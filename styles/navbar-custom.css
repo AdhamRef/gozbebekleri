@@ -1,0 +1,19 @@
+/* Add this CSS file and import it in your main CSS file or component */
+
+.nav-link {
+    @apply font-semibold text-slate-600 hover:text-primary transition-colors duration-200;
+  }
+  
+  .nav-button {
+    @apply transition-all duration-200 hover:shadow-md;
+  }
+  
+  .dropdown-content {
+    @apply animate-in fade-in-50 data-[side=bottom]:slide-in-from-top-1 data-[side=top]:slide-in-from-bottom-1;
+  }
+  
+  .avatar-menu-item {
+    @apply flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary transition-colors duration-200;
+  }
+  
+  

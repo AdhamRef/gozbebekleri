@@ -1,0 +1,57 @@
+{
+  "hero": {
+    "title": "أنشئ مواقع مذهلة بدون كود",
+    "subtitle": "CRAX: طريق النجاح",
+    "start": "ابدأ الآن",
+
+    "cta": {
+      "title": "جاهز لبناء موقع أحلامك؟",
+      "description": "انضم إلى آلاف الشركات التي تنشئ مواقع مذهلة باستخدام CRAX.",
+      "cta": "ابدأ الآن"
+    }
+  },
+  "features": {
+    "loadedWithFeatures": {
+      "title": "مزود بميزات قوية للمحترفين",
+      "description": "من القوالب القابلة للتخصيص إلى النشر السريع، CRAX يجعل بناء موقع ويب احترافي أمرًا سهلاً. مصمم لمساعدتك على الوصول إلى العملاء وتنمية أعمالك."
+    },
+    "createProfessionalWebsites": {
+      "title": "أنشئ مواقع ويب احترافية بسهولة",
+      "description": "قم ببناء مواقع ويب مذهلة للوكالات والمحترفين والشركات دون الحاجة إلى البرمجة، باستخدام واجهتنا البديهية."
+    },
+    "customizableTemplates": {
+      "title": "قوالب قابلة للتخصيص لكل صناعة",
+      "description": "اختر من بين القوالب المصممة خصيصًا للأطباء والمحامين والاستشاريين والمزيد للبدء بسرعة."
+    }
+  },
+  "Navigation": {
+    "features": "الميزات",
+    "templates": "القوالب",
+    "pricing": "التسعير",
+    "dashboard": "لوحة التحكم",
+    "websites": "مواقعي",
+    "settings": "الإعدادات",
+    "signIn": "تسجيل دخول",
+    "signOut": "تسجيل خروج",
+    "startBuilding": "ابدأ البناء",
+    "newWebsite": "موقع جديد"
+  },
+  "signIn": {
+    "title": "مرحبًا بعودتك!",
+    "subtitle": "تسجيل دخول إلى CRAX",
+    "emailPlaceholder": "projectmayhem@fc.com",
+    "passwordPlaceholder": "••••••••",
+    "signInButton": "تسجيل دخول →",
+    "orSignInWith": "تسجيل دخول باستخدام جوجل"
+  },
+  "signUp": {
+    "title": "مرحبًا بك في CRAX",
+    "subtitle": "اشترك، وابدأ رحلتك على الإنترنت.",
+    "firstNamePlaceholder": "تايلر",
+    "lastNamePlaceholder": "دوردن",
+    "emailPlaceholder": "projectmayhem@fc.com",
+    "passwordPlaceholder": "••••••••",
+    "signUpButton": "اشترك →",
+    "orSignUpWith": "جوجل"
+  }
+}

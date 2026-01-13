@@ -1,0 +1,7 @@
+.dropdownLink {position: relative; cursor: pointer;}
+.dropdownLink .dropdownHover {padding:8px 15px; color:black; font-weight: 600 ;}
+.dropdownHover:hover {color:#FFF !important; background:#08a883;}
+.dropdownLink:hover .dropdownHover {color:#FFF !important; background:#08a883;}
+.dropdownLink:hover > .dropdownMenuPanel {display:flex !important; opacity: 1; transition:all .5s; top: 40px; visibility: visible; }
+.dropdownMenuPanel {width:210px; padding:10px; background:#fff; border:1px solid #eee; border-radius: 5px; position:absolute; left:0; z-index: 10; display:flex; flex-direction: column; opacity: 1;  top: 130%; transition:all .5s; z-index: 10; opacity: 0; visibility: hidden}
+.dropdownMenuPanel a {padding:5px;}

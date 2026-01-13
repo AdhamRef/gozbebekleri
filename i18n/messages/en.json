@@ -1,0 +1,57 @@
+{
+  "hero": {
+    "title": "Create Stunning Websites Without Code",
+    "subtitle": "CRAX: Way to success",
+    "start": "Get your website",
+
+    "cta": {
+      "title": "Ready to Build Your Dream Website?",
+      "description": "Join thousands of businesses already creating stunning websites with CRAX.",
+      "cta": "Get Started"
+    }
+  },
+  "features": {
+    "loadedWithFeatures": {
+      "title": "Loaded with Powerful Features for Professionals",
+      "description": "From customizable templates to fast deployment, CRAX makes building a professional website effortless. Designed to help you reach clients and grow your business."
+    },
+    "createProfessionalWebsites": {
+      "title": "Create Professional Websites Easily",
+      "description": "Build stunning websites for agencies, professionals, and businesses without coding, using our intuitive interface."
+    },
+    "customizableTemplates": {
+      "title": "Customizable Templates for Every Industry",
+      "description": "Choose from industry-specific templates designed for doctors, lawyers, consultants, and more to start quickly."
+    }
+  },
+  "Navigation": {
+    "features": "Features",
+    "templates": "Templates",
+    "pricing": "Pricing",
+    "dashboard": "Dashboard",
+    "websites": "My Websites",
+    "settings": "Settings",
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "startBuilding": "Start Building",
+    "newWebsite": "New Website"
+  },
+  "signIn": {
+    "title": "Welcome Back!",
+    "subtitle": "Login to CRAX",
+    "emailPlaceholder": "projectmayhem@fc.com",
+    "passwordPlaceholder": "••••••••",
+    "signInButton": "Sign In →",
+    "orSignInWith": "Signin with Google"
+  },
+  "signUp": {
+    "title": "Welcome to CRAX",
+    "subtitle": "Signup, Start your journey online.",
+    "firstNamePlaceholder": "Tyler",
+    "lastNamePlaceholder": "Durden",
+    "emailPlaceholder": "projectmayhem@fc.com",
+    "passwordPlaceholder": "••••••••",
+    "signUpButton": "Sign up →",
+    "orSignUpWith": "Google"
+  }
+}
