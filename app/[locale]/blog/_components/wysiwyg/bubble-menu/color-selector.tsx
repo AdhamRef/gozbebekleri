@@ -40,7 +40,7 @@ const TEXT_COLORS: BubbleColorMenuItem[] = [
     color: "#008A00",
   },
   {
-    name: "Orange",
+    name: "sky",
     color: "#FFA500",
   },
   {
@@ -79,8 +79,8 @@ const HIGHLIGHT_COLORS: BubbleColorMenuItem[] = [
     color: "var(--editor-highlight-green)",
   },
   {
-    name: "Orange",
-    color: "var(--editor-highlight-orange)",
+    name: "sky",
+    color: "var(--editor-highlight-sky)",
   },
   {
     name: "Pink",

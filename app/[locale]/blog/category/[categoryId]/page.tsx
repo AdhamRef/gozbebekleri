@@ -6,6 +6,7 @@ import MainPage from "./_components/MainPage";
 
 interface CategoryProps {
   params: {
+    locale: string;
     categoryId: string;
   };
 }
@@ -15,12 +16,11 @@ export async function generateMetadata({ params }: CategoryProps): Promise<Metad
   // const locale = useLocale(); // Get the current locale (ar or en)
   const fetchCategoryData = async (): Promise<Category> => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://alafiya.org";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.org";
+      const locale = params.locale || 'ar';
       const response = await axios.get(
         `${baseUrl}/api/post-categories/${params.categoryId}`,
-        {
-          params: { lang: "ar" }, // Pass the locale to the API
-        }
+        { params: { locale } }
       );
       return response.data;
     } catch (error) {
@@ -46,7 +46,7 @@ export async function generateMetadata({ params }: CategoryProps): Promise<Metad
           alt: category.title,
         },
       ],
-      url: `https://alafiya.org/ar/categories/${params.categoryId}`,
+      url: `https://gozbebekleri.org/ar/categories/${params.categoryId}`,
       type: "website",
     },
     twitter: {
@@ -56,7 +56,7 @@ export async function generateMetadata({ params }: CategoryProps): Promise<Metad
       images: [category.image || "/default-category-bg.jpg"],
     },
     alternates: {
-      canonical: `https://alafiya.org/ar/categories/${params.categoryId}`,
+      canonical: `https://gozbebekleri.org/ar/categories/${params.categoryId}`,
     },
   };
 }

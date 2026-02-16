@@ -209,7 +209,7 @@ const CampaignCard = ({ campaign, isMain = false, index = 0 }) => {
                         </div>
                         <div className="flex flex-col">
                           <span className="text-base md:text-lg max-sm:text-sm font-bold group-hover/stat:text-rose-300 transition-colors">
-                            {getCurrency()}{" "}
+                            {getCurrency()}
                             {formatNumber(convertToCurrency(campaign.currentAmount).convertedValue)}
                           </span>
                           <span className="text-xs md:text-sm text-gray-300">تم جمعها</span>
@@ -236,7 +236,7 @@ const CampaignCard = ({ campaign, isMain = false, index = 0 }) => {
                         </div>
                         <div className="flex flex-col">
                           <span className="text-base md:text-lg max-sm:text-sm font-bold group-hover/stat:text-yellow-300 transition-colors">
-                            {getCurrency()}{" "}
+                            {getCurrency()}
                             {formatNumber(convertToCurrency(campaign.targetAmount - campaign.currentAmount).convertedValue)}
                           </span>
                           <span className="text-xs md:text-sm text-gray-300">متبقي</span>
@@ -278,13 +278,13 @@ const CampaignCard = ({ campaign, isMain = false, index = 0 }) => {
                   <div className="flex items-center justify-between text-sm text-gray-600">
                     <span className="font-bold text-xs md:text-sm text-emerald-700 flex items-center gap-1">
                       <Heart size={14} className="text-rose-500" />
-                      {getCurrency()}{" "}
+                      {getCurrency()}
                       {formatNumber(
                         convertToCurrency(campaign.currentAmount).convertedValue
                       )}
                     </span>
                     <span className="font-bold text-xs md:text-sm text-gray-700">
-                      {getCurrency()}{" "}
+                      {getCurrency()}
                       {formatNumber(
                         convertToCurrency(campaign.targetAmount).convertedValue
                       )}

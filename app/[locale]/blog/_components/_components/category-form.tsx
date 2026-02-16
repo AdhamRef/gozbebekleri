@@ -48,7 +48,8 @@ const CategoryForm: React.FC<CategoryFormProps> = ({
     const values = form.getValues(); // Get the form values
     console.log(values);
     try {
-      await axios.patch(`/api/posts/${postId}`, values);
+      const payload = { categoryId: values.category_id };
+      await axios.patch(`/api/posts/${postId}`, payload);
       toast.success("تم تحديث معلومات المقال");
       setIsEditing(false);
       router.refresh();

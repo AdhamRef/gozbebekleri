@@ -10,11 +10,13 @@ interface Category {
   name: string;
   description: string;
   image: string;
+  campaignCount?: number;
 }
 
 interface Props {
   params: {
     id: string;
+    locale: string;
   };
 }
 
@@ -22,8 +24,8 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const fetchCategoryData = async (): Promise<Category> => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://alafiya.org";
-      const response = await axios.get(`${baseUrl}/api/categories/${params.id}`);
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.org";
+      const response = await axios.get(`${baseUrl}/api/categories/${params.id}?locale=${params.locale}&counts=true`);
       return response.data;
     } catch (error) {
       console.error("Failed to fetch category data:", error);
@@ -47,7 +49,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           alt: category.name,
         },
       ],
-      url: `https://alafiya.org/ar/categories/${params.id}`,
+      url: `https://gozbebekleri.org/${params.locale}/categories/${params.id}`,
       type: "website",
     },
     twitter: {
@@ -57,13 +59,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images: [category.image || "/default-category.jpg"],
     },
     alternates: {
-      canonical: `https://alafiya.org/ar/categories/${params.id}`,
+      canonical: `https://gozbebekleri.org/${params.locale}/categories/${params.id}`,
     },
   };
 }
 
 const CategoryPage = ({ params }: Props) => {
-  return <MainPage id={params.id} />;
+  return <MainPage id={params.id} locale={params.locale} />;
 };
 
 export default CategoryPage;

@@ -1,7 +1,6 @@
 import { getMessages, unstable_setRequestLocale } from "next-intl/server";
 import { NextIntlClientProvider } from "next-intl";
 import type { Metadata } from "next";
-import { Poppins, Noto_Kufi_Arabic } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import { Toaster } from "react-hot-toast";
 import SessionProvider from "@/components/providers/SessionProvider";
@@ -9,28 +8,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../api/auth/[...nextauth]/options";
 import { ConfettiProvider } from "../../components/providers/confetti-provider";
 import Footer from "@/components/Footer";
-import "./globals.css";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 import { Analytics } from "@vercel/analytics/react"
 import { SpeedInsights } from "@vercel/speed-insights/next"
-import Head from "next/head"; // Import Head for manual font loading
-import Script from "next/script";
-
-// Configure the Poppins font for English text
-const poppins = Poppins({
-  weight: ["400", "500", "600", "700"],
-  subsets: ["latin"],
-  variable: "--font-poppins",
-  display: "swap", // Ensure fonts are swapped properly
-});
-
-// Configure Noto Kufi Arabic font for Arabic text
-const notoKufiArabic = Noto_Kufi_Arabic({
-  weight: ["400", "500", "600", "700"],
-  subsets: ["arabic"],
-  variable: "--font-arabic",
-  display: "swap", // Ensure fonts are swapped properly
-});
 
 // Global metadata
 export const metadata: Metadata = {
@@ -46,11 +26,11 @@ export const metadata: Metadata = {
   openGraph: {
     title: "فريق قرة العيون في رمضان 25 | قرة العيون",
     description: "منصة قرة العيون لجمع التبرعات للقضايا الإنسانية الطبية في سوريا. ساعدنا في إحداث فرق في حياة المحتاجين.",
-    url: "https://www.sandooq-alafiya.org", // Replace with your actual domain
+    url: "https://www.sandooq-gozbebekleri.org", // Replace with your actual domain
     siteName: "قرة العيون",
     images: [
       {
-        url: "https://alafiya.org/og-image.jpg", // Replace with your actual OG image
+        url: "https://gozbebekleri.org/og-image.jpg", // Replace with your actual OG image
         width: 1200,
         height: 630,
         alt: "قرة العيون",
@@ -63,10 +43,10 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "فريق قرة العيون في رمضان 25 | قرة العيون",
     description: "منصة قرة العيون لجمع التبرعات للقضايا الإنسانية الطبية في سوريا. ساعدنا في إحداث فرق في حياة المحتاجين.",
-    images: ["https://www.sandooq-alafiya.org/og-image.jpg"], // Replace with your actual OG image
+    images: ["https://www.sandooq-gozbebekleri.org/og-image.jpg"], // Replace with your actual OG image
   },
   alternates: {
-    canonical: "https://www.alafiya.org", // Replace with your actual domain
+    canonical: "https://www.gozbebekleri.org", // Replace with your actual domain
   },
 };
 
@@ -84,39 +64,20 @@ export default async function Rootlayout({
   const dir = locale === "ar" ? "rtl" : "ltr";
 
   return (
-    <html lang={locale || "ar"} dir={dir} suppressHydrationWarning>
-      <Head>
-        {/* Manually load Google Fonts */}
-        <link
-          href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-        {/* Font Awesome Kit */}
-      </Head>
-        <Script src="https://kit.fontawesome.com/e895f0e5f8.js" crossOrigin="anonymous" strategy="afterInteractive" />
-      <body
-        className={`${poppins.variable} ${notoKufiArabic.variable} font-arabic antialiased`}
-      >
-        <NextIntlClientProvider messages={messages} locale={locale || "ar"}>
-          <CurrencyProvider>
-            <SessionProvider session={session}>
-              <Navbar />
-              <main dir={dir}>
-                {children}
-              </main>
-              <Footer />
-              <ConfettiProvider />
-              <Toaster position="top-center" />
-            </SessionProvider>
-          </CurrencyProvider>
-        </NextIntlClientProvider>
-      </body>
-        <Analytics/>
-        <SpeedInsights/>
-    </html>
+    <NextIntlClientProvider messages={messages} locale={locale || "ar"}>
+      <CurrencyProvider>
+        <SessionProvider session={session}>
+          <Navbar />
+          <main dir={dir} className="pt-20 lg:pt-32">
+            {children}
+          </main>
+          <Footer />
+          <ConfettiProvider />
+          <Toaster position="top-center" />
+        </SessionProvider>
+      </CurrencyProvider>
+      <Analytics />
+      <SpeedInsights />
+    </NextIntlClientProvider>
   );
 }

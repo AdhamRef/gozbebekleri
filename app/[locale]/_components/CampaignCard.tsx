@@ -20,7 +20,7 @@ const CampaignCard = ({ campaign, onClick }) => {
           alt={campaign.title}
           className="w-full h-full object-cover"
         />
-        <div className="absolute top-3 right-3 bg-orange-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+        <div className="absolute top-3 right-3 bg-sky-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
           {progress.toFixed(0)}%
         </div>
         <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-gray-700 shadow-md">
@@ -36,7 +36,7 @@ const CampaignCard = ({ campaign, onClick }) => {
         <div className="mb-4">
           <div className="flex justify-between text-sm mb-2">
             <span className="text-gray-700">
-              <span className="font-bold text-orange-600">
+              <span className="font-bold text-sky-600">
                 {formatNumber(campaign.currentAmount)} ₺
               </span>
               {" "}تبرعات
@@ -50,7 +50,7 @@ const CampaignCard = ({ campaign, onClick }) => {
           </div>
           <div className="w-full bg-gray-100 rounded-full h-2">
             <div
-              className="bg-gradient-to-r from-orange-500 to-orange-600 h-2 rounded-full transition-all duration-500 shadow-sm"
+              className="bg-gradient-to-r from-sky-500 to-sky-600 h-2 rounded-full transition-all duration-500 shadow-sm"
               style={{ width: `${Math.min(progress, 100)}%` }}
             />
           </div>
@@ -61,7 +61,7 @@ const CampaignCard = ({ campaign, onClick }) => {
             <Clock className="w-4 h-4" />
             {campaign.daysLeft} يوم متبقي
           </span>
-          <span className="bg-orange-50 text-orange-700 px-2 py-1 rounded-full font-medium">
+          <span className="bg-sky-50 text-sky-700 px-2 py-1 rounded-full font-medium">
             {campaign.category}
           </span>
         </div>

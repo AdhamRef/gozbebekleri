@@ -22,6 +22,7 @@ import { useDebounce } from "use-debounce";
 import { Switch } from "@/components/ui/switch";
 import { useSession } from "next-auth/react";
 import SignInDialog from "@/components/SignInDialog";
+import { useLocale, useTranslations } from "next-intl";
 
 interface Campaign {
   id: string;
@@ -30,10 +31,12 @@ interface Campaign {
   description: string;
   currentAmount: number;
   targetAmount: number;
+  isActive?: boolean;
+  categoryId?: string;
   category: {
     id?: string;
     name: string;
-    icon: string;
+    icon?: string;
   };
   createdAt: string;
 }
@@ -41,7 +44,8 @@ interface Campaign {
 interface Category {
   id: string;
   name: string;
-  icon: string;
+  icon?: string;
+  campaignCount?: number;
 }
 
 interface FilterState {
@@ -51,6 +55,7 @@ interface FilterState {
 }
 
 const CampaignsPage = () => {
+  const t = useTranslations("CampaignsPage");
   const { data: session } = useSession();
   const [isSignInOpen, setIsSignInOpen] = useState(false);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -71,6 +76,9 @@ const CampaignsPage = () => {
   const [cursor, setCursor] = useState<string | null>(null);
   const ITEMS_PER_PAGE = 12;
 
+  // Locale from route
+  const locale = useLocale() as string;
+
   const fetchData = async (cursorParam?: string | null) => {
     try {
       setIsLoadingMore(true);
@@ -81,6 +89,7 @@ const CampaignsPage = () => {
                 cursor: cursorParam,
                 limit: ITEMS_PER_PAGE,
                 search: debouncedSearch,
+                locale,
                 ...filters,
               },
             })
@@ -89,20 +98,23 @@ const CampaignsPage = () => {
                 cursor: cursorParam,
                 limit: ITEMS_PER_PAGE,
                 search: debouncedSearch,
+                locale,
                 ...filters,
               },
             }),
         !categories.length
-          ? axios.get("/api/categories")
-          : Promise.resolve({ data: categories }),
+          ? axios.get("/api/categories", { params: { locale, counts: true, limit: 100 } })
+          : Promise.resolve({ data: { items: categories } }),
       ]);
 
-      const newCampaigns = campaignsRes.data.items.map(
+      const campaignsItems = campaignsRes.data.items || campaignsRes.data;
+
+      const newCampaigns = (campaignsItems as Campaign[]).map(
         (campaign: Campaign) => ({
           ...campaign,
           category: {
             ...campaign.category,
-            id: campaign.categoryId || selectedCategory,
+            id: campaign.category?.id || campaign.categoryId || selectedCategory,
           },
         })
       );
@@ -113,11 +125,13 @@ const CampaignsPage = () => {
         setCampaigns(newCampaigns);
       }
 
-      setHasMore(campaignsRes.data.hasMore);
-      setCursor(campaignsRes.data.nextCursor);
+      setHasMore(Boolean(campaignsRes.data.hasMore));
+      setCursor(campaignsRes.data.nextCursor || null);
 
-      if (categoriesRes.data && !categories.length) {
-        setCategories(categoriesRes.data);
+      // categoriesRes may return { items: [...] } or an array directly
+      const catData = categoriesRes.data.items || categoriesRes.data;
+      if (catData && !categories.length) {
+        setCategories(catData as Category[]);
       }
     } catch (err) {
       console.error("Error fetching campaigns:", err);
@@ -188,15 +202,15 @@ const CampaignsPage = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-white py-16">
+      <div className="min-h-screen bg-gradient-to-br from-sky-50 to-white py-16">
         <div className="max-w-2xl mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold text-gray-800 mb-4">حدث خطأ</h2>
+          <h2 className="text-3xl font-bold text-gray-800 mb-4">{t("error")}</h2>
           <p className="text-gray-600 mb-8">{error}</p>
           <Button
             onClick={() => window.location.reload()}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-sky-600 hover:bg-sky-700"
           >
-            إعادة المحاولة
+            {t("retry")}
           </Button>
         </div>
       </div>
@@ -209,7 +223,7 @@ const CampaignsPage = () => {
         isOpen={isSignInOpen}
         onClose={() => setIsSignInOpen(false)}
       />
-      <div className="relative bg-gradient-to-br from-emerald-50 via-white to-emerald-50">
+      <div className="relative bg-gradient-to-br from-sky-50 via-white to-sky-50">
         <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-10" />
         <div className="absolute bottom-0 left-0 right-0">
           <svg
@@ -235,7 +249,7 @@ const CampaignsPage = () => {
           }}
         >
           {/* Add dark overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br to-black/85 from-emerald-700/85 z-10" />
+          <div className="absolute inset-0 bg-gradient-to-br to-black/85 from-sky-700/85 z-10" />
 
           {/* Content container - increased z-index to appear above overlay */}
           <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-6 pt-6 pb-14 sm:py-16 lg:py-20">
@@ -246,10 +260,10 @@ const CampaignsPage = () => {
               className="text-center mb-8 sm:mb-12"
             >
               <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4">
-                تصفح{" "}
+                {t("browse")}{" "}
                 <span className="relative">
-                  <span className="relative z-10 bg-gradient-to-r from-green-400 to-emerald-300 text-transparent bg-clip-text">
-                    الحملات
+                  <span className="relative z-10 bg-gradient-to-r from-green-400 to-sky-300 text-transparent bg-clip-text">
+                    {t("campaigns")}
                   </span>
                   {/* <svg className="absolute -bottom-0 left-0 w-full" viewBox="0 0 100 20" preserveAspectRatio="none">
                 <path d="M0,10 Q50,20 100,10 L100,20 L0,20 Z" fill="rgba(16, 185, 129, 0.2)"/>
@@ -257,7 +271,7 @@ const CampaignsPage = () => {
                 </span>
               </h1>
               <p className="text-base sm:text-xl text-stone-100 max-w-2xl mx-auto px-4">
-                اكتشف الحملات الخيرية وساهم في دعم المحتاجين
+                {t("pageDescription")}
               </p>
             </motion.div>
 
@@ -268,13 +282,13 @@ const CampaignsPage = () => {
               className="flex gap-4 items-center max-w-2xl mx-auto"
             >
               <div className="relative flex-1 w-full sm:w-auto group">
-                <div className="absolute inset-0 bg-emerald-200/30 rounded-lg blur-xl group-hover:blur-2xl transition-all duration-300 opacity-0 group-hover:opacity-100" />
+                <div className="absolute inset-0 bg-sky-200/30 rounded-lg blur-xl group-hover:blur-2xl transition-all duration-300 opacity-0 group-hover:opacity-100" />
                 <Input
                   type="text"
                   placeholder="ابحث عن حملة..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-white/90 backdrop-blur-sm rounded-lg text-lg placeholder:text-gray-500 focus:ring-2 focus:ring-emerald-500 shadow-sm border transition-all duration-300"
+                  className="w-full pl-12 pr-4 py-3 bg-white/90 backdrop-blur-sm rounded-lg text-lg placeholder:text-gray-500 focus:ring-2 focus:ring-sky-500 shadow-sm border transition-all duration-300"
                 />
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
               </div>
@@ -284,7 +298,7 @@ const CampaignsPage = () => {
                   <Button
                     variant="outline"
                     size="icon"
-                    className="relative hover:bg-emerald-50 transition-colors duration-300"
+                    className="relative hover:bg-sky-50 transition-colors duration-300"
                   >
                     <Filter className="h-5 w-5" />
                     {Object.values(filters).some(
@@ -297,18 +311,18 @@ const CampaignsPage = () => {
                       <motion.span
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
-                        className="absolute -top-1 -right-1 h-3 w-3 bg-emerald-500 rounded-full"
+                        className="absolute -top-1 -right-1 h-3 w-3 bg-sky-500 rounded-full"
                       />
                     )}
                   </Button>
                 </SheetTrigger>
                 <SheetContent>
                   <SheetHeader>
-                    <SheetTitle>خيارات التصفية</SheetTitle>
+                    <SheetTitle>{t("filterOptions")}</SheetTitle>
                   </SheetHeader>
                   <div className="mt-6 space-y-6">
                     <div>
-                      <h3 className="text-sm font-medium mb-3">ترتيب حسب</h3>
+                      <h3 className="text-sm font-medium mb-3">{t("sortBy")}</h3>
                       <select
                         value={filters.sortBy}
                         onChange={(e) =>
@@ -316,21 +330,21 @@ const CampaignsPage = () => {
                         }
                         className="w-full rounded-md border border-gray-300 p-2"
                       >
-                        <option value="newest">الأحدث</option>
-                        <option value="amount-high">المبلغ (الأعلى)</option>
-                        <option value="amount-low">المبلغ (الأقل)</option>
-                        <option value="progress">نسبة الإنجاز</option>
+                        <option value="newest">{t("newest")}</option>
+                        <option value="amount-high">{t("amountHigh")}</option>
+                        <option value="amount-low">{t("amountLow")}</option>
+                        <option value="progress">{t("progress")}</option>
                       </select>
                     </div>
 
                     <div>
                       <h3 className="text-sm font-medium mb-3">
-                        نطاق المبلغ المستهدف
+                        {t("targetAmountRange")}
                       </h3>
                       <div className="flex flex-col sm:flex-row gap-4">
                         <div className="flex-1">
                           <label className="text-xs text-gray-500">
-                            الحد الأدنى ($)
+                            {t("minAmount")}
                           </label>
                           <input
                             type="number"
@@ -346,7 +360,7 @@ const CampaignsPage = () => {
                         </div>
                         <div className="flex-1">
                           <label className="text-xs text-gray-500">
-                            الحد الأقصى ($)
+                            {t("maxAmount")}
                           </label>
                           <input
                             type="number"
@@ -397,16 +411,16 @@ const CampaignsPage = () => {
                 <TabsList className="h-16 bg-transparent w-full flex flex-wrap gap-2">
                   <TabsTrigger
                     value="all"
-                    className="flex w-max items-center gap-2 text-stone-100 data-[state=active]:bg-emerald-400/35 data-[state=active]:backdrop-blur-sm data-[state=active]:text-white transition-all duration-300"
+                    className="flex w-max items-center gap-2 text-stone-100 data-[state=active]:bg-sky-400/35 data-[state=active]:backdrop-blur-sm data-[state=active]:text-white transition-all duration-300"
                   >
-                    <HandHeart className="w-4 h-4 text-emerald-600" /> كل
-                    الحملات
+                    <HandHeart className="w-4 h-4 text-sky-600" />{" "}
+                    {t("allCampaigns")}
                   </TabsTrigger>
                   {categories.map((category) => (
                     <TabsTrigger
                       key={category.id}
                       value={category.id}
-                      className="flex w-max items-center gap-2 text-stone-100 data-[state=active]:bg-emerald-400/35 data-[state=active]:backdrop-blur-sm data-[state=active]:text-white transition-all duration-300"
+                      className="flex w-max items-center gap-2 text-stone-100 data-[state=active]:bg-sky-400/35 data-[state=active]:backdrop-blur-sm data-[state=active]:text-white transition-all duration-300"
                     >
                       <span
                         className="w-4 h-4"
@@ -435,6 +449,7 @@ const CampaignsPage = () => {
             >
               <Link
                 href={`/campaign/${campaign.id}`}
+                prefetch={true}
                 className="block bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300"
               >
                 <div className="relative overflow-hidden">
@@ -471,19 +486,19 @@ const CampaignsPage = () => {
                     <div className="flex justify-between text-sm text-gray-700 mb-2">
                       <span>
                         <span className="font-semibold">
-                          {getCurrency()}{" "}
+                          {getCurrency()}
                           {formatNumber(
                             convertToCurrency(
                               Math.round(campaign.currentAmount)
                             ).convertedValue
                           )}
                         </span>{" "}
-                        تبرعات
+                        {t("donations")}
                       </span>
                       <span>
-                        تبقى{" "}
+                        {t("remaining")}{" "}
                         <span className="font-semibold">
-                          {getCurrency()}{" "}
+                          {getCurrency()}
                           {formatNumber(
                             convertToCurrency(Math.round(campaign.targetAmount))
                               .convertedValue
@@ -493,7 +508,7 @@ const CampaignsPage = () => {
                     </div>
                     <div className="w-full bg-gray-100 rounded-full h-3">
                       <div
-                        className="bg-emerald-500 h-3 rounded-full"
+                        className="bg-sky-500 h-3 rounded-full"
                         style={{
                           width: `${Math.min(
                             (campaign.currentAmount / campaign.targetAmount) *
@@ -519,7 +534,7 @@ const CampaignsPage = () => {
             <Button
               onClick={loadMore}
               disabled={isLoadingMore}
-              className="bg-emerald-600 hover:bg-emerald-700 px-8 py-6 rounded-xl transform hover:scale-105 transition-all duration-300"
+              className="bg-sky-600 hover:bg-sky-700 px-8 py-6 rounded-xl transform hover:scale-105 transition-all duration-300"
             >
               {isLoadingMore ? (
                 <span className="flex items-center gap-2">
@@ -535,7 +550,7 @@ const CampaignsPage = () => {
 
         {isLoadingMore && (
           <div className="text-center mt-8">
-            <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mx-auto" />
+            <Loader2 className="w-12 h-12 text-sky-500 animate-spin mx-auto" />
           </div>
         )}
 
@@ -543,13 +558,13 @@ const CampaignsPage = () => {
           <div className="text-center py-12">
             <h3 className="text-2xl font-bold text-gray-800 mb-2">
               {searchQuery
-                ? "لم يتم العثور على نتائج للبحث"
-                : "لا توجد حملات متاحة حالياً"}
+                ? t("noResults")
+                : t("noCampaigns")}
             </h3>
             <p className="text-gray-600">
               {searchQuery
-                ? "جرب استخدام كلمات بحث مختلفة"
-                : "يمكنك العودة لاحقاً لمشاهدة الحملات الجديدة"}
+                ? t("tryDifferentSearch")
+                : t("checkBackLater")}
             </p>
           </div>
         )}

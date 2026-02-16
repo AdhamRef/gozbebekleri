@@ -255,7 +255,7 @@ const BlogEditor = ({ post, userId, categories }) => {
         image: data.image,
         description: data.description,
         content: content,
-        category_id: data.categoryId,
+        categoryId: data.categoryId,
       });
 
       // Success handling
@@ -297,8 +297,8 @@ const BlogEditor = ({ post, userId, categories }) => {
       <Form {...form}>
         <form onSubmit={onSubmit} className="space-y-8">
           {/* Cards and form fields */}
-          <Card className="max-w-2xl">
-            <CardHeader>
+          <Card className="">
+            <CardHeader dir="rtl">
               <CardTitle>{protectedEditorConfig.generalTitle}</CardTitle>
               <CardDescription>
                 {protectedEditorConfig.generalDescription}
@@ -311,8 +311,8 @@ const BlogEditor = ({ post, userId, categories }) => {
           </Card>
 
           {/* Category */}
-          <Card className="max-w-2xl">
-            <CardHeader>
+          <Card className="">
+            <CardHeader dir="rtl">
               <CardTitle>{protectedEditorConfig.categoryTitle}</CardTitle>
               <CardDescription>
                 {protectedEditorConfig.categoryDescription}
@@ -329,8 +329,8 @@ const BlogEditor = ({ post, userId, categories }) => {
           </Card>
 
           {/* Cover Image */}
-          <Card className="max-w-2xl">
-            <CardHeader>
+          <Card className="">
+            <CardHeader dir="rtl">
               <CardTitle>{protectedEditorConfig.coverImageTitle}</CardTitle>
               <CardDescription>
                 {protectedEditorConfig.coverImageDescription}
@@ -343,8 +343,8 @@ const BlogEditor = ({ post, userId, categories }) => {
           </Card>
 
           {/* Short Description */}
-          <Card className="max-w-2xl">
-            <CardHeader>
+          <Card className="">
+            <CardHeader dir="rtl">
               <CardTitle>
                 {protectedEditorConfig.shortDescriptionTitle}
               </CardTitle>

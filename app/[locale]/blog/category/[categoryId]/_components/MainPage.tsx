@@ -24,12 +24,7 @@ const MainPage: React.FC<CategoryProps> = ({ id }:{id:string}) => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get<any>(
-          `/api/post-categories/${id}`,
-          {
-            params: { lang: locale }, // Pass the locale to the API
-          }
-        );
+        const response = await axios.get<any>(`/api/post-categories/${id}`, { params: { locale } });
         setCategory(response.data);
       } catch (err: unknown) {
         console.error("Error fetching data:", err);
@@ -44,7 +39,7 @@ const MainPage: React.FC<CategoryProps> = ({ id }:{id:string}) => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-emerald-600"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-sky-600"></div>
       </div>
     );
   }
@@ -68,7 +63,7 @@ const MainPage: React.FC<CategoryProps> = ({ id }:{id:string}) => {
         className="relative bg-cover bg-center text-white py-24 overflow-hidden shadow-md"
         style={{
           backgroundImage: `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url(${
-            category.image || "/default-category-bg.jpg"
+            category.image || "/colorfulbg.webp"
           })`,
           backgroundBlendMode: "multiply",
         }}
@@ -83,7 +78,7 @@ const MainPage: React.FC<CategoryProps> = ({ id }:{id:string}) => {
                 <h1 className="text-5xl font-extrabold tracking-tight leading-tight drop-shadow-lg">
                   {category.title}
                 </h1>
-                <blockquote className="text-xl border-b-4 border-emerald-300 pb-4 max-w-3xl mx-auto">
+                <blockquote className="text-xl border-b-4 border-sky-300 pb-4 max-w-3xl mx-auto">
                   {category.description}
                 </blockquote>
               </div>

@@ -5,11 +5,10 @@ import SignInDialog from "@/components/SignInDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCurrency } from "@/context/CurrencyContext";
-import { formatNumber } from "@/hooks/formatNumber";
-import { getCurrency } from "@/hooks/useCampaignValue";
 import { Award, Clock, Gift, HandCoins, HandHeart, Share2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import React, { useState } from "react";
+import { useTranslations, useLocale } from "next-intl";
 
 interface DonationSidebarProps {
   campaign: any;
@@ -17,12 +16,53 @@ interface DonationSidebarProps {
 }
 
 const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarProps) => {
+  const t = useTranslations("Campaign");
+  const locale = useLocale() as "ar" | "en" | "fr";
   const { data: session } = useSession();
   const { convertToCurrency } = useCurrency();
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isDonationOpen, setIsDonationOpen] = useState(false);
   const [isSignInOpen, setIsSignInOpen] = useState(false);
-  
+
+  // Helper function to get locale-specific property
+  const getLocalizedProperty = (obj: any, key: string) => {
+    const localeKey = `${key}${locale.charAt(0).toUpperCase() + locale.slice(1)}`;
+    return obj[localeKey] || obj[key] || "";
+  };
+
+  const formatMoney = (n: number) => {
+    const r = convertToCurrency(n);
+    if (r?.convertedValue != null && r?.currency) {
+      const sym =
+        r.currency === "USD"
+          ? "$"
+          : r.currency === "EUR"
+            ? "€"
+            : r.currency === "GBP"
+              ? "£"
+              : r.currency === "TRY"
+                ? "₺"
+                : r.currency;
+      const val =
+        typeof r.convertedValue === "number"
+          ? r.convertedValue.toLocaleString(undefined, {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0,
+            })
+          : "0";
+      return sym + " " + val;
+    }
+    return (
+      "$" +
+      (typeof n === "number"
+        ? n.toLocaleString(undefined, {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+          })
+        : "0")
+    );
+  };
+
   const handleDonate = () => {
     setIsDonationOpen(true);
   };
@@ -42,15 +82,15 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
           isOpen={isShareOpen}
           onClose={() => setIsShareOpen(false)}
           url={shareUrl}
-          title={campaign.title}
-          description={campaign.description}
+          title={getLocalizedProperty(campaign, "title")}
+          description={getLocalizedProperty(campaign, "description")}
           image={campaign.images[0]}
         />
 
         <DonationDialog
           isOpen={isDonationOpen}
           onClose={() => setIsDonationOpen(false)}
-          campaignTitle={campaign.title}
+          campaignTitle={getLocalizedProperty(campaign, "title")}
           campaignImage={campaign.images[0]}
           targetAmount={campaign.targetAmount}
           amountRaised={campaign.amountRaised}
@@ -69,21 +109,15 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
               <div className="flex lg:flex-col gap-4">
                 <div className="flex items-center gap-2">
                   <span className="text-lg font-bold text-gray-900">
-                    {getCurrency()}{" "}
-                    {formatNumber(
-                      convertToCurrency(campaign.currentAmount).convertedValue
-                    )}
+                    {formatMoney(campaign.currentAmount)}
                   </span>
                   <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-md">
-                    من {getCurrency()}{" "}
-                    {formatNumber(
-                      convertToCurrency(campaign.targetAmount).convertedValue
-                    )}
+                    {t("from")} {formatMoney(campaign.targetAmount)}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-600">
                   <HandHeart className="w-4 h-4" />
-                  <span>{campaign.donationCount} متبرع</span>
+                  <span>{campaign.donationCount} {t("donor")}</span>
                 </div>
               </div>
 
@@ -101,7 +135,7 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
                   <path
                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                     fill="none"
-                    stroke="#FA5D17"
+                    stroke="#0EA5E9"
                     strokeWidth="3"
                     strokeLinecap="round"
                     strokeDasharray={`${campaign.progress}, 100`}
@@ -120,18 +154,18 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
               {session ? (
                 <Button
                   onClick={handleDonate}
-                  className="flex-1 flex gap-2 bg-gradient-to-r from-orange-600 to-amber-600 hover:opacity-90 text-white font-semibold py-3 text-base rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                  className="flex-1 flex gap-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:opacity-90 text-white font-semibold py-3 text-base rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
                 >
                   <HandCoins className="w-5 h-5" />
-                  تبرع الآن
+                  {t("donateNow")}
                 </Button>
               ) : (
                 <Button
                   onClick={() => setIsSignInOpen(true)}
-                  className="flex-1 flex gap-2 bg-gradient-to-r from-orange-600 to-amber-600 hover:opacity-90 text-white font-semibold py-3 text-base rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                  className="flex-1 flex gap-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:opacity-90 text-white font-semibold py-3 text-base rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
                 >
                   <HandCoins className="w-5 h-5" />
-                  تبرع الآن
+                  {t("donateNow")}
                 </Button>
               )}
               <Button
@@ -155,15 +189,15 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
         isOpen={isShareOpen}
         onClose={() => setIsShareOpen(false)}
         url={shareUrl}
-        title={campaign.title}
-        description={campaign.description}
+        title={getLocalizedProperty(campaign, "title")}
+        description={getLocalizedProperty(campaign, "description")}
         image={campaign.images[0]}
       />
 
       <DonationDialog
         isOpen={isDonationOpen}
         onClose={() => setIsDonationOpen(false)}
-        campaignTitle={campaign.title}
+        campaignTitle={getLocalizedProperty(campaign, "title")}
         campaignImage={campaign.images[0]}
         targetAmount={campaign.targetAmount}
         amountRaised={campaign.amountRaised}
@@ -183,22 +217,16 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
               <div className="flex items-start justify-between mb-1">
                 <div className="flex flex-col gap-2">
                   <h2 className="text-[2rem] font-bold text-gray-900 leading-none">
-                    {getCurrency()}{" "}
-                    {formatNumber(
-                      convertToCurrency(campaign.currentAmount).convertedValue
-                    )}
+                    {formatMoney(campaign.currentAmount)}
                   </h2>
                   <div className="flex items-center gap-2">
                     <p className="text-white bg-primary px-2 py-1 rounded-md text-sm font-medium">
-                      من أصل هدف {getCurrency()}{" "}
-                      {formatNumber(
-                        convertToCurrency(campaign.targetAmount).convertedValue
-                      )}
+                      {t("outOfGoal")} {formatMoney(campaign.targetAmount)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-stone-800">
                     <HandHeart className="w-5 h-5" />
-                    {campaign.donationCount} شخصا تبرعوا للتو لدعم هذة الحالة
+                    {campaign.donationCount} {t("peopleDonated")}
                   </div>
                 </div>
                 <div className="relative w-16 h-16">
@@ -217,7 +245,7 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
                     a 15.9155 15.9155 0 0 1 0 31.831
                     a 15.9155 15.9155 0 0 1 0 -31.831"
                       fill="none"
-                      stroke="#FA5D17"
+                      stroke="#0EA5E9"
                       strokeWidth="3"
                       strokeLinecap="round"
                       strokeDasharray={`${campaign.progress}, 100`}
@@ -237,29 +265,36 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
             </div>
 
             <div className="space-y-3">
-              {session ? (
-                <Button
+            <Button
                   onClick={handleDonate}
-                  className="flex gap-2 w-full bg-gradient-to-r from-orange-600 to-amber-600 hover:opacity-90 text-white font-semibold py-6 text-lg rounded-md transition-all duration-200 shadow-md hover:shadow-lg"
+                  className="flex gap-2 w-full bg-gradient-to-r from-sky-600 to-indigo-600 hover:opacity-90 text-white font-semibold py-6 text-lg rounded-md transition-all duration-200 shadow-md hover:shadow-lg"
                 >
                   <HandCoins className="w-5 h-5" />
-                  تبرع الآن
+                  {t("donateNow")}
+                </Button>
+              {/* {session ? (
+                <Button
+                  onClick={handleDonate}
+                  className="flex gap-2 w-full bg-gradient-to-r from-sky-600 to-indigo-600 hover:opacity-90 text-white font-semibold py-6 text-lg rounded-md transition-all duration-200 shadow-md hover:shadow-lg"
+                >
+                  <HandCoins className="w-5 h-5" />
+                  {t("donateNow")}
                 </Button>
               ) : (
                 <Button
                   onClick={() => setIsSignInOpen(true)}
-                  className="flex gap-2 w-full bg-gradient-to-r from-orange-600 to-amber-600 hover:opacity-90 text-white font-semibold py-6 text-lg rounded-md transition-all duration-200 shadow-md hover:shadow-lg"
+                  className="flex gap-2 w-full bg-gradient-to-r from-sky-600 to-indigo-600 hover:opacity-90 text-white font-semibold py-6 text-lg rounded-md transition-all duration-200 shadow-md hover:shadow-lg"
                 >
                   <HandCoins className="w-5 h-5" />
-                  تبرع الآن
+                  {t("donateNow")}
                 </Button>
-              )}
+              )} */}
               <Button
                 onClick={handleShare}
                 className="flex gap-2 w-full bg-primary hover:bg-slate-800 text-white font-semibold py-6 text-lg rounded-md border-0 transition-all duration-200 shadow-md hover:shadow-lg"
               >
                 <Share2 className="w-5 h-5" />
-                مشاركة
+                {t("share")}
               </Button>
             </div>
           </CardContent>

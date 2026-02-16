@@ -20,7 +20,7 @@ import { defaultEditorProps } from "./props";
 
 export default function WysiwygEditor({
   isEditable = true,
-  className = "relative w-full focus:ring-orange-600 focus:outline-8 max-w-screen-lg border-stone-200 bg-white sm:mb-[calc(20vh)] sm:rounded-lg sm:border sm:shadow-lg",
+  className = "relative w-full focus:ring-sky-600 focus:outline-8 max-w-screen-lg border-stone-200 bg-white sm:mb-[calc(20vh)] sm:rounded-lg sm:border sm:shadow-lg",
   defaultValue = defaultEditorContent,
   onDebouncedUpdate = () => {},
   debounceDuration = 750,

@@ -3,7 +3,7 @@ import Image from "next/image";
 
 const sections = [
   {
-    title: "عن العافية",
+    title: "عن قرة العيون",
     description: "تنمية قدرات الفرد، وتوفير الدعم لمستحقيه من أجل مجتمع أفضل.",
     image: "/who-are-us.jpg", // استبدل بمسار الصورة الفعلي
     link: "/about-us",

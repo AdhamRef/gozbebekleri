@@ -19,7 +19,7 @@ if(dil=="tr"){
         <Container maxW={1200}>
             
         <Heading as='h1' size='xl' noOfLines={1} color={'#b12120'} fontWeight={600} textAlign={'center'}>
-        Devamlı bir bağışın... <span style={{color:'orange'}}>olması için.</span>
+        Devamlı bir bağışın... <span style={{color:'sky'}}>olması için.</span>
         </Heading>
 
         <Flex direction={'column'} style={{margin:'40px 0px'}}>
@@ -45,7 +45,7 @@ if(dil=="tr"){
                     <Image src={'/duzenlibagis/kesintininfaydasi1.png'} height={'137px'} />
                 </Flex>
                 <Flex flex={1}  width={'45%'} direction={'row'} bg={'#f7f7f7'} padding={8}>
-                    <Text fontSize={18}>{"Görevimiz olan Kudüs ve Mescid-i Aksa’ya yönelik sorumluluklarımızı yerine getirerek Peygamber Efendimizin vasiyetine bir kandil yağ hediye edelim"}</Text>
+                    <Text fontSize={18}>{"Görevimiz olan Kudüs ve Mescid-i Aksa’ya yönelik sorumluluklarımızı yerine getirerek Peygindigo Efendimizin vasiyetine bir kandil yağ hediye edelim"}</Text>
                     <Image src={'/duzenlibagis/kesintininfaydasi2.png'} height={'137px'} />
                 </Flex>
             </Flex>
@@ -78,7 +78,7 @@ if(dil=="en"){
       <main className='duzenlibagissayfa' style={{margin:'60px 0px'}}>
           <Container maxW={1200}>
           <Heading as='h1' size='xl' noOfLines={1} color={'#b12120'} fontWeight={600} textAlign={'center'}>
-          Let there be for you... <span style={{color:'orange'}}>continuous generosity.</span>
+          Let there be for you... <span style={{color:'sky'}}>continuous generosity.</span>
           </Heading>
           <Flex direction={'column'} style={{margin:'40px 0px'}}>
             <AylikBagisForm />
@@ -133,7 +133,7 @@ if(dil=="en"){
       <main className='duzenlibagissayfa' style={{margin:'60px 0px'}}>
           <Container maxW={1200}>
           <Heading as='h1' size='xl' noOfLines={1} color={'#b12120'} fontWeight={600} textAlign={'center'}>
-          <span style={{color:'orange'}}>ليكن لك </span> ، عطاء مستمر 
+          <span style={{color:'sky'}}>ليكن لك </span> ، عطاء مستمر 
           </Heading>
           
           <Flex direction={'column'} style={{margin:'40px 0px'}}>

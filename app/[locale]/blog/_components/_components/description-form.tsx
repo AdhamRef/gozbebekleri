@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Post } from "@prisma/client";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import React from "react";
 
 interface DescriptionFormProps {
   initialData: Post;
@@ -45,15 +46,18 @@ const DescriptionForm: React.FC<DescriptionFormProps> = ({
     descriptionAR: z.string().min(1, {
       message: "الوصف بالعربية مطلوب",
     }),
-    descriptionEN: z.string().min(1, {
-      message: "English description is required",
-    }),
+    descriptionEN: z.string().optional(),
+    descriptionFR: z.string().optional(),
   });
 
-  // Map initial data to new structure
+  // Map initial data to new structure, prefer translations
+  const trEn = Array.isArray(initialData?.translations) ? initialData.translations.find((t:any) => t.locale === 'en') : null;
+  const trFr = Array.isArray(initialData?.translations) ? initialData.translations.find((t:any) => t.locale === 'fr') : null;
+
   const mappedInitialData = {
     descriptionAR: initialData?.descriptionAR || initialData?.description || "",
-    descriptionEN: initialData?.descriptionEN || "",
+    descriptionEN: trEn?.description || initialData?.descriptionEN || "",
+    descriptionFR: trFr?.description || initialData?.descriptionFR || "",
   };
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -61,12 +65,19 @@ const DescriptionForm: React.FC<DescriptionFormProps> = ({
     defaultValues: mappedInitialData,
   });
 
+  // Reset form when initialData changes (e.g. translations loaded)
+  React.useEffect(() => {
+    form.reset(mappedInitialData);
+  }, [initialData?.translations]);
+
   const { isSubmitting, isValid } = form.formState;
 
   async function onSubmit() {
     const values = form.getValues();
     try {
-      await axios.patch(`/api/posts/${postId}`, values);
+      const payload:any = { description: values.descriptionAR };
+      if (values.descriptionEN) payload.translations = { en: { description: values.descriptionEN } };
+      await axios.patch(`/api/posts/${postId}`, payload);
       toast.success("تم تحديث معلومات المقال");
       setIsEditing(false);
       router.refresh();
@@ -77,10 +88,13 @@ const DescriptionForm: React.FC<DescriptionFormProps> = ({
   }
 
   const displayDescription = (language: string) => {
+    const trEn = Array.isArray(initialData?.translations) ? initialData.translations.find((t:any) => t.locale === 'en') : null;
+    const trFr = Array.isArray(initialData?.translations) ? initialData.translations.find((t:any) => t.locale === 'fr') : null;
     if (language === "ar") {
       return initialData?.descriptionAR || initialData?.description || "لا يوجد وصف بالعربية";
     }
-    return initialData?.descriptionEN || "No English description available";
+    if (language === "en") return trEn?.description || initialData?.descriptionEN || "No English description available";
+    return trFr?.description || initialData?.descriptionFR || "Aucune description en français";
   };
 
   return (
@@ -100,9 +114,12 @@ const DescriptionForm: React.FC<DescriptionFormProps> = ({
       </div>
       {!isEditing ? (
         <Tabs defaultValue="ar" className="mt-2">
-          <TabsList className="grid grid-cols-2">
+          <TabsList className="grid grid-cols-3">
             <TabsTrigger value="en" className="flex items-center gap-1">
               <span>English</span>
+            </TabsTrigger>
+            <TabsTrigger value="fr" className="flex items-center gap-1">
+              <span>Français</span>
             </TabsTrigger>
             <TabsTrigger value="ar" className="flex items-center gap-1">
               <span>عربي</span>
@@ -111,6 +128,11 @@ const DescriptionForm: React.FC<DescriptionFormProps> = ({
           <TabsContent value="ar" className="mt-2">
             <div className="p-3 bg-slate-50 rounded-md" dir="rtl">
               {displayDescription("ar")}
+            </div>
+          </TabsContent>
+          <TabsContent value="fr" className="mt-2">
+            <div className="p-3 bg-slate-50 rounded-md">
+              {displayDescription("fr")}
             </div>
           </TabsContent>
           <TabsContent value="en" className="mt-2">
@@ -154,6 +176,27 @@ const DescriptionForm: React.FC<DescriptionFormProps> = ({
                     )}
                   />
                 </div>
+              </TabsContent>
+              <TabsContent value="fr" className="mt-2">
+                <FormField
+                  control={form.control}
+                  name="descriptionFR"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Textarea
+                          disabled={isSubmitting}
+                          placeholder="Description de l'article en français"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Fournissez une brève description utile de votre article
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </TabsContent>
               <TabsContent value="en" className="mt-2">
                 <FormField

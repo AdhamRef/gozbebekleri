@@ -1,0 +1,186 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import axios from 'axios';
+import { useForm } from 'react-hook-form';
+import { toast } from 'react-hot-toast';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, Loader2, Upload, X } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+
+const schema = z.object({
+  title: z.string().min(1, 'مطلوب'),
+  description: z.string().optional(),
+  image: z.string().optional(),
+  showButton: z.boolean(),
+  buttonText: z.string().optional(),
+  buttonLink: z.string().optional(),
+  isActive: z.boolean(),
+  title_en: z.string().optional(),
+  description_en: z.string().optional(),
+  buttonText_en: z.string().optional(),
+  title_fr: z.string().optional(),
+  description_fr: z.string().optional(),
+  buttonText_fr: z.string().optional(),
+});
+type FormValues = z.infer<typeof schema>;
+
+export default function EditSlidePage({ params }: { params: { id: string } }) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      title: '', description: '', image: '', showButton: true, buttonText: '', buttonLink: '#quick_donate', isActive: true,
+      title_en: '', description_en: '', buttonText_en: '', title_fr: '', description_fr: '', buttonText_fr: '',
+    },
+  });
+
+  useEffect(() => {
+    axios.get(`/api/slides/${params.id}?allTranslations=true`)
+      .then((res) => {
+        const d = res.data;
+        const en = d.translations?.find((t: { locale: string }) => t.locale === 'en');
+        const fr = d.translations?.find((t: { locale: string }) => t.locale === 'fr');
+        form.reset({
+          title: d.title ?? '',
+          description: d.description ?? '',
+          image: d.image ?? '',
+          showButton: d.showButton ?? true,
+          buttonText: d.buttonText ?? '',
+          buttonLink: d.buttonLink ?? '#quick_donate',
+          isActive: d.isActive !== false,
+          title_en: en?.title ?? '',
+          description_en: en?.description ?? '',
+          buttonText_en: en?.buttonText ?? '',
+          title_fr: fr?.title ?? '',
+          description_fr: fr?.description ?? '',
+          buttonText_fr: fr?.buttonText ?? '',
+        });
+      })
+      .catch(() => { toast.error('فشل التحميل'); router.push('/dashboard/slides'); })
+      .finally(() => setLoading(false));
+  }, [params.id, router, form]);
+
+  const onSubmit = async (values: FormValues) => {
+    setSaving(true);
+    try {
+      await axios.put(`/api/slides/${params.id}`, {
+        title: values.title,
+        description: values.description,
+        image: values.image,
+        showButton: values.showButton,
+        buttonText: values.buttonText,
+        buttonLink: values.buttonLink,
+        isActive: values.isActive,
+        translations: {
+          en: { title: values.title_en ?? '', description: values.description_en ?? '', buttonText: values.buttonText_en ?? '' },
+          fr: { title: values.title_fr ?? '', description: values.description_fr ?? '', buttonText: values.buttonText_fr ?? '' },
+        },
+      });
+      toast.success('تم التحديث');
+      router.push('/dashboard/slides');
+    } catch (e) {
+      toast.error('فشل التحديث');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingImage(true);
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await axios.post('/api/upload', fd);
+      form.setValue('image', res.data.url);
+      toast.success('تم رفع الصورة');
+    } catch (e) {
+      toast.error('فشل الرفع');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">تعديل الشريحة</h1>
+        <Button variant="outline" onClick={() => router.push('/dashboard/slides')} className="gap-2"><ArrowLeft className="w-4 h-4" /> العودة</Button>
+      </div>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <Tabs defaultValue="ar" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-4" dir="rtl">
+              <TabsTrigger value="ar">العربية</TabsTrigger>
+              <TabsTrigger value="en">English</TabsTrigger>
+              <TabsTrigger value="fr">Français</TabsTrigger>
+            </TabsList>
+            <TabsContent value="ar" className="mt-0">
+              <Card className="p-6 space-y-4">
+                <FormField control={form.control} name="title" render={({ field }) => (<FormItem><FormLabel>العنوان</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>الوصف</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="buttonText" render={({ field }) => (<FormItem><FormLabel>نص الزر</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+              </Card>
+            </TabsContent>
+            <TabsContent value="en" className="mt-0">
+              <Card className="p-6 space-y-4">
+                <FormField control={form.control} name="title_en" render={({ field }) => (<FormItem><FormLabel>Title (English)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="description_en" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="buttonText_en" render={({ field }) => (<FormItem><FormLabel>Button text</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+              </Card>
+            </TabsContent>
+            <TabsContent value="fr" className="mt-0">
+              <Card className="p-6 space-y-4">
+                <FormField control={form.control} name="title_fr" render={({ field }) => (<FormItem><FormLabel>Titre (français)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="description_fr" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="buttonText_fr" render={({ field }) => (<FormItem><FormLabel>Texte du bouton</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          <Card className="p-6 space-y-4">
+            <FormField control={form.control} name="image" render={({ field }) => (
+              <FormItem>
+                <FormLabel>الصورة</FormLabel>
+                <FormControl>
+                  <div className="space-y-2">
+                    {field.value ? (
+                      <div className="relative w-40 h-28"><img src={field.value} alt="" className="w-full h-full object-cover rounded" />
+                        <button type="button" onClick={() => form.setValue('image', '')} className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded"><X className="w-4 h-4" /></button></div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center w-40 h-28 border-2 border-dashed rounded cursor-pointer">
+                        <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploadingImage} />
+                        {uploadingImage ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Upload className="w-6 h-6" /><span className="text-sm">رفع صورة</span></>}
+                      </label>
+                    )}
+                  </div>
+                </FormControl></FormItem>
+            )} />
+            <FormField control={form.control} name="showButton" render={({ field }) => (<FormItem className="flex items-center justify-between"><FormLabel>إظهار الزر</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
+            <FormField control={form.control} name="buttonLink" render={({ field }) => (<FormItem><FormLabel>رابط الزر</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+            <FormField control={form.control} name="isActive" render={({ field }) => (<FormItem className="flex items-center justify-between"><FormLabel>نشط</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
+          </Card>
+          <div className="flex gap-4">
+            <Button type="button" variant="outline" onClick={() => router.push('/dashboard/slides')}>إلغاء</Button>
+            <Button type="submit" disabled={saving}>{saving && <Loader2 className="w-4 h-4 ml-2 animate-spin" />} حفظ</Button>
+          </div>
+        </form>
+      </Form>
+    </div>
+  );
+}

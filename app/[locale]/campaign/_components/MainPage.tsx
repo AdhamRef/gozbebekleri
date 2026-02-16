@@ -191,7 +191,7 @@ export const dummyComments = [
   },
   {
     id: "comment_7",
-    text: "ربنا يبارك فيكم ويجعله في ميزان حسناتكم. شيء جميل أن نرى الناس تساعد بعضها. الله يعطيكم العافية على الجهود المبذولة 🙏",
+    text: "ربنا يبارك فيكم ويجعله في ميزان حسناتكم. شيء جميل أن نرى الناس تساعد بعضها. الله يعطيكم قرة العيون على الجهود المبذولة 🙏",
     createdAt: "2024-01-13T08:15:00Z",
     user: {
       name: "ليلى الحربي",
@@ -209,7 +209,7 @@ export const dummyComments = [
   }
 ];
 
-const MainPage = ({ id }: {id:string}) => {
+const MainPage = ({ id, locale }: {id:string; locale?: string}) => {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -235,11 +235,17 @@ const MainPage = ({ id }: {id:string}) => {
   }>({});
   const updateRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
+  // Compute effective locale (prop -> router locale)
+  const propLocale = locale;
+
   // Fetch campaign data
   useEffect(() => {
     const fetchCampaignData = async () => {
       try {
-        const response = await axios.get<Campaign>(`/api/campaigns/${id}`);
+        const headers: Record<string, string> = {};
+        if (propLocale) headers['x-locale'] = propLocale;
+
+        const response = await axios.get<Campaign>(`/api/campaigns/${id}`, { headers });
         if (!response.data) {
           throw new Error("Campaign not found");
         }
@@ -252,7 +258,7 @@ const MainPage = ({ id }: {id:string}) => {
     };
 
     fetchCampaignData();
-  }, [id]);
+  }, [id, locale]);
 
   // Fetch comments
   useEffect(() => {
@@ -400,7 +406,7 @@ const MainPage = ({ id }: {id:string}) => {
           className="max-sm:hidden flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4"
         >
           <div className="flex gap-x-4 items-center w-full">
-            <span className="inline-block bg-gradient-to-r from-orange-400 to-orange-600 text-white text-sm px-3 py-1 rounded-full">
+            <span className="inline-block bg-gradient-to-r from-sky-400 to-sky-600 text-white text-sm px-3 py-1 rounded-full">
               {campaign.category.name}
             </span>
             <h1 className="text-3xl font-semibold text-stone-800">
@@ -426,7 +432,7 @@ const MainPage = ({ id }: {id:string}) => {
             </motion.div>
 
             <div className="sm:hidden">
-              <span className="inline-block bg-gradient-to-r from-orange-400 to-orange-600 text-white text-[12px] px-2 py-[2px] rounded-full mb-2">
+              <span className="inline-block bg-gradient-to-r from-sky-400 to-sky-600 text-white text-[12px] px-2 py-[2px] rounded-full mb-2">
                 {campaign.category.name}
               </span>
               <h1 className="text-3xl max-sm:text-2xl font-semibold text-stone-800">

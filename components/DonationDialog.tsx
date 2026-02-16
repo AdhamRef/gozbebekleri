@@ -11,6 +11,7 @@ import {
   CreditCard as CardIcon,
   ShoppingCart,
   Check,
+  Loader2,
 } from "lucide-react";
 import axios from "axios";
 import Cards from "react-credit-cards-2";
@@ -23,6 +24,7 @@ import { useCurrency } from "@/context/CurrencyContext";
 import { formatNumber } from "@/hooks/formatNumber";
 import { useCart } from "@/hooks/useCart";
 import { useRouter } from "@/i18n/routing";
+import { useTranslations, useLocale } from "next-intl";
 
 type DonationType = "ONE_TIME" | "MONTHLY";
 type PaymentMethod = "CARD" | "PAYPAL" | null;
@@ -40,6 +42,14 @@ interface DonationDialogProps {
   campaignImage?: string;
   targetAmount?: number;
   amountRaised?: number;
+  /** When true, skip one-time/monthly choice and use monthly only */
+  monthlyOnly?: boolean;
+  /** Category donation: donate to a category instead of a campaign */
+  categoryId?: string;
+  categoryName?: string;
+  categoryImage?: string;
+  /** Pre-fill amount (e.g. from QuickDonate) */
+  initialDonationAmount?: number;
 }
 
 interface CardDetails {
@@ -49,53 +59,6 @@ interface CardDetails {
   cardholderName: string;
 }
 
-const DONATION_STEPS: Record<DonationType, DonationStep[]> = {
-  ONE_TIME: [
-    { title: "مبلغ التبرع", subtitle: "اختر المبلغ الذي تريد التبرع به" },
-    { title: "دعم الفريق", subtitle: "ساعدنا في تطوير المنصة" },
-    { title: "رسوم الدفع", subtitle: "تغطية رسوم عملية الدفع" },
-    { title: "التأكيد", subtitle: "مراجعة التبرع" },
-    { title: "طريقة الدفع", subtitle: "اختر طريقة الدفع المناسبة" },
-    { title: "معلومات الدفع", subtitle: "ادخل معلومات الدفع الخاصة بك" },
-  ],
-  MONTHLY: [
-    {
-      title: "مبلغ التبرع الشهري",
-      subtitle: "اختر المبلغ الذي تريد التبرع به شهرياً",
-    },
-    { title: "دعم الفريق", subtitle: "ساعدنا في تطوير المنصة" },
-    { title: "رسوم الدفع", subtitle: "تغطية رسوم عملية الدفع" },
-    { title: "التأكيد", subtitle: "مراجعة التبرع" },
-    { title: "يوم الدفع", subtitle: "اختر يوم الدفع الشهري" },
-    { title: "طريقة الدفع", subtitle: "اختر طريقة الدفع المناسبة" },
-    { title: "معلومات الدفع", subtitle: "ادخل معلومات الدفع الخاصة بك" },
-  ],
-};
-
-const TEAM_SUPPORT_OPTIONS = [
-  { label: "لا شكراً", value: 0 },
-  { label: "5", value: 5 },
-  { label: "10", value: 10 },
-  { label: "25", value: 25 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 },
-];
-
-const PAYMENT_METHODS = [
-  {
-    id: "CARD",
-    name: "البطاقة البنكية",
-    icon: CardIcon,
-    description: "الدفع باستخدام بطاقة الائتمان أو الخصم",
-  },
-  {
-    id: "PAYPAL",
-    name: "PayPal",
-    icon: CardIcon,
-    description: "الدفع باستخدام حساب PayPal",
-  },
-];
-
 const DonationDialog = ({
   isOpen,
   onClose,
@@ -104,7 +67,69 @@ const DonationDialog = ({
   campaignImage = "/placeholder.jpg",
   targetAmount = 0,
   amountRaised = 0,
+  monthlyOnly = false,
+  categoryId = "",
+  categoryName = "",
+  categoryImage,
+  initialDonationAmount,
 }: DonationDialogProps) => {
+  const isCategoryMode = Boolean(categoryId);
+  const t = useTranslations("DonationDialog");
+  const locale = useLocale() as "ar" | "en" | "fr";
+  
+  // Helper function to get locale-specific property
+  const getLocalizedProperty = (obj: any, key: string) => {
+    const localeKey = `${key}${locale.charAt(0).toUpperCase() + locale.slice(1)}`;
+    return obj[localeKey] || obj[key] || "";
+  };
+
+  const TEAM_SUPPORT_OPTIONS = [
+    { label: t("noThanks"), value: 0 },
+    { label: "5", value: 5 },
+    { label: "10", value: 10 },
+    { label: "25", value: 25 },
+    { label: "50", value: 50 },
+    { label: "100", value: 100 },
+  ];
+
+  const PAYMENT_METHODS = [
+    {
+      id: "CARD",
+      name: t("bankCard"),
+      icon: CardIcon,
+      description: t("cardDescription"),
+    },
+    {
+      id: "PAYPAL",
+      name: "PayPal",
+      icon: CardIcon,
+      description: t("paypalDescription"),
+    },
+  ];
+
+  const DONATION_STEPS: Record<DonationType, DonationStep[]> = {
+    ONE_TIME: [
+      { title: t("donationAmount"), subtitle: t("donationAmountDesc") },
+      { title: t("teamSupport"), subtitle: t("teamSupportDesc") },
+      { title: t("paymentFees"), subtitle: t("paymentFeesDesc") },
+      { title: t("confirmation"), subtitle: t("confirmationDesc") },
+      { title: t("paymentMethod"), subtitle: t("paymentMethodDesc") },
+      { title: t("paymentInfo"), subtitle: t("paymentInfoDesc") },
+    ],
+    MONTHLY: [
+      {
+        title: t("monthlyDonationAmount"),
+        subtitle: t("monthlyDonationAmountDesc"),
+      },
+      { title: t("billingDay"), subtitle: t("billingDayDesc") },
+      { title: t("teamSupport"), subtitle: t("teamSupportDesc") },
+      { title: t("paymentFees"), subtitle: t("paymentFeesDesc") },
+      { title: t("confirmation"), subtitle: t("confirmationDesc") },
+      { title: t("paymentMethod"), subtitle: t("paymentMethodDesc") },
+      { title: t("paymentInfo"), subtitle: t("paymentInfoDesc") },
+    ],
+  };
+
   const [currentStep, setCurrentStep] = useState(0);
   const [donationType, setDonationType] = useState<DonationType | null>(null);
   const [donationAmount, setDonationAmount] = useState<number>(0);
@@ -113,6 +138,7 @@ const DonationDialog = ({
   const [billingDay, setBillingDay] = useState<number>(1);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(null);
   const [loading, setLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [cardDetails, setCardDetails] = useState<CardDetails>({
     cardNumber: "",
     expiryDate: "",
@@ -129,6 +155,22 @@ const DonationDialog = ({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // When monthlyOnly (e.g. QuickDonate category), pre-select monthly and skip type step
+  useEffect(() => {
+    if (isOpen && monthlyOnly && !donationType) {
+      setDonationType("MONTHLY");
+      setCurrentStep(0);
+    }
+  }, [isOpen, monthlyOnly, donationType]);
+
+  // Pre-fill amount and skip amount step when opening with initialDonationAmount (e.g. from QuickDonate)
+  useEffect(() => {
+    if (isOpen && initialDonationAmount != null && initialDonationAmount > 0) {
+      setDonationAmount(initialDonationAmount);
+      setCurrentStep(1); // skip first step (donation amount)
+    }
+  }, [isOpen, initialDonationAmount]);
 
   const confetti = useConfettiStore();
 
@@ -147,7 +189,7 @@ const DonationDialog = ({
   const handleNext = () => {
     const steps = getSteps();
     if (currentStep < steps.length - 1) {
-      if (steps[currentStep].title === "طريقة الدفع") {
+      if (steps[currentStep].title === t("paymentMethod")) {
         setCurrentStep(currentStep + 1);
       } else {
         setCurrentStep(currentStep + 1);
@@ -199,15 +241,15 @@ const DonationDialog = ({
   const getStepContent = () => {
     if (!mounted) return null;
 
-    if (!donationType) {
+    if (!donationType && !monthlyOnly) {
       return (
         <div className="space-y-6">
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              اختر نوع التبرع
+              {t("chooseDonationType")}
             </h2>
             <p className="text-gray-600">
-              يمكنك اختيار التبرع لمرة واحدة أو التبرع الشهري
+              {t("chooseDonationTypeDesc")}
             </p>
           </div>
 
@@ -221,8 +263,8 @@ const DonationDialog = ({
                 <div className="w-12 h-12 mx-auto rounded-full bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
                   <Heart className="w-6 h-6 text-blue-600" />
                 </div>
-                <h3 className="font-semibold text-gray-900">تبرع لمرة واحدة</h3>
-                <p className="text-sm text-gray-500">تبرع مرة واحدة للحملة</p>
+                <h3 className="font-semibold text-gray-900">{t("oneTimeDonation")}</h3>
+                <p className="text-sm text-gray-500">{t("oneTimeDonationDesc")}</p>
               </div>
             </Button>
 
@@ -235,8 +277,8 @@ const DonationDialog = ({
                 <div className="w-12 h-12 mx-auto rounded-full bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
                   <Calendar className="w-6 h-6 text-blue-600" />
                 </div>
-                <h3 className="font-semibold text-gray-900">تبرع شهري</h3>
-                <p className="text-sm text-gray-500">تبرع بشكل شهري للحملة</p>
+                <h3 className="font-semibold text-gray-900">{t("monthlyDonation")}</h3>
+                <p className="text-sm text-gray-500">{t("monthlyDonationDesc")}</p>
               </div>
             </Button>
           </div>
@@ -245,48 +287,51 @@ const DonationDialog = ({
     }
 
     const steps = getSteps();
+    
+    // Safety check: ensure steps array is populated and currentStep is valid
+    if (!steps.length || !steps[currentStep]) {
+      return null;
+    }
 
     switch (steps[currentStep].title) {
-      case "مبلغ التبرع":
-      case "مبلغ التبرع الشهري":
+      case t("donationAmount"):
+      case t("monthlyDonationAmount"):
         return (
           <div className="space-y-6">
             <div className="text-center space-y-2">
               <h3 className="text-xl font-semibold text-gray-900">
-                قيمة التبرع
+                {t("donationValue")}
               </h3>
               <p className="text-gray-600 text-sm flex flex-col items-center gap-1">
-                عن رسول الله صلى الله عليه وسلم، قال:
+                {t("hadithQuote")}
                 <span className="text-blue-600 text-base">
-                  (قالَ اللَّهُ: أنْفِقْ يا ابْنَ آدَمَ أُنْفِقْ عَلَيْكَ)
+                  {t("hadithText")}
                 </span>
               </p>
             </div>
-            {donationType === "ONE_TIME" && (
+            {donationType === "ONE_TIME" && campaignId && (
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">
-                    تم جمع {getCurrency()}{" "}
+                    {t("collected")} {getCurrency()}
                     {formatNumber(
                       convertToCurrency(Math.round(amountRaised))
                         .convertedValue + donationAmount
                     )}
                   </span>
                   <span className="text-gray-600">
-                    الهدف {getCurrency()}{" "}
+                    {t("goal")} {getCurrency()}
                     {formatNumber(
                       convertToCurrency(Math.round(targetAmount)).convertedValue
                     )}
                   </span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2">
-  <div
-    className="bg-blue-500 h-2 rounded-full max-w-full transition-all duration-500 ease-in-out"
-    style={{
-      width: `${progress}%`,
-    }}
-  />
-</div>
+                  <div
+                    className="bg-blue-500 h-2 rounded-full max-w-full transition-all duration-500 ease-in-out"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
               </div>
             )}
 
@@ -295,7 +340,7 @@ const DonationDialog = ({
                 type="number"
                 value={donationAmount || ""}
                 onChange={(e) => setDonationAmount(Number(e.target.value))}
-                placeholder="أدخل مبلغ التبرع"
+                placeholder={t("enterDonationAmount")}
               />
 
               <div className="grid grid-cols-3 gap-2">
@@ -317,53 +362,52 @@ const DonationDialog = ({
             </div>
 
             <div className="flex justify-between gap-4 mt-6">
-              <Button
-                variant="outline"
-                onClick={async () => {
-                  try {
-                    const response = await axios.post("/api/cart", {
-                      campaignId: campaignId,
-                      amount: donationAmount,
-                      amountUSD: useConvetToUSD(donationAmount, getCurrency()),
-                      currency: getCurrency(),
-                    });
-
-                    addItem(response.data || []);
-                    console.log("asd", response.data);
-
-                    toast.success("تم إضافة المبلغ إلى السلة");
-                  } catch (error) {
-                    console.error("Error adding to cart:", error);
-                    toast.error("فشل في إضافة المبلغ إلى السلة");
-                  } finally {
-                    onClose();
-                  }
-                }}
-                className="flex-1 flex justify-center items-center gap-2 bg-blue-100 text-blue-800 hover:bg-blue-200 !border-none !shadow-none"
-              >
-                <ShoppingCart className="w-4 h-4" />
-                أضف إلى السلة
-              </Button>
+              {!isCategoryMode && campaignId && (
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      const response = await axios.post("/api/cart", {
+                        campaignId: campaignId,
+                        amount: donationAmount,
+                        amountUSD: useConvetToUSD(donationAmount, getCurrency()),
+                        currency: getCurrency(),
+                      });
+                      addItem(response.data || []);
+                      window.location.reload();
+                    } catch (error) {
+                      console.error("Error adding to cart:", error);
+                      toast.error(t("failedToAddToCart"));
+                    } finally {
+                      onClose();
+                    }
+                  }}
+                  className="flex-1 flex justify-center items-center gap-2 bg-blue-100 text-blue-800 hover:bg-blue-200 !border-none !shadow-none"
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  {t("addToCart")}
+                </Button>
+              )}
               <Button
                 onClick={handleNext}
                 disabled={!donationAmount}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                className={`${isCategoryMode || !campaignId ? "w-full" : "flex-1"} bg-blue-600 hover:bg-blue-700 text-white`}
               >
-                التالي
+                {t("next")}
               </Button>
             </div>
           </div>
         );
 
-      case "دعم الفريق":
+      case t("teamSupport"):
         return (
           <div className="space-y-6">
             <div className="text-center space-y-2">
               <h3 className="text-lg font-semibold text-gray-900">
-                هل تريد دعم فريق العمل؟
+                {t("wantToSupportTeam")}
               </h3>
               <p className="text-gray-600 text-sm">
-                تبرعك يساعدنا في تطوير المنصة وتحسين خدماتنا
+                {t("teamSupportHelp")}
               </p>
             </div>
             <div className="flex flex-col items-center gap-2">
@@ -371,7 +415,7 @@ const DonationDialog = ({
                 type="number"
                 value={teamSupport || ""}
                 onChange={(e) => setTeamSupport(Number(e.target.value))}
-                placeholder="مبلغ آخر"
+                placeholder={t("otherAmount")}
               />
               <div className="grid grid-cols-3 gap-3 w-full">
                 {TEAM_SUPPORT_OPTIONS.map((option) => (
@@ -393,33 +437,33 @@ const DonationDialog = ({
 
             <div className="flex justify-between gap-4">
               <Button variant="outline" onClick={handleBack} className="flex-1">
-                رجوع
+                {t("back")}
               </Button>
               <Button
                 onClick={handleNext}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
               >
-                التالي
+                {t("next")}
               </Button>
             </div>
           </div>
         );
 
-      case "رسوم الدفع":
+      case t("paymentFees"):
         return (
           <div className="space-y-6">
             <div className="text-center space-y-2">
               <h3 className="text-lg font-semibold text-gray-900">
-                تغطية رسوم الدفع
+                {t("coverPaymentFees")}
               </h3>
               <p className="text-gray-600 text-sm">
-                رسوم خدمة الدفع الإلكتروني تبلغ 3% من إجمالي المبلغ
+                {t("paymentFeesInfo")}
               </p>
             </div>
 
             <div className="bg-gray-50 p-4 rounded-lg space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">مبلغ التبرع</span>
+                <span className="text-gray-600">{t("amount")}</span>
                 <span className="font-medium">
                   {" "}
                   {getCurrency()} {formatNumber(donationAmount)}
@@ -427,14 +471,14 @@ const DonationDialog = ({
               </div>
               {teamSupport > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">دعم الفريق</span>
+                  <span className="text-gray-600">{t("teamSupport")}</span>
                   <span className="font-medium">
                     {getCurrency()} {formatNumber(teamSupport)}
                   </span>
                 </div>
               )}
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">رسوم الدفع (3%)</span>
+                <span className="text-gray-600">{t("paymentFeesPercent")}</span>
                 <span className="font-medium">
                   {getCurrency()} {fees.toFixed(2)}
                 </span>
@@ -462,11 +506,10 @@ const DonationDialog = ({
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">
-                    نعم، أريد تغطية رسوم الدفع
+                    {t("yesCoverFees")}
                   </p>
                   <p className="text-sm text-gray-500 mt-1">
-                    سيتم إضافة {getCurrency()} {fees.toFixed(2)} لتغطية رسوم
-                    الدفع
+                    {t("feesWillBeAdded", { amount: `${getCurrency()} ${fees.toFixed(2)}` })}
                   </p>
                 </div>
               </div>
@@ -474,32 +517,32 @@ const DonationDialog = ({
 
             <div className="flex justify-between gap-4">
               <Button variant="outline" onClick={handleBack} className="flex-1">
-                رجوع
+                {t("back")}
               </Button>
               <Button
                 onClick={handleNext}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
               >
-                التالي
+                {t("next")}
               </Button>
             </div>
           </div>
         );
 
-      case "التأكيد":
+      case t("confirmation"):
         return (
           <div className="space-y-8">
-            {/* Campaign Image Section */}
-            {campaignImage && (
+            {/* Campaign or Category Image Section */}
+            {(campaignImage || categoryImage || isCategoryMode) && (
               <div className="relative h-48 rounded-lg overflow-hidden">
                 <img
-                  src={campaignImage}
-                  alt="Campaign"
+                  src={isCategoryMode ? (categoryImage || "/placeholder.jpg") : campaignImage}
+                  alt={isCategoryMode ? categoryName : campaignTitle}
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
                   <h2 className="text-white text-2xl font-bold">
-                    {campaignTitle}
+                    {isCategoryMode ? categoryName : campaignTitle}
                   </h2>
                 </div>
               </div>
@@ -508,20 +551,20 @@ const DonationDialog = ({
             {/* Donation Details Section */}
             <div className="bg-gray-50 p-6 rounded-lg space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">نوع التبرع</span>
+                <span className="text-gray-600">{t("donationType")}</span>
                 <span className="font-medium text-gray-900">
-                  {donationType === "ONE_TIME" ? "مرة واحدة" : "شهري"}
+                  {donationType === "ONE_TIME" ? t("oneTime") : t("monthly")}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">المبلغ</span>
+                <span className="text-gray-600">{t("amount")}</span>
                 <span className="font-medium text-gray-900">
                   {getCurrency()} {formatNumber(donationAmount)}
                 </span>
               </div>
               {teamSupport > 0 && (
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">دعم الفريق</span>
+                  <span className="text-gray-600">{t("teamSupport")}</span>
                   <span className="font-medium text-gray-900">
                     {getCurrency()} {formatNumber(teamSupport)}
                   </span>
@@ -529,7 +572,7 @@ const DonationDialog = ({
               )}
               {coverFees && (
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">رسوم الدفع</span>
+                  <span className="text-gray-600">{t("paymentFeesLabel")}</span>
                   <span className="font-medium text-gray-900">
                     {getCurrency()} {fees.toFixed(2)}
                   </span>
@@ -537,9 +580,9 @@ const DonationDialog = ({
               )}
               <div className="pt-4 border-t">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-gray-900">الإجمالي</span>
+                  <span className="font-medium text-gray-900">{t("total")}</span>
                   <span className="font-bold text-blue-600 text-xl">
-                    {getCurrency()} {formatNumber(totalAmount)}
+                    {getCurrency()} {totalAmount.toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -552,40 +595,40 @@ const DonationDialog = ({
                 onClick={handleBack}
                 className="flex-1 py-3 text-gray-700 border-gray-300 hover:bg-gray-50"
               >
-                رجوع
+                {t("back")}
               </Button>
               <Button
                 onClick={handleNext}
                 className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white"
               >
-                التالي
+                {t("next")}
               </Button>
             </div>
 
             {/* Footer Note */}
             <p className="text-xs text-center text-gray-500 mt-4">
-              بالمتابعة، أنت توافق على{" "}
+              {t("byContinuing")}{" "}
               <a href="#" className="text-blue-600 hover:underline">
-                شروط الاستخدام
+                {t("termsOfUseLink")}
               </a>{" "}
-              و{" "}
+              {t("and")}{" "}
               <a href="#" className="text-blue-600 hover:underline">
-                سياسة الخصوصية
+                {t("privacyPolicyLink")}
               </a>
             </p>
           </div>
         );
 
-      case "يوم الدفع":
+      case t("billingDay"):
         if (donationType === "MONTHLY") {
           return (
             <div className="space-y-6">
               <div className="text-center space-y-2">
                 <h3 className="text-lg font-semibold text-gray-900">
-                  اختر يوم الدفع الشهري
+                  {t("chooseBillingDay")}
                 </h3>
                 <p className="text-gray-600 text-sm">
-                  سيتم خصم المبلغ تلقائياً في هذا اليوم من كل شهر
+                  {t("billingDayInfo")}
                 </p>
               </div>
 
@@ -612,13 +655,13 @@ const DonationDialog = ({
                   onClick={handleBack}
                   className="flex-1"
                 >
-                  رجوع
+                  {t("back")}
                 </Button>
                 <Button
                   onClick={handleNext}
                   className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  التالي
+                  {t("next")}
                 </Button>
               </div>
             </div>
@@ -626,16 +669,16 @@ const DonationDialog = ({
         }
       // Fall through to payment method selection if not monthly
 
-      case "طريقة الدفع":
+      case t("paymentMethod"):
         return (
           <div className="space-y-8">
             {/* Header Section */}
             <div className="text-center space-y-3">
               <h3 className="text-2xl font-bold text-gray-900">
-                اختر طريقة الدفع
+                {t("choosePaymentMethod")}
               </h3>
               <p className="text-gray-600 text-sm">
-                اختر الطريقة المناسبة لك لإتمام عملية التبرع
+                {t("choosePaymentMethodDesc")}
               </p>
             </div>
 
@@ -688,19 +731,19 @@ const DonationDialog = ({
                 onClick={handleBack}
                 className="flex-1 py-3 text-gray-700 border-gray-300 hover:bg-gray-50"
               >
-                رجوع
+                {t("back")}
               </Button>
               <Button
                 onClick={handleNext}
                 disabled={!paymentMethod}
                 className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white"
               >
-                متابعة
+                {t("continue")}
               </Button>
             </div>
           </div>
         );
-      case "معلومات الدفع":
+      case t("paymentInfo"):
         return (
           <div className="space-y-6">
             {paymentMethod === "CARD" ? (
@@ -718,7 +761,7 @@ const DonationDialog = ({
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      رقم البطاقة
+                      {t("cardNumber")}
                     </label>
                     <Input
                       type="text"
@@ -731,14 +774,14 @@ const DonationDialog = ({
                         })
                       }
                       onFocus={() => setFocus("number")}
-                      placeholder="0000 0000 0000 0000"
+                      placeholder={t("cardNumberPlaceholder")}
                       className="text-lg"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      اسم حامل البطاقة
+                      {t("cardholderName")}
                     </label>
                     <Input
                       type="text"
@@ -750,14 +793,14 @@ const DonationDialog = ({
                         })
                       }
                       onFocus={() => setFocus("name")}
-                      placeholder="الاسم كما يظهر على البطاقة"
+                      placeholder={t("cardholderNamePlaceholder")}
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        تاريخ الانتهاء
+                        {t("expiryDate")}
                       </label>
                       <Input
                         type="text"
@@ -774,13 +817,13 @@ const DonationDialog = ({
                           });
                         }}
                         onFocus={() => setFocus("expiry")}
-                        placeholder="MM/YY"
+                        placeholder={t("expiryDatePlaceholder")}
                       />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        رمز الأمان
+                        {t("securityCode")}
                       </label>
                       <Input
                         type="text"
@@ -793,7 +836,7 @@ const DonationDialog = ({
                           })
                         }
                         onFocus={() => setFocus("cvc")}
-                        placeholder="CVV"
+                        placeholder={t("securityCodePlaceholder")}
                       />
                     </div>
                   </div>
@@ -802,22 +845,30 @@ const DonationDialog = ({
             ) : (
               <div className="text-center">
                 <p className="text-gray-600">
-                  سيتم تحويلك إلى PayPal لإتمام عملية الدفع
+                  {t("paypalRedirect")}
                 </p>
               </div>
             )}
 
             <div className="flex justify-between gap-4">
               <Button variant="outline" onClick={handleBack} className="flex-1">
-                رجوع
+                {t("back")}
               </Button>
               <Button
-                onClick={handleSubmit}
-                disabled={paymentMethod === "CARD" && !isCardDetailsValid()}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                تأكيد التبرع
-              </Button>
+  onClick={handleSubmit}
+  disabled={
+    loading ||
+    (paymentMethod === "CARD" && !isCardDetailsValid())
+  }
+  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
+>
+  {loading ? (
+    <Loader2 className="h-4 w-4 animate-spin" />
+  ) : (
+    t("confirmDonation")
+  )}
+</Button>
+
             </div>
           </div>
         );
@@ -828,16 +879,11 @@ const DonationDialog = ({
   };
 
   const handleSubmit = async () => {
+    let isRedirecting = false;
     try {
       setLoading(true);
-      const donationData = {
-        items: [
-          {
-            campaignId,
-            amount: donationAmount,
-            amountUSD: await useConvetToUSD(donationAmount, getCurrency()),
-          },
-        ],
+      const amountUSD = await useConvetToUSD(donationAmount, getCurrency());
+      const donationData: Record<string, unknown> = {
         currency: getCurrency(),
         teamSupport,
         coverFees,
@@ -846,20 +892,30 @@ const DonationDialog = ({
         cardDetails: paymentMethod === "CARD" ? cardDetails : null,
         billingDay: donationType === "MONTHLY" ? billingDay : null,
       };
+      if (isCategoryMode && categoryId) {
+        donationData.categoryItems = [
+          { categoryId, amount: donationAmount, amountUSD },
+        ];
+      } else if (campaignId) {
+        donationData.items = [
+          { campaignId, amount: donationAmount, amountUSD },
+        ];
+      }
 
       const response = await axios.post("/api/donations", donationData);
 
       if (response.data.success) {
-        // confetti.onOpen();
-        onClose();
-        toast.success("تم التبرع بنجاح");
+        isRedirecting = true;
+        setRedirecting(true);
         router.push(`/success/${response.data.donation.id}`);
+        return;
       }
+      onClose();
     } catch (error) {
       console.error("Payment failed:", error);
-      toast.error("فشل في عملية التبرع");
+      toast.error(t("donationFailed"));
     } finally {
-      setLoading(false);
+      if (!isRedirecting) setLoading(false);
     }
   };
 
@@ -886,13 +942,28 @@ const DonationDialog = ({
             <div className="relative z-10 p-6 pt-0 bg-white">
               <AnimatePresence mode="wait">
                 <motion.div
-                  key={currentStep}
+                  key={redirecting ? "redirecting" : currentStep}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2 }}
                 >
-                  {getStepContent()}
+                  {redirecting ? (
+                    <div className="flex flex-col items-center justify-center py-10 gap-4 text-center">
+                      <CheckCircle2 className="h-16 w-16 text-green-500" />
+                      <div>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {t("successRedirecting")}
+                        </p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {t("successRedirectingDesc")}
+                        </p>
+                      </div>
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                    </div>
+                  ) : (
+                    getStepContent()
+                  )}
                 </motion.div>
               </AnimatePresence>
             </div>

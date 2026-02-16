@@ -6,22 +6,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import { v4 } from "uuid";
-import slugify from "react-slugify";
 import * as z from "zod";
 
-// Uppy imports
-import Uppy from "@uppy/core";
-import "@uppy/core/dist/style.min.css";
-import "@uppy/dashboard/dist/style.min.css";
-import { DashboardModal } from "@uppy/react";
-import Tus from "@uppy/tus";
-
-import {
-  SparklesIcon,
-  PaperclipIcon,
-  Loader2 as SpinnerIcon,
-} from "lucide-react";
+import { Loader2, SpinnerIcon, Upload, X } from "lucide-react";
+import Image from "next/image";
 
 // UI Components
 import { Button } from "@/components/ui/button";
@@ -43,8 +31,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -52,26 +38,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Custom components and config
 import WysiwygEditor from "./wysiwyg/wysiwyg-editor";
-import { mainCategoryConfig } from "@/lib/blog";
 import { defaultEditorContent } from "./wysiwyg/default-content";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-// Custom upload components
-import ImageForm from "./_components/image-form";
-import CategoryForm from "./_components/category-form";
-import TitleForm from "./_components/title-form";
-import DescriptionForm from "./_components/description-form";
-
-// Validation schema
+// Validation schema (Arabic fields only - simple inputs like BlogLocaleEditor)
 const postEditFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
-  image: z.string().optional(),
-  categoryId: z.string().min(1, "Category is required"),
   description: z.string().optional(),
-  content: z.string().optional(),
+  image: z.string().optional(),
+  categoryId: z.string().optional(),
 });
 
 // Configuration
@@ -109,20 +93,18 @@ const protectedPostConfig = {
   pleaseWait: "برجاء الانتظار ...",
 };
 
-const BlogEditor = ({ post, userId, categories }) => {
+const BlogEditor = ({ post, userId, categories, redirectAfterCreate, isCreate: isCreateProp }) => {
   const router = useRouter();
+  const isCreate = isCreateProp || !post?.id || post.id === "new";
 
 
   // States
   const [isSaving, setIsSaving] = useState(false);
   const [showLoadingAlert, setShowLoadingAlert] = useState(false);
-  const [showCoverModal, setShowCoverModal] = useState(false);
-  const [showGalleryModal, setShowGalleryModal] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
-  // Content state
-  const [contentEN, setContentEN] = useState(post?.contentEN || null);
+  // Arabic content only (en/fr edited in BlogLocaleEditor)
   const [contentAR, setContentAR] = useState(post?.contentAR || null);
-  const [activeLanguage, setActiveLanguage] = useState("ar");
 
 
   // Uppy instance for cover photo upload
@@ -168,17 +150,12 @@ const BlogEditor = ({ post, userId, categories }) => {
   //   setShowCoverModal(false);
   // });
 
-  // Form setup
+  // Form setup (simple inputs like BlogLocaleEditor)
   const defaultValues = {
-    titleAR: post.titleAR || "Untitled",
-    titleEN: post.titleEN || "Untitled",
-    imageAR: post.imageAR || "",
-    imageEN: post.imageEN || "",
-    categoryId: post.category_id || "",
-    descriptionAR: post.descriptionAR || "Post description",
-    descriptionEN: post.descriptionEN || "Post description",
-    contentEN: contentEN || protectedEditorConfig.placeholderContent,
-    contentAR: contentAR || protectedEditorConfig.placeholderContent,
+    title: post?.titleAR || post?.title || "",
+    description: post?.descriptionAR || post?.description || "",
+    image: post?.imageAR || post?.image || "",
+    categoryId: post?.category_id || post?.categoryId || "",
   };
 
   const form = useForm({
@@ -187,31 +164,36 @@ const BlogEditor = ({ post, userId, categories }) => {
     mode: "onChange",
   });
 
-  // Submit handler with Axios and Prisma API route
+  // Submit handler: Arabic fields only (en/fr edited in BlogLocaleEditor)
   const onSubmit = async (data) => {
     setShowLoadingAlert(true);
     setIsSaving(true);
 
     try {
-      // Update post using Axios to call Prisma API route
-      const response = await axios.patch(`/api/posts/${post.id}`, {
-        titleAR: data.titleAR,
-        titleEN: data.titleEN,
-        imageAR: data.imageAR,
-        imageEN: data.imageEN,
-        descriptionAR: data.descriptionAR,
-        descriptionEN: data.descriptionEN,
-        contentEN: contentEN,
-        contentAR: contentAR,
-        category_id: data.categoryId,
-      });
+      const payload = {
+        title: data.title,
+        description: data.description || "",
+        content: contentAR || "",
+        image: data.image || "",
+        categoryId: data.categoryId || null,
+      };
 
-      // Success handling
-      toast.success(protectedEditorConfig.successMessage);
-      router.push(`/blog/${response.data.id}`);
+      let response;
+      if (isCreate) {
+        response = await axios.post("/api/posts", payload);
+        toast.success(protectedEditorConfig.successMessage);
+        if (redirectAfterCreate) {
+          router.push(`${redirectAfterCreate}/${response.data.id}`);
+        } else {
+          router.push(`/blog/${response.data.id}`);
+        }
+      } else {
+        response = await axios.patch(`/api/posts/${post.id}`, payload);
+        toast.success(protectedEditorConfig.successMessage);
+        router.push(`/blog/${response.data.id}`);
+      }
     } catch (error) {
-      // Error handling
-      console.error("Post update error:", error);
+      console.error(isCreate ? "Post create error:" : "Post update error:", error);
       toast.error(protectedEditorConfig.errorMessage);
     } finally {
       setIsSaving(false);
@@ -219,7 +201,39 @@ const BlogEditor = ({ post, userId, categories }) => {
     }
   };
 
-  // Delete handler
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await axios.post("/api/upload", formData);
+      form.setValue("image", response.data.url || "");
+      toast.success(protectedEditorConfig.successMessageImageUpload);
+    } catch (err) {
+      console.error("Error uploading image:", err);
+      toast.error(protectedEditorConfig.errorMessageImageUpload);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const removeImage = async () => {
+    const current = form.getValues("image");
+    if (current) {
+      try {
+        const publicId = current.split("/").slice(-1)[0].split(".")[0];
+        if (publicId) await axios.delete(`/api/upload?publicId=${publicId}`);
+      } catch (err) {
+        console.error("Error removing image:", err);
+      }
+    }
+    form.setValue("image", "");
+    toast.success("تم حذف الصورة بنجاح");
+  };
+
+  // Delete handler (only when editing)
   const onDelete = async () => {
     setShowLoadingAlert(true);
     setIsSaving(true);
@@ -242,105 +256,166 @@ const BlogEditor = ({ post, userId, categories }) => {
 
   return (
     <>
-      <Form {...form}>
-        <form onSubmit={onSubmit} className="space-y-8">
-          {/* Cards and form fields */}
-          <Card className="max-w-2xl">
-            <CardHeader>
+      <Form {...form} dir="rtl">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          {/* Single card with simple inputs like BlogLocaleEditor */}
+          <Card className="">
+            <CardHeader dir="rtl">
               <CardTitle>{protectedEditorConfig.generalTitle}</CardTitle>
               <CardDescription>
                 {protectedEditorConfig.generalDescription}
               </CardDescription>
             </CardHeader>
-            <Separator className="mb-8" />
             <CardContent className="space-y-4">
-              <TitleForm initialData={post} postId={post.id} />
-            </CardContent>
-          </Card>
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem dir="rtl">
+                    <FormLabel>{protectedEditorConfig.formTitle} *</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={protectedEditorConfig.placeHolderTitle}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          {/* Category */}
-          <Card className="max-w-2xl">
-            <CardHeader>
-              <CardTitle>{protectedEditorConfig.categoryTitle}</CardTitle>
-              <CardDescription>
-                {protectedEditorConfig.categoryDescription}
-              </CardDescription>
-            </CardHeader>
-            <Separator className="mb-8" />
-            <CardContent className="space-y-4">
-              <CategoryForm
-                initialData={post}
-                postId={post.id}
-                options={categories}
+              <FormField
+                control={form.control}
+                name="categoryId"
+                render={({ field }) => (
+                  <FormItem dir="rtl">
+                    <FormLabel>{protectedEditorConfig.categoryTitle}</FormLabel>
+                    <Select
+                      value={field.value || ""}
+                      onValueChange={field.onChange}
+                      dir="rtl"
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={protectedEditorConfig.categoryDescription} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {(categories || []).map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="image"
+                render={({ field }) => (
+                  <FormItem dir="rtl">
+                    <FormLabel>{protectedEditorConfig.coverImageTitle}</FormLabel>
+                    <FormControl>
+                      <div className="space-y-2">
+                        {field.value ? (
+                          <div className="relative group">
+                            <div className="relative w-full h-48 rounded-lg overflow-hidden bg-muted">
+                              <Image
+                                src={field.value}
+                                alt="Cover"
+                                fill
+                                className="object-cover"
+                                sizes="(max-width: 768px) 100vw, 640px"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={removeImage}
+                              className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors opacity-0 group-hover:opacity-100"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleImageUpload}
+                              className="hidden"
+                              id="blog-cover-upload"
+                              disabled={uploadingImage}
+                            />
+                            <label
+                              htmlFor="blog-cover-upload"
+                              className={`flex flex-col items-center justify-center h-32 w-full border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-emerald-500 transition-colors ${uploadingImage ? "opacity-50 cursor-not-allowed" : ""}`}
+                            >
+                              {uploadingImage ? (
+                                <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
+                              ) : (
+                                <>
+                                  <Upload className="w-6 h-6 text-gray-400" />
+                                  <span className="mt-2 text-sm text-gray-500">
+                                    اضغط لرفع الصورة الرئيسية
+                                  </span>
+                                </>
+                              )}
+                            </label>
+                          </>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem dir="rtl">
+                    <FormLabel>{protectedEditorConfig.shortDescriptionTitle}</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder={protectedEditorConfig.placeholderDescription}
+                        className="min-h-[160px] resize-y"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </CardContent>
           </Card>
 
-          {/* Cover Image */}
-          <Card className="max-w-2xl">
-            <CardHeader>
-              <CardTitle>{protectedEditorConfig.coverImageTitle}</CardTitle>
-              <CardDescription>
-                {protectedEditorConfig.coverImageDescription}
-              </CardDescription>
+          {/* Content - single WYSIWYG for Arabic (no inner lang tabs) */}
+          <Card className="">
+          <CardHeader dir="rtl">
+              <CardTitle>المحتوى</CardTitle>
+              <CardDescription>{protectedEditorConfig.placeholderContent}</CardDescription>
             </CardHeader>
-            <Separator className="mb-8" />
-            <CardContent className="space-y-4">
-              <ImageForm initialData={post} postId={post.id} />
+            <CardContent>
+              <WysiwygEditor
+                defaultValue={(() => {
+                  if (!contentAR) return defaultEditorContent;
+                  try {
+                    return typeof contentAR === "string" ? JSON.parse(contentAR) : contentAR;
+                  } catch {
+                    return defaultEditorContent;
+                  }
+                })()}
+                onDebouncedUpdate={(editor) => {
+                  setContentAR(JSON.stringify(editor?.getJSON()));
+                }}
+              />
             </CardContent>
           </Card>
-
-          {/* Short Description */}
-          <Card className="max-w-2xl">
-            <CardHeader>
-              <CardTitle>
-                {protectedEditorConfig.shortDescriptionTitle}
-              </CardTitle>
-              <CardDescription>
-                {protectedEditorConfig.shortDescriptionDescription}
-              </CardDescription>
-            </CardHeader>
-            <Separator className="mb-8" />
-            <CardContent className="space-y-4">
-              <DescriptionForm initialData={post} postId={post.id} />
-            </CardContent>
-          </Card>
-
-          {/* Language Tabs */}
-          <Tabs
-            value={activeLanguage}
-            onValueChange={(value) => {
-              if (value === "en" || value === "ar") {
-                setActiveLanguage(value);
-              }
-            }}
-          >
-            <TabsList>
-              <TabsTrigger value="en">English</TabsTrigger>
-              <TabsTrigger value="ar">العربية</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          {/* WYSIWYG Editor */}
-          {activeLanguage === "en" ? (
-            <WysiwygEditor
-              defaultValue={
-                contentEN ? JSON.parse(contentEN) : defaultEditorContent
-              }
-              onDebouncedUpdate={(editor) => {
-                setContentEN(JSON.stringify(editor?.getJSON()));
-              }}
-            />
-          ) : (
-            <WysiwygEditor
-              defaultValue={
-                contentAR ? JSON.parse(contentAR) : defaultEditorContent
-              }
-              onDebouncedUpdate={(editor) => {
-                setContentAR(JSON.stringify(editor?.getJSON()));
-              }}
-            />
-          )}
 
           {/* Form submission buttons */}
           <div className="inline-flex items-center justify-start gap-x-3">
@@ -349,16 +424,18 @@ const BlogEditor = ({ post, userId, categories }) => {
               className="flex !bg-gray-900 px-10 !text-white hover:!bg-gray-800"
               disabled={isSaving}
             >
-              {protectedEditorConfig.submit}
+              {isCreate ? "إنشاء" : protectedEditorConfig.submit}
             </Button>
-            <Button
-              type="button"
-              onClick={onDelete}
-              className="flex !bg-gray-900 px-10 !text-white hover:!bg-gray-800"
-              disabled={isSaving}
-            >
-              {protectedEditorConfig.delete}
-            </Button>
+            {!isCreate && (
+              <Button
+                type="button"
+                onClick={onDelete}
+                className="flex !bg-gray-900 px-10 !text-white hover:!bg-gray-800"
+                disabled={isSaving}
+              >
+                {protectedEditorConfig.delete}
+              </Button>
+            )}
             <Button
               type="button"
               onClick={() => router.back()}
@@ -379,7 +456,7 @@ const BlogEditor = ({ post, userId, categories }) => {
               {protectedPostConfig.pleaseWait}
             </AlertDialogTitle>
             <AlertDialogDescription className="mx-auto text-center">
-              <SpinnerIcon className="h-6 w-6 animate-spin" />
+              <Loader2 className="h-6 w-6 animate-spin" />
             </AlertDialogDescription>
           </AlertDialogHeader>
         </AlertDialogContent>

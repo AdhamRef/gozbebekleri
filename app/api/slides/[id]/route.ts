@@ -1,0 +1,94 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from "@/lib/prisma";
+import { getServerSession } from 'next-auth';
+import { authOptions } from "../../auth/[...nextauth]/options";
+
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const locale = request.nextUrl.searchParams.get('locale') || 'ar';
+    const allTranslations = request.nextUrl.searchParams.get('allTranslations') === 'true';
+    const slide = await prisma.slide.findUnique({
+      where: { id: params.id },
+      select: {
+        id: true, title: true, description: true, image: true,
+        showButton: true, buttonText: true, buttonLink: true, isActive: true, order: true,
+        translations: { select: { locale: true, title: true, description: true, buttonText: true } },
+      },
+    });
+    if (!slide) return NextResponse.json({ error: 'Slide not found' }, { status: 404 });
+    if (allTranslations) return NextResponse.json(slide);
+    const t = slide.translations.find(tr => tr.locale === locale);
+    return NextResponse.json({
+      ...slide,
+      title: t?.title ?? slide.title,
+      description: t?.description ?? slide.description,
+      buttonText: t?.buttonText ?? slide.buttonText,
+    });
+  } catch (error) {
+    console.error('Error fetching slide:', error);
+    return NextResponse.json({ error: 'Failed to fetch slide' }, { status: 500 });
+  }
+}
+
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const body = await request.json();
+    const { title, description, image, showButton, buttonText, buttonLink, isActive, order, translations } = body;
+    if (!title) return NextResponse.json({ error: 'Title required' }, { status: 400 });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.slide.update({
+        where: { id: params.id },
+        data: {
+          title,
+          description: description ?? '',
+          image: image ?? '',
+          showButton: showButton ?? true,
+          buttonText: buttonText ?? '',
+          buttonLink: buttonLink ?? '',
+          isActive: isActive !== false,
+          order: order ?? 0,
+        },
+      });
+      if (translations && typeof translations === 'object') {
+        for (const [locale, t] of Object.entries(translations)) {
+          if (locale === 'ar' || !t || typeof t !== 'object') continue;
+          const tt = t as any;
+          if (!tt.title) continue;
+          await tx.slideTranslation.upsert({
+            where: { slideId_locale: { slideId: params.id, locale } },
+            update: { title: tt.title, description: tt.description ?? '', buttonText: tt.buttonText ?? '' },
+            create: { slideId: params.id, locale, title: tt.title, description: tt.description ?? '', buttonText: tt.buttonText ?? '' },
+          });
+        }
+      }
+    });
+
+    const full = await prisma.slide.findUnique({
+      where: { id: params.id },
+      select: { id: true, title: true, description: true, image: true, showButton: true, buttonText: true, buttonLink: true, isActive: true, order: true, translations: { select: { locale: true, title: true, description: true, buttonText: true } } },
+    });
+    return NextResponse.json(full);
+  } catch (error) {
+    console.error('Error updating slide:', error);
+    return NextResponse.json({ error: 'Failed to update slide' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    await prisma.slide.delete({ where: { id: params.id } });
+    return NextResponse.json({ message: 'Slide deleted' }, { status: 200 });
+  } catch (error) {
+    console.error('Error deleting slide:', error);
+    return NextResponse.json({ error: 'Failed to delete slide' }, { status: 500 });
+  }
+}

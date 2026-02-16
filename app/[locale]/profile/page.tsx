@@ -40,8 +40,10 @@ import {
   Loader2,
   PauseCircle,
   PlayCircle,
-  X,
-  Menu,
+  ChevronRight,
+  Bell,
+  Shield,
+  CreditCard,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -72,22 +74,77 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Link } from "@/i18n/routing";
 import EditDialog from "./_components/EditDialog";
+import { useLocale, useTranslations } from "next-intl";
+import { useCurrency } from "@/context/CurrencyContext";
+import { cn } from "@/lib/utils";
 
-// Define the navigation items without paths
-const navigationItems = [
-  { id: "account", label: "معلومات الحساب", icon: User },
-  { id: "settings", label: "إعدادات الحساب", icon: Settings },
-  { id: "donations", label: "التبرعات", icon: HandHeart },
-  { id: "subscriptions", label: "اشتراكات التبرع الدوري", icon: Repeat },
-  { id: "receipts", label: "الكشالات", icon: Receipt },
-  { id: "support", label: "طلبات الدعم و المساعدة", icon: Headphones },
-  { id: "logout", label: "تسجيل خروج", icon: LogOut },
-];
+interface DonationForProfile {
+  id: string;
+  amount: number;
+  amountUSD?: number | null;
+  totalAmount: number;
+  currency: string;
+  type: string;
+  status: string;
+  billingDay?: number | null;
+  nextBillingDate?: string | null;
+  createdAt: string;
+  teamSupport?: number;
+  fees?: number;
+  coverFees?: boolean;
+  items: Array<{
+    id: string;
+    amount: number;
+    amountUSD?: number | null;
+    campaignId: string;
+    campaign?: { title?: string; images?: string[] };
+  }>;
+  [key: string]: unknown;
+}
+
+interface UserProfile {
+  id?: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+  country?: string | null;
+  phone?: string | null;
+  birthdate?: string | null;
+  donations?: DonationForProfile[];
+  [key: string]: unknown;
+}
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  TRY: "₺",
+  SAR: "ر.س",
+  AED: "د.إ",
+};
+
+function formatDonationAmount(amount: number, currency: string = "USD", amountUSD?: number | null) {
+  const sym = CURRENCY_SYMBOLS[currency] || currency + " ";
+  const value = typeof amount === "number" ? amount : 0;
+  const formatted = value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return `${sym}${formatted}`;
+}
 
 const ProfilePage = () => {
   const router = useRouter();
+  const t = useTranslations("Profile");
   const { data: session } = useSession();
-  const [user, setUser] = useState(null);
+  const locale = useLocale();
+  const isRtl = locale === "ar";
+  const { convertToCurrency } = useCurrency();
+
+  const navigationItems = [
+    { id: "account", label: t("nav.myinfo"), icon: User, description: t("nav.accountDesc") },
+    { id: "donations", label: t("nav.donations"), icon: HandHeart, description: t("nav.donationsDesc") },
+    { id: "support", label: t("nav.support"), icon: Headphones, description: t("nav.supportDesc") },
+  ];
+
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState("account");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -98,10 +155,22 @@ const ProfilePage = () => {
   const [selectedPeriod, setSelectedPeriod] = useState("all");
   const [selectedType, setSelectedType] = useState("all");
   const [isPauseDialogOpen, setIsPauseDialogOpen] = useState(false);
-  const [selectedDonation, setSelectedDonation] = useState(null);
+  const [selectedDonation, setSelectedDonation] = useState<DonationForProfile | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState<string | null>(null);
-  const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [subscriptionSettingsDonation, setSubscriptionSettingsDonation] = useState<DonationForProfile | null>(null);
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+
+  // Read tab from URL query parameter
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam && navigationItems.some(item => item.id === tabParam)) {
+        setActiveTab(tabParam);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -109,7 +178,7 @@ const ProfilePage = () => {
         const response = await axios.get(`/api/users/${id}`);
         setUser(response.data.user);
       } catch (err) {
-        setError("Failed to fetch user data");
+        setError(t("misc.failedToFetchUser"));
       } finally {
         setLoading(false);
       }
@@ -124,9 +193,9 @@ const ProfilePage = () => {
     try {
       await axios.delete(`/api/users/${id}`);
       await signOut({ callbackUrl: "/" });
-      toast.success("Account deleted");
+      toast.success(t("toast.accountDeleted"));
     } catch (error) {
-      toast.error("Failed to delete account. Please try again.");
+      toast.error(t("toast.deleteAccountFailed"));
     }
   };
 
@@ -140,63 +209,114 @@ const ProfilePage = () => {
         [field]: value,
       });
       setUser((prevUser) => ({ ...prevUser, [field]: value }));
-      toast.success("تم تحديث المعلومات بنجاح");
+      toast.success(t("toast.updateSuccess"));
     } catch (error) {
-      toast.error("فشل تحديث المعلومات");
+      toast.error(t("toast.updateFailed"));
     }
   };
 
-  const handleToggleSubscription = async (donation) => {
+  const handleToggleSubscription = (donation: DonationForProfile) => {
     setSelectedDonation(donation);
     setIsPauseDialogOpen(true);
   };
 
   const handleConfirmToggle = async () => {
     if (!selectedDonation) return;
-
     setIsLoading(true);
     try {
-      const newStatus =
-        selectedDonation.status === "ACTIVE" ? "PAUSED" : "ACTIVE";
-      // Add donation type to help with validation
-      const response = await axios.put(
-        `/api/donations/${selectedDonation.id}`,
-        {
-          status: newStatus,
-          type: selectedDonation.type, // Add this to help with validation
-        }
-      );
-
-      // Update local state
-      const updatedDonations = user.donations.map((d) =>
-        d.id === selectedDonation.id ? { ...d, status: newStatus } : d
-      );
-      setUser({ ...user, donations: updatedDonations });
-
+      const newStatus = selectedDonation.status === "ACTIVE" ? "PAUSED" : "ACTIVE";
+      const response = await axios.put(`/api/donations/${selectedDonation.id}`, {
+        status: newStatus,
+        billingDay: selectedDonation.billingDay ?? 1,
+      });
+      const updated = response.data as DonationForProfile;
+      setUser((prev) => {
+        if (!prev || !prev.donations) return prev;
+        return {
+          ...prev,
+          donations: prev.donations.map((d) =>
+            d.id === selectedDonation.id ? { ...d, ...updated } : d
+          ),
+        };
+      });
+      if (subscriptionSettingsDonation?.id === selectedDonation.id) {
+        setSubscriptionSettingsDonation((prev) => (prev ? { ...prev, ...updated } : null));
+      }
       toast.success(
         newStatus === "ACTIVE"
-          ? "تم تفعيل الاشتراك الشهري"
-          : "تم إيقاف الاشتراك الشهري مؤقتاً"
+          ? t("toast.subscriptionActivated")
+          : t("toast.subscriptionPaused")
       );
     } catch (error) {
-      console.error("Toggle error:", error); // Add this for debugging
-      toast.error("حدث خطأ أثناء تحديث حالة الاشتراك");
+      console.error("Toggle error:", error);
+      toast.error(t("toast.subscriptionUpdateError"));
     } finally {
       setIsLoading(false);
       setIsPauseDialogOpen(false);
       setSelectedDonation(null);
+      setSubscriptionSettingsDonation((prev) => (prev?.id === selectedDonation.id ? null : prev));
+    }
+  };
+
+  const handleBillingDayChange = async (donationId: string, billingDay: number) => {
+    try {
+      const response = await axios.put(`/api/donations/${donationId}`, { billingDay });
+      const updated = response.data as DonationForProfile;
+      setUser((prev) => {
+        if (!prev || !prev.donations) return prev;
+        return {
+          ...prev,
+          donations: prev.donations.map((d) =>
+            d.id === donationId ? { ...d, ...updated } : d
+          ),
+        };
+      });
+      setSubscriptionSettingsDonation((prev) => (prev?.id === donationId ? { ...prev, ...updated } : prev));
+      toast.success(t("toast.updateSuccess"));
+    } catch (error) {
+      toast.error(t("toast.subscriptionUpdateError"));
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!subscriptionSettingsDonation) return;
+    setIsLoading(true);
+    try {
+      const response = await axios.put(`/api/donations/${subscriptionSettingsDonation.id}`, {
+        status: "CANCELLED",
+      });
+      const updated = response.data as DonationForProfile;
+      setUser((prev) => {
+        if (!prev || !prev.donations) return prev;
+        return {
+          ...prev,
+          donations: prev.donations.map((d) =>
+            d.id === subscriptionSettingsDonation.id ? { ...d, ...updated } : d
+          ),
+        };
+      });
+      setSubscriptionSettingsDonation(null);
+      setIsCancelDialogOpen(false);
+      toast.success(t("toast.subscriptionCancelled"));
+    } catch (error) {
+      toast.error(t("toast.subscriptionUpdateError"));
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleDownload = async (donationId: string) => {
     try {
       setIsDownloading(donationId);
-      const response = await axios.get(`/api/donations/${donationId}/receipt`, {
-        responseType: "blob",
-        // Add timeout and retry logic
-        timeout: 30000,
-        validateStatus: (status) => status === 200,
-      });
+      const localeParam = typeof locale === "string" ? locale : "en";
+      const response = await axios.get(
+        `/api/donations/${donationId}/receipt?locale=${encodeURIComponent(localeParam)}`,
+        {
+          responseType: "blob",
+          timeout: 30000,
+          validateStatus: (status) => status === 200,
+        }
+      );
 
       if (!(response.data instanceof Blob)) {
         throw new Error("Invalid response format");
@@ -210,16 +330,15 @@ const ProfilePage = () => {
       document.body.appendChild(link);
       link.click();
 
-      // Cleanup
       setTimeout(() => {
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
       }, 100);
 
-      toast.success("تم تحميل الإيصال بنجاح");
+      toast.success(t("toast.receiptDownloadSuccess"));
     } catch (error) {
       console.error("Download error:", error);
-      toast.error("فشل تحميل الإيصال");
+      toast.error(t("toast.receiptDownloadFailed"));
     } finally {
       setIsDownloading(null);
     }
@@ -228,128 +347,144 @@ const ProfilePage = () => {
   const handleDownloadAll = async () => {
     try {
       setIsDownloading("all");
-      for (const donation of user.donations || []) {
+      for (const donation of user?.donations ?? []) {
         await handleDownload(donation.id);
       }
-      toast.success("تم تحميل جميع الإيصالات بنجاح");
+      toast.success(t("toast.allReceiptsDownloadSuccess"));
     } catch (error) {
-      toast.error("فشل تحميل بعض الإيصالات");
+      toast.error(t("toast.allReceiptsDownloadFailed"));
     } finally {
       setIsDownloading(null);
     }
   };
 
-  const AccountInfo = () => (
-    <div className="space-y-1 divide-y">
-      <EditDialog
-        title="الاسم"
-        value={user.name}
-        onSave={(value) => handleUpdateField("name", value)}
-        icon={User}
-      />
-
-      <EditDialog
-        title="البريد الإلكتروني"
-        value={user.email}
-        onSave={(value) => handleUpdateField("email", value)}
-        icon={Mail}
-      />
-
-      <EditDialog
-        title="البلد"
-        value={user.country}
-        onSave={(value) => handleUpdateField("country", value)}
-        icon={Globe}
-      />
-
-      <EditDialog
-        title="رقم الهاتف"
-        value={user.phone}
-        onSave={(value) => handleUpdateField("phone", value)}
-        type="tel"
-        icon={Phone}
-      />
-
-      <EditDialog
-        title="تاريخ الميلاد"
-        value={user.birthdate}
-        onSave={(value) => handleUpdateField("birthdate", value)}
-        type="date"
-        icon={Calendar}
-      />
-    </div>
-  );
-
-  const Settings = () => (
-    <div className="space-y-4 md:space-y-6">
-      <Card className="p-3 md:p-4">
-        <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4">
-          الإشعارات
-        </h3>
-        <div className="space-y-3 md:space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <h4 className="text-sm md:text-base font-medium">
-                إشعارات البريد الإلكتروني
-              </h4>
-              <p className="text-xs md:text-sm text-gray-500">
-                تلقي تحديثات عبر البريد الإلكتروني
-              </p>
-            </div>
-            <Switch
-              checked={emailNotifications}
-              onCheckedChange={setEmailNotifications}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <h4 className="text-sm md:text-base font-medium">
-                إشعارات الرسائل النصية
-              </h4>
-              <p className="text-xs md:text-sm text-gray-500">
-                تلقي تحديثات عبر الرسائل النصية
-              </p>
-            </div>
-            <Switch
-              checked={smsNotifications}
-              onCheckedChange={setSmsNotifications}
-            />
-          </div>
+  // Account Section with improved organization
+  const AccountInfo = ({ user: u }: { user: UserProfile }) => (
+    <div className="space-y-6">
+      {/* Profile Header */}
+      <div className="flex flex-col sm:flex-row items-center gap-6 p-6 bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl border border-primary/20">
+        <Avatar className="w-24 h-24 ring-4 ring-white shadow-xl">
+          <AvatarImage src={u.image ?? undefined} alt={u.name ?? undefined} />
+          <AvatarFallback className="text-2xl bg-primary text-white">
+            {(u.name ?? u.email ?? "?").charAt(0).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+        <div className="text-center sm:text-left flex-1">
+          <h2 className="text-2xl font-bold text-gray-900">{u.name || t("account.name")}</h2>
+          <p className="text-gray-600 mt-1">{u.email}</p>
+          <Badge variant="secondary" className="mt-3">
+            {t("account.verified")}
+          </Badge>
         </div>
-      </Card>
+      </div>
 
-      <Card className="p-3 md:p-4 border-red-200">
-        <h3 className="text-base md:text-lg font-semibold text-red-600 mb-3 md:mb-4">
-          حذف الحساب
+      {/* Personal Information */}
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <User className="w-5 h-5" />
+          {t("account.personalInfo")}
         </h3>
-        <p className="text-xs md:text-sm text-gray-500 mb-3 md:mb-4">
-          سيؤدي حذف حسابك إلى إزالة جميع بياناتك بشكل دائم. هذا الإجراء لا يمكن
-          التراجع عنه.
-        </p>
-        <Button
-          variant="destructive"
-          onClick={() => setIsDeleteDialogOpen(true)}
-        >
-          حذف الحساب
-        </Button>
-      </Card>
+        <Card className="divide-y divide-gray-100">
+          <EditDialog
+            title={t("account.name")}
+            value={u.name ?? ""}
+            onSave={(value: string) => handleUpdateField("name", value)}
+            icon={User}
+          />
+          <EditDialog
+            title={t("account.email")}
+            value={u.email ?? ""}
+            onSave={(value: string) => handleUpdateField("email", value)}
+            icon={Mail}
+          />
+          <EditDialog
+            title={t("account.country")}
+            value={u.country ?? ""}
+            onSave={(value: string) => handleUpdateField("country", value)}
+            icon={Globe}
+          />
+          <EditDialog
+            title={t("account.phone")}
+            value={u.phone ?? ""}
+            onSave={(value: string) => handleUpdateField("phone", value)}
+            type="tel"
+            icon={Phone}
+          />
+          <EditDialog
+            title={t("account.birthdate")}
+            value={u.birthdate ?? ""}
+            onSave={(value: string) => handleUpdateField("birthdate", value)}
+            type="date"
+            icon={Calendar}
+          />
+        </Card>
+      </div>
+
+      {/* Security & Preferences */}
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <Shield className="w-5 h-5" />
+          {t("account.security")}
+        </h3>
+        <Card className="p-6 space-y-6">
+          {/* Notifications */}
+          <div>
+            <h4 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+              <Bell className="w-4 h-4" />
+              {t("settings.notifications")}
+            </h4>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div className="flex-1">
+                  <h5 className="font-medium text-gray-900">{t("settings.emailNotifications")}</h5>
+                  <p className="text-sm text-gray-500 mt-1">{t("settings.emailNotificationsDesc")}</p>
+                </div>
+                <Switch
+                  checked={emailNotifications}
+                  onCheckedChange={setEmailNotifications}
+                />
+              </div>
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div className="flex-1">
+                  <h5 className="font-medium text-gray-900">{t("settings.smsNotifications")}</h5>
+                  <p className="text-sm text-gray-500 mt-1">{t("settings.smsNotificationsDesc")}</p>
+                </div>
+                <Switch
+                  checked={smsNotifications}
+                  onCheckedChange={setSmsNotifications}
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Danger Zone */}
+          <div className="p-4 border-2 border-red-200 bg-red-50/50 rounded-xl">
+            <h4 className="font-semibold text-red-900 mb-2">{t("settings.deleteAccount")}</h4>
+            <p className="text-sm text-red-700 mb-4">{t("settings.deleteAccountWarning")}</p>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setIsDeleteDialogOpen(true)}
+            >
+              {t("settings.deleteAccountButton")}
+            </Button>
+          </div>
+        </Card>
+      </div>
     </div>
   );
 
-  const Donations = () => {
-    const filteredDonations = user.donations?.filter((donation) => {
-      const matchesType =
-        selectedType === "all" || donation.type === selectedType;
+  // Donations Section with improved layout
+  const Donations = ({ user: u }: { user: UserProfile }) => {
+    const filteredDonations = u.donations?.filter((donation: DonationForProfile) => {
+      const matchesType = selectedType === "all" || donation.type === selectedType;
       const date = new Date(donation.createdAt);
       const now = new Date();
-
       switch (selectedPeriod) {
         case "month":
-          return (
-            matchesType &&
-            date.getMonth() === now.getMonth() &&
-            date.getFullYear() === now.getFullYear()
-          );
+          return matchesType && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
         case "year":
           return matchesType && date.getFullYear() === now.getFullYear();
         default:
@@ -357,632 +492,338 @@ const ProfilePage = () => {
       }
     });
 
-    const totalAmount =
-      filteredDonations?.reduce((sum, d) => sum + d.totalAmount, 0) || 0;
-    const averageAmount = filteredDonations?.length
-      ? totalAmount / filteredDonations.length
-      : 0;
+    const totalAmountUSD =
+      filteredDonations?.reduce((sum: number, d: DonationForProfile) => sum + (d.amountUSD ?? d.totalAmount), 0) || 0;
+    const totalAmountConverted = convertToCurrency(totalAmountUSD);
+    const totalDisplayValue =
+      totalAmountConverted?.convertedValue != null && totalAmountConverted?.currency
+        ? totalAmountConverted.convertedValue
+        : totalAmountUSD;`sideba`
+    const totalDisplayCurrency = totalAmountConverted?.currency ?? "USD";
+    const totalDisplaySymbol = CURRENCY_SYMBOLS[totalDisplayCurrency] || totalDisplayCurrency + " ";
+    const totalDisplayFormatted =
+      typeof totalDisplayValue === "number"
+        ? totalDisplayValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+        : "0";
+    const monthlyCount =
+      u.donations?.filter(
+        (d: DonationForProfile) =>
+          d.type === "MONTHLY" && d.status === "ACTIVE"
+      ).length || 0;
+      const campaignCount =
+      new Set(u.donations?.flatMap((d: DonationForProfile) => d.items?.map((i: { campaignId: string }) => i.campaignId) ?? [])).size;
+
+    const statusLabel = (d: DonationForProfile) => {
+      if (d.type !== "MONTHLY") return null;
+      if (d.status === "ACTIVE") return t("subscriptions.active");
+      if (d.status === "PAUSED") return t("subscriptions.paused");
+      return t("subscriptions.cancelled");
+    };
 
     return (
-      <div className="space-y-4 md:space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
-          <Card className="p-3 md:p-4">
-            <h4 className="text-xs md:text-sm text-gray-500">
-              إجمالي التبرعات
-            </h4>
-            <p className="text-lg md:text-2xl font-bold">
-              ${totalAmount.toFixed(2)}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              {filteredDonations?.length || 0} تبرع
-            </p>
+      <div className="space-y-6" dir={isRtl ? "rtl" : "ltr"}>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="p-6 bg-gradient-to-br from-slate-50 to-slate-100/50 border-slate-200">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-700 uppercase tracking-wide">
+                  {t("donations.totalDonations")}
+                </p>
+                <p className="text-3xl font-bold text-slate-900 mt-2">
+                  {totalDisplaySymbol}{totalDisplayFormatted}
+                </p>
+                <p className="text-sm text-slate-600 mt-1">
+                  {t("donations.donationsCount", { count: filteredDonations?.length || 0 })}
+                </p>
+              </div>
+              <div className="p-3 bg-slate-200 rounded-xl">
+                <HandHeart className="w-6 h-6 text-slate-700" />
+              </div>
+            </div>
           </Card>
-          <Card className="p-3 md:p-4">
-            <h4 className="text-xs md:text-sm text-gray-500">متوسط التبرع</h4>
-            <p className="text-lg md:text-2xl font-bold">
-              ${averageAmount.toFixed(2)}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">لكل تبرع</p>
+
+          <Card className="p-6 bg-gradient-to-br from-slate-50 to-slate-100/50 border-slate-200">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-700 uppercase tracking-wide">
+                  {t("donations.monthlyDonations")}
+                </p>
+                <p className="text-3xl font-bold text-slate-900 mt-2">{monthlyCount}</p>
+                <p className="text-sm text-slate-600 mt-1">{t("donations.activeSubscription")}</p>
+              </div>
+              <div className="p-3 bg-slate-200 rounded-xl">
+                <Repeat className="w-6 h-6 text-slate-700" />
+              </div>
+            </div>
           </Card>
-          <Card className="p-3 md:p-4">
-            <h4 className="text-xs md:text-sm text-gray-500">
-              التبرعات الشهرية
-            </h4>
-            <p className="text-lg md:text-2xl font-bold">
-              {user.donations?.filter((d) => d.type === "MONTHLY").length || 0}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">اشتراك نشط</p>
-          </Card>
-          <Card className="p-3 md:p-4">
-            <h4 className="text-xs md:text-sm text-gray-500">
-              الحملات المدعومة
-            </h4>
-            <p className="text-lg md:text-2xl font-bold">
-              {
-                new Set(
-                  user.donations?.flatMap((d) =>
-                    d.items.map((i) => i.campaignId)
-                  )
-                ).size
-              }
-            </p>
-            <p className="text-xs text-gray-500 mt-1">حملة</p>
+
+          <Card className="p-6 bg-gradient-to-br from-slate-50 to-slate-100/50 border-slate-200">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-700 uppercase tracking-wide">
+                  {t("donations.supportedCampaigns")}
+                </p>
+                <p className="text-3xl font-bold text-slate-900 mt-2">{campaignCount}</p>
+                <p className="text-sm text-slate-600 mt-1">{t("donations.campaign")}</p>
+              </div>
+              <div className="p-3 bg-slate-200 rounded-xl">
+                <CreditCard className="w-6 h-6 text-slate-700" />
+              </div>
+            </div>
           </Card>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-col md:flex-row gap-2 md:gap-4">
-          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger className="w-full md:w-[180px] text-sm md:text-base">
-              <SelectValue placeholder="الفترة الزمنية" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">كل الفترات</SelectItem>
-              <SelectItem value="month">هذا الشهر</SelectItem>
-              <SelectItem value="year">هذا العام</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={selectedType} onValueChange={setSelectedType}>
-            <SelectTrigger className="w-full md:w-[180px] text-sm md:text-base">
-              <SelectValue placeholder="نوع التبرع" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">الكل</SelectItem>
-              <SelectItem value="ONE_TIME">تبرع لمرة واحدة</SelectItem>
-              <SelectItem value="MONTHLY">تبرع شهري</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Filters and Actions */}
+        <Card className="p-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder={t("donations.timePeriod")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("donations.allPeriods")}</SelectItem>
+                  <SelectItem value="month">{t("donations.thisMonth")}</SelectItem>
+                  <SelectItem value="year">{t("donations.thisYear")}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={selectedType} onValueChange={setSelectedType}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder={t("donations.donationType")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("donations.all")}</SelectItem>
+                  <SelectItem value="ONE_TIME">{t("donations.oneTime")}</SelectItem>
+                  <SelectItem value="MONTHLY">{t("donations.monthly")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleDownloadAll}
+              disabled={isDownloading !== null || !filteredDonations?.length}
+              className="gap-2"
+            >
+              {isDownloading === "all" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              {t("receipts.downloadAll", { count: filteredDonations?.length || 0 })}
+            </Button>
+          </div>
+        </Card>
 
         {/* Donations List */}
-        <Card>
-          <ScrollArea className="h-[400px] md:h-[600px]">
-            <Accordion type="single" collapsible className="w-full">
-              {filteredDonations?.map((donation) => (
-                <AccordionItem key={donation.id} value={donation.id}>
-                  <AccordionTrigger className="px-2 md:px-4">
-                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between w-full">
-                      <div className="flex items-center gap-2 md:gap-4">
-                        <div className="bg-primary/10 p-1.5 md:p-2 rounded-full">
-                          {donation.type === "MONTHLY" ? (
-                            <Repeat className="w-3 h-3 md:w-4 md:h-4 text-primary" />
-                          ) : (
-                            <HandHeart className="w-3 h-3 md:w-4 md:h-4 text-primary" />
+        <Card className="overflow-hidden">
+          {filteredDonations?.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+              <Receipt className="w-16 h-16 mb-4 opacity-50" />
+              <p className="text-lg font-medium">{t("receipts.noReceiptsMatch")}</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              {/* Desktop Table */}
+              <table className="hidden lg:table w-full" dir={isRtl ? "rtl" : "ltr"}>
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className={cn("text-left font-semibold text-gray-700 py-4 px-6", isRtl && "text-right")}>
+                      {t("donations.date")}
+                    </th>
+                    <th className={cn("text-left font-semibold text-gray-700 py-4 px-6", isRtl && "text-right")}>
+                      {t("donations.donationType")}
+                    </th>
+                    <th className={cn("text-left font-semibold text-gray-700 py-4 px-6", isRtl && "text-right")}>
+                      {t("donations.total")}
+                    </th>
+                    <th className={cn("text-left font-semibold text-gray-700 py-4 px-6", isRtl && "text-right")}>
+                      {t("donations.status")}
+                    </th>
+                    <th className={cn("text-right font-semibold text-gray-700 py-4 px-6", isRtl && "text-left")}>
+                      {t("donations.actions")}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredDonations?.map((donation: DonationForProfile) => (
+                    <tr key={donation.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="py-4 px-6 text-gray-900">
+                        {new Date(donation.createdAt).toLocaleDateString(locale === "ar" ? "ar-EG" : undefined)}
+                      </td>
+                      <td className="py-4 px-6">
+                        <Badge variant={donation.type === "MONTHLY" ? "default" : "secondary"}>
+                          {donation.type === "MONTHLY" ? t("donations.monthly") : t("donations.oneTime")}
+                        </Badge>
+                      </td>
+                      <td className="py-4 px-6 font-semibold text-gray-900">
+                        {formatDonationAmount(donation.totalAmount, donation.currency, donation.amountUSD)}
+                      </td>
+                      <td className="py-4 px-6">
+                        {donation.type === "MONTHLY" ? (
+                          <Badge
+                            variant="outline"
+                            className={
+                              donation.status === "ACTIVE"
+                                ? "border-slate-300 bg-slate-50 text-slate-700"
+                                : donation.status === "PAUSED"
+                                  ? "border-amber-300 bg-amber-50 text-amber-700"
+                                  : "border-gray-300 text-gray-600"
+                            }
+                          >
+                            {statusLabel(donation)}
+                          </Badge>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className={cn("py-4 px-6", isRtl ? "text-left" : "text-right")}>
+                        <div className="flex items-center justify-end gap-2">
+                          {donation.type === "MONTHLY" && donation.status !== "CANCELLED" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSubscriptionSettingsDonation(donation)}
+                            >
+                              <Settings className="w-4 h-4 mr-2" />
+                              {t("subscriptions.manage")}
+                            </Button>
                           )}
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm md:text-base font-medium">
-                            تبرع #{donation.id.slice(-4)}
-                          </p>
-                          <p className="text-xs md:text-sm text-gray-500">
-                            {new Date(donation.createdAt).toLocaleDateString(
-                              "en-US"
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDownload(donation.id)}
+                            disabled={isDownloading === donation.id}
+                            title={t("receipts.downloadReceipt")}
+                          >
+                            {isDownloading === donation.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Download className="w-4 h-4" />
                             )}
-                          </p>
+                          </Button>
                         </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Mobile Cards */}
+              <div className="lg:hidden divide-y divide-gray-100">
+                {filteredDonations?.map((donation: DonationForProfile) => (
+                  <div key={donation.id} className="p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-semibold text-lg text-gray-900">
+                          {formatDonationAmount(donation.totalAmount, donation.currency, donation.amountUSD)}
+                        </p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {new Date(donation.createdAt).toLocaleDateString(locale === "ar" ? "ar-EG" : undefined)}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-2 md:gap-4 mt-2 md:mt-0">
+                      <Badge variant={donation.type === "MONTHLY" ? "default" : "secondary"}>
+                        {donation.type === "MONTHLY" ? t("donations.monthly") : t("donations.oneTime")}
+                      </Badge>
+                    </div>
+                    {donation.type === "MONTHLY" && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">{t("donations.status")}:</span>
                         <Badge
-                          variant={
+                          variant="outline"
+                          className={
                             donation.status === "ACTIVE"
-                              ? "default"
-                              : "secondary"
+                              ? "border-slate-300 bg-slate-50 text-slate-700"
+                              : donation.status === "PAUSED"
+                                ? "border-amber-300 bg-amber-50 text-amber-700"
+                                : "border-gray-300 text-gray-600"
                           }
                         >
-                          {donation.type === "MONTHLY" ? "شهري" : "مرة واحدة"}
+                          {statusLabel(donation)}
                         </Badge>
-                        <p className="text-sm md:text-base font-semibold">
-                          ${donation.totalAmount}
-                        </p>
                       </div>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="px-4 py-3 space-y-4">
-                      {/* Donation Details */}
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <p className="text-sm text-gray-500">طريقة الدفع</p>
-                          <p className="font-medium">
-                            {donation.paymentMethod}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">الحالة</p>
-                          <Badge variant="outline">{donation.status}</Badge>
-                        </div>
-                        {donation.type === "MONTHLY" && (
-                          <div>
-                            <p className="text-sm text-gray-500">
-                              تاريخ التجديد
-                            </p>
-                            <p className="font-medium">
-                              {new Date(
-                                donation.nextBillingDate
-                              ).toLocaleDateString("en-US")}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      <Separator />
-
-                      {/* Donation Items */}
-                      <div className="space-y-3">
-                        <h4 className="font-medium">تفاصيل التبرع</h4>
-                        {donation.items.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex justify-between items-center bg-secondary/50 p-3 rounded-lg"
-                          >
-                            <div className="flex items-center gap-3">
-                              {item.campaign.images?.[0] && (
-                                <img
-                                  src={item.campaign.images[0]}
-                                  alt={item.campaign.title}
-                                  className="w-12 h-12 rounded-lg object-cover"
-                                />
-                              )}
-                              <div>
-                                <p className="font-medium">
-                                  {item.campaign.title}
-                                </p>
-                                {donation.type === "MONTHLY" && (
-                                  <p className="text-sm text-gray-500">
-                                    تبرع شهري
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                            <p className="font-semibold">${item.amount}</p>
-                          </div>
-                        ))}
-                      </div>
-
-                      <Separator />
-
-                      {/* Calculations */}
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>المبلغ الأساسي</span>
-                          <span>${donation.amount}</span>
-                        </div>
-                        {donation.teamSupport > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span>دعم الفريق</span>
-                            <span>${donation.teamSupport}</span>
-                          </div>
-                        )}
-                        {donation.coverFees && (
-                          <div className="flex justify-between text-sm">
-                            <span>رسوم المعاملة</span>
-                            <span>${donation.fees}</span>
-                          </div>
-                        )}
-                        <Separator />
-                        <div className="flex justify-between font-semibold">
-                          <span>الإجمالي</span>
-                          <span>${donation.totalAmount}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </ScrollArea>
-        </Card>
-      </div>
-    );
-  };
-
-  const Subscriptions = () => {
-    const monthlyDonations =
-      user.donations?.filter((d) => d.type === "MONTHLY") || [];
-    const activeDonations = monthlyDonations.filter(
-      (d) => d.status === "ACTIVE"
-    );
-    const totalMonthly = monthlyDonations.reduce((sum, d) => sum + d.amount, 0);
-
-    return (
-      <div className="space-y-4 md:space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
-          <Card className="p-3 md:p-4">
-            <h4 className="text-xs md:text-sm text-gray-500">
-              التبرعات الشهرية النشطة
-            </h4>
-            <p className="text-lg md:text-2xl font-bold">
-              {activeDonations.length}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              من أصل {monthlyDonations.length} اشتراك
-            </p>
-          </Card>
-          <Card className="p-3 md:p-4">
-            <h4 className="text-xs md:text-sm text-gray-500">
-              إجمالي التبرعات الشهرية
-            </h4>
-            <p className="text-lg md:text-2xl font-bold">
-              ${totalMonthly.toFixed(2)}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">شهرياً</p>
-          </Card>
-          <Card className="p-3 md:p-4">
-            <h4 className="text-xs md:text-sm text-gray-500">
-              تاريخ التجديد القادم
-            </h4>
-            <p className="text-lg md:text-2xl font-bold">
-              {activeDonations[0]?.nextBillingDate
-                ? new Date(
-                    activeDonations[0].nextBillingDate
-                  ).toLocaleDateString("ar-EG")
-                : "لا يوجد"}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              {activeDonations.length > 1 && "لأقرب اشتراك"}
-            </p>
-          </Card>
-        </div>
-
-        <div className="space-y-3 md:space-y-4">
-          {monthlyDonations.map((subscription) => (
-            <Card key={subscription.id} className="p-3 md:p-4">
-              <div className="flex flex-col md:flex-row justify-between items-start mb-3 md:mb-4">
-                <div>
-                  <h3 className="text-sm md:text-base font-semibold">
-                    اشتراك #{subscription.id.slice(-4)}
-                  </h3>
-                  <p className="text-xs md:text-sm text-gray-500">
-                    تم الإنشاء:{" "}
-                    {new Date(subscription.createdAt).toLocaleDateString(
-                      "ar-EG"
                     )}
-                  </p>
-                  {subscription.status === "ACTIVE" && (
-                    <p className="text-xs md:text-sm text-gray-500">
-                      التجديد القادم:{" "}
-                      {new Date(
-                        subscription.nextBillingDate
-                      ).toLocaleDateString("ar-EG")}
-                    </p>
-                  )}
-                </div>
-                <Badge
-                  variant={
-                    subscription.status === "ACTIVE" ? "success" : "secondary"
-                  }
-                  className="mt-2 md:mt-0"
-                >
-                  {subscription.status === "ACTIVE" ? "نشط" : "متوقف مؤقتاً"}
-                </Badge>
-              </div>
-
-              <div className="space-y-3">
-                {subscription.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex flex-col md:flex-row justify-between items-start md:items-center bg-secondary/20 p-2 md:p-3 rounded-lg"
-                  >
-                    <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto">
-                      {item.campaign.images?.[0] && (
-                        <img
-                          src={item.campaign.images[0]}
-                          alt={item.campaign.title}
-                          className="w-10 h-10 md:w-12 md:h-12 rounded-lg object-cover"
-                        />
-                      )}
-                      <div>
-                        <p className="text-sm md:text-base font-medium">
-                          {item.campaign.title}
-                        </p>
-                        <p className="text-xs md:text-sm text-gray-500">
-                          ${item.amount} شهرياً
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      variant={
-                        subscription.status === "ACTIVE" ? "outline" : "default"
-                      }
-                      size="sm"
-                      onClick={() => handleToggleSubscription(subscription)}
-                      disabled={isLoading}
-                      className={`mt-2 md:mt-0 w-full md:w-auto ${
-                        subscription.status === "ACTIVE"
-                          ? "bg-orange-600 hover:bg-orange-700"
-                          : "bg-emerald-600 hover:bg-emerald-700"
-                      } text-white hover:text-white text-xs md:text-sm`}
-                    >
-                      <div className="flex items-center justify-center gap-1 md:gap-2">
-                        {subscription.status === "ACTIVE" ? (
-                          <>
-                            <PauseCircle className="w-3 h-3 md:w-4 md:h-4" />
-                            إيقاف مؤقت
-                          </>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleDownload(donation.id)}
+                        disabled={isDownloading === donation.id}
+                      >
+                        {isDownloading === donation.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
                         ) : (
-                          <>
-                            <PlayCircle className="w-3 h-3 md:w-4 md:h-4" />
-                            استئناف
-                          </>
+                          <Download className="w-4 h-4 mr-2" />
                         )}
-                      </div>
-                    </Button>
+                        {t("receipts.download")}
+                      </Button>
+                      {donation.type === "MONTHLY" && donation.status !== "CANCELLED" && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setSubscriptionSettingsDonation(donation)}
+                        >
+                          <Settings className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const Receipts = () => {
-    const [isDownloading, setIsDownloading] = useState<string | null>(null);
-    const [selectedPeriod, setSelectedPeriod] = useState("all");
-    const [selectedType, setSelectedType] = useState("all");
-
-    const filteredReceipts = user?.donations?.filter((donation) => {
-      const matchesType =
-        selectedType === "all" || donation.type === selectedType;
-      const date = new Date(donation.createdAt);
-      const now = new Date();
-
-      switch (selectedPeriod) {
-        case "month":
-          return (
-            matchesType &&
-            date.getMonth() === now.getMonth() &&
-            date.getFullYear() === now.getFullYear()
-          );
-        case "year":
-          return matchesType && date.getFullYear() === now.getFullYear();
-        default:
-          return matchesType;
-      }
-    });
-
-    const handleDownload = async (donationId: string) => {
-      try {
-        setIsDownloading(donationId);
-        const response = await axios.get(
-          `/api/donations/${donationId}/receipt`,
-          {
-            responseType: "blob",
-          }
-        );
-
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement("a");
-        link.href = url;
-        link.setAttribute("download", `receipt-${donationId.slice(-8)}.pdf`);
-        document.body.appendChild(link);
-        link.click();
-        link.parentNode?.removeChild(link);
-        window.URL.revokeObjectURL(url);
-
-        toast.success("تم تحميل الإيصال بنجاح");
-      } catch (error) {
-        toast.error("فشل تحميل الإيصال");
-      } finally {
-        setIsDownloading(null);
-      }
-    };
-
-    const handleDownloadAll = async () => {
-      try {
-        setIsDownloading("all");
-        for (const donation of filteredReceipts || []) {
-          await handleDownload(donation.id);
-        }
-        toast.success("تم تحميل جميع الإيصالات بنجاح");
-      } catch (error) {
-        toast.error("فشل تحميل بعض الإيصالات");
-      } finally {
-        setIsDownloading(null);
-      }
-    };
-
-    return (
-      <div className="space-y-4 md:space-y-6">
-        {/* Stats Section */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
-          <Card className="p-3 md:p-4">
-            <h4 className="text-xs md:text-sm text-gray-500">عدد الإيصالات</h4>
-            <p className="text-lg md:text-2xl font-bold">
-              {filteredReceipts?.length || 0}
-            </p>
-          </Card>
-          <Card className="p-3 md:p-4">
-            <h4 className="text-xs md:text-sm text-gray-500">
-              إجمالي التبرعات
-            </h4>
-            <p className="text-lg md:text-2xl font-bold">
-              $
-              {filteredReceipts
-                ?.reduce((sum, d) => sum + d.totalAmount, 0)
-                .toFixed(2) || "0.00"}
-            </p>
-          </Card>
-          <Card className="p-3 md:p-4 col-span-2 lg:col-span-1">
-            <h4 className="text-xs md:text-sm text-gray-500">متوسط التبرع</h4>
-            <p className="text-lg md:text-2xl font-bold">
-              $
-              {filteredReceipts?.length
-                ? (
-                    filteredReceipts.reduce(
-                      (sum, d) => sum + d.totalAmount,
-                      0
-                    ) / filteredReceipts.length
-                  ).toFixed(2)
-                : "0.00"}
-            </p>
-          </Card>
-        </div>
-
-        {/* Filters and Download All */}
-        <div className="flex flex-col md:flex-row gap-2 md:gap-4">
-          <div className="flex flex-col md:flex-row gap-2 md:gap-4 w-full md:w-auto">
-            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-              <SelectTrigger className="w-full md:w-[180px] text-sm md:text-base">
-                <SelectValue placeholder="الفترة الزمنية" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">كل الفترات</SelectItem>
-                <SelectItem value="month">هذا الشهر</SelectItem>
-                <SelectItem value="year">هذا العام</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={selectedType} onValueChange={setSelectedType}>
-              <SelectTrigger className="w-full md:w-[180px] text-sm md:text-base">
-                <SelectValue placeholder="نوع التبرع" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">الكل</SelectItem>
-                <SelectItem value="ONE_TIME">تبرع لمرة واحدة</SelectItem>
-                <SelectItem value="MONTHLY">تبرع شهري</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Button
-            variant="outline"
-            onClick={handleDownloadAll}
-            disabled={isDownloading !== null || !filteredReceipts?.length}
-            className="w-full md:w-auto text-xs md:text-sm"
-          >
-            {isDownloading === "all" ? (
-              <Loader2 className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2 animate-spin" />
-            ) : (
-              <Download className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2" />
-            )}
-            تحميل الكل ({filteredReceipts?.length || 0})
-          </Button>
-        </div>
-
-        {/* Receipts List */}
-        <Card>
-          <ScrollArea className="h-[400px] md:h-[600px]">
-            <div className="p-2 md:p-4">
-              {filteredReceipts?.length === 0 ? (
-                <div className="text-center py-6 md:py-8 text-sm md:text-base text-gray-500">
-                  لا توجد إيصالات متطابقة مع المعايير المحددة
-                </div>
-              ) : (
-                <Accordion type="single" collapsible className="w-full">
-                  {filteredReceipts?.map((receipt) => (
-                    <AccordionItem key={receipt.id} value={receipt.id}>
-                      <AccordionTrigger className="px-2 md:px-4 py-2 md:py-3">
-                        <div className="flex flex-col md:flex-row justify-between items-start w-full gap-2 md:gap-0">
-                          <div className="flex items-center gap-2 md:gap-4">
-                            <div className="bg-primary/10 p-1.5 md:p-2 rounded-full">
-                              <Receipt className="w-3 h-3 md:w-4 md:h-4 text-primary" />
-                            </div>
-                            <div>
-                              <p className="text-sm md:text-base font-medium">
-                                إيصال #{receipt.id.slice(-4)}
-                              </p>
-                              <p className="text-xs md:text-sm text-gray-500">
-                                {new Date(receipt.createdAt).toLocaleDateString(
-                                  "ar-EG"
-                                )}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 md:gap-4">
-                            <Badge
-                              variant="outline"
-                              className="text-xs md:text-sm"
-                            >
-                              {receipt.type === "MONTHLY"
-                                ? "شهري"
-                                : "مرة واحدة"}
-                            </Badge>
-                            <p className="text-sm md:text-base font-semibold">
-                              ${receipt.totalAmount}
-                            </p>
-                          </div>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="px-2 md:px-4 py-2 md:py-3 space-y-3 md:space-y-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDownload(receipt.id)}
-                            disabled={isDownloading === receipt.id}
-                            className="w-full md:w-auto text-xs md:text-sm"
-                          >
-                            {isDownloading === receipt.id ? (
-                              <Loader2 className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2 animate-spin" />
-                            ) : (
-                              <Download className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2" />
-                            )}
-                            تحميل الإيصال
-                          </Button>
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              )}
             </div>
-          </ScrollArea>
+          )}
         </Card>
       </div>
     );
   };
 
   const Support = () => (
-    <div className="space-y-4 md:space-y-6">
-      <Card className="p-3 md:p-6">
-        <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4">
-          طلب دعم جديد
-        </h3>
-        <div className="space-y-3 md:space-y-4">
-          <div className="flex flex-col gap-2">
-            <Label className="text-sm md:text-base">نوع الطلب</Label>
+    <div className="space-y-6">
+      <Card className="p-6">
+        <h3 className="text-xl font-semibold mb-6">{t("support.newSupportRequest")}</h3>
+        <div className="space-y-4">
+          <div>
+            <Label>{t("support.requestType")}</Label>
             <Select>
-              <SelectTrigger className="text-sm md:text-base">
-                <SelectValue placeholder="اختر نوع الطلب" />
+              <SelectTrigger className="mt-2">
+                <SelectValue placeholder={t("support.chooseRequestType")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="technical">دعم فني</SelectItem>
-                <SelectItem value="financial">دعم مالي</SelectItem>
-                <SelectItem value="other">أخرى</SelectItem>
+                <SelectItem value="technical">{t("support.technicalSupport")}</SelectItem>
+                <SelectItem value="financial">{t("support.financialSupport")}</SelectItem>
+                <SelectItem value="other">{t("support.other")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="flex flex-col gap-2">
-            <Label className="text-sm md:text-base">تفاصيل الطلب</Label>
+          <div>
+            <Label>{t("support.requestDetails")}</Label>
             <Textarea
-              placeholder="اكتب تفاصيل طلبك هنا..."
-              className="h-24 md:h-32 text-sm md:text-base"
+              placeholder={t("support.requestDetailsPlaceholder")}
+              className="h-32 mt-2"
             />
           </div>
-          <Button className="w-full text-sm md:text-base">إرسال الطلب</Button>
+          <Button className="w-full">{t("support.sendRequest")}</Button>
         </div>
       </Card>
 
       <Card className="p-6">
-        <h3 className="font-semibold mb-4">الطلبات السابقة</h3>
+        <h3 className="text-xl font-semibold mb-6">{t("support.previousRequests")}</h3>
         <div className="space-y-4">
           {[1, 2].map((ticket) => (
-            <div key={ticket} className="p-4 border rounded-lg">
+            <div key={ticket} className="p-4 border rounded-xl hover:bg-gray-50 transition-colors">
               <div className="flex justify-between items-start mb-2">
                 <div>
-                  <p className="font-medium">طلب #{ticket}</p>
-                  <p className="text-sm text-gray-500">دعم فني</p>
+                  <p className="font-semibold">{t("support.requestLabel", { id: ticket })}</p>
+                  <p className="text-sm text-gray-500 mt-1">{t("support.technicalSupport")}</p>
                 </div>
-                <Badge variant="outline">مغلق</Badge>
+                <Badge variant="outline">{t("support.closed")}</Badge>
               </div>
               <p className="text-sm text-gray-600 mb-2">
-                تفاصيل الطلب تظهر هنا...
+                {t("support.requestDetailsPreview")}
               </p>
-              <p className="text-sm text-gray-500">
-                تم الإنشاء: {new Date().toLocaleDateString("en-US")}
+              <p className="text-xs text-gray-400">
+                {new Date().toLocaleDateString("en-US")}
               </p>
             </div>
           ))}
@@ -991,147 +832,325 @@ const ProfilePage = () => {
     </div>
   );
 
-  const renderContent = () => {
+  const SubscriptionSettingsDialog = () => {
+    const sub = subscriptionSettingsDonation;
+    if (!sub) return null;
+    const isActive = sub.status === "ACTIVE";
+    return (
+      <Dialog open={!!sub} onOpenChange={(open) => !open && setSubscriptionSettingsDonation(null)}>
+        <DialogContent className="max-w-md" dir={isRtl ? "rtl" : "ltr"}>
+          <DialogHeader>
+            <DialogTitle>{t("subscriptions.subscriptionSettings")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6 pt-2">
+            <div className="p-4 bg-gray-50 rounded-xl">
+              <p className="text-lg font-semibold text-gray-900">
+                {formatDonationAmount(sub.totalAmount, sub.currency, sub.amountUSD)} {t("subscriptions.perMonth")}
+              </p>
+              {sub.items?.map((item: DonationForProfile["items"][0]) => (
+                <p key={item.id} className="text-sm text-gray-600 mt-1">
+                  • {item.campaign?.title}
+                </p>
+              ))}
+            </div>
+            {isActive && (
+              <div>
+                <Label className="text-sm font-medium">{t("subscriptions.billingDay")}</Label>
+                <Select
+                  value={String(sub.billingDay ?? 1)}
+                  onValueChange={(v) => handleBillingDayChange(sub.id, Number(v))}
+                >
+                  <SelectTrigger className="mt-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 28 }, (_, i) => i + 1).map((day) => (
+                      <SelectItem key={day} value={String(day)}>{day}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {sub.status !== "CANCELLED" && (
+                <Button
+                  variant={isActive ? "outline" : "default"}
+                  className="flex-1"
+                  onClick={() => handleToggleSubscription(sub)}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : isActive ? (
+                    <>
+                      <PauseCircle className="w-4 h-4 mr-2" />
+                      {t("subscriptions.pause")}
+                    </>
+                  ) : (
+                    <>
+                      <PlayCircle className="w-4 h-4 mr-2" />
+                      {t("subscriptions.resume")}
+                    </>
+                  )}
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => handleDownload(sub.id)}
+                disabled={isDownloading === sub.id}
+              >
+                {isDownloading === sub.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
+            {sub.status !== "CANCELLED" && (
+              <>
+                <Separator />
+                <Button
+                  variant="ghost"
+                  className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => setIsCancelDialogOpen(true)}
+                >
+                  {t("subscriptions.cancelSubscription")}
+                </Button>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  const renderContent = (currentUser: UserProfile) => {
     switch (activeTab) {
       case "account":
-        return <AccountInfo />;
-      case "settings":
-        return <Settings />;
+        return <AccountInfo user={currentUser} />;
       case "donations":
-        return <Donations />;
-      case "subscriptions":
-        return <Subscriptions />;
-      case "receipts":
-        return <Receipts />;
+        return <Donations user={currentUser} />;
       case "support":
         return <Support />;
-      case "logout":
-        handleLogout();
-        return null;
       default:
-        return <div className="text-center text-gray-500">قريباً</div>;
+        return null;
     }
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-[80vh] mt-[-80px]">
-        <Loader2 className="w-10 h-10 animate-spin text-emerald-600" />
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+        </div>
       </div>
     );
   }
 
   if (error) {
-    return <div className="text-center text-red-500">{error}</div>;
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Card className="p-8 text-center max-w-md">
+          <p className="text-red-600 text-lg font-semibold">{error}</p>
+          <Button className="mt-4" onClick={() => window.location.reload()}>
+            {t("misc.tryAgain")}
+          </Button>
+        </Card>
+      </div>
+    );
   }
 
+  if (!user) {
+    return null;
+  }
+
+  // Desktop sidebar only (mobile uses top tabs; no second burger)
   const Sidebar = () => (
-    <Card className="p-3 md:p-4 h-full !rounded-none">
-      <div className="flex flex-col items-center mb-4 md:mb-6">
-        <Avatar className="w-16 h-16 md:w-20 md:h-20 mb-2">
-          <AvatarImage src={user.image} />
-          <AvatarFallback>{user.name?.charAt(0)}</AvatarFallback>
-        </Avatar>
-        <h2 className="text-base md:text-lg font-semibold">{user.name}</h2>
-        <p className="text-xs md:text-sm text-gray-500">{user.email}</p>
+    <div className="flex flex-col h-full rounded-2xl border border-gray-200 shadow-sm bg-white">
+      <div className="p-6 border-b border-gray-100">
+        <div className="flex flex-col items-center text-center">
+          <Avatar className="w-20 h-20 mb-4 ring-4 ring-primary/10">
+            <AvatarImage src={user.image ?? undefined} alt={user.name ?? undefined} />
+            <AvatarFallback className="text-xl bg-primary text-white">
+              {(user.name ?? user.email ?? "?").charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <h2 className="text-lg font-semibold text-gray-900 truncate w-full">
+            {user.name || t("account.name")}
+          </h2>
+          <p className="text-sm text-gray-500 truncate w-full mt-1">
+            {user.email}
+          </p>
+        </div>
       </div>
-      <nav className="space-y-1">
-        {navigationItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => {
-              if (item.id === "logout") {
-                handleLogout();
-              } else {
-                setActiveTab(item.id);
-                setSidebarOpen(false);
-              }
-              setSidebarOpen(!isSidebarOpen)
-            }}
-            className={`w-full flex items-center gap-2 px-2 md:px-3 py-1.5 md:py-2 rounded-lg text-right text-sm md:text-base ${
-              activeTab === item.id
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-secondary"
-            }`}
-          >
-            {item.icon && <item.icon className="w-3 h-3 md:w-4 md:h-4" />}
-            {item.label}
-          </button>
-        ))}
+
+      <nav className="flex-1 p-4 space-y-1" dir={isRtl ? "rtl" : "ltr"}>
+        {navigationItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all",
+                isActive
+                  ? "bg-primary text-white shadow-md shadow-primary/20"
+                  : "text-gray-700 hover:bg-gray-100"
+              )}
+            >
+              <Icon className="w-5 h-5 shrink-0" />
+              <div className="flex-1 text-left">
+                <p className={cn(isActive ? "text-white" : "text-gray-900")}>{item.label}</p>
+                {!isActive && (
+                  <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>
+                )}
+              </div>
+              {isActive && <Check className="w-4 h-4" />}
+            </button>
+          );
+        })}
       </nav>
-    </Card>
+
+      <div className="p-4 border-t border-gray-100">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+        >
+          <LogOut className="w-5 h-5" />
+          <span>{t("nav.logout")}</span>
+        </button>
+      </div>
+    </div>
   );
 
   return (
     <>
-      <Toaster />
+      <Toaster position="top-center" />
 
-      <button
-        onClick={() => setSidebarOpen(!isSidebarOpen)}
-        className="lg:hidden fixed top-16 left-2 z-50 p-2 bg-background rounded-lg shadow-lg"
-      >
-        {isSidebarOpen ? (
-          <X className="w-5 h-5" />
-        ) : (
-          <User className="w-5 h-5" />
-        )}
-      </button>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-50 to-gray-100">
+        {/* Mobile: horizontal tabs - sticky at very top */}
+        <div className="lg:hidden sticky top-0 z-50 bg-gradient-to-br from-gray-50 via-gray-50 to-gray-100 pt-4 pb-4 px-4 sm:px-6 shadow-sm">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-[1600px] mx-auto">
+            <TabsList className="w-full grid grid-cols-3 h-12 p-1 bg-gray-100 rounded-xl">
+              {navigationItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <TabsTrigger
+                    key={item.id}
+                    value={item.id}
+                    className="gap-1.5 sm:gap-2 text-xs sm:text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-lg"
+                  >
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </Tabs>
+        </div>
 
-      <div className="max-w-7xl mx-auto p-2 md:p-4 lg:p-6">
-        <div className="flex gap-4 md:gap-6">
-          <div
-            className={`lg:hidden mt-[60px] fixed inset-y-0 right-0 z-40 w-64 transform transition-transform duration-200 ease-in-out ${
-              isSidebarOpen ? "translate-x-0" : "translate-x-full"
-            }`}
-          >
-            <Sidebar />
-          </div>
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+          <div className="flex gap-8">
+            {/* Desktop only: Sidebar */}
+            <aside className="hidden lg:block w-80 shrink-0 sticky top-[104px] self-start">
+              <Sidebar />
+            </aside>
 
-          <div className="hidden lg:block w-64 shrink-0">
-            <Sidebar />
-          </div>
+            {/* Main: on mobile use top tabs (no second burger); on desktop use title + content */}
+            <main className="flex-1 min-w-0">
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8">
+                {/* Desktop: page header with title + description */}
+                <div className="hidden lg:block mb-8 pb-6 border-b border-gray-100">
+                  <h1 className="text-3xl font-bold text-gray-900">
+                    {navigationItems.find((item) => item.id === activeTab)?.label}
+                  </h1>
+                  <p className="text-gray-600 mt-2">
+                    {navigationItems.find((item) => item.id === activeTab)?.description}
+                  </p>
+                </div>
 
-          <div className="flex-1">
-            <Card className="p-3 md:p-4 lg:p-6">
-              <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">
-                {navigationItems.find((item) => item.id === activeTab)?.label}
-              </h1>
-              {renderContent()}
-            </Card>
+                <div className={isRtl ? "text-right" : ""}>
+                  {renderContent(user)}
+                </div>
+              </div>
+            </main>
           </div>
         </div>
       </div>
 
-      {isSidebarOpen && (
-        <div
-          className="lg:hidden fixed inset-0 bg-black/50 z-30"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      <AlertDialog
-        open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-      >
+      {/* Dialogs */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>هل أنت متأكد من حذف حسابك؟</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteDialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              هذا الإجراء لا يمكن التراجع عنه. سيؤدي هذا إلى حذف حسابك بشكل دائم
-              وإزالة بياناتك من خوادمنا.
+              {t("deleteDialog.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogCancel>{t("deleteDialog.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteAccount}
               className="bg-red-600 hover:bg-red-700"
             >
-              حذف الحساب
+              {t("deleteDialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={isPauseDialogOpen} onOpenChange={setIsPauseDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {selectedDonation?.status === "ACTIVE"
+                ? t("subscriptions.pauseSubscription")
+                : t("subscriptions.resume")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedDonation?.status === "ACTIVE"
+                ? t("pauseDialog.descriptionPause")
+                : t("pauseDialog.descriptionResume")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("deleteDialog.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmToggle} disabled={isLoading}>
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : selectedDonation?.status === "ACTIVE" ? (
+                t("subscriptions.pause")
+              ) : (
+                t("subscriptions.resume")
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("subscriptions.cancelSubscription")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("cancelDialog.description")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("deleteDialog.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelSubscription}
+              disabled={isLoading}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : t("subscriptions.cancel")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <SubscriptionSettingsDialog />
     </>
   );
 };

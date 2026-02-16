@@ -1,15 +1,15 @@
 {
-  "name": "alafiya",
+  "name": "gozbebekleri",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
     "build": "TSC_COMPILE_ON_ERROR=true prisma generate && next build",
     "start": "next start",
     "lint": "next lint"
   },
   "prisma": {
-    "seed": "node --loader ts-node/esm prisma/seed.ts"
+    "seed": "node prisma/seed.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",
@@ -66,7 +66,7 @@
     "cookies-next": "^5.1.0",
     "date-fns": "^4.1.0",
     "fontkit": "^2.0.4",
-    "framer-motion": "^12.0.11",
+    "framer-motion": "^12.34.0",
     "html-pdf-node": "^1.0.8",
     "i18n": "^0.15.1",
     "install": "^0.13.0",

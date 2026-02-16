@@ -1,16 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Image from "next/image";
 import {
-  Heart,
-  Utensils,
-  Hospital,
   Users,
   Globe,
-  HandCoins,
-  ForkKnife,
-  Moon,
   UserPlus,
   CheckCircle,
   Lightbulb,
@@ -22,7 +15,6 @@ import CampaignCard from "./_components/CampaignCard";
 import QuickDonate from "./_components/homepage/QuickDonate";
 import HeroSlider from "./_components/homepage/HeroSlider";
 import axios from "axios";
-import router from "next/router";
 import {
   Accordion,
   AccordionContent,
@@ -31,209 +23,175 @@ import {
 } from "@/components/ui/accordion";
 import BlogCard from "./_components/BlogCard";
 import LiveDonationsTicker from "@/components/LiveDonationsTicker";
+import { useTranslations, useLocale } from "next-intl";
+import { Link } from "@/i18n/routing";
 
-// Gerçek projelere ve görsellere göre güncellenmiş veriler
-const heroSlides = [
-  {
-    title: "كُدْسْتَكِي بِرْ چُوْجُوغَا دَسْتَكْ أُولْ",
-    subtitle: "فَلِسْطِينَ لِلْأَطْفَالِ الْمَظْلُومِينَ",
-    buttonText: "الآن تَبَرَّعْ",
-    image: "/hero3.jpg",
-  },
-  {
-    title: "أَطْفَالُنَا الْيَتَامَى فِي كُلِّ الْعَالَمِ",
-    subtitle: "مَعَكُمْ نُبْنِي مُسْتَقْبَلًا أَفْضَلَ",
-    buttonText: "تَبَرَّعْ الْآنَ",
-    image: "/hero2.jpg",
-  },
-];
+const HOME_LOGO_URL = "https://i.ibb.co/ZwcJcN1/logo.webp";
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-const campaigns = [
-  {
-    id: "1",
-    images: [
-      "https://images.unsplash.com/photo-1609599006353-e629aaabfeae?w=600&h=400&fit=crop",
-    ],
-    title: "مَشْرُوعُ حِفْظِ الْقُرْآنِ الْكَرِيمِ",
-    description: "دعم حفظة القرآن الكريم",
-    category: "تعليم",
-    currentAmount: 15750,
-    targetAmount: 50000,
-    contributors: 127,
-    daysLeft: 15,
-  },
-  {
-    id: "2",
-    images: [
-      "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=600&h=400&fit=crop",
-    ],
-    title: "أَطْفَالٌ سُعَدَاء وَجُوهٌ مُبْتَسِمَة",
-    description: "إسعاد الأطفال الأيتام",
-    category: "رعاية اجتماعية",
-    currentAmount: 8200,
-    targetAmount: 25000,
-    contributors: 89,
-    daysLeft: 22,
-  },
-  {
-    id: "3",
-    images: [
-      "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=600&h=400&fit=crop",
-    ],
-    title: "مَشْرُوعُ دَعْمِ التَّعْلِيمِ",
-    description: "توفير التعليم للمحتاجين",
-    category: "تعليم",
-    currentAmount: 32500,
-    targetAmount: 40000,
-    contributors: 203,
-    daysLeft: 8,
-  },
-  {
-    id: "4",
-    images: [
-      "https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=600&h=400&fit=crop",
-    ],
-    title: "إفطار صائم في رمضان",
-    description: "توفير وجبات إفطار للصائمين",
-    category: "إغاثة",
-    currentAmount: 45000,
-    targetAmount: 60000,
-    contributors: 312,
-    daysLeft: 12,
-  },
-  {
-    id: "5",
-    images: [
-      "https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=600&h=400&fit=crop",
-    ],
-    title: "كفالة يتيم",
-    description: "كفالة الأيتام ورعايتهم",
-    category: "رعاية اجتماعية",
-    currentAmount: 18900,
-    targetAmount: 36000,
-    contributors: 156,
-    daysLeft: 30,
-  },
-  {
-    id: "6",
-    images: [
-      "https://images.unsplash.com/photo-1578496479530-be46d80fc43a?w=600&h=400&fit=crop",
-    ],
-    title: "بناء مسجد",
-    description: "المساهمة في بناء مسجد للقرية",
-    category: "مشاريع خيرية",
-    currentAmount: 125000,
-    targetAmount: 200000,
-    contributors: 445,
-    daysLeft: 45,
-  },
-  {
-    id: "7",
-    images: [
-      "https://images.unsplash.com/photo-1631815588090-d4bfec5b1ccb?w=600&h=400&fit=crop",
-    ],
-    title: "علاج المرضى المحتاجين",
-    description: "توفير العلاج الطبي للفقراء",
-    category: "صحة",
-    currentAmount: 67500,
-    targetAmount: 100000,
-    contributors: 289,
-    daysLeft: 18,
-  },
-  {
-    id: "8",
-    images: [
-      "https://images.unsplash.com/photo-1593113598332-cd288d649433?w=600&h=400&fit=crop",
-    ],
-    title: "حفر بئر ماء",
-    description: "توفير مياه نظيفة للقرى النائية",
-    category: "مشاريع خيرية",
-    currentAmount: 28000,
-    targetAmount: 50000,
-    contributors: 178,
-    daysLeft: 25,
-  },
-];
+const cacheGet = <T,>(key: string): T | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const { data, expires } = JSON.parse(raw) as { data: T; expires: number };
+    if (Date.now() > expires) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+};
 
-const targetedDonations = [
-  { title: "مَشْرُوعُ إِنْقَاذِ فَلِسْطِينَ", image: "/target1.jpg" },
-  { title: "مَشْرُوعُ تَدْفِئَةِ كُلِّ طِفْلٍ", image: "/target2.jpg" },
-  { title: "مَشْرُوعُ دَعْمِ التَّعْلِيمِ", image: "/target3.jpg" },
-];
+const cacheSet = <T,>(key: string, data: T): void => {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({ data, expires: Date.now() + CACHE_TTL_MS })
+    );
+  } catch {
+    /* ignore */
+  }
+};
 
-const news = [
-  {
-    title:
-      "لقد كان شرفًا لنا حضور مؤتمر أولئك الذين يتخذون إجراءات من أجل الإنسانية",
-    image:
-      "https://gozbebekleri.org/uploads/insanligin-etkileyicileri-konferansi_2084.jpg",
-  },
-  {
-    title: "دعمنا للمتضررين من الزلزال في شمال سوريا",
-    image:
-      "https://gozbebekleri.org/uploads/suriyenin-kuzeyindeki-depremden-etkilenenlere-destegimiz_2081.jpg",
-  },
-  {
-    title: "حملة بسمة هلال الرمضانية",
-    image:
-      "https://gozbebekleri.org/uploads/4FLefMYaeSyqaKK2N1Hb_1744967602314.jpg",
-  },
-];
+interface CategoryItem {
+  id: string;
+  name: string;
+  image?: string | null;
+  icon?: string | null;
+  order?: number;
+}
+
+interface PostItem {
+  id: string;
+  title: string;
+  description: string | null;
+  image: string | null;
+  published: boolean;
+  createdAt: string;
+}
+
+function HomeLoadingScreen() {
+  return (
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gradient-to-b from-slate-50 to-white">
+      <div className="flex flex-col items-center gap-10">
+        <div className="relative">
+          <div className="absolute -inset-4 animate-pulse rounded-full bg-sky-100/60 blur-xl" />
+          <img
+            src={HOME_LOGO_URL}
+            alt=""
+            className="relative h-16 w-auto sm:h-20 object-contain animate-[fadeIn_0.5s_ease-out]"
+          />
+        </div>
+        <div className="flex flex-col items-center gap-4 w-full max-w-[200px]">
+          <div className="h-1 w-full overflow-hidden rounded-full bg-slate-200">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-sky-500 to-sky-600 animate-[shimmer_1.2s_ease-in-out_infinite]"
+              style={{ width: "40%" }}
+            />
+          </div>
+          <p className="text-xs font-medium text-slate-500 tracking-wide">
+            Loading...
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const HomePage: React.FC = () => {
+  const t = useTranslations("HomePage");
+  const locale = useLocale() as "ar" | "en" | "fr";
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [posts, setPosts] = useState<PostItem[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
+      setCurrentSlide((prev) => (prev + 1) % 2);
     }, 6000);
     return () => clearInterval(interval);
   }, []);
 
-  const fetchPostData = async () => {
-    try {
-      const response = await axios.get(`https://minberiaksa.org/admasfasfafin`);
-      console.log(response.data);
-    } catch (error) {
-      router.push("/404");
-    }
-  };
-
   useEffect(() => {
-    fetchPostData();
-  }, []);
+    const cacheKeyCategories = `home_categories_${locale}`;
+    const cacheKeyPosts = `home_posts_${locale}`;
+
+    let cancelled = false;
+
+    const run = async () => {
+      const cachedCategories = cacheGet<CategoryItem[]>(cacheKeyCategories);
+      const cachedPosts = cacheGet<PostItem[]>(cacheKeyPosts);
+
+      if (cachedCategories?.length !== undefined) {
+        setCategories(cachedCategories);
+      }
+      if (cachedPosts?.length !== undefined) {
+        setPosts(cachedPosts);
+      }
+
+      const hasValidCache = cachedCategories && cachedPosts;
+      if (hasValidCache) {
+        setInitialLoading(false);
+      }
+
+      const [categoriesRes, postsRes] = await Promise.all([
+        fetch(`/api/categories?locale=${locale}&limit=50&sortBy=order`).then(
+          (r) => r.json()
+        ),
+        axios.get("/api/posts", { params: { locale, limit: 3 } }).then(
+          (r) => r.data
+        ),
+      ]);
+
+      if (cancelled) return;
+
+      const categoryItems =
+        categoriesRes?.items ?? categoriesRes ?? [];
+      const newCategories = Array.isArray(categoryItems) ? categoryItems : [];
+      setCategories(newCategories);
+      cacheSet(cacheKeyCategories, newCategories);
+
+      const postItems = postsRes?.items ?? postsRes ?? [];
+      const postList = Array.isArray(postItems) ? postItems : [];
+      setPosts(postList);
+      cacheSet(cacheKeyPosts, postList);
+
+      setInitialLoading(false);
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [locale]);
+
+  // Helper function to get locale-specific property
+  const getLocalizedProperty = (obj: any, key: string) => {
+    const localeKey = `${key}${locale.charAt(0).toUpperCase() + locale.slice(1)}`;
+    return obj[localeKey] || obj[key] || "";
+  };
 
   return (
     <div className="bg-white mx-auto">
+      {initialLoading && <HomeLoadingScreen />}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          @keyframes shimmer {
+            0%, 100% { transform: translateX(-100%); }
+            50% { transform: translateX(150%); }
+          }
+          @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.98); }
+            to { opacity: 1; transform: scale(1); }
+          }
+        `,
+      }} />
       {/* Hero Carousel */}
-      {/* <section className="relative h-[300px] sm:h-[400px] lg:h-[500px] mx-2 sm:mx-4 overflow-hidden mt-16 sm:mt-20 lg:mt-24 rounded-2xl sm:rounded-3xl shadow-xl">
-        {heroSlides.map((slide, index) => (
-          <div
-            key={index}
-            className={`absolute inset-0 transition-opacity duration-1000 ${index === currentSlide ? 'opacity-100' : 'opacity-0'}`}
-          >
-            <Image src={slide.image} alt="Hero" fill className="object-cover" priority={index === 0} />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
-            <div className="absolute bottom-8 sm:bottom-12 lg:bottom-20 right-4 sm:right-6 lg:right-10 text-white max-w-xs sm:max-w-md lg:max-w-2xl">
-              <h1 className="text-xl sm:text-3xl lg:text-5xl font-bold mb-2 sm:mb-3 lg:mb-4">{slide.title}</h1>
-              <p className="text-sm sm:text-lg lg:text-xl mb-4 sm:mb-6 lg:mb-8">{slide.subtitle}</p>
-              <button className="bg-orange-600 text-white px-5 py-2 sm:px-7 sm:py-3 lg:px-10 lg:py-4 rounded-full font-bold text-sm sm:text-base lg:text-lg hover:bg-orange-700 transition">
-                {slide.buttonText}
-              </button>
-            </div>
-          </div>
-        ))}
-
-        <div className="absolute bottom-3 sm:bottom-6 lg:bottom-8 left-1/2 -translate-x-1/2 flex gap-2">
-          {heroSlides.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setCurrentSlide(i)}
-              className={`w-2 h-2 sm:w-3 sm:h-3 lg:w-4 lg:h-4 rounded-full ${i === currentSlide ? 'bg-orange-600' : 'bg-white/60'}`}
-            />
-          ))}
-        </div>
-      </section> */}
       <HeroSlider />
 
       {/* Current Projects */}
@@ -243,31 +201,31 @@ const HomePage: React.FC = () => {
 
       {/* Donation Categories */}
       <section
-        className="bg-white py-6 sm:py-10"
+        className="relative py-8 sm:py-10 lg:py-12 overflow-hidden"
         style={{
           backgroundImage: `url('/wavey-fingerprint.svg')`,
           backgroundRepeat: "repeat",
+          backgroundColor: "rgb(248 250 252)",
         }}
       >
-        <div className="container mx-auto px-4">
-          <h2 className="text-2xl lg:text-3xl font-semibold sm:font-bold text-center mb-6 text-gray-800">
-            مجالات التبرع
+        <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center text-gray-800 mb-6">
+            {t("donationCategories")}
           </h2>
-          <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-6 text-center">
-            {[
-              { icon: Moon, label: "أُمَّةٌ" },
-              { icon: Heart, label: "مَلَابِس" },
-              { icon: Hospital, label: "صِحَّة" },
-              { icon: Utensils, label: "غِذَاء" },
-              { icon: HandCoins, label: "زَكَاة" },
-              { icon: ForkKnife, label: "أَضَاحِي" },
-            ].map((cat, i) => (
-              <a key={i} href="#" className="hover:text-orange-600 transition">
-                <cat.icon className="w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-2 text-orange-600" />
-                <span className="font-medium text-xs sm:text-sm">
-                  {cat.label}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
+            {categories.map((cat) => (
+              <Link
+                key={cat.id}
+                href={`/category/${cat.id}`}
+                className="group flex flex-col items-center rounded-xl bg-white hover:bg-sky-50/50 border border-gray-200/60 hover:border-sky-200 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 p-5 sm:p-6"
+              >
+                <span className="text-3xl sm:text-4xl lg:text-5xl mb-2.5 sm:mb-3 leading-none" aria-hidden>
+                  {cat.icon ?? "❤️"}
                 </span>
-              </a>
+                <h3 className="font-semibold text-gray-800 group-hover:text-sky-700 text-xs sm:text-sm text-center line-clamp-2 transition-colors duration-200">
+                  {cat.name}
+                </h3>
+              </Link>
             ))}
           </div>
         </div>
@@ -280,16 +238,20 @@ const HomePage: React.FC = () => {
 
       <section className="container mx-auto px-4 py-8 sm:py-10 lg:py-12">
         <h2 className="text-2xl sm:text-3xl font-bold text-center mb-3 text-gray-800">
-          أخبارنا
+          {t("news")}
         </h2>
         <p className="text-center text-gray-700 mb-6 text-xs sm:text-sm">
-          اخر أخبار جمعيتنا
+          {t("newsSubtitle")}
         </p>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-          {news.map((item) => (
-            <div key={item.title}>
-              <BlogCard title={item.title} image={item.image} link='#' />
-              </div>
+        <div className="grid sm:grid-cols-3 lg:grid-cols-3 gap-5 sm:gap-6">
+          {posts.map((post) => (
+            <div key={post.id}>
+              <BlogCard
+                title={post.title}
+                image={post.image || "/placeholder.jpg"}
+                link={`/blog/${post.id}`}
+              />
+            </div>
           ))}
         </div>
       </section>
@@ -301,40 +263,70 @@ const HomePage: React.FC = () => {
             {/* قسم الأسئلة الشائعة */}
             <div>
               <h2 className="text-2xl md:text-4xl max-sm:text-center font-bold mb-6 text-gray-800">
-                الأسئلة الشائعة
+                {t("faq")}
               </h2>
               <Accordion type="single" collapsible>
                 {[
                   {
-                    question: "كيف يمكنني الانضمام كمتطوع؟",
-                    answer:
+                    questionAr: "كيف يمكنني الانضمام كمتطوع؟",
+                    questionEn: "How can I join as a volunteer?",
+                    questionFr: "Comment puis-je devenir bénévole ?",
+                    answerAr:
                       "يمكنك التسجيل من خلال موقعنا عبر ملء نموذج الانضمام، وستتلقى رسالة تحتوي على الخطوات التالية مثل الاختبارات والتوجيه الأولي.",
+                    answerEn:
+                      "You can register through our website by filling out the membership form, and you will receive a message containing the following steps such as tests and initial orientation.",
+                    answerFr:
+                      "Vous pouvez vous inscrire via notre site Web en remplissant le formulaire d'adhésion, et vous recevrez un message contenant les étapes suivantes telles que les tests et l'orientation initiale.",
                     icon: <UserPlus className="w-6 h-6 mx-3 text-blue-500" />,
                   },
                   {
-                    question: "هل التطوع في فريق العافية مدفوع؟",
-                    answer:
+                    questionAr: "هل التطوع في فريق قرة العيون مدفوع؟",
+                    questionEn: "Is volunteering in the gozbebekleri team paid?",
+                    questionFr: "Le bénévolat dans l'équipe gozbebekleri est-il rémunéré ?",
+                    answerAr:
                       "لا، التطوع مجاني بالكامل، ولكن في بعض البرامج يتم توفير بدل انتقالات أو مكافآت تقديرية للمتطوعين النشطين.",
+                    answerEn:
+                      "No, volunteering is completely free, but in some programs, transportation allowances or appreciation rewards are provided for active volunteers.",
+                    answerFr:
+                      "Non, le bénévolat est entièrement gratuit, mais dans certains programmes, des indemnités de transport ou des récompenses d'appréciation sont fournies aux bénévoles actifs.",
                     icon: <Wallet className="w-6 h-6 mx-3 text-green-500" />,
                   },
                   {
-                    question: "كيف يتم اختيار المتطوعين للمشاريع؟",
-                    answer:
+                    questionAr: "كيف يتم اختيار المتطوعين للمشاريع؟",
+                    questionEn: "How are volunteers selected for projects?",
+                    questionFr: "Comment les bénévoles sont-ils sélectionnés pour les projets ?",
+                    answerAr:
                       "يعتمد الاختيار على عدة عوامل مثل التخصص، الموقع الجغرافي، والتوافر، حيث نحاول توجيه كل متطوع إلى الفرصة الأنسب له.",
+                    answerEn:
+                      "Selection depends on several factors such as specialization, geographic location, and availability, where we try to direct each volunteer to the most suitable opportunity for them.",
+                    answerFr:
+                      "La sélection dépend de plusieurs facteurs tels que la spécialisation, l'emplacement géographique et la disponibilité, où nous essayons d'orienter chaque bénévole vers l'opportunité la plus adaptée.",
                     icon: (
                       <CheckCircle className="w-6 h-6 mx-3 text-purple-500" />
                     ),
                   },
                   {
-                    question: "هل أستطيع التطوع عن بعد؟",
-                    answer:
+                    questionAr: "هل أستطيع التطوع عن بعد؟",
+                    questionEn: "Can I volunteer remotely?",
+                    questionFr: "Puis-je faire du bénévolat à distance ?",
+                    answerAr:
                       "نعم! لدينا فرص تطوع رقمية تشمل إدارة المحتوى، تصميم الجرافيك، التسويق الإلكتروني، والتواصل مع الجهات الداعمة.",
-                    icon: <Globe className="w-6 h-6 mx-3 text-orange-500" />,
+                    answerEn:
+                      "Yes! We have digital volunteering opportunities including content management, graphic design, digital marketing, and communication with supporting parties.",
+                    answerFr:
+                      "Oui ! Nous avons des opportunités de bénévolat numérique comprenant la gestion de contenu, la conception graphique, le marketing numérique et la communication avec les parties de soutien.",
+                    icon: <Globe className="w-6 h-6 mx-3 text-sky-500" />,
                   },
                   {
-                    question: "كيف يمكنني اقتراح مبادرة خاصة بي؟",
-                    answer:
-                      "إذا كانت لديك فكرة مشروع إنساني، يمكن لفريق العافية مساعدتك في تنفيذها عبر توفير الموارد والدعم اللوجستي.",
+                    questionAr: "كيف يمكنني اقتراح مبادرة خاصة بي؟",
+                    questionEn: "How can I suggest my own initiative?",
+                    questionFr: "Comment puis-je proposer ma propre initiative ?",
+                    answerAr:
+                      "إذا كانت لديك فكرة مشروع إنساني، يمكن لفريق قرة العيون مساعدتك في تنفيذها عبر توفير الموارد والدعم اللوجستي.",
+                    answerEn:
+                      "If you have a humanitarian project idea, the gozbebekleri team can help you implement it by providing resources and logistical support.",
+                    answerFr:
+                      "Si vous avez une idée de projet humanitaire, l'équipe gozbebekleri peut vous aider à la mettre en œuvre en fournissant des ressources et un soutien logistique.",
                     icon: (
                       <Lightbulb className="w-6 h-6 mx-3 text-yellow-500" />
                     ),
@@ -348,11 +340,11 @@ const HomePage: React.FC = () => {
                     <AccordionTrigger className="text-sm text-right hover:text-blue-600 transition">
                       <div className="flex items-center">
                         {faq.icon}
-                        {faq.question}
+                        {getLocalizedProperty(faq, "question")}
                       </div>
                     </AccordionTrigger>
                     <AccordionContent className="text-gray-600 pb-4">
-                      {faq.answer}
+                      {getLocalizedProperty(faq, "answer")}
                     </AccordionContent>
                   </AccordionItem>
                 ))}
@@ -363,7 +355,7 @@ const HomePage: React.FC = () => {
             <div>
               <img
                 src="https://i.ibb.co/Q7zfYF8J/558969696-1112724364364070-4681565038920366683-n.jpg"
-                alt="تأثير المجتمع"
+                alt={t("communityImpact")}
                 className="max-sm:hidden rounded-2xl shadow-2xl transform transition duration-300 w-full"
               />
             </div>

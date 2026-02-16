@@ -108,7 +108,7 @@ export default function FaaliyetKategorileri() {
                       <Progress
                         mb={3}
                         w={"100%"}
-                        colorScheme={"orange"}
+                        colorScheme={"sky"}
                         bg={"#FFC7A9"}
                         value={post.totalDonateSuccessCalc}
                         borderRadius={10}

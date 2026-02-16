@@ -7,12 +7,11 @@ export default async function getPost(postId: string) {
           id: postId,
         },
         include: {
-          category: true
-        }
+          category: true,
+          translations: true,
+        },
       });
 
-      console.log(post)
-      
       return post;
     } catch (error) {
       console.error("Error fetching post:", error);

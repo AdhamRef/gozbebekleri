@@ -55,7 +55,9 @@ const ImageForm: React.FC<ImageFormProps> = ({ initialData, postId }) => {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     console.log("Submitting form with values:", values);
     try {
-      await axios.patch(`/api/posts/${postId}`, values);
+      const payload:any = { image: values.imageAR };
+      if (values.imageEN) payload.translations = { en: { image: values.imageEN } };
+      await axios.patch(`/api/posts/${postId}`, payload);
       toast.success("تم تحديث معلومات المقال");
       setIsEditing(false);
       router.refresh();

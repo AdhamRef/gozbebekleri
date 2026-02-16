@@ -3,83 +3,422 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
-model migrations {
-  id        Int    @id @default(autoincrement()) @db.UnsignedInt
-  migration String @db.VarChar(255)
-  batch     Int
+/* ===================== AUTH ===================== */
+
+model Account {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.String
+  access_token      String? @db.String
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.String
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
 }
 
-model oauth_access_tokens {
-  id         String    @id @db.VarChar(100)
-  user_id    BigInt?   @db.UnsignedBigInt
-  client_id  BigInt    @db.UnsignedBigInt
-  name       String?   @db.VarChar(255)
-  scopes     String?   @db.Text
-  revoked    Boolean
-  created_at DateTime? @db.Timestamp(0)
-  updated_at DateTime? @db.Timestamp(0)
-  expires_at DateTime? @db.DateTime(0)
+model Session {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionToken String   @unique
+  userId       String   @db.ObjectId
+  expires      DateTime
 
-  @@index([user_id], map: "oauth_access_tokens_user_id_index")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model oauth_auth_codes {
-  id         String    @id @db.VarChar(100)
-  user_id    BigInt    @db.UnsignedBigInt
-  client_id  BigInt    @db.UnsignedBigInt
-  scopes     String?   @db.Text
-  revoked    Boolean
-  expires_at DateTime? @db.DateTime(0)
+model VerificationToken {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  identifier String
+  token      String   @unique
+  expires    DateTime
 
-  @@index([user_id], map: "oauth_auth_codes_user_id_index")
+  @@unique([identifier, token])
 }
 
-model oauth_clients {
-  id                     BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  user_id                BigInt?   @db.UnsignedBigInt
-  name                   String    @db.VarChar(255)
-  secret                 String?   @db.VarChar(100)
-  provider               String?   @db.VarChar(255)
-  redirect               String    @db.Text
-  personal_access_client Boolean
-  password_client        Boolean
-  revoked                Boolean
-  created_at             DateTime? @db.Timestamp(0)
-  updated_at             DateTime? @db.Timestamp(0)
+/* ===================== USER ===================== */
 
-  @@index([user_id], map: "oauth_clients_user_id_index")
+model User {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  name          String?
+  email         String?  @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  country       String?
+  phone         String?
+  birthdate     String?
+  role          Role     @default(DONOR)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  accounts  Account[]
+  sessions  Session[]
+  donations Donation[]
+  comments  Comment[]
+  cartItems CartItem[]
 }
 
-model oauth_personal_access_clients {
-  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  client_id  BigInt    @db.UnsignedBigInt
-  created_at DateTime? @db.Timestamp(0)
-  updated_at DateTime? @db.Timestamp(0)
+enum Role {
+  ADMIN
+  DONOR
 }
 
-model oauth_refresh_tokens {
-  id              String    @id @db.VarChar(100)
-  access_token_id String    @db.VarChar(100)
-  revoked         Boolean
-  expires_at      DateTime? @db.DateTime(0)
+/* ===================== CATEGORY ===================== */
 
-  @@index([access_token_id], map: "oauth_refresh_tokens_access_token_id_index")
+model Category {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Arabic (default)
+  name          String   @unique
+  description   String?
+
+  image         String?
+  icon          String?
+  order         Int?
+  currentAmount Float    @default(0)
+
+  campaigns     Campaign[]
+  donationItems DonationCategoryItem[]
+  translations  CategoryTranslation[]
 }
 
-model personal_access_tokens {
-  id             BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  tokenable_type String    @db.VarChar(255)
-  tokenable_id   BigInt    @db.UnsignedBigInt
-  name           String    @db.VarChar(255)
-  token          String    @unique(map: "personal_access_tokens_token_unique") @db.VarChar(64)
-  abilities      String?   @db.Text
-  last_used_at   DateTime? @db.Timestamp(0)
-  created_at     DateTime? @db.Timestamp(0)
-  updated_at     DateTime? @db.Timestamp(0)
+model CategoryTranslation {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  categoryId String   @db.ObjectId
+  locale     String   // en, fr, ...
 
-  @@index([tokenable_type, tokenable_id], map: "personal_access_tokens_tokenable_type_tokenable_id_index")
+  name        String
+  description String?
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, locale])
+}
+
+/* ===================== HERO SLIDES ===================== */
+
+model Slide {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String   // Arabic default
+  description String?
+  image       String?
+  showButton  Boolean  @default(true)
+  buttonText  String?
+  buttonLink  String?
+  isActive    Boolean  @default(true)
+  order       Int      @default(0)
+  translations SlideTranslation[]
+}
+
+model SlideTranslation {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  slideId     String   @db.ObjectId
+  locale      String
+  title       String
+  description String?
+  buttonText  String?
+  slide       Slide    @relation(fields: [slideId], references: [id], onDelete: Cascade)
+  @@unique([slideId, locale])
+}
+
+/* ===================== CAMPAIGN ===================== */
+
+model Campaign {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Arabic (default)
+  title         String
+  description   String
+
+  targetAmount  Float
+  currentAmount Float   @default(0)
+  images        String[]
+  videoUrl      String?
+  isActive      Boolean @default(true)
+  priority      Int?
+
+  categoryId    String   @db.ObjectId
+  category      Category @relation(fields: [categoryId], references: [id])
+
+  updates       Update[]
+  comments      Comment[]
+  cartItems     CartItem[]
+  donations     DonationItem[]
+  translations  CampaignTranslation[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model CampaignTranslation {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  campaignId  String   @db.ObjectId
+  locale      String   // en, fr, ...
+
+  title       String
+  description String
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, locale])
+}
+
+/* ===================== CAMPAIGN UPDATES ===================== */
+
+model Update {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Arabic
+  title       String
+  description String
+
+  image       String?
+  videoUrl    String?
+
+  campaignId  String   @db.ObjectId
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+
+  translations UpdateTranslation[]
+
+  createdAt   DateTime @default(now())
+}
+
+model UpdateTranslation {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  updateId  String   @db.ObjectId
+  locale    String
+
+  title       String
+  description String
+
+  update Update @relation(fields: [updateId], references: [id], onDelete: Cascade)
+
+  @@unique([updateId, locale])
+}
+
+/* ===================== DONATIONS ===================== */
+
+model Donation {
+  id              String             @id @default(auto()) @map("_id") @db.ObjectId
+  amount          Float
+  amountUSD       Float?
+  currency        String             @default("USD")
+  teamSupport     Float              @default(0)
+  coverFees       Boolean            @default(false)
+  fees            Float              @default(0)
+  totalAmount     Float
+
+  donorId         String             @db.ObjectId
+  donor           User               @relation(fields: [donorId], references: [id])
+
+  comment         String?
+  type            DonationType       @default(ONE_TIME)
+  status          SubscriptionStatus @default(ACTIVE)
+  paymentMethod   PaymentMethod
+  cardDetails     CardDetails?
+  billingDay      Int?
+
+  createdAt       DateTime @default(now())
+  lastBillingDate DateTime?
+  nextBillingDate DateTime?
+
+  items           DonationItem[]
+  categoryItems   DonationCategoryItem[]
+  comments        Comment[]
+}
+
+model DonationItem {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  donationId String   @db.ObjectId
+  campaignId String   @db.ObjectId
+
+  amount     Float
+  amountUSD  Float?
+
+  donation Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DonationCategoryItem {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  donationId String   @db.ObjectId
+  categoryId String   @db.ObjectId
+
+  amount     Float
+  amountUSD  Float?
+
+  donation Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
+  category  Category @relation(fields: [categoryId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum DonationType {
+  ONE_TIME
+  MONTHLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CARD
+  PAYPAL
+}
+
+type CardDetails {
+  cardNumber     String
+  expiryDate     String
+  cvv            String
+  cardholderName String
+}
+
+/* ===================== COMMENTS & CART ===================== */
+
+model Comment {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  text       String
+
+  userId     String   @db.ObjectId
+  user       User     @relation(fields: [userId], references: [id])
+
+  donationId String?  @db.ObjectId
+  donation   Donation? @relation(fields: [donationId], references: [id])
+
+  campaignId String   @db.ObjectId
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+
+  createdAt  DateTime @default(now())
+}
+
+model CartItem {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  campaignId String   @db.ObjectId
+  userId     String   @db.ObjectId
+
+  amount     Float
+  amountUSD  Float?
+  currency   String   @default("USD")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+/* ===================== POSTS ===================== */
+
+model PostCategory {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Arabic
+  name      String   @unique
+  title     String?
+  description String?
+  image     String?
+
+  posts       Post[]
+  translations PostCategoryTranslation[]
+
+  createdAt DateTime @default(now())
+}
+
+model PostCategoryTranslation {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  categoryId  String   @db.ObjectId
+  locale      String
+
+  name        String
+  title       String?
+  description String?
+  image       String?
+
+  category PostCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, locale])
+}
+
+model Post {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Arabic
+  title     String?
+  description String?
+  content   String?
+  image     String?
+
+  published Boolean @default(false)
+
+  categoryId String? @db.ObjectId
+  category   PostCategory? @relation(fields: [categoryId], references: [id])
+
+  translations PostTranslation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PostTranslation {
+  id      String   @id @default(auto()) @map("_id") @db.ObjectId
+  postId  String   @db.ObjectId
+  locale  String
+
+  title       String?
+  description String?
+  content     String?
+  image       String?
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, locale])
+}
+
+model LiveDonationTicker {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  
+  isActive  Boolean  @default(true)
+  
+  // Donor names pool (will be randomly selected)
+  donorNames String[] @default([])
+  
+  // Campaign names by locale
+  // campaignNamesAr String[] @default([])
+  // campaignNamesEn String[] @default([])
+  // campaignNamesFr String[] @default([])
+  
+  // Amount ranges with probabilities
+  amountRanges AmountRange[]
+  
+  // Display timing
+  minIntervalSeconds Int @default(3)  // Minimum seconds between donations
+  maxIntervalSeconds Int @default(8)  // Maximum seconds between donations
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+type AmountRange {
+  minAmount    Float
+  maxAmount    Float
+  probability  Float  // Weight for this range (e.g., 70 for high, 20 for medium, 10 for low)
+  label        String // e.g., "high", "medium", "low"
 }

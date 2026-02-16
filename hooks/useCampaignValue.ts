@@ -77,8 +77,22 @@ const useCampaignValue = (campaignValue: number): number | null => {
 };
 
 // Function to get the current currency
-export const getCurrency = (): string => {
-  return Cookies.get('currency') || 'USD'; // Retrieve currency from cookies
+const currencySymbols = {
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  TRY: '₺',
+  SAR: '﷼',
+  AED: 'دينار',
+  KWD: 'دينار',
+  EGP: 'EGP',
+  QAR: '﷼',
+  BHD: 'دينار',
 };
+export const getCurrency = (): string => {
+  const currencyCode = Cookies.get('currency') || 'USD';
+  return Cookies.get('currency') || '$';
+};
+
 
 export default useCampaignValue;

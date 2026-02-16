@@ -41,15 +41,18 @@ const TitleForm = ({ initialData, postId }: Props) => {
     titleAR: z.string().min(1, {
       message: "العنوان بالعربية مطلوب",
     }),
-    titleEN: z.string().min(1, {
-      message: "English title is required",
-    }),
+    titleEN: z.string().optional(),
+    titleFR: z.string().optional(),
   });
 
-  // Map initial data to new structure
+  // Map initial data to new structure, prefer translations if available
+  const trEn = Array.isArray(initialData?.translations) ? initialData.translations.find((t:any) => t.locale === 'en') : null;
+  const trFr = Array.isArray(initialData?.translations) ? initialData.translations.find((t:any) => t.locale === 'fr') : null;
+
   const mappedInitialData = {
     titleAR: initialData?.titleAR || initialData?.title || "",
-    titleEN: initialData?.titleEN || "",
+    titleEN: trEn?.title || initialData?.titleEN || "",
+    titleFR: trFr?.title || initialData?.titleFR || "",
   };
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -62,7 +65,12 @@ const TitleForm = ({ initialData, postId }: Props) => {
   async function onSubmit() {
     const values = form.getValues();
     try {
-      await axios.patch(`/api/posts/${postId}`, values);
+      const payload: any = { title: values.titleAR };
+      const translations: any = {};
+      if (values.titleEN) translations.en = { ...(translations.en || {}), title: values.titleEN };
+      if (values.titleFR) translations.fr = { ...(translations.fr || {}), title: values.titleFR };
+      if (Object.keys(translations).length > 0) payload.translations = translations;
+      await axios.patch(`/api/posts/${postId}`, payload);
       toast.success("تم تحديث معلومات المقال");
       setIsEditing(false);
       router.refresh();
@@ -73,10 +81,15 @@ const TitleForm = ({ initialData, postId }: Props) => {
   }
 
   const displayTitle = (language: string) => {
+    const trEn = Array.isArray(initialData?.translations) ? initialData.translations.find((t:any) => t.locale === 'en') : null;
+    const trFr = Array.isArray(initialData?.translations) ? initialData.translations.find((t:any) => t.locale === 'fr') : null;
     if (language === "ar") {
       return initialData?.titleAR || initialData?.title || "لا يوجد عنوان بالعربية";
     }
-    return initialData?.titleEN || "No English title available";
+    if (language === "en") {
+      return trEn?.title || initialData?.titleEN || "No English title available";
+    }
+    return trFr?.title || initialData?.titleFR || "No French title available";
   };
 
   return (
@@ -100,9 +113,12 @@ const TitleForm = ({ initialData, postId }: Props) => {
 
         {!isEditing ? (
           <Tabs defaultValue="ar" className="mt-2">
-            <TabsList className="grid grid-cols-2">
+            <TabsList className="grid grid-cols-3">
               <TabsTrigger value="en" className="flex items-center gap-1">
                 <span>English</span>
+              </TabsTrigger>
+              <TabsTrigger value="fr" className="flex items-center gap-1">
+                <span>Français</span>
               </TabsTrigger>
               <TabsTrigger value="ar" className="flex items-center gap-1">
                 <span>عربي</span>
@@ -111,6 +127,11 @@ const TitleForm = ({ initialData, postId }: Props) => {
             <TabsContent value="ar" className="mt-2">
               <div className="p-3 bg-slate-50 rounded-md" dir="rtl">
                 {displayTitle("ar")}
+              </div>
+            </TabsContent>
+            <TabsContent value="fr" className="mt-2">
+              <div className="p-3 bg-slate-50 rounded-md">
+                {displayTitle("fr")}
               </div>
             </TabsContent>
             <TabsContent value="en" className="mt-2">
@@ -123,9 +144,12 @@ const TitleForm = ({ initialData, postId }: Props) => {
           <Form {...form}>
             <div className="space-y-4 mt-4 w-full">
               <Tabs defaultValue="ar" onValueChange={setActiveTab}>
-                <TabsList className="grid grid-cols-2">
+                <TabsList className="grid grid-cols-3">
                   <TabsTrigger value="en" className="flex items-center gap-1">
                     <span>English</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="fr" className="flex items-center gap-1">
+                    <span>Français</span>
                   </TabsTrigger>
                   <TabsTrigger value="ar" className="flex items-center gap-1">
                     <span>عربي</span>
@@ -154,6 +178,27 @@ const TitleForm = ({ initialData, postId }: Props) => {
                       )}
                     />
                   </div>
+                </TabsContent>
+                <TabsContent value="fr" className="mt-2">
+                  <FormField
+                    control={form.control}
+                    name="titleFR"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input
+                            disabled={isSubmitting}
+                            placeholder="Titre de l'article en français"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Quel est le sujet de votre article?
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </TabsContent>
                 <TabsContent value="en" className="mt-2">
                   <FormField

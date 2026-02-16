@@ -1,123 +1,90 @@
 import React, { useState, useRef, useEffect } from "react";
-import { ChevronLeft, ChevronRight, HandCoins, Heart } from "lucide-react";
+import { ChevronLeft, ChevronRight, HandCoins, Heart, Loader2 } from "lucide-react";
+import { useCurrency } from "@/context/CurrencyContext";
+import { getCurrency } from "@/hooks/useCampaignValue";
+import { formatNumber } from "@/hooks/formatNumber";
+import { useTranslations, useLocale } from "next-intl";
+import axios from "axios";
+import { Link } from "@/i18n/routing";
 
-const CampaignsSlider = ({ isGrid = false, isGridMobile = false, limit = 100 }) => {
-  const sliderRef = useRef(null);
-  const [currentSlide, setCurrentSlide] = useState(0);
+// Campaign Type
+interface Campaign {
+  id: string;
+  title: string;
+  description: string;
+  images: string[];
+  currentAmount: number;
+  targetAmount: number;
+  donationCount: number;
+  progress: number;
+  category?: {
+    id: string;
+    name: string;
+    icon?: string;
+  };
+}
+
+const CampaignsSlider = ({
+  isGrid = false,
+  isGridMobile = false,
+  limit = 8,
+}) => {
+  const t = useTranslations("CampaignsSlider");
+  const locale = useLocale();
+  const sliderRef = useRef<HTMLDivElement>(null);
+  const justDraggedRef = useRef(false);
+  const { convertToCurrency } = useCurrency();
+
+  // State management
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
 
-  const allCampaigns = [
-    {
-      id: "1",
-      images: ["https://images.unsplash.com/photo-1609599006353-e629aaabfeae?w=600&h=400&fit=crop"],
-      title: "مَشْرُوعُ حِفْظِ الْقُرْآنِ الْكَرِيمِ",
-      description: "دعم حفظة القرآن الكريم",
-      category: "تعليم",
-      currentAmount: 15750,
-      targetAmount: 50000,
-      contributors: 127,
-      daysLeft: 15
-    },
-    {
-      id: "2",
-      images: ["https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=600&h=400&fit=crop"],
-      title: "أَطْفَالٌ سُعَدَاء وَجُوهٌ مُبْتَسِمَة",
-      description: "إسعاد الأطفال الأيتام",
-      category: "رعاية اجتماعية",
-      currentAmount: 8200,
-      targetAmount: 25000,
-      contributors: 89,
-      daysLeft: 22
-    },
-    {
-      id: "3",
-      images: ["https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=600&h=400&fit=crop"],
-      title: "مَشْرُوعُ دَعْمِ التَّعْلِيمِ",
-      description: "توفير التعليم للمحتاجين",
-      category: "تعليم",
-      currentAmount: 32500,
-      targetAmount: 40000,
-      contributors: 203,
-      daysLeft: 8
-    },
-    {
-      id: "4",
-      images: ["https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=600&h=400&fit=crop"],
-      title: "إفطار صائم في رمضان",
-      description: "توفير وجبات إفطار للصائمين",
-      category: "إغاثة",
-      currentAmount: 45000,
-      targetAmount: 60000,
-      contributors: 312,
-      daysLeft: 12
-    },
-    {
-      id: "5",
-      images: ["https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=600&h=400&fit=crop"],
-      title: "كفالة يتيم",
-      description: "كفالة الأيتام ورعايتهم",
-      category: "رعاية اجتماعية",
-      currentAmount: 18900,
-      targetAmount: 36000,
-      contributors: 156,
-      daysLeft: 30
-    },
-    {
-      id: "6",
-      images: ["https://www.muslimglobalrelief.org/wp-content/uploads/2023/03/mosque-building-fund.jpeg"],
-      title: "بناء مسجد",
-      description: "المساهمة في بناء مسجد للقرية",
-      category: "مشاريع خيرية",
-      currentAmount: 125000,
-      targetAmount: 200000,
-      contributors: 445,
-      daysLeft: 45
-    },
-    {
-      id: "7",
-      images: ["https://images.unsplash.com/photo-1631815588090-d4bfec5b1ccb?w=600&h=400&fit=crop"],
-      title: "علاج المرضى المحتاجين",
-      description: "توفير العلاج الطبي للفقراء",
-      category: "صحة",
-      currentAmount: 67500,
-      targetAmount: 100000,
-      contributors: 289,
-      daysLeft: 18
-    },
-    {
-      id: "8",
-      images: ["https://images.unsplash.com/photo-1593113598332-cd288d649433?w=600&h=400&fit=crop"],
-      title: "حفر بئر ماء",
-      description: "توفير مياه نظيفة للقرى النائية",
-      category: "مشاريع خيرية",
-      currentAmount: 28000,
-      targetAmount: 50000,
-      contributors: 178,
-      daysLeft: 25
-    }
-  ];
+  // Fetch campaigns from API
+  useEffect(() => {
+    const fetchCampaigns = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await axios.get("/api/campaigns", {
+          params: {
+            limit: limit,
+            sortBy: "newest",
+            locale: locale, // Pass the locale to the API
+          },
+        });
 
-  const campaigns = limit ? allCampaigns.slice(0, limit) : allCampaigns;
+        if (response.data && response.data.items) {
+          setCampaigns(response.data.items);
+        }
+      } catch (err) {
+        console.error("Error fetching campaigns:", err);
+        setError("Failed to load campaigns");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const formatNumber = (num) => {
-    return num.toLocaleString('ar-EG');
-  };
+    fetchCampaigns();
+  }, [limit, locale]); // Add locale to dependencies
 
-  const scroll = (direction) => {
+  const scroll = (direction: "left" | "right") => {
     if (sliderRef.current) {
       const scrollAmount = 320;
       sliderRef.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth'
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
       });
     }
   };
 
-  const handleCampaignClick = (id) => {
-    if (!isDragging) {
-      console.log(`Campaign ${id} clicked`);
+  const handleLinkClick = (e: React.MouseEvent) => {
+    if (justDraggedRef.current) {
+      e.preventDefault();
     }
   };
 
@@ -126,22 +93,22 @@ const CampaignsSlider = ({ isGrid = false, isGridMobile = false, limit = 100 }) 
     if (isGrid && isGridMobile) return false; // Full grid mode
     if (!isGrid) return true; // Always slider
     // Grid on desktop, slider on mobile - check window width
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       return window.innerWidth < 640; // sm breakpoint
     }
     return false;
   };
 
   // Mouse drag handlers
-  const handleMouseDown = (e) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!sliderRef.current || !shouldAllowDrag()) return;
     setIsDragging(true);
     setStartX(e.pageX - sliderRef.current.offsetLeft);
     setScrollLeft(sliderRef.current.scrollLeft);
-    sliderRef.current.style.cursor = 'grabbing';
+    sliderRef.current.style.cursor = "grabbing";
   };
 
-const handleMouseMove = (e) => {
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isDragging || !sliderRef.current) return;
     e.preventDefault();
     const x = e.pageX - sliderRef.current.offsetLeft;
@@ -150,9 +117,15 @@ const handleMouseMove = (e) => {
   };
 
   const handleMouseUp = () => {
+    if (isDragging) {
+      justDraggedRef.current = true;
+      setTimeout(() => {
+        justDraggedRef.current = false;
+      }, 0);
+    }
     setIsDragging(false);
     if (sliderRef.current) {
-      sliderRef.current.style.cursor = 'grab';
+      sliderRef.current.style.cursor = "grab";
     }
   };
 
@@ -160,20 +133,20 @@ const handleMouseMove = (e) => {
     if (isDragging) {
       setIsDragging(false);
       if (sliderRef.current) {
-        sliderRef.current.style.cursor = 'grab';
+        sliderRef.current.style.cursor = "grab";
       }
     }
   };
 
   // Touch handlers
-  const handleTouchStart = (e) => {
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     if (!sliderRef.current || !shouldAllowDrag()) return;
     setIsDragging(true);
     setStartX(e.touches[0].pageX - sliderRef.current.offsetLeft);
     setScrollLeft(sliderRef.current.scrollLeft);
   };
 
-  const handleTouchMove = (e) => {
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     if (!isDragging || !sliderRef.current) return;
     const x = e.touches[0].pageX - sliderRef.current.offsetLeft;
     const walk = (x - startX) * 2;
@@ -181,36 +154,118 @@ const handleMouseMove = (e) => {
   };
 
   const handleTouchEnd = () => {
+    if (isDragging) {
+      justDraggedRef.current = true;
+      setTimeout(() => {
+        justDraggedRef.current = false;
+      }, 0);
+    }
     setIsDragging(false);
   };
 
   useEffect(() => {
     const slider = sliderRef.current;
     if (slider && shouldAllowDrag()) {
-      slider.style.cursor = 'grab';
+      slider.style.cursor = "grab";
     }
     return () => {
       if (slider) {
-        slider.style.cursor = 'default';
+        slider.style.cursor = "default";
       }
     };
   }, [isGrid, isGridMobile]);
 
   const shouldShowSlider = !isGrid || (isGrid && !isGridMobile);
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="bg-gradient-to-br p-4 sm:p-6 lg:p-8 w-full mx-auto">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-sky-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <HandCoins className="w-4 h-4 text-sky-600" />
+              </div>
+              <h2 className="text-xl sm:text-2xl font-semibold sm:font-bold text-gray-800">
+                {t("ongoingProjects")}
+              </h2>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-sky-600" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="bg-gradient-to-br p-4 sm:p-6 lg:p-8 w-full mx-auto">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-sky-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <HandCoins className="w-4 h-4 text-sky-600" />
+              </div>
+              <h2 className="text-xl sm:text-2xl font-semibold sm:font-bold text-gray-800">
+                {t("ongoingProjects")}
+              </h2>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center py-20">
+            <p className="text-gray-600">{error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (campaigns.length === 0) {
+    return (
+      <div className="bg-gradient-to-br p-4 sm:p-6 lg:p-8 w-full mx-auto">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-sky-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <HandCoins className="w-4 h-4 text-sky-600" />
+              </div>
+              <h2 className="text-xl sm:text-2xl font-semibold sm:font-bold text-gray-800">
+                {t("ongoingProjects")}
+              </h2>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center py-20">
+            <p className="text-gray-600">{t("noCampaigns") || "No campaigns available"}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-gradient-to-br p-4 sm:p-6 lg:p-8 w-full mx-auto">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <HandCoins className="w-4 h-4 text-orange-600" />
+            <div className="w-8 h-8 bg-sky-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <HandCoins className="w-4 h-4 text-sky-600" />
             </div>
-            <h2 className="text-xl sm:text-2xl font-semibold sm:font-bold text-gray-800">أهم المشاريع الجارية</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold sm:font-bold text-gray-800">
+              {t("ongoingProjects")}
+            </h2>
           </div>
-          <button className="text-gray-700 px-2 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 font-semibold text-xs shadow-sm transition-colors">
-            عرض الكل
-          </button>
+          <Link href="/campaign">
+            <button className="text-gray-700 px-2 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 font-semibold text-xs shadow-sm transition-colors">
+              {t("viewAll")}
+            </button>
+          </Link>
         </div>
 
         <div className="relative group">
@@ -218,16 +273,11 @@ const handleMouseMove = (e) => {
           {shouldShowSlider && (
             <div className="hidden max-sm:block absolute left-[-2px] top-0 bottom-0 w-20 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
           )}
-          
-          {/* Right fade overlay */}
-          {/* {shouldShowSlider && (
-            <div className="hidden max-sm:block absolute right-[-2px] top-0 bottom-0 w-20 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
-          )} */}
 
           {!isGrid && (
             <>
               <button
-                onClick={() => scroll('left')}
+                onClick={() => scroll("left")}
                 className="hidden lg:flex absolute left-[-20px] top-1/2 -translate-y-1/2 z-20 bg-white shadow-lg rounded-full p-3 hover:bg-gray-50 transition-all opacity-0 group-hover:opacity-100 items-center justify-center"
                 aria-label="Previous"
               >
@@ -235,7 +285,7 @@ const handleMouseMove = (e) => {
               </button>
 
               <button
-                onClick={() => scroll('right')}
+                onClick={() => scroll("right")}
                 className="hidden lg:flex absolute right-[-20px] top-1/2 -translate-y-1/2 z-20 bg-white shadow-lg rounded-full p-3 hover:bg-gray-50 transition-all opacity-0 group-hover:opacity-100 items-center justify-center"
                 aria-label="Next"
               >
@@ -244,20 +294,24 @@ const handleMouseMove = (e) => {
             </>
           )}
 
-          <div 
+          <div
             ref={sliderRef}
             className={
-              isGrid 
-                ? isGridMobile 
+              isGrid
+                ? isGridMobile
                   ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
                   : "flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-4 pt-1 sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
                 : "flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-4 pt-1"
             }
-            style={shouldShowSlider ? { 
-              scrollbarWidth: 'none', 
-              msOverflowStyle: 'none',
-              userSelect: isDragging ? 'none' : 'auto'
-            } : {}}
+            style={
+              shouldShowSlider
+                ? {
+                    scrollbarWidth: "none",
+                    msOverflowStyle: "none",
+                    userSelect: isDragging ? "none" : "auto",
+                  }
+                : {}
+            }
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -267,34 +321,42 @@ const handleMouseMove = (e) => {
             onTouchEnd={handleTouchEnd}
           >
             {campaigns.map((campaign) => {
-              const progress = (campaign.currentAmount / campaign.targetAmount) * 100;
-              
+              const progress =
+                (campaign.currentAmount / campaign.targetAmount) * 100;
+              const remainingAmount = campaign.targetAmount - campaign.currentAmount;
+
               return (
-                <div
+                <Link
                   key={campaign.id}
-                  onClick={() => handleCampaignClick(campaign.id)}
+                  href={`/campaign/${campaign.id}`}
+                  onClick={handleLinkClick}
+                  prefetch={true}
                   className={
                     isGrid
-                      ? "transition-all duration-300 cursor-pointer hover:-translate-y-1 bg-white rounded-lg shadow-md hover:shadow-xl"
-                      : "min-w-[280px] sm:min-w-[300px] transition-all duration-300 cursor-pointer hover:-translate-y-1 bg-white rounded-lg shadow-md hover:shadow-xl flex-shrink-0"
+                      ? "block transition-all duration-300 cursor-pointer hover:-translate-y-0.5 bg-white rounded-xl border border-gray-200/80 shadow-sm hover:shadow-lg hover:border-sky-200/80 overflow-hidden"
+                      : "block min-w-[280px] sm:min-w-[300px] transition-all duration-300 cursor-pointer hover:-translate-y-0.5 bg-white rounded-xl border border-gray-200/80 shadow-sm hover:shadow-lg hover:border-sky-200/80 flex-shrink-0 overflow-hidden"
                   }
                 >
-                  <div className="relative h-40 sm:h-48 overflow-hidden rounded-t-lg">
+                  <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
                     <img
-                      src={campaign.images[0]}
+                      src={campaign.images[0] || "/placeholder.jpg"}
                       alt={campaign.title}
                       className="w-full h-full object-cover"
                       draggable="false"
                     />
-                    <div className="absolute top-3 right-3 bg-orange-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-md">
-                      {progress.toFixed(0)}%
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+                    <div className="absolute top-2.5 right-2.5 rounded-lg bg-white/95 px-2.5 py-1 text-xs font-bold text-sky-600 shadow-sm">
+                      {Math.min(progress, 100).toFixed(0)}%
                     </div>
-                    <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-semibold text-gray-700 shadow-sm">
-                      {campaign.contributors} متبرع
+                    <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 text-white text-xs font-medium drop-shadow-sm">
+                      <Heart className="h-3.5 w-3.5 shrink-0 opacity-90" />
+                      <span>
+                        {campaign.donationCount} {t("contributor")}
+                      </span>
                     </div>
                   </div>
 
-                  <div className="p-4 sm:p-5">
+                  <div className="p-4 sm:p-4">
                     <h3 className="text-sm sm:text-base font-bold text-gray-900 mb-3 line-clamp-1">
                       {campaign.title}
                     </h3>
@@ -302,27 +364,37 @@ const handleMouseMove = (e) => {
                     <div className="mb-4">
                       <div className="flex justify-between text-xs sm:text-sm mb-2 gap-2">
                         <span className="text-gray-700 whitespace-nowrap">
-                          <span className="font-bold text-orange-600">
-                            {formatNumber(campaign.currentAmount)} ₺
-                          </span>
-                          {" "}تبرعات
+                          <span className="font-bold text-sky-600">
+                            {getCurrency()}
+                            {formatNumber(
+                              convertToCurrency(
+                                Math.round(campaign.currentAmount)
+                              ).convertedValue
+                            )}
+                          </span>{" "}
+                          {t("donations")}
                         </span>
                         <span className="text-gray-600 text-left whitespace-nowrap">
-                          تبقى{" "}
+                          {t("remaining")}{" "}
                           <span className="font-semibold">
-                            {formatNumber(campaign.targetAmount - campaign.currentAmount)} ₺
+                            {getCurrency()}
+                            {formatNumber(
+                              convertToCurrency(
+                                Math.round(remainingAmount)
+                              ).convertedValue
+                            )}
                           </span>
                         </span>
                       </div>
                       <div className="w-full bg-gray-100 rounded-full h-2">
                         <div
-                          className="bg-gradient-to-r from-orange-500 to-orange-600 h-2 rounded-full transition-all duration-500"
+                          className="bg-gradient-to-r from-sky-500 to-sky-600 h-2 rounded-full transition-all duration-500"
                           style={{ width: `${Math.min(progress, 100)}%` }}
                         />
                       </div>
                     </div>
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>

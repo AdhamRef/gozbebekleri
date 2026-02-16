@@ -14,6 +14,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { useTranslations } from "next-intl";
 
 interface SharePopupProps {
   isOpen: boolean;
@@ -32,13 +33,14 @@ const SharePopup = ({
   description,
   image = "/placeholder.jpg",
 }: SharePopupProps) => {
+  const t = useTranslations("SharePopup");
   const encodedUrl = encodeURIComponent(url);
-  const shareText = `ادعم حملة "${title}" وساعدنا في صنع فرق! 🤲\n${description}`;
+  const shareText = t("shareText", { title, description });
   const encodedShareText = encodeURIComponent(shareText);
 
   // Share links (image is fetched from the Open Graph meta tags)
   const shareLinks = {
-    facebook: `https://www.facebook.com/dialog/feed?app_id=2263261010727677&display=popup&quote=${encodedShareText}&link=${encodedUrl}&redirect_uri=${encodedUrl}`,
+    facebook: `https://www.facebook.com/dialog/feed?app_id=495577266291860&display=popup&quote=${encodedShareText}&link=${encodedUrl}&redirect_uri=${encodedUrl}`,
     twitter: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedShareText}`,
     telegram: `https://telegram.me/share/url?url=${encodedUrl}&text=${encodedShareText}`,
     whatsapp: `https://api.whatsapp.com/send?text=${encodedShareText}%20${encodedUrl}`,
@@ -47,9 +49,9 @@ const SharePopup = ({
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(url);
-      toast.success("تم نسخ الرابط بنجاح");
+      toast.success(t("linkCopied"));
     } catch (err) {
-      toast.error("فشل نسخ الرابط");
+      toast.error(t("linkCopyFailed"));
     }
   };
 
@@ -61,8 +63,8 @@ const SharePopup = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-auto">
         <DialogHeader>
-          <DialogTitle className="text-center text-xl font-bold text-orange-800">
-            شارك الحملة مع الآخرين
+          <DialogTitle className="text-center text-xl font-bold text-sky-800">
+            {t("shareCampaign")}
           </DialogTitle>
         </DialogHeader>
         <div className="!p-0">
@@ -90,28 +92,28 @@ const SharePopup = ({
               className="flex items-center justify-center gap-2 bg-[#1877f2] hover:bg-[#166fe5] text-white py-2 h-auto"
             >
               <Facebook className="w-4 h-4" />
-              فيسبوك
+              {t("facebook")}
             </Button>
             <Button
               onClick={() => handleShare("twitter")}
               className="flex items-center justify-center gap-2 bg-[#1da1f2] hover:bg-[#1a94da] text-white py-2 h-auto"
             >
               <Twitter className="w-4 h-4" />
-              تويتر
+              {t("twitter")}
             </Button>
             <Button
               onClick={() => handleShare("telegram")}
               className="flex items-center justify-center gap-2 bg-[#0088cc] hover:bg-[#0077b3] text-white py-2 h-auto"
             >
               <Send className="w-4 h-4" />
-              تيليجرام
+              {t("telegram")}
             </Button>
             <Button
               onClick={() => handleShare("whatsapp")}
               className="flex items-center justify-center gap-2 bg-[#25d366] hover:bg-[#22c35e] text-white py-2 h-auto"
             >
               <MessageCircle className="w-4 h-4" />
-              واتساب
+              {t("whatsapp")}
             </Button>
           </div>
 
@@ -131,7 +133,7 @@ const SharePopup = ({
                 className="flex items-center gap-1.5 hover:bg-emerald-50 hover:text-emerald-600 transition-colors h-auto py-1.5"
               >
                 <Copy className="w-3.5 h-3.5" />
-                نسخ
+                {t("copy")}
               </Button>
             </div>
           </div>

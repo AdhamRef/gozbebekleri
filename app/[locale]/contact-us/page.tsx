@@ -16,13 +16,29 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useTranslations, useLocale } from "next-intl";
 
 const ContactPage = () => {
+  const t = useTranslations("ContactUs");
+  const locale = useLocale() as "ar" | "en" | "fr";
+
+  // Helper function to get locale-specific property
+  const getLocalizedProperty = (obj: any, key: string) => {
+    const localeKey = `${key}${locale.charAt(0).toUpperCase() + locale.slice(1)}`;
+    return obj[localeKey] || obj[key] || "";
+  };
+
+  const messageTypes = [
+    { valueAr: "اقتراح", valueEn: "Suggestion", valueFr: "Suggestion" },
+    { valueAr: "يتمنى", valueEn: "Wish", valueFr: "Souhait" },
+    { valueAr: "يشتكي", valueEn: "Complaint", valueFr: "Plainte" }
+  ];
+
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
     email: "",
-    messageType: "اقتراح",
+    messageType: getLocalizedProperty(messageTypes[0], "value"),
     message: ""
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -30,7 +46,7 @@ const ContactPage = () => {
 
   const handleSubmit = async () => {
     if (!formData.name || !formData.phone || !formData.email || !formData.message) {
-      alert("الرجاء ملء جميع الحقول المطلوبة");
+      alert(t("requiredFields"));
       return;
     }
 
@@ -48,7 +64,7 @@ const ContactPage = () => {
         name: "",
         phone: "",
         email: "",
-        messageType: "اقتراح",
+        messageType: getLocalizedProperty(messageTypes[0], "value"),
         message: ""
       });
       setIsSuccess(false);
@@ -65,24 +81,30 @@ const ContactPage = () => {
   const contactInfo = [
     {
       icon: MapPin,
-      title: "العنوان",
+      titleAr: "العنوان",
+      titleEn: "Address",
+      titleFr: "Adresse",
       content: "İstanbul",
       color: "text-blue-600",
       bgColor: "bg-blue-50"
     },
     {
       icon: Phone,
-      title: "الهاتف",
+      titleAr: "الهاتف",
+      titleEn: "Phone",
+      titleFr: "Téléphone",
       content: "+90 212 288 59 30",
       color: "text-green-600",
       bgColor: "bg-green-50"
     },
     {
       icon: Mail,
-      title: "البريد الإلكتروني",
+      titleAr: "البريد الإلكتروني",
+      titleEn: "Email",
+      titleFr: "E-mail",
       content: "info@gozbebekleri.org",
-      color: "text-orange-600",
-      bgColor: "bg-orange-50"
+      color: "text-sky-600",
+      bgColor: "bg-sky-50"
     }
   ];
 
@@ -97,7 +119,7 @@ const ContactPage = () => {
     <div className="min-h-screen bg-gray-50">
       
       {/* Hero Section */}
-      <div className="relative text-white py-16 sm:py-20 mt-14 sm:mt-20 overflow-hidden">
+      <div className="relative text-white py-16 sm:py-20 mt-14 overflow-hidden">
         <div className="absolute inset-0">
           <img 
             src="https://i.ibb.co/Xm58ssT/481207566-944951421141366-1158434782285969951-n-1.png" 
@@ -109,10 +131,10 @@ const ContactPage = () => {
         <div className="container mx-auto px-4 relative z-10 text-center">
           <MessageCircle className="w-12 h-12 sm:w-14 sm:h-14 mx-auto mb-3" />
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2">
-            اتصل بنا
+            {t("pageTitle")}
           </h1>
           <p className="text-sm sm:text-base max-w-xl mx-auto opacity-90">
-            نحن هنا للإجابة على استفساراتك ومساعدتك
+            {t("pageSubtitle")}
           </p>
         </div>
       </div>
@@ -134,11 +156,10 @@ const ContactPage = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-bold text-gray-800 mb-1 text-sm">
-                        {info.title}
+                        {getLocalizedProperty(info, "title")}
                       </h3>
                       <p className="text-gray-600 text-xs break-words">
-                        {info.title === "الهاتف" ? <span dir="ltr">{info.content}</span> : info.content}
-                        
+                        {getLocalizedProperty(info, "title") === t("phone") ? <span dir="ltr">{info.content}</span> : info.content}
                       </p>
                     </div>
                   </div>
@@ -149,7 +170,7 @@ const ContactPage = () => {
             {/* Social Media */}
             <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
               <h3 className="font-bold text-gray-800 mb-3 text-md">
-                تابعنا
+                {t("followUs")}
               </h3>
               <div className="flex gap-2">
                 {socialMedia.map((social, index) => (
@@ -179,20 +200,20 @@ const ContactPage = () => {
           <div className="lg:col-span-3">
             <div className="bg-white rounded-xl shadow-md p-5 sm:p-6 border border-gray-100">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-1">
-                نموذج الاتصال
+                {t("contactForm")}
               </h2>
               <p className="text-gray-600 mb-5 text-xs sm:text-sm">
-                املأ النموذج وسنتواصل معك قريباً
+                {t("formSubtitle")}
               </p>
 
               {isSuccess ? (
                 <div className="bg-green-50 border-2 border-green-500 rounded-xl p-6 text-center">
                   <CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-3" />
                   <h3 className="text-lg font-bold text-green-800 mb-1">
-                    تم إرسال رسالتك بنجاح!
+                    {t("successTitle")}
                   </h3>
                   <p className="text-green-700 text-sm">
-                    شكراً لتواصلك معنا، سنرد عليك قريباً
+                    {t("successMessage")}
                   </p>
                 </div>
               ) : (
@@ -200,7 +221,7 @@ const ContactPage = () => {
                   {/* Name */}
                   <div>
                     <label className="block text-gray-700 font-semibold mb-1.5 text-xs">
-                      اسمك ولقبك <span className="text-red-500">*</span>
+                      {t("nameLabel")} <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                       <User className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -209,8 +230,8 @@ const ContactPage = () => {
                         name="name"
                         value={formData.name}
                         onChange={handleChange}
-                        className="w-full pr-9 pl-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none transition-colors text-sm"
-                        placeholder="أدخل اسمك الكامل"
+                        className="w-full pr-9 pl-3 py-2 border border-gray-300 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none transition-colors text-sm"
+                        placeholder={t("namePlaceholder")}
                       />
                     </div>
                   </div>
@@ -218,7 +239,7 @@ const ContactPage = () => {
                   {/* Phone */}
                   <div>
                     <label className="block text-gray-700 font-semibold mb-1.5 text-xs">
-                      رقم هاتفك <span className="text-red-500">*</span>
+                      {t("phoneLabel")} <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                       <Phone className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -227,8 +248,8 @@ const ContactPage = () => {
                         name="phone"
                         value={formData.phone}
                         onChange={handleChange}
-                        className="w-full pr-9 pl-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none transition-colors text-sm"
-                        placeholder="+90 XXX XXX XX XX"
+                        className="w-full pr-9 pl-3 py-2 border border-gray-300 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none transition-colors text-sm"
+                        placeholder={t("phonePlaceholder")}
                       />
                     </div>
                   </div>
@@ -236,7 +257,7 @@ const ContactPage = () => {
                   {/* Email */}
                   <div>
                     <label className="block text-gray-700 font-semibold mb-1.5 text-xs">
-                      البريد الإلكتروني <span className="text-red-500">*</span>
+                      {t("emailLabel")} <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                       <Mail className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -245,8 +266,8 @@ const ContactPage = () => {
                         name="email"
                         value={formData.email}
                         onChange={handleChange}
-                        className="w-full pr-9 pl-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none transition-colors text-sm"
-                        placeholder="example@email.com"
+                        className="w-full pr-9 pl-3 py-2 border border-gray-300 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none transition-colors text-sm"
+                        placeholder={t("emailPlaceholder")}
                       />
                     </div>
                   </div>
@@ -254,32 +275,34 @@ const ContactPage = () => {
                   {/* Message Type */}
                   <div>
                     <label className="block text-gray-700 font-semibold mb-1.5 text-xs">
-                      نوع الرسالة <span className="text-red-500">*</span>
+                      {t("messageTypeLabel")} <span className="text-red-500">*</span>
                     </label>
                     <select
                       name="messageType"
                       value={formData.messageType}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none transition-colors text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none transition-colors text-sm"
                     >
-                      <option value="اقتراح">اقتراح</option>
-                      <option value="يتمنى">يتمنى</option>
-                      <option value="يشتكي">يشتكي</option>
+                      {messageTypes.map((type, index) => (
+                        <option key={index} value={getLocalizedProperty(type, "value")}>
+                          {getLocalizedProperty(type, "value")}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
                   {/* Message */}
                   <div>
                     <label className="block text-gray-700 font-semibold mb-1.5 text-xs">
-                      رسالتك <span className="text-red-500">*</span>
+                      {t("messageLabel")} <span className="text-red-500">*</span>
                     </label>
                     <Textarea
                       name="message"
                       value={formData.message}
                       onChange={handleChange}
                       rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none transition-colors resize-none text-sm"
-                      placeholder="اكتب رسالتك هنا..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none transition-colors resize-none text-sm"
+                      placeholder={t("messagePlaceholder")}
                     />
                   </div>
 
@@ -287,17 +310,17 @@ const ContactPage = () => {
                   <Button
                     onClick={handleSubmit}
                     disabled={isSubmitting}
-                    className="w-full bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 text-white py-2.5 rounded-lg font-bold text-sm transition-all duration-300 hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
+                    className="w-full bg-gradient-to-r from-sky-600 to-sky-500 hover:from-sky-700 hover:to-sky-600 text-white py-2.5 rounded-lg font-bold text-sm transition-all duration-300 hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
                   >
                     {isSubmitting ? (
                       <span className="flex items-center justify-center gap-2">
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        جاري الإرسال...
+                        {t("sending")}
                       </span>
                     ) : (
                       <span className="flex items-center justify-center gap-2">
                         <Send className="w-4 h-4" />
-                        إرسال الرسالة
+                        {t("sendMessage")}
                       </span>
                     )}
                   </Button>
@@ -312,7 +335,7 @@ const ContactPage = () => {
       <div className="bg-white pt-8 sm:pt-10">
         <div className="container mx-auto">
           <h2 className="text-xl sm:text-2xl font-bold text-center text-gray-800 mb-5">
-            موقعنا
+            {t("ourLocation")}
           </h2>
           <div className="overflow-hidden shadow-md h-80 sm:h-[450px] bg-gray-200">
             <iframe

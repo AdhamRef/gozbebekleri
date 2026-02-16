@@ -466,7 +466,7 @@ export default function SlaytHizliBagis() {
             <Button
               rightIcon={<MdAddShoppingCart size={18} />}
               bg={"#D08E30"}
-              colorScheme="orange"
+              colorScheme="sky"
               p={3}
               px={4}
               fontSize={11}

@@ -1,10 +1,12 @@
 import { Metadata } from "next";
 import axios from "axios";
 import MainPage from "../_components/MainPage";
+import MainPageDummy from "../_components/MainPageDummy";
 
 interface Props {
   params: {
     id: string;
+    locale: string;
   };
 }
 
@@ -19,12 +21,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const fetchCampaignData = async (): Promise<Campaign> => {
     try {
       // Use an absolute URL for server-side fetching
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://alafiya.org";
-      const response = await axios.get(`${baseUrl}/api/campaigns/${params.id}`);
-      console.log("GOTTEN");
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.org";
+      const response = await axios.get(`${baseUrl}/api/campaigns/${params.id}?locale=${params.locale}`);
       return response.data;
     } catch (error) {
-      console.log("NOT GOTTEN");
       console.error("Failed to fetch campaign data:", error);
       throw new Error("Failed to fetch campaign data");
     }
@@ -48,7 +48,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           alt: campaign.title,
         },
       ],
-      url: `https://alafiya.org/ar/campaigns/${params.id}`,
+      url: `https://gozbebekleri.org/${params.locale}/campaigns/${params.id}`,
       type: "website",
     },
     twitter: {
@@ -58,13 +58,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images: [campaign.images[0] || "/placeholder.jpg"],
     },
     alternates: {
-      canonical: `https://alafiya.org/ar/campaigns/${params.id}`,
+      canonical: `https://gozbebekleri.org/${params.locale}/campaigns/${params.id}`,
     },
   };
 }
 
 const CampaignPage = ({ params }: Props) => {
-  return <MainPage id={params.id} />;
+  return <MainPageDummy id={params.id} locale={params.locale} />;
 };
 
 export default CampaignPage;

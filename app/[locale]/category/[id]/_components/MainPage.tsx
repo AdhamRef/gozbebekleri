@@ -29,7 +29,7 @@ interface Category {
   image: string;
 }
 
-const MainPage = ({ id }: { id: string }) => {
+const MainPage = ({ id, locale }: { id: string; locale?: string }) => {
   const [category, setCategory] = useState<Category | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,13 +40,14 @@ const MainPage = ({ id }: { id: string }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const effectiveLocale = locale || (typeof window !== 'undefined' ? (window.location.pathname.split('/')[1] || 'ar') : 'ar');
         const [categoryRes, campaignsRes] = await Promise.all([
-          axios.get(`/api/categories/${id}`),
-          axios.get(`/api/categories/${id}/campaigns`),
+          axios.get(`/api/categories/${id}?locale=${effectiveLocale}&counts=true`),
+          axios.get(`/api/categories/${id}/campaigns?locale=${effectiveLocale}&limit=100`),
         ]);
 
         setCategory(categoryRes.data);
-        setCampaigns(campaignsRes.data.items);
+        setCampaigns(campaignsRes.data.items || []);
         console.log(campaignsRes.data.items);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load data");
@@ -56,7 +57,7 @@ const MainPage = ({ id }: { id: string }) => {
     };
 
     fetchData();
-  }, [id]);
+  }, [id, locale]);
 
   const filteredCampaigns = campaigns.filter(
     (campaign) =>
@@ -109,7 +110,7 @@ const MainPage = ({ id }: { id: string }) => {
           >
             <h1 className="text-4xl md:text-5xl font-semibold text-white mb-6">
               تبرع لحالات{" "}
-              <span className="bg-gradient-to-r rounded-lg from-emerald-200 to-emerald-300 text-transparent bg-clip-text leading-[1.24]">
+              <span className="bg-gradient-to-r rounded-lg from-sky-200 to-sky-300 text-transparent bg-clip-text leading-[1.24]">
                 {category.name}{" "}
               </span>
             </h1>
@@ -157,6 +158,7 @@ const MainPage = ({ id }: { id: string }) => {
             >
               <Link
                 href={`/campaign/${campaign.id}`}
+                prefetch={true}
                 className="block bg-white rounded-lg overflow-hidden"
               >
                 <div className="relative">
@@ -181,7 +183,7 @@ const MainPage = ({ id }: { id: string }) => {
                     <div className="flex justify-between text-sm text-gray-700 mb-2">
                       <span>
                         <span className="font-semibold">
-                          {getCurrency()}{" "}
+                          {getCurrency()}
                           {formatNumber(
                             convertToCurrency(
                               Math.round(campaign.currentAmount)
@@ -193,7 +195,7 @@ const MainPage = ({ id }: { id: string }) => {
                       <span>
                         تبقي{" "}
                         <span className="font-semibold">
-                          {getCurrency()}{" "}
+                          {getCurrency()}
                           {formatNumber(
                             convertToCurrency(Math.round(campaign.targetAmount))
                               .convertedValue

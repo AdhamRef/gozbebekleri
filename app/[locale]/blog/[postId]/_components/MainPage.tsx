@@ -52,9 +52,7 @@ const MainPage: React.FC<BlogPostProps> = ({ id }: { id: string }) => {
   const fetchPostData = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`/api/posts/${id}`, {
-        params: { lang: locale }, // Pass the locale to the API
-      });
+      const response = await axios.get(`/api/posts/${id}`, { params: { locale } });
       console.log(response.data);
       setPost(response.data.post);
       setSimilarPosts(response.data.similarPosts);
