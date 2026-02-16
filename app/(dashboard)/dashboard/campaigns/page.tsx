@@ -44,7 +44,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { useRouter } from "@/i18n/routing";
+import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { CampaignReorderDialog } from './_components/CampaignReorderDialog';
 

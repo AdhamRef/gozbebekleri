@@ -71,7 +71,8 @@ export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
   }
 }
 
-export default async function BlogPost({ params }: BlogPostProps) {
+export default async function BlogPost({ params: paramsPromise }: BlogPostProps) {
+  const params = await paramsPromise;
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.vercel.app";
   const locale = params.locale || "ar";
   const msgs = await import(`../../../../i18n/messages/${locale}.json`);
