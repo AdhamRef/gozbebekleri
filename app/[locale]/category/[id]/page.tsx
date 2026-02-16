@@ -1,5 +1,3 @@
-"use server";
-
 import React from "react";
 import axios from "axios";
 import { Metadata } from "next";
@@ -64,8 +62,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-const CategoryPage = ({ params }: Props) => {
+export default function CategoryPage({ params }: Props) {
   return <MainPage id={params.id} locale={params.locale} />;
-};
-
-export default CategoryPage;
+}

@@ -1,4 +1,3 @@
-'use server'
 import axios from "axios";
 import { Metadata } from "next";
 import MainPage from "./_components/MainPage";
@@ -13,7 +12,6 @@ interface CategoryProps {
 
 // Generate metadata for the category page
 export async function generateMetadata({ params }: CategoryProps): Promise<Metadata> {
-  // const locale = useLocale(); // Get the current locale (ar or en)
   const fetchCategoryData = async (): Promise<Category> => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.org";
@@ -30,7 +28,6 @@ export async function generateMetadata({ params }: CategoryProps): Promise<Metad
   };
 
   const category = await fetchCategoryData();
-
 
   return {
     title: `${category.title} - قرة العيون`,
@@ -61,10 +58,6 @@ export async function generateMetadata({ params }: CategoryProps): Promise<Metad
   };
 }
 
-const PostCategoryPage: React.FC<CategoryProps> = ({ params }) => {
-  return (
-  <MainPage id={params.categoryId} />
-  );
-};
-
-export default PostCategoryPage;
+export default function PostCategoryPage({ params }: CategoryProps) {
+  return <MainPage id={params.categoryId} />;
+}
