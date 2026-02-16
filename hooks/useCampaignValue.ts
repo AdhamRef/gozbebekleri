@@ -89,9 +89,9 @@ const currencySymbols = {
   QAR: '﷼',
   BHD: 'دينار',
 };
+/** Returns currency code (e.g. 'USD'). Use CURRENCY_SYMBOLS[code] for display symbol. */
 export const getCurrency = (): string => {
-  const currencyCode = Cookies.get('currency') || 'USD';
-  return Cookies.get('currency') || '$';
+  return typeof window === 'undefined' ? 'USD' : (Cookies.get('currency') || 'USD');
 };
 
 

@@ -8,16 +8,12 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/[...nextauth]/options";
 
-interface Params {
-  params: {
-    id: string;
-  };
-}
+type ParamsPromise = { params: Promise<{ id: string }> };
 
 // ✅ GET - Fetch campaign updates with translations
-export async function GET(request: NextRequest, { params }: Params) {
+export async function GET(request: NextRequest, { params }: ParamsPromise) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const locale = request.headers.get("x-locale") || "ar";
 
     // ✅ Performance optimization: Fetch only needed fields with locale-specific translations
@@ -76,8 +72,9 @@ export async function GET(request: NextRequest, { params }: Params) {
 }
 
 // ✅ POST - Create new update with translations (admin only)
-export async function POST(request: NextRequest, { params }: Params) {
+export async function POST(request: NextRequest, { params }: ParamsPromise) {
   try {
+    const { id } = await params;
     // ✅ STEP 1: Authentication check
     const session = await getServerSession(authOptions);
     if (!session?.user || session.user.role !== 'ADMIN') {
@@ -86,8 +83,6 @@ export async function POST(request: NextRequest, { params }: Params) {
         { status: 401 }
       );
     }
-
-    const { id } = params;
     const data = await request.json();
 
     // ✅ STEP 2: Validate campaign exists

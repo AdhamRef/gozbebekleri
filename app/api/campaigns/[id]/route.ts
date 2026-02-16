@@ -15,10 +15,10 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params; // Campaign ID from URL
+    const { id } = await params; // Campaign ID from URL
     const locale = request.headers.get("x-locale") || "ar";
 
     // ✅ STEP 1: Fetch campaign with ONLY current locale translations
@@ -227,10 +227,10 @@ export async function GET(
 // ✅ PUT - Update campaign
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
 
     // ✅ STEP 1: Validate campaign exists
@@ -362,14 +362,14 @@ export async function PUT(
 }
 
 // ✅ DELETE - Delete campaign (admin only) - refuses if donations exist
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user || session.user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Unauthorized - Only admins can delete campaigns' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     // Ensure campaign exists
     const camp = await prisma.campaign.findUnique({ where: { id }, select: { id: true } });

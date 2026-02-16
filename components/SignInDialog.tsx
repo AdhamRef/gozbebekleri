@@ -1,6 +1,6 @@
 'use client';
 
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { signIn } from 'next-auth/react';
 import { motion } from 'framer-motion';
 import { Heart } from 'lucide-react';
@@ -33,9 +33,9 @@ export default function SignInDialog({ isOpen, onClose }: SignInDialogProps) {
             <div className="flex justify-center mb-2">
             <img src="https://i.ibb.co/ZwcJcN1/logo.webp" className="h-12" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">
+            <DialogTitle className="text-2xl font-bold text-gray-900 text-center">
               {t("welcomeTitle")}
-            </h2>
+            </DialogTitle>
             <p className="mt-2 text-sm text-gray-600">
               {t("welcomeSubtitle")}
             </p>

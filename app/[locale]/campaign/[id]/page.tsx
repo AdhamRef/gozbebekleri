@@ -4,10 +4,7 @@ import MainPage from "../_components/MainPage";
 import MainPageDummy from "../_components/MainPageDummy";
 
 interface Props {
-  params: {
-    id: string;
-    locale: string;
-  };
+  params: Promise<{ id: string; locale: string }>;
 }
 
 interface Campaign {
@@ -17,12 +14,12 @@ interface Campaign {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id, locale } = await params;
   // Fetch campaign data using axios
   const fetchCampaignData = async (): Promise<Campaign> => {
     try {
-      // Use an absolute URL for server-side fetching
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.org";
-      const response = await axios.get(`${baseUrl}/api/campaigns/${params.id}?locale=${params.locale}`);
+      const response = await axios.get(`${baseUrl}/api/campaigns/${id}?locale=${locale}`);
       return response.data;
     } catch (error) {
       console.error("Failed to fetch campaign data:", error);
@@ -30,10 +27,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
   };
 
-  // Fetch the campaign data
   const campaign = await fetchCampaignData();
 
-  // Return metadata
   return {
     title: `${campaign.title} - قرة العيون`,
     description: campaign.description,
@@ -48,7 +43,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           alt: campaign.title,
         },
       ],
-      url: `https://gozbebekleri.org/${params.locale}/campaigns/${params.id}`,
+      url: `https://gozbebekleri.org/${locale}/campaigns/${id}`,
       type: "website",
     },
     twitter: {
@@ -58,13 +53,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images: [campaign.images[0] || "/placeholder.jpg"],
     },
     alternates: {
-      canonical: `https://gozbebekleri.org/${params.locale}/campaigns/${params.id}`,
+      canonical: `https://gozbebekleri.org/${locale}/campaigns/${id}`,
     },
   };
 }
 
-const CampaignPage = ({ params }: Props) => {
-  return <MainPageDummy id={params.id} locale={params.locale} />;
-};
-
-export default CampaignPage;
+export default async function CampaignPage({ params }: Props) {
+  const { id, locale } = await params;
+  return <MainPageDummy id={id} locale={locale} />;
+}

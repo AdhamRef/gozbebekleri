@@ -9,10 +9,10 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { postId: string } }
+  { params }: { params: Promise<{ postId: string }> }
 ) {
   try {
-    const { postId } = params;
+    const { postId } = await params;
     const url = new URL(req.url);
     const qp = url.searchParams;
     const locale = req.headers.get('x-locale') || qp.get('locale') || qp.get('lang') || 'ar';
@@ -112,10 +112,10 @@ export async function GET(
 // PATCH: update post main fields and upsert translations
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { postId: string } }
+  { params }: { params: Promise<{ postId: string }> }
 ) {
   try {
-    const { postId } = params;
+    const { postId } = await params;
     const body = await req.json();
 
     const updateData: any = {};
@@ -166,14 +166,14 @@ export async function PATCH(
 }
 
 // DELETE: admin-only delete
-export async function DELETE(req: NextRequest, { params }: { params: { postId: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ postId: string }> }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user || session.user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Unauthorized - Only admins can delete posts' }, { status: 401 });
     }
 
-    const { postId } = params;
+    const { postId } = await params;
 
     const exists = await prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
     if (!exists) return NextResponse.json({ error: 'Post not found' }, { status: 404 });

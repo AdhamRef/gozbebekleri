@@ -158,9 +158,12 @@ function currencyFormat(amount: number, currency: string) {
   return `${sym} ${amount.toFixed(2)}`;
 }
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = await Promise.resolve(params.id);
+    const { id } = await params;
+    if (!id) {
+      return NextResponse.json({ error: 'Donation ID required' }, { status: 400 });
+    }
     let locale = (request.nextUrl.searchParams.get('locale') || 'en').slice(0, 2) as LocaleKey;
 
     // Force English receipt if Arabic to avoid RTL/font issues

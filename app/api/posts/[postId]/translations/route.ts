@@ -5,14 +5,10 @@ const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
-interface Params {
-  params: { postId: string };
-}
-
 // GET /api/posts/[postId]/translations - return all translations for a post
-export async function GET(request: NextRequest, { params }: Params) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ postId: string }> }) {
   try {
-    const { postId } = params;
+    const { postId } = await params;
 
     const translations = await prisma.postTranslation.findMany({
       where: { postId },

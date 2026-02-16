@@ -17,16 +17,13 @@ import ShareButton from "./_components/ShareButton";
 import BlogPostContent from "./_components/BlogPostContent";
 
 interface BlogPostProps {
-  params: {
-    locale: string;
-    postId: string;
-  };
+  params: Promise<{ locale: string; postId: string }>;
 }
 
 // Generate metadata for the blog post page
-export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
+export async function generateMetadata(args: { params: Promise<{ locale: string; postId: string }> }): Promise<Metadata> {
   try {
-    const { params } = await args;
+    const params = await args.params;
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.org";
     const locale = params?.locale || "ar";
     const postId = params?.postId;
@@ -75,13 +72,15 @@ export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
 }
 
 export default async function BlogPost({ params }: BlogPostProps) {
+  const resolved = await params;
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.org";
-  const locale = params.locale || "ar";
+  const locale = resolved.locale || "ar";
+  const postId = resolved.postId;
   const msgs = await import(`../../../../i18n/messages/${locale}.json`);
   const t = (k: string) => msgs?.default?.Blog?.[k] ?? k;
 
   // Fetch the post and similar posts (API already returns localized fields)
-  const res = await axios.get(`${baseUrl}/api/posts/${params.postId}`, { params: { locale } });
+  const res = await axios.get(`${baseUrl}/api/posts/${postId}`, { params: { locale } });
   const { post, similarPosts } = res.data;
 
   // Helper to pick a localized value: prefer a top-level localized field, then translations array, then post.fieldAR/EN/FR
@@ -141,7 +140,7 @@ export default async function BlogPost({ params }: BlogPostProps) {
                 </CardContent>
 
                 <CardFooter>
-                  <ShareButton label={t('sharePost')} copiedMessage={t('linkCopied')} url={`https://gozbebekleri.org/${locale}/blog/${params.postId}`} />
+                  <ShareButton label={t('sharePost')} copiedMessage={t('linkCopied')} url={`https://gozbebekleri.org/${locale}/blog/${postId}`} />
                 </CardFooter>
               </Card>
             </div>

@@ -3,21 +3,16 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/options";
 
-interface Params {
-  params: {
-    id: string;
-  };
-}
-
-export async function DELETE(request: NextRequest, { params }: Params) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const cartItem = await prisma.cartItem.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
     if (!cartItem) {
       return NextResponse.json(
@@ -27,7 +22,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     }
 
     await prisma.cartItem.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     const remainingCartItems = await prisma.cartItem.findMany({

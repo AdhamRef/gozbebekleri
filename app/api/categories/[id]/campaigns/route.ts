@@ -3,9 +3,13 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+    if (!id || id === 'undefined') {
+      return NextResponse.json({ error: 'Category ID required' }, { status: 400 });
+    }
     const searchParams = request.nextUrl.searchParams;
     const cursor = searchParams.get('cursor'); // Last item's ID from previous batch
     const limit = Math.min(Number(searchParams.get('limit')) || 10, 100); // cap for safety
@@ -21,7 +25,7 @@ export async function GET(
 
     // Check that category exists and fetch localized name if available
     const category = await prisma.category.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true,
         name: true,
@@ -36,7 +40,7 @@ export async function GET(
 
     // Build where clause
     const where: any = {
-      categoryId: params.id,
+      categoryId: id,
       AND: [
         { targetAmount: { gte: minAmount } },
         maxAmount < Infinity ? { targetAmount: { lte: maxAmount } } : {},

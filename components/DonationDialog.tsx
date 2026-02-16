@@ -1,4 +1,4 @@
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -921,7 +921,8 @@ const DonationDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-auto p-0">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-auto p-0" aria-describedby={undefined}>
+        <DialogTitle className="sr-only">{t("donationAmount")}</DialogTitle>
         {mounted && (
           <>
             <div className="p-6 pb-0">

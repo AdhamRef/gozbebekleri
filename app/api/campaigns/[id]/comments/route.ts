@@ -3,19 +3,15 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/[...nextauth]/options";
 
-interface Params {
-  params: {
-    id: string;
-    commentId: string;
-  };
-}
+type ParamsPromise = { params: Promise<{ id: string }> };
 
 // Get campaign comments
-export async function GET(request: NextRequest, { params }: Params) {
+export async function GET(request: NextRequest, { params }: ParamsPromise) {
   try {
+    const { id } = await params;
     const comments = await prisma.comment.findMany({
       where: {
-        campaignId: params.id,
+        campaignId: id,
       },
       include: {
         user: {
@@ -42,8 +38,9 @@ export async function GET(request: NextRequest, { params }: Params) {
 }
 
 // Add new comment
-export async function POST(request: NextRequest, { params }: Params) {
+export async function POST(request: NextRequest, { params }: ParamsPromise) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json(
@@ -56,7 +53,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const comment = await prisma.comment.create({
       data: {
         text: data.text,
-        campaignId: params.id,
+        campaignId: id,
         userId: session.user.id,
       },
       include: {
@@ -80,9 +77,10 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 }
 
-// Delete comment
-export async function DELETE(request: NextRequest, { params }: Params) {
+// Delete comment (commentId from query: ?commentId=xxx)
+export async function DELETE(request: NextRequest, { params }: ParamsPromise) {
   try {
+    await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json(
@@ -91,8 +89,13 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       );
     }
 
+    const commentId = request.nextUrl.searchParams.get('commentId');
+    if (!commentId) {
+      return NextResponse.json({ error: 'Comment ID required' }, { status: 400 });
+    }
+
     const comment = await prisma.comment.findUnique({
-      where: { id: params.commentId },
+      where: { id: commentId },
     });
 
     if (!comment) {
@@ -111,7 +114,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     }
 
     await prisma.comment.delete({
-      where: { id: params.commentId },
+      where: { id: commentId },
     });
 
     return NextResponse.json({ success: true });
@@ -124,9 +127,10 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   }
 }
 
-// Update comment
-export async function PATCH(request: NextRequest, { params }: Params) {
+// Update comment (commentId from query: ?commentId=xxx)
+export async function PATCH(request: NextRequest, { params }: ParamsPromise) {
   try {
+    await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json(
@@ -135,8 +139,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       );
     }
 
+    const commentId = request.nextUrl.searchParams.get('commentId');
+    if (!commentId) {
+      return NextResponse.json({ error: 'Comment ID required' }, { status: 400 });
+    }
+
     const comment = await prisma.comment.findUnique({
-      where: { id: params.commentId },
+      where: { id: commentId },
     });
 
     if (!comment) {
@@ -156,7 +165,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     const data = await request.json();
     const updatedComment = await prisma.comment.update({
-      where: { id: params.commentId },
+      where: { id: commentId },
       data: {
         text: data.text,
       },

@@ -6,9 +6,10 @@ import { authOptions } from '../../../auth/[...nextauth]/options';
 // GET /api/donations/[id]/comments - Get comments for a donation
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json(
@@ -24,12 +25,12 @@ export async function GET(
 
     // Get total count for pagination
     const total = await prisma.comment.count({
-      where: { donationId: params.id },
+      where: { donationId: id },
     });
 
     // Get comments with pagination
     const comments = await prisma.comment.findMany({
-      where: { donationId: params.id },
+      where: { donationId: id },
       include: {
         donor: {
           select: {
@@ -66,9 +67,10 @@ export async function GET(
 // POST /api/donations/[id]/comments - Add a comment to a donation
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json(
@@ -90,7 +92,7 @@ export async function POST(
 
     // Check if donation exists
     const donation = await prisma.donation.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!donation) {
@@ -105,7 +107,7 @@ export async function POST(
       data: {
         text,
         donorId: session.user.id,
-        donationId: params.id,
+        donationId: id,
       },
       include: {
         donor: {
@@ -130,9 +132,10 @@ export async function POST(
 // DELETE /api/donations/[id]/comments - Delete a comment
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await params;
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json(

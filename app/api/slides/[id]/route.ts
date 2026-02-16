@@ -3,12 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from "../../auth/[...nextauth]/options";
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const locale = request.nextUrl.searchParams.get('locale') || 'ar';
     const allTranslations = request.nextUrl.searchParams.get('allTranslations') === 'true';
     const slide = await prisma.slide.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true, title: true, description: true, image: true,
         showButton: true, buttonText: true, buttonLink: true, isActive: true, order: true,
@@ -30,8 +31,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user || session.user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -42,7 +44,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     await prisma.$transaction(async (tx) => {
       await tx.slide.update({
-        where: { id: params.id },
+        where: { id },
         data: {
           title,
           description: description ?? '',
@@ -60,16 +62,16 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
           const tt = t as any;
           if (!tt.title) continue;
           await tx.slideTranslation.upsert({
-            where: { slideId_locale: { slideId: params.id, locale } },
+            where: { slideId_locale: { slideId: id, locale } },
             update: { title: tt.title, description: tt.description ?? '', buttonText: tt.buttonText ?? '' },
-            create: { slideId: params.id, locale, title: tt.title, description: tt.description ?? '', buttonText: tt.buttonText ?? '' },
+            create: { slideId: id, locale, title: tt.title, description: tt.description ?? '', buttonText: tt.buttonText ?? '' },
           });
         }
       }
     });
 
     const full = await prisma.slide.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: { id: true, title: true, description: true, image: true, showButton: true, buttonText: true, buttonLink: true, isActive: true, order: true, translations: { select: { locale: true, title: true, description: true, buttonText: true } } },
     });
     return NextResponse.json(full);
@@ -79,13 +81,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user || session.user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    await prisma.slide.delete({ where: { id: params.id } });
+    await prisma.slide.delete({ where: { id } });
     return NextResponse.json({ message: 'Slide deleted' }, { status: 200 });
   } catch (error) {
     console.error('Error deleting slide:', error);

@@ -6,16 +6,17 @@ import { authOptions } from "../../auth/[...nextauth]/options";
 // GET: return a single category (localized) with optional counts
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const paramsUrl = request.nextUrl.searchParams;
     const locale = paramsUrl.get('locale') || 'ar';
     const includeCounts = paramsUrl.get('counts') === 'true';
     const allTranslations = paramsUrl.get('allTranslations') === 'true';
 
     const category = await prisma.category.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true,
         name: true,
@@ -61,9 +62,10 @@ export async function GET(
 // PUT: admin-only; supports updating base fields and upserting translations in a transaction
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user || session.user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Unauthorized - Only admins can update categories' }, { status: 401 });
@@ -78,7 +80,7 @@ export async function PUT(
 
     const updated = await prisma.$transaction(async (tx) => {
       const updatedCat = await tx.category.update({
-        where: { id: params.id },
+        where: { id },
         data: {
           name,
           description: description || '',
@@ -98,9 +100,9 @@ export async function PUT(
           if (!tt.name) continue; // skip incomplete translations
 
           ops.push(tx.categoryTranslation.upsert({
-            where: { categoryId_locale: { categoryId: params.id, locale } as any },
+            where: { categoryId_locale: { categoryId: id, locale } as any },
             update: { name: tt.name, description: tt.description || '' },
-            create: { categoryId: params.id, locale, name: tt.name, description: tt.description || '' }
+            create: { categoryId: id, locale, name: tt.name, description: tt.description || '' }
           }));
         }
         await Promise.all(ops);
@@ -138,20 +140,21 @@ export async function PUT(
 // DELETE: admin-only; refuse to delete if campaigns exist
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user || session.user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Unauthorized - Only admins can delete categories' }, { status: 401 });
     }
 
-    const campaignCount = await prisma.campaign.count({ where: { categoryId: params.id } });
+    const campaignCount = await prisma.campaign.count({ where: { categoryId: id } });
     if (campaignCount > 0) {
       return NextResponse.json({ error: 'Category has campaigns. Delete or move campaigns before deleting the category.' }, { status: 400 });
     }
 
-    await prisma.category.delete({ where: { id: params.id } });
+    await prisma.category.delete({ where: { id } });
 
     return NextResponse.json({ message: 'Category deleted successfully' }, { status: 200 });
   } catch (error) {

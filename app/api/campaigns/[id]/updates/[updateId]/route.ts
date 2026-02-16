@@ -9,17 +9,12 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../../auth/[...nextauth]/options";
 
-interface Params {
-  params: {
-    id: string;
-    updateId: string;
-  };
-}
+type ParamsPromise = { params: Promise<{ id: string; updateId: string }> };
 
 // ✅ GET - Fetch specific update with translations
-export async function GET(request: NextRequest, { params }: Params) {
+export async function GET(request: NextRequest, { params }: ParamsPromise) {
   try {
-    const { updateId } = params;
+    const { updateId } = await params;
     const locale = request.headers.get("x-locale") || "ar";
 
     const update = await prisma.update.findUnique({
@@ -79,8 +74,9 @@ export async function GET(request: NextRequest, { params }: Params) {
 }
 
 // ✅ PATCH - Update an update with translations (admin only)
-export async function PATCH(request: NextRequest, { params }: Params) {
+export async function PATCH(request: NextRequest, { params }: ParamsPromise) {
   try {
+    const { updateId } = await params;
     // ✅ STEP 1: Authentication check
     const session = await getServerSession(authOptions);
     if (!session?.user || session.user.role !== 'ADMIN') {
@@ -89,8 +85,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         { status: 401 }
       );
     }
-
-    const { updateId } = params;
     const data = await request.json();
 
     // ✅ STEP 2: Validate update exists
@@ -196,8 +190,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 }
 
 // ✅ DELETE - Delete update and all its translations (admin only)
-export async function DELETE(request: NextRequest, { params }: Params) {
+export async function DELETE(request: NextRequest, { params }: ParamsPromise) {
   try {
+    const { updateId } = await params;
     // ✅ STEP 1: Authentication check
     const session = await getServerSession(authOptions);
     if (!session?.user || session.user.role !== 'ADMIN') {
@@ -206,8 +201,6 @@ export async function DELETE(request: NextRequest, { params }: Params) {
         { status: 401 }
       );
     }
-
-    const { updateId } = params;
 
     // ✅ STEP 2: Validate update exists
     const existingUpdate = await prisma.update.findUnique({

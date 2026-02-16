@@ -6,9 +6,13 @@ import { DonationType, SubscriptionStatus } from '@prisma/client';
 // GET /api/donations/[id] - Get donation by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+    if (!id) {
+      return NextResponse.json({ error: 'Donation ID required' }, { status: 400 });
+    }
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json(
@@ -18,7 +22,7 @@ export async function GET(
     }
 
     const donation = await prisma.donation.findUnique({
-      where: { id: params.id },
+      where: { id },
       omit: {
         cardDetails: true,
       },
@@ -106,9 +110,10 @@ function nextBillingFromDay(billingDay: number): Date {
 // PUT /api/donations/[id] - Update donation (admin full update; donor can update status + billingDay for own MONTHLY)
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json(
@@ -121,7 +126,7 @@ export async function PUT(
     const { status, billingDay } = body;
 
     const currentDonation = await prisma.donation.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: { items: true },
     });
 
@@ -169,7 +174,7 @@ export async function PUT(
         return NextResponse.json(currentDonation);
       }
       const updatedDonation = await prisma.donation.update({
-        where: { id: params.id },
+        where: { id },
         data: updates,
         include: {
           donor: { select: { name: true, email: true } },
@@ -229,7 +234,7 @@ export async function PUT(
     }
 
     const updatedDonation = await prisma.donation.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status: status as SubscriptionStatus,
         ...(billingDay != null && { billingDay: Math.min(28, Math.max(1, Number(billingDay))) }),
@@ -276,9 +281,10 @@ export async function PUT(
 // DELETE /api/donations/[id] - Delete donation (admin only)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session || session.user.role !== 'ADMIN') {
       return NextResponse.json(
@@ -289,7 +295,7 @@ export async function DELETE(
 
     // Get donation details with items and categoryItems before deletion
     const donation = await prisma.donation.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         items: true,
         categoryItems: true,
@@ -318,7 +324,7 @@ export async function DELETE(
         });
       }
       await tx.donation.delete({
-        where: { id: params.id },
+        where: { id },
       });
     });
 

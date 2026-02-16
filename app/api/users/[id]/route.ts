@@ -6,9 +6,10 @@ import { authOptions } from '../../auth/[...nextauth]/options';
 // GET /api/users/[id] - Get user by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json(
@@ -18,7 +19,7 @@ export async function GET(
     }
 
     // Only allow users to view their own profile or admins to view any profile
-    if (session.user.role !== 'ADMIN' && session.user.id !== params.id) {
+    if (session.user.role !== 'ADMIN' && session.user.id !== id) {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403 }
@@ -26,7 +27,7 @@ export async function GET(
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         donations: {
           include: {
@@ -82,9 +83,10 @@ export async function GET(
 // PUT /api/users/[id] - Update user
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json(
@@ -94,7 +96,7 @@ export async function PUT(
     }
 
     // Only allow users to update their own profile or admins to update any profile
-    if (session.user.role !== 'ADMIN' && session.user.id !== params.id) {
+    if (session.user.role !== 'ADMIN' && session.user.id !== id) {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403 }
@@ -118,7 +120,7 @@ export async function PUT(
         where: {
           email,
           NOT: {
-            id: params.id,
+            id,
           },
         },
       });
@@ -132,7 +134,7 @@ export async function PUT(
     }
 
     const updatedUser = await prisma.user.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...(name && { name }),
         ...(email && { email }),
@@ -156,11 +158,12 @@ export async function PUT(
 // DELETE /api/users/[id] - Delete user (admin only)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== 'ADMIN' || session.user.id !== params.id) {
+    if (!session || session.user.role !== 'ADMIN') {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -169,7 +172,7 @@ export async function DELETE(
 
     // Check if user exists
     const user = await prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         donations: true, // Include donations to access them
       },
@@ -196,7 +199,7 @@ export async function DELETE(
 
     // Now delete the user
     await prisma.user.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json(

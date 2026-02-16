@@ -5,10 +5,10 @@ import { authOptions } from "../../auth/[...nextauth]/options";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { categoryId: string } }
+  { params }: { params: Promise<{ categoryId: string }> }
 ) {
   try {
-    const { categoryId } = params;
+    const { categoryId } = await params;
     const locale = req.headers.get('x-locale') || new URL(req.url).searchParams.get('locale') || 'ar';
 
     const category = await prisma.postCategory.findUnique({
@@ -68,13 +68,12 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { categoryId: string } }
+  { params }: { params: Promise<{ categoryId: string }> }
 ) {
   try {
+    const { categoryId } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user || session.user.role !== 'ADMIN') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { categoryId } = params;
     const body = await req.json();
 
     const updateData: any = {};
@@ -122,21 +121,20 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { categoryId: string } }
+  { params }: { params: Promise<{ categoryId: string }> }
 ) {
   try {
+    const { categoryId } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user || session.user.role !== 'ADMIN') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { categoryId } = params;
     const force = req.nextUrl.searchParams.get('force') === 'true';
 
-    const postCount = await prisma.post.count({ where: { category_id: categoryId } });
+    const postCount = await prisma.post.count({ where: { categoryId } });
     if (postCount > 0 && !force) return NextResponse.json({ error: 'Category has posts. Use force=true to delete.' }, { status: 400 });
 
     await prisma.$transaction(async (tx) => {
       if (postCount > 0 && force) {
-        await tx.post.deleteMany({ where: { category_id: categoryId } });
+        await tx.post.deleteMany({ where: { categoryId } });
       }
       await tx.postCategoryTranslation.deleteMany({ where: { categoryId } });
       await tx.postCategory.delete({ where: { id: categoryId } });

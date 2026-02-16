@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
 import { useLocale } from 'next-intl';
@@ -18,11 +19,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 const dateLocales: Record<string, Locale> = { ar, en: enUS, fr };
 
-interface Props {
-  params: { id: string };
-}
-
-const DonationSuccessPage = ({ params }: Props) => {
+const DonationSuccessPage = () => {
+  const params = useParams();
+  const id = params?.id as string | undefined;
   const router = useRouter();
   const t = useTranslations('DonationSuccess');
   const locale = useLocale();
@@ -35,13 +34,18 @@ const DonationSuccessPage = ({ params }: Props) => {
   const isMonthly = donation?.type === 'MONTHLY';
 
   useEffect(() => {
-    fetchDonation();
-    confetti.onOpen();
-  }, []);
+    if (id) {
+      fetchDonation();
+      confetti.onOpen();
+    } else {
+      setLoading(false);
+    }
+  }, [id]);
 
   const fetchDonation = async () => {
+    if (!id) return;
     try {
-      const response = await axios.get(`/api/donations/${params.id}`);
+      const response = await axios.get(`/api/donations/${id}`);
       setDonation(response.data);
     } catch (error) {
       console.error('Error fetching donation:', error);
@@ -51,11 +55,11 @@ const DonationSuccessPage = ({ params }: Props) => {
   };
 
   const handleDownloadReceipt = async () => {
-    if (!donation) return;
+    if (!donation || !id) return;
     
     setIsDownloading(true);
     try {
-      const response = await axios.get(`/api/donations/${params.id}/receipt`, {
+      const response = await axios.get(`/api/donations/${id}/receipt`, {
         responseType: 'blob',
       });
       

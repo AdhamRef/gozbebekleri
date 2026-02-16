@@ -19,6 +19,11 @@ const QuickDonate = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const [donationDialogOpen, setDonationDialogOpen] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [currencyLabel, setCurrencyLabel] = useState<string>("USD");
+
+  useEffect(() => {
+    setCurrencyLabel(getCurrency());
+  }, []);
 
   // Fetch categories with locale for translations
   useEffect(() => {
@@ -199,7 +204,7 @@ const QuickDonate = () => {
                             : "bg-white text-gray-800 hover:bg-sky-50 hover:text-sky-600 border-2 border-gray-300 hover:border-sky-400 hover:scale-105 hover:shadow-md"
                         }`}
                       >
-                        {amount} {getCurrency()}
+                        {amount} {currencyLabel}
                       </button>
                     ))}
                   </div>
@@ -216,7 +221,7 @@ const QuickDonate = () => {
                       placeholder={t("enterAmount")}
                       className="w-full p-2.5 pr-10 rounded-lg bg-white text-gray-900 border-2 border-gray-300 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-400/40 transition-all text-xs hover:border-sky-400 shadow-sm"
                     />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 font-bold text-xs">{getCurrency()}</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 font-bold text-xs">{currencyLabel}</span>
                   </div>
                 </div>
 

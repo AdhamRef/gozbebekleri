@@ -3,16 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from '../../../../auth/[...nextauth]/options';
 
-interface Params {
-  params: {
-    id: string;
-    commentId: string;
-  };
-}
+type ParamsPromise = { params: Promise<{ id: string; commentId: string }> };
 
 // Delete comment
-export async function DELETE(request: NextRequest, { params }: Params) {
+export async function DELETE(request: NextRequest, { params }: ParamsPromise) {
   try {
+    const { commentId } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json(
@@ -22,7 +18,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     }
 
     const comment = await prisma.comment.findUnique({
-      where: { id: params.commentId },
+      where: { id: commentId },
     });
 
     if (!comment) {
@@ -41,7 +37,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     }
 
     await prisma.comment.delete({
-      where: { id: params.commentId },
+      where: { id: commentId },
     });
 
     return NextResponse.json({ success: true });
@@ -55,8 +51,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 }
 
 // Update comment
-export async function PATCH(request: NextRequest, { params }: Params) {
+export async function PATCH(request: NextRequest, { params }: ParamsPromise) {
   try {
+    const { commentId } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json(
@@ -66,7 +63,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     const comment = await prisma.comment.findUnique({
-      where: { id: params.commentId },
+      where: { id: commentId },
     });
 
     if (!comment) {
@@ -86,7 +83,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     const data = await request.json();
     const updatedComment = await prisma.comment.update({
-      where: { id: params.commentId },
+      where: { id: commentId },
       data: {
         text: data.text,
       },

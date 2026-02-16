@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-interface Params {
-  params: { categoryId: string };
-}
-
-export async function GET(req: NextRequest, { params }: Params) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ categoryId: string }> }) {
   try {
-    const { categoryId } = params;
+    const { categoryId } = await params;
 
     const translations = await prisma.postCategoryTranslation.findMany({
       where: { categoryId },
