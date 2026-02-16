@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // Fetch campaign data using axios
   const fetchCampaignData = async (): Promise<Campaign> => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.org";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
       const response = await axios.get(`${baseUrl}/api/campaigns/${id}?locale=${locale}`);
       return response.data;
     } catch (error) {
@@ -43,7 +43,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           alt: campaign.title,
         },
       ],
-      url: `https://gozbebekleri.org/${locale}/campaigns/${id}`,
+      url: `https://gozbebekleri.vercel.app/${locale}/campaigns/${id}`,
       type: "website",
     },
     twitter: {
@@ -53,7 +53,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images: [campaign.images[0] || "/placeholder.jpg"],
     },
     alternates: {
-      canonical: `https://gozbebekleri.org/${locale}/campaigns/${id}`,
+      canonical: `https://gozbebekleri.vercel.app/${locale}/campaigns/${id}`,
     },
   };
 }

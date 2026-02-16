@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id, locale } = await params;
   const fetchCategoryData = async (): Promise<Category> => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.org";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
       const response = await axios.get(`${baseUrl}/api/categories/${id}?locale=${locale}&counts=true`);
       return response.data;
     } catch (error) {
@@ -45,7 +45,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           alt: category.name,
         },
       ],
-      url: `https://gozbebekleri.org/${locale}/categories/${id}`,
+      url: `https://gozbebekleri.vercel.app/${locale}/categories/${id}`,
       type: "website",
     },
     twitter: {
@@ -55,7 +55,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images: [category.image || "/default-category.jpg"],
     },
     alternates: {
-      canonical: `https://gozbebekleri.org/${locale}/categories/${id}`,
+      canonical: `https://gozbebekleri.vercel.app/${locale}/categories/${id}`,
     },
   };
 }

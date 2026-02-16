@@ -14,7 +14,7 @@ interface CategoryProps {
 export async function generateMetadata({ params }: CategoryProps): Promise<Metadata> {
   const fetchCategoryData = async (): Promise<Category> => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.org";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
       const locale = params.locale || 'ar';
       const response = await axios.get(
         `${baseUrl}/api/post-categories/${params.categoryId}`,
@@ -43,7 +43,7 @@ export async function generateMetadata({ params }: CategoryProps): Promise<Metad
           alt: category.title,
         },
       ],
-      url: `https://gozbebekleri.org/ar/categories/${params.categoryId}`,
+      url: `https://gozbebekleri.vercel.app/ar/categories/${params.categoryId}`,
       type: "website",
     },
     twitter: {
@@ -53,7 +53,7 @@ export async function generateMetadata({ params }: CategoryProps): Promise<Metad
       images: [category.image || "/default-category-bg.jpg"],
     },
     alternates: {
-      canonical: `https://gozbebekleri.org/ar/categories/${params.categoryId}`,
+      canonical: `https://gozbebekleri.vercel.app/ar/categories/${params.categoryId}`,
     },
   };
 }

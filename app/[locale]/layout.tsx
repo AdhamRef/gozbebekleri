@@ -28,11 +28,11 @@ export const metadata: Metadata = {
   openGraph: {
     title: "فريق قرة العيون في رمضان 25 | قرة العيون",
     description: "منصة قرة العيون لجمع التبرعات للقضايا الإنسانية الطبية في سوريا. ساعدنا في إحداث فرق في حياة المحتاجين.",
-    url: "https://www.sandooq-gozbebekleri.org", // Replace with your actual domain
+    url: "https://gozbebekleri.vercel.app", // Replace with your actual domain
     siteName: "قرة العيون",
     images: [
       {
-        url: "https://gozbebekleri.org/og-image.jpg", // Replace with your actual OG image
+        url: "https://gozbebekleri.vercel.app/og-image.jpg", // Replace with your actual OG image
         width: 1200,
         height: 630,
         alt: "قرة العيون",
@@ -45,10 +45,10 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "فريق قرة العيون في رمضان 25 | قرة العيون",
     description: "منصة قرة العيون لجمع التبرعات للقضايا الإنسانية الطبية في سوريا. ساعدنا في إحداث فرق في حياة المحتاجين.",
-    images: ["https://www.sandooq-gozbebekleri.org/og-image.jpg"], // Replace with your actual OG image
+    images: ["https://gozbebekleri.vercel.app/og-image.jpg"], // Replace with your actual OG image
   },
   alternates: {
-    canonical: "https://www.gozbebekleri.org", // Replace with your actual domain
+    canonical: "https://gozbebekleri.vercel.app", // Replace with your actual domain
   },
 };
 

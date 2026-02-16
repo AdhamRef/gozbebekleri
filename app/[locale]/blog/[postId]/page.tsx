@@ -21,10 +21,10 @@ interface BlogPostProps {
 }
 
 // Generate metadata for the blog post page
-export async function generateMetadata(args: { params: Promise<{ locale: string; postId: string }> }): Promise<Metadata> {
+export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
   try {
-    const params = await args.params;
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.org";
+    const { params } = await args;
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.vercel.app";
     const locale = params?.locale || "ar";
     const postId = params?.postId;
 
@@ -52,7 +52,7 @@ export async function generateMetadata(args: { params: Promise<{ locale: string;
             alt: titleText,
           },
         ],
-        url: `https://gozbebekleri.org/${locale}/blog/${postId}`,
+        url: `https://gozbebekleri.vercel.app/${locale}/blog/${postId}`,
         type: "article",
       },
       twitter: {
@@ -62,7 +62,7 @@ export async function generateMetadata(args: { params: Promise<{ locale: string;
         images: [imageUrl],
       },
       alternates: {
-        canonical: `https://gozbebekleri.org/${locale}/blog/${postId}`,
+        canonical: `https://gozbebekleri.vercel.app/${locale}/blog/${postId}`,
       },
     };
   } catch (err) {
@@ -72,15 +72,13 @@ export async function generateMetadata(args: { params: Promise<{ locale: string;
 }
 
 export default async function BlogPost({ params }: BlogPostProps) {
-  const resolved = await params;
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.org";
-  const locale = resolved.locale || "ar";
-  const postId = resolved.postId;
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.vercel.app";
+  const locale = params.locale || "ar";
   const msgs = await import(`../../../../i18n/messages/${locale}.json`);
   const t = (k: string) => msgs?.default?.Blog?.[k] ?? k;
 
   // Fetch the post and similar posts (API already returns localized fields)
-  const res = await axios.get(`${baseUrl}/api/posts/${postId}`, { params: { locale } });
+  const res = await axios.get(`${baseUrl}/api/posts/${params.postId}`, { params: { locale } });
   const { post, similarPosts } = res.data;
 
   // Helper to pick a localized value: prefer a top-level localized field, then translations array, then post.fieldAR/EN/FR
@@ -140,7 +138,7 @@ export default async function BlogPost({ params }: BlogPostProps) {
                 </CardContent>
 
                 <CardFooter>
-                  <ShareButton label={t('sharePost')} copiedMessage={t('linkCopied')} url={`https://gozbebekleri.org/${locale}/blog/${postId}`} />
+                  <ShareButton label={t('sharePost')} copiedMessage={t('linkCopied')} url={`https://gozbebekleri.vercel.app/${locale}/blog/${params.postId}`} />
                 </CardFooter>
               </Card>
             </div>
