@@ -23,7 +23,7 @@ export const authOptions: NextAuthOptions = {
   debug: process.env.NODE_ENV === 'development',
   providers: [
     GoogleProvider({
-      clientId: "35986183218-dano7coam5akni7n0nqt1km9uh2mvlcg.apps.googleusercontent.com",
+      clientId: "556226032118-jgamet2p8in6djdncc42j2ikh1lj8o6r.apps.googleusercontent.com",
       clientSecret: "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",
       authorization: {
         params: {
