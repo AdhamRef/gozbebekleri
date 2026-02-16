@@ -112,7 +112,6 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@tailwindcss/typography": "^0.5.19",
     "@types/fontkit": "^2.0.7",
     "@types/html-pdf-node": "^1.0.2",
     "@types/node": "^20",
