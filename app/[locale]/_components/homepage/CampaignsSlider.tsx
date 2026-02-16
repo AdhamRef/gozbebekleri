@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight, HandCoins, Heart, Loader2 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
-import { getCurrency } from "@/hooks/useCampaignValue";
+import { getCurrencySymbol } from "@/hooks/useCampaignValue";
 import { formatNumber } from "@/hooks/formatNumber";
 import { useTranslations, useLocale } from "next-intl";
 import axios from "axios";
@@ -365,11 +365,11 @@ const CampaignsSlider = ({
                       <div className="flex justify-between text-xs sm:text-sm mb-2 gap-2">
                         <span className="text-gray-700 whitespace-nowrap">
                           <span className="font-bold text-sky-600">
-                            {getCurrency()}
+                            {getCurrencySymbol()}
                             {formatNumber(
                               convertToCurrency(
                                 Math.round(campaign.currentAmount)
-                              ).convertedValue
+                              ).convertedValue ?? 0
                             )}
                           </span>{" "}
                           {t("donations")}
@@ -377,11 +377,11 @@ const CampaignsSlider = ({
                         <span className="text-gray-600 text-left whitespace-nowrap">
                           {t("remaining")}{" "}
                           <span className="font-semibold">
-                            {getCurrency()}
+                            {getCurrencySymbol()}
                             {formatNumber(
                               convertToCurrency(
                                 Math.round(remainingAmount)
-                              ).convertedValue
+                              ).convertedValue ?? 0
                             )}
                           </span>
                         </span>

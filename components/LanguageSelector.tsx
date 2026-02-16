@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Globe, ChevronDown } from "lucide-react";
 import ReactCountryFlag from "react-country-flag";
 
@@ -20,7 +20,6 @@ const languages: Language[] = [
 ];
 
 export default function LanguageSwitcher() {
-  const router = useRouter();
   const pathname = usePathname();
 
   const [open, setOpen] = useState(false);
@@ -41,14 +40,17 @@ export default function LanguageSwitcher() {
     }
 
     /**
-     * Replace only the locale segment
-     * /en/blog/123 → /ar/blog/123
+     * Build path with new locale and do a full page navigation so the server
+     * and backend re-render with the new locale (translations apply).
+     * Handles both pathnames: /en/campaign/123 or /campaign/123 (no locale in path).
      */
-    const segments = pathname.split("/");
-    segments[1] = newLocale;
+    const segments = pathname.split("/").filter(Boolean);
+    const localeInPath = ["ar", "en", "fr"].includes(segments[0]);
+    const pathWithoutLocale = localeInPath ? segments.slice(1).join("/") : segments.join("/");
+    const newPath = pathWithoutLocale ? `/${newLocale}/${pathWithoutLocale}` : `/${newLocale}`;
 
-    router.replace(segments.join("/"));
     setOpen(false);
+    window.location.assign(newPath);
   };
 
   return (

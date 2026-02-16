@@ -10,6 +10,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../api/auth/[...nextauth]/options";
 import { ConfettiProvider } from "../../components/providers/confetti-provider";
 import Footer from "@/components/Footer";
+import SyncHtmlDir from "@/components/SyncHtmlDir";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 import { Analytics } from "@vercel/analytics/react"
 import { SpeedInsights } from "@vercel/speed-insights/next"
@@ -73,19 +74,22 @@ export default async function Rootlayout({
 
   return (
     <IntlProviderClient locale={locale || "ar"} messages={messages}>
-      <CurrencyProvider>
-        <SessionProvider session={session}>
-          <Navbar />
-          <main dir={dir} className="pt-20 lg:pt-32">
-            {children}
-          </main>
-          <Footer />
-          <ConfettiProvider />
-          <Toaster position="top-center" />
-        </SessionProvider>
-      </CurrencyProvider>
-      <Analytics />
-      <SpeedInsights />
+      <SyncHtmlDir locale={locale} />
+      <div dir={dir} lang={locale === "ar" ? "ar" : locale === "fr" ? "fr" : "en"}>
+        <CurrencyProvider>
+          <SessionProvider session={session}>
+            <Navbar />
+            <main className="pt-20 lg:pt-32">
+              {children}
+            </main>
+            <Footer />
+            <ConfettiProvider />
+            <Toaster position="top-center" />
+          </SessionProvider>
+        </CurrencyProvider>
+        <Analytics />
+        <SpeedInsights />
+      </div>
     </IntlProviderClient>
   );
 }

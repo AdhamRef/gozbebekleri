@@ -300,7 +300,7 @@ export default function CategoriesPage() {
               </TableCell>
               <TableCell className="font-medium">{category.name}</TableCell>
                 <TableCell className='max-w-[300px] truncate pl-12'>{category.description || 'لا يوجد وصف'}</TableCell>
-                <TableCell>{category.campaigns.length}</TableCell>
+                <TableCell>{category.campaignCount ?? 0}</TableCell>
                 <TableCell>
                   {category.image ? (
                     <img

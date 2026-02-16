@@ -141,21 +141,19 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
     const fetchCampaignData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get<Campaign>(`/api/campaigns/${id}`, {
-          headers: {
-            "x-locale": locale, // Pass locale in header
-          },
-        });
+        const response = await axios.get<Campaign>(
+          `/api/campaigns/${id}?locale=${encodeURIComponent(locale)}`,
+          { headers: { "x-locale": locale } }
+        );
         if (!response.data) {
           throw new Error("Campaign not found");
         }
         console.log("Fetched campaign:", response.data);
         setCampaign(response.data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load campaign");
-        toast.error(
-          err instanceof Error ? err.message : "Failed to load campaign"
-        );
+        const msg = err instanceof Error ? err.message : t("fetchError");
+        setError(msg);
+        toast.error(msg);
       } finally {
         setLoading(false);
       }
@@ -172,7 +170,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
         setComments(response.data);
       } catch (error) {
         console.error("Error fetching comments:", error);
-        toast.error("Failed to load comments");
+        toast.error(t("failedToLoadComments"));
       }
     };
 
@@ -198,10 +196,10 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
       });
       setComments([response.data, ...comments]);
       setNewComment("");
-      toast.success("Comment added successfully");
+      toast.success(t("commentAdded"));
     } catch (error) {
       console.error("Error adding comment:", error);
-      toast.error("Failed to add comment");
+      toast.error(t("failedToAddComment"));
     } finally {
       setIsSubmitting(false);
     }
@@ -225,10 +223,10 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
         )
       );
       setEditingComment(null);
-      toast.success("Comment updated successfully");
+      toast.success(t("commentUpdated"));
     } catch (error) {
       console.error("Error updating comment:", error);
-      toast.error("Failed to update comment");
+      toast.error(t("failedToUpdateComment"));
     } finally {
       setIsSubmitting(false);
     }
@@ -236,38 +234,24 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
 
   // Delete a comment
   const handleDeleteComment = async (commentId: string) => {
-    if (!window.confirm("Are you sure you want to delete this comment?")) return;
+    if (!window.confirm(t("confirmDeleteComment"))) return;
 
     try {
       await axios.delete(`/api/campaigns/${id}/comments/${commentId}`);
       setComments(comments.filter((comment) => comment.id !== commentId));
-      toast.success("Comment deleted successfully");
+      toast.success(t("commentDeleted"));
     } catch (error) {
       console.error("Error deleting comment:", error);
-      toast.error("Failed to delete comment");
+      toast.error(t("failedToDeleteComment"));
     }
   };
 
-  // Tab configuration
+  // Tab configuration (labels from i18n)
   const tabs = [
-    { id: "description", labelAr: "القصة", labelEn: "Story", labelFr: "Histoire", icon: Book },
-    {
-      id: "updates",
-      labelAr: "التحديثات",
-      labelEn: "Updates",
-      labelFr: "Mises à jour",
-      icon: Bell,
-      badge: campaign?.updates?.length || 0,
-    },
-    {
-      id: "comments",
-      labelAr: "التعليقات",
-      labelEn: "Comments",
-      labelFr: "Commentaires",
-      icon: MessageCircle,
-      badge: comments.length,
-    },
-    { id: "info", labelAr: "معلومات", labelEn: "Info", labelFr: "Informations", icon: Info },
+    { id: "description", labelKey: "story" as const, icon: Book },
+    { id: "updates", labelKey: "updates" as const, icon: Bell, badge: campaign?.updates?.length || 0 },
+    { id: "comments", labelKey: "comments" as const, icon: MessageCircle, badge: comments.length },
+    { id: "info", labelKey: "info" as const, icon: Info },
   ];
 
   // Loading state
@@ -281,16 +265,16 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-white">
         <div className="max-w-2xl mx-auto px-4 py-16 text-center">
           <h2 className="text-3xl font-bold text-gray-800 mb-4">
-            {t("campaignNotFound") || "Campaign Not Found"}
+            {t("campaignNotFound")}
           </h2>
           <p className="text-gray-600 mb-8">
-            {error || "The campaign you're looking for doesn't exist."}
+            {error || t("campaignNotFoundDescription")}
           </p>
           <Button
             onClick={() => window.history.back()}
             className="bg-emerald-600 hover:bg-emerald-700"
           >
-            {t("goBack") || "Go Back"}
+            {t("goBack")}
           </Button>
         </div>
       </div>
@@ -417,7 +401,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                         <Icon className="w-4 h-4 flex-shrink-0" />
 
                         <span className="truncate max-w-full text-center">
-                          {getLocalizedProperty(tab, "label")}
+                          {t(tab.labelKey)}
                         </span>
 
                         {tab.badge !== undefined && tab.badge > 0 && (
@@ -538,7 +522,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                                           src={`https://img.youtube.com/vi/${
                                             new URL(update.videoUrl).pathname.split("/")[2]
                                           }/hqdefault.jpg`}
-                                          alt="Video thumbnail"
+                                          alt={t("videoThumbnail")}
                                           className="rounded-xl shadow-md w-28 h-28 object-cover group-hover:opacity-90 transition-opacity"
                                         />
                                         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 rounded-xl opacity-90 group-hover:opacity-100 transition-opacity">
@@ -553,7 +537,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                           ))
                         ) : (
                           <p className="text-gray-500 text-center py-8">
-                            {t("noUpdates") || "No updates yet"}
+                            {t("noUpdates")}
                           </p>
                         )}
                       </motion.div>
@@ -584,7 +568,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                                 <Textarea
                                   value={newComment}
                                   onChange={(e) => setNewComment(e.target.value)}
-                                  placeholder={t("commentPlaceholder") || "Write a comment..."}
+                                  placeholder={t("commentPlaceholder")}
                                   className="w-full resize-none border-none focus:ring-0 text-sm bg-transparent"
                                   rows={2}
                                 />
@@ -599,7 +583,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                                     ) : (
                                       <Send className="w-3.5 h-3.5 mr-1" />
                                     )}
-                                    {t("send") || "Send"}
+                                    {t("send")}
                                   </Button>
                                 </div>
                               </div>
@@ -607,13 +591,13 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                           ) : (
                             <div className="bg-gray-50 p-4 rounded-lg text-center mb-5">
                               <p className="text-gray-600 mb-2">
-                                {t("signInToComment") || "Sign in to add a comment"}
+                                {t("signInToComment")}
                               </p>
                               <Button
                                 onClick={() => setIsSignInOpen(true)}
                                 className="bg-blue-600 hover:bg-blue-700"
                               >
-                                {t("signIn") || "Sign In"}
+                                {t("signIn")}
                               </Button>
                             </div>
                           )}
@@ -677,7 +661,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                                               }}
                                             >
                                               <Edit2 className="w-4 h-4" />
-                                              {t("edit") || "Edit"}
+                                              {t("edit")}
                                             </button>
                                             <button
                                               className="flex gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-100"
@@ -687,7 +671,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                                               }}
                                             >
                                               <Trash2 className="w-4 h-4" />
-                                              {t("delete") || "Delete"}
+                                              {t("delete")}
                                             </button>
                                           </div>
                                         )}
@@ -710,7 +694,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                                           {isSubmitting ? (
                                             <Loader2 className="w-4 h-4 animate-spin" />
                                           ) : (
-                                            t("save") || "Save"
+                                            t("save")
                                           )}
                                         </Button>
                                         <Button
@@ -718,7 +702,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                                           size="sm"
                                           onClick={() => setEditingComment(null)}
                                         >
-                                          {t("cancel") || "Cancel"}
+                                          {t("cancel")}
                                         </Button>
                                       </div>
                                     </div>
@@ -732,7 +716,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                             ))
                           ) : (
                             <p className="text-gray-500 text-center py-8">
-                              {t("noComments") || "No comments yet. Be the first to comment!"}
+                              {t("noComments")}
                             </p>
                           )}
                         </div>
@@ -750,7 +734,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                       >
                         <div>
                           <h3 className="text-lg font-bold text-gray-900 mb-3">
-                            {t("campaignStats") || "Campaign Statistics"}
+                            {t("campaignStats")}
                           </h3>
                           <div className="grid grid-cols-2 gap-3">
                             <div className="bg-blue-50 rounded-lg p-3">
@@ -758,7 +742,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                                 {campaign.donationCount}
                               </div>
                               <div className="text-xs text-gray-600">
-                                {t("donor") || "Donors"}
+                                {t("donor")}
                               </div>
                             </div>
                             <div className="bg-blue-50 rounded-lg p-3">
@@ -766,7 +750,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                                 {campaign.progress.toFixed(0)}%
                               </div>
                               <div className="text-xs text-gray-600">
-                                {t("completed") || "Completed"}
+                                {t("completed")}
                               </div>
                             </div>
                           </div>
@@ -776,13 +760,13 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                         {campaign.donationStats && (
                           <div>
                             <h3 className="text-lg font-bold text-gray-900 mb-3">
-                              {t("topDonors") || "Notable Donations"}
+                              {t("topDonors")}
                             </h3>
                             <div className="space-y-2">
                               {campaign.donationStats.first && (
                                 <div className="bg-gray-50 rounded-lg p-3">
                                   <div className="text-xs text-gray-600 mb-1">
-                                    {t("firstDonor") || "First Donor"}
+                                    {t("firstDonor")}
                                   </div>
                                   <div className="font-semibold">
                                     {campaign.donationStats.first.donor}
@@ -795,7 +779,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                               {campaign.donationStats.largest && (
                                 <div className="bg-gray-50 rounded-lg p-3">
                                   <div className="text-xs text-gray-600 mb-1">
-                                    {t("largestDonor") || "Largest Donor"}
+                                    {t("largestDonor")}
                                   </div>
                                   <div className="font-semibold">
                                     {campaign.donationStats.largest.donor}
@@ -808,7 +792,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                               {campaign.donationStats.last && (
                                 <div className="bg-gray-50 rounded-lg p-3">
                                   <div className="text-xs text-gray-600 mb-1">
-                                    {t("latestDonor") || "Latest Donor"}
+                                    {t("latestDonor")}
                                   </div>
                                   <div className="font-semibold">
                                     {campaign.donationStats.last.donor}

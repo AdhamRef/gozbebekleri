@@ -351,7 +351,7 @@ export default function CampaignsPage() {
                   onClick={() => handleSort('targetAmount')}
                   className="hover:bg-transparent p-0 font-bold"
                 >
-                  المبلغ المستهدف
+                  المبلغ المستهدف ($)
                   <ArrowUpDown className="mr-2 h-4 w-4" />
                 </Button>
               </TableHead>
@@ -390,8 +390,8 @@ export default function CampaignsPage() {
                 </TableCell>
                 <TableCell className="font-medium">{campaign.title}</TableCell>
                 <TableCell>{campaign.category.name}</TableCell>
-                <TableCell>€{campaign.targetAmount.toLocaleString()}</TableCell>
-                <TableCell>€{campaign.currentAmount.toLocaleString()}</TableCell>
+                <TableCell>${campaign.targetAmount.toLocaleString()}</TableCell>
+                <TableCell>${campaign.currentAmount.toLocaleString()}</TableCell>
                 <TableCell>
                   <div className="w-full min-w-[4rem] bg-muted rounded-full h-2.5">
                     <div
@@ -425,7 +425,7 @@ export default function CampaignsPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>إجراءات</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => router.push(`/campaign/${campaign.id}`)}>
+                        <DropdownMenuItem onClick={() => router.push(`/${locale}/campaign/${campaign.id}`)}>
                           <Eye className="w-4 h-4 ml-2" />
                           عرض
                         </DropdownMenuItem>

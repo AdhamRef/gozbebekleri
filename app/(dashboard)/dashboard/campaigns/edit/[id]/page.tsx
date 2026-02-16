@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import axios from 'axios';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -70,8 +70,8 @@ const formSchema = z.object({
     .min(1, 'الوصف مطلوب')
     .max(10000, 'الوصف طويل جداً'),
   targetAmount: z.number()
-    .min(1, 'المبلغ المستهدف مطلوب')
-    .max(1000000, 'المبلغ المستهدف كبير جداً'),
+    .min(1, 'المبلغ المستهدف ($) مطلوب')
+    .max(1000000, 'المبلغ المستهدف ($) كبير جداً'),
   categoryId: z.string()
     .min(1, 'القسم مطلوب'),
   isActive: z.boolean(),
@@ -133,8 +133,9 @@ const getDateLocale = (locale: string) => {
   }
 };
 
-export default function EditCampaignPage({ params }: { params: { id: string } }) {
+export default function EditCampaignPage() {
   const router = useRouter();
+  const params = useParams<{ id: string }>();
   const locale = useLocale();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -196,7 +197,7 @@ export default function EditCampaignPage({ params }: { params: { id: string } })
         ]);
 
         const campaign = campaignRes.data;
-        setCategories(categoriesRes.data);
+        setCategories(categoriesRes.data.items);
 
         // ✅ Fetch all translations for the campaign
         const allTranslationsRes = await axios.get(`/api/campaigns/${params.id}/translations`);
@@ -236,6 +237,7 @@ export default function EditCampaignPage({ params }: { params: { id: string } })
 
   useEffect(() => {
     const fetchUpdates = async () => {
+      if (!params?.id) return;
       try {
         // ✅ Fetch updates with all translations
         const response = await axios.get(`/api/campaigns/${params.id}/updates/all-translations`);
@@ -247,7 +249,7 @@ export default function EditCampaignPage({ params }: { params: { id: string } })
     };
 
     fetchUpdates();
-  }, [params.id]);
+  }, [params?.id]);
 
   const onSubmit = async (values: FormValues) => {
     if (!params?.id) return;
@@ -720,13 +722,13 @@ export default function EditCampaignPage({ params }: { params: { id: string } })
                 name="targetAmount"
                 render={({ field }) => (
                   <FormItem dir='rtl'>
-                    <FormLabel>المبلغ المستهدف</FormLabel>
+                    <FormLabel>المبلغ المستهدف ($)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         {...field}
                         onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                        placeholder="أدخل المبلغ المستهدف"
+                        placeholder="أدخل المبلغ المستهدف ($)"
                       />
                     </FormControl>
                     <FormMessage />

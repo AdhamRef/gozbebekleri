@@ -19,7 +19,11 @@ export async function GET(
 ) {
   try {
     const { id } = await params; // Campaign ID from URL
-    const locale = request.headers.get("x-locale") || "ar";
+    const url = new URL(request.url);
+    const locale =
+      request.headers.get("x-locale") ||
+      url.searchParams.get("locale") ||
+      "ar";
 
     // ✅ STEP 1: Fetch campaign with ONLY current locale translations
     const campaign = await prisma.campaign.findUnique({

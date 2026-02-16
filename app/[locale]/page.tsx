@@ -217,7 +217,7 @@ const HomePage: React.FC = () => {
               <Link
                 key={cat.id}
                 href={`/category/${cat.id}`}
-                className="group flex flex-col items-center rounded-xl bg-white hover:bg-sky-50/50 border border-gray-200/60 hover:border-sky-200 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 p-5 sm:p-6"
+                className="group flex flex-col items-center rounded-xl hover:-translate-y-0.5 p-5 sm:p-6"
               >
                 <span className="text-3xl sm:text-4xl lg:text-5xl mb-2.5 sm:mb-3 leading-none" aria-hidden>
                   {cat.icon ?? "❤️"}

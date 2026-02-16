@@ -38,8 +38,8 @@ const formSchema = z.object({
     .min(1, 'الوصف مطلوب')
     .max(10000, 'الوصف طويل جداً'),
   targetAmount: z.number()
-    .min(1, 'المبلغ المستهدف مطلوب')
-    .max(1000000, 'المبلغ المستهدف كبير جداً'),
+    .min(1, 'المبلغ المستهدف ($) مطلوب')
+    .max(1000000, 'المبلغ المستهدف ($) كبير جداً'),
   categoryId: z.string()
     .min(1, 'القسم مطلوب'),
   isActive: z.boolean(),
@@ -243,13 +243,13 @@ export default function NewCampaignPage() {
                 name="targetAmount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>المبلغ المستهدف</FormLabel>
+                    <FormLabel>المبلغ المستهدف ($)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         {...field}
                         onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                        placeholder="أدخل المبلغ المستهدف"
+                        placeholder="أدخل المبلغ المستهدف ($)"
                       />
                     </FormControl>
                     <FormMessage />

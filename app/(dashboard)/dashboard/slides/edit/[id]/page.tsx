@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import axios from 'axios';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
@@ -33,8 +33,9 @@ const schema = z.object({
 });
 type FormValues = z.infer<typeof schema>;
 
-export default function EditSlidePage({ params }: { params: { id: string } }) {
+export default function EditSlidePage() {
   const router = useRouter();
+  const params = useParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);

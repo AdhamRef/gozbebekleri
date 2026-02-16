@@ -76,22 +76,29 @@ const useCampaignValue = (campaignValue: number): number | null => {
   return convertedValue;
 };
 
-// Function to get the current currency
-const currencySymbols = {
+// Currency code → display symbol (for amounts)
+export const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: '$',
   EUR: '€',
   GBP: '£',
   TRY: '₺',
-  SAR: '﷼',
-  AED: 'دينار',
-  KWD: 'دينار',
-  EGP: 'EGP',
-  QAR: '﷼',
-  BHD: 'دينار',
+  SAR: 'ر.س',
+  AED: 'د.إ',
+  KWD: 'د.ك',
+  EGP: 'ج.م',
+  QAR: 'ر.ق',
+  BHD: 'د.ب',
 };
-/** Returns currency code (e.g. 'USD'). Use CURRENCY_SYMBOLS[code] for display symbol. */
+
+/** Returns currency code (e.g. 'USD'). */
 export const getCurrency = (): string => {
   return typeof window === 'undefined' ? 'USD' : (Cookies.get('currency') || 'USD');
+};
+
+/** Returns the display symbol for the current currency (e.g. '$', '€'). */
+export const getCurrencySymbol = (): string => {
+  const code = getCurrency();
+  return CURRENCY_SYMBOLS[code] ?? code + ' ';
 };
 
 

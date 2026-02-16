@@ -15,17 +15,17 @@ type TranslationRow = {
   image?: string | null;
 };
 
-interface PostEditorPageProps {
-  params: Promise<{ postId: string }>;
-}
-
 function getTranslations(post: PostWithRelations): TranslationRow[] {
   if (!post || !("translations" in post)) return [];
   const t = (post as { translations?: TranslationRow[] }).translations;
   return Array.isArray(t) ? t : [];
 }
 
-export default async function PostEditorPage({ params }: PostEditorPageProps) {
+export default async function PostEditorPage({
+  params,
+}: {
+  params: Promise<{ postId: string }>;
+}) {
   const { postId } = await params;
 
   const post = await getPost(postId);
