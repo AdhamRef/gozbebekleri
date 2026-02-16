@@ -1,7 +1,9 @@
-import { getMessages, unstable_setRequestLocale } from "next-intl/server";
-import { NextIntlClientProvider } from "next-intl";
 import type { Metadata } from "next";
 import Navbar from "@/components/Navbar";
+import IntlProviderClient from "./IntlProviderClient";
+import ar from "../../i18n/messages/ar.json";
+import en from "../../i18n/messages/en.json";
+import fr from "../../i18n/messages/fr.json";
 import { Toaster } from "react-hot-toast";
 import SessionProvider from "@/components/providers/SessionProvider";
 import { getServerSession } from "next-auth";
@@ -50,21 +52,27 @@ export const metadata: Metadata = {
   },
 };
 
+const localeMessages: Record<string, Record<string, unknown>> = { ar, en, fr };
+const VALID_LOCALES = ["ar", "en", "fr"] as const;
+const DEFAULT_LOCALE = "ar";
+
 export default async function Rootlayout({
   children,
   params,
 }: {
   children: React.ReactNode;
-  params: { locale: string };
+  params: Promise<{ locale: string }>;
 }) {
   const session = await getServerSession(authOptions);
-  const locale = params.locale;
-  unstable_setRequestLocale(locale);
-  const messages = await getMessages();
+  const { locale: rawLocale } = await params;
+  const locale = VALID_LOCALES.includes(rawLocale as (typeof VALID_LOCALES)[number])
+    ? rawLocale
+    : DEFAULT_LOCALE;
+  const messages = localeMessages[locale] ?? localeMessages[DEFAULT_LOCALE];
   const dir = locale === "ar" ? "rtl" : "ltr";
 
   return (
-    <NextIntlClientProvider messages={messages} locale={locale || "ar"}>
+    <IntlProviderClient locale={locale || "ar"} messages={messages}>
       <CurrencyProvider>
         <SessionProvider session={session}>
           <Navbar />
@@ -78,6 +86,6 @@ export default async function Rootlayout({
       </CurrencyProvider>
       <Analytics />
       <SpeedInsights />
-    </NextIntlClientProvider>
+    </IntlProviderClient>
   );
 }

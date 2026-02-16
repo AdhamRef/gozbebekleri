@@ -1,7 +1,7 @@
-import { getMessages } from "next-intl/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import DashboardLayoutClient from "./DashboardLayoutClient";
+import ar from "../../../i18n/messages/ar.json";
 
 export default async function DashboardLayout({
   children,
@@ -9,13 +9,13 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const session = await getServerSession(authOptions);
-  const messages = await getMessages();
   const locale = "ar";
+  const messages = (ar ?? {}) as unknown as Record<string, string | Record<string, string>>;
 
   return (
     <DashboardLayoutClient
       session={session}
-      messages={(messages ?? {}) as Record<string, string | Record<string, string>>}
+      messages={messages}
       locale={locale}
     >
       {children}
