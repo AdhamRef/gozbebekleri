@@ -23,8 +23,8 @@ export const authOptions: NextAuthOptions = {
   debug: process.env.NODE_ENV === 'development',
   providers: [
     GoogleProvider({
-      clientId: "556226032118-jgamet2p8in6djdncc42j2ikh1lj8o6r.apps.googleusercontent.com",
-      clientSecret: "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",
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
           prompt: "select_account",
@@ -35,8 +35,8 @@ export const authOptions: NextAuthOptions = {
       allowDangerousEmailAccountLinking: true,
     }),
     FacebookProvider({
-      clientId: "2263261010727677",
-      clientSecret: "6ed1ea68a62a69a87b361e3057301ada",
+      clientId: process.env.FACEBOOK_CLIENT_ID!,
+      clientSecret: process.env.FACEBOOK_CLIENT_SECRET!,
       allowDangerousEmailAccountLinking: true,
     }),
   ],
