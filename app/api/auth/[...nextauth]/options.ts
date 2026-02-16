@@ -24,7 +24,7 @@ export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
       clientId: "556226032118-jgamet2p8in6djdncc42j2ikh1lj8o6r.apps.googleusercontent.com",
-      clientSecret: "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",
+      clientSecret: "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",
       authorization: {
         params: {
           prompt: "select_account",
