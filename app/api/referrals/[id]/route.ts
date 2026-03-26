@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../../../auth/[...nextauth]/options";
+import { authOptions } from "../../auth/[...nextauth]/options";
 
 /** GET /api/referrals/[id] - Get one referral (admin only) */
 export async function GET(

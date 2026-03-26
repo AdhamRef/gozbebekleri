@@ -397,7 +397,7 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
                       <div className="space-y-2">
                         {field.value ? (
                           <div className="relative group">
-                            <div className="relative w-full h-48 rounded-lg overflow-hidden bg-muted">
+                            <div className="relative w-56 h-56 rounded-lg overflow-hidden bg-muted">
                               <Image
                                 src={field.value}
                                 alt="Cover"
