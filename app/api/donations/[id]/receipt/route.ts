@@ -4,9 +4,10 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import jsPDF from 'jspdf';
 import { format } from 'date-fns';
-import { arSA, enUS, fr } from 'date-fns/locale';
+import type { Locale } from 'date-fns';
+import { arSA, enUS, fr, tr, id, pt, es } from 'date-fns/locale';
 
-const DATE_LOCALES = { ar: arSA, en: enUS, fr } as const;
+const DATE_LOCALES: Record<string, Locale> = { ar: arSA, en: enUS, fr, tr, id, pt, es };
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: '$',
@@ -176,7 +177,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const donation = await prisma.donation.findUnique({
+    const donationRow = await prisma.donation.findUnique({
       where: { id },
       omit: { cardDetails: true },
       include: {
@@ -186,6 +187,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             email: true,
             phone: true,
             country: true,
+          },
+        },
+        subscription: {
+          select: {
+            status: true,
+            billingDay: true,
+            nextBillingDate: true,
+            lastBillingDate: true,
           },
         },
         items: {
@@ -212,13 +221,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       },
     });
 
-    if (!donation) {
+    if (!donationRow) {
       return NextResponse.json({ error: 'Donation not found' }, { status: 404 });
     }
 
-    if (session.user.role !== 'ADMIN' && session.user.id !== donation.donorId) {
+    if (session.user.role !== 'ADMIN' && session.user.id !== donationRow.donorId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const sub = donationRow.subscription;
+    const donation = {
+      ...donationRow,
+      type: donationRow.subscriptionId ? ('MONTHLY' as const) : ('ONE_TIME' as const),
+      status: sub?.status ?? null,
+      nextBillingDate: sub?.nextBillingDate ?? null,
+      billingDay: sub?.billingDay ?? null,
+    };
 
     const L = getLabels(locale);
     const dateLocale = getDateLocale(locale);

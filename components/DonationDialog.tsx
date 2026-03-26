@@ -20,11 +20,16 @@ import { toast } from "react-hot-toast";
 import { useConfettiStore } from "@/hooks/use-confetti-store";
 import { getCurrency } from "@/hooks/useCampaignValue";
 import useConvetToUSD from "@/hooks/useConvetToUSD";
+import { useReferralCode } from "@/hooks/useReferralCode";
 import { useCurrency } from "@/context/CurrencyContext";
 import { formatNumber } from "@/hooks/formatNumber";
 import { useCart } from "@/hooks/useCart";
+import { useTracking } from "@/components/TrackingPixels";
 import { useRouter } from "@/i18n/routing";
 import { useTranslations, useLocale } from "next-intl";
+import { useSession } from "next-auth/react";
+import { PhoneInput } from "react-international-phone";
+import "react-international-phone/style.css";
 
 type DonationType = "ONE_TIME" | "MONTHLY";
 type PaymentMethod = "CARD" | "PAYPAL" | null;
@@ -76,6 +81,7 @@ const DonationDialog = ({
   const isCategoryMode = Boolean(categoryId);
   const t = useTranslations("DonationDialog");
   const locale = useLocale() as "ar" | "en" | "fr";
+  const getReferralCode = useReferralCode();
   
   // Helper function to get locale-specific property
   const getLocalizedProperty = (obj: any, key: string) => {
@@ -147,14 +153,32 @@ const DonationDialog = ({
   });
   const [mounted, setMounted] = useState(false);
   const [focus, setFocus] = useState("");
+  const [phoneValue, setPhoneValue] = useState("");
+  const [phoneCountry, setPhoneCountry] = useState<string>("");
+  const [currentUser, setCurrentUser] = useState<{ phone: string | null; country: string | null } | null>(null);
+  const { data: session } = useSession();
   const { convertToCurrency } = useCurrency();
   const { addItem, setItems } = useCart();
-
+  const tracking = useTracking();
   const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen || !session?.user?.id) return;
+    axios
+      .get(`/api/users/${session.user.id}`)
+      .then((res) => {
+        const user = res.data?.user;
+        if (user) {
+          setCurrentUser({ phone: user.phone ?? null, country: user.country ?? null });
+          if (user.phone) setPhoneValue(user.phone);
+        }
+      })
+      .catch(() => setCurrentUser(null));
+  }, [isOpen, session?.user?.id]);
 
   // When monthlyOnly (e.g. QuickDonate category), pre-select monthly and skip type step
   useEffect(() => {
@@ -186,14 +210,15 @@ const DonationDialog = ({
     setCurrentStep(0);
   };
 
+  const isPhoneValid = () => {
+    const p = phoneValue.trim().replace(/\s/g, "");
+    return p.length >= 10;
+  };
+
   const handleNext = () => {
     const steps = getSteps();
     if (currentStep < steps.length - 1) {
-      if (steps[currentStep].title === t("paymentMethod")) {
-        setCurrentStep(currentStep + 1);
-      } else {
-        setCurrentStep(currentStep + 1);
-      }
+      setCurrentStep(currentStep + 1);
     } else {
       handleSubmit();
     }
@@ -367,13 +392,21 @@ const DonationDialog = ({
                   variant="outline"
                   onClick={async () => {
                     try {
+                      const amountUSD = useConvetToUSD(donationAmount, getCurrency());
                       const response = await axios.post("/api/cart", {
                         campaignId: campaignId,
                         amount: donationAmount,
-                        amountUSD: useConvetToUSD(donationAmount, getCurrency()),
+                        amountUSD,
                         currency: getCurrency(),
                       });
                       addItem(response.data || []);
+                      tracking?.trackAddToCart({
+                        value: amountUSD,
+                        currency: "USD",
+                        contentIds: [campaignId],
+                        contentName: campaignTitle,
+                        quantity: 1,
+                      });
                       window.location.reload();
                     } catch (error) {
                       console.error("Error adding to cart:", error);
@@ -745,7 +778,7 @@ const DonationDialog = ({
         );
       case t("paymentInfo"):
         return (
-          <div className="space-y-6">
+          <div className="space-y-6 overflow-visible">
             {paymentMethod === "CARD" ? (
               <div className="space-y-6">
                 <div className="flex justify-center mb-6">
@@ -850,7 +883,24 @@ const DonationDialog = ({
               </div>
             )}
 
-            <div className="flex justify-between gap-4">
+            <div className="space-y-2 overflow-visible pt-2 border-t border-border" dir={locale}>
+              <label className={`block text-sm font-medium text-gray-700 ${locale === "ar" ? "text-right" : "text-left"}`}>{t("contactPhone")}</label>
+              <div className="overflow-visible phone-input-wrapper">
+                <PhoneInput
+                  defaultCountry="sy"
+                  value={phoneValue}
+                  onChange={(phone, meta) => {
+                    setPhoneValue(phone);
+                    setPhoneCountry(meta.country?.name ?? meta.country?.iso2 ?? "");
+                  }}
+                  className="w-full overflow-visible"
+                  inputClassName="w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className={`flex justify-between gap-4 ${locale === "ar" ? "flex-row-reverse" : ""}`}>
               <Button variant="outline" onClick={handleBack} className="flex-1">
                 {t("back")}
               </Button>
@@ -858,6 +908,7 @@ const DonationDialog = ({
   onClick={handleSubmit}
   disabled={
     loading ||
+    !isPhoneValid() ||
     (paymentMethod === "CARD" && !isCardDetailsValid())
   }
   className="flex-1 bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
@@ -882,6 +933,12 @@ const DonationDialog = ({
     let isRedirecting = false;
     try {
       setLoading(true);
+      if (session?.user?.id && !currentUser?.phone && phoneValue.trim()) {
+        await axios.put(`/api/users/${session.user.id}`, {
+          phone: phoneValue.trim(),
+          country: phoneCountry || undefined,
+        });
+      }
       const amountUSD = await useConvetToUSD(donationAmount, getCurrency());
       const donationData: Record<string, unknown> = {
         currency: getCurrency(),
@@ -891,7 +948,10 @@ const DonationDialog = ({
         paymentMethod,
         cardDetails: paymentMethod === "CARD" ? cardDetails : null,
         billingDay: donationType === "MONTHLY" ? billingDay : null,
+        locale,
       };
+      const refCode = getReferralCode();
+      if (refCode) donationData.referralCode = refCode;
       if (isCategoryMode && categoryId) {
         donationData.categoryItems = [
           { categoryId, amount: donationAmount, amountUSD },
@@ -921,7 +981,7 @@ const DonationDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-auto p-0" aria-describedby={undefined}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-visible p-0" aria-describedby={undefined}>
         <DialogTitle className="sr-only">{t("donationAmount")}</DialogTitle>
         {mounted && (
           <>
@@ -940,10 +1000,11 @@ const DonationDialog = ({
                 </>
               )}
             </div>
-            <div className="relative z-10 p-6 pt-0 bg-white">
+            <div className="relative z-10 p-6 pt-0 bg-white overflow-visible">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={redirecting ? "redirecting" : currentStep}
+                  className="overflow-visible"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}

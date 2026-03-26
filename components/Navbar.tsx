@@ -12,8 +12,9 @@ import {
   LogOut,
   LayoutDashboard,
 } from "lucide-react";
-import { Link } from "@/i18n/routing";
+import { Link, usePathname, useRouter } from "@/i18n/routing";
 import { useTranslations, useLocale } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import { useSession, signOut } from "next-auth/react";
 import CartSheet from "../components/CartSheet";
@@ -42,6 +43,9 @@ interface CartItem {
 const Navbar = () => {
   const t = useTranslations("Navbar");
   const { data: session, status } = useSession();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartLoading, setCartLoading] = useState(false);
@@ -51,7 +55,15 @@ const Navbar = () => {
   const [isSignInOpen, setIsSignInOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isCartPaymentDialogOpen, setIsCartPaymentDialogOpen] = useState(false);
+  const [signInCallbackUrl, setSignInCallbackUrl] = useState<string | undefined>(undefined);
 
+  // After sign-in redirect: open cart payment dialog and clean URL
+  useEffect(() => {
+    if (searchParams.get("openCartPayment") === "1") {
+      setIsCartPaymentDialogOpen(true);
+      router.replace(pathname);
+    }
+  }, [searchParams, pathname, router]);
 
   // Fetch cart items when user is logged in
   useEffect(() => {
@@ -86,7 +98,16 @@ const Navbar = () => {
   };
 
   const onOpenDonationDialog = () => {
-    console.log("open donation dialog");
+    if (session) {
+      setIsCartPaymentDialogOpen(true);
+    } else {
+      setSignInCallbackUrl(
+        typeof window !== "undefined"
+          ? `${window.location.pathname}?openCartPayment=1`
+          : undefined
+      );
+      setIsSignInOpen(true);
+    }
   };
 
   // Refresh cart items (can be called after adding items)
@@ -640,13 +661,17 @@ const Navbar = () => {
         onOpenChange={setIsCartOpen}
         cartItems={cartItems}
         handleRemoveItem={handleRemoveItem}
-        onOpenDonationDialog={() => setIsCartPaymentDialogOpen(true)}
+        onOpenDonationDialog={onOpenDonationDialog}
       />
 
       {/* Sign In Dialog */}
       <SignInDialog
         isOpen={isSignInOpen}
-        onClose={() => setIsSignInOpen(false)}
+        onClose={() => {
+          setIsSignInOpen(false);
+          setSignInCallbackUrl(undefined);
+        }}
+        callbackUrl={signInCallbackUrl}
       />
 
       <CartPaymentDialog

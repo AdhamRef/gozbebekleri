@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Calendar,
   CreditCard as CardIcon,
@@ -19,9 +19,14 @@ import { toast } from "react-hot-toast";
 import { useConfettiStore } from "@/hooks/use-confetti-store";
 import { getCurrency } from "@/hooks/useCampaignValue";
 import { useCart } from "@/hooks/useCart";
+import { useTracking } from "@/components/TrackingPixels";
 import useConvetToUSD from "@/hooks/useConvetToUSD";
+import { useReferralCode } from "@/hooks/useReferralCode";
 import { useRouter } from "@/i18n/routing";
 import { useTranslations, useLocale } from "next-intl";
+import { useSession } from "next-auth/react";
+import { PhoneInput } from "react-international-phone";
+import "react-international-phone/style.css";
 
 type DonationType = "ONE_TIME" | "MONTHLY";
 type PaymentMethod = "CARD" | "PAYPAL" | null;
@@ -104,13 +109,56 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
   });
   const [mounted, setMounted] = useState(false);
   const [focus, setFocus] = useState("");
+  const [phoneValue, setPhoneValue] = useState("");
+  const [phoneCountry, setPhoneCountry] = useState<string>("");
+  const [currentUser, setCurrentUser] = useState<{ phone: string | null; country: string | null } | null>(null);
+  const { data: session } = useSession();
 
   const { clearItems } = useCart();
   const router = useRouter();
+  const getReferralCode = useReferralCode();
+  const tracking = useTracking();
+  const checkoutTrackedRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Fire InitiateCheckout when user opens cart payment dialog (checkout started)
+  useEffect(() => {
+    if (!isOpen || !tracking || cartItems.length === 0 || checkoutTrackedRef.current) return;
+    checkoutTrackedRef.current = true;
+    const contentIds = cartItems.map((i) => i.campaign?.id).filter(Boolean) as string[];
+    tracking.trackInitiateCheckout({
+      value: amount,
+      currency: "USD",
+      numItems: cartItems.length,
+      contentIds: contentIds.length ? contentIds : undefined,
+    });
+  }, [isOpen, tracking, cartItems, amount]);
+
+  useEffect(() => {
+    if (!isOpen) checkoutTrackedRef.current = false;
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !session?.user?.id) return;
+    axios
+      .get(`/api/users/${session.user.id}`)
+      .then((res) => {
+        const user = res.data?.user;
+        if (user) {
+          setCurrentUser({ phone: user.phone ?? null, country: user.country ?? null });
+          if (user.phone) setPhoneValue(user.phone);
+        }
+      })
+      .catch(() => setCurrentUser(null));
+  }, [isOpen, session?.user?.id]);
+
+  const isPhoneValid = () => {
+    const p = phoneValue.trim().replace(/\s/g, "");
+    return p.length >= 10;
+  };
 
   const confetti = useConfettiStore();
 
@@ -501,7 +549,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
 
       case t("paymentInfo"):
         return (
-          <div className="space-y-6">
+          <div className="space-y-6 overflow-visible">
             {paymentMethod === "CARD" ? (
               <div className="space-y-6">
                 <div className="flex justify-center mb-6">
@@ -617,15 +665,33 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
               </div>
             )}
 
-            <div className={`flex gap-4 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
+            <div className="space-y-2 overflow-visible pt-2 border-t border-border" dir={locale}>
+              <label className={`block text-sm font-medium text-gray-700 ${isRTL ? "text-right" : "text-left"}`}>{t("contactPhone")}</label>
+              <div className="overflow-visible phone-input-wrapper">
+                <PhoneInput
+                  defaultCountry="sy"
+                  value={phoneValue}
+                  onChange={(phone, meta) => {
+                    setPhoneValue(phone);
+                    setPhoneCountry(meta.country?.name ?? meta.country?.iso2 ?? "");
+                  }}
+                  className="w-full overflow-visible"
+                  inputClassName={`w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent ${isRTL ? "text-right" : "text-left"}`}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className={`flex gap-4 ${isRTL ? "flex-row-reverse" : "flex-row"}`}>
               <Button variant="outline" onClick={handleBack} className="flex-1">
-                <BackIcon className={`w-4 h-4 ${isRTL ? 'ml-2' : 'mr-2'}`} />
+                <BackIcon className={`w-4 h-4 ${isRTL ? "ml-2" : "mr-2"}`} />
                 {t("back")}
               </Button>
               <Button
                 onClick={handleSubmit}
                 disabled={
                   loading ||
+                  !isPhoneValid() ||
                   (paymentMethod === "CARD" && !isCardDetailsValid())
                 }
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
@@ -649,7 +715,12 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
     let isRedirecting = false;
     try {
       setLoading(true);
-
+      if (session?.user?.id && !currentUser?.phone && phoneValue.trim()) {
+        await axios.put(`/api/users/${session.user.id}`, {
+          phone: phoneValue.trim(),
+          country: phoneCountry || undefined,
+        });
+      }
       // Convert cart items to donation items format
       const items = await Promise.all(cartItems.map(async (item) => ({
         campaignId: item.campaign.id,
@@ -657,7 +728,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
         amountUSD: await useConvetToUSD(item.amount, getCurrency()),
       })));
 
-      const donationData = {
+      const donationData: Record<string, unknown> = {
         items,
         currency: getCurrency(),
         teamSupport,
@@ -665,7 +736,10 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
         type: "ONE_TIME" as DonationType,
         paymentMethod,
         cardDetails: paymentMethod === "CARD" ? cardDetails : null,
+        locale,
       };
+      const refCode = getReferralCode();
+      if (refCode) donationData.referralCode = refCode;
 
       const response = await axios.post("/api/cart/payment", donationData);
 
@@ -688,17 +762,18 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-auto p-0" aria-describedby={undefined}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-visible p-0" aria-describedby={undefined}>
         <DialogTitle className="sr-only">{t("confirmation")}</DialogTitle>
         {mounted && (
           <>
             <div className="p-6 pb-4">
               {donationType && renderStepIndicator()}
             </div>
-            <div className="relative z-10 px-6 pb-6 bg-white">
+            <div className="relative z-10 px-6 pb-6 bg-white overflow-visible">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={redirecting ? "redirecting" : currentStep}
+                  className="overflow-visible"
                   initial={{ opacity: 0, x: isRTL ? -20 : 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: isRTL ? 20 : -20 }}

@@ -4,13 +4,19 @@ import IntlProviderClient from "./IntlProviderClient";
 import ar from "../../i18n/messages/ar.json";
 import en from "../../i18n/messages/en.json";
 import fr from "../../i18n/messages/fr.json";
+import tr from "../../i18n/messages/tr.json";
+import id from "../../i18n/messages/id.json";
+import pt from "../../i18n/messages/pt.json";
+import es from "../../i18n/messages/es.json";
 import { Toaster } from "react-hot-toast";
 import SessionProvider from "@/components/providers/SessionProvider";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../api/auth/[...nextauth]/options";
 import { ConfettiProvider } from "../../components/providers/confetti-provider";
 import Footer from "@/components/Footer";
+import ReferralTracker from "@/components/ReferralTracker";
 import SyncHtmlDir from "@/components/SyncHtmlDir";
+import TrackingPixels from "@/components/TrackingPixels";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 import { Analytics } from "@vercel/analytics/react"
 import { SpeedInsights } from "@vercel/speed-insights/next"
@@ -53,8 +59,8 @@ export const metadata: Metadata = {
   },
 };
 
-const localeMessages: Record<string, Record<string, unknown>> = { ar, en, fr };
-const VALID_LOCALES = ["ar", "en", "fr"] as const;
+const localeMessages: Record<string, Record<string, unknown>> = { ar, en, fr, tr, id, pt, es };
+const VALID_LOCALES = ["ar", "en", "fr", "tr", "id", "pt", "es"] as const;
 const DEFAULT_LOCALE = "ar";
 
 export default async function Rootlayout({
@@ -75,10 +81,12 @@ export default async function Rootlayout({
   return (
     <IntlProviderClient locale={locale || "ar"} messages={messages}>
       <SyncHtmlDir locale={locale} />
-      <div dir={dir} lang={locale === "ar" ? "ar" : locale === "fr" ? "fr" : "en"}>
-        <CurrencyProvider>
-          <SessionProvider session={session}>
-            <Navbar />
+      <TrackingPixels>
+        <ReferralTracker />
+        <div dir={dir} lang={locale === "ar" ? "ar" : locale === "fr" ? "fr" : locale === "tr" ? "tr" : locale === "id" ? "id" : locale === "pt" ? "pt" : locale === "es" ? "es" : "en"}>
+          <CurrencyProvider>
+            <SessionProvider session={session}>
+              <Navbar />
             <main className="pt-20 lg:pt-32">
               {children}
             </main>
@@ -90,6 +98,7 @@ export default async function Rootlayout({
         <Analytics />
         <SpeedInsights />
       </div>
+      </TrackingPixels>
     </IntlProviderClient>
   );
 }

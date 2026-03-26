@@ -8,7 +8,7 @@ import axios from "axios";
 import { toast } from "react-hot-toast";
 import * as z from "zod";
 
-import { Loader2, SpinnerIcon, Upload, X } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, SpinnerIcon, Upload, X } from "lucide-react";
 import Image from "next/image";
 
 // UI Components
@@ -49,6 +49,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 // Validation schema (Arabic fields only - simple inputs like BlogLocaleEditor)
 const postEditFormSchema = z.object({
@@ -56,6 +70,7 @@ const postEditFormSchema = z.object({
   description: z.string().optional(),
   image: z.string().optional(),
   categoryId: z.string().optional(),
+  campaignId: z.string().optional(),
 });
 
 // Configuration
@@ -68,6 +83,10 @@ const protectedEditorConfig = {
   generateSlug: "توليد الرابط",
   categoryTitle: "التصنيف",
   categoryDescription: "اختر تصنيفاً لمقالك",
+  campaignTitle: "الحملة ذات الصلة",
+  campaignDescription: "اختر حملة إذا كان المقال يتحدث عنها (اختياري)",
+  campaignSearchPlaceholder: "بحث عن حملة...",
+  campaignEmpty: "لا توجد حملة",
   coverImageTitle: "الصورة الرئيسية",
   coverImageDescription: "قم برفع صورة رئيسية لمقالك",
   placeholderImage: "رابط الصورة الرئيسية",
@@ -93,7 +112,7 @@ const protectedPostConfig = {
   pleaseWait: "برجاء الانتظار ...",
 };
 
-const BlogEditor = ({ post, userId, categories, redirectAfterCreate, isCreate: isCreateProp }) => {
+const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAfterCreate, isCreate: isCreateProp }) => {
   const router = useRouter();
   const isCreate = isCreateProp || !post?.id || post.id === "new";
 
@@ -151,11 +170,13 @@ const BlogEditor = ({ post, userId, categories, redirectAfterCreate, isCreate: i
   // });
 
   // Form setup (simple inputs like BlogLocaleEditor)
+  const NO_CAMPAIGN_VALUE = "__none__";
   const defaultValues = {
     title: post?.titleAR || post?.title || "",
     description: post?.descriptionAR || post?.description || "",
     image: post?.imageAR || post?.image || "",
     categoryId: post?.category_id || post?.categoryId || "",
+    campaignId: post?.campaign_id || post?.campaignId || NO_CAMPAIGN_VALUE,
   };
 
   const form = useForm({
@@ -176,6 +197,7 @@ const BlogEditor = ({ post, userId, categories, redirectAfterCreate, isCreate: i
         content: contentAR || "",
         image: data.image || "",
         categoryId: data.categoryId || null,
+        campaignId: data.campaignId && data.campaignId !== "__none__" ? data.campaignId : null,
       };
 
       let response;
@@ -311,6 +333,58 @@ const BlogEditor = ({ post, userId, categories, redirectAfterCreate, isCreate: i
                     <FormMessage />
                   </FormItem>
                 )}
+              />
+
+              <FormField
+                control={form.control}
+                name="campaignId"
+                render={({ field }) => {
+                  const campaignChoices = [
+                    { label: "—", value: NO_CAMPAIGN_VALUE },
+                    ...(campaignOptions || []),
+                  ];
+                  const selectedLabel = campaignChoices.find((o) => o.value === (field.value || NO_CAMPAIGN_VALUE))?.label ?? protectedEditorConfig.campaignDescription;
+                  return (
+                    <FormItem dir="rtl">
+                      <FormLabel>{protectedEditorConfig.campaignTitle}</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={cn("w-full justify-between font-normal", !field.value || field.value === NO_CAMPAIGN_VALUE ? "text-muted-foreground" : "")}
+                            >
+                              {selectedLabel}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder={protectedEditorConfig.campaignSearchPlaceholder} />
+                            <CommandEmpty>{protectedEditorConfig.campaignEmpty}</CommandEmpty>
+                            <CommandList>
+                              <CommandGroup>
+                                {campaignChoices.map((opt) => (
+                                  <CommandItem
+                                    key={opt.value}
+                                    value={opt.label}
+                                    onSelect={() => field.onChange(opt.value)}
+                                  >
+                                    <Check className={cn("mr-2 h-4 w-4", (field.value || NO_CAMPAIGN_VALUE) === opt.value ? "opacity-100" : "opacity-0")} />
+                                    {opt.label}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
 
               <FormField

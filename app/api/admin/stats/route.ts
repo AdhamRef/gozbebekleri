@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../../auth/[...nextauth]/options';
+import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 
 function getDateRange(period: string, startParam?: string | null, endParam?: string | null) {
   let endDate: Date;
@@ -13,12 +13,15 @@ function getDateRange(period: string, startParam?: string | null, endParam?: str
     endDate = new Date();
     startDate = new Date(endDate);
     startDate.setFullYear(startDate.getFullYear() - 10);
+    startDate.setUTCHours(0, 0, 0, 0);
+    endDate.setUTCHours(23, 59, 59, 999);
   } else {
     endDate = endParam ? new Date(endParam + 'T23:59:59.999Z') : new Date();
     startDate = new Date(endDate);
     const days = period === 'day' ? 1 : period === 'week' ? 7 : 30;
-    startDate.setDate(startDate.getDate() - days);
-    startDate.setHours(0, 0, 0, 0);
+    startDate.setUTCDate(startDate.getUTCDate() - days);
+    startDate.setUTCHours(0, 0, 0, 0);
+    endDate.setUTCHours(23, 59, 59, 999);
   }
   return { startDate, endDate };
 }
@@ -31,6 +34,20 @@ function buildDonationWhere(
 ) {
   const dateFilter = { createdAt: { gte: startDate, lte: endDate } };
   const base: Record<string, unknown> = { ...dateFilter };
+  if (campaignId && campaignId !== 'all') {
+    base.items = { some: { campaignId } };
+  } else if (categoryId && categoryId !== 'all') {
+    base.OR = [
+      { items: { some: { campaign: { categoryId } } } },
+      { categoryItems: { some: { categoryId } } },
+    ];
+  }
+  return base;
+}
+
+/** Same filters as buildDonationWhere but no date — all-time إيرادات (donation amountUSD sum) */
+function buildDonationWhereAllTime(categoryId: string | null, campaignId: string | null) {
+  const base: Record<string, unknown> = {};
   if (campaignId && campaignId !== 'all') {
     base.items = { some: { campaignId } };
   } else if (categoryId && categoryId !== 'all') {
@@ -89,6 +106,27 @@ export async function GET(request: NextRequest) {
 
     const { startDate, endDate } = getDateRange(period, startParam, endParam);
     const donationWhere = buildDonationWhere(startDate, endDate, categoryId, campaignId);
+    const donationWhereAllTime = buildDonationWhereAllTime(categoryId, campaignId);
+
+    const oneTimeWhere = { ...donationWhere, subscriptionId: null };
+    const fromSubscriptionWhere = { ...donationWhere, subscriptionId: { not: null } };
+
+    const last30End = new Date();
+    last30End.setUTCHours(23, 59, 59, 999);
+    const last30Start = new Date(last30End);
+    last30Start.setUTCDate(last30Start.getUTCDate() - 30);
+    last30Start.setUTCHours(0, 0, 0, 0);
+    const last30Where = { ...donationWhere, createdAt: { gte: last30Start, lte: last30End } };
+
+    const subscriptionWhere: Record<string, unknown> = { status: 'ACTIVE' };
+    if (campaignId && campaignId !== 'all') {
+      subscriptionWhere.items = { some: { campaignId } };
+    } else if (categoryId && categoryId !== 'all') {
+      subscriptionWhere.OR = [
+        { items: { some: { campaign: { categoryId } } } },
+        { categoryItems: { some: { categoryId } } },
+      ];
+    }
 
     const [
       totalCampaigns,
@@ -97,17 +135,17 @@ export async function GET(request: NextRequest) {
       totalDonations,
       totalAmountResult,
       oneTimeCount,
-      monthlyCount,
-      activeMonthlyCount,
-      monthlyStoppedCount,
+      fromSubscriptionCount,
+      activeSubscriptionCount,
+      stoppedSubscriptionCount,
       monthlyRecurringRevenueResult,
       monthlyStoppedAmountResult,
-      thisMonthRevenueResult,
       oneTimeTotalResult,
-      monthlyTotalResult,
+      fromSubscriptionTotalResult,
+      last30TotalResult,
+      allTimeRevenueResult,
       campaignDonationsSum,
       categoryDonationsSum,
-      teamSupportFeesSum,
       recentDonations,
     ] = await Promise.all([
       prisma.campaign.count(),
@@ -115,44 +153,38 @@ export async function GET(request: NextRequest) {
       prisma.user.count(),
       prisma.donation.count({ where: donationWhere }),
       prisma.donation.aggregate({
-        _sum: { totalAmount: true, amount: true, amountUSD: true },
+        _sum: { amountUSD: true },
         where: donationWhere,
       }),
-      prisma.donation.count({ where: { ...donationWhere, type: 'ONE_TIME' } }),
-      prisma.donation.count({ where: { ...donationWhere, type: 'MONTHLY' } }),
-      prisma.donation.count({
-        where: { ...donationWhere, type: 'MONTHLY', status: 'ACTIVE' },
+      prisma.donation.count({ where: oneTimeWhere }),
+      prisma.donation.count({ where: fromSubscriptionWhere }),
+      prisma.subscription.count({ where: subscriptionWhere }),
+      prisma.subscription.count({
+        where: { status: { in: ['PAUSED', 'CANCELLED'] } },
       }),
-      prisma.donation.count({
-        where: {
-          ...donationWhere,
-          type: 'MONTHLY',
-          status: { in: ['PAUSED', 'CANCELLED'] },
-        },
+      prisma.subscription.aggregate({
+        _sum: { amountUSD: true },
+        where: subscriptionWhere,
       }),
-      prisma.donation.aggregate({
-        _sum: { totalAmount: true, amountUSD: true, amount: true },
-        where: { ...donationWhere, type: 'MONTHLY', status: 'ACTIVE' },
+      prisma.subscription.aggregate({
+        _sum: { amountUSD: true },
+        where: { status: { in: ['PAUSED', 'CANCELLED'] } },
       }),
       prisma.donation.aggregate({
-        _sum: { totalAmount: true, amountUSD: true, amount: true },
-        where: {
-          ...donationWhere,
-          type: 'MONTHLY',
-          status: { in: ['PAUSED', 'CANCELLED'] },
-        },
+        _sum: { amountUSD: true },
+        where: oneTimeWhere,
       }),
       prisma.donation.aggregate({
-        _sum: { totalAmount: true },
-        where: donationWhere,
+        _sum: { amountUSD: true },
+        where: fromSubscriptionWhere,
       }),
       prisma.donation.aggregate({
-        _sum: { totalAmount: true },
-        where: { ...donationWhere, type: 'ONE_TIME' },
+        _sum: { amountUSD: true },
+        where: last30Where,
       }),
       prisma.donation.aggregate({
-        _sum: { totalAmount: true },
-        where: { ...donationWhere, type: 'MONTHLY' },
+        _sum: { amountUSD: true },
+        where: donationWhereAllTime,
       }),
       prisma.donationItem.aggregate({
         _sum: { amountUSD: true, amount: true },
@@ -164,10 +196,6 @@ export async function GET(request: NextRequest) {
         _count: { id: true },
         where: buildDonationCategoryItemWhere(startDate, endDate, categoryId),
       }),
-      prisma.donation.aggregate({
-        _sum: { teamSupport: true, fees: true },
-        where: donationWhere,
-      }),
       prisma.donation.findMany({
         take: 10,
         orderBy: { createdAt: 'desc' },
@@ -176,9 +204,10 @@ export async function GET(request: NextRequest) {
           id: true,
           amount: true,
           totalAmount: true,
+          amountUSD: true,
           createdAt: true,
           currency: true,
-          type: true,
+          subscriptionId: true,
           donor: { select: { name: true } },
           items: {
             select: {
@@ -194,34 +223,47 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
-    const totalAmount = totalAmountResult._sum.totalAmount ?? totalAmountResult._sum.amount ?? 0;
-    const monthlyRecurringRevenue = monthlyRecurringRevenueResult._sum.totalAmount ?? 0;
-    const activeMonthlyAmountUSD =
-      monthlyRecurringRevenueResult._sum.amountUSD ??
-      monthlyRecurringRevenueResult._sum.totalAmount ??
-      monthlyRecurringRevenueResult._sum.amount ??
-      0;
-    const monthlyStoppedAmountUSD =
-      monthlyStoppedAmountResult._sum.amountUSD ??
-      monthlyStoppedAmountResult._sum.totalAmount ??
-      monthlyStoppedAmountResult._sum.amount ??
-      0;
-    const thisMonthRevenue = thisMonthRevenueResult._sum.totalAmount ?? 0;
-    const oneTimeTotalAmount = oneTimeTotalResult._sum.totalAmount ?? 0;
-    const monthlyTotalAmount = monthlyTotalResult._sum.totalAmount ?? 0;
-    const campaignDonationsTotal = campaignDonationsSum._sum.amountUSD ?? campaignDonationsSum._sum.amount ?? 0;
-    const categoryDonationsTotal = categoryDonationsSum._sum.amountUSD ?? categoryDonationsSum._sum.amount ?? 0;
+    const oneTimeTotalAmount = oneTimeTotalResult._sum?.amountUSD ?? 0;
+    const fromSubscriptionTotalAmount = fromSubscriptionTotalResult._sum?.amountUSD ?? 0;
+    const totalAmount = oneTimeTotalAmount + fromSubscriptionTotalAmount;
+
+    const monthlyRecurringRevenue = monthlyRecurringRevenueResult._sum?.amountUSD ?? 0;
+    const activeMonthlyAmountUSD = monthlyRecurringRevenue;
+    const monthlyStoppedAmountUSD = monthlyStoppedAmountResult._sum?.amountUSD ?? 0;
+    const thisMonthRevenue = last30TotalResult._sum?.amountUSD ?? 0;
+    const allTimeRevenue = allTimeRevenueResult._sum?.amountUSD ?? 0;
+    const campaignDonationsTotal = campaignDonationsSum._sum?.amountUSD ?? campaignDonationsSum._sum?.amount ?? 0;
+    const categoryDonationsTotal = categoryDonationsSum._sum?.amountUSD ?? categoryDonationsSum._sum?.amount ?? 0;
     const campaignDonationsCount = campaignDonationsSum._count?.id ?? 0;
     const categoryDonationsCount = categoryDonationsSum._count?.id ?? 0;
-    const teamSupportTotal = teamSupportFeesSum._sum.teamSupport ?? 0;
-    const feesTotal = teamSupportFeesSum._sum.fees ?? 0;
 
-    const recentDonationsFormatted = recentDonations.map((d) => ({
+    const donationsForSupportFees = await prisma.donation.findMany({
+      where: donationWhere,
+      select: { amountUSD: true, totalAmount: true, teamSupport: true, fees: true },
+      take: 100000,
+    });
+    const toUSD = (
+      rows: { amountUSD: number | null; totalAmount: number; teamSupport?: number | null; fees?: number | null }[]
+    ) =>
+      rows.reduce(
+        (acc, r) => {
+          const usd = r.amountUSD ?? 0;
+          const total = r.totalAmount || 1;
+          acc.teamSupport += usd * ((r.teamSupport ?? 0) / total);
+          acc.fees += usd * ((r.fees ?? 0) / total);
+          return acc;
+        },
+        { teamSupport: 0, fees: 0 }
+      );
+    const { teamSupport: teamSupportTotal, fees: feesTotal } = toUSD(donationsForSupportFees);
+
+    const recentDonationsList = Array.isArray(recentDonations) ? recentDonations : [];
+    const recentDonationsFormatted = recentDonationsList.map((d) => ({
       id: d.id,
-      amount: d.totalAmount ?? d.amount,
+      amount: d.totalAmount ?? d.amount ?? 0,
       currency: d.currency,
       donorName: d.donor?.name ?? '—',
-      type: d.type,
+      type: d.subscriptionId ? ('MONTHLY' as const) : ('ONE_TIME' as const),
       campaignTitle: d.items[0]?.campaign?.title ?? null,
       categoryName: d.categoryItems[0]?.category?.name ?? null,
       createdAt: d.createdAt,
@@ -233,16 +275,17 @@ export async function GET(request: NextRequest) {
       totalDonations,
       totalUsers,
       totalAmount,
+      allTimeRevenue,
       oneTimeCount,
-      monthlyCount,
-      activeMonthlyCount,
-      monthlyStoppedCount,
+      monthlyCount: fromSubscriptionCount,
+      activeMonthlyCount: activeSubscriptionCount,
+      monthlyStoppedCount: stoppedSubscriptionCount,
       monthlyRecurringRevenue,
       activeMonthlyAmountUSD,
       monthlyStoppedAmountUSD,
       thisMonthRevenue,
       oneTimeTotalAmount,
-      monthlyTotalAmount,
+      monthlyTotalAmount: fromSubscriptionTotalAmount,
       campaignDonationsTotal,
       categoryDonationsTotal,
       campaignDonationsCount,
@@ -250,11 +293,15 @@ export async function GET(request: NextRequest) {
       teamSupportTotal,
       feesTotal,
       recentDonations: recentDonationsFormatted,
+      monthlyTransactionCount: fromSubscriptionCount,
     });
   } catch (error) {
     console.error('Error fetching admin stats:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch admin statistics' },
+      {
+        error: 'Failed to fetch admin statistics',
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }

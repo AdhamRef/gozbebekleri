@@ -5,10 +5,15 @@ import SignInDialog from "@/components/SignInDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCurrency } from "@/context/CurrencyContext";
+import { usePathname, useRouter } from "@/i18n/routing";
 import { Award, Clock, Gift, HandCoins, HandHeart, Share2 } from "lucide-react";
 import { useSession } from "next-auth/react";
-import React, { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import React, { useState, useEffect } from "react";
 import { useTranslations, useLocale } from "next-intl";
+
+// Shared across instances (MainPageDummy renders desktop + mobile sidebars); only one should open the dialog
+let openDonationHandledThisLoad = false;
 
 interface DonationSidebarProps {
   campaign: any;
@@ -20,9 +25,29 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
   const locale = useLocale() as "ar" | "en" | "fr";
   const { data: session } = useSession();
   const { convertToCurrency } = useCurrency();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isDonationOpen, setIsDonationOpen] = useState(false);
   const [isSignInOpen, setIsSignInOpen] = useState(false);
+
+  // After sign-in redirect: open donation dialog once and clean URL (only one instance handles it)
+  useEffect(() => {
+    if (searchParams.get("openDonation") !== "1") {
+      openDonationHandledThisLoad = false;
+      return;
+    }
+    if (openDonationHandledThisLoad) return;
+    openDonationHandledThisLoad = true;
+    setIsDonationOpen(true);
+    router.replace(pathname);
+  }, [searchParams, pathname, router]);
+
+  const donationCallbackUrl =
+    typeof window !== "undefined"
+      ? `${window.location.pathname}?openDonation=1`
+      : undefined;
 
   // Helper function to get locale-specific property
   const getLocalizedProperty = (obj: any, key: string) => {
@@ -64,7 +89,11 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
   };
 
   const handleDonate = () => {
-    setIsDonationOpen(true);
+    if (session) {
+      setIsDonationOpen(true);
+    } else {
+      setIsSignInOpen(true);
+    }
   };
   
   const handleShare = () => {
@@ -100,6 +129,7 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
         <SignInDialog
           isOpen={isSignInOpen}
           onClose={() => setIsSignInOpen(false)}
+          callbackUrl={donationCallbackUrl}
         />
 
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t-2 border-gray-200 shadow-2xl">
@@ -151,23 +181,13 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
 
             {/* Action Buttons */}
             <div className="flex gap-2">
-              {session ? (
-                <Button
-                  onClick={handleDonate}
-                  className="flex-1 flex gap-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:opacity-90 text-white font-semibold py-3 text-base rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-                >
-                  <HandCoins className="w-5 h-5" />
-                  {t("donateNow")}
-                </Button>
-              ) : (
-                <Button
-                  onClick={() => setIsSignInOpen(true)}
-                  className="flex-1 flex gap-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:opacity-90 text-white font-semibold py-3 text-base rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-                >
-                  <HandCoins className="w-5 h-5" />
-                  {t("donateNow")}
-                </Button>
-              )}
+              <Button
+                onClick={handleDonate}
+                className="flex-1 flex gap-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:opacity-90 text-white font-semibold py-3 text-base rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+              >
+                <HandCoins className="w-5 h-5" />
+                {t("donateNow")}
+              </Button>
               <Button
                 onClick={handleShare}
                 className="flex-shrink-0 flex gap-2 bg-primary hover:bg-slate-800 text-white font-semibold py-3 px-4 rounded-lg border-0 transition-all duration-200 shadow-md hover:shadow-lg"
@@ -207,8 +227,9 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
       <SignInDialog
         isOpen={isSignInOpen}
         onClose={() => setIsSignInOpen(false)}
+        callbackUrl={donationCallbackUrl}
       />
-      
+
       <div className="sticky top-24 gap-y-6">
         {/* Progress Card */}
         <Card className="border-0">
@@ -265,30 +286,13 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
             </div>
 
             <div className="space-y-3">
-            <Button
-                  onClick={handleDonate}
-                  className="flex gap-2 w-full bg-gradient-to-r from-sky-600 to-indigo-600 hover:opacity-90 text-white font-semibold py-6 text-lg rounded-md transition-all duration-200 shadow-md hover:shadow-lg"
-                >
-                  <HandCoins className="w-5 h-5" />
-                  {t("donateNow")}
-                </Button>
-              {/* {session ? (
-                <Button
-                  onClick={handleDonate}
-                  className="flex gap-2 w-full bg-gradient-to-r from-sky-600 to-indigo-600 hover:opacity-90 text-white font-semibold py-6 text-lg rounded-md transition-all duration-200 shadow-md hover:shadow-lg"
-                >
-                  <HandCoins className="w-5 h-5" />
-                  {t("donateNow")}
-                </Button>
-              ) : (
-                <Button
-                  onClick={() => setIsSignInOpen(true)}
-                  className="flex gap-2 w-full bg-gradient-to-r from-sky-600 to-indigo-600 hover:opacity-90 text-white font-semibold py-6 text-lg rounded-md transition-all duration-200 shadow-md hover:shadow-lg"
-                >
-                  <HandCoins className="w-5 h-5" />
-                  {t("donateNow")}
-                </Button>
-              )} */}
+              <Button
+                onClick={handleDonate}
+                className="flex gap-2 w-full bg-gradient-to-r from-sky-600 to-indigo-600 hover:opacity-90 text-white font-semibold py-6 text-lg rounded-md transition-all duration-200 shadow-md hover:shadow-lg"
+              >
+                <HandCoins className="w-5 h-5" />
+                {t("donateNow")}
+              </Button>
               <Button
                 onClick={handleShare}
                 className="flex gap-2 w-full bg-primary hover:bg-slate-800 text-white font-semibold py-6 text-lg rounded-md border-0 transition-all duration-200 shadow-md hover:shadow-lg"

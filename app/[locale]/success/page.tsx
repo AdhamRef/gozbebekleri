@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Heart, Gift, Star, Sparkles, ArrowLeft, Check, PartyPopper } from 'lucide-react';
 import { useTranslations, useLocale } from 'next-intl';
 
-// Dummy campaign data
+// Dummy campaign datapixel
 const dummyCampaign = {
   id: "camp_123456",
   titleAr: "مساعدة عائلة أبو أحمد لبناء منزل جديد",
@@ -40,7 +40,7 @@ const dummyDonation = {
 
 const DonationSuccessPage = () => {
   const t = useTranslations('DonationSuccess');
-  const locale = useLocale() as 'ar' | 'en' | 'fr';
+  const locale = useLocale() as string;
   const [showConfetti, setShowConfetti] = useState(false);
   const donation = dummyDonation;
 
@@ -57,12 +57,16 @@ const DonationSuccessPage = () => {
 
   const formatDate = (date: string) => {
     const d = new Date(date);
-    const months = {
+    const months: Record<string, string[]> = {
       ar: ['يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'],
       en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-      fr: ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
+      fr: ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
+      tr: ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'],
+      id: ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'],
+      pt: ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'],
+      es: ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'],
     };
-    const monthNames = months[locale] || months.ar;
+    const monthNames = months[locale] || months.en;
     return `${d.getDate()} ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
   };
 

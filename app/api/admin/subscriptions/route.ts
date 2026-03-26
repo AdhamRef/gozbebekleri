@@ -1,0 +1,115 @@
+import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+
+/** GET /api/admin/subscriptions — paginated list for dashboard (status, category, campaign, user) */
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session || session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const sp = request.nextUrl.searchParams;
+    const statusParam = (sp.get("status") || "ACTIVE").toUpperCase();
+    const categoryId = sp.get("categoryId");
+    const campaignId = sp.get("campaignId");
+    const userId = sp.get("userId");
+    const referralIdParam = sp.get("referralId");
+    const page = Math.max(1, parseInt(sp.get("page") || "1", 10) || 1);
+    const limit = Math.min(Math.max(1, parseInt(sp.get("limit") || "10", 10) || 10), 100);
+    const sortBy = sp.get("sortBy") === "amount" ? "amount" : "date";
+    const sortOrder = sp.get("sortOrder") === "asc" ? "asc" : "desc";
+
+    if (referralIdParam) {
+      const ref = await prisma.referral.findUnique({ where: { id: referralIdParam }, select: { id: true } });
+      if (!ref) {
+        return NextResponse.json({ error: "Referral not found" }, { status: 404 });
+      }
+    }
+
+    const where: Prisma.SubscriptionWhereInput = {};
+
+    if (referralIdParam) {
+      where.referralId = referralIdParam;
+    }
+
+    if (statusParam !== "ALL") {
+      if (statusParam === "ACTIVE" || statusParam === "PAUSED" || statusParam === "CANCELLED") {
+        where.status = statusParam;
+      }
+    }
+
+    if (userId && userId !== "all") {
+      where.donorId = userId;
+    }
+
+    if (campaignId && campaignId !== "all") {
+      where.items = { some: { campaignId } };
+    } else if (categoryId && categoryId !== "all") {
+      where.OR = [
+        { items: { some: { campaign: { categoryId } } } },
+        { categoryItems: { some: { categoryId } } },
+      ];
+    }
+
+    const skip = (page - 1) * limit;
+
+    const orderBy: Prisma.SubscriptionOrderByWithRelationInput =
+      sortBy === "amount"
+        ? { amountUSD: sortOrder }
+        : { createdAt: sortOrder };
+
+    const [total, rows] = await Promise.all([
+      prisma.subscription.count({ where }),
+      prisma.subscription.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy,
+        select: {
+          id: true,
+          status: true,
+          amount: true,
+          amountUSD: true,
+          currency: true,
+          createdAt: true,
+          nextBillingDate: true,
+          lastBillingDate: true,
+          billingDay: true,
+          donor: { select: { id: true, name: true, email: true } },
+          items: { select: { campaign: { select: { id: true, title: true } } } },
+          categoryItems: { select: { category: { select: { id: true, name: true } } } },
+        },
+      }),
+    ]);
+
+    const subscriptions = rows.map((s) => ({
+      id: s.id,
+      status: s.status,
+      amount: s.amount,
+      amountUSD: s.amountUSD,
+      currency: s.currency,
+      createdAt: s.createdAt,
+      nextBillingDate: s.nextBillingDate,
+      lastBillingDate: s.lastBillingDate,
+      billingDay: s.billingDay,
+      donor: s.donor,
+      campaigns: s.items.map((i) => ({ id: i.campaign.id, title: i.campaign.title })),
+      categories: s.categoryItems.map((c) => ({ id: c.category.id, name: c.category.name })),
+    }));
+
+    return NextResponse.json({
+      subscriptions,
+      pagination: { total, page, limit, pages: Math.ceil(total / limit) || 1 },
+    });
+  } catch (error) {
+    console.error("Error listing subscriptions:", error);
+    return NextResponse.json(
+      { error: "Failed to list subscriptions", details: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    );
+  }
+}

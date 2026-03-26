@@ -3,7 +3,7 @@ import createMiddleware from 'next-intl/middleware';
  
 export default createMiddleware({
   // A list of all locales that are supported
-  locales: ['ar', 'en', 'fr'],
+  locales: ['ar', 'en', 'fr', 'tr', 'id', 'pt', 'es'],
   
   // Used when no locale matches
   defaultLocale: 'ar', // Ensure Arabic is the default
@@ -25,5 +25,5 @@ export default createMiddleware({
 export const config = {
   // Skip all paths that should not be internationalized. This example skips the
   // folders "api", "_next" and all files with an extension (e.g. favicon.ico)
-  matcher: ['/', '/(ar|en|fr)/:path*']
+  matcher: ['/', '/(ar|en|fr|tr|id|pt|es)/:path*']
 };

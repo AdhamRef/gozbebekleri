@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/options";
+import { resolveReferralId } from "@/lib/referral-server";
 
-// GET /api/donations - Get all donations (admin) or user's donations
 // GET /api/donations - Get all donations (admin) or user's donations
 export async function GET(request: NextRequest) {
   try {
@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const campaignId = searchParams.get("campaignId");
     const userId = searchParams.get("userId");
     const categoryId = searchParams.get("categoryId");
+    const referralId = searchParams.get("referralId");
     const search = searchParams.get("search")?.trim();
     const startParam = searchParams.get("start"); // YYYY-MM-DD
     const endParam = searchParams.get("end"); // YYYY-MM-DD
@@ -29,104 +30,59 @@ export async function GET(request: NextRequest) {
     if (startParam) dateFilter.gte = new Date(startParam + "T00:00:00.000Z");
     if (endParam) dateFilter.lte = new Date(endParam + "T23:59:59.999Z");
 
+    const isAdmin = session.user.role === "ADMIN";
+    const subscriptionOnly =
+      isAdmin &&
+      (searchParams.get("subscriptionOnly") === "true" || searchParams.get("subscriptionOnly") === "1");
+
     const where: Record<string, unknown> = {
       ...(campaignId && { items: { some: { campaignId } } }),
       ...(userId && { donorId: userId }),
-      ...(session.user.role !== "ADMIN" && { donorId: session.user.id }),
-      ...(search && session.user.role === "ADMIN" && {
-        donor: {
-          name: { contains: search },
-        },
-      }),
+      ...(referralId && isAdmin && { referralId }),
+      ...(subscriptionOnly && { subscriptionId: { not: null } }),
+      ...(!isAdmin && { donorId: session.user.id }),
+      ...(search && isAdmin && { donor: { name: { contains: search } } }),
       ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
     };
-    if (categoryId && session.user.role === "ADMIN") {
+    if (categoryId && isAdmin) {
       where.OR = [
         { items: { some: { campaign: { categoryId } } } },
         { categoryItems: { some: { categoryId } } },
       ];
     }
 
-    // Sort by amount uses amountUSD only (USD) for consistent comparison
     const orderBy =
       sortBy === "amount"
         ? { amountUSD: sortOrder }
         : { createdAt: sortOrder };
 
     const total = await prisma.donation.count({ where });
-
     const donations = await prisma.donation.findMany({
       where,
       include: {
-
-        donor: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-          },
-        },
-        items: {
-          include: {
-            campaign: {
-              select: {
-                id: true,
-                title: true,
-                images: true,
-              },
-            },
-          },
-        },
-        categoryItems: {
-          include: {
-            category: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-        comments: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
-        },
+        donor: { select: { id: true, name: true, email: true, image: true } },
+        items: { include: { campaign: { select: { id: true, title: true, images: true } } } },
+        categoryItems: { include: { category: { select: { id: true, name: true } } } },
+        comments: { orderBy: { createdAt: "desc" }, take: 1 },
+        referral: { select: { id: true, code: true, name: true } },
       },
       orderBy,
       skip,
       take: limit,
     });
-
     const formattedDonations = donations.map((donation) => ({
       ...donation,
+      type: donation.subscriptionId ? ("MONTHLY" as const) : ("ONE_TIME" as const),
       fees: donation.fees,
       teamSupport: donation.teamSupport,
-      donor: {
-        id: donation.donor.id,
-        name: donation.donor.name,
-        email: donation.donor.email,
-        image: donation.donor.image,
-      },
-      campaigns: donation.items.map((item) => ({
-        id: item.campaign.id,
-        title: item.campaign.title,
-        images: item.campaign.images,
-      })),
-      categories: donation.categoryItems?.map((ci) => ({
-        id: ci.category.id,
-        name: ci.category.name,
-      })) ?? [],
+      donor: donation.donor,
+      campaigns: donation.items.map((item) => ({ id: item.campaign.id, title: item.campaign.title, images: item.campaign.images })),
+      categories: (donation.categoryItems ?? []).map((ci) => ({ id: ci.category.id, name: ci.category.name })),
+      referral: donation.referral ? { id: donation.referral.id, code: donation.referral.code, name: donation.referral.name } : null,
     }));
-
     return NextResponse.json({
       donations: formattedDonations,
-      pagination: {
-        total,
-        pages: Math.ceil(total / limit),
-        page,
-        limit,
-      },
+      pagination: { total, pages: Math.ceil(total / limit), page, limit },
     });
   } catch (error) {
     console.error("Error fetching donations:", error);
@@ -147,8 +103,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const {
-      items, // Array of { campaignId, amount, amountUSD }
-      categoryItems, // Array of { categoryId, amount, amountUSD }
+      items,
+      categoryItems,
       currency,
       teamSupport = 0,
       coverFees = false,
@@ -156,6 +112,9 @@ export async function POST(request: NextRequest) {
       billingDay = null,
       paymentMethod,
       cardDetails = null,
+      referralCode,
+      referralId: bodyReferralId,
+      locale: donationLocale,
     } = body;
 
     const hasCampaignItems = items?.length > 0;
@@ -227,9 +186,147 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create donation and items in a transaction
+    // Accept either referralId (MongoDB id) or referralCode (string code); validate and use one.
+    let referralId: string | null = null;
+    if (bodyReferralId && typeof bodyReferralId === "string" && bodyReferralId.trim()) {
+      const ref = await prisma.referral.findUnique({
+        where: { id: bodyReferralId.trim() },
+        select: { id: true },
+      });
+      referralId = ref?.id ?? null;
+    }
+    if (referralId == null) {
+      referralId = await resolveReferralId(referralCode);
+    }
+
+    const validLocale =
+      donationLocale && ["ar", "en", "fr", "tr", "id", "pt", "es"].includes(String(donationLocale).toLowerCase())
+        ? String(donationLocale).toLowerCase()
+        : null;
+
+    if (type === "MONTHLY") {
+      // Monthly: create Subscription + first Donation (transaction) linked to it
+      const subscription = await prisma.$transaction(async (tx) => {
+        const nextBilling = new Date();
+        nextBilling.setUTCMonth(nextBilling.getUTCMonth() + 1);
+        nextBilling.setUTCHours(0, 0, 0, 0);
+
+        const sub = await tx.subscription.create({
+          data: {
+            status: "ACTIVE",
+            billingDay: billingDay ?? undefined,
+            amount: totalAmount,
+            amountUSD: totalAmountUSD,
+            currency,
+            teamSupport,
+            coverFees,
+            paymentMethod,
+            cardDetails: paymentMethod === "CARD" ? cardDetails : null,
+            donorId: session.user.id,
+            referralId: referralId ?? undefined,
+            nextBillingDate: nextBilling,
+            lastBillingDate: new Date(),
+            items: hasCampaignItems
+              ? {
+                  create: items.map((item: { campaignId: string; amount: number; amountUSD?: number }) => ({
+                    campaignId: item.campaignId,
+                    amount: item.amount,
+                    amountUSD: item.amountUSD,
+                  })),
+                }
+              : undefined,
+            categoryItems: hasCategoryItems
+              ? {
+                  create: categoryItems.map((item: { categoryId: string; amount: number; amountUSD?: number }) => ({
+                    categoryId: item.categoryId,
+                    amount: item.amount,
+                    amountUSD: item.amountUSD,
+                  })),
+                }
+              : undefined,
+          },
+          include: { items: true, categoryItems: true },
+        });
+
+        const donation = await tx.donation.create({
+          data: {
+            amount: totalAmount,
+            amountUSD: totalAmountUSD,
+            teamSupport,
+            coverFees,
+            currency,
+            fees: coverFees ? fees : 0,
+            totalAmount: finalTotalAmount,
+            donorId: session.user.id,
+            referralId: referralId ?? undefined,
+            subscriptionId: sub.id,
+            paymentMethod,
+            cardDetails: paymentMethod === "CARD" ? cardDetails : null,
+            items: hasCampaignItems
+              ? {
+                  create: items.map((item: { campaignId: string; amount: number; amountUSD?: number }) => ({
+                    campaignId: item.campaignId,
+                    amount: item.amount,
+                    amountUSD: item.amountUSD,
+                  })),
+                }
+              : undefined,
+            categoryItems: hasCategoryItems
+              ? {
+                  create: categoryItems.map((item: { categoryId: string; amount: number; amountUSD?: number }) => ({
+                    categoryId: item.categoryId,
+                    amount: item.amount,
+                    amountUSD: item.amountUSD,
+                  })),
+                }
+              : undefined,
+          },
+          include: {
+            donor: { select: { name: true, email: true } },
+            items: { include: { campaign: { select: { title: true } } } },
+            categoryItems: { include: { category: { select: { name: true } } } },
+          },
+        });
+
+        for (const item of hasCampaignItems ? items : []) {
+          await tx.campaign.update({
+            where: { id: item.campaignId },
+            data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
+          });
+        }
+        for (const item of hasCategoryItems ? categoryItems : []) {
+          await tx.category.update({
+            where: { id: item.categoryId },
+            data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
+          });
+        }
+
+        if (validLocale) {
+          const donor = await tx.user.findUnique({
+            where: { id: session.user.id },
+            select: { preferredLang: true },
+          });
+          if (donor && donor.preferredLang == null) {
+            await tx.user.update({
+              where: { id: session.user.id },
+              data: { preferredLang: validLocale },
+            });
+          }
+        }
+
+        return { subscription: sub, donation };
+      }, { timeout: 15000 });
+
+      return NextResponse.json({
+        success: true,
+        subscription: subscription.subscription,
+        donation: subscription.donation,
+      });
+    }
+
+    // One-time: create a single Donation (transaction) only
     const donation = await prisma.$transaction(async (tx) => {
-      const donation = await tx.donation.create({
+      const d = await tx.donation.create({
         data: {
           amount: totalAmount,
           amountUSD: totalAmountUSD,
@@ -239,16 +336,9 @@ export async function POST(request: NextRequest) {
           fees: coverFees ? fees : 0,
           totalAmount: finalTotalAmount,
           donorId: session.user.id,
-          type: type as "ONE_TIME" | "MONTHLY",
-          status: "ACTIVE",
+          referralId: referralId ?? undefined,
           paymentMethod,
           cardDetails: paymentMethod === "CARD" ? cardDetails : null,
-          billingDay: type === "MONTHLY" ? billingDay : null,
-          lastBillingDate: type === "MONTHLY" ? new Date() : null,
-          nextBillingDate:
-            type === "MONTHLY"
-              ? new Date(new Date().setMonth(new Date().getMonth() + 1))
-              : null,
           items: hasCampaignItems
             ? {
                 create: items.map((item: { campaignId: string; amount: number; amountUSD?: number }) => ({
@@ -288,8 +378,21 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      return donation;
-    });
+      if (validLocale) {
+        const donor = await tx.user.findUnique({
+          where: { id: session.user.id },
+          select: { preferredLang: true },
+        });
+        if (donor && donor.preferredLang == null) {
+          await tx.user.update({
+            where: { id: session.user.id },
+            data: { preferredLang: validLocale },
+          });
+        }
+      }
+
+      return d;
+    }, { timeout: 15000 });
 
     return NextResponse.json({
       success: true,

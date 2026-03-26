@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/options";
-import useConvetToUSD from "@/hooks/useConvetToUSD";
+import { resolveReferralId } from "@/lib/referral-server";
 
 // GET /api/donations - Get all donations (admin) or user's donations
 export async function GET(request: NextRequest) {
@@ -19,12 +19,10 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "10");
     const skip = (page - 1) * limit;
 
-    // Build filter conditions
-    const where = {
-      ...(campaignId && { campaignId }),
+    const where: Record<string, unknown> = {
       ...(userId && { donorId: userId }),
-      // If not admin, only show user's own donations
-      ...(!session.user.role === "ADMIN" && { donorId: session.user.id }),
+      ...(session.user.role !== "ADMIN" && { donorId: session.user.id }),
+      ...(campaignId && { items: { some: { campaignId } } }),
     };
 
     // Get total count for pagination
@@ -51,10 +49,8 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        Comment: {
-          orderBy: {
-            createdAt: "desc",
-          },
+        comments: {
+          orderBy: { createdAt: "desc" },
           take: 1,
         },
       },
@@ -93,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const {
-      items, // Array of { campaignId, amount, amountUSD }
+      items,
       currency,
       teamSupport = 0,
       coverFees = false,
@@ -101,6 +97,8 @@ export async function POST(request: NextRequest) {
       billingDay = null,
       paymentMethod,
       cardDetails = null,
+      referralCode,
+      locale: donationLocale,
     } = body;
 
     // Validate required fields
@@ -154,10 +152,106 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create donation and items in a transaction
-    const donation = await prisma.$transaction(async (prisma) => {
-      // Create main donation
-      const donation = await prisma.donation.create({
+    const referralId = await resolveReferralId(referralCode);
+
+    const validLocale =
+      donationLocale && ["ar", "en", "fr", "tr", "id", "pt", "es"].includes(String(donationLocale).toLowerCase())
+        ? String(donationLocale).toLowerCase()
+        : null;
+
+    if (type === "MONTHLY") {
+      const nextBilling = new Date();
+      nextBilling.setUTCMonth(nextBilling.getUTCMonth() + 1);
+      nextBilling.setUTCHours(0, 0, 0, 0);
+
+      const result = await prisma.$transaction(async (tx) => {
+        const sub = await tx.subscription.create({
+          data: {
+            status: "ACTIVE",
+            billingDay: billingDay ?? undefined,
+            amount: totalAmount,
+            amountUSD: totalAmountUSD,
+            currency,
+            teamSupport,
+            coverFees,
+            paymentMethod,
+            cardDetails: paymentMethod === "CARD" ? cardDetails : null,
+            donorId: session.user.id,
+            referralId: referralId ?? undefined,
+            nextBillingDate: nextBilling,
+            lastBillingDate: new Date(),
+            items: {
+              create: items.map((item: { campaignId: string; amount: number; amountUSD?: number }) => ({
+                campaignId: item.campaignId,
+                amount: item.amount,
+                amountUSD: item.amountUSD,
+              })),
+            },
+          },
+        });
+
+        const donation = await tx.donation.create({
+          data: {
+            amount: totalAmount,
+            amountUSD: totalAmountUSD,
+            teamSupport,
+            coverFees,
+            currency,
+            fees: coverFees ? fees : 0,
+            totalAmount: finalTotalAmount,
+            donorId: session.user.id,
+            referralId: referralId ?? undefined,
+            subscriptionId: sub.id,
+            paymentMethod,
+            cardDetails: paymentMethod === "CARD" ? cardDetails : null,
+            items: {
+              create: items.map((item: { campaignId: string; amount: number; amountUSD?: number }) => ({
+                campaignId: item.campaignId,
+                amount: item.amount,
+                amountUSD: item.amountUSD,
+              })),
+            },
+          },
+          include: {
+            donor: { select: { name: true, email: true } },
+            items: { include: { campaign: { select: { title: true } } } },
+          },
+        });
+
+        for (const item of items) {
+          await tx.campaign.update({
+            where: { id: item.campaignId },
+            data: { currentAmount: { increment: item.amountUSD ?? item.amount ?? 0 } },
+          });
+        }
+
+        await tx.cartItem.deleteMany({ where: { userId: session.user.id } });
+
+        if (validLocale) {
+          const donor = await tx.user.findUnique({
+            where: { id: session.user.id },
+            select: { preferredLang: true },
+          });
+          if (donor && donor.preferredLang == null) {
+            await tx.user.update({
+              where: { id: session.user.id },
+              data: { preferredLang: validLocale },
+            });
+          }
+        }
+
+        return { subscription: sub, donation };
+      }, { timeout: 15000 });
+
+      return NextResponse.json({
+        success: true,
+        subscription: result.subscription,
+        donation: result.donation,
+      });
+    }
+
+    const donation = await prisma.$transaction(async (tx) => {
+      const d = await tx.donation.create({
         data: {
           amount: totalAmount,
           amountUSD: totalAmountUSD,
@@ -167,19 +261,11 @@ export async function POST(request: NextRequest) {
           fees: coverFees ? fees : 0,
           totalAmount: finalTotalAmount,
           donorId: session.user.id,
-          type: type as "ONE_TIME" | "MONTHLY",
-          status: "ACTIVE",
+          referralId: referralId ?? undefined,
           paymentMethod,
           cardDetails: paymentMethod === "CARD" ? cardDetails : null,
-          billingDay: type === "MONTHLY" ? billingDay : null,
-          lastBillingDate: type === "MONTHLY" ? new Date() : null,
-          nextBillingDate:
-            type === "MONTHLY"
-              ? new Date(new Date().setMonth(new Date().getMonth() + 1))
-              : null,
-          // Create donation items
           items: {
-            create: items.map((item) => ({
+            create: items.map((item: { campaignId: string; amount: number; amountUSD?: number }) => ({
               campaignId: item.campaignId,
               amount: item.amount,
               amountUSD: item.amountUSD,
@@ -187,45 +273,35 @@ export async function POST(request: NextRequest) {
           },
         },
         include: {
-          donor: {
-            select: {
-              name: true,
-              email: true,
-            },
-          },
-          items: {
-            include: {
-              campaign: {
-                select: {
-                  title: true,
-                },
-              },
-            },
-          },
+          donor: { select: { name: true, email: true } },
+          items: { include: { campaign: { select: { title: true } } } },
         },
       });
 
-      // Update campaign amounts
       for (const item of items) {
-        await prisma.campaign.update({
+        await tx.campaign.update({
           where: { id: item.campaignId },
-          data: {
-            currentAmount: {
-              increment: item.amountUSD || 0,
-            },
-          },
+          data: { currentAmount: { increment: item.amountUSD ?? item.amount ?? 0 } },
         });
       }
 
-      // Clear the user's cart
-      await prisma.cartItem.deleteMany({
-        where: {
-          userId: session.user.id,
-        },
-      });
+      await tx.cartItem.deleteMany({ where: { userId: session.user.id } });
 
-      return donation;
-    });
+      if (validLocale) {
+        const donor = await tx.user.findUnique({
+          where: { id: session.user.id },
+          select: { preferredLang: true },
+        });
+        if (donor && donor.preferredLang == null) {
+          await tx.user.update({
+            where: { id: session.user.id },
+            data: { preferredLang: validLocale },
+          });
+        }
+      }
+
+      return d;
+    }, { timeout: 15000 });
 
     return NextResponse.json({
       success: true,

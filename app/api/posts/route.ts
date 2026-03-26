@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await request.json();
-    const { title, description, content, image, published, categoryId, translations } = data;
+    const { title, description, content, image, published, categoryId, campaignId, translations } = data;
 
     const translationData: { locale: string; title?: string; description?: string; content?: string; image?: string }[] = [];
     if (translations && typeof translations === 'object') {
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     }
 
     const created = await prisma.$transaction(async (tx) => {
-      const post = await tx.post.create({ data: { title: title || '', description: description || '', content: content || '', image: image || '', published: !!published, categoryId: categoryId || null } });
+      const post = await tx.post.create({ data: { title: title || '', description: description || '', content: content || '', image: image || '', published: !!published, categoryId: categoryId || null, campaignId: campaignId || null } });
 
       if (translationData.length > 0) {
         await tx.postTranslation.createMany({ data: translationData.map(t => ({ postId: post.id, locale: t.locale, title: t.title || '', description: t.description || '', content: t.content || '', image: t.image || '' })) });

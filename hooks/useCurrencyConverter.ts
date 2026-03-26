@@ -39,15 +39,18 @@ const useCurrencyConverter = () => {
     fetchRates();
   }, []);
 
+  const getSelectedCurrency = () => Cookies.get("currency") || "DEFAULT";
+
   const convertToCurrency = (value: number) => {
-    const currency = Cookies.get("currency") || BASE_CURRENCY;
+    const currency = getSelectedCurrency();
+    if (currency === "DEFAULT") return { convertedValue: value, currency: "USD", exchangeRate: 1 };
     if (!exchangeRates) return { convertedValue: null, currency: null, exchangeRate: null };
     const exchangeRate = exchangeRates[currency];
     if (!exchangeRate) return { convertedValue: null, currency, exchangeRate: null };
     return { convertedValue: value * exchangeRate, currency, exchangeRate };
   };
 
-  return { convertToCurrency, exchangeRates, loading };
+  return { convertToCurrency, getSelectedCurrency, exchangeRates, loading };
 };
 
 export default useCurrencyConverter;

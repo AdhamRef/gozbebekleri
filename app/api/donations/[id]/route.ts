@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/options';
-import { DonationType, SubscriptionStatus } from '@prisma/client';
-// GET /api/donations/[id] - Get donation by ID
+import { SubscriptionStatus } from '@prisma/client';
+
+// GET /api/donations/[id] - Get donation (transaction) by ID; include type/status from subscription when applicable
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -32,6 +33,14 @@ export async function GET(
             name: true,
             email: true,
             image: true,
+          },
+        },
+        subscription: {
+          select: {
+            status: true,
+            billingDay: true,
+            nextBillingDate: true,
+            lastBillingDate: true,
           },
         },
         items: {
@@ -70,7 +79,6 @@ export async function GET(
       );
     }
 
-    // Check if user has permission to view this donation
     if (
       session.user.role !== 'ADMIN' &&
       session.user.id !== donation.donorId
@@ -81,7 +89,16 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(donation);
+    const sub = donation.subscription;
+    const response = {
+      ...donation,
+      type: donation.subscriptionId ? ('MONTHLY' as const) : ('ONE_TIME' as const),
+      status: sub?.status ?? null,
+      billingDay: sub?.billingDay ?? null,
+      nextBillingDate: sub?.nextBillingDate ?? null,
+      lastBillingDate: sub?.lastBillingDate ?? null,
+    };
+    return NextResponse.json(response);
   } catch (error) {
     console.error('Error fetching donation:', error);
     return NextResponse.json(
@@ -107,7 +124,7 @@ function nextBillingFromDay(billingDay: number): Date {
   return new Date(year, month, day);
 }
 
-// PUT /api/donations/[id] - Update donation (admin full update; donor can update status + billingDay for own MONTHLY)
+// PUT /api/donations/[id] - Update subscription (when this donation is from a subscription); donor or admin can update status/billingDay
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -127,7 +144,12 @@ export async function PUT(
 
     const currentDonation = await prisma.donation.findUnique({
       where: { id },
-      include: { items: true },
+      include: {
+        items: true,
+        subscription: {
+          select: { id: true, status: true, billingDay: true, nextBillingDate: true, lastBillingDate: true },
+        },
+      },
     });
 
     if (!currentDonation) {
@@ -140,135 +162,110 @@ export async function PUT(
     const isAdmin = session.user.role === 'ADMIN';
     const isOwner = session.user.id === currentDonation.donorId;
 
-    // Donor: may only update status (ACTIVE/PAUSED) and/or billingDay for their own MONTHLY donation
-    if (!isAdmin && isOwner) {
-      if (currentDonation.type !== 'MONTHLY') {
+    if (!currentDonation.subscriptionId) {
+      return NextResponse.json(
+        { error: 'Only subscriptions can be updated; this donation is one-time' },
+        { status: 400 }
+      );
+    }
+
+    const sub = currentDonation.subscription;
+    if (!sub) {
+      return NextResponse.json(
+        { error: 'Subscription not found' },
+        { status: 404 }
+      );
+    }
+
+    const updates: { status?: SubscriptionStatus; billingDay?: number; nextBillingDate?: Date } = {};
+    if (status !== undefined) {
+      if (!['ACTIVE', 'PAUSED', 'CANCELLED'].includes(String(status))) {
         return NextResponse.json(
-          { error: 'Only monthly donations can be updated' },
+          { error: 'Invalid status; use ACTIVE, PAUSED or CANCELLED' },
           { status: 400 }
         );
       }
-      const updates: { status?: SubscriptionStatus; billingDay?: number; nextBillingDate?: Date } = {};
-      if (status !== undefined) {
-        if (![SubscriptionStatus.ACTIVE, SubscriptionStatus.PAUSED, SubscriptionStatus.CANCELLED].includes(status as SubscriptionStatus)) {
-          return NextResponse.json(
-            { error: 'Invalid status; use ACTIVE, PAUSED or CANCELLED' },
-            { status: 400 }
-          );
-        }
-        updates.status = status as SubscriptionStatus;
-        if (status === SubscriptionStatus.ACTIVE && currentDonation.status !== SubscriptionStatus.ACTIVE) {
-          const day = billingDay != null ? Math.min(28, Math.max(1, Number(billingDay))) : (currentDonation.billingDay ?? 1);
-          updates.nextBillingDate = nextBillingFromDay(day);
-          updates.billingDay = day;
-        }
-      }
-      if (billingDay !== undefined) {
-        const day = Math.min(28, Math.max(1, Number(billingDay)));
+      updates.status = status as SubscriptionStatus;
+      if (status === 'ACTIVE' && sub.status !== 'ACTIVE') {
+        const day = billingDay != null ? Math.min(28, Math.max(1, Number(billingDay))) : (sub.billingDay ?? 1);
+        updates.nextBillingDate = nextBillingFromDay(day);
         updates.billingDay = day;
-        if (currentDonation.status === SubscriptionStatus.ACTIVE) {
-          updates.nextBillingDate = nextBillingFromDay(day);
-        }
       }
-      if (Object.keys(updates).length === 0) {
-        return NextResponse.json(currentDonation);
+    }
+    if (billingDay !== undefined) {
+      const day = Math.min(28, Math.max(1, Number(billingDay)));
+      updates.billingDay = day;
+      if ((updates.status ?? sub.status) === 'ACTIVE') {
+        updates.nextBillingDate = nextBillingFromDay(day);
       }
-      const updatedDonation = await prisma.donation.update({
-        where: { id },
-        data: updates,
-        include: {
-          donor: { select: { name: true, email: true } },
-          items: {
-            include: {
-              campaign: {
-                select: {
-                  title: true,
-                  images: true,
-                  translations: { select: { locale: true, title: true } },
-                },
-              },
-            },
-          },
-          categoryItems: {
-            include: {
-              category: {
-                select: {
-                  name: true,
-                  image: true,
-                  translations: { select: { locale: true, name: true } },
-                },
-              },
-            },
-          },
-        },
-      });
-      return NextResponse.json(updatedDonation);
     }
 
-    // Admin: full status update (including CANCELLED)
-    if (!isAdmin) {
+    if (Object.keys(updates).length === 0) {
+      const out = await prisma.donation.findUnique({
+        where: { id },
+        omit: { cardDetails: true },
+        include: {
+          donor: { select: { name: true, email: true, image: true } },
+          subscription: { select: { status: true, billingDay: true, nextBillingDate: true, lastBillingDate: true } },
+          items: { include: { campaign: { select: { title: true, images: true, translations: { select: { locale: true, title: true } } } } } },
+          categoryItems: { include: { category: { select: { name: true, image: true, translations: { select: { locale: true, name: true } } } } } },
+        },
+      });
+      if (!out) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      const s = out.subscription;
+      return NextResponse.json({
+        ...out,
+        type: 'MONTHLY' as const,
+        status: s?.status ?? null,
+        billingDay: s?.billingDay ?? null,
+        nextBillingDate: s?.nextBillingDate ?? null,
+        lastBillingDate: s?.lastBillingDate ?? null,
+      });
+    }
+
+    if (!isAdmin && !isOwner) {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403 }
       );
     }
 
-    if (currentDonation.type !== 'MONTHLY') {
+    if (!isAdmin && isOwner && status === 'CANCELLED') {
       return NextResponse.json(
-        { error: 'Status can only be changed for monthly donations' },
-        { status: 400 }
+        { error: 'Only admin can cancel a subscription' },
+        { status: 403 }
       );
     }
 
-    // if (![SubscriptionStatus.ACTIVE, SubscriptionStatus.PAUSED, SubscriptionStatus.CANCELLED].includes(status as SubscriptionStatus)) {
-    //   return NextResponse.json(
-    //     { error: 'Invalid subscription status' },
-    //     { status: 400 }
-    //   );
-    // }
+    await prisma.subscription.update({
+      where: { id: currentDonation.subscriptionId },
+      data: updates,
+    });
 
-    let nextBillingDate: Date | null = null;
-    if (status === SubscriptionStatus.ACTIVE && currentDonation.status !== SubscriptionStatus.ACTIVE) {
-      const day = billingDay != null ? Math.min(28, Math.max(1, Number(billingDay))) : (currentDonation.billingDay ?? 1);
-      nextBillingDate = nextBillingFromDay(day);
-    }
-
-    const updatedDonation = await prisma.donation.update({
+    const updatedDonation = await prisma.donation.findUnique({
       where: { id },
-      data: {
-        status: status as SubscriptionStatus,
-        ...(billingDay != null && { billingDay: Math.min(28, Math.max(1, Number(billingDay))) }),
-        ...(nextBillingDate && { nextBillingDate }),
-        ...(status === SubscriptionStatus.ACTIVE && { lastBillingDate: new Date() }),
-      },
+      omit: { cardDetails: true },
       include: {
-        donor: { select: { name: true, email: true } },
-        items: {
-          include: {
-            campaign: {
-              select: {
-                title: true,
-                images: true,
-                translations: { select: { locale: true, title: true } },
-              },
-            },
-          },
-        },
-        categoryItems: {
-          include: {
-            category: {
-              select: {
-                name: true,
-                image: true,
-                translations: { select: { locale: true, name: true } },
-              },
-            },
-          },
-        },
+        donor: { select: { name: true, email: true, image: true } },
+        subscription: { select: { status: true, billingDay: true, nextBillingDate: true, lastBillingDate: true } },
+        items: { include: { campaign: { select: { title: true, images: true, translations: { select: { locale: true, title: true } } } } } },
+        categoryItems: { include: { category: { select: { name: true, image: true, translations: { select: { locale: true, name: true } } } } } },
       },
     });
 
-    return NextResponse.json(updatedDonation);
+    if (!updatedDonation) {
+      return NextResponse.json({ error: 'Donation not found' }, { status: 404 });
+    }
+
+    const s = updatedDonation.subscription;
+    return NextResponse.json({
+      ...updatedDonation,
+      type: 'MONTHLY' as const,
+      status: s?.status ?? null,
+      billingDay: s?.billingDay ?? null,
+      nextBillingDate: s?.nextBillingDate ?? null,
+      lastBillingDate: s?.lastBillingDate ?? null,
+    });
   } catch (error) {
     console.error('Error updating donation:', error);
     return NextResponse.json(

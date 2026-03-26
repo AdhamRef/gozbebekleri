@@ -67,13 +67,19 @@ const formSchema = z.object({
     .max(5, 'الحد الأقصى 5 صور'),
   videoUrl: z.string().optional(),
   
-  // English translations (optional)
+  // Optional translations
   title_en: z.string().optional(),
   description_en: z.string().optional(),
-  
-  // French translations (optional)
   title_fr: z.string().optional(),
   description_fr: z.string().optional(),
+  title_tr: z.string().optional(),
+  description_tr: z.string().optional(),
+  title_id: z.string().optional(),
+  description_id: z.string().optional(),
+  title_pt: z.string().optional(),
+  description_pt: z.string().optional(),
+  title_es: z.string().optional(),
+  description_es: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -90,7 +96,7 @@ export default function NewCampaignPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [activeTab, setActiveTab] = useState<'ar' | 'en' | 'fr'>('ar');
+  const [activeTab, setActiveTab] = useState<'ar' | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es'>('ar');
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -106,6 +112,14 @@ export default function NewCampaignPage() {
       description_en: '',
       title_fr: '',
       description_fr: '',
+      title_tr: '',
+      description_tr: '',
+      title_id: '',
+      description_id: '',
+      title_pt: '',
+      description_pt: '',
+      title_es: '',
+      description_es: '',
     },
   });
 
@@ -149,18 +163,12 @@ export default function NewCampaignPage() {
         
         // Only include translations if they have content
         translations: {
-          ...(values.title_en && values.description_en ? {
-            en: {
-              title: values.title_en,
-              description: values.description_en,
-            }
-          } : {}),
-          ...(values.title_fr && values.description_fr ? {
-            fr: {
-              title: values.title_fr,
-              description: values.description_fr,
-            }
-          } : {}),
+          ...(values.title_en && values.description_en ? { en: { title: values.title_en, description: values.description_en } } : {}),
+          ...(values.title_fr && values.description_fr ? { fr: { title: values.title_fr, description: values.description_fr } } : {}),
+          ...(values.title_tr && values.description_tr ? { tr: { title: values.title_tr, description: values.description_tr } } : {}),
+          ...(values.title_id && values.description_id ? { id: { title: values.title_id, description: values.description_id } } : {}),
+          ...(values.title_pt && values.description_pt ? { pt: { title: values.title_pt, description: values.description_pt } } : {}),
+          ...(values.title_es && values.description_es ? { es: { title: values.title_es, description: values.description_es } } : {}),
         },
       };
 
@@ -230,12 +238,15 @@ export default function NewCampaignPage() {
   };
 
   // ✅ Check translation completeness
-  const getTranslationStatus = () => {
+const getTranslationStatus = () => {
     const hasEn = !!form.watch('title_en') && !!form.watch('description_en');
     const hasFr = !!form.watch('title_fr') && !!form.watch('description_fr');
-    const completed = [hasEn, hasFr].filter(Boolean).length;
-    
-    return { completed, total: 2, hasEn, hasFr };
+    const hasTr = !!form.watch('title_tr') && !!form.watch('description_tr');
+    const hasId = !!form.watch('title_id') && !!form.watch('description_id');
+    const hasPt = !!form.watch('title_pt') && !!form.watch('description_pt');
+    const hasEs = !!form.watch('title_es') && !!form.watch('description_es');
+    const completed = [hasEn, hasFr, hasTr, hasId, hasPt, hasEs].filter(Boolean).length;
+    return { completed, total: 6, hasEn, hasFr, hasTr, hasId, hasPt, hasEs };
   };
 
   if (loading) {
@@ -264,9 +275,11 @@ export default function NewCampaignPage() {
             {translationStatus.hasEn && (
               <CheckCircle2 className="w-4 h-4 text-green-600" title="English ready" />
             )}
-            {translationStatus.hasFr && (
-              <CheckCircle2 className="w-4 h-4 text-blue-600" title="French ready" />
-            )}
+            {translationStatus.hasFr && <CheckCircle2 className="w-4 h-4 text-blue-600" title="French ready" />}
+            {translationStatus.hasTr && <CheckCircle2 className="w-4 h-4 text-green-600" title="Turkish ready" />}
+            {translationStatus.hasId && <CheckCircle2 className="w-4 h-4 text-green-600" title="Indonesian ready" />}
+            {translationStatus.hasPt && <CheckCircle2 className="w-4 h-4 text-green-600" title="Portuguese ready" />}
+            {translationStatus.hasEs && <CheckCircle2 className="w-4 h-4 text-green-600" title="Spanish ready" />}
           </div>
         </div>
         <Button
@@ -289,22 +302,34 @@ export default function NewCampaignPage() {
             </div>
             
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-              <TabsList className="grid w-full grid-cols-3 mb-6">
+              <TabsList className="flex flex-wrap gap-1 mb-6">
                 <TabsTrigger value="ar" className="gap-2">
                   🇸🇦 العربية
                   <span className="text-xs text-red-600">*</span>
                 </TabsTrigger>
                 <TabsTrigger value="en" className="gap-2">
                   🇬🇧 English
-                  {translationStatus.hasEn && (
-                    <CheckCircle2 className="w-3 h-3 text-green-600" />
-                  )}
+                  {translationStatus.hasEn && <CheckCircle2 className="w-3 h-3 text-green-600" />}
                 </TabsTrigger>
                 <TabsTrigger value="fr" className="gap-2">
                   🇫🇷 Français
-                  {translationStatus.hasFr && (
-                    <CheckCircle2 className="w-3 h-3 text-blue-600" />
-                  )}
+                  {translationStatus.hasFr && <CheckCircle2 className="w-3 h-3 text-blue-600" />}
+                </TabsTrigger>
+                <TabsTrigger value="tr" className="gap-2">
+                  🇹🇷 Türkçe
+                  {translationStatus.hasTr && <CheckCircle2 className="w-3 h-3 text-green-600" />}
+                </TabsTrigger>
+                <TabsTrigger value="id" className="gap-2">
+                  🇮🇩 Bahasa
+                  {translationStatus.hasId && <CheckCircle2 className="w-3 h-3 text-green-600" />}
+                </TabsTrigger>
+                <TabsTrigger value="pt" className="gap-2">
+                  🇵🇹 Português
+                  {translationStatus.hasPt && <CheckCircle2 className="w-3 h-3 text-green-600" />}
+                </TabsTrigger>
+                <TabsTrigger value="es" className="gap-2">
+                  🇪🇸 Español
+                  {translationStatus.hasEs && <CheckCircle2 className="w-3 h-3 text-green-600" />}
                 </TabsTrigger>
               </TabsList>
 
@@ -490,6 +515,39 @@ export default function NewCampaignPage() {
                   </Alert>
                 )}
               </TabsContent>
+
+              <TabsContent value="tr" className="space-y-6">
+                <FormField control={form.control} name="title_tr" render={({ field }) => (
+                  <FormItem dir="rtl"><FormLabel>Kampanya Başlığı (Türkçe)</FormLabel><FormControl><Input {...field} placeholder="Türkçe kampanya başlığı" /></FormControl></FormItem>
+                )} />
+                <FormField control={form.control} name="description_tr" render={({ field }) => (
+                  <FormItem dir="rtl"><FormLabel>Kampanya Açıklaması</FormLabel><FormControl><Textarea className="min-h-[200px] resize-y" {...field} placeholder="Türkçe açıklama..." /></FormControl></FormItem>
+                )} />
+              </TabsContent>
+              <TabsContent value="id" className="space-y-6">
+                <FormField control={form.control} name="title_id" render={({ field }) => (
+                  <FormItem dir="rtl"><FormLabel>Judul Kampanye (Indonesia)</FormLabel><FormControl><Input {...field} placeholder="Judul kampanye dalam Bahasa Indonesia" /></FormControl></FormItem>
+                )} />
+                <FormField control={form.control} name="description_id" render={({ field }) => (
+                  <FormItem dir="rtl"><FormLabel>Deskripsi Kampanye</FormLabel><FormControl><Textarea className="min-h-[200px] resize-y" {...field} placeholder="Deskripsi dalam Bahasa Indonesia..." /></FormControl></FormItem>
+                )} />
+              </TabsContent>
+              <TabsContent value="pt" className="space-y-6">
+                <FormField control={form.control} name="title_pt" render={({ field }) => (
+                  <FormItem dir="rtl"><FormLabel>Título da Campanha (Português)</FormLabel><FormControl><Input {...field} placeholder="Título da campanha em português" /></FormControl></FormItem>
+                )} />
+                <FormField control={form.control} name="description_pt" render={({ field }) => (
+                  <FormItem dir="rtl"><FormLabel>Descrição da Campanha</FormLabel><FormControl><Textarea className="min-h-[200px] resize-y" {...field} placeholder="Descrição em português..." /></FormControl></FormItem>
+                )} />
+              </TabsContent>
+              <TabsContent value="es" className="space-y-6">
+                <FormField control={form.control} name="title_es" render={({ field }) => (
+                  <FormItem dir="rtl"><FormLabel>Título de la Campaña (Español)</FormLabel><FormControl><Input {...field} placeholder="Título de la campaña en español" /></FormControl></FormItem>
+                )} />
+                <FormField control={form.control} name="description_es" render={({ field }) => (
+                  <FormItem dir="rtl"><FormLabel>Descripción de la Campaña</FormLabel><FormControl><Textarea className="min-h-[200px] resize-y" {...field} placeholder="Descripción en español..." /></FormControl></FormItem>
+                )} />
+              </TabsContent>
             </Tabs>
           </Card>
 
@@ -638,7 +696,7 @@ export default function NewCampaignPage() {
           </Card>
 
           {/* ✅ Translation Summary */}
-          {(translationStatus.hasEn || translationStatus.hasFr) && (
+          {(translationStatus.hasEn || translationStatus.hasFr || translationStatus.hasTr || translationStatus.hasId || translationStatus.hasPt || translationStatus.hasEs) && (
             <Card className="p-6 bg-blue-50 border-blue-200">
               <div className="flex items-start gap-3">
                 <Globe className="w-5 h-5 text-blue-600 mt-0.5" />
@@ -649,15 +707,17 @@ export default function NewCampaignPage() {
                     {translationStatus.hasEn && (
                       <p>✓ الترجمة الإنجليزية: مكتملة</p>
                     )}
-                    {translationStatus.hasFr && (
-                      <p>✓ الترجمة الفرنسية: مكتملة</p>
-                    )}
-                    {!translationStatus.hasEn && (
-                      <p className="text-blue-600">○ الترجمة الإنجليزية: غير مكتملة (اختياري)</p>
-                    )}
-                    {!translationStatus.hasFr && (
-                      <p className="text-blue-600">○ الترجمة الفرنسية: غير مكتملة (اختياري)</p>
-                    )}
+                    {translationStatus.hasFr && <p>✓ الترجمة الفرنسية: مكتملة</p>}
+                    {translationStatus.hasTr && <p>✓ الترجمة التركية: مكتملة</p>}
+                    {translationStatus.hasId && <p>✓ الترجمة الإندونيسية: مكتملة</p>}
+                    {translationStatus.hasPt && <p>✓ الترجمة البرتغالية: مكتملة</p>}
+                    {translationStatus.hasEs && <p>✓ الترجمة الإسبانية: مكتملة</p>}
+                    {!translationStatus.hasEn && <p className="text-blue-600">○ الترجمة الإنجليزية: غير مكتملة (اختياري)</p>}
+                    {!translationStatus.hasFr && <p className="text-blue-600">○ الترجمة الفرنسية: غير مكتملة (اختياري)</p>}
+                    {!translationStatus.hasTr && <p className="text-blue-600">○ الترجمة التركية: غير مكتملة (اختياري)</p>}
+                    {!translationStatus.hasId && <p className="text-blue-600">○ الترجمة الإندونيسية: غير مكتملة (اختياري)</p>}
+                    {!translationStatus.hasPt && <p className="text-blue-600">○ الترجمة البرتغالية: غير مكتملة (اختياري)</p>}
+                    {!translationStatus.hasEs && <p className="text-blue-600">○ الترجمة الإسبانية: غير مكتملة (اختياري)</p>}
                   </div>
                 </div>
               </div>

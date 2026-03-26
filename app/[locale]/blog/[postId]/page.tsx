@@ -20,49 +20,53 @@ interface BlogPostProps {
   params: Promise<{ locale: string; postId: string }>;
 }
 
-// Generate metadata for the blog post page
+// Generate metadata for the blog post page (SEO with translated title)
 export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
   try {
-    const { params } = await args;
+    const params = await args.params;
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.vercel.app";
-    const locale = params?.locale || "ar";
+    const locale = (params?.locale as string) || "ar";
     const postId = params?.postId;
 
     const response = await axios.get(`${baseUrl}/api/posts/${postId}`, { params: { locale } });
     const post = response.data.post;
 
     // Prefer localized top-level fields, then translations array, then language-suffixed fallbacks
-    const tr = Array.isArray(post?.translations) ? post.translations.find((t) => t.locale === locale) : null;
+    const tr = Array.isArray(post?.translations) ? post.translations.find((t: { locale: string }) => t.locale === locale) : null;
     const titleText = post?.title || tr?.title || post?.titleAR || post?.titleEN || post?.titleFR || "Blog";
     const descriptionText = post?.description || tr?.description || post?.descriptionAR || post?.descriptionEN || post?.descriptionFR || "";
-    // Use only top-level `post.image` for metadata images (do not prefer translation images)
     const imageUrl = post?.image || "/default-post-image.jpg";
 
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://gozbebekleri.vercel.app";
+    const canonicalUrl = `${siteUrl}/${locale}/blog/${postId}`;
+
+    const msgs = await import(`../../../../i18n/messages/${locale}.json`).catch(() => null);
+    const metaSuffix = msgs?.default?.Blog?.metaTitleSuffix ?? " - قرة العيون";
+    const fullTitle = `${titleText}${metaSuffix}`;
+
     return {
-      title: `${titleText} - قرة العيون`,
-      description: descriptionText,
+      title: fullTitle,
+      description: descriptionText || undefined,
       openGraph: {
-        title: `${titleText} - قرة العيون`,
-        description: descriptionText,
-        images: [
-          {
-            url: imageUrl,
-            width: 1200,
-            height: 630,
-            alt: titleText,
-          },
-        ],
-        url: `https://gozbebekleri.vercel.app/${locale}/blog/${postId}`,
+        title: fullTitle,
+        description: descriptionText || undefined,
+        images: imageUrl ? [{ url: imageUrl, width: 1200, height: 630, alt: titleText }] : undefined,
+        url: canonicalUrl,
         type: "article",
+        locale: locale === "ar" ? "ar_SA" : locale === "fr" ? "fr_FR" : "en_US",
       },
       twitter: {
         card: "summary_large_image",
-        title: `${titleText} - قرة العيون`,
-        description: descriptionText,
-        images: [imageUrl],
+        title: fullTitle,
+        description: descriptionText || undefined,
+        images: imageUrl ? [imageUrl] : undefined,
       },
       alternates: {
-        canonical: `https://gozbebekleri.vercel.app/${locale}/blog/${postId}`,
+        canonical: canonicalUrl,
+      },
+      robots: {
+        index: true,
+        follow: true,
       },
     };
   } catch (err) {
@@ -144,8 +148,61 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
               </Card>
             </div>
 
-            <aside>
-              <Card className="sticky top-[5.5rem] overflow-hidden">
+            <aside className="flex flex-col gap-4 sticky top-[6.5rem] self-start">
+              {post.campaign && (() => {
+                const camp = post.campaign as { id: string; title: string; currentAmount: number; targetAmount: number; images?: string[] };
+                const progress = camp.targetAmount > 0 ? Math.min(100, (camp.currentAmount / camp.targetAmount) * 100) : 0;
+                const remaining = Math.max(0, camp.targetAmount - camp.currentAmount);
+                return (
+                  <Card className="overflow-hidden">
+                    <CardHeader>
+                      <CardTitle className="text-lg font-bold">{t("relatedCampaign")}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0 flex flex-col gap-4">
+                      <Link
+                        href={`/${locale}/campaign/${camp.id}`}
+                        className="group block rounded-xl overflow-hidden border border-gray-200/80 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-sky-200/80"
+                      >
+                        <div className="relative aspect-[4/2.5] overflow-hidden bg-gray-100">
+                          <Image
+                            src={camp.images?.[0] || "/placeholder.jpg"}
+                            alt={camp.title}
+                            fill
+                            sizes="(max-width: 768px) 100vw, 400px"
+                            className="object-cover transition-transform duration-500 group-hover:scale-110"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+                          <div className="absolute top-2 right-2 rounded-lg bg-white/95 px-2 py-0.5 text-xs font-bold text-sky-600 shadow-sm">
+                            {progress.toFixed(0)}%
+                          </div>
+                        </div>
+                        <div className="p-3">
+                          <h3 className="text-sm font-bold text-gray-900 mb-2 line-clamp-1">
+                            {camp.title}
+                          </h3>
+                          <div className="flex justify-between text-xs mb-1.5 gap-1">
+                            <span className="text-gray-700 whitespace-nowrap">
+                              <span className="font-bold text-sky-600">{Number(camp.currentAmount).toLocaleString()}</span> {t("campaignDonations")}
+                            </span>
+                            <span className="text-gray-600 text-right whitespace-nowrap">
+                              {t("campaignRemaining")} <span className="font-semibold">{Number(remaining).toLocaleString()}</span>
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-100 rounded-full h-1.5">
+                            <div
+                              className="bg-gradient-to-r from-sky-500 to-sky-600 h-1.5 rounded-full transition-all duration-500"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <p className="text-center text-xs font-semibold text-sky-600 mt-2">{t("donateNow")}</p>
+                        </div>
+                      </Link>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+
+              <Card className="overflow-hidden">
                 <CardHeader>
                   <CardTitle className="text-lg font-bold">{t('similarPosts')}</CardTitle>
                 </CardHeader>

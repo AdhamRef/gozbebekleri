@@ -8,6 +8,7 @@ export default async function getPost(postId: string) {
         },
         include: {
           category: true,
+          campaign: { select: { id: true, title: true } },
           translations: true,
         },
       });

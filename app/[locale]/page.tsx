@@ -102,9 +102,17 @@ function HomeLoadingScreen() {
   );
 }
 
+const FAQ_ICONS = [
+  <UserPlus key="1" className="w-6 h-6 mx-3 text-blue-500" />,
+  <Wallet key="2" className="w-6 h-6 mx-3 text-green-500" />,
+  <CheckCircle key="3" className="w-6 h-6 mx-3 text-purple-500" />,
+  <Globe key="4" className="w-6 h-6 mx-3 text-sky-500" />,
+  <Lightbulb key="5" className="w-6 h-6 mx-3 text-yellow-500" />,
+];
+
 const HomePage: React.FC = () => {
   const t = useTranslations("HomePage");
-  const locale = useLocale() as "ar" | "en" | "fr";
+  const locale = useLocale();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [posts, setPosts] = useState<PostItem[]>([]);
@@ -169,12 +177,6 @@ const HomePage: React.FC = () => {
       cancelled = true;
     };
   }, [locale]);
-
-  // Helper function to get locale-specific property
-  const getLocalizedProperty = (obj: any, key: string) => {
-    const localeKey = `${key}${locale.charAt(0).toUpperCase() + locale.slice(1)}`;
-    return obj[localeKey] || obj[key] || "";
-  };
 
   return (
     <div className="bg-white mx-auto">
@@ -266,72 +268,7 @@ const HomePage: React.FC = () => {
                 {t("faq")}
               </h2>
               <Accordion type="single" collapsible>
-                {[
-                  {
-                    questionAr: "كيف يمكنني الانضمام كمتطوع؟",
-                    questionEn: "How can I join as a volunteer?",
-                    questionFr: "Comment puis-je devenir bénévole ?",
-                    answerAr:
-                      "يمكنك التسجيل من خلال موقعنا عبر ملء نموذج الانضمام، وستتلقى رسالة تحتوي على الخطوات التالية مثل الاختبارات والتوجيه الأولي.",
-                    answerEn:
-                      "You can register through our website by filling out the membership form, and you will receive a message containing the following steps such as tests and initial orientation.",
-                    answerFr:
-                      "Vous pouvez vous inscrire via notre site Web en remplissant le formulaire d'adhésion, et vous recevrez un message contenant les étapes suivantes telles que les tests et l'orientation initiale.",
-                    icon: <UserPlus className="w-6 h-6 mx-3 text-blue-500" />,
-                  },
-                  {
-                    questionAr: "هل التطوع في فريق قرة العيون مدفوع؟",
-                    questionEn: "Is volunteering in the gozbebekleri team paid?",
-                    questionFr: "Le bénévolat dans l'équipe gozbebekleri est-il rémunéré ?",
-                    answerAr:
-                      "لا، التطوع مجاني بالكامل، ولكن في بعض البرامج يتم توفير بدل انتقالات أو مكافآت تقديرية للمتطوعين النشطين.",
-                    answerEn:
-                      "No, volunteering is completely free, but in some programs, transportation allowances or appreciation rewards are provided for active volunteers.",
-                    answerFr:
-                      "Non, le bénévolat est entièrement gratuit, mais dans certains programmes, des indemnités de transport ou des récompenses d'appréciation sont fournies aux bénévoles actifs.",
-                    icon: <Wallet className="w-6 h-6 mx-3 text-green-500" />,
-                  },
-                  {
-                    questionAr: "كيف يتم اختيار المتطوعين للمشاريع؟",
-                    questionEn: "How are volunteers selected for projects?",
-                    questionFr: "Comment les bénévoles sont-ils sélectionnés pour les projets ?",
-                    answerAr:
-                      "يعتمد الاختيار على عدة عوامل مثل التخصص، الموقع الجغرافي، والتوافر، حيث نحاول توجيه كل متطوع إلى الفرصة الأنسب له.",
-                    answerEn:
-                      "Selection depends on several factors such as specialization, geographic location, and availability, where we try to direct each volunteer to the most suitable opportunity for them.",
-                    answerFr:
-                      "La sélection dépend de plusieurs facteurs tels que la spécialisation, l'emplacement géographique et la disponibilité, où nous essayons d'orienter chaque bénévole vers l'opportunité la plus adaptée.",
-                    icon: (
-                      <CheckCircle className="w-6 h-6 mx-3 text-purple-500" />
-                    ),
-                  },
-                  {
-                    questionAr: "هل أستطيع التطوع عن بعد؟",
-                    questionEn: "Can I volunteer remotely?",
-                    questionFr: "Puis-je faire du bénévolat à distance ?",
-                    answerAr:
-                      "نعم! لدينا فرص تطوع رقمية تشمل إدارة المحتوى، تصميم الجرافيك، التسويق الإلكتروني، والتواصل مع الجهات الداعمة.",
-                    answerEn:
-                      "Yes! We have digital volunteering opportunities including content management, graphic design, digital marketing, and communication with supporting parties.",
-                    answerFr:
-                      "Oui ! Nous avons des opportunités de bénévolat numérique comprenant la gestion de contenu, la conception graphique, le marketing numérique et la communication avec les parties de soutien.",
-                    icon: <Globe className="w-6 h-6 mx-3 text-sky-500" />,
-                  },
-                  {
-                    questionAr: "كيف يمكنني اقتراح مبادرة خاصة بي؟",
-                    questionEn: "How can I suggest my own initiative?",
-                    questionFr: "Comment puis-je proposer ma propre initiative ?",
-                    answerAr:
-                      "إذا كانت لديك فكرة مشروع إنساني، يمكن لفريق قرة العيون مساعدتك في تنفيذها عبر توفير الموارد والدعم اللوجستي.",
-                    answerEn:
-                      "If you have a humanitarian project idea, the gozbebekleri team can help you implement it by providing resources and logistical support.",
-                    answerFr:
-                      "Si vous avez une idée de projet humanitaire, l'équipe gozbebekleri peut vous aider à la mettre en œuvre en fournissant des ressources et un soutien logistique.",
-                    icon: (
-                      <Lightbulb className="w-6 h-6 mx-3 text-yellow-500" />
-                    ),
-                  },
-                ].map((faq, index) => (
+                {[1, 2, 3, 4, 5].map((i, index) => (
                   <AccordionItem
                     key={index}
                     value={`item-${index}`}
@@ -339,12 +276,12 @@ const HomePage: React.FC = () => {
                   >
                     <AccordionTrigger className="text-sm text-right hover:text-blue-600 transition">
                       <div className="flex items-center">
-                        {faq.icon}
-                        {getLocalizedProperty(faq, "question")}
+                        {FAQ_ICONS[index]}
+                        {t(`faq${i}Question`)}
                       </div>
                     </AccordionTrigger>
                     <AccordionContent className="text-gray-600 pb-4">
-                      {getLocalizedProperty(faq, "answer")}
+                      {t(`faq${i}Answer`)}
                     </AccordionContent>
                   </AccordionItem>
                 ))}

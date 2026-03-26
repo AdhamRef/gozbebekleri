@@ -57,7 +57,7 @@ const config = {
   imageLabel: "رابط الصورة",
 };
 
-type Locale = "en" | "fr";
+type Locale = "en" | "fr" | "tr" | "id" | "pt" | "es";
 
 interface BlogLocaleEditorProps {
   post: {

@@ -3,22 +3,23 @@
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { signIn } from 'next-auth/react';
 import { motion } from 'framer-motion';
-import { Heart } from 'lucide-react';
 import { Link, usePathname } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
 
 interface SignInDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  /** When provided, user is redirected here after sign-in (e.g. same page with ?openDonation=1 to resume flow) */
+  callbackUrl?: string;
 }
 
-export default function SignInDialog({ isOpen, onClose }: SignInDialogProps) {
+export default function SignInDialog({ isOpen, onClose, callbackUrl }: SignInDialogProps) {
   const t = useTranslations("SignInDialog");
   const pathname = usePathname();
 
   const handleSignIn = (provider: string) => {
-    const callbackUrl = pathname;
-    signIn(provider, { callbackUrl });
+    const url = callbackUrl ?? pathname;
+    signIn(provider, { callbackUrl: url });
   };
 
   return (

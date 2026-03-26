@@ -66,13 +66,17 @@ export default function BooksManagement() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <CardTitle>ادارة المقالات</CardTitle>
           <Tabs value={activeLocale} onValueChange={setActiveLocale} className="w-auto">
-            <TabsList className="grid w-full grid-cols-3 max-w-[280px]" dir="rtl">
+            <TabsList className="flex flex-wrap gap-1 max-w-full" dir="rtl">
               <TabsTrigger value="ar" className="gap-1.5">
                 <Globe className="w-3.5 h-3.5" />
                 العربية
               </TabsTrigger>
               <TabsTrigger value="en">English</TabsTrigger>
               <TabsTrigger value="fr">Français</TabsTrigger>
+              <TabsTrigger value="tr">Türkçe</TabsTrigger>
+              <TabsTrigger value="id">Bahasa</TabsTrigger>
+              <TabsTrigger value="pt">Português</TabsTrigger>
+              <TabsTrigger value="es">Español</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>

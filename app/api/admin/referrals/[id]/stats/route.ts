@@ -1,0 +1,255 @@
+import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+
+function getDateRange(period: string, startParam?: string | null, endParam?: string | null) {
+  let endDate: Date;
+  let startDate: Date;
+  if (startParam && endParam) {
+    startDate = new Date(startParam + "T00:00:00.000Z");
+    endDate = new Date(endParam + "T23:59:59.999Z");
+  } else if (period === "all") {
+    endDate = new Date();
+    startDate = new Date(endDate);
+    startDate.setFullYear(startDate.getFullYear() - 10);
+    startDate.setUTCHours(0, 0, 0, 0);
+    endDate.setUTCHours(23, 59, 59, 999);
+  } else {
+    endDate = endParam ? new Date(endParam + "T23:59:59.999Z") : new Date();
+    startDate = new Date(endDate);
+    const days = period === "day" ? 1 : period === "week" ? 7 : 30;
+    startDate.setUTCDate(startDate.getUTCDate() - days);
+    startDate.setUTCHours(0, 0, 0, 0);
+    endDate.setUTCHours(23, 59, 59, 999);
+  }
+  return { startDate, endDate };
+}
+
+/** GET /api/admin/referrals/[id]/stats - Stats for donations (transactions) and subscriptions attributed to this referral */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session || session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const { id: referralId } = await params;
+    const referral = await prisma.referral.findUnique({
+      where: { id: referralId },
+      select: { id: true, code: true, name: true },
+    });
+    if (!referral) {
+      return NextResponse.json({ error: "Referral not found" }, { status: 404 });
+    }
+
+    const searchParams = request.nextUrl.searchParams;
+    const period = searchParams.get("period") || "all";
+    const startParam = searchParams.get("start");
+    const endParam = searchParams.get("end");
+    const categoryId = searchParams.get("categoryId");
+    const campaignId = searchParams.get("campaignId");
+
+    const { startDate, endDate } = getDateRange(period, startParam, endParam);
+    const donationWhere: Prisma.DonationWhereInput = {
+      referralId,
+      createdAt: { gte: startDate, lte: endDate },
+    };
+    /** Same category/campaign filters as donationWhere, but no date — for all-time إيرادات card */
+    const allTimeDonationWhere: Prisma.DonationWhereInput = { referralId };
+    if (campaignId && campaignId !== "all") {
+      donationWhere.items = { some: { campaignId } };
+      allTimeDonationWhere.items = { some: { campaignId } };
+    } else if (categoryId && categoryId !== "all") {
+      donationWhere.OR = [
+        { items: { some: { campaign: { categoryId } } } },
+        { categoryItems: { some: { categoryId } } },
+      ];
+      allTimeDonationWhere.OR = [
+        { items: { some: { campaign: { categoryId } } } },
+        { categoryItems: { some: { categoryId } } },
+      ];
+    }
+
+    const oneTimeWhere = { ...donationWhere, subscriptionId: null };
+    const fromSubscriptionWhere = { ...donationWhere, subscriptionId: { not: null } };
+
+    const subscriptionWhere: Prisma.SubscriptionWhereInput = { referralId };
+    if (campaignId && campaignId !== "all") {
+      subscriptionWhere.items = { some: { campaignId } };
+    } else if (categoryId && categoryId !== "all") {
+      subscriptionWhere.OR = [
+        { items: { some: { campaign: { categoryId } } } },
+        { categoryItems: { some: { categoryId } } },
+      ];
+    }
+
+    const last30End = new Date();
+    last30End.setUTCHours(23, 59, 59, 999);
+    const last30Start = new Date(last30End);
+    last30Start.setUTCDate(last30Start.getUTCDate() - 30);
+    last30Start.setUTCHours(0, 0, 0, 0);
+    const last30DonationWhere = { ...donationWhere, createdAt: { gte: last30Start, lte: last30End } };
+
+    const [
+      totalDonations,
+      oneTimeCount,
+      fromSubscriptionCount,
+      activeSubscriptionCount,
+      stoppedSubscriptionCount,
+      monthlyRecurringRevenueResult,
+      monthlyStoppedAmountResult,
+      oneTimeTotalResult,
+      fromSubscriptionTotalResult,
+      last30TotalResult,
+      allTimeRevenueResult,
+      campaignDonationsSum,
+      categoryDonationsSum,
+      recentDonations,
+    ] = await Promise.all([
+      prisma.donation.count({ where: donationWhere }),
+      prisma.donation.count({ where: oneTimeWhere }),
+      prisma.donation.count({ where: fromSubscriptionWhere }),
+      prisma.subscription.count({ where: { ...subscriptionWhere, status: "ACTIVE" } }),
+      prisma.subscription.count({
+        where: { ...subscriptionWhere, status: { in: ["PAUSED", "CANCELLED"] } },
+      }),
+      prisma.subscription.aggregate({
+        _sum: { amountUSD: true },
+        where: { ...subscriptionWhere, status: "ACTIVE" },
+      }),
+      prisma.subscription.aggregate({
+        _sum: { amountUSD: true },
+        where: { ...subscriptionWhere, status: { in: ["PAUSED", "CANCELLED"] } },
+      }),
+      prisma.donation.aggregate({
+        _sum: { amountUSD: true },
+        where: oneTimeWhere,
+      }),
+      prisma.donation.aggregate({
+        _sum: { amountUSD: true },
+        where: fromSubscriptionWhere,
+      }),
+      prisma.donation.aggregate({
+        _sum: { amountUSD: true },
+        where: last30DonationWhere,
+      }),
+      prisma.donation.aggregate({
+        _sum: { amountUSD: true },
+        where: allTimeDonationWhere,
+      }),
+      prisma.donationItem.aggregate({
+        _sum: { amountUSD: true, amount: true },
+        _count: { id: true },
+        where: { donation: donationWhere },
+      }),
+      prisma.donationCategoryItem.aggregate({
+        _sum: { amountUSD: true, amount: true },
+        _count: { id: true },
+        where: { donation: donationWhere },
+      }),
+      prisma.donation.findMany({
+        take: 10,
+        orderBy: { createdAt: "desc" },
+        where: donationWhere,
+        select: {
+          id: true,
+          amount: true,
+          totalAmount: true,
+          amountUSD: true,
+          createdAt: true,
+          currency: true,
+          subscriptionId: true,
+          donor: { select: { name: true } },
+          items: { select: { campaign: { select: { title: true } } } },
+          categoryItems: { select: { category: { select: { name: true } } } },
+        },
+      }),
+    ]);
+
+    const oneTimeTotalAmount = oneTimeTotalResult._sum?.amountUSD ?? 0;
+    const fromSubscriptionTotalAmount = fromSubscriptionTotalResult._sum?.amountUSD ?? 0;
+    const totalAmount = oneTimeTotalAmount + fromSubscriptionTotalAmount;
+
+    const monthlyRecurringRevenue = monthlyRecurringRevenueResult._sum?.amountUSD ?? 0;
+    const activeMonthlyAmountUSD = monthlyRecurringRevenue;
+    const monthlyStoppedAmountUSD = monthlyStoppedAmountResult._sum?.amountUSD ?? 0;
+    const thisMonthRevenue = last30TotalResult._sum?.amountUSD ?? 0;
+    const allTimeRevenue = allTimeRevenueResult._sum?.amountUSD ?? 0;
+    const campaignDonationsTotal = campaignDonationsSum._sum?.amountUSD ?? campaignDonationsSum._sum?.amount ?? 0;
+    const categoryDonationsTotal = categoryDonationsSum._sum?.amountUSD ?? categoryDonationsSum._sum?.amount ?? 0;
+    const campaignDonationsCount = campaignDonationsSum._count?.id ?? 0;
+    const categoryDonationsCount = categoryDonationsSum._count?.id ?? 0;
+
+    const donationsForSupportFees = await prisma.donation.findMany({
+      where: donationWhere,
+      select: { amountUSD: true, totalAmount: true, teamSupport: true, fees: true },
+      take: 100000,
+    });
+    const toUSD = (
+      rows: { amountUSD: number | null; totalAmount: number; teamSupport?: number | null; fees?: number | null }[]
+    ) =>
+      rows.reduce(
+        (acc, r) => {
+          const usd = r.amountUSD ?? 0;
+          const total = r.totalAmount || 1;
+          acc.teamSupport += usd * ((r.teamSupport ?? 0) / total);
+          acc.fees += usd * ((r.fees ?? 0) / total);
+          return acc;
+        },
+        { teamSupport: 0, fees: 0 }
+      );
+    const { teamSupport: teamSupportTotal, fees: feesTotal } = toUSD(donationsForSupportFees);
+
+    const recentDonationsList = Array.isArray(recentDonations) ? recentDonations : [];
+    const recentDonationsFormatted = recentDonationsList.map((d) => ({
+      id: d.id,
+      amount: d.totalAmount ?? d.amount ?? 0,
+      currency: d.currency ?? "USD",
+      donorName: d.donor?.name ?? "—",
+      type: d.subscriptionId ? ("MONTHLY" as const) : ("ONE_TIME" as const),
+      campaignTitle: d.items?.[0]?.campaign?.title ?? null,
+      categoryName: d.categoryItems?.[0]?.category?.name ?? null,
+      createdAt: d.createdAt,
+    }));
+
+    return NextResponse.json({
+      referral: { id: referral.id, code: referral.code, name: referral.name },
+      totalCampaigns: 0,
+      totalCategories: 0,
+      totalDonations,
+      totalUsers: 0,
+      totalAmount,
+      allTimeRevenue,
+      oneTimeCount,
+      monthlyCount: fromSubscriptionCount,
+      activeMonthlyCount: activeSubscriptionCount,
+      monthlyStoppedCount: stoppedSubscriptionCount,
+      monthlyRecurringRevenue,
+      activeMonthlyAmountUSD,
+      monthlyStoppedAmountUSD,
+      thisMonthRevenue,
+      oneTimeTotalAmount,
+      monthlyTotalAmount: fromSubscriptionTotalAmount,
+      campaignDonationsTotal,
+      categoryDonationsTotal,
+      campaignDonationsCount,
+      categoryDonationsCount,
+      teamSupportTotal,
+      feesTotal,
+      recentDonations: recentDonationsFormatted,
+    });
+  } catch (error) {
+    console.error("Error fetching referral stats:", error);
+    return NextResponse.json(
+      {
+        error: "Failed to fetch referral statistics",
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    );
+  }
+}

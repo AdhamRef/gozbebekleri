@@ -2,11 +2,13 @@
 import React, { useState } from 'react';
 import { Heart, Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin, Send } from 'lucide-react';
 import { useTranslations, useLocale } from 'next-intl';
+import { useSession } from 'next-auth/react';
 
 const Footer = () => {
   const t = useTranslations('Footer');
   const locale = useLocale() as 'ar' | 'en' | 'fr';
-  const [email, setEmail] = useState('');
+  const { data: session } = useSession();
+  const [body, setBody] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
 
@@ -39,18 +41,38 @@ const Footer = () => {
     { Icon: Mail, textAr: 'info@al-amal.com', textEn: 'info@al-amal.com', textFr: 'info@al-amal.com' }
   ];
 
-  const handleEmailSubmit = async (e: React.MouseEvent) => {
+  const handleMessageSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmed = body.trim();
+    if (!trimmed || trimmed.length < 3) {
+      setSubmitMessage(t('sendError'));
+      setTimeout(() => setSubmitMessage(''), 3000);
+      return;
+    }
     setIsSubmitting(true);
     setSubmitMessage('');
-
-    // Simulate API call
-    setTimeout(() => {
-      setSubmitMessage(t('subscribeSuccess'));
-      setEmail('');
-      setIsSubmitting(false);
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          body: trimmed,
+          locale,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || 'Failed');
+      }
+      setSubmitMessage(t('sendSuccess'));
+      setBody('');
+      setTimeout(() => setSubmitMessage(''), 4000);
+    } catch {
+      setSubmitMessage(t('sendError'));
       setTimeout(() => setSubmitMessage(''), 3000);
-    }, 1000);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -63,10 +85,10 @@ const Footer = () => {
           {/* Brand Section */}
           <div className="flex-1 max-lg:text-center">
             <a href="/" className="inline-flex items-center gap-2 sm:gap-3 hover:opacity-90 transition-opacity mb-2 sm:mb-3">
-              <img src="https://i.ibb.co/ZwcJcN1/logo.webp" className="h-10 sm:h-12 lg:h-14" alt="Logo" />
+              <img src="https://i.ibb.co/ZwcJcN1/logo.webp" className="h-12 sm:h-16 lg:h-20" alt="Logo" />
             </a>
             <p className="text-xs sm:text-sm text-white/80 leading-relaxed mb-3 sm:mb-4 max-w-2xl mx-auto lg:mx-0">
-              {t('description')}
+              {t('aboutUsDesc1')}
             </p>
             <div className="flex items-center justify-center lg:justify-start gap-2 sm:gap-3">
               {[Facebook, Twitter, Instagram, Linkedin].map((Icon, index) => (
@@ -81,32 +103,32 @@ const Footer = () => {
             </div>
           </div>
 
-          {/* Newsletter Section */}
+          {/* Send us a message */}
           <div className="flex-1 bg-white/5 rounded-lg p-4 sm:p-5 border border-white/10">
-            <h3 className="text-sm sm:text-base font-semibold mb-2">{t('newsletterTitle')}</h3>
+            <h3 className="text-sm sm:text-base font-semibold mb-2">{t('messageTitle')}</h3>
             <p className="text-white/80 text-xs mb-3">
-              {t('newsletterDesc')}
+              {t('messageDesc')}
             </p>
-            <div className="flex gap-2 flex-col sm:flex-row">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={t('emailPlaceholder')}
+            <form onSubmit={handleMessageSubmit} className="space-y-2">
+              <textarea
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                placeholder={t('messagePlaceholder')}
                 disabled={isSubmitting}
-                className="flex-1 px-3 py-2 text-sm rounded-lg bg-white/10 border border-white/20 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all disabled:opacity-50"
+                rows={3}
+                className="w-full px-3 py-2 text-sm rounded-lg bg-white/10 border border-white/20 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all disabled:opacity-50 resize-y h-[60px]"
               />
               <button
-                onClick={handleEmailSubmit}
+                type="submit"
                 disabled={isSubmitting}
-                className="px-4 py-2 text-sm bg-white text-blue-900 rounded-lg font-semibold hover:bg-white/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                className="w-full sm:w-auto px-4 py-2 text-sm bg-white text-blue-900 rounded-lg font-semibold hover:bg-white/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send className="h-3.5 w-3.5" />
-                {isSubmitting ? t('subscribing') : t('subscribe')}
+                {isSubmitting ? t('sending') : t('send')}
               </button>
-            </div>
+            </form>
             {submitMessage && (
-              <p className={`mt-2 text-xs ${submitMessage.includes('نجاح') || submitMessage.includes('Success') || submitMessage.includes('réussi') ? 'text-green-300' : 'text-red-300'}`}>
+              <p className={`mt-2 text-xs ${/نجاح|success|succès|réussi/i.test(submitMessage) ? 'text-green-300' : 'text-red-300'}`}>
                 {submitMessage}
               </p>
             )}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
@@ -10,14 +10,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { HandHeartIcon, Receipt, Calendar, Heart, ArrowLeft, CalendarClock, Repeat, Info, Download, Loader2, FileText } from 'lucide-react';
 import { useConfettiStore } from '@/hooks/use-confetti-store';
+import { useTracking } from '@/components/TrackingPixels';
 import axios from 'axios';
 import { format } from 'date-fns';
 import type { Locale } from 'date-fns';
-import { ar, enUS, fr } from 'date-fns/locale';
+import { ar, enUS, fr, tr, id, pt, es } from 'date-fns/locale';
 import Image from 'next/image';
 import { Skeleton } from '@/components/ui/skeleton';
 
-const dateLocales: Record<string, Locale> = { ar, en: enUS, fr };
+const dateLocales: Record<string, Locale> = { ar, en: enUS, fr, tr, id, pt, es };
 
 const DonationSuccessPage = () => {
   const params = useParams();
@@ -26,6 +27,8 @@ const DonationSuccessPage = () => {
   const t = useTranslations('DonationSuccess');
   const locale = useLocale();
   const confetti = useConfettiStore();
+  const tracking = useTracking();
+  const purchaseTracked = useRef(false);
   const [donation, setDonation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -41,6 +44,18 @@ const DonationSuccessPage = () => {
       setLoading(false);
     }
   }, [id]);
+
+  useEffect(() => {
+    if (!donation || !id || purchaseTracked.current || !tracking) return;
+    purchaseTracked.current = true;
+    const value = Number(donation.amountUSD ?? donation.totalAmount ?? 0);
+    tracking.trackPurchase({
+      value,
+      currency: 'USD',
+      orderId: donation.id,
+      numItems: 1,
+    });
+  }, [donation, id, tracking]);
 
   const fetchDonation = async () => {
     if (!id) return;

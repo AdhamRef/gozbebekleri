@@ -33,6 +33,14 @@ const formSchema = z.object({
   description_en: z.string().max(500).optional(),
   name_fr: z.string().max(50).optional(),
   description_fr: z.string().max(500).optional(),
+  name_tr: z.string().max(50).optional(),
+  description_tr: z.string().max(500).optional(),
+  name_id: z.string().max(50).optional(),
+  description_id: z.string().max(500).optional(),
+  name_pt: z.string().max(50).optional(),
+  description_pt: z.string().max(500).optional(),
+  name_es: z.string().max(50).optional(),
+  description_es: z.string().max(500).optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -68,6 +76,14 @@ export default function EditCategoryPage() {
       description_en: '',
       name_fr: '',
       description_fr: '',
+      name_tr: '',
+      description_tr: '',
+      name_id: '',
+      description_id: '',
+      name_pt: '',
+      description_pt: '',
+      name_es: '',
+      description_es: '',
     },
   });
 
@@ -76,18 +92,20 @@ export default function EditCategoryPage() {
       try {
         const response = await axios.get(`/api/categories/${params.id}?allTranslations=true`);
         const category = response.data;
-        const en = category.translations?.find((t: { locale: string }) => t.locale === 'en');
-        const fr = category.translations?.find((t: { locale: string }) => t.locale === 'fr');
+        const getTr = (locale: string) => category.translations?.find((t: { locale: string }) => t.locale === locale);
+        const en = getTr('en'); const fr = getTr('fr'); const tr = getTr('tr'); const id = getTr('id'); const pt = getTr('pt'); const es = getTr('es');
         form.reset({
           name: category.name || '',
           description: category.description || '',
           image: category.image || '',
           icon: category.icon || '',
           order: category.order ?? 0,
-          name_en: en?.name || '',
-          description_en: en?.description || '',
-          name_fr: fr?.name || '',
-          description_fr: fr?.description || '',
+          name_en: en?.name || '', description_en: en?.description || '',
+          name_fr: fr?.name || '', description_fr: fr?.description || '',
+          name_tr: tr?.name || '', description_tr: tr?.description || '',
+          name_id: id?.name || '', description_id: id?.description || '',
+          name_pt: pt?.name || '', description_pt: pt?.description || '',
+          name_es: es?.name || '', description_es: es?.description || '',
         });
       } catch (error) {
         console.error('Error fetching category:', error);
@@ -113,6 +131,10 @@ export default function EditCategoryPage() {
         translations: {
           en: { name: values.name_en ?? '', description: values.description_en ?? '' },
           fr: { name: values.name_fr ?? '', description: values.description_fr ?? '' },
+          tr: { name: values.name_tr ?? '', description: values.description_tr ?? '' },
+          id: { name: values.name_id ?? '', description: values.description_id ?? '' },
+          pt: { name: values.name_pt ?? '', description: values.description_pt ?? '' },
+          es: { name: values.name_es ?? '', description: values.description_es ?? '' },
         },
       });
       toast.success('تم تحديث القسم بنجاح');
@@ -190,10 +212,14 @@ export default function EditCategoryPage() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <Tabs defaultValue="ar" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-4" dir="rtl">
+            <TabsList className="flex flex-wrap gap-1 mb-4" dir="rtl">
               <TabsTrigger value="ar">العربية</TabsTrigger>
               <TabsTrigger value="en">English</TabsTrigger>
               <TabsTrigger value="fr">Français</TabsTrigger>
+              <TabsTrigger value="tr">Türkçe</TabsTrigger>
+              <TabsTrigger value="id">Bahasa</TabsTrigger>
+              <TabsTrigger value="pt">Português</TabsTrigger>
+              <TabsTrigger value="es">Español</TabsTrigger>
             </TabsList>
             <TabsContent value="ar" className="mt-0">
               <Card className="p-6">
@@ -223,10 +249,58 @@ export default function EditCategoryPage() {
               <Card className="p-6">
                 <div className="grid gap-6">
                   <FormField control={form.control} name="name_fr" render={({ field }) => (
-                    <FormItem><FormLabel>Nom de la catégorie (français)</FormLabel><FormControl><Input {...field} placeholder="Nom de la catégorie" /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Nom (français)</FormLabel><FormControl><Input {...field} placeholder="Nom de la catégorie" /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="description_fr" render={({ field }) => (
                     <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Description..." className="resize-y" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
+              </Card>
+            </TabsContent>
+            <TabsContent value="tr" className="mt-0">
+              <Card className="p-6">
+                <div className="grid gap-6">
+                  <FormField control={form.control} name="name_tr" render={({ field }) => (
+                    <FormItem><FormLabel>Kategori adı (Türkçe)</FormLabel><FormControl><Input {...field} placeholder="Kategori adı" /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="description_tr" render={({ field }) => (
+                    <FormItem><FormLabel>Açıklama</FormLabel><FormControl><Textarea placeholder="Açıklama..." className="resize-y" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
+              </Card>
+            </TabsContent>
+            <TabsContent value="id" className="mt-0">
+              <Card className="p-6">
+                <div className="grid gap-6">
+                  <FormField control={form.control} name="name_id" render={({ field }) => (
+                    <FormItem><FormLabel>Nama kategori (Indonesia)</FormLabel><FormControl><Input {...field} placeholder="Nama kategori" /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="description_id" render={({ field }) => (
+                    <FormItem><FormLabel>Deskripsi</FormLabel><FormControl><Textarea placeholder="Deskripsi..." className="resize-y" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
+              </Card>
+            </TabsContent>
+            <TabsContent value="pt" className="mt-0">
+              <Card className="p-6">
+                <div className="grid gap-6">
+                  <FormField control={form.control} name="name_pt" render={({ field }) => (
+                    <FormItem><FormLabel>Nome da categoria (Português)</FormLabel><FormControl><Input {...field} placeholder="Nome da categoria" /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="description_pt" render={({ field }) => (
+                    <FormItem><FormLabel>Descrição</FormLabel><FormControl><Textarea placeholder="Descrição..." className="resize-y" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
+              </Card>
+            </TabsContent>
+            <TabsContent value="es" className="mt-0">
+              <Card className="p-6">
+                <div className="grid gap-6">
+                  <FormField control={form.control} name="name_es" render={({ field }) => (
+                    <FormItem><FormLabel>Nombre de categoría (Español)</FormLabel><FormControl><Input {...field} placeholder="Nombre de la categoría" /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="description_es" render={({ field }) => (
+                    <FormItem><FormLabel>Descripción</FormLabel><FormControl><Textarea placeholder="Descripción..." className="resize-y" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
               </Card>

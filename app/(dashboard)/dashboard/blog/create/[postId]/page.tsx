@@ -41,6 +41,8 @@ export default async function PostEditorPage({
     ? { id: post.category.id, name: (post.category as { name?: string }).name ?? "" }
     : null;
 
+  const campaign = post && "campaign" in post ? (post as { campaign?: { id: string; title: string | null } | null }).campaign : null;
+
   const editorPost = {
     id: post.id,
     title: post.title ?? null,
@@ -50,6 +52,8 @@ export default async function PostEditorPage({
     published: post.published,
     categoryId: post.categoryId ?? null,
     category_id: post.categoryId ?? undefined,
+    campaignId: (post as { campaignId?: string | null }).campaignId ?? null,
+    campaign_id: (post as { campaignId?: string | null }).campaignId ?? undefined,
     category,
     titleAR: post.title ?? undefined,
     titleEN: trEn?.title ?? undefined,
@@ -81,6 +85,15 @@ export default async function PostEditorPage({
     value: category.id,
   }));
 
+  const campaigns = await prisma.campaign.findMany({
+    select: { id: true, title: true },
+    orderBy: { createdAt: "desc" },
+  });
+  const campaignOptions = campaigns.map((c) => ({
+    label: c.title,
+    value: c.id,
+  }));
+
   return (
     <div className="container mx-auto">
       <Card className="w-full mx-auto shadow-lg">
@@ -90,7 +103,7 @@ export default async function PostEditorPage({
           </CardTitle>
         </CardHeader>
         <CardContent className="p-6">
-          <LanguageTabs post={editorPost} categories={categoryOptions} />
+          <LanguageTabs post={editorPost} categories={categoryOptions} campaignOptions={campaignOptions} />
         </CardContent>
       </Card>
     </div>

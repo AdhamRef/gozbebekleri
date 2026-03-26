@@ -5,19 +5,20 @@ import { usePathname } from "next/navigation";
 import { Globe, ChevronDown } from "lucide-react";
 import ReactCountryFlag from "react-country-flag";
 
-type Locale = "en" | "ar" | "fr";
+import { SUPPORTED_LOCALES, LOCALE_LABELS } from "@/lib/locales";
 
-type Language = {
-  code: Locale;
-  name: string;
-  countryCode: "US" | "EG" | "FR";
+type Locale = (typeof SUPPORTED_LOCALES)[number];
+
+const COUNTRY_CODES: Record<Locale, string> = {
+  ar: "EG", en: "US", fr: "FR", tr: "TR", id: "ID", pt: "PT", es: "ES",
 };
 
-const languages: Language[] = [
-  { code: "en", name: "English", countryCode: "US" },
-  { code: "ar", name: "العربية", countryCode: "EG" },
-  { code: "fr", name: "Français", countryCode: "FR" },
-];
+const languages: { code: Locale; name: string; countryCode: string }[] =
+  SUPPORTED_LOCALES.map((code) => ({
+    code,
+    name: LOCALE_LABELS[code],
+    countryCode: COUNTRY_CODES[code],
+  }));
 
 export default function LanguageSwitcher() {
   const pathname = usePathname();
@@ -45,7 +46,7 @@ export default function LanguageSwitcher() {
      * Handles both pathnames: /en/campaign/123 or /campaign/123 (no locale in path).
      */
     const segments = pathname.split("/").filter(Boolean);
-    const localeInPath = ["ar", "en", "fr"].includes(segments[0]);
+    const localeInPath = SUPPORTED_LOCALES.includes(segments[0] as Locale);
     const pathWithoutLocale = localeInPath ? segments.slice(1).join("/") : segments.join("/");
     const newPath = pathWithoutLocale ? `/${newLocale}/${pathWithoutLocale}` : `/${newLocale}`;
 

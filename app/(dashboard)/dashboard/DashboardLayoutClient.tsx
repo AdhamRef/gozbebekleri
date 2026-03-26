@@ -18,11 +18,17 @@ import {
   Sun,
   Moon,
   PieChart,
+  Link2,
+  Award,
+  BarChart3,
+  MessageSquare,
+  Repeat,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import SessionProvider from '@/components/providers/SessionProvider';
+import DashboardHeader from './components/DashboardHeader';
 import { NextIntlClientProvider } from "next-intl";
 import { Toaster } from "react-hot-toast";
 import { ConfettiProvider } from "@/components/providers/confetti-provider";
@@ -71,6 +77,16 @@ function DashboardContent({
       group: "الإدارة العامة",
       items: [
         { title: 'تحليل الإيرادات', icon: <PieChart className="w-5 h-5 shrink-0" />, href: '/dashboard' },
+        { title: 'التبرعات الشهرية', icon: <Repeat className="w-5 h-5 shrink-0" />, href: '/dashboard/monthly' },
+        { title: 'روابط التتبع', icon: <Link2 className="w-5 h-5 shrink-0" />, href: '/dashboard/referrals' },
+      ],
+    },
+    {
+      group: "إدارة المستخدمين",
+      items: [
+        { title: 'المستخدمين', icon: <Users className="w-5 h-5 shrink-0" />, href: '/dashboard/users' },
+        { title: 'الشارات', icon: <Award className="w-5 h-5 shrink-0" />, href: '/dashboard/badges' },
+        { title: 'الرسائل', icon: <MessageSquare className="w-5 h-5 shrink-0" />, href: '/dashboard/messages' },
       ],
     },
     {
@@ -89,9 +105,9 @@ function DashboardContent({
       ],
     },
     {
-      group: "إدارة المستخدمين",
+      group: "التتبع والإعلانات",
       items: [
-        { title: 'المستخدمين', icon: <Users className="w-5 h-5 shrink-0" />, href: '/dashboard/users' },
+        { title: 'البكسلات والتتبع', icon: <BarChart3 className="w-5 h-5 shrink-0" />, href: '/dashboard/pixels' },
       ],
     },
   ];
@@ -167,7 +183,12 @@ function DashboardContent({
               </p>
               <div className="space-y-0.5">
                 {section.items.map((item) => {
-                  const isActive = pathname === item.href;
+                  const isActive =
+                    item.href === '/dashboard/referrals'
+                      ? pathname === item.href || pathname.startsWith('/dashboard/referrals/')
+                      : item.href === '/dashboard/monthly'
+                        ? pathname === item.href || pathname.startsWith('/dashboard/monthly/')
+                        : pathname === item.href;
                   return (
                     <Link
                       key={item.href}
@@ -208,6 +229,7 @@ function DashboardContent({
       <main className="flex-1 min-w-0 pt-14 lg:pt-0 lg:mr-72 transition-all duration-300">
         <div className="p-3 sm:p-4 md:p-6 lg:p-8 min-h-screen">
           <div className="rounded-xl sm:rounded-2xl shadow-sm dark:shadow-none border border-border bg-card text-card-foreground p-4 sm:p-6 lg:p-8 min-h-[calc(100vh-8rem)] lg:min-h-[calc(100vh-4rem)] transition-colors duration-300 overflow-auto">
+            <DashboardHeader />
             {children}
           </div>
         </div>

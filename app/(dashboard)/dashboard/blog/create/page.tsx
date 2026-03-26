@@ -14,6 +14,8 @@ const emptyEditorPost = {
   categoryId: null,
   category_id: undefined,
   category: null,
+  campaignId: null,
+  campaign_id: undefined,
   titleAR: undefined,
   titleEN: undefined,
   titleFR: undefined,
@@ -30,13 +32,18 @@ const emptyEditorPost = {
 };
 
 export default async function CreateBlogPage() {
-  const categories = await prisma.postCategory.findMany({
-    orderBy: { name: "asc" },
-  });
+  const [categories, campaigns] = await Promise.all([
+    prisma.postCategory.findMany({ orderBy: { name: "asc" } }),
+    prisma.campaign.findMany({ select: { id: true, title: true }, orderBy: { createdAt: "desc" } }),
+  ]);
 
   const categoryOptions = categories.map((category) => ({
     label: category.name,
     value: category.id,
+  }));
+  const campaignOptions = campaigns.map((c) => ({
+    label: c.title,
+    value: c.id,
   }));
 
   return (
@@ -51,6 +58,7 @@ export default async function CreateBlogPage() {
           <BlogEditor
             post={emptyEditorPost}
             categories={categoryOptions}
+            campaignOptions={campaignOptions}
             userId={undefined}
             redirectAfterCreate="/dashboard/blog/create"
             isCreate={true}

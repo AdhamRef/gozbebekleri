@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { Heart, TrendingUp, Users, Award, CheckCircle, ArrowLeft, Sparkles } from "lucide-react";
 import { getCurrency } from "@/hooks/useCampaignValue";
+import { usePathname, useRouter } from "@/i18n/routing";
 import { useTranslations, useLocale } from "next-intl";
+import { useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import DonationDialog from "@/components/DonationDialog";
+import SignInDialog from "@/components/SignInDialog";
 
 interface CategoryOption {
   id: string;
@@ -10,20 +14,51 @@ interface CategoryOption {
   image?: string | null;
 }
 
+const QUICK_DONATE_RESUME_KEY = "quickDonateResume";
+
 const QuickDonate = () => {
   const t = useTranslations("QuickDonate");
   const locale = useLocale() as "ar" | "en" | "fr";
+  const { data: session } = useSession();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState<string>("");
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const [donationDialogOpen, setDonationDialogOpen] = useState(false);
+  const [signInOpen, setSignInOpen] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [currencyLabel, setCurrencyLabel] = useState<string>("USD");
+  const [resumeAmount, setResumeAmount] = useState<number | undefined>(undefined);
+  const [resumeCategoryId, setResumeCategoryId] = useState<string>("");
+  const [resumeCategoryName, setResumeCategoryName] = useState<string>("");
+  const [resumeCategoryImage, setResumeCategoryImage] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     setCurrencyLabel(getCurrency());
   }, []);
+
+  // After sign-in redirect: restore selection, open donation dialog, clean URL
+  useEffect(() => {
+    if (searchParams.get("openDonation") !== "1") return;
+    try {
+      const stored = typeof window !== "undefined" ? sessionStorage.getItem(QUICK_DONATE_RESUME_KEY) : null;
+      if (stored) {
+        const data = JSON.parse(stored) as { categoryId?: string; categoryName?: string; categoryImage?: string; amount?: number };
+        if (data.categoryId) setResumeCategoryId(data.categoryId);
+        if (data.categoryName) setResumeCategoryName(data.categoryName);
+        if (data.categoryImage) setResumeCategoryImage(data.categoryImage);
+        if (typeof data.amount === "number" && data.amount > 0) setResumeAmount(data.amount);
+        sessionStorage.removeItem(QUICK_DONATE_RESUME_KEY);
+      }
+    } catch {
+      /* ignore */
+    }
+    setDonationDialogOpen(true);
+    router.replace(`${pathname}#quick_donate`);
+  }, [searchParams, pathname, router]);
 
   // Fetch categories with locale for translations
   useEffect(() => {
@@ -56,28 +91,32 @@ const QuickDonate = () => {
   const handleDonateClick = () => {
     if (!selectedCategoryId || !selectedCategory) return;
     if (displayAmount <= 0) return;
-    setDonationDialogOpen(true);
-  };
-
-  // Helper function to get locale-specific property
-  const getLocalizedProperty = (obj: any, key: string) => {
-    const localeKey = `${key}${locale.charAt(0).toUpperCase() + locale.slice(1)}`;
-    return obj[localeKey] || obj[key] || "";
+    if (session) {
+      setDonationDialogOpen(true);
+    } else {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(
+          QUICK_DONATE_RESUME_KEY,
+          JSON.stringify({
+            categoryId: selectedCategoryId,
+            categoryName: selectedCategory.name,
+            categoryImage: selectedCategory.image ?? undefined,
+            amount: displayAmount,
+          })
+        );
+      }
+      setSignInOpen(true);
+    }
   };
 
   const stats = [
-    { icon: Users, value: "50,000+", labelAr: "مستفيد", labelEn: "Beneficiary", labelFr: "Bénéficiaire" },
-    { icon: Award, value: "250+", labelAr: "مشروع خيري", labelEn: "Charity Project", labelFr: "Projet caritatif" },
-    { icon: Heart, value: "13", labelAr: "سنة من العطاء", labelEn: "Years of Giving", labelFr: "Années de don" },
-    { icon: TrendingUp, value: "95%", labelAr: "نسبة الشفافية", labelEn: "Transparency Rate", labelFr: "Taux de transparence" }
+    { icon: Users, value: "50,000+", labelKey: "stat1" as const },
+    { icon: Award, value: "250+", labelKey: "stat2" as const },
+    { icon: Heart, value: "13", labelKey: "stat3" as const },
+    { icon: TrendingUp, value: "95%", labelKey: "stat4" as const },
   ];
 
-  const features = [
-    { textAr: "توصيل المساعدات للمحتاجين مباشرة", textEn: "Direct delivery of aid to those in need", textFr: "Livraison directe de l'aide aux nécessiteux" },
-    { textAr: "تقارير شفافة لكل مشروع", textEn: "Transparent reports for each project", textFr: "Rapports transparents pour chaque projet" },
-    { textAr: "فريق محترف ومتخصص", textEn: "Professional and specialized team", textFr: "Équipe professionnelle et spécialisée" },
-    { textAr: "شراكات دولية موثوقة", textEn: "Trusted international partnerships", textFr: "Partenariats internationaux de confiance" }
-  ];
+  const featureKeys = ["feature1", "feature2", "feature3", "feature4"] as const;
 
   const quickAmounts = [100, 200, 300, 400, 500, 1000];
 
@@ -121,10 +160,10 @@ const QuickDonate = () => {
             </p>
 
             <div className="grid grid-cols-2 gap-2">
-              {features.map((feature, idx) => (
+              {featureKeys.map((key, idx) => (
                 <div key={idx} className="flex items-start gap-1.5">
                   <CheckCircle className="w-3.5 h-3.5 text-sky-300 mt-0.5 drop-shadow-md" />
-                  <span className="text-white text-xs drop-shadow-md">{getLocalizedProperty(feature, "text")}</span>
+                  <span className="text-white text-xs drop-shadow-md">{t(key)}</span>
                 </div>
               ))}
             </div>
@@ -137,7 +176,7 @@ const QuickDonate = () => {
                     <div className="bg-white/20 backdrop-blur-md rounded-lg p-2 border border-sky-300/40 hover:bg-white/25 transition-all shadow-lg">
                       <Icon className="w-4 h-4 text-sky-200 mx-auto mb-1" />
                       <div className="text-lg font-bold text-white drop-shadow-md">{stat.value}</div>
-                      <div className="text-[9px] text-sky-50">{getLocalizedProperty(stat, "label")}</div>
+                      <div className="text-[9px] text-sky-50">{t(stat.labelKey)}</div>
                     </div>
                   </div>
                 );
@@ -250,15 +289,34 @@ const QuickDonate = () => {
         </div>
       </section>
 
+      {/* Sign-in when user wants to donate but is not signed in */}
+      <SignInDialog
+        isOpen={signInOpen}
+        onClose={() => setSignInOpen(false)}
+        callbackUrl={
+          typeof window !== "undefined"
+            ? `${window.location.pathname}?openDonation=1#quick_donate`
+            : undefined
+        }
+      />
+
       {/* Monthly donation dialog for selected category */}
       <DonationDialog
         isOpen={donationDialogOpen}
-        onClose={() => setDonationDialogOpen(false)}
+        onClose={() => {
+          setDonationDialogOpen(false);
+          setResumeAmount(undefined);
+          setResumeCategoryId("");
+          setResumeCategoryName("");
+          setResumeCategoryImage(undefined);
+        }}
         monthlyOnly
-        categoryId={selectedCategoryId}
-        categoryName={selectedCategory?.name ?? ""}
-        categoryImage={selectedCategory?.image ?? undefined}
-        initialDonationAmount={displayAmount > 0 ? displayAmount : undefined}
+        categoryId={resumeCategoryId || selectedCategoryId}
+        categoryName={resumeCategoryName || (selectedCategory?.name ?? "")}
+        categoryImage={resumeCategoryImage ?? selectedCategory?.image ?? undefined}
+        initialDonationAmount={
+          resumeAmount ?? (displayAmount > 0 ? displayAmount : undefined)
+        }
       />
     </div>
   );

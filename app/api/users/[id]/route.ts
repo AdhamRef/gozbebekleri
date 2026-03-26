@@ -31,6 +31,7 @@ export async function GET(
       include: {
         donations: {
           include: {
+            subscription: { select: { status: true } },
             items: {
               include: {
                 campaign: {
@@ -42,15 +43,9 @@ export async function GET(
               },
             },
           },
-          orderBy: {
-            createdAt: 'desc',
-          },
+          orderBy: { createdAt: 'desc' },
         },
-        _count: {
-          select: {
-            donations: true,
-          },
-        },
+        _count: { select: { donations: true } },
       },
     });
 
@@ -61,15 +56,24 @@ export async function GET(
       );
     }
 
-    // Separate donations by type
-    const oneTimeDonations = user.donations.filter(donation => donation.type === "ONE_TIME");
-    const monthlyDonations = user.donations.filter(donation => donation.type === "MONTHLY");
+    const oneTimeDonations = user.donations.filter((d) => d.subscriptionId == null);
+    const monthlyDonations = user.donations.filter((d) => d.subscriptionId != null);
 
-    // You can return these separated donations if needed
+    const withType = (d: typeof user.donations[0], type: 'ONE_TIME' | 'MONTHLY') => ({
+      ...d,
+      type,
+      status: type === 'MONTHLY' ? (d.subscription?.status ?? null) : null,
+    });
+
+    const donationsForUser = [
+      ...oneTimeDonations.map((d) => withType(d, 'ONE_TIME')),
+      ...monthlyDonations.map((d) => withType(d, 'MONTHLY')),
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
     return NextResponse.json({
-      user,
-      oneTimeDonations,
-      monthlyDonations,
+      user: { ...user, donations: donationsForUser },
+      oneTimeDonations: oneTimeDonations.map((d) => withType(d, 'ONE_TIME')),
+      monthlyDonations: monthlyDonations.map((d) => withType(d, 'MONTHLY')),
     });
   } catch (error) {
     console.error('Error fetching user:', error);
@@ -104,7 +108,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, email, country, phone, birthdate, role } = body;
+    const { name, email, country, phone, birthdate, role, preferredLang } = body;
 
     // Only admins can change roles
     if (role && session.user.role !== 'ADMIN') {
@@ -136,12 +140,13 @@ export async function PUT(
     const updatedUser = await prisma.user.update({
       where: { id },
       data: {
-        ...(name && { name }),
-        ...(email && { email }),
-        ...(country && { country }),
-        ...(phone && { phone }),
-        ...(birthdate && { birthdate }),
+        ...(name !== undefined && { name }),
+        ...(email !== undefined && { email }),
+        ...(country !== undefined && { country }),
+        ...(phone !== undefined && { phone }),
+        ...(birthdate !== undefined && { birthdate }),
         ...(role && { role }),
+        ...(preferredLang !== undefined && { preferredLang: preferredLang === '' ? null : preferredLang }),
       },
     });
 
@@ -173,9 +178,7 @@ export async function DELETE(
     // Check if user exists
     const user = await prisma.user.findUnique({
       where: { id },
-      include: {
-        donations: true, // Include donations to access them
-      },
+      select: { id: true },
     });
 
     if (!user) {
@@ -185,25 +188,14 @@ export async function DELETE(
       );
     }
 
-    // Delete only monthly donations
-    const monthlyDonations = user.donations.filter(donation => donation.type === "MONTHLY");
-    if (monthlyDonations.length > 0) {
-      await prisma.donation.deleteMany({
-        where: {
-          id: {
-            in: monthlyDonations.map(donation => donation.id),
-          },
-        },
-      });
-    }
-
-    // Now delete the user
-    await prisma.user.delete({
-      where: { id },
+    await prisma.$transaction(async (tx) => {
+      await tx.donation.deleteMany({ where: { donorId: id } });
+      await tx.subscription.deleteMany({ where: { donorId: id } });
+      await tx.user.delete({ where: { id } });
     });
 
     return NextResponse.json(
-      { message: 'User and monthly donations deleted successfully' },
+      { message: 'User, donations and subscriptions deleted successfully' },
       { status: 200 }
     );
   } catch (error) {

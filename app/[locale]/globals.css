@@ -161,3 +161,22 @@ input[type="checkbox"]:checked::before {
     rgba(255, 255, 255, 1) 100%
   );
 }
+
+/* Phone country dropdown: open upward so it doesn't get cut off at bottom of screen */
+.phone-input-wrapper .react-international-phone-country-selector-dropdown {
+  top: auto !important;
+  bottom: 100%;
+  margin-bottom: 4px;
+}
+
+.phone-input-wrapper .react-international-phone-country-selector-button {
+  padding: 0 5px 0 5px;
+}
+[dir="rtl"] .phone-input-wrapper .react-international-phone-country-selector-button {
+  border-radius: 0 4px 4px 0;
+  margin-right: 0;
+  margin-left: -1px;
+}
+[dir="rtl"] .phone-input-wrapper .react-international-phone-input {
+  border-radius: 4px 0 0 4px;
+}

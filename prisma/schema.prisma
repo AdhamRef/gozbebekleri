@@ -59,20 +59,64 @@ model User {
   phone         String?
   birthdate     String?
   role          Role     @default(DONOR)
+  preferredLang String? // locale from first donation (ar, en, fr) for emails/SMS
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  accounts  Account[]
-  sessions  Session[]
-  donations Donation[]
-  comments  Comment[]
-  cartItems CartItem[]
+  accounts     Account[]
+  sessions     Session[]
+  donations    Donation[]
+  subscriptions Subscription[]
+  comments     Comment[]
+  cartItems    CartItem[]
+  messages     Message[]
+}
+
+/* ===================== CONTACT MESSAGES ===================== */
+
+model Message {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  body      String   @db.String
+  locale    String   // ar, en, fr - language when sent
+  userId    String?  @db.ObjectId // optional: guest can send without account
+  guestName String?
+  guestEmail String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 }
 
 enum Role {
   ADMIN
   DONOR
+}
+
+/* ===================== USER BADGES (GROUPS) ===================== */
+// Badges are computed from criteria; no direct User-Badge relation stored.
+// Criteria types: TOTAL_LAST_N_MONTHS, ANY_SPAN_N_MONTHS, MONTHLY_ACTIVE_RANGE, TOTAL_LIFETIME, DONATION_COUNT_MIN
+
+model Badge {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String   // default name (e.g. Arabic)
+  color     String   @default("#3b82f6") // hex
+  criteria  Json     // { type, amountMinUSD?, amountMaxUSD?, months?, count? }
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  translations BadgeTranslation[]
+}
+
+model BadgeTranslation {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  badgeId String @db.ObjectId
+  locale String // ar, en, fr
+  name   String
+
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([badgeId, locale])
 }
 
 /* ===================== CATEGORY ===================== */
@@ -89,9 +133,10 @@ model Category {
   order         Int?
   currentAmount Float    @default(0)
 
-  campaigns     Campaign[]
-  donationItems DonationCategoryItem[]
-  translations  CategoryTranslation[]
+  campaigns              Campaign[]
+  donationItems          DonationCategoryItem[]
+  subscriptionCategoryItems SubscriptionCategoryItem[]
+  translations           CategoryTranslation[]
 }
 
 model CategoryTranslation {
@@ -152,11 +197,13 @@ model Campaign {
   categoryId    String   @db.ObjectId
   category      Category @relation(fields: [categoryId], references: [id])
 
-  updates       Update[]
-  comments      Comment[]
-  cartItems     CartItem[]
-  donations     DonationItem[]
-  translations  CampaignTranslation[]
+  updates           Update[]
+  comments          Comment[]
+  cartItems         CartItem[]
+  donations         DonationItem[]
+  subscriptionItems SubscriptionItem[]
+  translations      CampaignTranslation[]
+  posts             Post[]
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -210,33 +257,102 @@ model UpdateTranslation {
 
 /* ===================== DONATIONS ===================== */
 
+model Referral {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  code             String   @unique // e.g. "ahmed", "tiktok1"
+  name             String?  // optional label for dashboard
+  cookieExpiryDays Int      @default(30) // 0 = unlimited (cookie lasts ~10 years)
+  createdAt        DateTime @default(now())
+
+  donations     Donation[]
+  subscriptions Subscription[]
+}
+
 model Donation {
-  id              String             @id @default(auto()) @map("_id") @db.ObjectId
-  amount          Float
-  amountUSD       Float?
-  currency        String             @default("USD")
-  teamSupport     Float              @default(0)
-  coverFees       Boolean            @default(false)
-  fees            Float              @default(0)
-  totalAmount     Float
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  amount     Float
+  amountUSD  Float?
+  currency   String   @default("USD")
+  teamSupport Float   @default(0)
+  coverFees  Boolean  @default(false)
+  fees       Float    @default(0)
+  totalAmount Float
 
-  donorId         String             @db.ObjectId
-  donor           User               @relation(fields: [donorId], references: [id])
+  donorId        String    @db.ObjectId
+  donor          User      @relation(fields: [donorId], references: [id])
+  referralId     String?   @db.ObjectId
+  referral       Referral? @relation(fields: [referralId], references: [id])
 
-  comment         String?
-  type            DonationType       @default(ONE_TIME)
-  status          SubscriptionStatus @default(ACTIVE)
-  paymentMethod   PaymentMethod
-  cardDetails     CardDetails?
-  billingDay      Int?
+  subscriptionId String?       @db.ObjectId
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
 
-  createdAt       DateTime @default(now())
-  lastBillingDate DateTime?
+  comment       String?
+  paymentMethod PaymentMethod
+  cardDetails   CardDetails?
+
+  createdAt DateTime @default(now())
+
+  items         DonationItem[]
+  categoryItems DonationCategoryItem[]
+  comments      Comment[]
+}
+
+model Subscription {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  status     SubscriptionStatus @default(ACTIVE)
+  billingDay Int?
+
+  amount       Float
+  amountUSD    Float?
+  currency     String   @default("USD")
+  teamSupport  Float    @default(0)
+  coverFees    Boolean  @default(false)
+  paymentMethod PaymentMethod
+  cardDetails  CardDetails?
+
+  donorId    String   @db.ObjectId
+  donor      User     @relation(fields: [donorId], references: [id])
+  referralId String?  @db.ObjectId
+  referral   Referral? @relation(fields: [referralId], references: [id])
+
   nextBillingDate DateTime?
+  lastBillingDate DateTime?
 
-  items           DonationItem[]
-  categoryItems   DonationCategoryItem[]
-  comments        Comment[]
+  createdAt DateTime @default(now())
+
+  items         SubscriptionItem[]
+  categoryItems SubscriptionCategoryItem[]
+  donations     Donation[]
+}
+
+model SubscriptionItem {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  subscriptionId String   @db.ObjectId
+  campaignId     String   @db.ObjectId
+
+  amount    Float
+  amountUSD Float?
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id])
+  campaign     Campaign     @relation(fields: [campaignId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SubscriptionCategoryItem {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  subscriptionId String   @db.ObjectId
+  categoryId     String   @db.ObjectId
+
+  amount    Float
+  amountUSD Float?
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id])
+  category     Category     @relation(fields: [categoryId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model DonationItem {
@@ -267,11 +383,6 @@ model DonationCategoryItem {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
-
-enum DonationType {
-  ONE_TIME
-  MONTHLY
 }
 
 enum SubscriptionStatus {
@@ -371,6 +482,9 @@ model Post {
   categoryId String? @db.ObjectId
   category   PostCategory? @relation(fields: [categoryId], references: [id])
 
+  campaignId String? @db.ObjectId
+  campaign   Campaign? @relation(fields: [campaignId], references: [id])
+
   translations PostTranslation[]
 
   createdAt DateTime @default(now())
@@ -421,4 +535,16 @@ type AmountRange {
   maxAmount    Float
   probability  Float  // Weight for this range (e.g., 70 for high, 20 for medium, 10 for low)
   label        String // e.g., "high", "medium", "low"
+}
+
+/* ===================== TRACKING PIXELS (dashboard configurable) ===================== */
+model TrackingSettings {
+  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  facebookPixelId      String?
+  facebookAccessToken  String?  // Server-side Conversion API token (never exposed to client)
+  gaMeasurementId      String?  // Google Analytics 4: G-XXXXXXXXXX
+  tiktokPixelId        String?
+  xPixelId             String?  // X (Twitter) Pixel ID
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }

@@ -35,6 +35,18 @@ export async function GET(
             translations: { where: { locale }, take: 1, select: { name: true } }
           }
         },
+        campaign: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            targetAmount: true,
+            currentAmount: true,
+            images: true,
+            isActive: true,
+            translations: { where: { locale }, take: 1, select: { title: true, description: true } }
+          }
+        },
         translations: { where: { locale }, take: 1, select: { title: true, description: true, content: true, image: true, locale: true } }
       }
     });
@@ -87,6 +99,17 @@ export async function GET(
       image: post.translations[0]?.image || post.image,
       published: post.published,
       category: post.category ? { id: post.category.id, name: post.category.translations[0]?.name || post.category.name } : null,
+      campaign: post.campaign
+        ? {
+            id: post.campaign.id,
+            title: post.campaign.translations[0]?.title || post.campaign.title,
+            description: post.campaign.translations[0]?.description || post.campaign.description,
+            targetAmount: post.campaign.targetAmount,
+            currentAmount: post.campaign.currentAmount,
+            images: post.campaign.images,
+            isActive: post.campaign.isActive,
+          }
+        : null,
       createdAt: post.createdAt,
       updatedAt: post.updatedAt,
     };
@@ -125,6 +148,7 @@ export async function PATCH(
     if (body.image !== undefined) updateData.image = body.image;
     if (body.published !== undefined) updateData.published = body.published;
     if (body.categoryId !== undefined) updateData.categoryId = body.categoryId;
+    if (body.campaignId !== undefined) updateData.campaignId = body.campaignId === "" || body.campaignId == null ? null : body.campaignId;
 
     const translationUpdates: { locale: string; data: any }[] = [];
     if (body.translations && typeof body.translations === 'object') {

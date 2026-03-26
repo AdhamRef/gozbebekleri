@@ -4,7 +4,10 @@ import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import { ChevronDown } from "lucide-react";
 
+export const DEFAULT_CURRENCY_CODE = "DEFAULT";
+
 const currencies = [
+  { code: DEFAULT_CURRENCY_CODE, symbol: "•", name: "Default" },
   { code: "USD", symbol: "$", name: "US Dollar" },
   { code: "EUR", symbol: "€", name: "Euro" },
   { code: "GBP", symbol: "£", name: "British Pound" },
@@ -22,7 +25,7 @@ const CACHE_KEY = "cachedExchangeRates";
 const CACHE_DURATION = 24 * 60 * 60 * 1000;
 
 export default function CurrencySelector() {
-  const [selectedCurrency, setSelectedCurrency] = useState("USD");
+  const [selectedCurrency, setSelectedCurrency] = useState(DEFAULT_CURRENCY_CODE);
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
   const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
 
@@ -33,7 +36,7 @@ export default function CurrencySelector() {
   ========================= */
   useEffect(() => {
     const saved = Cookies.get("currency");
-    if (saved) setSelectedCurrency(saved);
+    setSelectedCurrency(saved || DEFAULT_CURRENCY_CODE);
   }, []);
 
   /* =========================
@@ -89,7 +92,7 @@ export default function CurrencySelector() {
           {current?.symbol}
         </span>
         <span className="text-sm font-medium text-gray-700">
-          {selectedCurrency}
+          {current?.code === DEFAULT_CURRENCY_CODE ? "Default" : selectedCurrency}
         </span>
         <ChevronDown
           className={`w-4 h-4 transition-transform duration-300 ${
