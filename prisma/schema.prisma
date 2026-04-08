@@ -61,6 +61,9 @@ model User {
   role          Role     @default(DONOR)
   preferredLang String? // locale from first donation (ar, en, fr) for emails/SMS
 
+  /// Section keys for Role.STAFF — see lib/dashboard/permissions.ts; ignored for ADMIN
+  dashboardPermissions String[] @default([])
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -73,10 +76,29 @@ model User {
   messages     Message[]
 }
 
+/* ===================== AUDIT LOG (dashboard activity) ===================== */
+
+model AuditLog {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt  DateTime @default(now())
+  actorId    String?  @db.ObjectId
+  actorName  String?
+  actorRole  String
+  action     String
+  messageAr  String
+  messageEn  String?
+  entityType String?
+  entityId   String?
+  metadata   Json?
+  /// TEAM: actions by ADMIN/STAFF — DONOR: actions by donors (e.g. donations, profile)
+  stream     String
+}
+
 /* ===================== CONTACT MESSAGES ===================== */
 
 model Message {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  subject   MessageSubject? @default(GENERAL)
   body      String   @db.String
   locale    String   // ar, en, fr - language when sent
   userId    String?  @db.ObjectId // optional: guest can send without account
@@ -87,9 +109,19 @@ model Message {
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 }
 
+enum MessageSubject {
+  COMPLAINT
+  DONATION_ISSUE
+  CAMPAIGN_SUPPORT
+  PARTNERSHIP
+  VOLUNTEERING
+  GENERAL
+}
+
 enum Role {
   ADMIN
   DONOR
+  STAFF
 }
 
 /* ===================== USER BADGES (GROUPS) ===================== */
@@ -194,6 +226,18 @@ model Campaign {
   isActive      Boolean @default(true)
   priority      Int?
 
+  /// { "amounts": number[], "byCurrency"?: Record<string, number[]> } — quick-pick donation amounts; omit/null uses app defaults
+  suggestedDonations Json?
+
+  /// FIXED = show goal & progress bar; OPEN = open-ended (no fixed target UI)
+  goalType              String   @default("FIXED")
+  /// AMOUNT = donor enters amount; SHARES = سهوم (share price × number of shares)
+  fundraisingMode       String   @default("AMOUNT")
+  /// Price of one share in USD when fundraisingMode is SHARES
+  sharePriceUSD         Float?
+  /// { "counts": number[] } — quick-pick share counts for سهوم campaigns
+  suggestedShareCounts  Json?
+
   categoryId    String   @db.ObjectId
   category      Category @relation(fields: [categoryId], references: [id])
 
@@ -203,7 +247,6 @@ model Campaign {
   donations         DonationItem[]
   subscriptionItems SubscriptionItem[]
   translations      CampaignTranslation[]
-  posts             Post[]
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -278,6 +321,20 @@ model Donation {
   fees       Float    @default(0)
   totalAmount Float
 
+  status     DonationStatus @default(PENDING)
+  locale     String?
+
+  // Payment provider tracking (PayFor Sanal POS)
+  provider               String? // e.g. "PAYFOR"
+  providerOrderId        String? // PayFor OrderId (we use donation id by default)
+  providerTxnType        String? // e.g. "Auth"
+  providerProcReturnCode String?
+  providerTxnResult      String? // "Success" / "Failed"
+  providerAuthCode       String?
+  providerHostRefNum     String?
+  providerErrorMessage   String?
+  providerRaw            Json?
+
   donorId        String    @db.ObjectId
   donor          User      @relation(fields: [donorId], references: [id])
   referralId     String?   @db.ObjectId
@@ -291,6 +348,7 @@ model Donation {
   cardDetails   CardDetails?
 
   createdAt DateTime @default(now())
+  paidAt    DateTime?
 
   items         DonationItem[]
   categoryItems DonationCategoryItem[]
@@ -309,6 +367,11 @@ model Subscription {
   coverFees    Boolean  @default(false)
   paymentMethod PaymentMethod
   cardDetails  CardDetails?
+
+  // PayFor recurring support (requires bank-provided token/reference transaction model)
+  payforToken     String?
+  payforMaskedPan String?
+  payforExpiry    String? // MMYY (if bank requires it alongside token)
 
   donorId    String   @db.ObjectId
   donor      User     @relation(fields: [donorId], references: [id])
@@ -362,6 +425,8 @@ model DonationItem {
 
   amount     Float
   amountUSD  Float?
+  /// When set, line item was a سهوم (shares) purchase
+  shareCount Int?
 
   donation Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
   campaign Campaign @relation(fields: [campaignId], references: [id])
@@ -389,6 +454,12 @@ enum SubscriptionStatus {
   ACTIVE
   PAUSED
   CANCELLED
+}
+
+enum DonationStatus {
+  PENDING
+  PAID
+  FAILED
 }
 
 enum PaymentMethod {
@@ -429,6 +500,8 @@ model CartItem {
   amount     Float
   amountUSD  Float?
   currency   String   @default("USD")
+  /// Optional: number of سهوم shares for this line (display / receipt)
+  shareCount Int?
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
@@ -482,8 +555,8 @@ model Post {
   categoryId String? @db.ObjectId
   category   PostCategory? @relation(fields: [categoryId], references: [id])
 
-  campaignId String? @db.ObjectId
-  campaign   Campaign? @relation(fields: [campaignId], references: [id])
+  /// Up to 3 related campaigns (enforced in API / UI)
+  campaignIds String[] @default([]) @db.ObjectId
 
   translations PostTranslation[]
 

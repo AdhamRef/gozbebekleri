@@ -360,7 +360,7 @@ export default function BrandPage() {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              className="px-4 py-2 bg-[#025EB8] text-white rounded hover:bg-[#014fa0]"
             >
               حفظ التغييرات
             </button>
@@ -393,7 +393,7 @@ export default function BrandPage() {
               <label className="block mb-2 text-gray-600">اسم الشركة</label>
               <input
                 {...register("companyName", { required: "هذا الحقل مطلوب" })}
-                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-[#025EB8] focus:border-transparent"
               />
               {errors.companyName && (
                 <span className="text-red-500 text-sm">{errors.companyName.message}</span>
@@ -403,7 +403,7 @@ export default function BrandPage() {
               <label className="block mb-2 text-gray-600">رابط الشعار</label>
               <input
                 {...register("logo")}
-                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-[#025EB8] focus:border-transparent"
               />
             </div>
             <div className="md:col-span-2">
@@ -411,14 +411,14 @@ export default function BrandPage() {
               <input
                 {...register("slogan")}
                 placeholder="أدخل شعار الشركة هنا"
-                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-[#025EB8] focus:border-transparent"
               />
             </div>
             <div className="md:col-span-2">
               <label className="block mb-2 text-gray-600">الوصف</label>
               <textarea
                 {...register("description")}
-                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-[#025EB8] focus:border-transparent"
                 rows={4}
               />
             </div>
@@ -433,7 +433,7 @@ export default function BrandPage() {
               <label className="block mb-2 text-gray-600">رقم الهاتف</label>
               <input
                 {...register("phone")}
-                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-[#025EB8] focus:border-transparent"
                 dir="ltr"
               />
             </div>
@@ -441,7 +441,7 @@ export default function BrandPage() {
               <label className="block mb-2 text-gray-600">البريد الإلكتروني</label>
               <input
                 {...register("email")}
-                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-[#025EB8] focus:border-transparent"
                 dir="ltr"
               />
             </div>
@@ -449,7 +449,7 @@ export default function BrandPage() {
               <label className="block mb-2 text-gray-600">واتساب</label>
               <input
                 {...register("whatsapp")}
-                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-[#025EB8] focus:border-transparent"
                 dir="ltr"
               />
             </div>
@@ -457,7 +457,7 @@ export default function BrandPage() {
               <label className="block mb-2 text-gray-600">العنوان</label>
               <input
                 {...register("address")}
-                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-[#025EB8] focus:border-transparent"
               />
             </div>
             <div className="md:col-span-2">
@@ -471,7 +471,7 @@ export default function BrandPage() {
                 {...register("coordinates")}
                 placeholder="41.0082, 28.9784"
                 defaultValue={initialLocation}
-                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-[#025EB8] focus:border-transparent"
                 dir="ltr"
               />
               <p className="text-sm text-gray-500 mt-1">
@@ -491,7 +491,7 @@ export default function BrandPage() {
                   type="checkbox"
                   {...register(`has${key}` as keyof FooterContent)}
                   id={`has${key}`}
-                  className="w-4 h-4 text-blue-600"
+                  className="w-4 h-4 text-[#025EB8]"
                 />
                 <label htmlFor={`has${key}`} className="text-gray-700">{label}</label>
               </div>
@@ -501,7 +501,7 @@ export default function BrandPage() {
                     <label className="block mb-2 text-gray-600">الرابط</label>
                     <input
                       {...register(`${key.toLowerCase()}Link` as keyof FooterContent)}
-                      className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full p-2 border rounded focus:ring-2 focus:ring-[#025EB8] focus:border-transparent"
                       dir="ltr"
                     />
                   </div>
@@ -514,7 +514,7 @@ export default function BrandPage() {
                         valueAsNumber: true,
                         setValueAs: (value) => Number(value) || 0
                       })}
-                      className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full p-2 border rounded focus:ring-2 focus:ring-[#025EB8] focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -533,19 +533,19 @@ export default function BrandPage() {
                 <input
                   type="time"
                   {...register(`workingHours.${index}.openTime`)}
-                  className="p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="p-2 border rounded focus:ring-2 focus:ring-[#025EB8] focus:border-transparent"
                 />
                 <input
                   type="time"
                   {...register(`workingHours.${index}.closeTime`)}
-                  className="p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="p-2 border rounded focus:ring-2 focus:ring-[#025EB8] focus:border-transparent"
                 />
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     {...register(`workingHours.${index}.isClosed`)}
                     id={`closed-${day}`}
-                    className="w-4 h-4 text-blue-600"
+                    className="w-4 h-4 text-[#025EB8]"
                   />
                   <label htmlFor={`closed-${day}`} className="text-gray-600">مغلق</label>
                 </div>
@@ -557,7 +557,7 @@ export default function BrandPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full md:w-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors duration-200 flex items-center justify-center gap-2"
+          className="w-full md:w-auto px-6 py-3 bg-[#025EB8] text-white rounded-lg hover:bg-[#014fa0] disabled:bg-[#025EB8]/50 transition-colors duration-200 flex items-center justify-center gap-2"
         >
           {loading && <Loader2 className="w-4 h-4 animate-spin" />}
           {loading ? "جاري الحفظ..." : "حفظ التغييرات"}
@@ -592,7 +592,7 @@ export default function BrandPage() {
                         ref={provided.innerRef}
                         {...provided.draggableProps}
                         className={`bg-gray-50 p-4 rounded-lg mb-4 hover:shadow-md transition-shadow ${
-                          testimonial.featured ? 'border-2 border-sky-500' : ''
+                          testimonial.featured ? 'border-2 border-[#025EB8]' : ''
                         }`}
                       >
                         <div className="flex items-start gap-4">
@@ -620,7 +620,7 @@ export default function BrandPage() {
                               <span className="font-medium text-gray-900">
                                 {testimonial.author}
                               </span>
-                              <span className="text-sky-600">
+                              <span className="text-[#025EB8]">
                                 {testimonial.role}
                               </span>
                             </div>
@@ -631,7 +631,7 @@ export default function BrandPage() {
                               <DialogTrigger asChild>
                                 <button
                                   onClick={() => setEditingTestimonial(testimonial)}
-                                  className="p-2 text-gray-600 hover:text-blue-600 transition-colors"
+                                  className="p-2 text-gray-600 hover:text-[#025EB8] transition-colors"
                                   title="تعديل"
                                 >
                                   <Edit2 className="w-5 h-5" />
@@ -646,8 +646,8 @@ export default function BrandPage() {
                               onClick={() => toggleFeatured(testimonial.id, !testimonial.featured)}
                               className={`p-2 rounded-full ${
                                 testimonial.featured 
-                                  ? 'bg-sky-100 text-sky-600' 
-                                  : 'text-gray-400 hover:text-sky-600'
+                                  ? 'bg-[#025EB8]/10 text-[#025EB8]' 
+                                  : 'text-gray-400 hover:text-[#025EB8]'
                               }`}
                               title={testimonial.featured ? 'إلغاء التمييز' : 'تمييز'}
                             >

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from "../../auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -35,9 +37,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params;
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, 'slides');
+    if (denied) return denied;
     const body = await request.json();
     const { title, description, image, showButton, buttonText, buttonLink, isActive, order, translations } = body;
     if (!title) return NextResponse.json({ error: 'Title required' }, { status: 400 });
@@ -74,6 +75,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       where: { id },
       select: { id: true, title: true, description: true, image: true, showButton: true, buttonText: true, buttonLink: true, isActive: true, order: true, translations: { select: { locale: true, title: true, description: true, buttonText: true } } },
     });
+
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "SLIDE_UPDATE",
+      messageAr: `${actor.actorName ?? "مسؤول"} عدّل شريحة الهيرو: ${full?.title ?? title}`,
+      entityType: "Slide",
+      entityId: id,
+    });
+
     return NextResponse.json(full);
   } catch (error) {
     console.error('Error updating slide:', error);
@@ -85,10 +96,23 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   try {
     const { id } = await params;
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, 'slides');
+    if (denied) return denied;
+    const existing = await prisma.slide.findUnique({
+      where: { id },
+      select: { title: true },
+    });
     await prisma.slide.delete({ where: { id } });
+
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "SLIDE_DELETE",
+      messageAr: `${actor.actorName ?? "مسؤول"} حذف شريحة الهيرو: ${existing?.title ?? id}`,
+      entityType: "Slide",
+      entityId: id,
+    });
+
     return NextResponse.json({ message: 'Slide deleted' }, { status: 200 });
   } catch (error) {
     console.error('Error deleting slide:', error);

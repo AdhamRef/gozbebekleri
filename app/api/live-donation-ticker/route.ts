@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -48,12 +50,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Unauthorized - Only admins can configure the ticker' },
-        { status: 401 }
-      );
-    }
+    const denied = requireAdminOrDashboardPermission(session, 'ticker');
+    if (denied) return denied;
 
     const data = await request.json();
     const {
@@ -99,6 +97,15 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "TICKER_CREATE",
+      messageAr: `${actor.actorName ?? "مسؤول"} أنشأ إعدادًا جديدًا لتيكر التبرعات المباشر`,
+      entityType: "LiveDonationTicker",
+      entityId: ticker.id,
+    });
+
     return NextResponse.json(ticker, { status: 201 });
   } catch (error) {
     console.error('Error creating ticker config:', error);
@@ -115,12 +122,8 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Unauthorized - Only admins can update the ticker' },
-        { status: 401 }
-      );
-    }
+    const denied = requireAdminOrDashboardPermission(session, 'ticker');
+    if (denied) return denied;
 
     const data = await request.json();
     const { id, ...updates } = data;
@@ -155,6 +158,15 @@ export async function PATCH(request: NextRequest) {
       data: updates
     });
 
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "TICKER_UPDATE",
+      messageAr: `${actor.actorName ?? "مسؤول"} عدّل إعداد تيكر التبرعات المباشر`,
+      entityType: "LiveDonationTicker",
+      entityId: id,
+    });
+
     return NextResponse.json(ticker);
   } catch (error) {
     console.error('Error updating ticker config:', error);
@@ -171,12 +183,8 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Unauthorized - Only admins can delete the ticker' },
-        { status: 401 }
-      );
-    }
+    const denied = requireAdminOrDashboardPermission(session, 'ticker');
+    if (denied) return denied;
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -190,6 +198,15 @@ export async function DELETE(request: NextRequest) {
 
     await prisma.liveDonationTicker.delete({
       where: { id }
+    });
+
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "TICKER_DELETE",
+      messageAr: `${actor.actorName ?? "مسؤول"} حذف إعداد تيكر التبرعات المباشر`,
+      entityType: "LiveDonationTicker",
+      entityId: id,
     });
 
     return NextResponse.json({ message: 'Ticker configuration deleted successfully' });

@@ -21,7 +21,11 @@
     "noCategories": "Tidak ada kategori",
     "myProfile": "Profil Saya",
     "myDonations": "Donasi Saya",
-    "signOut": "Keluar"
+    "signOut": "Keluar",
+    "activities": "Kegiatan",
+    "searchPlaceholder": "Cari...",
+    "donate": "DONASI SEKARANG",
+    "signIn": "Masuk"
   },
   "HomePage": {
     "donationCategories": "Kategori Donasi",
@@ -38,7 +42,16 @@
     "faq4Question": "Bisakah saya menjadi relawan dari jarak jauh?",
     "faq4Answer": "Ya! Kami memiliki kesempatan relawan digital termasuk manajemen konten, desain grafis, pemasaran digital, dan komunikasi dengan pihak pendukung.",
     "faq5Question": "Bagaimana saya bisa mengusulkan inisiatif saya sendiri?",
-    "faq5Answer": "Jika Anda memiliki ide proyek kemanusiaan, tim gozbebekleri dapat membantu Anda mewujudkannya dengan menyediakan sumber daya dan dukungan logistik."
+    "faq5Answer": "Jika Anda memiliki ide proyek kemanusiaan, tim gozbebekleri dapat membantu Anda mewujudkannya dengan menyediakan sumber daya dan dukungan logistik.",
+    "featuredProjects": "PROYEK UNGGULAN",
+    "currentProjects": "Proyek Saat Ini",
+    "viewAll": "Lihat Semua",
+    "weHelp": "KAMI MEMBANTU",
+    "latestNews": "BERITA TERBARU",
+    "stat1Label": "Penerima Manfaat",
+    "stat2Label": "Relawan",
+    "stat3Label": "Proyek Selesai",
+    "stat4Label": "Mitra"
   },
   "HeroSlider": {
     "quickDonate": "Donasi Cepat"
@@ -48,7 +61,9 @@
     "viewAll": "Lihat Semua",
     "donations": "terkumpul",
     "remaining": "tersisa",
-    "contributor": "kontributor"
+    "contributor": "kontributor",
+    "openGoal": "Target terbuka",
+    "sharesMode": "Saham — {currency}{price} per saham"
   },
   "QuickDonate": {
     "associationName": "Asosiasi Bantuan dan Solidaritas Qurrat Al-Ayun",
@@ -144,13 +159,19 @@
     "successTitle": "Pesan Anda berhasil dikirim!",
     "successMessage": "Terima kasih telah menghubungi kami, kami akan segera membalas",
     "requiredFields": "Harap isi semua bidang yang wajib",
-    "ourLocation": "Lokasi Kami"
+    "ourLocation": "Lokasi Kami",
+    "subtitle": "Kami di sini untuk membantu",
+    "name": "Nama Lengkap",
+    "message": "Pesan",
+    "messageType": "Subjek",
+    "submit": "Kirim",
+    "errorOccurred": "Terjadi kesalahan. Silakan coba lagi."
   },
   "Blog": {
     "metaTitleSuffix": " - Qurrat Al-Ayun",
     "sharePost": "Bagikan Artikel",
     "similarPosts": "Artikel Serupa",
-    "relatedCampaign": "Kampanye Terkait",
+    "relatedCampaign": "Kampanye-kampanye terkait",
     "viewCampaign": "Lihat kampanye",
     "donateNow": "Donasi Sekarang",
     "campaignDonations": "donasi",
@@ -177,7 +198,10 @@
     "retry": "Coba lagi",
     "noResults": "Tidak ada hasil untuk pencarian Anda",
     "tryDifferentSearch": "Coba gunakan istilah pencarian yang berbeda",
-    "checkBackLater": "Periksa kembali nanti untuk artikel baru"
+    "checkBackLater": "Periksa kembali nanti untuk artikel baru",
+    "title": "Berita",
+    "subtitle": "Berita dan pembaruan terbaru",
+    "news": "BERITA"
   },
   "CampaignsPage": {
     "browse": "Jelajahi",
@@ -204,7 +228,17 @@
     "noResults": "Tidak ada hasil untuk pencarian Anda",
     "noCampaigns": "Tidak ada kampanye tersedia saat ini",
     "tryDifferentSearch": "Coba gunakan istilah pencarian yang berbeda",
-    "checkBackLater": "Periksa kembali nanti untuk kampanye baru"
+    "checkBackLater": "Periksa kembali nanti untuk kampanye baru",
+    "projects": "PROYEK KAMI",
+    "filter": "Filter",
+    "resetFilters": "Reset",
+    "donateNow": "Donasi Sekarang",
+    "details": "Detail",
+    "raised": "Terkumpul",
+    "goal": "Target",
+    "home": "Beranda",
+    "heroDescription": "Dukung tujuan yang bermakna dan buat perbedaan nyata dalam kehidupan orang-orang.",
+    "resultsFound": "kampanye ditemukan"
   },
   "Campaign": {
     "story": "Cerita",
@@ -348,8 +382,8 @@
     "processing": "Memproses...",
     "donationSuccess": "Donasi berhasil",
     "donationFailed": "Donasi gagal",
-    "successRedirecting": "Terima kasih!",
-    "successRedirectingDesc": "Mengalihkan ke struk Anda...",
+    "successRedirecting": "Mengalihkan ke Gateway Pembayaran",
+    "successRedirectingDesc": "Anda akan dialihkan dengan aman untuk menyelesaikan pembayaran.",
     "paymentFeesPercent": "Biaya Pembayaran (3%)"
   },
   "DonationSuccess": {
@@ -444,7 +478,8 @@
       "notSpecified": "Tidak ditentukan",
       "editTitle": "Edit {title}",
       "enterPlaceholder": "Masukkan {title}",
-      "saveChanges": "Simpan perubahan"
+      "saveChanges": "Simpan perubahan",
+      "cancel": "Batal"
     },
     "settings": {
       "notifications": "Notifikasi",
@@ -465,6 +500,10 @@
     "donations": {
       "donation": "Donasi",
       "totalDonations": "Total Donasi",
+      "totalInPeriodTitle": "Total (periode ini)",
+      "recordsInPeriodLabel": "{count} entri dalam periode ini",
+      "historyTableTitle": "Riwayat donasi",
+      "emptyHistoryList": "Tidak ada donasi untuk periode yang dipilih.",
       "donationsCount": "{count} donasi",
       "perDonation": "per donasi",
       "monthlyDonations": "Donasi Bulanan",
@@ -493,6 +532,9 @@
       "actions": "Tindakan"
     },
     "subscriptions": {
+      "settingsTableTitle": "Langganan & pengaturan",
+      "emptySubscriptionsList": "Anda tidak memiliki langganan bulanan.",
+      "sinceDate": "Sejak",
       "activeMonthlyDonations": "Donasi Bulanan Aktif",
       "ofSubscriptions": "dari {count} langganan",
       "totalMonthlyDonations": "Total Donasi Bulanan",
@@ -505,12 +547,14 @@
       "nextRenewal": "Perpanjangan berikutnya:",
       "active": "Aktif",
       "paused": "Dijeda",
+      "pause": "Jeda",
       "pauseSubscription": "Jeda",
       "resume": "Lanjutkan",
       "billingDay": "Hari penagihan",
       "manage": "Kelola",
       "manageSubscription": "Kelola langganan",
       "cancelSubscription": "Batalkan langganan",
+      "cancel": "Batalkan langganan",
       "subscriptionSettings": "Pengaturan donasi bulanan",
       "cancelled": "Dibatalkan",
       "perMonth": "/ bulan"
@@ -562,5 +606,13 @@
       "openMenu": "Buka menu",
       "closeMenu": "Tutup menu"
     }
+  },
+  "MessageSubjects": {
+    "COMPLAINT": "Keluhan",
+    "DONATION_ISSUE": "Masalah donasi",
+    "CAMPAIGN_SUPPORT": "Dukungan kampanye",
+    "PARTNERSHIP": "Kemitraan",
+    "VOLUNTEERING": "Kerelawanan",
+    "GENERAL": "Pertanyaan umum"
   }
 }

@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 
 type ParamsPromise = { params: Promise<{ id: string }> };
 
@@ -77,18 +79,14 @@ export async function POST(request: NextRequest, { params }: ParamsPromise) {
     const { id } = await params;
     // ✅ STEP 1: Authentication check
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: "Unauthorized - Only admins can add updates" },
-        { status: 401 }
-      );
-    }
+    const denied = requireAdminOrDashboardPermission(session, "campaigns");
+    if (denied) return denied;
     const data = await request.json();
 
     // ✅ STEP 2: Validate campaign exists
     const campaign = await prisma.campaign.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, title: true },
     });
 
     if (!campaign) {
@@ -171,6 +169,16 @@ export async function POST(request: NextRequest, { params }: ParamsPromise) {
           },
         },
       },
+    });
+
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "CAMPAIGN_UPDATE_POST_CREATE",
+      messageAr: `${actor.actorName ?? "مسؤول"} أضاف تحديثًا للحملة «${campaign.title}»: ${fullUpdate?.title ?? data.title}`,
+      entityType: "Update",
+      entityId: update.id,
+      metadata: { campaignId: id },
     });
 
     return NextResponse.json(fullUpdate, { status: 201 });

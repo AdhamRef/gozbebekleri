@@ -19,7 +19,7 @@ export const LOCALE_LABELS: Record<SupportedLocale, string> = {
   en: "English",
   fr: "Français",
   tr: "Türkçe",
-  id: "Bahasa Indonesia",
+  id: "Indonesia",
   pt: "Português",
   es: "Español",
 };

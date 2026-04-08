@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,19 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Loader2, Link2, Plus, BarChart3, Infinity } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Loader2, Link2, Plus, BarChart3, Infinity, Pencil, MoreHorizontal } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import {
+  getMinCookieExpiryDaysForEdit,
+  getReferralCookieSettingsWindow,
+} from "@/lib/referral-cookie-settings";
 
 interface ReferralRow {
   id: string;
@@ -35,6 +45,17 @@ export default function ReferralsPage() {
   const [cookieExpiryDays, setCookieExpiryDays] = useState(30);
   const [cookieUnlimited, setCookieUnlimited] = useState(false);
   const [creating, setCreating] = useState(false);
+
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingReferral, setEditingReferral] = useState<ReferralRow | null>(null);
+  const [editCookieExpiryDays, setEditCookieExpiryDays] = useState(30);
+  const [editCookieUnlimited, setEditCookieUnlimited] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const editMinCookieDays = useMemo(
+    () => (editingReferral ? getMinCookieExpiryDaysForEdit(editingReferral.createdAt) : 1),
+    [editingReferral]
+  );
 
   const fetchList = async () => {
     setLoading(true);
@@ -93,6 +114,46 @@ export default function ReferralsPage() {
     }
   };
 
+  const openEditCookie = (r: ReferralRow) => {
+    const minDays = getMinCookieExpiryDaysForEdit(r.createdAt);
+    const days = r.cookieExpiryDays ?? 30;
+    setEditingReferral(r);
+    setEditCookieUnlimited(days === 0);
+    setEditCookieExpiryDays(days === 0 ? minDays : Math.max(minDays, days));
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveCookieExpiry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingReferral) return;
+    setSavingEdit(true);
+    try {
+      const res = await fetch(`/api/referrals/${editingReferral.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cookieExpiryDays: editCookieUnlimited
+            ? 0
+            : Math.max(
+                getMinCookieExpiryDaysForEdit(editingReferral.createdAt),
+                editCookieExpiryDays
+              ),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(typeof data?.error === "string" ? data.error : "فشل في حفظ المدة");
+        return;
+      }
+      toast.success("تم تحديث مدة الكوكي");
+      setEditDialogOpen(false);
+      setEditingReferral(null);
+      fetchList();
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
   const localePrefix = "/ar";
 
@@ -141,14 +202,24 @@ export default function ReferralsPage() {
                     <tr className="border-b border-border bg-muted/30">
                       <th className="text-right py-3.5 px-4 font-medium text-muted-foreground">الرمز</th>
                       <th className="text-right py-3.5 px-4 font-medium text-muted-foreground">الاسم</th>
-                      <th className="text-right py-3.5 px-4 font-medium text-muted-foreground">صلاحية الكوكي</th>
+                      <th className="text-right py-3.5 px-4 font-medium text-muted-foreground">
+                        صلاحية الكوكي / المتبقي
+                      </th>
                       <th className="text-right py-3.5 px-4 font-medium text-muted-foreground">عدد التبرعات</th>
                       <th className="text-right py-3.5 px-4 font-medium text-muted-foreground">التاريخ</th>
-                      <th className="text-center py-3.5 px-4 font-medium text-muted-foreground w-[1%]">تحليل</th>
+                      <th className="text-center py-3.5 px-2 font-medium text-muted-foreground w-12">
+                        <span className="sr-only">إجراءات</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {list.map((r) => (
+                    {list.map((r) => {
+                      const cookieDays = r.cookieExpiryDays ?? 30;
+                      const { daysLeft, canEditCookieExpiry } = getReferralCookieSettingsWindow(
+                        r.createdAt,
+                        cookieDays
+                      );
+                      return (
                       <tr
                         key={r.id}
                         className="border-b border-border/60 hover:bg-muted/20 transition-colors"
@@ -160,14 +231,31 @@ export default function ReferralsPage() {
                           {r.name || "—"}
                         </td>
                         <td className="py-2 px-4 text-muted-foreground">
-                          {(r.cookieExpiryDays ?? 30) === 0 ? (
-                            <span className="inline-flex items-center gap-1">
-                              <Infinity className="w-3.5 h-3.5" />
-                              غير محدود
-                            </span>
-                          ) : (
-                            `${r.cookieExpiryDays ?? 30} يوم`
-                          )}
+                          <div className="flex flex-col gap-1.5 items-start">
+                            <div>
+                              {cookieDays === 0 ? (
+                                <span className="inline-flex items-center gap-1">
+                                  <Infinity className="w-3.5 h-3.5" />
+                                  غير محدود
+                                </span>
+                              ) : (
+                                `${cookieDays} يوم`
+                              )}
+                            </div>
+                            {cookieDays === 0 ? (
+                              <span className="text-xs text-muted-foreground/80">
+                                
+                              </span>
+                            ) : daysLeft !== null && daysLeft > 0 ? (
+                              <span className="text-xs font-medium text-[#025EB8]"
+                                متبقي {daysLeft} {daysLeft === 1 ? "يوم" : "يوم"}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-[#FA5D17]"
+                                انتهت صلاحية التتبع
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-2 px-4 font-medium tabular-nums">
                           {r.donationsCount}
@@ -177,24 +265,47 @@ export default function ReferralsPage() {
                             dateStyle: "medium",
                           })}
                         </td>
-                        <td className="py-2 px-4 flex items-center justify-center">
-                          <Link
-                            href={`/dashboard/referrals/${r.id}`}
-                            className={cn(
-                              "w-max inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium",
-                              "bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                            )}
-                          >
-                            <BarChart3 className="w-4 h-4" />
-                            عرض التحليل
-                          </Link>
+                        <td className="py-2 px-2 text-center align-middle">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                              >
+                                <span className="sr-only">إجراءات</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-44 rtl">
+                              <DropdownMenuItem asChild className="cursor-pointer">
+                                <Link
+                                  href={`/dashboard/referrals/${r.id}`}
+                                  className={cn(
+                                    "flex w-full items-center justify-end gap-2 text-foreground",
+                                    "focus:text-foreground"
+                                  )}
+                                >
+                                  تحليلات
+                                  <BarChart3 className="h-4 w-4 shrink-0 opacity-70" />
+                                </Link>
+                              </DropdownMenuItem>
+                              {canEditCookieExpiry && (
+                                <DropdownMenuItem
+                                  className="flex cursor-pointer items-center justify-end gap-2"
+                                  onSelect={() => openEditCookie(r)}
+                                >
+                                  تعديل المدة
+                                  <Pencil className="h-4 w-4 shrink-0 opacity-70" />
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </td>
-
-
-
-
                       </tr>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -288,6 +399,85 @@ export default function ReferralsPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setDialogOpen(false)}
+              >
+                إلغاء
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit cookie duration (only while edit window is open) */}
+      <Dialog
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open);
+          if (!open) setEditingReferral(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md" dir="rtl">
+          <DialogHeader className="text-right">
+            <DialogTitle className="text-right">تعديل مدة صلاحية الكوكي</DialogTitle>
+            <DialogDescription className="text-right">
+              الرمز:{" "}
+              <code className="bg-muted px-1 rounded font-mono">{editingReferral?.code}</code>
+              <br />
+              <span className="text-xs mt-2 block text-muted-foreground">
+                تُحتسب نافذة التعديل من تاريخ إنشاء الرابط ولمدة مساوية لأيام الكوكي الحالية.
+                الزوار الجدد يحصلون على كوكي بالمدة التي تحفظها هنا. الحد الأدنى للمدة هو عدد
+                أيام الانقضاء منذ الإنشاء + 1 (حاليًا: {editMinCookieDays} يومًا).
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveCookieExpiry} className="grid gap-4 py-2">
+            <div className="space-y-3 text-right">
+              <label className="text-sm font-medium text-foreground block">
+                مدة صلاحية الكوكي للزوار
+              </label>
+              <div className="flex flex-wrap items-center gap-3">
+                {!editCookieUnlimited && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={editMinCookieDays}
+                      max={3650}
+                      value={editCookieExpiryDays}
+                      onChange={(e) =>
+                        setEditCookieExpiryDays(
+                          Math.max(
+                            editMinCookieDays,
+                            parseInt(e.target.value, 10) || editMinCookieDays
+                          )
+                        )
+                      }
+                      className="h-10 w-24 text-sm"
+                      dir="ltr"
+                    />
+                    <span className="text-sm text-muted-foreground">يوم</span>
+                  </div>
+                )}
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editCookieUnlimited}
+                    onChange={(e) => setEditCookieUnlimited(e.target.checked)}
+                    className="rounded border-input"
+                  />
+                  <span className="text-sm text-muted-foreground">غير محدود</span>
+                </label>
+              </div>
+            </div>
+            <DialogFooter className="gap-2 flex-row-reverse">
+              <Button type="submit" disabled={savingEdit}>
+                {savingEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : "حفظ"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setEditDialogOpen(false);
+                  setEditingReferral(null);
+                }}
               >
                 إلغاء
               </Button>

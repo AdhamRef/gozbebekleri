@@ -2,6 +2,7 @@
 import React from 'react';
 import { Target, Users, Heart, MessageSquare, CheckCircle, Eye, Sparkles } from 'lucide-react';
 import { useTranslations, useLocale } from 'next-intl';
+import { Link } from '@/i18n/routing';
 
 const AboutUs = () => {
   const t = useTranslations('AboutUs');
@@ -98,7 +99,7 @@ const AboutUs = () => {
         </div>
         <div className="relative z-10 h-full flex flex-col justify-center items-center text-center text-white px-4">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2">{t('pageTitle')}</h1>
-          <p className="text-sm sm:text-base lg:text-lg text-sky-200">
+          <p className="text-sm sm:text-base lg:text-lg text-blue-100">
             {t('associationName')}
           </p>
         </div>
@@ -109,7 +110,7 @@ const AboutUs = () => {
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-6 lg:gap-8 items-center">
             <div className="order-2 lg:order-1">
-              <div className="inline-flex items-center gap-2 bg-sky-100 text-sky-600 px-3 py-1.5 rounded-full text-xs font-semibold mb-4">
+              <div className="inline-flex items-center gap-2 bg-[#025EB8]/10 text-[#025EB8] px-3 py-1.5 rounded-full text-xs font-semibold mb-4">
                 <Heart className="w-3.5 h-3.5" />
                 <span>{t('associationName')}</span>
               </div>
@@ -134,7 +135,7 @@ const AboutUs = () => {
                 />
                 <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm px-3 py-2 rounded-lg shadow-md">
                   <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-sky-600" />
+                    <Users className="w-4 h-4 text-[#025EB8]" />
                     <div>
                       <p className="text-lg font-bold text-gray-800">50,000+</p>
                       <p className="text-[10px] text-gray-600">{t('beneficiaries')}</p>
@@ -148,7 +149,7 @@ const AboutUs = () => {
       </section>
 
       {/* Section 2: Vision - Compact */}
-      <section className="py-10 sm:py-12 lg:py-16 bg-gradient-to-br from-gray-100 to-slate-50">
+      <section className="py-10 sm:py-12 lg:py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-6 lg:gap-8 items-center">
             <div className="relative rounded-xl overflow-hidden shadow-lg">
@@ -160,16 +161,16 @@ const AboutUs = () => {
 
             </div>
             <div>
-              <div className="inline-flex items-center gap-2 bg-white text-sky-600 px-3 py-1.5 rounded-full text-xs font-semibold mb-4 shadow-sm">
+              <div className="inline-flex items-center gap-2 bg-white text-[#025EB8] px-3 py-1.5 rounded-full text-xs font-semibold mb-4 shadow-sm">
                 <Eye className="w-3.5 h-3.5" />
                 <span>{t('vision')}</span>
               </div>
               <h2 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-800 mb-4">
                 {t('visionTitle')}
               </h2>
-              <div className="relative bg-white rounded-xl p-6 sm:p-8 shadow-md border-r-4 border-sky-500">
+              <div className="relative bg-white rounded-xl p-6 sm:p-8 shadow-md border-r-4 border-[#025EB8]">
                 {/* Quote Icon */}
-                <div className="absolute bottom-3 right-3 text-sky-200">
+                <div className="absolute bottom-3 right-3 text-blue-100">
                   <svg className="w-10 h-10 sm:w-12 sm:h-12" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
                   </svg>
@@ -192,7 +193,7 @@ const AboutUs = () => {
       <section className="py-10 sm:py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-2 bg-sky-100 text-sky-600 px-3 py-1.5 rounded-full text-xs font-semibold mb-3">
+            <div className="inline-flex items-center gap-2 bg-[#025EB8]/10 text-[#025EB8] px-3 py-1.5 rounded-full text-xs font-semibold mb-3">
               <Target className="w-3.5 h-3.5" />
               <span>{t('goals')}</span>
             </div>
@@ -212,7 +213,7 @@ const AboutUs = () => {
                 alt="أهدافنا"
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-br from-sky-600/60 to-indigo-600/60"></div>
+              <div className="absolute inset-0 bg-[#025EB8]/70"></div>
               <div className="absolute inset-0 flex items-center justify-center p-6">
                 <div className="text-center text-white">
                   <Target className="w-12 h-12 mx-auto mb-3" />
@@ -230,8 +231,8 @@ const AboutUs = () => {
                   className="group border bg-white rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition-all duration-300 border-r-4"
                 >
                   <div className="flex items-start gap-2.5">
-                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-sky-100 flex items-center justify-center group-hover:bg-sky-500 transition-colors">
-                      <CheckCircle className="w-4 h-4 text-sky-600 group-hover:text-white transition-colors" />
+                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#025EB8]/10 flex items-center justify-center group-hover:bg-[#025EB8] transition-colors">
+                      <CheckCircle className="w-4 h-4 text-[#025EB8] group-hover:text-white transition-colors" />
                     </div>
                     <p className="text-gray-700 leading-relaxed text-xs sm:text-sm flex-1">
                       {getLocalizedProperty(goal, 'text')}
@@ -248,7 +249,7 @@ const AboutUs = () => {
       <section className="py-10 sm:py-12 lg:py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-2 bg-sky-100 text-sky-600 px-3 py-1.5 rounded-full text-xs font-semibold mb-3">
+            <div className="inline-flex items-center gap-2 bg-[#025EB8]/10 text-[#025EB8] px-3 py-1.5 rounded-full text-xs font-semibold mb-3">
               <MessageSquare className="w-3.5 h-3.5" />
               <span>{t('presidentMessage')}</span>
             </div>
@@ -268,7 +269,7 @@ const AboutUs = () => {
                 />
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
                   <h3 className="text-white font-bold text-base mb-0.5">{t('presidentName')}</h3>
-                  <p className="text-sky-300 text-xs">{t('presidentPosition')}</p>
+                  <p className="text-blue-200 text-xs">{t('presidentPosition')}</p>
                 </div>
               </div>
             </div>
@@ -278,7 +279,7 @@ const AboutUs = () => {
               <div className="bg-white rounded-xl p-5 sm:p-6 shadow-md">
                 <div className="text-gray-700 leading-relaxed space-y-3 text-sm sm:text-base">
                   {presidentMessage.map((paragraph, index) => (
-                    <p key={index} className={index === presidentMessage.length - 1 ? "font-semibold text-sky-700 text-sm" : ""}>
+                    <p key={index} className={index === presidentMessage.length - 1 ? "font-semibold text-[#025EB8] text-sm" : ""}>
                       {getLocalizedProperty(paragraph, 'text')}
                     </p>
                   ))}
@@ -307,12 +308,12 @@ const AboutUs = () => {
             {t('ctaDesc')}
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button className="bg-white text-sky-600 px-6 py-3 rounded-full font-bold text-sm hover:bg-sky-50 transition-all shadow-lg hover:shadow-xl hover:scale-105">
+            <Link href={"/campaigns"} className="bg-white text-[#025EB8] px-6 py-3 rounded-full font-bold text-sm hover:bg-blue-50 transition-all shadow-lg hover:shadow-xl hover:scale-105">
               {t('donateNow')}
-            </button>
-            <button className="bg-sky-700 text-white px-6 py-3 rounded-full font-bold text-sm hover:bg-sky-800 transition-all shadow-lg hover:shadow-xl hover:scale-105 border-2 border-white/30">
+            </Link>
+            <Link href={"/contact-us"} className="bg-[#025EB8] text-white px-6 py-3 rounded-full font-bold text-sm hover:bg-sky-800 transition-all shadow-lg hover:shadow-xl hover:scale-105 border-2 border-white/30">
               {t('contactUs')}
-            </button>
+            </Link>
           </div>
         </div>
       </section>

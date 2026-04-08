@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/options";
+import { orderCampaignsByIds, sanitizeCampaignIds } from "@/lib/blog/campaign-ids";
+import {
+  computeCampaignProgressPercent,
+  normalizeFundraisingMode,
+  normalizeGoalType,
+  parseSuggestedShareCounts,
+  showCampaignProgress,
+} from "@/lib/campaign/campaign-modes";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog } from "@/lib/audit-log";
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -35,23 +45,56 @@ export async function GET(
             translations: { where: { locale }, take: 1, select: { name: true } }
           }
         },
-        campaign: {
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            targetAmount: true,
-            currentAmount: true,
-            images: true,
-            isActive: true,
-            translations: { where: { locale }, take: 1, select: { title: true, description: true } }
-          }
-        },
+        campaignIds: true,
         translations: { where: { locale }, take: 1, select: { title: true, description: true, content: true, image: true, locale: true } }
       }
     });
 
     if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
+
+    const campaignIdList = post.campaignIds ?? [];
+    const campaignRows =
+      campaignIdList.length === 0
+        ? []
+        : await prisma.campaign.findMany({
+            where: { id: { in: campaignIdList } },
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              targetAmount: true,
+              currentAmount: true,
+              images: true,
+              isActive: true,
+              goalType: true,
+              fundraisingMode: true,
+              sharePriceUSD: true,
+              suggestedShareCounts: true,
+              translations: { where: { locale }, take: 1, select: { title: true, description: true } },
+            },
+          });
+    const orderedCampaigns = orderCampaignsByIds(campaignIdList, campaignRows).map((c) => {
+      const goalType = normalizeGoalType(c.goalType);
+      return {
+        id: c.id,
+        title: c.translations[0]?.title || c.title,
+        description: c.translations[0]?.description || c.description,
+        targetAmount: c.targetAmount,
+        currentAmount: c.currentAmount,
+        images: c.images,
+        isActive: c.isActive,
+        goalType,
+        fundraisingMode: normalizeFundraisingMode(c.fundraisingMode),
+        sharePriceUSD: c.sharePriceUSD ?? null,
+        suggestedShareCounts: parseSuggestedShareCounts(c.suggestedShareCounts),
+        showProgress: showCampaignProgress(goalType),
+        progress: computeCampaignProgressPercent(
+          c.currentAmount,
+          c.targetAmount,
+          goalType
+        ),
+      };
+    });
 
     // Find similar posts in the same category (only published)
     let similar = await prisma.post.findMany({
@@ -99,17 +142,9 @@ export async function GET(
       image: post.translations[0]?.image || post.image,
       published: post.published,
       category: post.category ? { id: post.category.id, name: post.category.translations[0]?.name || post.category.name } : null,
-      campaign: post.campaign
-        ? {
-            id: post.campaign.id,
-            title: post.campaign.translations[0]?.title || post.campaign.title,
-            description: post.campaign.translations[0]?.description || post.campaign.description,
-            targetAmount: post.campaign.targetAmount,
-            currentAmount: post.campaign.currentAmount,
-            images: post.campaign.images,
-            isActive: post.campaign.isActive,
-          }
-        : null,
+      campaigns: orderedCampaigns,
+      /** @deprecated use campaigns[0] */
+      campaign: orderedCampaigns[0] ?? null,
       createdAt: post.createdAt,
       updatedAt: post.updatedAt,
     };
@@ -138,6 +173,10 @@ export async function PATCH(
   { params }: { params: Promise<{ postId: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions);
+    const denied = requireAdminOrDashboardPermission(session, "blog");
+    if (denied) return denied;
+
     const { postId } = await params;
     const body = await req.json();
 
@@ -148,7 +187,13 @@ export async function PATCH(
     if (body.image !== undefined) updateData.image = body.image;
     if (body.published !== undefined) updateData.published = body.published;
     if (body.categoryId !== undefined) updateData.categoryId = body.categoryId;
-    if (body.campaignId !== undefined) updateData.campaignId = body.campaignId === "" || body.campaignId == null ? null : body.campaignId;
+    if (body.campaignIds !== undefined) {
+      updateData.campaignIds = sanitizeCampaignIds(body.campaignIds);
+    } else if (body.campaignId !== undefined) {
+      updateData.campaignIds = sanitizeCampaignIds(
+        body.campaignId === "" || body.campaignId == null ? [] : [body.campaignId]
+      );
+    }
 
     const translationUpdates: { locale: string; data: any }[] = [];
     if (body.translations && typeof body.translations === 'object') {
@@ -180,7 +225,31 @@ export async function PATCH(
       return post;
     });
 
-    const full = await prisma.post.findUnique({ where: { id: updated.id }, select: { id: true, title: true, description: true, content: true, image: true, published: true, categoryId: true, translations: { select: { locale: true, title: true, description: true, content: true, image: true } } } });
+    const full = await prisma.post.findUnique({
+      where: { id: updated.id },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        content: true,
+        image: true,
+        published: true,
+        categoryId: true,
+        campaignIds: true,
+        translations: { select: { locale: true, title: true, description: true, content: true, image: true } },
+      },
+    });
+
+    const actor = session!.user;
+    await writeAuditLog({
+      actorId: actor.id,
+      actorName: actor.name,
+      actorRole: actor.role ?? "ADMIN",
+      action: "POST_UPDATE",
+      messageAr: `${actor.name ?? "مسؤول"} عدّل مقالًا: ${full?.title ?? body.title ?? postId}`,
+      entityType: "Post",
+      entityId: postId,
+    });
 
     return NextResponse.json(full);
   } catch (error) {
@@ -193,18 +262,31 @@ export async function PATCH(
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ postId: string }> }) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized - Only admins can delete posts' }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, "blog");
+    if (denied) return denied;
 
     const { postId } = await params;
 
-    const exists = await prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
+    const exists = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { id: true, title: true },
+    });
     if (!exists) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
 
     await prisma.$transaction(async (tx) => {
       await tx.postTranslation.deleteMany({ where: { postId } });
       await tx.post.delete({ where: { id: postId } });
+    });
+
+    const actor = session!.user;
+    await writeAuditLog({
+      actorId: actor.id,
+      actorName: actor.name,
+      actorRole: actor.role ?? "ADMIN",
+      action: "POST_DELETE",
+      messageAr: `${actor.name ?? "مسؤول"} حذف مقالًا: ${exists.title}`,
+      entityType: "Post",
+      entityId: postId,
     });
 
     return NextResponse.json({ message: 'Post deleted' });

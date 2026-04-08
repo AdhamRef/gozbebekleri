@@ -393,7 +393,7 @@ const MainPage = ({ id, locale }: {id:string; locale?: string}) => {
         className="overflow-hidden shadow-lg sm:hidden"
       >
         <img
-          src={campaign.images[0] || "/placeholder.jpg"}
+          src={campaign.images[0] || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"}
           alt={`${campaign.title} - Campaign Image`}
           className="w-full h-[500px] max-sm:h-[300px] object-cover transform"
         />
@@ -425,7 +425,7 @@ const MainPage = ({ id, locale }: {id:string; locale?: string}) => {
               className="max-sm:hidden rounded-2xl overflow-hidden mb-6 max-sm:mb-4 shadow-lg"
             >
               <img
-                src={campaign.images[0] || "/placeholder.jpg"}
+                src={campaign.images[0] || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"}
                 alt={`${campaign.title} - Campaign Image`}
                 className="w-full h-[500px] max-sm:h-[300px] object-cover transform"
               />

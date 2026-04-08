@@ -21,7 +21,11 @@
     "noCategories": "Sin categorías",
     "myProfile": "Mi perfil",
     "myDonations": "Mis donaciones",
-    "signOut": "Cerrar sesión"
+    "signOut": "Cerrar sesión",
+    "activities": "Actividades",
+    "searchPlaceholder": "Buscar...",
+    "donate": "DONAR AHORA",
+    "signIn": "Iniciar sesión"
   },
   "HomePage": {
     "donationCategories": "Categorías de donación",
@@ -38,7 +42,16 @@
     "faq4Question": "¿Puedo ser voluntario a distancia?",
     "faq4Answer": "¡Sí! Tenemos oportunidades de voluntariado digital: gestión de contenido, diseño gráfico, marketing digital y comunicación con entidades de apoyo.",
     "faq5Question": "¿Cómo puedo proponer mi propia iniciativa?",
-    "faq5Answer": "Si tienes una idea de proyecto humanitario, el equipo gozbebekleri puede ayudarte a llevarla a cabo con recursos y apoyo logístico."
+    "faq5Answer": "Si tienes una idea de proyecto humanitario, el equipo gozbebekleri puede ayudarte a llevarla a cabo con recursos y apoyo logístico.",
+    "featuredProjects": "PROYECTOS DESTACADOS",
+    "currentProjects": "Proyectos Actuales",
+    "viewAll": "Ver Todo",
+    "weHelp": "AYUDAMOS",
+    "latestNews": "ÚLTIMAS NOTICIAS",
+    "stat1Label": "Beneficiarios",
+    "stat2Label": "Voluntarios",
+    "stat3Label": "Proyectos Completados",
+    "stat4Label": "Socios"
   },
   "HeroSlider": {
     "quickDonate": "Donación rápida"
@@ -48,7 +61,9 @@
     "viewAll": "Ver todo",
     "donations": "recaudado",
     "remaining": "restante",
-    "contributor": "contribuyente"
+    "contributor": "contribuyente",
+    "openGoal": "Meta abierta",
+    "sharesMode": "Cuotas — {currency}{price} cada una"
   },
   "QuickDonate": {
     "associationName": "Asociación de Socorro y Solidaridad Qurrat Al-Ayun",
@@ -144,13 +159,19 @@
     "successTitle": "¡Tu mensaje se ha enviado correctamente!",
     "successMessage": "Gracias por contactarnos, te responderemos pronto",
     "requiredFields": "Por favor, rellena todos los campos obligatorios",
-    "ourLocation": "Nuestra ubicación"
+    "ourLocation": "Nuestra ubicación",
+    "subtitle": "Estamos aquí para ayudar",
+    "name": "Nombre Completo",
+    "message": "Mensaje",
+    "messageType": "Asunto",
+    "submit": "Enviar",
+    "errorOccurred": "Ocurrió un error. Por favor, inténtelo de nuevo."
   },
   "Blog": {
     "metaTitleSuffix": " - Qurrat Al-Ayun",
     "sharePost": "Compartir artículo",
     "similarPosts": "Artículos similares",
-    "relatedCampaign": "Campaña relacionada",
+    "relatedCampaign": "Campañas relacionadas",
     "viewCampaign": "Ver campaña",
     "donateNow": "Donar ahora",
     "campaignDonations": "donaciones",
@@ -177,7 +198,10 @@
     "retry": "Reintentar",
     "noResults": "No se encontraron resultados para tu búsqueda",
     "tryDifferentSearch": "Prueba con otros términos de búsqueda",
-    "checkBackLater": "Vuelve más tarde para ver nuevos artículos"
+    "checkBackLater": "Vuelve más tarde para ver nuevos artículos",
+    "title": "Noticias",
+    "subtitle": "Últimas noticias y actualizaciones",
+    "news": "NOTICIAS"
   },
   "CampaignsPage": {
     "browse": "Explorar",
@@ -204,7 +228,17 @@
     "noResults": "No se encontraron resultados para tu búsqueda",
     "noCampaigns": "No hay campañas disponibles en este momento",
     "tryDifferentSearch": "Prueba con otros términos de búsqueda",
-    "checkBackLater": "Vuelve más tarde para ver nuevas campañas"
+    "checkBackLater": "Vuelve más tarde para ver nuevas campañas",
+    "projects": "NUESTROS PROYECTOS",
+    "filter": "Filtrar",
+    "resetFilters": "Restablecer",
+    "donateNow": "Donar Ahora",
+    "details": "Detalles",
+    "raised": "Recaudado",
+    "goal": "Meta",
+    "home": "Inicio",
+    "heroDescription": "Apoya causas significativas y marca una diferencia duradera en la vida de las personas.",
+    "resultsFound": "campañas encontradas"
   },
   "Campaign": {
     "story": "Historia",
@@ -348,8 +382,8 @@
     "processing": "Procesando...",
     "donationSuccess": "Donación realizada",
     "donationFailed": "Donación fallida",
-    "successRedirecting": "¡Gracias!",
-    "successRedirectingDesc": "Redirigiendo a tu recibo...",
+    "successRedirecting": "Redirigiendo a la pasarela de pago",
+    "successRedirectingDesc": "Serás redirigido de forma segura para completar tu pago.",
     "paymentFeesPercent": "Comisiones de pago (3%)"
   },
   "DonationSuccess": {
@@ -444,7 +478,8 @@
       "notSpecified": "No especificado",
       "editTitle": "Editar {title}",
       "enterPlaceholder": "Introduce {title}",
-      "saveChanges": "Guardar cambios"
+      "saveChanges": "Guardar cambios",
+      "cancel": "Cancelar"
     },
     "settings": {
       "notifications": "Notificaciones",
@@ -465,6 +500,10 @@
     "donations": {
       "donation": "Donación",
       "totalDonations": "Total de donaciones",
+      "totalInPeriodTitle": "Total (este periodo)",
+      "recordsInPeriodLabel": "{count} movimiento(s) en este periodo",
+      "historyTableTitle": "Historial de donaciones",
+      "emptyHistoryList": "No hay donaciones para el periodo seleccionado.",
       "donationsCount": "{count} donación",
       "perDonation": "por donación",
       "monthlyDonations": "Donaciones mensuales",
@@ -493,6 +532,9 @@
       "actions": "Acciones"
     },
     "subscriptions": {
+      "settingsTableTitle": "Suscripciones y ajustes",
+      "emptySubscriptionsList": "No tienes suscripciones mensuales.",
+      "sinceDate": "Desde",
       "activeMonthlyDonations": "Donaciones mensuales activas",
       "ofSubscriptions": "de {count} suscripción(es)",
       "totalMonthlyDonations": "Total de donaciones mensuales",
@@ -505,12 +547,14 @@
       "nextRenewal": "Próxima renovación:",
       "active": "Activa",
       "paused": "Pausada",
+      "pause": "Pausar",
       "pauseSubscription": "Pausar",
       "resume": "Reanudar",
       "billingDay": "Día de cargo",
       "manage": "Gestionar",
       "manageSubscription": "Gestionar suscripción",
       "cancelSubscription": "Cancelar suscripción",
+      "cancel": "Cancelar suscripción",
       "subscriptionSettings": "Configuración de donación mensual",
       "cancelled": "Cancelada",
       "perMonth": "/ mes"
@@ -562,5 +606,13 @@
       "openMenu": "Abrir menú",
       "closeMenu": "Cerrar menú"
     }
+  },
+  "MessageSubjects": {
+    "COMPLAINT": "Queja",
+    "DONATION_ISSUE": "Problema de donación",
+    "CAMPAIGN_SUPPORT": "Soporte de campaña",
+    "PARTNERSHIP": "Alianza",
+    "VOLUNTEERING": "Voluntariado",
+    "GENERAL": "Consulta general"
   }
 }

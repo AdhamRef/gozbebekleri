@@ -7,10 +7,10 @@ import {
   Calendar,
   CreditCard as CardIcon,
   Check,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Loader2,
+  ExternalLink,
 } from "lucide-react";
 import axios from "axios";
 import Cards from "react-credit-cards-2";
@@ -45,6 +45,8 @@ interface CardDetails {
 interface CartItem {
   id: string;
   amount: number;
+  amountUSD?: number;
+  shareCount?: number | null;
   campaign: {
     id: string;
     title: string;
@@ -192,16 +194,13 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
   const renderStepIndicator = () => {
     const steps = getSteps();
     return (
-      <div className="flex items-center justify-center gap-2 mb-6">
+      <div className="flex items-center gap-1 mb-4 px-6">
         {steps.map((step, index) => (
           <div
             key={index}
-            className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${index === currentStep
-                ? "bg-blue-500 w-8"
-                : index < currentStep
-                  ? "bg-blue-300"
-                  : "bg-gray-200"
-              }`}
+            className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+              index <= currentStep ? "bg-[#025EB8]" : "bg-gray-200"
+            }`}
           />
         ))}
       </div>
@@ -238,10 +237,10 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
             <Button
               onClick={() => handleTypeSelect("ONE_TIME")}
               variant="outline"
-              className="h-auto p-6 hover:border-blue-500 hover:bg-blue-50 group transition-all duration-200"
+              className="h-auto p-6 hover:border-[#025EB8] hover:bg-[#025EB8]/5 group transition-all duration-200"
             >
               <div className="text-center space-y-3 w-full">
-                <div className="w-14 h-14 mx-auto rounded-full bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 group-hover:scale-110 transition-all duration-200">
+                <div className="w-14 h-14 mx-auto rounded-full bg-[#025EB8]/10 flex items-center justify-center group-hover:bg-[#025EB8]/20 group-hover:scale-110 transition-all duration-200">
                   <img src="https://i.ibb.co/ZwcJcN1/logo.webp" className="h-8 w-8" alt="One time" />
                 </div>
                 <h3 className="font-semibold text-gray-900">{t("oneTimeDonation")}</h3>
@@ -252,11 +251,11 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
             <Button
               onClick={() => handleTypeSelect("MONTHLY")}
               variant="outline"
-              className="h-auto p-6 hover:border-blue-500 hover:bg-blue-50 group transition-all duration-200"
+              className="h-auto p-6 hover:border-[#025EB8] hover:bg-[#025EB8]/5 group transition-all duration-200"
             >
               <div className="text-center space-y-3 w-full">
-                <div className="w-14 h-14 mx-auto rounded-full bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 group-hover:scale-110 transition-all duration-200">
-                  <Calendar className="w-7 h-7 text-blue-600" />
+                <div className="w-14 h-14 mx-auto rounded-full bg-[#025EB8]/10 flex items-center justify-center group-hover:bg-[#025EB8]/20 group-hover:scale-110 transition-all duration-200">
+                  <Calendar className="w-7 h-7 text-[#025EB8]" />
                 </div>
                 <h3 className="font-semibold text-gray-900">{t("monthlyDonation")}</h3>
                 <p className="text-sm text-gray-500">{t("monthlyDonationDesc")}</p>
@@ -299,7 +298,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
                     variant="outline"
                     onClick={() => setTeamSupport(option.value)}
                     className={`transition-all duration-200 ${teamSupport === option.value
-                        ? "border-blue-500 bg-blue-50 text-blue-600 shadow-sm"
+                        ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8] shadow-sm"
                         : "hover:border-gray-400"
                       }`}
                   >
@@ -316,7 +315,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
               </Button>
               <Button
                 onClick={handleNext}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white"
               >
                 {t("next")}
               </Button>
@@ -353,39 +352,34 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
               )}
               <div className={`flex justify-between text-sm ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
                 <span className="text-gray-600">{t("paymentFeesPercent")}</span>
-                <span className="font-semibold text-blue-600">
+                <span className="font-semibold text-[#025EB8]">
                   {getCurrency()} {fees.toFixed(2)}
                 </span>
               </div>
             </div>
 
-            <Button
-              variant="outline"
+            <button
+              type="button"
+              dir={isRTL ? "rtl" : "ltr"}
               onClick={() => setCoverFees(!coverFees)}
-              className={`w-full h-auto p-4 transition-all duration-200 ${coverFees
-                  ? "border-blue-500 bg-blue-50 shadow-sm"
+              className={`w-full flex items-start gap-3 p-4 rounded-lg border transition-all duration-200 ${
+                coverFees
+                  ? "border-[#025EB8] bg-[#025EB8]/5 shadow-sm"
                   : "border-gray-200 hover:border-gray-400"
-                }`}
+              }`}
             >
-              <div className={`flex items-start gap-3 w-full ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
-                <div
-                  className={`w-6 h-6 flex justify-center items-center rounded-full border-2 flex-shrink-0 transition-all duration-200 ${coverFees
-                      ? "bg-blue-500 border-blue-500 scale-110"
-                      : "border-gray-300"
-                    }`}
-                >
-                  {coverFees && <Check className="w-4 h-4 text-white" />}
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-900">
-                    {t("yesCoverFees")}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {t("feesWillBeAdded", { amount: `${getCurrency()} ${fees.toFixed(2)}` })}
-                  </p>
-                </div>
+              <div className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full border-2 mt-0.5 transition-all duration-200 ${
+                coverFees ? "bg-[#025EB8] border-[#025EB8] scale-110" : "border-gray-300"
+              }`}>
+                {coverFees && <Check className="w-4 h-4 text-white" />}
               </div>
-            </Button>
+              <div className="flex-1 text-start">
+                <p className="font-semibold text-gray-900">{t("yesCoverFees")}</p>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  {t("feesWillBeAdded", { amount: `${getCurrency()} ${fees.toFixed(2)}` })}
+                </p>
+              </div>
+            </button>
 
             <div className={`flex gap-4 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
               <Button variant="outline" onClick={handleBack} className="flex-1">
@@ -394,7 +388,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
               </Button>
               <Button
                 onClick={handleNext}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white"
               >
                 {t("next")}
               </Button>
@@ -431,12 +425,19 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
                           alt={campaignTitle}
                           className="w-20 h-20 rounded-lg object-cover flex-shrink-0 shadow-sm"
                         />
-                        <span
-                          className={`text-gray-900 font-medium text-sm block line-clamp-3 min-w-0 max-w-48 ${isRTL ? 'text-right' : 'text-left'}`}
-                          title={campaignTitle}
-                        >
-                          {campaignTitle}
-                        </span>
+                        <div className={`min-w-0 max-w-48 ${isRTL ? 'text-right' : 'text-left'}`}>
+                          <span
+                            className="text-gray-900 font-medium text-sm block line-clamp-3"
+                            title={campaignTitle}
+                          >
+                            {campaignTitle}
+                          </span>
+                          {item.shareCount != null && item.shareCount > 0 && (
+                            <span className="text-xs text-violet-700 block mt-0.5">
+                              {t("sharesLine", { count: item.shareCount })}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <span className="font-semibold text-gray-900 text-sm flex-shrink-0 whitespace-nowrap">
                         {getCurrency()} {item.amount}
@@ -463,7 +464,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
                 <div className="pt-3 border-t border-gray-300">
                   <div className={`flex items-center gap-2 w-full min-w-0 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
                     <span className="font-semibold text-gray-900 text-base flex-1 min-w-0">{t("total")}</span>
-                    <span className="font-bold text-blue-600 text-lg flex-shrink-0 whitespace-nowrap">
+                    <span className="font-bold text-[#025EB8] text-lg flex-shrink-0 whitespace-nowrap">
                       {getCurrency()} {totalAmount.toFixed(2)}
                     </span>
                   </div>
@@ -478,7 +479,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
               </Button>
               <Button
                 onClick={handleNext}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white"
               >
                 {t("next")}
               </Button>
@@ -486,9 +487,9 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
 
             <p className="text-xs text-center text-gray-500 leading-relaxed px-2 break-words">
               {t("byContinuing")}{" "}
-              <a href="#" className="text-blue-600 hover:underline font-medium">{t("termsOfUseLink")}</a>{" "}
+              <a href="#" className="text-[#025EB8] hover:underline font-medium">{t("termsOfUseLink")}</a>{" "}
               {t("and")}{" "}
-              <a href="#" className="text-blue-600 hover:underline font-medium">{t("privacyPolicyLink")}</a>
+              <a href="#" className="text-[#025EB8] hover:underline font-medium">{t("privacyPolicyLink")}</a>
             </p>
           </div>
         );
@@ -512,13 +513,13 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
                   variant="outline"
                   onClick={() => setPaymentMethod(method.id as PaymentMethod)}
                   className={`w-full h-auto p-5 transition-all duration-200 ${paymentMethod === method.id
-                      ? "border-blue-500 bg-blue-50 shadow-sm"
+                      ? "border-[#025EB8] bg-[#025EB8]/5 shadow-sm"
                       : "hover:border-gray-400"
                     }`}
                 >
                   <div className={`flex items-center gap-4 w-full ${isRTL ? 'flex-row-reverse text-right' : 'text-left'}`}>
-                    <div className={`p-3 rounded-lg ${paymentMethod === method.id ? 'bg-blue-100' : 'bg-gray-100'} transition-colors duration-200`}>
-                      <method.icon className={`w-6 h-6 ${paymentMethod === method.id ? 'text-blue-600' : 'text-gray-600'}`} />
+                    <div className={`p-3 rounded-lg ${paymentMethod === method.id ? 'bg-[#025EB8]/10' : 'bg-gray-100'} transition-colors duration-200`}>
+                      <method.icon className={`w-6 h-6 ${paymentMethod === method.id ? 'text-[#025EB8]' : 'text-gray-600'}`} />
                     </div>
                     <div className="flex-1">
                       <p className="font-semibold text-gray-900">{method.name}</p>
@@ -539,7 +540,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
               <Button
                 onClick={handleNext}
                 disabled={!paymentMethod}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t("continue")}
               </Button>
@@ -656,8 +657,8 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
               </div>
             ) : (
               <div className="text-center py-8">
-                <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
-                  <CardIcon className="w-8 h-8 text-blue-600" />
+                <div className="w-16 h-16 mx-auto mb-4 bg-[#025EB8]/10 rounded-full flex items-center justify-center">
+                  <CardIcon className="w-8 h-8 text-[#025EB8]" />
                 </div>
                 <p className="text-gray-600">
                   {t("paypalRedirect")}
@@ -694,7 +695,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
                   !isPhoneValid() ||
                   (paymentMethod === "CARD" && !isCardDetailsValid())
                 }
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
+                className="flex-1 bg-[#FA5D17] hover:bg-[#e04d0f] text-white flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -721,12 +722,19 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
           country: phoneCountry || undefined,
         });
       }
-      // Convert cart items to donation items format
-      const items = await Promise.all(cartItems.map(async (item) => ({
-        campaignId: item.campaign.id,
-        amount: item.amount,
-        amountUSD: await useConvetToUSD(item.amount, getCurrency()),
-      })));
+      const items = await Promise.all(
+        cartItems.map(async (item) => ({
+          campaignId: item.campaign.id,
+          amount: item.amount,
+          amountUSD:
+            item.amountUSD != null && item.amountUSD > 0
+              ? item.amountUSD
+              : await useConvetToUSD(item.amount, getCurrency()),
+          ...(item.shareCount != null && item.shareCount > 0
+            ? { shareCount: item.shareCount }
+            : {}),
+        }))
+      );
 
       const donationData: Record<string, unknown> = {
         items,
@@ -762,13 +770,20 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-visible p-0" aria-describedby={undefined}>
+      <DialogContent className="w-full h-full sm:h-auto sm:max-w-lg sm:max-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden p-0 rounded-none sm:rounded-lg top-0 sm:top-[50%] translate-y-0 sm:translate-y-[-50%]" aria-describedby={undefined}>
         <DialogTitle className="sr-only">{t("confirmation")}</DialogTitle>
         {mounted && (
           <>
-            <div className="p-6 pb-4">
-              {donationType && renderStepIndicator()}
+            {/* Branded header */}
+            <div className="relative h-24 overflow-hidden rounded-t-lg bg-[#025EB8]">
+              <div className="absolute inset-0 opacity-[0.07] bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
+                <p className="text-white/70 text-[11px] font-semibold uppercase tracking-wider mb-1">{t("confirmation")}</p>
+                <h2 className="text-white font-bold text-base">{t("paymentMethod")}</h2>
+              </div>
             </div>
+            {/* Step progress bar */}
+            {donationType && renderStepIndicator()}
             <div className="relative z-10 px-6 pb-6 bg-white overflow-visible">
               <AnimatePresence mode="wait">
                 <motion.div
@@ -780,17 +795,27 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
                   transition={{ duration: 0.3, ease: "easeInOut" }}
                 >
                   {redirecting ? (
-                    <div className="flex flex-col items-center justify-center py-10 gap-4 text-center">
-                      <CheckCircle2 className="h-16 w-16 text-green-500" />
+                    <div className="flex flex-col items-center justify-center py-10 gap-5 text-center">
+                      <div className="relative">
+                        <div className="w-20 h-20 rounded-full bg-[#025EB8]/8 flex items-center justify-center">
+                          <CardIcon className="h-9 w-9 text-[#025EB8]" />
+                        </div>
+                        <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-white border-2 border-[#025EB8]/20 rounded-full flex items-center justify-center">
+                          <ExternalLink className="h-3 w-3 text-[#025EB8]" />
+                        </span>
+                      </div>
                       <div>
-                        <p className="text-lg font-semibold text-gray-900">
+                        <p className="text-base font-semibold text-gray-900">
                           {t("successRedirecting")}
                         </p>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-sm text-gray-400 mt-1 max-w-xs mx-auto">
                           {t("successRedirectingDesc")}
                         </p>
                       </div>
-                      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                      <div className="flex items-center gap-2 text-xs text-[#025EB8] bg-[#025EB8]/6 px-4 py-2 rounded-full">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>جارٍ الاتصال بالبوابة…</span>
+                      </div>
                     </div>
                   ) : (
                     getStepContent()

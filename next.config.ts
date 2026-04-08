@@ -7,7 +7,7 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 /** @type {import('next').NextConfig} */
 const nextConfig: NextConfig = {
   images: {
-    domains: ['i.ibb.co','example.com','res.cloudinary.com','images.unsplash.com','via.placeholder.com','gozbebekleri.org','muslimglobalrelief.org'],
+    domains: ['picsum.photos','i.ibb.co','example.com','res.cloudinary.com','images.unsplash.com','via.placeholder.com','gozbebekleri.org','muslimglobalrelief.org'],
   },
   eslint: {
     ignoreDuringBuilds: true,
@@ -20,6 +20,19 @@ const nextConfig: NextConfig = {
     buildActivityPosition: 'bottom-right',
   },
   reactStrictMode: true,
+  /** Avoid /subscriptions/[id] shadowing literal "chart" / "stats" segments (legacy URLs). */
+  async rewrites() {
+    return [
+      {
+        source: "/api/admin/subscriptions/chart",
+        destination: "/api/admin/subscriptions/overview/chart",
+      },
+      {
+        source: "/api/admin/subscriptions/stats",
+        destination: "/api/admin/subscriptions/overview/stats",
+      },
+    ];
+  },
 };
 
 module.exports = withNextIntl(nextConfig);

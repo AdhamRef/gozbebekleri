@@ -1,4 +1,7 @@
 {
+  "BlogCard": {
+    "readMore": "Read More"
+  },
   "Navbar": {
     "profile": "Profile",
     "dashboard": "Dashboard",
@@ -21,7 +24,11 @@
     "noCategories": "No categories",
     "myProfile": "My Profile",
     "myDonations": "My Donations",
-    "signOut": "Sign Out"
+    "signOut": "Sign Out",
+    "activities": "Activities",
+    "searchPlaceholder": "Search...",
+    "donate": "DONATE NOW",
+    "signIn": "Sign In"
   },
   "HomePage": {
     "donationCategories": "Donation Categories",
@@ -38,7 +45,16 @@
     "faq4Question": "Can I volunteer remotely?",
     "faq4Answer": "Yes! We have digital volunteering opportunities including content management, graphic design, digital marketing, and communication with supporting parties.",
     "faq5Question": "How can I suggest my own initiative?",
-    "faq5Answer": "If you have a humanitarian project idea, the gozbebekleri team can help you implement it by providing resources and logistical support."
+    "faq5Answer": "If you have a humanitarian project idea, the gozbebekleri team can help you implement it by providing resources and logistical support.",
+    "featuredProjects": "FEATURED PROJECTS",
+    "currentProjects": "Current Projects",
+    "viewAll": "View All",
+    "weHelp": "WE HELP",
+    "latestNews": "LATEST NEWS",
+    "stat1Label": "Families Supported",
+    "stat2Label": "Children Helped",
+    "stat3Label": "Countries Reached",
+    "stat4Label": "Continents"
   },
   "HeroSlider": {
     "quickDonate": "Quick Donate"
@@ -48,7 +64,9 @@
     "viewAll": "View All",
     "donations": "raised",
     "remaining": "left",
-    "contributor": "contributor"
+    "contributor": "contributor",
+    "openGoal": "Open goal",
+    "sharesMode": "Shares — {currency}{price} each"
   },
   "QuickDonate": {
     "associationName": "Qurrat Al-Ayun Relief and Solidarity Association",
@@ -144,17 +162,27 @@
     "successTitle": "Your message has been sent successfully!",
     "successMessage": "Thank you for contacting us, we will respond to you soon",
     "requiredFields": "Please fill in all required fields",
-    "ourLocation": "Our Location"
+    "ourLocation": "Our Location",
+    "subtitle": "We are here to help",
+    "name": "Full Name",
+    "message": "Message",
+    "messageType": "Subject",
+    "submit": "Send",
+    "errorOccurred": "An error occurred. Please try again."
   },
   "Blog": {
     "metaTitleSuffix": " - Qurrat Al-Ayun",
     "sharePost": "Share Post",
     "similarPosts": "Similar Posts",
-    "relatedCampaign": "Related Campaign",
+    "relatedCampaign": "Related Campaigns",
     "viewCampaign": "View campaign",
     "donateNow": "Donate Now",
     "campaignDonations": "donations",
     "campaignRemaining": "remaining",
+    "campaignOpenBadge": "Open goal",
+    "campaignSharesBadge": "Shares",
+    "campaignOpenGoal": "Open fundraising",
+    "sharePriceUsd": "Per share",
     "article": "Article",
     "linkCopied": "Link copied",
     "all": "All",
@@ -177,7 +205,10 @@
     "retry": "Try again",
     "noResults": "No results found for your search",
     "tryDifferentSearch": "Try using different search terms",
-    "checkBackLater": "Check back later for new articles"
+    "checkBackLater": "Check back later for new articles",
+    "title": "News",
+    "subtitle": "Latest news and updates",
+    "news": "NEWS"
   },
   "CampaignsPage": {
     "browse": "Browse",
@@ -197,6 +228,8 @@
     "allCampaigns": "All campaigns",
     "donations": "donations",
     "remaining": "left",
+    "openGoalLabel": "Open goal",
+    "sharesCampaignLabel": "Shares (سهوم)",
     "loading": "Loading...",
     "loadMore": "Load more",
     "error": "Something went wrong",
@@ -204,7 +237,17 @@
     "noResults": "No results found for your search",
     "noCampaigns": "No campaigns available at the moment",
     "tryDifferentSearch": "Try using different search terms",
-    "checkBackLater": "Check back later for new campaigns"
+    "checkBackLater": "Check back later for new campaigns",
+    "projects": "OUR PROJECTS",
+    "filter": "Filter",
+    "resetFilters": "Reset",
+    "donateNow": "Donate Now",
+    "details": "Details",
+    "raised": "Raised",
+    "goal": "Goal",
+    "home": "Home",
+    "heroDescription": "Support meaningful causes and make a lasting difference in people's lives.",
+    "resultsFound": "campaigns found"
   },
   "Campaign": {
     "story": "Story",
@@ -218,6 +261,8 @@
     "completed": "Completed",
     "image": "Image",
     "from": "of",
+    "openGoalBadge": "Open goal",
+    "sharesCampaignBadge": "Shares (سهوم)",
     "donateNow": "Donate Now",
     "outOfGoal": "out of goal",
     "peopleDonated": "people supported this case",
@@ -259,7 +304,12 @@
     "termsAgreement": "By signing in, you agree to",
     "termsOfUse": "Terms of Use",
     "and": "and",
-    "privacyPolicy": "Privacy Policy"
+    "privacyPolicy": "Privacy Policy",
+    "orContinueWith": "or",
+    "secure": "Secure",
+    "trusted": "Trusted",
+    "community": "Community",
+    "donationHint": "Sign in to track your donations and manage your account."
   },
   "SharePopup": {
     "shareCampaign": "Share Campaign with Others",
@@ -288,6 +338,11 @@
     "hadithText": "(Allah said: Spend, O son of Adam, and I will spend on you)",
     "collected": "Collected",
     "goal": "Goal",
+    "sharePriceLabel": "Price per share:",
+    "sharesLabel": "shares",
+    "sharesPickHint": "Choose how many shares (سهوم) to give",
+    "donationTotal": "Donation total",
+    "sharesLine": "{count} shares (سهوم)",
     "enterDonationAmount": "Enter donation amount",
     "addToCart": "Add to Cart",
     "addedToCart": "Amount added to cart successfully",
@@ -348,8 +403,8 @@
     "processing": "Processing ...",
     "donationSuccess": "Donation successful",
     "donationFailed": "Donation failed",
-    "successRedirecting": "Thank you!",
-    "successRedirectingDesc": "Redirecting to your receipt...",
+    "successRedirecting": "Redirecting to Payment Gateway",
+    "successRedirectingDesc": "You will be securely redirected to complete your payment.",
     "paymentFeesPercent": "Payment Fees (3%)"
   },
   "DonationSuccess": {
@@ -366,6 +421,7 @@
     "transactionFees": "Transaction Fees",
     "supportedCampaign": "Supported Campaign",
     "campaignsDonatedTo": "Campaigns You Donated To",
+    "itemShares": "{count} shares (سهوم)",
     "categoriesDonatedTo": "Categories You Donated To",
     "campaignsAndCategoriesDonatedTo": "Campaigns & Categories You Donated To",
     "donateToAnotherCampaign": "Donate to Another Campaign",
@@ -396,7 +452,8 @@
     "subtotal": "Subtotal",
     "total": "Total",
     "proceedToDonate": "Proceed to Donate",
-    "secureCheckout": "Your donation is secure and encrypted"
+    "secureCheckout": "Your donation is secure and encrypted",
+    "sharesLine": "{count} shares (سهوم)"
   },
   "LiveDonationsTicker": {
     "donated": "donated",
@@ -444,7 +501,8 @@
       "notSpecified": "Not specified",
       "editTitle": "Edit {title}",
       "enterPlaceholder": "Enter {title}",
-      "saveChanges": "Save changes"
+      "saveChanges": "Save changes",
+      "cancel": "Cancel"
     },
     "settings": {
       "notifications": "Notifications",
@@ -465,6 +523,10 @@
     "donations": {
       "donation": "Donation",
       "totalDonations": "Total Donations",
+      "totalInPeriodTitle": "Total (this period)",
+      "recordsInPeriodLabel": "{count} record(s) in this period",
+      "historyTableTitle": "Donation history",
+      "emptyHistoryList": "No donations for the selected period.",
       "donationsCount": "{count} donation",
       "perDonation": "per donation",
       "monthlyDonations": "Monthly Donations",
@@ -493,6 +555,9 @@
       "actions": "Actions"
     },
     "subscriptions": {
+      "settingsTableTitle": "Subscriptions & settings",
+      "emptySubscriptionsList": "You have no monthly subscriptions.",
+      "sinceDate": "Since",
       "activeMonthlyDonations": "Active Monthly Donations",
       "ofSubscriptions": "of {count} subscription(s)",
       "totalMonthlyDonations": "Total Monthly Donations",
@@ -505,12 +570,14 @@
       "nextRenewal": "Next renewal:",
       "active": "Active",
       "paused": "Paused",
+      "pause": "Pause",
       "pauseSubscription": "Pause",
       "resume": "Resume",
       "billingDay": "Billing day",
       "manage": "Manage",
       "manageSubscription": "Manage subscription",
       "cancelSubscription": "Cancel subscription",
+      "cancel": "Unsubscribe",
       "subscriptionSettings": "Monthly donation settings",
       "cancelled": "Cancelled",
       "perMonth": "/ month"
@@ -562,5 +629,13 @@
       "openMenu": "Open menu",
       "closeMenu": "Close menu"
     }
+  },
+  "MessageSubjects": {
+    "COMPLAINT": "Complaint",
+    "DONATION_ISSUE": "Donation Issue",
+    "CAMPAIGN_SUPPORT": "Campaign Support",
+    "PARTNERSHIP": "Partnership",
+    "VOLUNTEERING": "Volunteering",
+    "GENERAL": "General Inquiry"
   }
 }

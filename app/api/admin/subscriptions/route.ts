@@ -3,14 +3,14 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 
 /** GET /api/admin/subscriptions — paginated list for dashboard (status, category, campaign, user) */
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, "monthly");
+    if (denied) return denied;
 
     const sp = request.nextUrl.searchParams;
     const statusParam = (sp.get("status") || "ACTIVE").toUpperCase();
@@ -80,6 +80,7 @@ export async function GET(request: NextRequest) {
           lastBillingDate: true,
           billingDay: true,
           donor: { select: { id: true, name: true, email: true } },
+          referral: { select: { id: true, code: true } },
           items: { select: { campaign: { select: { id: true, title: true } } } },
           categoryItems: { select: { category: { select: { id: true, name: true } } } },
         },
@@ -97,6 +98,7 @@ export async function GET(request: NextRequest) {
       lastBillingDate: s.lastBillingDate,
       billingDay: s.billingDay,
       donor: s.donor,
+      referral: s.referral ? { id: s.referral.id, code: s.referral.code } : null,
       campaigns: s.items.map((i) => ({ id: i.campaign.id, title: i.campaign.title })),
       categories: s.categoryItems.map((c) => ({ id: c.category.id, name: c.category.name })),
     }));

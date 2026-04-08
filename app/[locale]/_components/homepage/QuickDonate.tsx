@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Heart, TrendingUp, Users, Award, CheckCircle, ArrowLeft, Sparkles } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Heart, TrendingUp, Users, Award, CheckCircle, ArrowLeft, Sparkles, ChevronDown, Check } from "lucide-react";
 import { getCurrency } from "@/hooks/useCampaignValue";
 import { usePathname, useRouter } from "@/i18n/routing";
 import { useTranslations, useLocale } from "next-intl";
@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import DonationDialog from "@/components/DonationDialog";
 import SignInDialog from "@/components/SignInDialog";
+import { Link } from "@/i18n/routing";
 
 interface CategoryOption {
   id: string;
@@ -30,6 +31,8 @@ const QuickDonate = () => {
   const [donationDialogOpen, setDonationDialogOpen] = useState(false);
   const [signInOpen, setSignInOpen] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const [currencyLabel, setCurrencyLabel] = useState<string>("USD");
   const [resumeAmount, setResumeAmount] = useState<number | undefined>(undefined);
   const [resumeCategoryId, setResumeCategoryId] = useState<string>("");
@@ -59,6 +62,17 @@ const QuickDonate = () => {
     setDonationDialogOpen(true);
     router.replace(`${pathname}#quick_donate`);
   }, [searchParams, pathname, router]);
+
+  // Close category dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) {
+        setCategoryDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Fetch categories with locale for translations
   useEffect(() => {
@@ -121,175 +135,196 @@ const QuickDonate = () => {
   const quickAmounts = [100, 200, 300, 400, 500, 1000];
 
   return (
-    <div className="relative min-h-[60vh] lg:min-h-[70vh] overflow-hidden" id="quick_donate">
-      {/* Background */}
-      <div className="absolute inset-0 z-0">
-        <img
-          src="https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"
-          alt="background"
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900/80 via-slate-800/75 to-slate-900/80"></div>
-      </div>
+    <div id="quick_donate" className="relative rounded-none lg:rounded-2xl overflow-hidden shadow-xl">
 
-      {/* Floating Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 right-10 w-72 h-72 bg-sky-400/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-20 left-10 w-96 h-96 bg-cyan-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-      </div>
+      {/* Full-bleed background image */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"
+        alt=""
+        aria-hidden
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+      <div className="absolute inset-0 bg-gradient-to-l from-[#014fa0]/80 via-[#014fa0]/60 to-[#014fa0]/40" />
+      <div className="absolute inset-0 opacity-[0.06] bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:18px_18px]" />
+      {/* <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#FA5D17]" /> */}
 
-      {/* Content */}
-      <section className="relative z-10 container max-w-7xl mx-auto py-6 lg:py-8 px-6">
-        <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-          {/* Left Content */}
-          <div className="space-y-3 lg:space-y-4 text-white">
-            <div className="inline-flex items-center gap-2 bg-sky-500/30 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-semibold shadow-lg border border-sky-300/50">
-              <Heart className="w-3.5 h-3.5 text-sky-200" fill="currentColor" />
-              <span className="text-sky-50">{t("associationName")}</span>
+      {/* Content — mobile: card first, text second; lg: side by side */}
+      <div className="relative z-10 flex flex-col lg:grid lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 p-5 sm:p-8 lg:p-12 items-center">
+
+        {/* ── Donation card — ORDER 2 on mobile, ORDER 2 on desktop ── */}
+        <div className="order-2 lg:order-2 w-full flex justify-center lg:justify-end">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
+            {/* Card header */}
+            <div className="bg-[#025EB8] px-5 py-4 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-white leading-tight">{t("monthlyCommitment")}</h3>
+                <p className="text-white/70 text-[11px] mt-0.5">{t("monthlyCommitmentDesc")}</p>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight flex flex-col gap-2">
-                <span className="text-sky-100 text-sm drop-shadow-md">{t("hadithQuote")}</span>
-                <span className="text-white drop-shadow-lg mt-1">{t("hadithText")}</span>
-              </h1>
-            </div>
+            <div className="p-4 sm:p-5 space-y-3 sm:space-y-4">
+              {/* Category */}
+              <div ref={categoryDropdownRef} className="relative">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">{t("selectProject")}</label>
+                <button
+                  type="button"
+                  onClick={() => !categoriesLoading && setCategoryDropdownOpen((o) => !o)}
+                  dir={locale === "ar" ? "rtl" : "ltr"}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border text-sm transition-all cursor-pointer ${
+                    categoryDropdownOpen
+                      ? "border-[#025EB8] ring-2 ring-[#025EB8]/20 bg-white"
+                      : "border-gray-200 bg-gray-50 hover:border-[#025EB8]/50"
+                  } ${categoriesLoading ? "opacity-60 pointer-events-none" : ""}`}
+                >
+                  {categoriesLoading ? (
+                    <span className="text-gray-400 text-xs animate-pulse">...</span>
+                  ) : (
+                    <span className="text-gray-900 truncate text-start">
+                      {selectedCategory?.name ?? ""}
+                    </span>
+                  )}
+                  <ChevronDown
+                    className={`w-4 h-4 text-[#025EB8] flex-shrink-0 transition-transform duration-200 ${categoryDropdownOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
 
-            <p className="text-base leading-relaxed text-white drop-shadow-md">
-              {t("description")}
-            </p>
-
-            <div className="grid grid-cols-2 gap-2">
-              {featureKeys.map((key, idx) => (
-                <div key={idx} className="flex items-start gap-1.5">
-                  <CheckCircle className="w-3.5 h-3.5 text-sky-300 mt-0.5 drop-shadow-md" />
-                  <span className="text-white text-xs drop-shadow-md">{t(key)}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="hidden lg:grid grid-cols-4 gap-2 pt-2">
-              {stats.map((stat, idx) => {
-                const Icon = stat.icon;
-                return (
-                  <div key={idx} className="text-center">
-                    <div className="bg-white/20 backdrop-blur-md rounded-lg p-2 border border-sky-300/40 hover:bg-white/25 transition-all shadow-lg">
-                      <Icon className="w-4 h-4 text-sky-200 mx-auto mb-1" />
-                      <div className="text-lg font-bold text-white drop-shadow-md">{stat.value}</div>
-                      <div className="text-[9px] text-sky-50">{t(stat.labelKey)}</div>
+                {categoryDropdownOpen && !categoriesLoading && (
+                  <div className="absolute z-50 mt-1.5 w-full bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden">
+                    <div className="max-h-48 overflow-y-auto divide-y divide-gray-50">
+                      {categories.map((cat) => {
+                        const isSelected = cat.id === selectedCategoryId;
+                        return (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            dir={locale === "ar" ? "rtl" : "ltr"}
+                            onClick={() => { setSelectedCategoryId(cat.id); setCategoryDropdownOpen(false); }}
+                            className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 text-sm transition-colors text-start ${
+                              isSelected
+                                ? "bg-[#025EB8]/8 text-[#025EB8] font-semibold"
+                                : "text-gray-700 hover:bg-gray-50"
+                            }`}
+                          >
+                            <span className="truncate">{cat.name}</span>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-[#025EB8] flex-shrink-0" />}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                )}
+              </div>
 
-            <button className="group flex items-center gap-2 bg-white text-sky-600 px-4 py-2 rounded-lg hover:bg-sky-50 transition-all shadow-lg hover:shadow-xl hover:scale-105">
-              <span className="font-bold text-xs lg:text-sm">{t("discoverMore")}</span>
-              <ArrowLeft className="w-3.5 h-3.5 group-hover:translate-x-[-4px] transition-transform" />
-            </button>
-          </div>
-
-          {/* Right Side - Donation Card */}
-          <div className="lg:sticky lg:top-6">
-            <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
-              <div className="bg-gradient-to-br from-sky-500 via-sky-600 to-cyan-600 p-4 lg:p-5 text-white relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-white/20 rounded-full -mr-12 -mt-12"></div>
-                <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/20 rounded-full -ml-10 -mb-10"></div>
-                <Sparkles className="absolute top-3 left-3 w-4 h-4 text-sky-200" />
-                <div className="relative z-10 text-center">
-                  <h3 className="text-lg lg:text-xl font-extrabold mb-1 drop-shadow-md">
-                    {t("monthlyCommitment")}
-                  </h3>
-                  <p className="text-sky-50 text-xs drop-shadow-sm">
-                    {t("monthlyCommitmentDesc")}
-                    <span className="font-bold"> "{t("hadithText")}"</span>
-                  </p>
+              {/* Quick amounts — 3 cols always, amounts shrink on tiny screens */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">{t("selectAmount")}</label>
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                  {quickAmounts.map((amount, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => { setSelectedAmount(amount); setCustomAmount(""); }}
+                      dir="ltr"
+                      className={`py-2 rounded-lg font-bold text-xs sm:text-sm transition-all border ${
+                        selectedAmount === amount
+                          ? "bg-[#025EB8] text-white border-[#025EB8] shadow-sm"
+                          : "bg-white text-gray-700 border-gray-200 hover:border-[#025EB8] hover:text-[#025EB8]"
+                      }`}
+                    >
+                      {amount} {currencyLabel}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div className="p-4 lg:p-5 space-y-3 bg-gradient-to-b from-gray-50 to-white">
-                {/* Category Selection (from API, localized) */}
-                <div>
-                  <label className="block text-gray-900 font-bold mb-2 text-xs">{t("selectProject")}</label>
-                  <select
-                    value={selectedCategoryId}
-                    onChange={(e) => setSelectedCategoryId(e.target.value)}
-                    className="w-full p-2.5 rounded-lg bg-white text-gray-900 border-2 border-gray-300 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-400/40 transition-all cursor-pointer text-xs hover:border-sky-400 shadow-sm"
-                  >
-                    {categoriesLoading ? (
-                      <option value="">...</option>
-                    ) : (
-                      categories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </option>
-                      ))
-                    )}
-                  </select>
+              {/* Custom amount */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">{t("customAmount")}</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={customAmount}
+                    onChange={(e) => { setCustomAmount(e.target.value); setSelectedAmount(null); }}
+                    placeholder={t("enterAmount")}
+                    className={`w-full py-2.5 rounded-lg bg-gray-50 text-gray-900 border border-gray-200 focus:border-[#025EB8] focus:outline-none focus:ring-2 focus:ring-[#025EB8]/20 transition-all text-sm ${locale === "ar" ? "pl-12 pr-3" : "pl-3 pr-12"}`}
+                  />
+                  <span className={`absolute top-1/2 -translate-y-1/2 text-gray-400 text-xs font-semibold ${locale === "ar" ? "left-3" : "right-3"}`}>{currencyLabel}</span>
                 </div>
+              </div>
 
-                {/* Amount Buttons */}
-                <div>
-                  <label className="block text-gray-900 font-bold mb-2 text-xs">{t("selectAmount")}</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {quickAmounts.map((amount, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setSelectedAmount(amount)}
-                        dir="ltr"
-                        className={`p-2.5 rounded-lg font-bold text-xs transition-all shadow-sm ${
-                          selectedAmount === amount
-                            ? "bg-gradient-to-br from-sky-500 to-sky-600 text-white shadow-md scale-105 ring-2 ring-sky-400/50"
-                            : "bg-white text-gray-800 hover:bg-sky-50 hover:text-sky-600 border-2 border-gray-300 hover:border-sky-400 hover:scale-105 hover:shadow-md"
-                        }`}
-                      >
-                        {amount} {currencyLabel}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              {/* CTA */}
+              <button
+                onClick={handleDonateClick}
+                disabled={!selectedCategoryId || displayAmount <= 0 || categoriesLoading}
+                className="w-full bg-[#FA5D17] hover:bg-[#e04d0f] text-white py-3 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 shadow-md disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {t("donateNow")}
+                <Heart className="w-4 h-4" fill="currentColor" />
+              </button>
 
-                {/* Custom Amount */}
-                <div>
-                  <label className="block text-gray-900 font-bold mb-2 text-xs">{t("customAmount")}</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      value={customAmount}
-                      onChange={(e) => setCustomAmount(e.target.value)}
-                      placeholder={t("enterAmount")}
-                      className="w-full p-2.5 pr-10 rounded-lg bg-white text-gray-900 border-2 border-gray-300 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-400/40 transition-all text-xs hover:border-sky-400 shadow-sm"
-                    />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 font-bold text-xs">{currencyLabel}</span>
-                  </div>
-                </div>
-
-                {/* Donate Button - opens monthly category donation dialog */}
-                <button
-                  onClick={handleDonateClick}
-                  disabled={!selectedCategoryId || displayAmount <= 0 || categoriesLoading}
-                  className="w-full bg-gradient-to-r from-sky-500 via-sky-600 to-cyan-600 text-white py-3 rounded-lg font-bold hover:from-sky-600 hover:via-sky-700 hover:to-cyan-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-[1.02] text-sm group disabled:opacity-60 disabled:pointer-events-none"
-                >
-                  <span className="flex items-center justify-center gap-2">
-                    {t("donateNow")}
-                    <Heart className="w-4 h-4 group-hover:scale-110 transition-transform" fill="currentColor" />
-                  </span>
-                </button>
-
-                {/* Trust Badge */}
-                <div className="pt-2 border-t-2 border-gray-200">
-                  <div className="flex items-center justify-center gap-2 text-gray-700 text-[10px] font-medium">
-                    <CheckCircle className="w-3.5 h-3.5 text-green-600" />
-                    <span>{t("secureTransactions")}</span>
-                  </div>
-                </div>
+              {/* Trust */}
+              <div className="flex items-center justify-center gap-1.5 text-gray-400 text-[11px]">
+                <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                <span>{t("secureTransactions")}</span>
               </div>
             </div>
           </div>
         </div>
-      </section>
 
-      {/* Sign-in when user wants to donate but is not signed in */}
+        {/* ── Text content — ORDER 2 on mobile, ORDER 1 on desktop ── */}
+        <div className="order-1 flex flex-col gap-5 sm:gap-6 text-white">
+          {/* Badge + heading */}
+          <div className="space-y-3 sm:space-y-4">
+            <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-semibold border border-white/25">
+              <Heart className="w-3.5 h-3.5 text-[#FA5D17]" fill="currentColor" />
+              <span>{t("associationName")}</span>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-white/80 text-xs tracking-wide uppercase font-semibold">{t("hadithQuote")}</p>
+              <h2 className="text-xl sm:text-2xl lg:text-4xl font-extrabold leading-snug">
+                {t("hadithText")}
+              </h2>
+              <div className="w-12 h-1 bg-[#FA5D17] rounded-full" />
+            </div>
+
+            <p className="text-white/75 text-sm leading-relaxed hidden sm:block">{t("description")}</p>
+          </div>
+
+          {/* Features — hidden on mobile to keep it clean */}
+          <div className="hidden sm:grid grid-cols-2 gap-y-2.5 gap-x-4">
+            {featureKeys.map((key, idx) => (
+              <div key={idx} className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-[#FA5D17] mt-0.5 shrink-0" />
+                <span className="text-white text-xs">{t(key)}</span>
+              </div>
+            ))}
+          </div>
+
+          <Link href="/about-us" className="hidden sm:inline-flex group items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white border border-white/30 px-3 py-2 rounded-lg font-semibold text-xs transition-all w-fit">
+            {t("discoverMore")}
+          </Link>
+
+          {/* Stats — 2 cols on mobile, 4 on sm+ */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {stats.map((stat, idx) => {
+              const Icon = stat.icon;
+              return (
+                <div key={idx} className="text-center bg-white/10 backdrop-blur-sm rounded-xl p-2.5 sm:p-3 border border-white/15">
+                  <Icon className="w-4 h-4 text-[#FA5D17] mx-auto mb-1" />
+                  <div className="text-sm sm:text-base font-extrabold">{stat.value}</div>
+                  <div className="text-[10px] text-white/80 leading-tight mt-0.5">{t(stat.labelKey)}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+      </div>
+
       <SignInDialog
         isOpen={signInOpen}
         onClose={() => setSignInOpen(false)}
@@ -300,7 +335,6 @@ const QuickDonate = () => {
         }
       />
 
-      {/* Monthly donation dialog for selected category */}
       <DonationDialog
         isOpen={donationDialogOpen}
         onClose={() => {
@@ -314,9 +348,7 @@ const QuickDonate = () => {
         categoryId={resumeCategoryId || selectedCategoryId}
         categoryName={resumeCategoryName || (selectedCategory?.name ?? "")}
         categoryImage={resumeCategoryImage ?? selectedCategory?.image ?? undefined}
-        initialDonationAmount={
-          resumeAmount ?? (displayAmount > 0 ? displayAmount : undefined)
-        }
+        initialDonationAmount={resumeAmount ?? (displayAmount > 0 ? displayAmount : undefined)}
       />
     </div>
   );

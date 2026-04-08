@@ -2,27 +2,15 @@
 
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { motion } from "framer-motion";
-import { Link } from "@/i18n/routing";
-import { Search, Filter, Loader2, HandHeart } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getCurrency } from "@/hooks/useCampaignValue";
-import { useCurrency } from "@/context/CurrencyContext";
-import { formatNumber } from "@/hooks/formatNumber";
+import { Search, HandHeart, ArrowRight, SlidersHorizontal, X, ChevronRight } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import CampaignCard from "@/app/[locale]/_components/CampaignCard";
 import { useDebounce } from "use-debounce";
-import { Switch } from "@/components/ui/switch";
 import { useSession } from "next-auth/react";
 import SignInDialog from "@/components/SignInDialog";
 import { useLocale, useTranslations } from "next-intl";
+import { Link } from "@/i18n/routing";
+import CategoryIcon from "@/components/CategoryIcon";
 
 interface Campaign {
   id: string;
@@ -31,13 +19,12 @@ interface Campaign {
   description: string;
   currentAmount: number;
   targetAmount: number;
+  progress?: number;
+  showProgress?: boolean;
+  fundraisingMode?: string;
   isActive?: boolean;
   categoryId?: string;
-  category: {
-    id?: string;
-    name: string;
-    icon?: string;
-  };
+  category: { id?: string; name: string; icon?: string };
   createdAt: string;
 }
 
@@ -54,6 +41,8 @@ interface FilterState {
   maxAmount: number;
 }
 
+const HERO_IMAGE = "https://i.ibb.co/Xm58ssT/481207566-944951421141366-1158434782285969951-n-1.png";
+
 const CampaignsPage = () => {
   const t = useTranslations("CampaignsPage");
   const { data: session } = useSession();
@@ -65,19 +54,13 @@ const CampaignsPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch] = useDebounce(searchQuery, 300);
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const { convertToCurrency } = useCurrency();
-  const [filters, setFilters] = useState<FilterState>({
-    sortBy: "newest",
-    minAmount: 0,
-    maxAmount: 100000000,
-  });
+  const [filters, setFilters] = useState<FilterState>({ sortBy: "newest", minAmount: 0, maxAmount: 100000000 });
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [cursor, setCursor] = useState<string | null>(null);
   const ITEMS_PER_PAGE = 12;
-
-  // Locale from route
   const locale = useLocale() as string;
+  const isRTL = locale === "ar";
 
   const fetchData = async (cursorParam?: string | null) => {
     try {
@@ -85,56 +68,32 @@ const CampaignsPage = () => {
       const [campaignsRes, categoriesRes] = await Promise.all([
         selectedCategory !== "all"
           ? axios.get(`/api/categories/${selectedCategory}/campaigns`, {
-              params: {
-                cursor: cursorParam,
-                limit: ITEMS_PER_PAGE,
-                search: debouncedSearch,
-                locale,
-                ...filters,
-              },
+              params: { cursor: cursorParam, limit: ITEMS_PER_PAGE, search: debouncedSearch, locale, ...filters },
             })
           : axios.get("/api/campaigns", {
-              params: {
-                cursor: cursorParam,
-                limit: ITEMS_PER_PAGE,
-                search: debouncedSearch,
-                locale,
-                ...filters,
-              },
+              params: { cursor: cursorParam, limit: ITEMS_PER_PAGE, search: debouncedSearch, locale, ...filters },
             }),
         !categories.length
           ? axios.get("/api/categories", { params: { locale, counts: true, limit: 100 } })
           : Promise.resolve({ data: { items: categories } }),
       ]);
-
       const campaignsItems = campaignsRes.data.items || campaignsRes.data;
-
-      const newCampaigns = (campaignsItems as Campaign[]).map(
-        (campaign: Campaign) => ({
-          ...campaign,
-          category: {
-            ...campaign.category,
-            id: campaign.category?.id || campaign.categoryId || selectedCategory,
-          },
-        })
-      );
-
+      const newCampaigns = (campaignsItems as Campaign[]).map((campaign) => ({
+        ...campaign,
+        // Ensure categoryId is always set so the local filter works correctly
+        categoryId: campaign.categoryId || campaign.category?.id || (selectedCategory !== "all" ? selectedCategory : undefined),
+        category: { ...campaign.category, id: campaign.category?.id || campaign.categoryId || (selectedCategory !== "all" ? selectedCategory : "") },
+      }));
       if (cursorParam) {
         setCampaigns((prev) => [...prev, ...newCampaigns]);
       } else {
         setCampaigns(newCampaigns);
       }
-
       setHasMore(Boolean(campaignsRes.data.hasMore));
       setCursor(campaignsRes.data.nextCursor || null);
-
-      // categoriesRes may return { items: [...] } or an array directly
       const catData = categoriesRes.data.items || categoriesRes.data;
-      if (catData && !categories.length) {
-        setCategories(catData as Category[]);
-      }
+      if (catData && !categories.length) setCategories(catData as Category[]);
     } catch (err) {
-      console.error("Error fetching campaigns:", err);
       setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
       setIsLoadingMore(false);
@@ -145,463 +104,351 @@ const CampaignsPage = () => {
   useEffect(() => {
     setCursor(null);
     setHasMore(true);
-    if(!session){
-      setIsSignInOpen(true)
-    }
+    if (!session) setIsSignInOpen(true);
     setCampaigns([]);
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, selectedCategory, debouncedSearch]);
 
-  const loadMore = () => {
-    if (!isLoadingMore && hasMore) {
-      fetchData(cursor);
-    }
-  };
+  const loadMore = () => { if (!isLoadingMore && hasMore) fetchData(cursor); };
 
-  const filteredCampaigns = campaigns.filter((campaign) => {
-    const matchesSearch =
-      campaign.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      campaign.description.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesCategory =
-      selectedCategory === "all" || campaign.categoryId === selectedCategory;
-
-    const matchesAmount =
-      campaign.targetAmount >= filters.minAmount &&
-      campaign.targetAmount <= filters.maxAmount;
-
-    return (
-      matchesSearch && matchesCategory && matchesAmount && campaign.isActive
-    );
+  const filteredCampaigns = campaigns.filter((c) => {
+    const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) || c.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === "all" || c.categoryId === selectedCategory;
+    const matchesAmount = c.targetAmount >= filters.minAmount && c.targetAmount <= filters.maxAmount;
+    return matchesSearch && matchesCategory && matchesAmount && c.isActive;
   });
 
   const sortedCampaigns = [...filteredCampaigns].sort((a, b) => {
     switch (filters.sortBy) {
-      case "amount-high":
-        return b.targetAmount - a.targetAmount;
-      case "amount-low":
-        return a.targetAmount - b.targetAmount;
-      case "progress":
-        return (
-          b.currentAmount / b.targetAmount - a.currentAmount / a.targetAmount
-        );
-      default: // 'newest'
-        return (
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+      case "amount-high": return b.targetAmount - a.targetAmount;
+      case "amount-low": return a.targetAmount - b.targetAmount;
+      case "progress": return (b.currentAmount / b.targetAmount) - (a.currentAmount / a.targetAmount);
+      default: return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     }
   });
 
-  const handleFilterChange = (key: keyof FilterState, value: any) => {
+  const handleFilterChange = (key: keyof FilterState, value: number | string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
-  if (loading) {
-    return <LoadingSkeleton />;
-  }
+  const hasActiveFilters = filters.sortBy !== "newest" || filters.minAmount !== 0 || filters.maxAmount !== 100000000;
+
+  if (loading) return <LoadingSkeleton />;
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-sky-50 to-white py-16">
-        <div className="max-w-2xl mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold text-gray-800 mb-4">{t("error")}</h2>
-          <p className="text-gray-600 mb-8">{error}</p>
-          <Button
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center bg-white rounded-2xl p-10 shadow-sm border border-gray-100 max-w-sm mx-4">
+          <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+            <X className="w-7 h-7 text-red-400" />
+          </div>
+          <p className="text-gray-700 font-semibold mb-1">{t("errorTitle") || "Something went wrong"}</p>
+          <p className="text-gray-400 text-sm mb-6">{error}</p>
+          <button
             onClick={() => window.location.reload()}
-            className="bg-sky-600 hover:bg-sky-700"
+            className="bg-[#025EB8] hover:bg-[#014fa0] text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors"
           >
             {t("retry")}
-          </Button>
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-white">
-      <SignInDialog
-        isOpen={isSignInOpen}
-        onClose={() => setIsSignInOpen(false)}
-      />
-      <div className="relative bg-gradient-to-br from-sky-50 via-white to-sky-50">
-        <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-10" />
-        <div className="absolute bottom-0 left-0 right-0">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 1440 320"
-            className="w-full h-auto"
-          >
-            <path
-              fill="#ffffff"
-              fillOpacity="1"
-              d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,154.7C960,171,1056,181,1152,165.3C1248,149,1344,107,1392,85.3L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
-            />
-          </svg>
+    <main className="min-h-screen bg-gray-50" dir={isRTL ? "rtl" : "ltr"}>
+      <SignInDialog isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} />
+
+      {/* ── Hero Header ── */}
+      <section className="relative">
+        {/* Background layers — clipped independently so the search bar can overflow the section */}
+        <div className="absolute inset-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={HERO_IMAGE} alt="" aria-hidden className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/75" />
+          <div className="absolute inset-0 bg-[#025EB8]/30" />
+          <div className="absolute inset-0 opacity-[0.04] bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:20px_20px]" />
         </div>
 
-        <div
-          className="relative w-full"
-          style={{
-            backgroundImage: "url('/hero2.jpg')",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            backgroundRepeat: "no-repeat",
-          }}
-        >
-          {/* Add dark overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br to-black/85 from-sky-700/85 z-10" />
+        <div className="relative z-10 max-w-7xl mx-auto px-4 pt-12 pb-20">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-1.5 text-white/60 text-xs mb-6">
+            <Link href="/" className="hover:text-white transition-colors">{t("home") || "Home"}</Link>
+            <ChevronRight className={`w-3 h-3 ${isRTL ? "rotate-180" : ""}`} />
+            <span className="text-white/90 font-medium">{t("campaigns") || "Campaigns"}</span>
+          </div>
 
-          {/* Content container - increased z-index to appear above overlay */}
-          <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-6 pt-6 pb-14 sm:py-16 lg:py-20">
-            {/* Rest of your content remains the same */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center mb-8 sm:mb-12"
-            >
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4">
-                {t("browse")}{" "}
-                <span className="relative">
-                  <span className="relative z-10 bg-gradient-to-r from-green-400 to-sky-300 text-transparent bg-clip-text">
-                    {t("campaigns")}
-                  </span>
-                  {/* <svg className="absolute -bottom-0 left-0 w-full" viewBox="0 0 100 20" preserveAspectRatio="none">
-                <path d="M0,10 Q50,20 100,10 L100,20 L0,20 Z" fill="rgba(16, 185, 129, 0.2)"/>
-              </svg> */}
-                </span>
-              </h1>
-              <p className="text-base sm:text-xl text-stone-100 max-w-2xl mx-auto px-4">
-                {t("pageDescription")}
-              </p>
-            </motion.div>
+          {/* Title */}
+          <div className="text-center max-w-2xl mx-auto">
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-1.5 rounded-full text-xs font-semibold text-white/90 mb-4">
+              <HandHeart className="w-3.5 h-3.5 text-[#FA5D17]" />
+              <span>{t("projects") || "OUR PROJECTS"}</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white leading-tight mb-3">
+              {t("browse") || "Browse"}{" "}
+              <span className="text-[#FA5D17]">{t("allCampaigns") || "All Campaigns"}</span>
+            </h1>
+            <p className="text-white/70 text-sm sm:text-base leading-relaxed">
+              {t("heroDescription") || "Support meaningful causes and make a lasting difference in people's lives."}
+            </p>
+          </div>
+        </div>
+      </section>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="flex gap-4 items-center max-w-2xl mx-auto"
-            >
-              <div className="relative flex-1 w-full sm:w-auto group">
-                <div className="absolute inset-0 bg-sky-200/30 rounded-lg blur-xl group-hover:blur-2xl transition-all duration-300 opacity-0 group-hover:opacity-100" />
-                <Input
-                  type="text"
-                  placeholder="ابحث عن حملة..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-white/90 backdrop-blur-sm rounded-lg text-lg placeholder:text-gray-500 focus:ring-2 focus:ring-sky-500 shadow-sm border transition-all duration-300"
-                />
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-              </div>
-
+      {/* ── Search bar — floats between hero and tabs ── */}
+      <div className="relative z-30 max-w-2xl mx-auto px-4 -mt-6">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-2 flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 ${isRTL ? "right-3" : "left-3"}`} />
+            <input
+              type="text"
+              placeholder={t("searchPlaceholder") || "Search campaigns..."}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={`w-full ${isRTL ? "pr-9 pl-3" : "pl-9 pr-3"} py-2.5 rounded-xl text-sm text-gray-800 bg-gray-50 outline-none focus:bg-white transition-colors`}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className={`absolute top-1/2 -translate-y-1/2 ${isRTL ? "left-3" : "right-3"} text-gray-400 hover:text-gray-600`}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
               <Sheet>
                 <SheetTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="relative hover:bg-sky-50 transition-colors duration-300"
-                  >
-                    <Filter className="h-5 w-5" />
-                    {Object.values(filters).some(
-                      (value) =>
-                        value !== false &&
-                        value !== "newest" &&
-                        value !== 0 &&
-                        value !== 100000000
-                    ) && (
-                      <motion.span
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="absolute -top-1 -right-1 h-3 w-3 bg-sky-500 rounded-full"
-                      />
+                  <button className={`relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors flex-shrink-0 ${hasActiveFilters ? "bg-[#FA5D17] text-white" : "bg-[#025EB8] hover:bg-[#014fa0] text-white"}`}>
+                    <SlidersHorizontal className="w-4 h-4" />
+                    <span className="hidden sm:inline">{t("filter") || "Filter"}</span>
+                    {hasActiveFilters && (
+                      <span className="absolute -top-1.5 -end-1.5 w-4 h-4 rounded-full bg-white text-[#FA5D17] text-[10px] font-bold flex items-center justify-center">!</span>
                     )}
-                  </Button>
+                  </button>
                 </SheetTrigger>
-                <SheetContent>
-                  <SheetHeader>
-                    <SheetTitle>{t("filterOptions")}</SheetTitle>
+                <SheetContent dir={isRTL ? "rtl" : "ltr"} className="w-full sm:max-w-sm">
+                  <SheetHeader className="pb-4 border-b border-gray-100">
+                    <SheetTitle className="flex items-center gap-2 text-start">
+                      <SlidersHorizontal className="w-4 h-4 text-[#025EB8]" />
+                      {t("filterOptions") || "Filter Options"}
+                    </SheetTitle>
                   </SheetHeader>
                   <div className="mt-6 space-y-6">
                     <div>
-                      <h3 className="text-sm font-medium mb-3">{t("sortBy")}</h3>
-                      <select
-                        value={filters.sortBy}
-                        onChange={(e) =>
-                          handleFilterChange("sortBy", e.target.value)
-                        }
-                        className="w-full rounded-md border border-gray-300 p-2"
-                      >
-                        <option value="newest">{t("newest")}</option>
-                        <option value="amount-high">{t("amountHigh")}</option>
-                        <option value="amount-low">{t("amountLow")}</option>
-                        <option value="progress">{t("progress")}</option>
-                      </select>
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{t("sortBy") || "Sort By"}</h3>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { value: "newest", label: t("newest") || "Newest" },
+                          { value: "amount-high", label: t("amountHigh") || "Highest Goal" },
+                          { value: "amount-low", label: t("amountLow") || "Lowest Goal" },
+                          { value: "progress", label: t("progress") || "Progress" },
+                        ].map((opt) => (
+                          <button
+                            key={opt.value}
+                            onClick={() => handleFilterChange("sortBy", opt.value)}
+                            className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${filters.sortBy === opt.value ? "bg-[#025EB8] text-white border-[#025EB8]" : "bg-white text-gray-600 border-gray-200 hover:border-[#025EB8]/50"}`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-
                     <div>
-                      <h3 className="text-sm font-medium mb-3">
-                        {t("targetAmountRange")}
-                      </h3>
-                      <div className="flex flex-col sm:flex-row gap-4">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{t("targetAmountRange") || "Target Amount"}</h3>
+                      <div className="flex gap-3">
                         <div className="flex-1">
-                          <label className="text-xs text-gray-500">
-                            {t("minAmount")}
-                          </label>
+                          <label className="text-xs text-gray-500 mb-1 block">{t("minAmount") || "Min"}</label>
                           <input
                             type="number"
                             value={filters.minAmount}
-                            onChange={(e) =>
-                              handleFilterChange(
-                                "minAmount",
-                                Number(e.target.value)
-                              )
-                            }
-                            className="w-full rounded-md border border-gray-300 p-2"
+                            onChange={(e) => handleFilterChange("minAmount", Number(e.target.value))}
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-[#025EB8] focus:ring-2 focus:ring-[#025EB8]/20 outline-none transition-all"
                           />
                         </div>
                         <div className="flex-1">
-                          <label className="text-xs text-gray-500">
-                            {t("maxAmount")}
-                          </label>
+                          <label className="text-xs text-gray-500 mb-1 block">{t("maxAmount") || "Max"}</label>
                           <input
                             type="number"
                             value={filters.maxAmount}
-                            onChange={(e) =>
-                              handleFilterChange(
-                                "maxAmount",
-                                Number(e.target.value)
-                              )
-                            }
-                            className="w-full rounded-md border border-gray-300 p-2"
+                            onChange={(e) => handleFilterChange("maxAmount", Number(e.target.value))}
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-[#025EB8] focus:ring-2 focus:ring-[#025EB8]/20 outline-none transition-all"
                           />
                         </div>
                       </div>
                     </div>
-
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() =>
-                        setFilters({
-                          sortBy: "newest",
-                          minAmount: 0,
-                          maxAmount: 100000000,
-                        })
-                      }
+                    <button
+                      onClick={() => setFilters({ sortBy: "newest", minAmount: 0, maxAmount: 100000000 })}
+                      className="w-full py-2.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
                     >
-                      إعادة تعيين التصفية
-                    </Button>
+                      {t("resetFilters") || "Reset Filters"}
+                    </button>
                   </div>
                 </SheetContent>
               </Sheet>
-            </motion.div>
+        </div>
+      </div>
 
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.4 }}
-              className="mt-8 max-sm:mt-5 sm:border-b border-gray-200/50 flex flex-wrap"
+      {/* ── Category tabs ── */}
+      <div className="bg-gray-50 border-b border-gray-100 shadow-sm sticky top-16 lg:top-[104px] z-20">
+        <div className="max-w-7xl mx-auto px-4 pt-6 pb-3">
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+            <button
+              onClick={() => setSelectedCategory("all")}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition-all whitespace-nowrap flex-shrink-0 border ${
+                selectedCategory === "all"
+                  ? "bg-[#025EB8] text-white border-[#025EB8] shadow-sm"
+                  : "bg-white text-gray-600 border-gray-200 hover:border-[#025EB8]/50 hover:text-[#025EB8]"
+              }`}
             >
-              <Tabs
-                defaultValue="all"
-                value={selectedCategory}
-                onValueChange={setSelectedCategory}
-                dir="rtl"
-                className="w-full flex justify-center items-center flex-wrap"
+              <HandHeart className="w-3.5 h-3.5" />
+              {t("allCampaigns") || "All"}
+            </button>
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                dir={isRTL ? "rtl" : "ltr"}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition-all whitespace-nowrap flex-shrink-0 border ${
+                  selectedCategory === cat.id
+                    ? "bg-[#025EB8] text-white border-[#025EB8] shadow-sm"
+                    : "bg-white text-gray-600 border-gray-200 hover:border-[#025EB8]/50 hover:text-[#025EB8]"
+                }`}
               >
-                <TabsList className="h-16 bg-transparent w-full flex flex-wrap gap-2">
-                  <TabsTrigger
-                    value="all"
-                    className="flex w-max items-center gap-2 text-stone-100 data-[state=active]:bg-sky-400/35 data-[state=active]:backdrop-blur-sm data-[state=active]:text-white transition-all duration-300"
-                  >
-                    <HandHeart className="w-4 h-4 text-sky-600" />{" "}
-                    {t("allCampaigns")}
-                  </TabsTrigger>
-                  {categories.map((category) => (
-                    <TabsTrigger
-                      key={category.id}
-                      value={category.id}
-                      className="flex w-max items-center gap-2 text-stone-100 data-[state=active]:bg-sky-400/35 data-[state=active]:backdrop-blur-sm data-[state=active]:text-white transition-all duration-300"
-                    >
-                      <span
-                        className="w-4 h-4"
-                        dangerouslySetInnerHTML={{ __html: category.icon }}
-                      />
-                      {category.name}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-            </motion.div>
+                {cat.campaignCount != null && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold flex-shrink-0 ${selectedCategory === cat.id ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}`}>
+                    {cat.campaignCount}
+                  </span>
+                )}
+                <CategoryIcon name={cat.icon} className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>{cat.name}</span>
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedCampaigns.map((campaign, index) => (
-            <motion.div
-              key={campaign.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: Math.min(index * 0.1, 1) }}
-              whileHover={{ y: -5 }}
-              className="group"
-            >
-              <Link
-                href={`/campaign/${campaign.id}`}
-                prefetch={true}
-                className="block bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300"
-              >
-                <div className="relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent z-10" />
-                  <img
-                    src={campaign.images[0]}
-                    alt={campaign.title}
-                    className="w-full h-60 object-cover transform group-hover:scale-105 transition-transform duration-500"
-                    loading="lazy"
-                  />
-                  <div className="absolute bottom-4 left-4 right-4 z-20">
-                    <div className="flex items-center gap-2 text-white text-sm">
-                      <span
-                        className="w-4 h-4"
-                        dangerouslySetInnerHTML={{
-                          __html: campaign.category.icon,
-                        }}
-                      />
-                      {campaign.category.name}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col p-4 pt-0">
-                  <div className="flex flex-col gap-[2px] pt-4 pb-2">
-                    <h3 className="text-[17px] font-bold text-stone-800 line-clamp-1 text-center mb-1">
-                      {campaign.title}
-                    </h3>
-                    <h3 className="text-[14px] text-gray-500 line-clamp-2">
-                      {campaign.description}
-                    </h3>
-                  </div>
-                  <div className="h-[1px] bg-black/10 w-full mb-2" />
-                  <div>
-                    <div className="flex justify-between text-sm text-gray-700 mb-2">
-                      <span>
-                        <span className="font-semibold">
-                          {getCurrency()}
-                          {formatNumber(
-                            convertToCurrency(
-                              Math.round(campaign.currentAmount)
-                            ).convertedValue
-                          )}
-                        </span>{" "}
-                        {t("donations")}
-                      </span>
-                      <span>
-                        {t("remaining")}{" "}
-                        <span className="font-semibold">
-                          {getCurrency()}
-                          {formatNumber(
-                            convertToCurrency(Math.round(campaign.targetAmount))
-                              .convertedValue
-                          )}
-                        </span>
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-3">
-                      <div
-                        className="bg-sky-500 h-3 rounded-full"
-                        style={{
-                          width: `${Math.min(
-                            (campaign.currentAmount / campaign.targetAmount) *
-                              100,
-                            100
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            </motion.div>
-          ))}
-        </div>
-
-        {hasMore && !isLoadingMore && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center mt-12"
-          >
-            <Button
-              onClick={loadMore}
-              disabled={isLoadingMore}
-              className="bg-sky-600 hover:bg-sky-700 px-8 py-6 rounded-xl transform hover:scale-105 transition-all duration-300"
-            >
-              {isLoadingMore ? (
-                <span className="flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  جاري التحميل...
-                </span>
-              ) : (
-                "تحميل المزيد"
-              )}
-            </Button>
-          </motion.div>
-        )}
-
-        {isLoadingMore && (
-          <div className="text-center mt-8">
-            <Loader2 className="w-12 h-12 text-sky-500 animate-spin mx-auto" />
-          </div>
-        )}
-
-        {sortedCampaigns.length === 0 && !loading && !isLoadingMore && (
-          <div className="text-center py-12">
-            <h3 className="text-2xl font-bold text-gray-800 mb-2">
-              {searchQuery
-                ? t("noResults")
-                : t("noCampaigns")}
-            </h3>
-            <p className="text-gray-600">
-              {searchQuery
-                ? t("tryDifferentSearch")
-                : t("checkBackLater")}
+      {/* ── Campaign Grid ── */}
+      <section className="max-w-7xl mx-auto px-4 py-10">
+        {/* Results count */}
+        {!loading && sortedCampaigns.length > 0 && (
+          <div className="flex items-center justify-between mb-6">
+            <p className="text-sm text-gray-500">
+              <span className="font-semibold text-gray-800">{sortedCampaigns.length}</span>{" "}
+              {t("resultsFound") || "campaigns found"}
             </p>
+            {hasActiveFilters && (
+              <button
+                onClick={() => setFilters({ sortBy: "newest", minAmount: 0, maxAmount: 100000000 })}
+                className="flex items-center gap-1 text-xs text-[#FA5D17] font-semibold hover:underline"
+              >
+                <X className="w-3 h-3" /> {t("clearFilters") || "Clear filters"}
+              </button>
+            )}
           </div>
         )}
-      </div>
+
+        {sortedCampaigns.length === 0 && !isLoadingMore ? (
+          <div className="text-center py-20">
+            <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+              <HandHeart className="w-9 h-9 text-gray-300" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-700 mb-1">
+              {searchQuery ? t("noResults") : t("noCampaigns")}
+            </h3>
+            <p className="text-gray-400 text-sm">
+              {searchQuery ? t("tryDifferentSearch") : t("checkBackLater")}
+            </p>
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="mt-4 text-[#025EB8] text-sm font-semibold hover:underline"
+              >
+                {t("clearSearch") || "Clear search"}
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {sortedCampaigns.map((campaign) => (
+              <CampaignCard key={campaign.id} campaign={campaign} />
+            ))}
+            {/* Inline loading more skeletons */}
+            {isLoadingMore && Array.from({ length: 3 }).map((_, i) => (
+              <CardSkeleton key={`more-${i}`} />
+            ))}
+          </div>
+        )}
+
+        {/* Load more */}
+        {hasMore && !isLoadingMore && sortedCampaigns.length > 0 && (
+          <div className="text-center mt-12">
+            <button
+              onClick={loadMore}
+              className="inline-flex items-center gap-2 bg-[#025EB8] hover:bg-[#014fa0] text-white font-semibold px-8 py-3 rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
+            >
+              {t("loadMore") || "Load More"}
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {isLoadingMore && sortedCampaigns.length === 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
+          </div>
+        )}
+      </section>
     </main>
   );
 };
 
+/* ── Skeleton card ── */
+const CardSkeleton = () => (
+  <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+    <div className="relative h-52 bg-gray-100 overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_1.4s_infinite] -translate-x-full" />
+    </div>
+    <div className="p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="h-5 w-5 rounded-full bg-gray-100 animate-pulse" />
+        <div className="h-3 w-20 bg-gray-100 rounded animate-pulse" />
+      </div>
+      <div className="h-4 bg-gray-100 rounded animate-pulse w-4/5" />
+      <div className="h-3 bg-gray-100 rounded animate-pulse w-full" />
+      <div className="h-3 bg-gray-100 rounded animate-pulse w-3/5" />
+      <div className="h-2 bg-gray-100 rounded-full animate-pulse mt-2" />
+      <div className="flex justify-between pt-1">
+        <div className="h-3 w-16 bg-gray-100 rounded animate-pulse" />
+        <div className="h-3 w-12 bg-gray-100 rounded animate-pulse" />
+      </div>
+      <div className="h-9 bg-gray-100 rounded-lg animate-pulse mt-1" />
+    </div>
+  </div>
+);
+
+/* ── Full page loading skeleton ── */
 const LoadingSkeleton = () => (
-  <div className="min-h-screen bg-[#fafafa]">
-    <div className="relative h-[500px] bg-gray-200 animate-pulse">
-      <div className="absolute inset-0 bg-black/20" />
-      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 h-full flex items-center">
-        <div className="max-w-3xl space-y-6">
-          <div className="h-16 bg-gray-300 rounded-lg w-2/3" />
-          <div className="h-20 bg-gray-300 rounded-lg w-full" />
-          <div className="h-12 bg-gray-300 rounded-lg w-96" />
-        </div>
+  <div className="min-h-screen bg-gray-50">
+    {/* Hero skeleton */}
+    <div className="relative h-64 bg-[#025EB8] overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[shimmer_1.8s_infinite] -translate-x-full" />
+      <div className="relative z-10 flex flex-col items-center justify-center h-full gap-3 px-4">
+        <div className="h-3 w-28 bg-white/20 rounded-full animate-pulse" />
+        <div className="h-8 w-64 bg-white/20 rounded-xl animate-pulse" />
+        <div className="h-3 w-48 bg-white/15 rounded animate-pulse" />
+        <div className="h-11 w-full max-w-lg bg-white/20 rounded-2xl animate-pulse mt-4" />
       </div>
     </div>
-
-    <div className="max-w-7xl mx-auto px-6 py-12">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-          <div
-            key={i}
-            className="bg-white rounded-lg shadow-sm overflow-hidden"
-          >
-            <div className="w-full h-48 bg-gray-200 animate-pulse" />
-            <div className="p-4">
-              <div className="h-6 bg-gray-200 rounded mb-2 animate-pulse" />
-              <div className="h-4 bg-gray-200 rounded mb-4 animate-pulse" />
-              <div className="h-2 bg-gray-200 rounded animate-pulse" />
-            </div>
-          </div>
-        ))}
-      </div>
+    {/* Tabs skeleton */}
+    <div className="bg-white border-b border-gray-100 px-4 py-3 flex gap-2">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="h-8 w-20 bg-gray-100 rounded-full animate-pulse flex-shrink-0" />
+      ))}
+    </div>
+    {/* Grid skeleton */}
+    <div className="max-w-7xl mx-auto px-4 py-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
     </div>
   </div>
 );

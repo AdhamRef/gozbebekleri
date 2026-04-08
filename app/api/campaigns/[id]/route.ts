@@ -4,9 +4,24 @@
 // PUT /api/campaigns/[id] - Updates campaign data
 
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { getServerSession } from 'next-auth';
 import { authOptions } from "../../auth/[...nextauth]/options";
+import {
+  parseSuggestedDonations,
+  validateSuggestedDonationsBody,
+} from "@/lib/campaign/suggested-donations";
+import {
+  computeCampaignProgressPercent,
+  normalizeFundraisingMode,
+  normalizeGoalType,
+  parseSuggestedShareCounts,
+  showCampaignProgress,
+  validateSuggestedShareCountsBody,
+  FUNDRAISING_SHARES,
+} from "@/lib/campaign/campaign-modes";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog } from "@/lib/audit-log";
 
 // ✅ Prisma Singleton - Reuse connection across requests
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
@@ -40,7 +55,12 @@ export async function GET(
         isActive: true,
         createdAt: true,
         updatedAt: true,
-        
+        suggestedDonations: true,
+        goalType: true,
+        fundraisingMode: true,
+        sharePriceUSD: true,
+        suggestedShareCounts: true,
+
         // Get ONLY current locale translation (not all 3)
         translations: {
           where: { locale }, // Filters at DB level
@@ -155,6 +175,10 @@ export async function GET(
         }),
       ]);
 
+    const goalType = normalizeGoalType(campaign.goalType);
+    const fundraisingMode = normalizeFundraisingMode(campaign.fundraisingMode);
+    const showProgress = showCampaignProgress(goalType);
+
     // ✅ STEP 3: Transform data to match frontend expectations
     const transformedCampaign = {
       id: campaign.id,
@@ -169,7 +193,16 @@ export async function GET(
       targetAmount: campaign.targetAmount,
       amountRaised: campaign.currentAmount, // Alias for compatibility
       donationCount: donationCount,
-      progress: (campaign.currentAmount / campaign.targetAmount) * 100,
+      progress: computeCampaignProgressPercent(
+        campaign.currentAmount,
+        campaign.targetAmount,
+        goalType
+      ),
+      showProgress,
+      goalType,
+      fundraisingMode,
+      sharePriceUSD: campaign.sharePriceUSD ?? null,
+      suggestedShareCounts: parseSuggestedShareCounts(campaign.suggestedShareCounts),
       isActive: campaign.isActive,
       
       // Category with translation
@@ -206,6 +239,8 @@ export async function GET(
           donor: lastDonation.donation?.donor?.name || "Anonymous",
         } : null,
       },
+
+      suggestedDonations: parseSuggestedDonations(campaign.suggestedDonations),
       
       createdAt: campaign.createdAt.toISOString(),
       updatedAt: campaign.updatedAt.toISOString(),
@@ -234,13 +269,17 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions);
+    const denied = requireAdminOrDashboardPermission(session, "campaigns");
+    if (denied) return denied;
+
     const { id } = await params;
     const body = await request.json();
 
     // ✅ STEP 1: Validate campaign exists
     const existingCampaign = await prisma.campaign.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, fundraisingMode: true, goalType: true },
     });
 
     if (!existingCampaign) {
@@ -266,6 +305,57 @@ export async function PUT(
     if (body.priority !== undefined) updateData.priority = body.priority;
     if (body.categoryId !== undefined) updateData.categoryId = body.categoryId;
 
+    if (body.goalType !== undefined) {
+      updateData.goalType = normalizeGoalType(body.goalType);
+    }
+    if (body.fundraisingMode !== undefined) {
+      updateData.fundraisingMode = normalizeFundraisingMode(body.fundraisingMode);
+    }
+    if (body.sharePriceUSD !== undefined) {
+      const nextMode =
+        body.fundraisingMode !== undefined
+          ? normalizeFundraisingMode(body.fundraisingMode)
+          : normalizeFundraisingMode(existingCampaign.fundraisingMode);
+      const sp = Number(body.sharePriceUSD);
+      if (nextMode === FUNDRAISING_SHARES) {
+        if (!Number.isFinite(sp) || sp <= 0) {
+          return NextResponse.json(
+            { error: "sharePriceUSD must be a positive number for share-based campaigns" },
+            { status: 400 }
+          );
+        }
+      }
+      updateData.sharePriceUSD =
+        Number.isFinite(sp) && sp > 0 ? sp : null;
+    }
+    if (body.suggestedShareCounts !== undefined) {
+      try {
+        if (body.suggestedShareCounts === null) {
+          updateData.suggestedShareCounts = null;
+        } else {
+          const v = validateSuggestedShareCountsBody(body.suggestedShareCounts);
+          if (v) updateData.suggestedShareCounts = v as unknown as Prisma.InputJsonValue;
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Invalid suggestedShareCounts";
+        return NextResponse.json({ error: msg }, { status: 400 });
+      }
+    }
+
+    if (body.suggestedDonations !== undefined) {
+      try {
+        if (body.suggestedDonations === null) {
+          updateData.suggestedDonations = null;
+        } else {
+          const v = validateSuggestedDonationsBody(body.suggestedDonations);
+          if (v) updateData.suggestedDonations = v as unknown as Prisma.InputJsonValue;
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Invalid suggestedDonations";
+        return NextResponse.json({ error: msg }, { status: 400 });
+      }
+    }
+
     // ✅ STEP 3: Handle translations if provided
     // Expected format: { translations: { en: { title, description }, fr: {...} } }
     if (body.translations && typeof body.translations === 'object') {
@@ -279,41 +369,47 @@ export async function PUT(
       }
     }
 
-    // ✅ STEP 4: Execute update in transaction
-    const updatedCampaign = await prisma.$transaction(async (tx) => {
-      // Update main campaign
-      const campaign = await tx.campaign.update({
-        where: { id },
-        data: updateData,
-      });
-
-      // Update or create translations
-      for (const { locale, data } of translationUpdates) {
-        const translationData: any = {};
-        if (data.title !== undefined) translationData.title = data.title;
-        if (data.description !== undefined) translationData.description = data.description;
-
-        // Skip if no translation data
-        if (Object.keys(translationData).length === 0) continue;
-
-        await tx.campaignTranslation.upsert({
-          where: {
-            campaignId_locale: {
-              campaignId: id,
-              locale,
-            },
-          },
-          update: translationData,
-          create: {
-            campaignId: id,
-            locale,
-            ...translationData,
-          },
+    // ✅ STEP 4: Execute update in transaction (higher timeout: default 5s is too low for
+    // cold DB / many locales; parallel upserts reduce wall time)
+    const updatedCampaign = await prisma.$transaction(
+      async (tx) => {
+        const campaign = await tx.campaign.update({
+          where: { id },
+          data: updateData,
         });
-      }
 
-      return campaign;
-    });
+        const upsertPromises = translationUpdates.flatMap(({ locale, data }) => {
+          const translationData: Record<string, string> = {};
+          if (data.title !== undefined) translationData.title = data.title;
+          if (data.description !== undefined)
+            translationData.description = data.description;
+          if (Object.keys(translationData).length === 0) return [];
+          return [
+            tx.campaignTranslation.upsert({
+              where: {
+                campaignId_locale: {
+                  campaignId: id,
+                  locale,
+                },
+              },
+              update: translationData,
+              create: {
+                campaignId: id,
+                locale,
+                ...translationData,
+              },
+            }),
+          ];
+        });
+
+        if (upsertPromises.length > 0) {
+          await Promise.all(upsertPromises);
+        }
+
+        return campaign;
+      },
+      { maxWait: 10_000, timeout: 60_000 }
+    );
 
     // ✅ STEP 5: Fetch updated campaign with all translations
     const fullCampaign = await prisma.campaign.findUnique({
@@ -331,6 +427,11 @@ export async function PUT(
         categoryId: true,
         createdAt: true,
         updatedAt: true,
+        suggestedDonations: true,
+        goalType: true,
+        fundraisingMode: true,
+        sharePriceUSD: true,
+        suggestedShareCounts: true,
         translations: {
           select: {
             locale: true,
@@ -339,6 +440,19 @@ export async function PUT(
           },
         },
       },
+    });
+
+    const actor = session!.user;
+    const t = fullCampaign?.title ?? body.title ?? "حملة";
+    await writeAuditLog({
+      actorId: actor.id,
+      actorName: actor.name,
+      actorRole: actor.role ?? "ADMIN",
+      action: "CAMPAIGN_UPDATE",
+      messageAr: `${actor.name ?? "مسؤول"} عدّل الحملة: ${t}`,
+      messageEn: `${actor.name ?? "Admin"} updated campaign ${t}`,
+      entityType: "Campaign",
+      entityId: id,
     });
 
     return NextResponse.json(fullCampaign, {
@@ -369,14 +483,16 @@ export async function PUT(
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized - Only admins can delete campaigns' }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, 'campaigns');
+    if (denied) return denied;
 
     const { id } = await params;
 
     // Ensure campaign exists
-    const camp = await prisma.campaign.findUnique({ where: { id }, select: { id: true } });
+    const camp = await prisma.campaign.findUnique({
+      where: { id },
+      select: { id: true, title: true },
+    });
     if (!camp) {
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
@@ -416,6 +532,17 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
       // Finally delete campaign
       await tx.campaign.delete({ where: { id } });
+    });
+
+    const actor = session!.user;
+    await writeAuditLog({
+      actorId: actor.id,
+      actorName: actor.name,
+      actorRole: actor.role ?? "ADMIN",
+      action: "CAMPAIGN_DELETE",
+      messageAr: `${actor.name ?? "مسؤول"} حذف الحملة: ${camp.title}`,
+      entityType: "Campaign",
+      entityId: id,
     });
 
     return NextResponse.json({ message: 'تم مسح الحملة' }, { status: 200 });

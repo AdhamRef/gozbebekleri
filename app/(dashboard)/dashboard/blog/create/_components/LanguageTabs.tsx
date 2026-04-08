@@ -16,6 +16,7 @@ interface LanguageTabsProps {
     categoryId?: string | null;
     category_id?: string;
     category?: { id: string; name: string } | null;
+    campaignIds?: string[];
     campaignId?: string | null;
     campaign_id?: string;
     translations?: Array<{

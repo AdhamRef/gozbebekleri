@@ -1,22 +1,28 @@
-import { NextResponse } from 'next/server';
-import {prisma} from '@/lib/prisma';
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    const denied = requireAdminOrDashboardPermission(session, "categories");
+    if (denied) return denied;
+
     const body = await req.json();
     const { categories } = body;
 
-    // Validate the request body
     if (!Array.isArray(categories)) {
       return NextResponse.json(
-        { error: 'Invalid request body' },
+        { error: "Invalid request body" },
         { status: 400 }
       );
     }
 
-    // Update all categories in a single transaction
     await prisma.$transaction(
-      categories.map(({ id, order }) =>
+      categories.map(({ id, order }: { id: string; order: number }) =>
         prisma.category.update({
           where: { id },
           data: { order },
@@ -24,15 +30,24 @@ export async function POST(req: Request) {
       )
     );
 
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "CATEGORY_REORDER",
+      messageAr: `${actor.actorName ?? "مسؤول"} أعاد ترتيب الأقسام (${categories.length} قسم)`,
+      entityType: "Category",
+      metadata: { count: categories.length },
+    });
+
     return NextResponse.json(
-      { message: 'Categories reordered successfully' },
+      { message: "Categories reordered successfully" },
       { status: 200 }
     );
   } catch (error) {
-    console.error('Error reordering categories:', error);
+    console.error("Error reordering categories:", error);
     return NextResponse.json(
-      { error: 'Failed to reorder categories' },
+      { error: "Failed to reorder categories" },
       { status: 500 }
     );
   }
-} 
+}

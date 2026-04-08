@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from "../../auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 
 // GET: return a single category (localized) with optional counts
 export async function GET(
@@ -67,9 +69,8 @@ export async function PUT(
   try {
     const { id } = await params;
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized - Only admins can update categories' }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, 'categories');
+    if (denied) return denied;
 
     const body = await request.json();
     const { name, description, image, icon, order, translations } = body;
@@ -125,6 +126,15 @@ export async function PUT(
       }
     });
 
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "CATEGORY_UPDATE",
+      messageAr: `${actor.actorName ?? "مسؤول"} عدّل القسم: ${full?.name ?? name}`,
+      entityType: "Category",
+      entityId: id,
+    });
+
     return NextResponse.json(full);
   } catch (error) {
     console.error('Error updating category:', error);
@@ -145,16 +155,29 @@ export async function DELETE(
   try {
     const { id } = await params;
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized - Only admins can delete categories' }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, 'categories');
+    if (denied) return denied;
 
     const campaignCount = await prisma.campaign.count({ where: { categoryId: id } });
     if (campaignCount > 0) {
       return NextResponse.json({ error: 'Category has campaigns. Delete or move campaigns before deleting the category.' }, { status: 400 });
     }
 
+    const cat = await prisma.category.findUnique({
+      where: { id },
+      select: { name: true },
+    });
+
     await prisma.category.delete({ where: { id } });
+
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "CATEGORY_DELETE",
+      messageAr: `${actor.actorName ?? "مسؤول"} حذف القسم: ${cat?.name ?? id}`,
+      entityType: "Category",
+      entityId: id,
+    });
 
     return NextResponse.json({ message: 'Category deleted successfully' }, { status: 200 });
   } catch (error) {

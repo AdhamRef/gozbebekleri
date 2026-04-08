@@ -31,7 +31,7 @@ const SharePopup = ({
   url,
   title,
   description,
-  image = "/placeholder.jpg",
+  image = "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg",
 }: SharePopupProps) => {
   const t = useTranslations("SharePopup");
   const encodedUrl = encodeURIComponent(url);

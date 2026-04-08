@@ -7,10 +7,9 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useRouter } from "@/i18n/routing";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { X, HandCoins, ShoppingBag, Trash2 } from "lucide-react";
+import { ShoppingCart, Heart, Trash2 } from "lucide-react";
 import Image from "next/image";
 import Spinner from "../components/ui/spinner";
 import { useTranslations, useLocale } from "next-intl";
@@ -21,6 +20,7 @@ interface CartItem {
   amount: number;
   amountUSD: number;
   currency: string;
+  shareCount?: number | null;
   campaign: {
     id: string;
     title: string;
@@ -51,13 +51,11 @@ const CartSheet: React.FC<CartSheetProps> = ({
   const [loadingItemId, setLoadingItemId] = useState<string | null>(null);
   const [removingItemId, setRemovingItemId] = useState<string | null>(null);
 
-  const items = Array.isArray(cartItems) ? cartItems : [];
+  const items = useMemo(() => Array.isArray(cartItems) ? cartItems : [], [cartItems]);
 
-  // Calculate totals from cart items
   const totals = useMemo(() => {
     const totalUSD = items.reduce((sum, item) => sum + (item.amountUSD || item.amount), 0);
-    const itemCount = items.length;
-    return { totalUSD, itemCount };
+    return { totalUSD, itemCount: items.length };
   }, [items]);
 
   const handleDelete = async (id: string) => {
@@ -76,192 +74,158 @@ const CartSheet: React.FC<CartSheetProps> = ({
     onOpenDonationDialog();
   };
 
+  const formatAmount = (amount: number, currency: string) =>
+    new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(amount);
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent 
-        side={isRTL ? "left" : "right"} 
-        className={cn(
-          "w-full sm:max-w-lg p-0 flex flex-col",
-          isRTL && "sm:max-w-lg"
-        )}
+      <SheetContent
+        side={isRTL ? 'left' : 'right'}
+        className="w-full sm:max-w-md p-0 flex flex-col"
       >
-        {/* Header */}
-        <SheetHeader className="px-6 py-4 border-b bg-gradient-to-r from-sky-50 to-white">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-sky-100 rounded-full">
-                <ShoppingBag className="h-5 w-5 text-sky-600" />
-              </div>
-              <div>
-                <SheetTitle className="text-xl font-bold text-gray-900">
-                  {t('myDonationCart')}
-                </SheetTitle>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  {totals.itemCount} {totals.itemCount === 1 ? t('item') : t('items')}
-                </p>
-              </div>
+        {/* ── Header ── */}
+        <SheetHeader className="px-6 py-5 border-b bg-[#025EB8]">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/15 rounded-xl">
+              <ShoppingCart className="h-5 w-5 text-white" />
             </div>
-
+            <div>
+              <SheetTitle className="text-lg font-bold text-white">
+                {t('myDonationCart')}
+              </SheetTitle>
+              <p className="text-xs text-white/70 mt-0.5">
+                {totals.itemCount} {totals.itemCount === 1 ? t('item') : t('items')}
+              </p>
+            </div>
           </div>
         </SheetHeader>
 
-        {/* Cart Items */}
-        <ScrollArea className="flex-1 px-6 py-4">
-          {items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="p-4 bg-gray-100 rounded-full mb-4">
-                <ShoppingBag className="h-12 w-12 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                {t('emptyCart')}
-              </h3>
-              <p className="text-sm text-gray-500 mb-6 max-w-xs">
-                {t('emptyCartMessage')}
-              </p>
-              <Button
-                onClick={() => {
-                  onOpenChange(false);
-                  router.push('/campaigns');
-                }}
-                variant="outline"
-                className="gap-2"
-              >
-                <ShoppingBag className="h-4 w-4" />
-                {t('browseCampaigns')}
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {items.map((item) => {
-                const campaignTitle =
-                  item.campaign.translations?.find((tr) => tr.locale === locale)?.title ??
-                  item.campaign.title;
-                return (
-                <div
-                  key={item.id}
-                  className={cn(
-                    "group relative bg-white border border-gray-200 rounded-xl p-4 transition-all duration-300 hover:shadow-md",
-                    removingItemId === item.id && "opacity-50 scale-95"
-                  )}
+        {/* ── Items ── */}
+        <ScrollArea className="flex-1 bg-gray-50">
+          <div className="px-4 py-4">
+            {items.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="w-20 h-20 rounded-full bg-blue-50 flex items-center justify-center mb-5">
+                  <ShoppingCart className="h-9 w-9 text-[#025EB8]" />
+                </div>
+                <h3 className="text-base font-bold text-gray-800 mb-1">
+                  {t('emptyCart')}
+                </h3>
+                <p className="text-sm text-gray-500 mb-6 max-w-[220px]">
+                  {t('emptyCartMessage')}
+                </p>
+                <button
+                  onClick={() => { onOpenChange(false); router.push('/campaigns'); }}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-[#025EB8] hover:bg-[#0150a0] text-white text-sm font-semibold rounded-lg transition-colors"
                 >
-                  <div className="flex gap-4">
-                    {/* Campaign Image */}
-                    <div className="relative flex-shrink-0">
-                      <div className="relative w-24 h-24 rounded-lg overflow-hidden bg-gray-100">
-                        <Image
-                          src={item.campaign.images[0]}
-                          alt={campaignTitle}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                    </div>
+                  <Heart className="h-4 w-4" />
+                  {t('browseCampaigns')}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {items.map((item) => {
+                  const campaignTitle =
+                    item.campaign.translations?.find((tr) => tr.locale === locale)?.title ??
+                    item.campaign.title;
 
-                    {/* Campaign Details */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 text-sm line-clamp-3 mb-2 leading-tight">
-                        {campaignTitle}
-                      </h3>
-                      
-                      {/* Amount Display */}
-                      <div className="flex items-center gap-2 mt-auto">
-                        <div className="inline-flex items-center gap-1.5 bg-sky-50 px-3 py-1.5 rounded-full">
-                          <HandCoins className="h-4 w-4 text-sky-600" />
-                          <span className="text-sm font-bold text-sky-700">
-                            {new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-US', {
-                              style: "currency",
-                              currency: item.currency,
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 2,
-                            }).format(item.amount)}
+                  return (
+                    <div
+                      key={item.id}
+                      dir={isRTL ? 'rtl' : 'ltr'}
+                      className={cn(
+                        "bg-white border border-gray-200 rounded-xl p-3.5 transition-all duration-300",
+                        removingItemId === item.id ? "opacity-40 scale-95" : "hover:shadow-sm hover:border-blue-100"
+                      )}
+                    >
+                      <div className="flex gap-3 items-start">
+                        {/* Image */}
+                        <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                          <Image
+                            src={item.campaign.images[0]}
+                            alt={campaignTitle}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+
+                        {/* Details */}
+                        <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                          <h3 className={cn(
+                            "text-sm font-semibold text-gray-800 line-clamp-2 leading-snug",
+                            isRTL ? "text-right" : "text-left"
+                          )}>
+                            {campaignTitle}
+                          </h3>
+                          {item.shareCount != null && item.shareCount > 0 && (
+                            <p className={cn(
+                              "text-xs text-[#025EB8] font-medium",
+                              isRTL ? "text-right" : "text-left"
+                            )}>
+                              {t('sharesLine', { count: item.shareCount })}
+                            </p>
+                          )}
+                          <span className="inline-flex items-center self-start gap-1 bg-[#025EB8]/10 text-[#025EB8] text-xs font-bold px-2.5 py-1 rounded-full">
+                            {formatAmount(item.amount, item.currency)}
                           </span>
                         </div>
+
+                        {/* Delete — always visible */}
+                        <div className="flex-shrink-0">
+                          {loadingItemId === item.id ? (
+                            <div className="p-1.5">
+                              <Spinner className="h-4 w-4 text-gray-400" />
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleDelete(item.id)}
+                              disabled={!!loadingItemId}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                              aria-label="Remove"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-
-                    {/* Remove Button */}
-                    <div className="flex-shrink-0">
-                      {loadingItemId === item.id ? (
-                        <div className="p-2">
-                          <Spinner className="h-5 w-5 text-gray-400" />
-                        </div>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className={cn(
-                            "h-8 w-8 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all",
-                            "opacity-0 group-hover:opacity-100"
-                          )}
-                          disabled={loadingItemId === item.id}
-                          onClick={() => handleDelete(item.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </ScrollArea>
 
-        {/* Footer with Summary and Checkout */}
+        {/* ── Footer ── */}
         {items.length > 0 && (
-          <div className="border-t bg-white">
-            {/* Summary */}
-            <div className="px-6 py-4 space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">{t('subtotal')}</span>
-                <span className="font-semibold text-gray-900">
-                  {new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-US', {
-                    style: "currency",
-                    currency: "USD",
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 2,
-                  }).format(totals.totalUSD)}
-                </span>
+          <div className="border-t bg-white px-5 py-4 space-y-4">
+            {/* Totals */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm text-gray-500">
+                <span>{t('subtotal')}</span>
+                <span className="font-medium text-gray-700">{formatAmount(totals.totalUSD, 'USD')}</span>
               </div>
-              
               <Separator />
-
               <div className="flex items-center justify-between">
-                <span className="text-base font-bold text-gray-900">
-                  {t('total')}
-                </span>
-                <span className="text-2xl font-bold text-sky-600">
-                  {new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-US', {
-                    style: "currency",
-                    currency: "USD",
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 2,
-                  }).format(totals.totalUSD)}
-                </span>
+                <span className="text-sm font-bold text-gray-800">{t('total')}</span>
+                <span className="text-xl font-bold text-[#025EB8]">{formatAmount(totals.totalUSD, 'USD')}</span>
               </div>
             </div>
 
-            {/* Checkout Button */}
-            <div className="px-6 pb-6">
-              <Button
-                onClick={handleCheckout}
-                className={cn(
-                  "w-full h-12 text-base font-bold shadow-lg",
-                  "bg-gradient-to-r from-sky-600 to-sky-500",
-                  "hover:from-sky-700 hover:to-sky-600",
-                  "active:scale-[0.98] transition-all",
-                  "gap-2"
-                )}
-              >
-                <HandCoins className="h-5 w-5" />
-                {t('proceedToDonate')}
-              </Button>
-              
-              <p className="text-xs text-center text-gray-500 mt-3">
-                {t('secureCheckout')}
-              </p>
-            </div>
+            {/* Checkout */}
+            <button
+              onClick={handleCheckout}
+              className="w-full flex items-center justify-center gap-2 py-3 bg-[#FA5D17] hover:bg-[#e04d0f] active:scale-[0.98] text-white text-sm font-bold rounded-xl transition-all"
+            >
+              <Heart className="h-4 w-4" />
+              {t('proceedToDonate')}
+            </button>
+            <p className="text-xs text-center text-gray-400">{t('secureCheckout')}</p>
           </div>
         )}
       </SheetContent>

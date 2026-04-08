@@ -70,7 +70,7 @@ const postEditFormSchema = z.object({
   description: z.string().optional(),
   image: z.string().optional(),
   categoryId: z.string().optional(),
-  campaignId: z.string().optional(),
+  campaignIds: z.tuple([z.string().optional(), z.string().optional(), z.string().optional()]),
 });
 
 // Configuration
@@ -83,8 +83,9 @@ const protectedEditorConfig = {
   generateSlug: "توليد الرابط",
   categoryTitle: "التصنيف",
   categoryDescription: "اختر تصنيفاً لمقالك",
-  campaignTitle: "الحملة ذات الصلة",
-  campaignDescription: "اختر حملة إذا كان المقال يتحدث عنها (اختياري)",
+  campaignTitle: "الحملات ذات الصلة",
+  campaignDescription: "اختر حتى 3 حملات إذا كان المقال يتحدث عنها (اختياري)",
+  campaignSlotLabel: (n) => `حملة ${n}`,
   campaignSearchPlaceholder: "بحث عن حملة...",
   campaignEmpty: "لا توجد حملة",
   coverImageTitle: "الصورة الرئيسية",
@@ -171,12 +172,22 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
 
   // Form setup (simple inputs like BlogLocaleEditor)
   const NO_CAMPAIGN_VALUE = "__none__";
+  const padCampaignIds = () => {
+    const raw = Array.isArray(post?.campaignIds) && post.campaignIds.length
+      ? post.campaignIds.filter(Boolean).slice(0, 3)
+      : post?.campaign_id || post?.campaignId
+        ? [post.campaign_id || post.campaignId]
+        : [];
+    const padded = [...raw];
+    while (padded.length < 3) padded.push(NO_CAMPAIGN_VALUE);
+    return padded.slice(0, 3);
+  };
   const defaultValues = {
     title: post?.titleAR || post?.title || "",
     description: post?.descriptionAR || post?.description || "",
     image: post?.imageAR || post?.image || "",
     categoryId: post?.category_id || post?.categoryId || "",
-    campaignId: post?.campaign_id || post?.campaignId || NO_CAMPAIGN_VALUE,
+    campaignIds: padCampaignIds(),
   };
 
   const form = useForm({
@@ -191,13 +202,23 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
     setIsSaving(true);
 
     try {
+      const rawIds = (data.campaignIds || [])
+        .filter((id) => id && id !== NO_CAMPAIGN_VALUE);
+      const seen = new Set();
+      const campaignIds = [];
+      for (const id of rawIds) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        campaignIds.push(id);
+        if (campaignIds.length >= 3) break;
+      }
       const payload = {
         title: data.title,
         description: data.description || "",
         content: contentAR || "",
         image: data.image || "",
         categoryId: data.categoryId || null,
-        campaignId: data.campaignId && data.campaignId !== "__none__" ? data.campaignId : null,
+        campaignIds,
       };
 
       let response;
@@ -335,57 +356,84 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="campaignId"
-                render={({ field }) => {
-                  const campaignChoices = [
-                    { label: "—", value: NO_CAMPAIGN_VALUE },
-                    ...(campaignOptions || []),
-                  ];
-                  const selectedLabel = campaignChoices.find((o) => o.value === (field.value || NO_CAMPAIGN_VALUE))?.label ?? protectedEditorConfig.campaignDescription;
-                  return (
-                    <FormItem dir="rtl">
-                      <FormLabel>{protectedEditorConfig.campaignTitle}</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              className={cn("w-full justify-between font-normal", !field.value || field.value === NO_CAMPAIGN_VALUE ? "text-muted-foreground" : "")}
-                            >
-                              {selectedLabel}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-                          <Command>
-                            <CommandInput placeholder={protectedEditorConfig.campaignSearchPlaceholder} />
-                            <CommandEmpty>{protectedEditorConfig.campaignEmpty}</CommandEmpty>
-                            <CommandList>
-                              <CommandGroup>
-                                {campaignChoices.map((opt) => (
-                                  <CommandItem
-                                    key={opt.value}
-                                    value={opt.label}
-                                    onSelect={() => field.onChange(opt.value)}
+              <FormItem dir="rtl">
+                <FormLabel>{protectedEditorConfig.campaignTitle}</FormLabel>
+                <p className="text-sm text-muted-foreground mb-3">{protectedEditorConfig.campaignDescription}</p>
+                <div className="space-y-3">
+                  {[0, 1, 2].map((index) => (
+                    <FormField
+                      key={index}
+                      control={form.control}
+                      name={`campaignIds.${index}`}
+                      render={({ field }) => {
+                        const taken = new Set(
+                          (form.watch("campaignIds") || [])
+                            .map((v, i) => (i !== index && v && v !== NO_CAMPAIGN_VALUE ? v : null))
+                            .filter(Boolean)
+                        );
+                        const campaignChoices = [
+                          { label: "—", value: NO_CAMPAIGN_VALUE },
+                          ...(campaignOptions || []).filter((o) => !taken.has(o.value) || o.value === field.value),
+                        ];
+                        const selectedLabel =
+                          campaignChoices.find((o) => o.value === (field.value || NO_CAMPAIGN_VALUE))?.label ??
+                          protectedEditorConfig.campaignDescription;
+                        return (
+                          <FormItem dir="rtl" className="space-y-1.5">
+                            <FormLabel className="text-xs font-normal text-muted-foreground">
+                              {protectedEditorConfig.campaignSlotLabel(index + 1)}
+                            </FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    role="combobox"
+                                    className={cn(
+                                      "w-full justify-between font-normal",
+                                      !field.value || field.value === NO_CAMPAIGN_VALUE ? "text-muted-foreground" : ""
+                                    )}
                                   >
-                                    <Check className={cn("mr-2 h-4 w-4", (field.value || NO_CAMPAIGN_VALUE) === opt.value ? "opacity-100" : "opacity-0")} />
-                                    {opt.label}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
-              />
+                                    {selectedLabel}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                                <Command>
+                                  <CommandInput placeholder={protectedEditorConfig.campaignSearchPlaceholder} />
+                                  <CommandEmpty>{protectedEditorConfig.campaignEmpty}</CommandEmpty>
+                                  <CommandList>
+                                    <CommandGroup>
+                                      {campaignChoices.map((opt) => (
+                                        <CommandItem
+                                          key={`${index}-${opt.value}`}
+                                          value={opt.label}
+                                          onSelect={() => field.onChange(opt.value)}
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              (field.value || NO_CAMPAIGN_VALUE) === opt.value ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          {opt.label}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+                  ))}
+                </div>
+              </FormItem>
 
               <FormField
                 control={form.control}

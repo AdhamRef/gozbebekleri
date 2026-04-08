@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
+import { requireAdminOrDashboardPermission } from '@/lib/dashboard/api-auth';
 
 function getDateRange(period: string, startParam?: string | null, endParam?: string | null) {
   let endDate: Date;
@@ -35,9 +36,8 @@ function toDateStr(d: Date) {
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, 'revenue');
+    if (denied) return denied;
 
     const searchParams = request.nextUrl.searchParams;
     const categoryId = searchParams.get('categoryId');
@@ -46,36 +46,30 @@ export async function GET(request: NextRequest) {
     const period = searchParams.get('period') || 'month';
     const startParam = searchParams.get('start');
     const endParam = searchParams.get('end');
+    const showFailed = searchParams.get('showFailed') === 'true';
 
     const { startDate, endDate } = getDateRange(period, startParam, endParam);
 
-    const whereClause: {
-      createdAt: { gte: Date; lte: Date };
-      donorId?: string;
-      items?: { some: { campaignId: string } };
-      OR?: Array<
-        | { items: { some: { campaign: { categoryId: string } } } }
-        | { categoryItems: { some: { categoryId: string } } }
-      >;
-    } = {
+    const baseWhere: Record<string, unknown> = {
       createdAt: { gte: startDate, lte: endDate },
     };
 
     if (userId && userId !== 'all') {
-      whereClause.donorId = userId;
+      baseWhere.donorId = userId;
     }
 
     if (campaignId && campaignId !== 'all') {
-      whereClause.items = { some: { campaignId } };
+      baseWhere.items = { some: { campaignId } };
     } else if (categoryId && categoryId !== 'all') {
-      whereClause.OR = [
+      baseWhere.OR = [
         { items: { some: { campaign: { categoryId } } } },
         { categoryItems: { some: { categoryId } } },
       ];
     }
 
+    // Always fetch both paid and failed donations
     const donations = await prisma.donation.findMany({
-      where: whereClause,
+      where: baseWhere,
       select: {
         createdAt: true,
         subscriptionId: true,
@@ -84,6 +78,7 @@ export async function GET(request: NextRequest) {
         amountUSD: true,
         totalAmount: true,
         amount: true,
+        status: true,
         items: { select: { amount: true, amountUSD: true } },
         categoryItems: { select: { amount: true, amountUSD: true } },
       },
@@ -94,6 +89,8 @@ export async function GET(request: NextRequest) {
       countOneTime: number;
       amountMonthly: number;
       countMonthly: number;
+      amountFailed: number;
+      countFailed: number;
       teamSupport: number;
       fees: number;
     };
@@ -106,19 +103,31 @@ export async function GET(request: NextRequest) {
         countOneTime: 0,
         amountMonthly: 0,
         countMonthly: 0,
+        amountFailed: 0,
+        countFailed: 0,
         teamSupport: 0,
         fees: 0,
       };
+
       const amount = Number(d.amountUSD ?? d.totalAmount ?? d.amount ?? 0);
-      if (d.subscriptionId == null) {
-        bucket.amountOneTime += amount;
-        bucket.countOneTime += 1;
-      } else {
-        bucket.amountMonthly += amount;
-        bucket.countMonthly += 1;
+      const isPaid = d.status === 'PAID';
+      const isFailed = d.status === 'FAILED';
+
+      if (isPaid) {
+        if (d.subscriptionId == null) {
+          bucket.amountOneTime += amount;
+          bucket.countOneTime += 1;
+        } else {
+          bucket.amountMonthly += amount;
+          bucket.countMonthly += 1;
+        }
+        bucket.teamSupport += Number(d.teamSupport ?? 0);
+        bucket.fees += Number(d.fees ?? 0);
+      } else if (isFailed) {
+        bucket.amountFailed += amount;
+        bucket.countFailed += 1;
       }
-      bucket.teamSupport += Number(d.teamSupport ?? 0);
-      bucket.fees += Number(d.fees ?? 0);
+
       byDate.set(dateStr, bucket);
     }
 
@@ -130,6 +139,8 @@ export async function GET(request: NextRequest) {
       countOneTime: number;
       amountMonthly: number;
       countMonthly: number;
+      amountFailed: number;
+      countFailed: number;
       teamSupport: number;
       fees: number;
     }[] = [];
@@ -142,8 +153,10 @@ export async function GET(request: NextRequest) {
       const b = byDate.get(dateStr);
       const amountOneTime = b ? Number(Number(b.amountOneTime).toFixed(2)) : 0;
       const amountMonthly = b ? Number(Number(b.amountMonthly).toFixed(2)) : 0;
+      const amountFailed = b ? Number(Number(b.amountFailed).toFixed(2)) : 0;
       const countOneTime = b?.countOneTime ?? 0;
       const countMonthly = b?.countMonthly ?? 0;
+      const countFailed = b?.countFailed ?? 0;
       const teamSupport = b ? Number(Number(b.teamSupport).toFixed(2)) : 0;
       const fees = b ? Number(Number(b.fees).toFixed(2)) : 0;
 
@@ -155,6 +168,8 @@ export async function GET(request: NextRequest) {
         countOneTime,
         amountMonthly,
         countMonthly,
+        amountFailed,
+        countFailed,
         teamSupport,
         fees,
       });

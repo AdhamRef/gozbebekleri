@@ -220,10 +220,10 @@ export default function BlogLocaleEditor({ post, locale }: BlogLocaleEditorProps
                             />
                             <label
                               htmlFor={`blog-locale-image-${locale}`}
-                              className={`flex flex-col items-center justify-center h-32 w-full border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-emerald-500 transition-colors ${uploadingImage ? "opacity-50 cursor-not-allowed" : ""}`}
+                              className={`flex flex-col items-center justify-center h-32 w-full border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#025EB8] transition-colors ${uploadingImage ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
                               {uploadingImage ? (
-                                <SpinnerIcon className="w-6 h-6 animate-spin text-emerald-600" />
+                                <SpinnerIcon className="w-6 h-6 animate-spin text-[#025EB8]" />
                               ) : (
                                 <>
                                   <Upload className="w-6 h-6 text-gray-400" />

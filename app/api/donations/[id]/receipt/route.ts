@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
+import { userHasDashboardPermission } from '@/lib/dashboard/permissions';
 import jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import type { Locale } from 'date-fns';
@@ -225,7 +226,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Donation not found' }, { status: 404 });
     }
 
-    if (session.user.role !== 'ADMIN' && session.user.id !== donationRow.donorId) {
+    const canViewReceipt =
+      userHasDashboardPermission(session.user, 'revenue') ||
+      session.user.id === donationRow.donorId;
+    if (!canViewReceipt) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

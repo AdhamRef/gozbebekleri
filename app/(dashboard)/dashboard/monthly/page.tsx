@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useLocale } from "next-intl";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,7 +33,6 @@ import {
   BarChart,
   Bar,
   Line,
-  AreaChart,
   Area,
   PieChart,
   Pie,
@@ -51,6 +51,7 @@ import CountUp from "react-countup";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import { formatUtcCalendarMonthLong } from "@/lib/admin/current-calendar-month-utc";
 
 interface ChartDataPoint {
   date: string;
@@ -90,10 +91,14 @@ interface DonationRow {
   teamSupport: number;
   fees: number;
   type: string;
+  status: string;
+  provider?: string | null;
+  providerErrorMessage?: string | null;
   createdAt: string;
   donor: { id: string; name: string | null; email: string };
   campaigns: { id: string; title: string }[];
   categories: { id: string; name: string }[];
+  referral: { id: string; code: string; name?: string | null } | null;
 }
 
 interface SubscriptionRow {
@@ -109,6 +114,7 @@ interface SubscriptionRow {
   donor: { id: string; name: string | null; email: string | null };
   campaigns: { id: string; title: string }[];
   categories: { id: string; name: string }[];
+  referral: { id: string; code: string } | null;
 }
 
 type SubscriptionStatusFilter = "ACTIVE" | "PAUSED" | "CANCELLED" | "all";
@@ -142,12 +148,18 @@ interface DashboardStats {
   categoryDonationsCount?: number;
   teamSupportTotal?: number;
   feesTotal?: number;
+  paidCount?: number;
+  failedCount?: number;
+  pendingCount?: number;
+  failedTotalAmount?: number;
   recentDonations: Array<{
     id: string;
     amount: number;
     currency: string;
     donorName: string;
     type: string;
+    status?: string;
+    provider?: string | null;
     campaignTitle: string | null;
     categoryName: string | null;
     createdAt: string;
@@ -197,6 +209,7 @@ function getDonationsDateRange(
 
 export default function MonthlySubscriptionsDashboardPage() {
   const locale = useLocale() as string;
+  const thisMonthRevenueTitle = `إيرادات شهر ${formatUtcCalendarMonthLong(new Date(), locale || "ar")}`;
   const searchParams = useSearchParams();
   const { convertToCurrency, getSelectedCurrency } = useCurrency();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -204,7 +217,9 @@ export default function MonthlySubscriptionsDashboardPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
-  const [usersSearch, setUsersSearch] = useState("");
+  const [usersSearchInput, setUsersSearchInput] = useState("");
+  const [usersSearchCommitted, setUsersSearchCommitted] = useState("");
+  const [usersSearchLoading, setUsersSearchLoading] = useState(false);
   const [statCardSet, setStatCardSet] = useState<StatCardSet>("revenue");
 
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -239,6 +254,7 @@ export default function MonthlySubscriptionsDashboardPage() {
   const [dateTo, setDateTo] = useState("");
   const [donationsSortBy, setDonationsSortBy] = useState<"date" | "amount">("date");
   const [donationsSortOrder, setDonationsSortOrder] = useState<"asc" | "desc">("desc");
+  const [donationsStatusFilter, setDonationsStatusFilter] = useState<"all" | "PAID" | "FAILED" | "PENDING">("all");
 
   const [donations, setDonations] = useState<DonationRow[]>([]);
   const [donationsPage, setDonationsPage] = useState(1);
@@ -255,6 +271,7 @@ export default function MonthlySubscriptionsDashboardPage() {
   const [subsFetchedOnce, setSubsFetchedOnce] = useState(false);
   const [subsSortBy, setSubsSortBy] = useState<"date" | "amount">("date");
   const [subsSortOrder, setSubsSortOrder] = useState<"asc" | "desc">("desc");
+  const [subsStatusUpdatingId, setSubsStatusUpdatingId] = useState<string | null>(null);
 
   // Fetch categories and campaigns
   useEffect(() => {
@@ -276,28 +293,57 @@ export default function MonthlySubscriptionsDashboardPage() {
     fetchFilters();
   }, [locale]);
 
-  // Fetch users when search changes (for user filter dropdown)
+  const commitUsersSearch = useCallback(() => {
+    setUsersSearchCommitted(usersSearchInput.trim());
+  }, [usersSearchInput]);
+
   useEffect(() => {
-    if (!usersSearch || usersSearch.length < 1) {
-      setUsers([]);
-      return;
-    }
+    if (!usersSearchCommitted) return;
     const controller = new AbortController();
-    const fetchUsers = async () => {
+    setUsersSearchLoading(true);
+    const run = async () => {
       try {
         const res = await fetch(
-          `/api/users?search=${encodeURIComponent(usersSearch)}&limit=20`,
+          `/api/users?search=${encodeURIComponent(usersSearchCommitted)}`,
           { signal: controller.signal }
         );
         const data = await res.json();
+        if (!res.ok) {
+          toast.error(typeof data?.error === "string" ? data.error : "فشل البحث عن المستخدمين");
+          setUsers([]);
+          return;
+        }
         setUsers(data.users ?? []);
       } catch (e) {
         if ((e as { name?: string }).name !== "AbortError") setUsers([]);
+      } finally {
+        setUsersSearchLoading(false);
       }
     };
-    fetchUsers();
+    run();
     return () => controller.abort();
-  }, [usersSearch]);
+  }, [usersSearchCommitted]);
+
+  useEffect(() => {
+    if (usersSearchCommitted) return;
+    if (selectedUserId === "all") {
+      setUsers([]);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/users/${selectedUserId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const u = data?.user;
+        if (u)
+          setUsers([{ id: u.id, name: u.name ?? null, email: u.email ?? "" }]);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [usersSearchCommitted, selectedUserId]);
 
   // Chart data (filters + period + from/to + user — user from state or URL when coming via link)
   useEffect(() => {
@@ -315,7 +361,7 @@ export default function MonthlySubscriptionsDashboardPage() {
         if (selectedCategory !== "all") params.append("categoryId", selectedCategory);
         if (selectedCampaign !== "all") params.append("campaignId", selectedCampaign);
         if (effectiveUserId !== "all") params.append("userId", effectiveUserId);
-        const response = await axios.get(`/api/admin/subscriptions/chart?${params}`);
+        const response = await axios.get(`/api/admin/subscriptions/overview/chart?${params}`);
         setChartData(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
         console.error("Error fetching chart data:", error);
@@ -340,7 +386,7 @@ export default function MonthlySubscriptionsDashboardPage() {
         }
         if (selectedCategory !== "all") params.set("categoryId", selectedCategory);
         if (selectedCampaign !== "all") params.set("campaignId", selectedCampaign);
-        const response = await fetch(`/api/admin/subscriptions/stats?${params}`);
+        const response = await fetch(`/api/admin/subscriptions/overview/stats?${params}`);
         const data = await response.json();
         if (!response.ok) {
           const message = data?.details || data?.error || "فشل في تحميل إحصائيات الاشتراكات";
@@ -375,6 +421,7 @@ export default function MonthlySubscriptionsDashboardPage() {
         if (start) params.set("start", start);
         if (end) params.set("end", end);
         params.set("subscriptionOnly", "1");
+        if (donationsStatusFilter !== "all") params.set("status", donationsStatusFilter);
         const res = await fetch(`/api/donations?${params}`);
         const data = await res.json();
         if (!res.ok) {
@@ -401,6 +448,7 @@ export default function MonthlySubscriptionsDashboardPage() {
       dateTo,
       donationsSortBy,
       donationsSortOrder,
+      donationsStatusFilter,
     ]
   );
 
@@ -409,7 +457,7 @@ export default function MonthlySubscriptionsDashboardPage() {
     if (loading) return;
     setDonationsPage(1);
     fetchDonations(1, false);
-  }, [loading, selectedCategory, selectedCampaign, selectedUserId, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, fetchDonations]);
+  }, [loading, selectedCategory, selectedCampaign, selectedUserId, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, donationsStatusFilter, fetchDonations]);
 
   const fetchSubscriptions = useCallback(
     async (page: number, append: boolean) => {
@@ -456,6 +504,31 @@ export default function MonthlySubscriptionsDashboardPage() {
       subsSortBy,
       subsSortOrder,
     ]
+  );
+
+  const handleSubscriptionStatusChange = useCallback(
+    async (
+      subscriptionId: string,
+      newStatus: SubscriptionRow["status"],
+      previousStatus: SubscriptionRow["status"]
+    ) => {
+      if (newStatus === previousStatus) return;
+      setSubsStatusUpdatingId(subscriptionId);
+      try {
+        await axios.patch(`/api/admin/subscriptions/${subscriptionId}`, { status: newStatus });
+        toast.success("تم تحديث حالة الاشتراك");
+        setSubsPage(1);
+        await fetchSubscriptions(1, false);
+      } catch (e: unknown) {
+        const msg = axios.isAxiosError(e)
+          ? (e.response?.data as { error?: string })?.error || e.message
+          : "فشل تحديث حالة الاشتراك";
+        toast.error(typeof msg === "string" ? msg : "فشل تحديث حالة الاشتراك");
+      } finally {
+        setSubsStatusUpdatingId(null);
+      }
+    },
+    [fetchSubscriptions]
   );
 
   useEffect(() => {
@@ -579,7 +652,7 @@ export default function MonthlySubscriptionsDashboardPage() {
               )}
             </p>
           </div>
-          <CurrencySelector />
+          <CurrencySelector showDefaultCurrencyOption />
         </header>
 
         {/* المؤشرات — تختفي عند عرض تبرعات مستخدم معين عبر الرابط */}
@@ -628,7 +701,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                   subtitle="منذ البداية (حسب التصفية)"
                 />
                 <StatsCard
-                  title="إيرادات آخر 30 يومًا"
+                  title={thisMonthRevenueTitle}
                   value={stats?.thisMonthRevenue ?? 0}
                   icon={Calendar}
                   accent="emerald"
@@ -656,6 +729,24 @@ export default function MonthlySubscriptionsDashboardPage() {
                   icon={Percent}
                   accent="orange"
                   format="money"
+                />
+                <StatsCard
+                  title="دفعات ناجحة"
+                  value={stats?.paidCount ?? 0}
+                  icon={Receipt}
+                  accent="teal"
+                />
+                <StatsCard
+                  title="دفعات فاشلة"
+                  value={stats?.failedCount ?? 0}
+                  icon={Receipt}
+                  accent="orange"
+                />
+                <StatsCard
+                  title="دفعات معلقة"
+                  value={stats?.pendingCount ?? 0}
+                  icon={Receipt}
+                  accent="amber"
                 />
               </>
             )}
@@ -781,7 +872,7 @@ export default function MonthlySubscriptionsDashboardPage() {
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
             />
           </div>
           <div className="space-y-1">
@@ -790,7 +881,7 @@ export default function MonthlySubscriptionsDashboardPage() {
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
             />
           </div>
         </div>
@@ -858,18 +949,51 @@ export default function MonthlySubscriptionsDashboardPage() {
       <label className="text-[11px] font-medium text-slate-500">
         المستخدم
       </label>
-      <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+      <Select
+        value={selectedUserId}
+        onValueChange={(v) => {
+          setSelectedUserId(v);
+          if (v === "all") {
+            setUsersSearchInput("");
+            setUsersSearchCommitted("");
+            setUsers([]);
+          }
+        }}
+      >
         <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
           <SelectValue placeholder="اختر المستخدم" />
         </SelectTrigger>
         <SelectContent>
-          <div className="p-2 border-b border-slate-100">
+          <div className="p-2 border-b border-slate-100 flex gap-1.5 flex-row-reverse items-center">
             <Input
-              placeholder="بحث..."
-              value={usersSearch}
-              onChange={(e) => setUsersSearch(e.target.value)}
-              className="w-full h-8 text-xs"
+              placeholder="بحث… ثم Enter أو زر البحث"
+              value={usersSearchInput}
+              onChange={(e) => setUsersSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitUsersSearch();
+                }
+              }}
+              className="w-full h-8 text-xs flex-1 min-w-0"
             />
+            <button
+              type="button"
+              title="بحث"
+              disabled={usersSearchLoading}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                commitUsersSearch();
+              }}
+              className="shrink-0 h-8 w-8 inline-flex items-center justify-center rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 disabled:opacity-50"
+            >
+              {usersSearchLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />
+              ) : (
+                <Search className="w-3.5 h-3.5 text-slate-600" />
+              )}
+            </button>
           </div>
           <SelectItem value="all" className="text-xs">الكل</SelectItem>
           {users.map((u) => (
@@ -916,6 +1040,24 @@ export default function MonthlySubscriptionsDashboardPage() {
     </Select>
   </div>
 
+  {/* Donation Status Filter */}
+  <div className="space-y-1 text-right">
+    <label className="text-[11px] font-medium text-slate-500">
+      حالة الدفعة
+    </label>
+    <Select value={donationsStatusFilter} onValueChange={(v) => setDonationsStatusFilter(v as typeof donationsStatusFilter)}>
+      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectValue placeholder="الحالة" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all" className="text-xs">كل الحالات</SelectItem>
+        <SelectItem value="PAID" className="text-xs">ناجح</SelectItem>
+        <SelectItem value="FAILED" className="text-xs">فاشل</SelectItem>
+        <SelectItem value="PENDING" className="text-xs">معلق</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+
 </div>
 
 </CardContent>
@@ -935,7 +1077,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                   <div className="h-[400px] w-full">
                     {chartLoading ? (
                       <div className="h-full flex items-center justify-center bg-slate-50 rounded-lg">
-                        <Loader2 className="w-9 h-9 animate-spin text-blue-500" />
+                        <Loader2 className="w-9 h-9 animate-spin text-[#025EB8]" />
                       </div>
                     ) : chartView === "bar" ? (
                       chartMetric === "amount" ? (
@@ -1446,13 +1588,19 @@ export default function MonthlySubscriptionsDashboardPage() {
                         التبرع
                       </th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                        الحالة
+                      </th>
+                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                        البوابة
+                      </th>
+                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
                         دعم الفريق
                       </th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">
                         مشاركة الرسوم
                       </th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">
-                        النوع
+                        الإحالة
                       </th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">
                         الحملة / الفئة
@@ -1465,19 +1613,19 @@ export default function MonthlySubscriptionsDashboardPage() {
                   <tbody>
                     {donationsLoading && donations.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-12 text-center">
+                        <td colSpan={9} className="py-12 text-center">
                           <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" />
                         </td>
                       </tr>
                     ) : !donationsFetchedOnce ? (
                       <tr>
-                        <td colSpan={7} className="py-12 text-center text-slate-500">
+                        <td colSpan={9} className="py-12 text-center text-slate-500">
                           جاري التحميل...
                         </td>
                       </tr>
                     ) : donations.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-12 text-center text-slate-500">
+                        <td colSpan={9} className="py-12 text-center text-slate-500">
                           لا توجد تبرعات تطابق التصفية
                         </td>
                       </tr>
@@ -1502,6 +1650,25 @@ export default function MonthlySubscriptionsDashboardPage() {
                               {formatMoney((d.amount ?? d.totalAmount ?? 0) as number, d.currency, d.amountUSD)}
                             </span>
                           </td>
+                          <td className="py-3 px-4">
+                            <span className={cn("inline-block px-2 py-0.5 rounded-full text-xs font-medium", d.status === "PAID" ? "bg-green-100 text-green-700" : d.status === "FAILED" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700")}>
+                              {d.status === "PAID" ? "ناجح" : d.status === "FAILED" ? "فاشل" : "معلق"}
+                            </span>
+                            {d.status === "FAILED" && d.providerErrorMessage && (
+                              <p className="text-[10px] text-red-500 mt-0.5 max-w-[140px] leading-tight" title={d.providerErrorMessage}>
+                                {d.providerErrorMessage.length > 50 ? d.providerErrorMessage.slice(0, 50) + "…" : d.providerErrorMessage}
+                              </p>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            {d.provider === "STRIPE" ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-[#635bff]/10 text-[#635bff]">Stripe</span>
+                            ) : d.provider === "PAYFOR" ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-red-50 text-red-700">PayFor</span>
+                            ) : (
+                              <span className="text-slate-400 text-xs">—</span>
+                            )}
+                          </td>
                           <td className="py-3 px-4 font-medium text-slate-800" dir="rtl">
                             {(d.teamSupport ?? 0) > 0 ? (
                               <span dir="ltr">
@@ -1520,17 +1687,17 @@ export default function MonthlySubscriptionsDashboardPage() {
                               <span className="text-slate-500">—</span>
                             )}
                           </td>
-                          <td className="py-3 px-4">
-                            <span
-                              className={cn(
-                                "inline-block px-2 py-0.5 rounded-full text-xs",
-                                d.type === "MONTHLY"
-                                  ? "bg-violet-100 text-violet-700"
-                                  : "bg-slate-100 text-slate-600"
-                              )}
-                            >
-                              {d.type === "MONTHLY" ? "شهري" : "مرة واحدة"}
-                            </span>
+                          <td className="py-3 px-4 align-top">
+                            {d.referral ? (
+                              <Link
+                                href={`/dashboard/referrals/${d.referral.id}`}
+                                className="text-sm font-medium text-[#025EB8] hover:text-[#025EB8] hover:underline"
+                              >
+                                {d.referral.code}
+                              </Link>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
                           </td>
                           <td className="py-3 px-4 text-slate-600 max-w-[240px]">
                             {d.campaigns?.length > 0 ? (
@@ -1587,11 +1754,11 @@ export default function MonthlySubscriptionsDashboardPage() {
           <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">
             الاشتراكات
           </h2>
-          <Card className="border border-violet-200/60 dark:border-violet-900/40 shadow-md shadow-violet-500/5 overflow-hidden bg-card">
-            <CardHeader className="border-b border-violet-100/80 dark:border-violet-900/50 py-4 bg-gradient-to-l from-violet-50/90 via-card to-card dark:from-violet-950/30">
+          <Card className="border border-gray-200/60 shadow-md shadow-violet-500/5 overflow-hidden bg-card">
+            <CardHeader className="border-b border-[#025EB8]/20 py-4 bg-[#025EB8]/4">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between flex-row-reverse">
                 <div className="flex items-center gap-3 justify-end min-w-0">
-                  <div className="p-2 rounded-xl bg-violet-600 text-white shadow-sm shrink-0">
+                  <div className="p-2 rounded-xl bg-[#025EB8] text-white shadow-sm shrink-0">
                     <LayoutList className="w-5 h-5" />
                   </div>
                   <div className="text-right min-w-0">
@@ -1599,18 +1766,77 @@ export default function MonthlySubscriptionsDashboardPage() {
                       قائمة الاشتراكات
                     </CardTitle>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      نفس تصفية الفئة والحملة والمستخدم من الأعلى · افتراضيًا النشطة فقط
+                      الفئة والحملة من أعلى الصفحة · تصفية المشترك أدناه (أو من الأعلى) · افتراضيًا النشطة فقط
                     </p>
                   </div>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-3 sm:items-end flex-row-reverse shrink-0">
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-end flex-row-reverse shrink-0 flex-wrap">
+                  <div className="space-y-1 text-right w-full sm:w-auto sm:min-w-[200px]">
+                    <label className="text-[11px] font-medium text-slate-500">المشترك</label>
+                    <Select
+                      value={selectedUserId}
+                      onValueChange={(v) => {
+                        setSelectedUserId(v);
+                        if (v === "all") {
+                          setUsersSearchInput("");
+                          setUsersSearchCommitted("");
+                          setUsers([]);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-full sm:w-[220px] h-9 text-xs rounded-lg border-gray-200 bg-white/80 ">
+                        <SelectValue placeholder="كل المشتركين" />
+                      </SelectTrigger>
+                      <SelectContent dir="rtl">
+                        <div className="p-2 border-b border-slate-100 flex gap-1.5 flex-row-reverse items-center">
+                          <Input
+                            placeholder="بحث… ثم Enter أو زر البحث"
+                            value={usersSearchInput}
+                            onChange={(e) => setUsersSearchInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                commitUsersSearch();
+                              }
+                            }}
+                            className="w-full h-8 text-xs flex-1 min-w-0"
+                          />
+                          <button
+                            type="button"
+                            title="بحث"
+                            disabled={usersSearchLoading}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              commitUsersSearch();
+                            }}
+                            className="shrink-0 h-8 w-8 inline-flex items-center justify-center rounded-md border border-gray-200 bg-white/90 hover:bg-gray-50  disabled:opacity-50"
+                          >
+                            {usersSearchLoading ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#025EB8]" />
+                            ) : (
+                              <Search className="w-3.5 h-3.5 text-[#025EB8]" />
+                            )}
+                          </button>
+                        </div>
+                        <SelectItem value="all" className="text-xs">
+                          الكل
+                        </SelectItem>
+                        {users.map((u) => (
+                          <SelectItem key={u.id} value={u.id} className="text-xs">
+                            {u.name || u.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-1 text-right">
                     <label className="text-[11px] font-medium text-slate-500">الحالة</label>
                     <Select
                       value={subStatusFilter}
                       onValueChange={(v) => setSubStatusFilter(v as SubscriptionStatusFilter)}
                     >
-                      <SelectTrigger className="w-full sm:w-[180px] h-9 text-xs rounded-lg border-violet-200 bg-white/80 dark:bg-slate-950/50">
+                      <SelectTrigger className="w-full sm:w-[180px] h-9 text-xs rounded-lg border-gray-200 bg-white/80 ">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent dir="rtl">
@@ -1637,7 +1863,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                       setSubsSortOrder(order);
                     }}
                   >
-                    <SelectTrigger className="w-full sm:w-[200px] h-9 text-xs rounded-lg border-violet-200 bg-white/80 dark:bg-slate-950/50" dir="rtl">
+                    <SelectTrigger className="w-full sm:w-[200px] h-9 text-xs rounded-lg border-gray-200 bg-white/80 " dir="rtl">
                       <SelectValue placeholder="ترتيب" />
                     </SelectTrigger>
                     <SelectContent dir="rtl">
@@ -1654,11 +1880,12 @@ export default function MonthlySubscriptionsDashboardPage() {
               <div className="overflow-x-auto" dir="rtl">
                 <table className="w-full text-sm text-right">
                   <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50/90 dark:bg-slate-900/40">
+                    <tr className="border-b border-slate-200 bg-slate-50/90 ">
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">المشترك</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">المبلغ الشهري</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">الحالة</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">الحملة / الفئة</th>
+                      <th className="text-right py-3 px-4 font-semibold text-slate-700">الإحالة</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">يوم الفوترة</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">آخر دفعة</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">الدفعة القادمة</th>
@@ -1668,19 +1895,19 @@ export default function MonthlySubscriptionsDashboardPage() {
                   <tbody>
                     {subsLoading && subsRows.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-14 text-center">
-                          <Loader2 className="w-8 h-8 animate-spin mx-auto text-violet-500" />
+                        <td colSpan={9} className="py-14 text-center">
+                          <Loader2 className="w-8 h-8 animate-spin mx-auto text-[#025EB8]" />
                         </td>
                       </tr>
                     ) : !subsFetchedOnce ? (
                       <tr>
-                        <td colSpan={8} className="py-14 text-center text-slate-500">
+                        <td colSpan={9} className="py-14 text-center text-slate-500">
                           جاري التحميل...
                         </td>
                       </tr>
                     ) : subsRows.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-14 text-center text-slate-500">
+                        <td colSpan={9} className="py-14 text-center text-slate-500">
                           لا توجد اشتراكات تطابق التصفية
                         </td>
                       </tr>
@@ -1688,7 +1915,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                       subsRows.map((s) => (
                         <tr
                           key={s.id}
-                          className="border-b border-slate-100 dark:border-slate-800/80 hover:bg-violet-50/50 dark:hover:bg-violet-950/15 transition-colors"
+                          className="border-b border-slate-100 /80 hover:bg-gray-50/50 transition-colors"
                         >
                           <td className="py-3 px-4 align-top">
                             <p className="font-medium text-slate-900">{s.donor?.name || "—"}</p>
@@ -1701,20 +1928,45 @@ export default function MonthlySubscriptionsDashboardPage() {
                               {formatMoney(s.amount, s.currency, s.amountUSD ?? undefined)}
                             </span>
                           </td>
-                          <td className="py-3 px-4 align-top">
-                            <span
-                              className={cn(
-                                "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ring-1",
-                                s.status === "ACTIVE" &&
-                                  "bg-emerald-50 text-emerald-800 ring-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-800",
-                                s.status === "PAUSED" &&
-                                  "bg-amber-50 text-amber-900 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-800",
-                                s.status === "CANCELLED" &&
-                                  "bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-600"
+                          <td className="py-3 px-4 align-top min-w-[150px]">
+                            <div className="flex items-center gap-2 justify-end flex-row-reverse">
+                              <Select
+                                value={s.status}
+                                disabled={subsStatusUpdatingId === s.id}
+                                onValueChange={(v) =>
+                                  handleSubscriptionStatusChange(
+                                    s.id,
+                                    v as SubscriptionRow["status"],
+                                    s.status
+                                  )
+                                }
+                              >
+                                <SelectTrigger
+                                  className={cn(
+                                    "h-8 text-xs w-[132px] border-gray-200 bg-white/90",
+                                    s.status === "ACTIVE" && "text-[#025EB8] border-[#025EB8]/20",
+                                    s.status === "PAUSED" && "text-[#FA5D17] border-[#FA5D17]/20",
+                                    s.status === "CANCELLED" && "text-slate-700 border-slate-200"
+                                  )}
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent dir="rtl">
+                                  <SelectItem value="ACTIVE" className="text-xs">
+                                    نشطة
+                                  </SelectItem>
+                                  <SelectItem value="PAUSED" className="text-xs">
+                                    موقوفة
+                                  </SelectItem>
+                                  <SelectItem value="CANCELLED" className="text-xs">
+                                    ملغاة
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                              {subsStatusUpdatingId === s.id && (
+                                <Loader2 className="w-4 h-4 shrink-0 animate-spin text-[#025EB8]" />
                               )}
-                            >
-                              {s.status === "ACTIVE" ? "نشطة" : s.status === "PAUSED" ? "موقوفة" : "ملغاة"}
-                            </span>
+                            </div>
                           </td>
                           <td className="py-3 px-4 text-slate-600 max-w-[220px] align-top">
                             {s.campaigns?.length > 0 ? (
@@ -1723,6 +1975,18 @@ export default function MonthlySubscriptionsDashboardPage() {
                               <span>فئة: {s.categories.map((c) => c.name).join("، ")}</span>
                             ) : (
                               "—"
+                            )}
+                          </td>
+                          <td className="py-3 px-4 align-top">
+                            {s.referral ? (
+                              <Link
+                                href={`/dashboard/referrals/${s.referral.id}`}
+                                className="text-sm font-medium text-[#025EB8] hover:underline"
+                              >
+                                {s.referral.code}
+                              </Link>
+                            ) : (
+                              <span className="text-slate-400">—</span>
                             )}
                           </td>
                           <td className="py-3 px-4 text-slate-600 align-top tabular-nums">
@@ -1760,12 +2024,12 @@ export default function MonthlySubscriptionsDashboardPage() {
                 </table>
               </div>
               {hasMoreSubs && (
-                <div className="p-4 border-t border-slate-100 dark:border-slate-800 text-center bg-slate-50/30 dark:bg-slate-900/20">
+                <div className="p-4 border-t border-slate-100  text-center bg-slate-50/30 ">
                   <button
                     type="button"
                     onClick={loadMoreSubs}
                     disabled={subsLoading}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium disabled:opacity-50 shadow-sm"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#025EB8] hover:bg-[#025EB8] text-white text-sm font-medium disabled:opacity-50 shadow-sm"
                   >
                     {subsLoading ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -1777,7 +2041,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                 </div>
               )}
               {subsTotal > 0 && (
-                <p className="text-xs text-slate-500 px-4 py-2 border-t border-slate-100 dark:border-slate-800 text-right bg-muted/20">
+                <p className="text-xs text-slate-500 px-4 py-2 border-t border-slate-100  text-right bg-muted/20">
                   عرض {subsRows.length} من {subsTotal} اشتراك
                 </p>
               )}
@@ -1793,26 +2057,26 @@ const ACCENT_STYLES: Record<
   string,
   { bg: string; text: string; border: string }
 > = {
-  teal: { bg: "bg-teal-50", text: "text-teal-600", border: "border-teal-200" },
+  teal: { bg: "bg-[#025EB8]/8", text: "text-[#025EB8]", border: "border-[#025EB8]/20" },
   indigo: {
-    bg: "bg-indigo-50",
-    text: "text-indigo-600",
-    border: "border-indigo-200",
+    bg: "bg-[#025EB8]/8",
+    text: "text-[#025EB8]",
+    border: "border-[#025EB8]/20",
   },
   amber: {
-    bg: "bg-amber-50",
-    text: "text-amber-600",
-    border: "border-amber-200",
+    bg: "bg-[#FA5D17]/8",
+    text: "text-[#FA5D17]",
+    border: "border-[#FA5D17]/20",
   },
   violet: {
-    bg: "bg-violet-50",
-    text: "text-violet-600",
-    border: "border-violet-200",
+    bg: "bg-[#025EB8]",
+    text: "text-[#025EB8]",
+    border: "border-gray-200",
   },
   emerald: {
-    bg: "bg-emerald-50",
-    text: "text-emerald-600",
-    border: "border-emerald-200",
+    bg: "bg-[#025EB8]/8",
+    text: "text-[#025EB8]",
+    border: "border-[#025EB8]/20",
   },
   slate: {
     bg: "bg-slate-100",
@@ -1820,9 +2084,9 @@ const ACCENT_STYLES: Record<
     border: "border-slate-200",
   },
   orange: {
-    bg: "bg-orange-50",
-    text: "text-orange-600",
-    border: "border-orange-200",
+    bg: "bg-[#FA5D17]/8",
+    text: "text-[#FA5D17]",
+    border: "border-[#FA5D17]/20",
   },
 };
 

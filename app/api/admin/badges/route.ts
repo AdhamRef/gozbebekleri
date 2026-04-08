@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog } from "@/lib/audit-log";
 
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, "badges");
+    if (denied) return denied;
     const locale = request.nextUrl.searchParams.get("locale") || "ar";
     const badges = await prisma.badge.findMany({
       orderBy: { order: "asc" },
@@ -39,9 +40,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, "badges");
+    if (denied) return denied;
     const body = await request.json();
     const { name, color, criteria, order, translations } = body;
     if (!name || !criteria?.type) {
@@ -68,6 +68,18 @@ export async function POST(request: NextRequest) {
       },
       include: { translations: true },
     });
+
+    const actor = session!.user;
+    await writeAuditLog({
+      actorId: actor.id,
+      actorName: actor.name,
+      actorRole: actor.role ?? "ADMIN",
+      action: "BADGE_CREATE",
+      messageAr: `${actor.name ?? "مسؤول"} أنشأ شارة جديدة: ${name}`,
+      entityType: "Badge",
+      entityId: badge.id,
+    });
+
     return NextResponse.json(badge);
   } catch (error) {
     console.error("Error creating badge:", error);

@@ -41,8 +41,6 @@ export default async function PostEditorPage({
     ? { id: post.category.id, name: (post.category as { name?: string }).name ?? "" }
     : null;
 
-  const campaign = post && "campaign" in post ? (post as { campaign?: { id: string; title: string | null } | null }).campaign : null;
-
   const editorPost = {
     id: post.id,
     title: post.title ?? null,
@@ -52,8 +50,11 @@ export default async function PostEditorPage({
     published: post.published,
     categoryId: post.categoryId ?? null,
     category_id: post.categoryId ?? undefined,
-    campaignId: (post as { campaignId?: string | null }).campaignId ?? null,
-    campaign_id: (post as { campaignId?: string | null }).campaignId ?? undefined,
+    campaignIds: Array.isArray((post as { campaignIds?: string[] }).campaignIds)
+      ? (post as { campaignIds: string[] }).campaignIds
+      : [],
+    campaignId: null,
+    campaign_id: undefined,
     category,
     titleAR: post.title ?? undefined,
     titleEN: trEn?.title ?? undefined,

@@ -85,10 +85,13 @@ interface DonationForProfile {
   totalAmount: number;
   currency: string;
   type: string;
-  status: string;
+  status: string | null;
+  subscriptionId?: string | null;
   billingDay?: number | null;
   nextBillingDate?: string | null;
   createdAt: string;
+  /** Earliest charge date for this subscription (client-only, subscriptions table) */
+  subscriptionStartedAt?: string;
   teamSupport?: number;
   fees?: number;
   coverFees?: boolean;
@@ -153,7 +156,6 @@ const ProfilePage = () => {
   const [smsNotifications, setSmsNotifications] = useState(false);
   const id = session?.user?.id;
   const [selectedPeriod, setSelectedPeriod] = useState("all");
-  const [selectedType, setSelectedType] = useState("all");
   const [isPauseDialogOpen, setIsPauseDialogOpen] = useState(false);
   const [selectedDonation, setSelectedDonation] = useState<DonationForProfile | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -344,10 +346,10 @@ const ProfilePage = () => {
     }
   };
 
-  const handleDownloadAll = async () => {
+  const handleDownloadAll = async (donations: DonationForProfile[]) => {
     try {
       setIsDownloading("all");
-      for (const donation of user?.donations ?? []) {
+      for (const donation of donations) {
         await handleDownload(donation.id);
       }
       toast.success(t("toast.allReceiptsDownloadSuccess"));
@@ -362,17 +364,17 @@ const ProfilePage = () => {
   const AccountInfo = ({ user: u }: { user: UserProfile }) => (
     <div className="space-y-6">
       {/* Profile Header */}
-      <div className="flex flex-col sm:flex-row items-center gap-6 p-6 bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl border border-primary/20">
-        <Avatar className="w-24 h-24 ring-4 ring-white shadow-xl">
+      <div className="flex flex-col sm:flex-row items-center gap-6 p-6 bg-gradient-to-br from-[#025EB8]/5 to-[#025EB8]/10 rounded-2xl border border-[#025EB8]/20">
+        <Avatar className="w-24 h-24 ring-4 ring-[#025EB8]/10 shadow-xl">
           <AvatarImage src={u.image ?? undefined} alt={u.name ?? undefined} />
-          <AvatarFallback className="text-2xl bg-primary text-white">
+          <AvatarFallback className="text-2xl bg-[#025EB8] text-white">
             {(u.name ?? u.email ?? "?").charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
         <div className="text-center sm:text-left flex-1">
           <h2 className="text-2xl font-bold text-gray-900">{u.name || t("account.name")}</h2>
           <p className="text-gray-600 mt-1">{u.email}</p>
-          <Badge variant="secondary" className="mt-3">
+          <Badge variant="secondary" className="mt-3 bg-[#025EB8]/10 text-[#025EB8] border-[#025EB8]/20">
             {t("account.verified")}
           </Badge>
         </div>
@@ -381,7 +383,7 @@ const ProfilePage = () => {
       {/* Personal Information */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <User className="w-5 h-5" />
+          <User className="w-5 h-5 text-[#025EB8]" />
           {t("account.personalInfo")}
         </h3>
         <Card className="divide-y divide-gray-100">
@@ -397,12 +399,12 @@ const ProfilePage = () => {
             onSave={(value: string) => handleUpdateField("email", value)}
             icon={Mail}
           />
-          <EditDialog
+          {/* <EditDialog
             title={t("account.country")}
             value={u.country ?? ""}
             onSave={(value: string) => handleUpdateField("country", value)}
             icon={Globe}
-          />
+          /> */}
           <EditDialog
             title={t("account.phone")}
             value={u.phone ?? ""}
@@ -421,13 +423,12 @@ const ProfilePage = () => {
       </div>
 
       {/* Security & Preferences */}
-      <div>
+      {/* <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Shield className="w-5 h-5" />
+          <Shield className="w-5 h-5 text-[#025EB8]" />
           {t("account.security")}
         </h3>
         <Card className="p-6 space-y-6">
-          {/* Notifications */}
           <div>
             <h4 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
               <Bell className="w-4 h-4" />
@@ -459,7 +460,6 @@ const ProfilePage = () => {
 
           <Separator />
 
-          {/* Danger Zone */}
           <div className="p-4 border-2 border-red-200 bg-red-50/50 rounded-xl">
             <h4 className="font-semibold text-red-900 mb-2">{t("settings.deleteAccount")}</h4>
             <p className="text-sm text-red-700 mb-4">{t("settings.deleteAccountWarning")}</p>
@@ -472,223 +472,233 @@ const ProfilePage = () => {
             </Button>
           </div>
         </Card>
-      </div>
+      </div> */}
     </div>
   );
 
-  // Donations Section with improved layout
+  // Donations tab: full donation history (all types) + subscriptions (one row per subscription)
   const Donations = ({ user: u }: { user: UserProfile }) => {
-    const filteredDonations = u.donations?.filter((donation: DonationForProfile) => {
-      const matchesType = selectedType === "all" || donation.type === selectedType;
+    const matchesPeriod = (donation: DonationForProfile) => {
       const date = new Date(donation.createdAt);
       const now = new Date();
       switch (selectedPeriod) {
         case "month":
-          return matchesType && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+          return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
         case "year":
-          return matchesType && date.getFullYear() === now.getFullYear();
+          return date.getFullYear() === now.getFullYear();
         default:
-          return matchesType;
+          return true;
       }
-    });
+    };
 
-    const totalAmountUSD =
-      filteredDonations?.reduce((sum: number, d: DonationForProfile) => sum + (d.amountUSD ?? d.totalAmount), 0) || 0;
-    const totalAmountConverted = convertToCurrency(totalAmountUSD);
+    const filteredHistory =
+      u.donations?.filter((d: DonationForProfile) => matchesPeriod(d)) ?? [];
+    const forReceiptDownload = filteredHistory;
+
+    const subscriptionRows: DonationForProfile[] = (() => {
+      const monthly = (u.donations ?? []).filter(
+        (d: DonationForProfile) => d.type === "MONTHLY" && d.subscriptionId
+      );
+      const bySub = new Map<string, DonationForProfile[]>();
+      for (const d of monthly) {
+        const sid = String(d.subscriptionId);
+        const arr = bySub.get(sid) ?? [];
+        arr.push(d);
+        bySub.set(sid, arr);
+      }
+      return Array.from(bySub.values())
+        .map((list) => {
+          const desc = [...list].sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+          const asc = [...list].sort(
+            (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
+          const rep = desc[0];
+          return {
+            ...rep,
+            subscriptionStartedAt: asc[0]?.createdAt ?? rep.createdAt,
+          };
+        })
+        .sort(
+          (a, b) =>
+            new Date(b.subscriptionStartedAt ?? b.createdAt).getTime() -
+            new Date(a.subscriptionStartedAt ?? a.createdAt).getTime()
+        );
+    })();
+
+    const totalHistoryUSD =
+      filteredHistory.reduce((sum: number, d: DonationForProfile) => sum + (d.amountUSD ?? d.totalAmount), 0) || 0;
+    const totalAmountConverted = convertToCurrency(totalHistoryUSD);
     const totalDisplayValue =
       totalAmountConverted?.convertedValue != null && totalAmountConverted?.currency
         ? totalAmountConverted.convertedValue
-        : totalAmountUSD;`sideba`
+        : totalHistoryUSD;
     const totalDisplayCurrency = totalAmountConverted?.currency ?? "USD";
     const totalDisplaySymbol = CURRENCY_SYMBOLS[totalDisplayCurrency] || totalDisplayCurrency + " ";
     const totalDisplayFormatted =
       typeof totalDisplayValue === "number"
         ? totalDisplayValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
         : "0";
+
     const monthlyCount =
       u.donations?.filter(
-        (d: DonationForProfile) =>
-          d.type === "MONTHLY" && d.status === "ACTIVE"
+        (d: DonationForProfile) => d.type === "MONTHLY" && d.status === "ACTIVE"
       ).length || 0;
-      const campaignCount =
-      new Set(u.donations?.flatMap((d: DonationForProfile) => d.items?.map((i: { campaignId: string }) => i.campaignId) ?? [])).size;
+    const campaignCount =
+      new Set(
+        u.donations?.flatMap((d: DonationForProfile) =>
+          d.items?.map((i: { campaignId: string }) => i.campaignId) ?? []
+        )
+      ).size;
 
     const statusLabel = (d: DonationForProfile) => {
-      if (d.type !== "MONTHLY") return null;
       if (d.status === "ACTIVE") return t("subscriptions.active");
       if (d.status === "PAUSED") return t("subscriptions.paused");
       return t("subscriptions.cancelled");
     };
 
+    const subscriptionCampaignsLine = (d: DonationForProfile) =>
+      d.items?.map((item: DonationForProfile["items"][0]) => item.campaign?.title).filter(Boolean).join(" · ") ||
+      "—";
+
+    const formatBillingDate = (iso?: string | null) =>
+      iso
+        ? new Date(iso).toLocaleDateString(locale === "ar" ? "ar-EG" : undefined)
+        : t("subscriptions.noDate");
+
+    const emptyTable = (message: string) => (
+      <div className="flex flex-col items-center justify-center py-12 text-gray-500 border-t border-gray-100">
+        <Receipt className="w-12 h-12 mb-3 text-[#025EB8] opacity-60" />
+        <p className="text-sm font-medium text-center px-4">{message}</p>
+      </div>
+    );
+
     return (
       <div className="space-y-6" dir={isRtl ? "rtl" : "ltr"}>
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="p-6 bg-gradient-to-br from-slate-50 to-slate-100/50 border-slate-200">
+          <Card className="p-6 bg-gradient-to-br from-[#025EB8]/5 to-[#025EB8]/10 border-[#025EB8]/20">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-700 uppercase tracking-wide">
-                  {t("donations.totalDonations")}
+                <p className="text-sm font-medium text-[#025EB8] uppercase tracking-wide">
+                  {t("donations.totalInPeriodTitle")}
                 </p>
-                <p className="text-3xl font-bold text-slate-900 mt-2">
-                  {totalDisplaySymbol}{totalDisplayFormatted}
+                <p className="text-3xl font-bold text-gray-900 mt-2">
+                  {totalDisplaySymbol}
+                  {totalDisplayFormatted}
                 </p>
-                <p className="text-sm text-slate-600 mt-1">
-                  {t("donations.donationsCount", { count: filteredDonations?.length || 0 })}
+                <p className="text-sm text-gray-600 mt-1">
+                  {t("donations.recordsInPeriodLabel", { count: filteredHistory.length })}
                 </p>
               </div>
-              <div className="p-3 bg-slate-200 rounded-xl">
-                <HandHeart className="w-6 h-6 text-slate-700" />
+              <div className="p-3 bg-[#025EB8]/10 rounded-xl">
+                <HandHeart className="w-6 h-6 text-[#025EB8]" />
               </div>
             </div>
           </Card>
 
-          <Card className="p-6 bg-gradient-to-br from-slate-50 to-slate-100/50 border-slate-200">
+          <Card className="p-6 bg-gradient-to-br from-[#FA5D17]/5 to-[#FA5D17]/10 border-[#FA5D17]/20">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-700 uppercase tracking-wide">
+                <p className="text-sm font-medium text-[#FA5D17] uppercase tracking-wide">
                   {t("donations.monthlyDonations")}
                 </p>
-                <p className="text-3xl font-bold text-slate-900 mt-2">{monthlyCount}</p>
-                <p className="text-sm text-slate-600 mt-1">{t("donations.activeSubscription")}</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">{monthlyCount}</p>
+                <p className="text-sm text-gray-600 mt-1">{t("donations.activeSubscription")}</p>
               </div>
-              <div className="p-3 bg-slate-200 rounded-xl">
-                <Repeat className="w-6 h-6 text-slate-700" />
+              <div className="p-3 bg-[#FA5D17]/10 rounded-xl">
+                <Repeat className="w-6 h-6 text-[#FA5D17]" />
               </div>
             </div>
           </Card>
 
-          <Card className="p-6 bg-gradient-to-br from-slate-50 to-slate-100/50 border-slate-200">
+          <Card className="p-6 bg-gradient-to-br from-[#025EB8]/5 to-[#025EB8]/10 border-[#025EB8]/20">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-700 uppercase tracking-wide">
+                <p className="text-sm font-medium text-[#025EB8] uppercase tracking-wide">
                   {t("donations.supportedCampaigns")}
                 </p>
-                <p className="text-3xl font-bold text-slate-900 mt-2">{campaignCount}</p>
-                <p className="text-sm text-slate-600 mt-1">{t("donations.campaign")}</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">{campaignCount}</p>
+                <p className="text-sm text-gray-600 mt-1">{t("donations.campaign")}</p>
               </div>
-              <div className="p-3 bg-slate-200 rounded-xl">
-                <CreditCard className="w-6 h-6 text-slate-700" />
+              <div className="p-3 bg-[#025EB8]/10 rounded-xl">
+                <CreditCard className="w-6 h-6 text-[#025EB8]" />
               </div>
             </div>
           </Card>
         </div>
 
-        {/* Filters and Actions */}
         <Card className="p-4">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder={t("donations.timePeriod")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("donations.allPeriods")}</SelectItem>
-                  <SelectItem value="month">{t("donations.thisMonth")}</SelectItem>
-                  <SelectItem value="year">{t("donations.thisYear")}</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={selectedType} onValueChange={setSelectedType}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder={t("donations.donationType")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("donations.all")}</SelectItem>
-                  <SelectItem value="ONE_TIME">{t("donations.oneTime")}</SelectItem>
-                  <SelectItem value="MONTHLY">{t("donations.monthly")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder={t("donations.timePeriod")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("donations.allPeriods")}</SelectItem>
+                <SelectItem value="month">{t("donations.thisMonth")}</SelectItem>
+                <SelectItem value="year">{t("donations.thisYear")}</SelectItem>
+              </SelectContent>
+            </Select>
             <Button
               variant="outline"
-              onClick={handleDownloadAll}
-              disabled={isDownloading !== null || !filteredDonations?.length}
-              className="gap-2"
+              onClick={() => handleDownloadAll(forReceiptDownload)}
+              disabled={isDownloading !== null || forReceiptDownload.length === 0}
+              className="gap-2 border-[#025EB8] text-[#025EB8] hover:bg-[#025EB8]/5"
             >
               {isDownloading === "all" ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <Download className="w-4 h-4" />
               )}
-              {t("receipts.downloadAll", { count: filteredDonations?.length || 0 })}
+              {t("receipts.downloadAll", { count: forReceiptDownload.length })}
             </Button>
           </div>
         </Card>
 
-        {/* Donations List */}
-        <Card className="overflow-hidden">
-          {filteredDonations?.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-              <Receipt className="w-16 h-16 mb-4 opacity-50" />
-              <p className="text-lg font-medium">{t("receipts.noReceiptsMatch")}</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              {/* Desktop Table */}
-              <table className="hidden lg:table w-full" dir={isRtl ? "rtl" : "ltr"}>
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className={cn("text-left font-semibold text-gray-700 py-4 px-6", isRtl && "text-right")}>
-                      {t("donations.date")}
-                    </th>
-                    <th className={cn("text-left font-semibold text-gray-700 py-4 px-6", isRtl && "text-right")}>
-                      {t("donations.donationType")}
-                    </th>
-                    <th className={cn("text-left font-semibold text-gray-700 py-4 px-6", isRtl && "text-right")}>
-                      {t("donations.total")}
-                    </th>
-                    <th className={cn("text-left font-semibold text-gray-700 py-4 px-6", isRtl && "text-right")}>
-                      {t("donations.status")}
-                    </th>
-                    <th className={cn("text-right font-semibold text-gray-700 py-4 px-6", isRtl && "text-left")}>
-                      {t("donations.actions")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredDonations?.map((donation: DonationForProfile) => (
-                    <tr key={donation.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-4 px-6 text-gray-900">
-                        {new Date(donation.createdAt).toLocaleDateString(locale === "ar" ? "ar-EG" : undefined)}
-                      </td>
-                      <td className="py-4 px-6">
-                        <Badge variant={donation.type === "MONTHLY" ? "default" : "secondary"}>
-                          {donation.type === "MONTHLY" ? t("donations.monthly") : t("donations.oneTime")}
-                        </Badge>
-                      </td>
-                      <td className="py-4 px-6 font-semibold text-gray-900">
-                        {formatDonationAmount(donation.totalAmount, donation.currency, donation.amountUSD)}
-                      </td>
-                      <td className="py-4 px-6">
-                        {donation.type === "MONTHLY" ? (
-                          <Badge
-                            variant="outline"
-                            className={
-                              donation.status === "ACTIVE"
-                                ? "border-slate-300 bg-slate-50 text-slate-700"
-                                : donation.status === "PAUSED"
-                                  ? "border-amber-300 bg-amber-50 text-amber-700"
-                                  : "border-gray-300 text-gray-600"
-                            }
-                          >
-                            {statusLabel(donation)}
+        {/* All donation charges (one-time + each monthly payment) */}
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <HandHeart className="w-5 h-5 text-[#025EB8]" />
+            {t("donations.historyTableTitle")}
+          </h3>
+          <Card className="overflow-hidden">
+            {filteredHistory.length === 0 ? (
+              emptyTable(t("donations.emptyHistoryList"))
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="hidden lg:table w-full" dir={isRtl ? "rtl" : "ltr"}>
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className={cn("text-left font-semibold text-gray-700 py-4 px-6", isRtl && "text-right")}>
+                        {t("donations.date")}
+                      </th>
+                      <th className={cn("text-left font-semibold text-gray-700 py-4 px-6", isRtl && "text-right")}>
+                        {t("donations.donationType")}
+                      </th>
+                      <th className={cn("text-left font-semibold text-gray-700 py-4 px-6", isRtl && "text-right")}>
+                        {t("donations.total")}
+                      </th>
+                      <th className={cn("text-right font-semibold text-gray-700 py-4 px-6", isRtl && "text-left")}>
+                        {t("donations.actions")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredHistory.map((donation: DonationForProfile) => (
+                      <tr key={donation.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="py-4 px-6 text-gray-900">
+                          {new Date(donation.createdAt).toLocaleDateString(locale === "ar" ? "ar-EG" : undefined)}
+                        </td>
+                        <td className="py-4 px-6">
+                          <Badge variant={donation.type === "MONTHLY" ? "default" : "secondary"}>
+                            {donation.type === "MONTHLY" ? t("donations.monthly") : t("donations.oneTime")}
                           </Badge>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className={cn("py-4 px-6", isRtl ? "text-left" : "text-right")}>
-                        <div className="flex items-center justify-end gap-2">
-                          {donation.type === "MONTHLY" && donation.status !== "CANCELLED" && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setSubscriptionSettingsDonation(donation)}
-                            >
-                              <Settings className="w-4 h-4 mr-2" />
-                              {t("subscriptions.manage")}
-                            </Button>
-                          )}
+                        </td>
+                        <td className="py-4 px-6 font-semibold text-gray-900">
+                          {formatDonationAmount(donation.totalAmount, donation.currency, donation.amountUSD)}
+                        </td>
+                        <td className={cn("py-4 px-6", isRtl ? "text-left" : "text-right")}>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -702,33 +712,172 @@ const ProfilePage = () => {
                               <Download className="w-4 h-4" />
                             )}
                           </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="lg:hidden divide-y divide-gray-100">
+                  {filteredHistory.map((donation: DonationForProfile) => (
+                    <div key={donation.id} className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-lg text-gray-900">
+                            {formatDonationAmount(donation.totalAmount, donation.currency, donation.amountUSD)}
+                          </p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            {new Date(donation.createdAt).toLocaleDateString(locale === "ar" ? "ar-EG" : undefined)}
+                          </p>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {/* Mobile Cards */}
-              <div className="lg:hidden divide-y divide-gray-100">
-                {filteredDonations?.map((donation: DonationForProfile) => (
-                  <div key={donation.id} className="p-4 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-semibold text-lg text-gray-900">
-                          {formatDonationAmount(donation.totalAmount, donation.currency, donation.amountUSD)}
-                        </p>
-                        <p className="text-sm text-gray-500 mt-1">
-                          {new Date(donation.createdAt).toLocaleDateString(locale === "ar" ? "ar-EG" : undefined)}
-                        </p>
+                        <Badge variant={donation.type === "MONTHLY" ? "default" : "secondary"}>
+                          {donation.type === "MONTHLY" ? t("donations.monthly") : t("donations.oneTime")}
+                        </Badge>
                       </div>
-                      <Badge variant={donation.type === "MONTHLY" ? "default" : "secondary"}>
-                        {donation.type === "MONTHLY" ? t("donations.monthly") : t("donations.oneTime")}
-                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => handleDownload(donation.id)}
+                        disabled={isDownloading === donation.id}
+                      >
+                        {isDownloading === donation.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        ) : (
+                          <Download className="w-4 h-4 mr-2" />
+                        )}
+                        {t("receipts.download")}
+                      </Button>
                     </div>
-                    {donation.type === "MONTHLY" && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600">{t("donations.status")}:</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {/* Subscriptions (one row per subscription — settings & billing) */}
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <Repeat className="w-5 h-5 text-[#025EB8]" />
+            {t("subscriptions.settingsTableTitle")}
+          </h3>
+          <Card className="overflow-hidden">
+            {subscriptionRows.length === 0 ? (
+              emptyTable(t("subscriptions.emptySubscriptionsList"))
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="hidden lg:table w-full" dir={isRtl ? "rtl" : "ltr"}>
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className={cn("text-left font-semibold text-gray-700 py-4 px-6", isRtl && "text-right")}>
+                        {t("subscriptions.sinceDate")}
+                      </th>
+                      <th className={cn("text-left font-semibold text-gray-700 py-4 px-6", isRtl && "text-right")}>
+                        {t("donations.monthlyDonationLabel")}
+                      </th>
+                      <th className={cn("text-left font-semibold text-gray-700 py-4 px-6", isRtl && "text-right")}>
+                        {t("donations.status")}
+                      </th>
+                      <th className={cn("text-left font-semibold text-gray-700 py-4 px-6", isRtl && "text-right")}>
+                        {t("subscriptions.billingDay")}
+                      </th>
+                      <th className={cn("text-left font-semibold text-gray-700 py-4 px-6", isRtl && "text-right")}>
+                        {t("donations.nextBillingDate")}
+                      </th>
+                      <th className={cn("text-left font-semibold text-gray-700 py-4 px-6 min-w-[8rem]", isRtl && "text-right")}>
+                        {t("donations.supportedCampaigns")}
+                      </th>
+                      <th className={cn("text-right font-semibold text-gray-700 py-4 px-6", isRtl && "text-left")}>
+                        {t("donations.actions")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {subscriptionRows.map((donation: DonationForProfile) => (
+                      <tr key={donation.subscriptionId ?? donation.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="py-4 px-6 text-gray-900 whitespace-nowrap">
+                          {new Date(donation.subscriptionStartedAt ?? donation.createdAt).toLocaleDateString(
+                            locale === "ar" ? "ar-EG" : undefined
+                          )}
+                        </td>
+                        <td className="py-4 px-6 font-semibold text-gray-900 whitespace-nowrap">
+                          {formatDonationAmount(donation.totalAmount, donation.currency, donation.amountUSD)}
+                          <span className="text-sm font-normal text-gray-500"> {t("subscriptions.perMonth")}</span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <Badge
+                            variant="outline"
+                            className={
+                              donation.status === "ACTIVE"
+                                ? "border-green-300 bg-green-50 text-green-700"
+                                : donation.status === "PAUSED"
+                                  ? "border-amber-300 bg-amber-50 text-amber-700"
+                                  : "border-gray-300 text-gray-600"
+                            }
+                          >
+                            {statusLabel(donation)}
+                          </Badge>
+                        </td>
+                        <td className="py-4 px-6 text-gray-700 text-sm whitespace-nowrap">
+                          {donation.billingDay != null ? donation.billingDay : "—"}
+                        </td>
+                        <td className="py-4 px-6 text-gray-700 text-sm whitespace-nowrap">
+                          {formatBillingDate(donation.nextBillingDate)}
+                        </td>
+                        <td className="py-4 px-6 text-sm text-gray-600 max-w-[14rem] truncate" title={subscriptionCampaignsLine(donation)}>
+                          {subscriptionCampaignsLine(donation)}
+                        </td>
+                        <td className={cn("py-4 px-6 whitespace-nowrap", isRtl ? "text-left" : "text-right")}>
+                          <div className="flex items-center justify-end gap-2">
+                            {donation.status !== "CANCELLED" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSubscriptionSettingsDonation(donation)}
+                              >
+                                <Settings className={cn("w-4 h-4", isRtl ? "ml-2" : "mr-2")} />
+                                {t("subscriptions.manage")}
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDownload(donation.id)}
+                              disabled={isDownloading === donation.id}
+                              title={t("receipts.downloadReceipt")}
+                            >
+                              {isDownloading === donation.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Download className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="lg:hidden divide-y divide-gray-100">
+                  {subscriptionRows.map((donation: DonationForProfile) => (
+                    <div key={donation.subscriptionId ?? donation.id} className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-lg text-gray-900">
+                            {formatDonationAmount(donation.totalAmount, donation.currency, donation.amountUSD)}
+                            <span className="text-sm font-normal text-gray-500"> {t("subscriptions.perMonth")}</span>
+                          </p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            {t("subscriptions.sinceDate")}:{" "}
+                            {new Date(donation.subscriptionStartedAt ?? donation.createdAt).toLocaleDateString(
+                              locale === "ar" ? "ar-EG" : undefined
+                            )}
+                          </p>
+                        </div>
+                        <Badge variant="default">{t("donations.monthly")}</Badge>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <span className="text-gray-600">{t("donations.status")}:</span>
                         <Badge
                           variant="outline"
                           className={
@@ -742,38 +891,47 @@ const ProfilePage = () => {
                           {statusLabel(donation)}
                         </Badge>
                       </div>
-                    )}
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => handleDownload(donation.id)}
-                        disabled={isDownloading === donation.id}
-                      >
-                        {isDownloading === donation.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                        ) : (
-                          <Download className="w-4 h-4 mr-2" />
-                        )}
-                        {t("receipts.download")}
-                      </Button>
-                      {donation.type === "MONTHLY" && donation.status !== "CANCELLED" && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => setSubscriptionSettingsDonation(donation)}
-                        >
-                          <Settings className="w-4 h-4" />
-                        </Button>
+                      {donation.billingDay != null && (
+                        <p className="text-sm text-gray-600">
+                          <span className="font-medium">{t("subscriptions.billingDay")}: </span>
+                          {donation.billingDay}
+                        </p>
                       )}
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium">{t("donations.nextBillingDate")}: </span>
+                        {formatBillingDate(donation.nextBillingDate)}
+                      </p>
+                      {subscriptionCampaignsLine(donation) !== "—" && (
+                        <p className="text-sm text-gray-600 line-clamp-2">{subscriptionCampaignsLine(donation)}</p>
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => handleDownload(donation.id)}
+                          disabled={isDownloading === donation.id}
+                        >
+                          {isDownloading === donation.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : (
+                            <Download className="w-4 h-4 mr-2" />
+                          )}
+                          {t("receipts.download")}
+                        </Button>
+                        {donation.status !== "CANCELLED" && (
+                          <Button variant="secondary" size="sm" onClick={() => setSubscriptionSettingsDonation(donation)}>
+                            <Settings className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-        </Card>
+            )}
+          </Card>
+        </div>
       </div>
     );
   };
@@ -803,7 +961,7 @@ const ProfilePage = () => {
               className="h-32 mt-2"
             />
           </div>
-          <Button className="w-full">{t("support.sendRequest")}</Button>
+          <Button className="w-full bg-[#025EB8] hover:bg-[#014fa0] text-white">{t("support.sendRequest")}</Button>
         </div>
       </Card>
 
@@ -843,7 +1001,7 @@ const ProfilePage = () => {
             <DialogTitle>{t("subscriptions.subscriptionSettings")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-6 pt-2">
-            <div className="p-4 bg-gray-50 rounded-xl">
+            <div className="p-4 bg-[#025EB8]/5 border border-[#025EB8]/10 rounded-xl">
               <p className="text-lg font-semibold text-gray-900">
                 {formatDonationAmount(sub.totalAmount, sub.currency, sub.amountUSD)} {t("subscriptions.perMonth")}
               </p>
@@ -857,7 +1015,7 @@ const ProfilePage = () => {
               <div>
                 <Label className="text-sm font-medium">{t("subscriptions.billingDay")}</Label>
                 <Select
-                  value={String(sub.billingDay ?? 1)}
+                  value={sub.billingDay ? String(sub.billingDay) : undefined}
                   onValueChange={(v) => handleBillingDayChange(sub.id, Number(v))}
                 >
                   <SelectTrigger className="mt-2">
@@ -941,7 +1099,7 @@ const ProfilePage = () => {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+          <Loader2 className="w-12 h-12 animate-spin text-[#025EB8] mx-auto mb-4" />
         </div>
       </div>
     );
@@ -969,9 +1127,9 @@ const ProfilePage = () => {
     <div className="flex flex-col h-full rounded-2xl border border-gray-200 shadow-sm bg-white">
       <div className="p-6 border-b border-gray-100">
         <div className="flex flex-col items-center text-center">
-          <Avatar className="w-20 h-20 mb-4 ring-4 ring-primary/10">
+          <Avatar className="w-20 h-20 mb-4 ring-4 ring-[#025EB8]/10">
             <AvatarImage src={user.image ?? undefined} alt={user.name ?? undefined} />
-            <AvatarFallback className="text-xl bg-primary text-white">
+            <AvatarFallback className="text-xl bg-[#025EB8] text-white">
               {(user.name ?? user.email ?? "?").charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
@@ -995,7 +1153,7 @@ const ProfilePage = () => {
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all",
                 isActive
-                  ? "bg-primary text-white shadow-md shadow-primary/20"
+                  ? "bg-[#025EB8] text-white shadow-md shadow-[#025EB8]/20"
                   : "text-gray-700 hover:bg-gray-100"
               )}
             >
@@ -1028,18 +1186,18 @@ const ProfilePage = () => {
     <>
       <Toaster position="top-center" />
 
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-50 to-gray-100">
+      <div className="min-h-screen bg-gray-50">
         {/* Mobile: horizontal tabs - sticky at very top */}
-        <div className="lg:hidden sticky top-0 z-50 bg-gradient-to-br from-gray-50 via-gray-50 to-gray-100 pt-4 pb-4 px-4 sm:px-6 shadow-sm">
+        <div className="lg:hidden sticky top-0 z-50 bg-gray-50 pt-4 pb-4 px-4 sm:px-6 shadow-sm">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-[1600px] mx-auto">
-            <TabsList className="w-full grid grid-cols-3 h-12 p-1 bg-gray-100 rounded-xl">
+            <TabsList className="w-full grid grid-cols-3 h-12 p-1 bg-[#025EB8]/8 rounded-xl">
               {navigationItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <TabsTrigger
                     key={item.id}
                     value={item.id}
-                    className="gap-1.5 sm:gap-2 text-xs sm:text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-lg"
+                    className="gap-1.5 sm:gap-2 text-xs sm:text-sm data-[state=active]:bg-[#025EB8] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-lg"
                   >
                     <Icon className="w-4 h-4 shrink-0" />
                     <span className="truncate">{item.label}</span>
@@ -1062,12 +1220,14 @@ const ProfilePage = () => {
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8">
                 {/* Desktop: page header with title + description */}
                 <div className="hidden lg:block mb-8 pb-6 border-b border-gray-100">
-                  <h1 className="text-3xl font-bold text-gray-900">
-                    {navigationItems.find((item) => item.id === activeTab)?.label}
-                  </h1>
-                  <p className="text-gray-600 mt-2">
-                    {navigationItems.find((item) => item.id === activeTab)?.description}
-                  </p>
+                  <div className="border-l-4 border-[#FA5D17] pl-4">
+                    <h1 className="text-3xl font-bold text-gray-900">
+                      {navigationItems.find((item) => item.id === activeTab)?.label}
+                    </h1>
+                    <p className="text-gray-600 mt-2">
+                      {navigationItems.find((item) => item.id === activeTab)?.description}
+                    </p>
+                  </div>
                 </div>
 
                 <div className={isRtl ? "text-right" : ""}>

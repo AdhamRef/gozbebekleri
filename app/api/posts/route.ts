@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/options";
+import { orderCampaignsByIds, sanitizeCampaignIds } from "@/lib/blog/campaign-ids";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog } from "@/lib/audit-log";
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -36,7 +39,8 @@ export async function GET(request: NextRequest) {
             translations: { where: { locale }, take: 1, select: { name: true } }
           }
         },
-        translations: { where: { locale }, take: 1, select: { locale: true, title: true, description: true, content: true, image: true } }
+        translations: { where: { locale }, take: 1, select: { locale: true, title: true, description: true, content: true, image: true } },
+        campaignIds: true,
       }
     });
 
@@ -53,17 +57,44 @@ export async function GET(request: NextRequest) {
     const items = hasMore ? filtered.slice(0, -1) : filtered;
     const nextCursor = hasMore ? items[items.length - 1]?.id : null;
 
-    const transformed = items.map(p => ({
-      id: p.id,
-      title: p.translations[0]?.title || p.title,
-      description: p.translations[0]?.description || p.description,
-      content: p.translations[0]?.content || p.content,
-      image: p.translations[0]?.image || p.image,
-      published: p.published,
-      category: p.category ? { id: p.category.id, name: p.category.translations[0]?.name || p.category.name } : null,
-      createdAt: p.createdAt,
-      updatedAt: p.updatedAt,
-    }));
+    const allCampaignIds = [...new Set(items.flatMap((p) => p.campaignIds ?? []))];
+    const campaignRows =
+      allCampaignIds.length === 0
+        ? []
+        : await prisma.campaign.findMany({
+            where: { id: { in: allCampaignIds } },
+            select: {
+              id: true,
+              title: true,
+              currentAmount: true,
+              targetAmount: true,
+              images: true,
+              translations: { where: { locale }, take: 1, select: { title: true } },
+            },
+          });
+
+    const transformed = items.map((p) => {
+      const ids = p.campaignIds ?? [];
+      const campaigns = orderCampaignsByIds(ids, campaignRows).map((c) => ({
+        id: c.id,
+        title: c.translations[0]?.title || c.title,
+        currentAmount: c.currentAmount,
+        targetAmount: c.targetAmount,
+        images: c.images,
+      }));
+      return {
+        id: p.id,
+        title: p.translations[0]?.title || p.title,
+        description: p.translations[0]?.description || p.description,
+        content: p.translations[0]?.content || p.content,
+        image: p.translations[0]?.image || p.image,
+        published: p.published,
+        category: p.category ? { id: p.category.id, name: p.category.translations[0]?.name || p.category.name } : null,
+        campaigns,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+      };
+    });
 
     return NextResponse.json({ items: transformed, nextCursor, hasMore, filters: { locale, limit, search } });
   } catch (error) {
@@ -76,12 +107,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized - Only admins can create posts' }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, "blog");
+    if (denied) return denied;
 
     const data = await request.json();
-    const { title, description, content, image, published, categoryId, campaignId, translations } = data;
+    const { title, description, content, image, published, categoryId, campaignIds, campaignId, translations } = data;
+    const resolvedCampaignIds = sanitizeCampaignIds(
+      campaignIds !== undefined ? campaignIds : campaignId != null ? [campaignId] : []
+    );
 
     const translationData: { locale: string; title?: string; description?: string; content?: string; image?: string }[] = [];
     if (translations && typeof translations === 'object') {
@@ -94,7 +127,17 @@ export async function POST(request: NextRequest) {
     }
 
     const created = await prisma.$transaction(async (tx) => {
-      const post = await tx.post.create({ data: { title: title || '', description: description || '', content: content || '', image: image || '', published: !!published, categoryId: categoryId || null, campaignId: campaignId || null } });
+      const post = await tx.post.create({
+        data: {
+          title: title || "",
+          description: description || "",
+          content: content || "",
+          image: image || "",
+          published: !!published,
+          categoryId: categoryId || null,
+          campaignIds: resolvedCampaignIds,
+        },
+      });
 
       if (translationData.length > 0) {
         await tx.postTranslation.createMany({ data: translationData.map(t => ({ postId: post.id, locale: t.locale, title: t.title || '', description: t.description || '', content: t.content || '', image: t.image || '' })) });
@@ -103,7 +146,31 @@ export async function POST(request: NextRequest) {
       return post;
     });
 
-    const full = await prisma.post.findUnique({ where: { id: created.id }, select: { id: true, title: true, description: true, content: true, image: true, published: true, categoryId: true, translations: { select: { locale: true, title: true, description: true, content: true, image: true } } } });
+    const full = await prisma.post.findUnique({
+      where: { id: created.id },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        content: true,
+        image: true,
+        published: true,
+        categoryId: true,
+        campaignIds: true,
+        translations: { select: { locale: true, title: true, description: true, content: true, image: true } },
+      },
+    });
+
+    const actor = session!.user;
+    await writeAuditLog({
+      actorId: actor.id,
+      actorName: actor.name,
+      actorRole: actor.role ?? "ADMIN",
+      action: "POST_CREATE",
+      messageAr: `${actor.name ?? "مسؤول"} أنشأ مقالًا في المدونة: ${(full?.title ?? title) || "(بدون عنوان)"}`,
+      entityType: "Post",
+      entityId: created.id,
+    });
 
     return NextResponse.json(full, { status: 201 });
   } catch (error) {

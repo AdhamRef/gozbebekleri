@@ -103,10 +103,9 @@ const HeroSlider: React.FC = () => {
               {slide.showButton && (
                 <Link
                   href={`/${slide.buttonLink || "#quick_donate"}`}
-                  className={`bg-transparent border-2 border-white text-white font-semibold py-2 px-6 sm:py-3 sm:px-8 md:py-3 md:px-10 rounded-lg hover:bg-white hover:text-sky-600 transition-all duration-300 hover:scale-105 text-sm sm:text-base md:text-lg ${
+                  className={`bg-[#FA5D17] border-2 border-[#FA5D17] text-white font-bold py-2 px-6 sm:py-3 sm:px-8 md:py-3 md:px-10 rounded-lg hover:bg-[#ee5712] transition-all duration-300 hover:scale-105 text-sm sm:text-base md:text-lg ${
                     current === index ? "translate-y-0 opacity-100" : "translate-y-10 opacity-0"
                   }`}
-                  style={{ transitionDelay: "800ms" }}
                 >
                   {slide.buttonText || t("quickDonate")}
                 </Link>

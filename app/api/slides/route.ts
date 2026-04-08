@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from "../auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,9 +48,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, 'slides');
+    if (denied) return denied;
     const data = await request.json();
     const { title, description, image, showButton, buttonText, buttonLink, isActive, order, translations } = data;
     if (!title) return NextResponse.json({ error: 'Title required' }, { status: 400 });
@@ -88,6 +89,16 @@ export async function POST(request: NextRequest) {
       where: { id: slide.id },
       select: { id: true, title: true, description: true, image: true, showButton: true, buttonText: true, buttonLink: true, isActive: true, order: true, translations: { select: { locale: true, title: true, description: true, buttonText: true } } },
     });
+
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "SLIDE_CREATE",
+      messageAr: `${actor.actorName ?? "مسؤول"} أنشأ شريحة هيرو: ${full?.title ?? title}`,
+      entityType: "Slide",
+      entityId: slide.id,
+    });
+
     return NextResponse.json(full, { status: 201 });
   } catch (error) {
     console.error('Error creating slide:', error);

@@ -3,32 +3,80 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/options';
 import { getUserIdsMatchingBadge, getBadgeIdsByUser } from '@/lib/badge-criteria';
+import { requireAdminOrDashboardPermission, requireAdminSession } from '@/lib/dashboard/api-auth';
+import {
+  sanitizeDashboardPermissions,
+  sessionHasDashboardPermission,
+} from '@/lib/dashboard/permissions';
+import { writeAuditLog } from '@/lib/audit-log';
 
-// GET /api/users - Get all users (admin only)
+type UserScope = 'donors' | 'team' | 'all';
+
+// GET /api/users — scope=donors | scope=team | omit/empty/all = every role (no role filter)
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== 'ADMIN') {
+    const { searchParams } = new URL(request.url);
+    const trimmedScope = (searchParams.get('scope') ?? '').trim();
+    if (
+      trimmedScope &&
+      trimmedScope !== 'donors' &&
+      trimmedScope !== 'team' &&
+      trimmedScope !== 'all'
+    ) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+        { error: 'Invalid scope; use donors, team, all, or omit for all users' },
+        { status: 400 }
       );
     }
+    const scope: UserScope =
+      trimmedScope === 'team' ? 'team' : trimmedScope === 'donors' ? 'donors' : 'all';
 
-    const { searchParams } = new URL(request.url);
-    const role = searchParams.get('role');
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (scope === 'donors') {
+      const canListDonors =
+        sessionHasDashboardPermission(session, 'donors') ||
+        sessionHasDashboardPermission(session, 'revenue') ||
+        sessionHasDashboardPermission(session, 'monthly');
+      if (!canListDonors) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    } else if (scope === 'team') {
+      const denied = requireAdminOrDashboardPermission(session, 'team');
+      if (denied) return denied;
+    } else {
+      const canListAll =
+        session.user.role === 'ADMIN' ||
+        sessionHasDashboardPermission(session, 'donors') ||
+        sessionHasDashboardPermission(session, 'team') ||
+        sessionHasDashboardPermission(session, 'revenue') ||
+        sessionHasDashboardPermission(session, 'monthly');
+      if (!canListAll) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
+
     const preferredLang = searchParams.get('preferredLang') || undefined;
     const badgeId = searchParams.get('badgeId') || undefined;
     const search = searchParams.get('search')?.trim() || undefined;
-    const sortBy = (searchParams.get('sortBy') || 'createdAt') as 'createdAt' | 'name' | 'email' | 'donationsCount' | 'totalDonated';
+    const sortBy = (searchParams.get('sortBy') || 'createdAt') as 'createdAt' | 'name' | 'email' | 'donationsCount' | 'totalDonated' | 'role';
     const sortOrder = (searchParams.get('sortOrder') || 'desc') as 'asc' | 'desc';
     const page = parseInt(searchParams.get('page') || '1');
     const limit = Math.min(parseInt(searchParams.get('limit') || '10') || 10, 100);
     const skip = (page - 1) * limit;
 
-    // Build filter conditions (MongoDB: no mode 'insensitive', use contains)
+    const roleFilter: Record<string, unknown> =
+      scope === 'donors'
+        ? { role: 'DONOR' as const }
+        : scope === 'team'
+          ? { role: { in: ['ADMIN', 'STAFF'] as const } }
+          : {};
+
     let where: Record<string, unknown> = {
-      ...(role && { role: role as 'ADMIN' | 'DONOR' }),
+      ...roleFilter,
       ...(preferredLang && { preferredLang }),
       ...(search && search.length > 0 && {
         OR: [
@@ -38,7 +86,11 @@ export async function GET(request: NextRequest) {
       }),
     };
 
-    if (badgeId) {
+    if (scope === 'team' && session?.user?.id) {
+      where = { ...where, NOT: { id: session.user.id } };
+    }
+
+    if (badgeId && scope === 'donors') {
       const badge = await prisma.badge.findUnique({
         where: { id: badgeId },
         select: { criteria: true },
@@ -59,76 +111,104 @@ export async function GET(request: NextRequest) {
     let orderedIds: string[] = [];
 
     if (isAggregateSort && total > 0) {
-      const userIds = (await prisma.user.findMany({ where, select: { id: true } })).map((u) => u.id);
-      const group = await prisma.donation.groupBy({
-        by: ['donorId'],
-        where: { donorId: { in: userIds } },
-        _count: { id: true },
-        _sum: { amountUSD: true, totalAmount: true },
+      const userRows = await prisma.user.findMany({
+        where,
+        select: { id: true, role: true },
       });
-      const byDonor = new Map(group.map((r) => [r.donorId, r]));
-      const withZero = userIds.map((id) => {
-        const g = byDonor.get(id);
-        return {
-          donorId: id,
-          count: g?._count.id ?? 0,
-          amountUSD: g?._sum.amountUSD ?? 0,
-        };
-      });
-      const mult = sortOrder === 'desc' ? 1 : -1;
-      if (sortBy === 'donationsCount') {
-        withZero.sort((a, b) => mult * (a.count - b.count));
+
+      const sortIdsByDonations = async (ids: string[]) => {
+        if (ids.length === 0) return [];
+        const gRows = await prisma.donation.groupBy({
+          by: ['donorId'],
+          where: { donorId: { in: ids } },
+          _count: { id: true },
+          _sum: { amountUSD: true, totalAmount: true },
+        });
+        const byDonor = new Map(gRows.map((r) => [r.donorId, r]));
+        const withZero = ids.map((id) => {
+          const g = byDonor.get(id);
+          return {
+            donorId: id,
+            count: g?._count.id ?? 0,
+            amountUSD: g?._sum.amountUSD ?? 0,
+          };
+        });
+        const mult = sortOrder === 'desc' ? 1 : -1;
+        if (sortBy === 'donationsCount') {
+          withZero.sort((a, b) => mult * (a.count - b.count));
+        } else {
+          withZero.sort((a, b) => mult * (a.amountUSD - b.amountUSD));
+        }
+        return withZero.map((x) => x.donorId);
+      };
+
+      if (scope === 'team') {
+        const adminIds = userRows.filter((u) => u.role === 'ADMIN').map((u) => u.id);
+        const staffIds = userRows.filter((u) => u.role !== 'ADMIN').map((u) => u.id);
+        const [a, s] = await Promise.all([
+          sortIdsByDonations(adminIds),
+          sortIdsByDonations(staffIds),
+        ]);
+        orderedIds = [...a, ...s];
       } else {
-        withZero.sort((a, b) => mult * (a.amountUSD - b.amountUSD));
+        const userIds = userRows.map((u) => u.id);
+        orderedIds = await sortIdsByDonations(userIds);
       }
-      orderedIds = withZero.map((x) => x.donorId);
     }
 
-    const orderByField = sortBy === 'name' || sortBy === 'email' || sortBy === 'createdAt'
+    const orderByField = sortBy === 'name' || sortBy === 'email' || sortBy === 'createdAt' || sortBy === 'role'
       ? sortBy
       : 'createdAt';
-    const users = isAggregateSort && orderedIds.length > 0
-      ? await (async () => {
-          const pageIds = orderedIds.slice(skip, skip + limit);
-          const byId = new Map(
-            (await prisma.user.findMany({
-              where: { id: { in: pageIds } },
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                image: true,
-                role: true,
-                preferredLang: true,
-                country: true,
-                phone: true,
-                createdAt: true,
-                updatedAt: true,
-                _count: { select: { donations: true } },
-              },
-            })).map((u) => [u.id, u])
-          );
-          return pageIds.map((id) => byId.get(id)).filter(Boolean) as Awaited<ReturnType<typeof prisma.user.findMany>>;
-        })()
-      : await prisma.user.findMany({
-          where,
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-            role: true,
-            preferredLang: true,
-            country: true,
-            phone: true,
-            createdAt: true,
-            updatedAt: true,
-            _count: { select: { donations: true } },
-          },
-          orderBy: orderByField === 'createdAt' ? { createdAt: sortOrder } : { [orderByField]: sortOrder },
-          skip,
-          take: limit,
-        });
+
+    const baseSelect = {
+      id: true,
+      name: true,
+      email: true,
+      image: true,
+      role: true,
+      dashboardPermissions: true,
+      preferredLang: true,
+      country: true,
+      phone: true,
+      createdAt: true,
+      updatedAt: true,
+      _count: { select: { donations: true } },
+    } as const;
+
+    let users: Awaited<ReturnType<typeof prisma.user.findMany>>;
+
+    if (scope === 'team' && !isAggregateSort) {
+      const secondary =
+        sortBy === 'role'
+          ? { createdAt: sortOrder }
+          : orderByField === 'createdAt'
+            ? { createdAt: sortOrder }
+            : { [orderByField]: sortOrder };
+      users = await prisma.user.findMany({
+        where,
+        select: baseSelect,
+        orderBy: [{ role: 'asc' }, secondary],
+        skip,
+        take: limit,
+      });
+    } else if (isAggregateSort && orderedIds.length > 0) {
+      const pageIds = orderedIds.slice(skip, skip + limit);
+      const byId = new Map(
+        (await prisma.user.findMany({
+          where: { id: { in: pageIds } },
+          select: baseSelect,
+        })).map((u) => [u.id, u])
+      );
+      users = pageIds.map((id) => byId.get(id)).filter(Boolean) as Awaited<ReturnType<typeof prisma.user.findMany>>;
+    } else {
+      users = await prisma.user.findMany({
+        where,
+        select: baseSelect,
+        orderBy: orderByField === 'createdAt' ? { createdAt: sortOrder } : { [orderByField]: sortOrder },
+        skip,
+        take: limit,
+      });
+    }
 
     const userIds = users.map((u) => u.id);
     const totalsByUser =
@@ -155,9 +235,12 @@ export async function GET(request: NextRequest) {
       select: { id: true, criteria: true },
       orderBy: { order: 'asc' },
     });
-    const badgeIdsByUser = userIds.length > 0 && allBadges.length > 0
-      ? await getBadgeIdsByUser(userIds, allBadges)
-      : new Map<string, string[]>();
+    const badgeIdsByUser =
+      (scope === 'donors' || scope === 'all') &&
+      userIds.length > 0 &&
+      allBadges.length > 0
+        ? await getBadgeIdsByUser(userIds, allBadges)
+        : new Map<string, string[]>();
 
     const usersWithTotals = users.map((u) => ({
       ...u,
@@ -176,6 +259,7 @@ export async function GET(request: NextRequest) {
         page,
         limit,
       },
+      scope,
     });
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -186,21 +270,16 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/users - Create a new user (admin only)
+// POST /api/users — admin only
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const denied = requireAdminSession(session);
+    if (denied) return denied;
 
     const body = await request.json();
-    const { name, email, role } = body;
+    const { name, email, role, dashboardPermissions: rawPerms } = body;
 
-    // Validate required fields
     if (!name || !email) {
       return NextResponse.json(
         { error: 'Name and email are required' },
@@ -208,7 +287,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if email already exists
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
@@ -220,13 +298,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create new user
+    const r = role || 'DONOR';
+    const perms =
+      r === 'STAFF' ? sanitizeDashboardPermissions(rawPerms) : [];
+    if (r === 'STAFF' && perms.length === 0) {
+      return NextResponse.json(
+        { error: 'Staff members need at least one dashboard section enabled' },
+        { status: 400 }
+      );
+    }
+
     const user = await prisma.user.create({
       data: {
         name,
         email,
-        role: role || 'DONOR',
+        role: r,
+        dashboardPermissions: perms,
       },
+    });
+
+    const actor = session!.user;
+    await writeAuditLog({
+      actorId: actor.id,
+      actorName: actor.name,
+      actorRole: actor.role ?? 'ADMIN',
+      action: 'USER_CREATE',
+      messageAr: `${actor.name ?? 'مسؤول'} أنشأ مستخدمًا جديدًا: ${name} (${email}) بدور ${r === 'ADMIN' ? 'مدير' : r === 'STAFF' ? 'طاقم' : 'متبرع'}`,
+      messageEn: `${actor.name ?? 'Admin'} created user ${name} (${email}) as ${r}`,
+      entityType: 'User',
+      entityId: user.id,
+      metadata: { role: r },
     });
 
     return NextResponse.json(user);
@@ -237,4 +338,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}

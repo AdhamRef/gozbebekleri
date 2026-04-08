@@ -1,45 +1,74 @@
-'use client'
-import React, { useState } from 'react';
-import { Heart, Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin, Send } from 'lucide-react';
+'use client';
+import React, { useEffect, useState } from 'react';
+import { Mail, Phone, MapPin, Facebook, Instagram, Youtube, Twitter, Send, Heart, ChevronRight } from 'lucide-react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useSession } from 'next-auth/react';
+import { usePathname, useRouter } from '@/i18n/routing';
+import { Link } from '@/i18n/routing';
+import { useSearchParams } from 'next/navigation';
+import SignInDialog from '@/components/SignInDialog';
+
+const LOGO_URL = 'https://i.ibb.co/ZwcJcN1/logo.webp';
 
 const Footer = () => {
   const t = useTranslations('Footer');
-  const locale = useLocale() as 'ar' | 'en' | 'fr';
+  const locale = useLocale() as 'ar' | 'en' | 'fr' | 'tr';
   const { data: session } = useSession();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [body, setBody] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
+  const [isSignInOpen, setIsSignInOpen] = useState(false);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const pendingMessageKey = 'footer_pending_contact_message';
+  const signInCallbackUrl =
+    typeof window !== 'undefined'
+      ? `${window.location.pathname}?footerMessageSent=1`
+      : undefined;
 
-  // Helper function to get locale-specific property
-  const getLocalizedProperty = (obj: any, key: string) => {
-    const localeKey = `${key}${locale.charAt(0).toUpperCase() + locale.slice(1)}`;
-    return obj[localeKey] || obj[key] || '';
-  };
+  useEffect(() => {
+    const shouldSend = searchParams.get('footerMessageSent') === '1';
+    if (!shouldSend || !session?.user?.id) return;
+    const run = async () => {
+      try {
+        const raw = window.sessionStorage.getItem(pendingMessageKey);
+        if (!raw) { router.replace(pathname); return; }
+        const parsed = JSON.parse(raw) as { body?: string; locale?: string };
+        const trimmed = (parsed.body || '').trim();
+        if (!trimmed) { window.sessionStorage.removeItem(pendingMessageKey); router.replace(pathname); return; }
+        const res = await fetch('/api/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body: trimmed, locale: parsed.locale || locale, subject: 'COMPLAINT' }),
+        });
+        if (!res.ok) throw new Error('Failed');
+        window.sessionStorage.removeItem(pendingMessageKey);
+        setBody('');
+        setSubmitMessage(t('sendSuccess'));
+        setTimeout(() => setSubmitMessage(''), 4000);
+      } catch {
+        setSubmitMessage(t('sendError'));
+        setTimeout(() => setSubmitMessage(''), 3000);
+      } finally {
+        router.replace(pathname);
+      }
+    };
+    run();
+  }, [searchParams, session?.user?.id, pathname, router, t, locale]);
 
-  // Categories with locale-specific names
-  const categories = [
-    { id: '1', nameAr: 'الحالات الطبية', nameEn: 'Medical Cases', nameFr: 'Cas médicaux' },
-    { id: '2', nameAr: 'كفالة الأيتام', nameEn: 'Orphan Sponsorship', nameFr: 'Parrainage d\'orphelin' },
-    { id: '3', nameAr: 'المشاريع التعليمية', nameEn: 'Educational Projects', nameFr: 'Projets éducatifs' },
-    { id: '4', nameAr: 'الإغاثة العاجلة', nameEn: 'Emergency Relief', nameFr: 'Secours d\'urgence' }
-  ];
-
-  // Quick links with locale-specific names
-  const quickLinks = [
-    { textAr: 'من نحن', textEn: 'About Us', textFr: 'À propos' },
-    { textAr: 'الحملات', textEn: 'Campaigns', textFr: 'Campagnes' },
-    { textAr: 'اتصل بنا', textEn: 'Contact Us', textFr: 'Contactez-nous' },
-    { textAr: 'سياسة الخصوصية', textEn: 'Privacy Policy', textFr: 'Politique de confidentialité' }
-  ];
-
-  // Contact info with locale-specific text
-  const contactInfo = [
-    { Icon: MapPin, textAr: 'الرياض، السعودية', textEn: 'Riyadh, Saudi Arabia', textFr: 'Riyad, Arabie Saoudite' },
-    { Icon: Phone, textAr: '+966 123 456 789', textEn: '+966 123 456 789', textFr: '+966 123 456 789' },
-    { Icon: Mail, textAr: 'info@al-amal.com', textEn: 'info@al-amal.com', textFr: 'info@al-amal.com' }
-  ];
+  useEffect(() => {
+    fetch(`/api/categories?locale=${locale}&limit=20`)
+      .then((r) => r.json())
+      .then((data) => {
+        const items = data?.items ?? data ?? [];
+        if (Array.isArray(items)) {
+          setCategories(items.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })));
+        }
+      })
+      .catch(() => {});
+  }, [locale]);
 
   const handleMessageSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,21 +78,22 @@ const Footer = () => {
       setTimeout(() => setSubmitMessage(''), 3000);
       return;
     }
+    if (!session?.user?.id) {
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem(pendingMessageKey, JSON.stringify({ body: trimmed, locale }));
+      }
+      setIsSignInOpen(true);
+      return;
+    }
     setIsSubmitting(true);
     setSubmitMessage('');
     try {
       const res = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          body: trimmed,
-          locale,
-        }),
+        body: JSON.stringify({ body: trimmed, locale, subject: 'COMPLAINT' }),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.error || 'Failed');
-      }
+      if (!res.ok) throw new Error('Failed');
       setSubmitMessage(t('sendSuccess'));
       setBody('');
       setTimeout(() => setSubmitMessage(''), 4000);
@@ -75,134 +105,177 @@ const Footer = () => {
     }
   };
 
+  const isTr = locale === 'tr';
+  const isAr = locale === 'ar';
+
+  // Built dynamically from the API — see useEffect above
+
+  const quickLinks = [
+    { label: isTr ? 'Hakkımızda' : isAr ? 'من نحن' : 'About Us', href: '/about-us' },
+    { label: isTr ? 'Projeler' : isAr ? 'المشاريع' : 'Projects', href: '/campaigns' },
+    { label: isTr ? 'Haberler' : isAr ? 'الأخبار' : 'News', href: '/blog' },
+    { label: isTr ? 'Faaliyetler' : isAr ? 'الأنشطة' : 'Activities', href: '/campaigns' },
+    { label: isTr ? 'İletişim' : isAr ? 'اتصل بنا' : 'Contact', href: '/contact-us' },
+    { label: isTr ? 'Gizlilik Politikası' : isAr ? 'سياسة الخصوصية' : 'Privacy Policy', href: '/' },
+  ];
+
+  const socialLinks = [
+    { Icon: Facebook, href: 'https://www.facebook.com/gozbebeklerider/', label: 'Facebook' },
+    { Icon: Twitter, href: 'https://x.com/gozbebeklerider', label: 'Twitter' },
+    { Icon: Instagram, href: 'https://www.instagram.com/gozbebekleri_foundation/', label: 'Instagram' },
+    { Icon: Youtube, href: 'https://www.youtube.com/channel/UCvvSx8jtGafK9BI2hQnBYSQ', label: 'Youtube' },
+  ] as const;
+
   return (
-    <footer className="bg-gradient-to-tl from-blue-800 to-blue-950 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <footer className="bg-[#0A2D6E] text-white">
 
-        {/* Top Section - Logo & Newsletter */}
-        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
+      {/* ── Main content ── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10 gap-2">
 
-          {/* Brand Section */}
-          <div className="flex-1 max-lg:text-center">
-            <a href="/" className="inline-flex items-center gap-2 sm:gap-3 hover:opacity-90 transition-opacity mb-2 sm:mb-3">
-              <img src="https://i.ibb.co/ZwcJcN1/logo.webp" className="h-12 sm:h-16 lg:h-20" alt="Logo" />
-            </a>
-            <p className="text-xs sm:text-sm text-white/80 leading-relaxed mb-3 sm:mb-4 max-w-2xl mx-auto lg:mx-0">
+          {/* ── Brand ── */}
+          <div className="sm:col-span-2 lg:col-span-1 flex flex-col">
+            <Link href="/" className="inline-block mb-5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={LOGO_URL} alt="Logo" className="h-14 w-auto object-contain brightness-0 invert" />
+            </Link>
+            <p className="text-sm text-white/70 leading-relaxed mb-6 max-w-xs">
               {t('aboutUsDesc1')}
             </p>
-            <div className="flex items-center justify-center lg:justify-start gap-2 sm:gap-3">
-              {[Facebook, Twitter, Instagram, Linkedin].map((Icon, index) => (
+            {/* Social icons */}
+            <div className="flex items-center gap-2 mt-auto">
+              {socialLinks.map(({ Icon, href, label }) => (
                 <a
-                  key={index}
-                  href="#"
-                  className="bg-white/10 p-1.5 sm:p-2 rounded-full hover:bg-white/20 transition-colors"
+                  key={label}
+                  href={href}
+                  aria-label={label}
+                  className="w-9 h-9 rounded-full bg-white/10 hover:bg-[#FA5D17] flex items-center justify-center transition-colors"
                 >
-                  <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <Icon className="w-4 h-4" />
                 </a>
               ))}
             </div>
           </div>
 
-          {/* Send us a message */}
-          <div className="flex-1 bg-white/5 rounded-lg p-4 sm:p-5 border border-white/10">
-            <h3 className="text-sm sm:text-base font-semibold mb-2">{t('messageTitle')}</h3>
-            <p className="text-white/80 text-xs mb-3">
-              {t('messageDesc')}
-            </p>
-            <form onSubmit={handleMessageSubmit} className="space-y-2">
+          {/* ── Online Donate ── */}
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-widest mb-5 text-white/50 border-b border-white/10 pb-3">
+              {isTr ? 'Online Bağış' : isAr ? 'التبرع الإلكتروني' : 'Online Donate'}
+            </h4>
+            <ul className="space-y-2.5">
+              {categories.map((cat) => (
+                <li key={cat.id}>
+                  <Link
+                    href={`/category/${cat.id}`}
+                    className="group flex items-center gap-1.5 text-sm text-white/65 hover:text-white transition-colors"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5 text-[#FA5D17] flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                    {cat.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* ── Quick Links ── */}
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-widest mb-5 text-white/50 border-b border-white/10 pb-3">
+              {isTr ? 'Bağlantılar' : isAr ? 'روابط سريعة' : 'Quick Links'}
+            </h4>
+            <ul className="space-y-2.5">
+              {quickLinks.map((item) => (
+                <li key={item.label}>
+                  <Link
+                    href={item.href}
+                    className="group flex items-center gap-1.5 text-sm text-white/65 hover:text-white transition-colors"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5 text-[#FA5D17] flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* ── Contact + Message ── */}
+          <div className="sm:col-span-2 lg:col-span-1">
+            <h4 className="text-xs font-bold uppercase tracking-widest mb-5 text-white/50 border-b border-white/10 pb-3">
+              {isTr ? 'İletişim' : isAr ? 'تواصل معنا' : 'Contact'}
+            </h4>
+
+            {/* Contact info */}
+            <ul className="space-y-3 mb-6">
+              <li className="flex items-start gap-3 text-sm text-white/70">
+                <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-[#FA5D17]" />
+                {isTr ? 'İstanbul, Türkiye' : isAr ? 'إسطنبول، تركيا' : 'Istanbul, Turkey'}
+              </li>
+              <li>
+                <a
+                  href="tel:+902122885930"
+                  className="flex items-center gap-3 text-sm text-white/70 hover:text-white transition-colors"
+                >
+                  <Phone className="w-4 h-4 flex-shrink-0 text-[#FA5D17]" />
+                  <span dir="ltr">+90 212 288 59 30</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="mailto:info@gozbebekleri.org"
+                  className="flex items-center gap-3 text-sm text-white/70 hover:text-white transition-colors"
+                >
+                  <Mail className="w-4 h-4 flex-shrink-0 text-[#FA5D17]" />
+                  info@gozbebekleri.org
+                </a>
+              </li>
+            </ul>
+
+            {/* Message form */}
+            <form onSubmit={handleMessageSubmit} className="flex flex-col gap-2">
               <textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 placeholder={t('messagePlaceholder')}
                 disabled={isSubmitting}
                 rows={3}
-                className="w-full px-3 py-2 text-sm rounded-lg bg-white/10 border border-white/20 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all disabled:opacity-50 resize-y h-[60px]"
+                className="w-full px-4 py-3 text-sm rounded-xl bg-white/10 border border-white/20 text-white placeholder:text-white/40 focus:outline-none focus:border-[#FA5D17]/60 focus:bg-white/15 resize-none disabled:opacity-50 transition-colors"
               />
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full sm:w-auto px-4 py-2 text-sm bg-white text-blue-900 rounded-lg font-semibold hover:bg-white/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-2 w-full py-2.5 bg-[#FA5D17] hover:bg-[#e04d0f] text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
               >
-                <Send className="h-3.5 w-3.5" />
+                <Send className="w-4 h-4" />
                 {isSubmitting ? t('sending') : t('send')}
               </button>
             </form>
             {submitMessage && (
-              <p className={`mt-2 text-xs ${/نجاح|success|succès|réussi/i.test(submitMessage) ? 'text-green-300' : 'text-red-300'}`}>
+              <p className={`mt-2 text-xs ${/success|نجاح|başar/i.test(submitMessage) ? 'text-green-300' : 'text-red-300'}`}>
                 {submitMessage}
               </p>
             )}
           </div>
         </div>
+      </div>
 
-        {/* Links Grid */}
-        <div className="grid grid-cols-3 gap-4 sm:gap-6 mb-6">
-
-          {/* Quick Links */}
-          <div className="">
-            <h3 className="text-sm sm:text-base font-semibold mb-2 sm:mb-3">{t('quickLinks')}</h3>
-            <ul className="space-y-1.5 sm:space-y-2">
-              {quickLinks.map((link, index) => (
-                <li key={index}>
-                  <a href="#" className="text-xs sm:text-sm text-white/80 hover:text-white transition-colors">
-                    {getLocalizedProperty(link, 'text')}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Categories */}
-          <div className="">
-            <h3 className="text-sm sm:text-base font-semibold mb-2 sm:mb-3">{t('categories')}</h3>
-            <ul className="space-y-1.5 sm:space-y-2">
-              {categories.map((category) => (
-                <li key={category.id}>
-                  <a
-                    href={`/category/${category.id}`}
-                    className="text-xs sm:text-sm text-white/80 hover:text-white transition-colors"
-                  >
-                    {getLocalizedProperty(category, 'name')}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Contact */}
-          <div className=" sm:col-span-2 lg:col-span-1">
-            <h3 className="text-sm sm:text-base font-semibold mb-2 sm:mb-3">{t('contactUs')}</h3>
-            <ul className="space-y-2">
-              {contactInfo.map((item, index) => (
-                <li key={index} className="flex items-center gap-2 text-white/80">
-                  <div className="bg-white/10 p-1.5 rounded-full">
-                    <item.Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                  </div>
-                  <span className="text-xs sm:text-sm">{getLocalizedProperty(item, 'text')}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-
-        {/* Divider */}
-        <div className="border-t border-white/20 my-4 sm:my-5" />
-
-        {/* Bottom Section */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-4 text-xs sm:text-sm text-center">
-          <p className="text-white/80">
+      {/* ── Bottom bar ── */}
+      <div className="border-t border-white/10 bg-[#071d4a]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-white/50">
+          <p className="flex items-center gap-1.5">
+            <Heart className="w-3 h-3 text-[#FA5D17]" />
             {t('copyright', { year: new Date().getFullYear() })}
           </p>
           <a
             href="https://www.jubyte.net"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-white/80 hover:text-white transition-colors"
+            className="hover:text-white transition-colors"
           >
             {t('developedBy')}
           </a>
         </div>
       </div>
+
+      <SignInDialog isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} callbackUrl={signInCallbackUrl} />
     </footer>
   );
 };

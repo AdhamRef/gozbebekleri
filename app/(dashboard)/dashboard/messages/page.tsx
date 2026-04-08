@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
+import { useLocale } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,12 +23,14 @@ import { toast } from "react-hot-toast";
 import { Search, Loader2, MessageSquare, User, Mail, Globe, Calendar, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LOCALE_LABELS } from "@/lib/locales";
+import { MESSAGE_SUBJECTS, subjectLabel, type MessageSubject } from "@/lib/messages/subjects";
 
 const PAGE_SIZE = 10;
 
 interface MessageRow {
   id: string;
   body: string;
+  subject: MessageSubject;
   locale: string;
   userId: string | null;
   guestName: string | null;
@@ -42,6 +45,7 @@ interface MessageRow {
 }
 
 export default function MessagesPage() {
+  const locale = useLocale();
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -51,6 +55,7 @@ export default function MessagesPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [localeFilter, setLocaleFilter] = useState<string>("all");
+  const [subjectFilter, setSubjectFilter] = useState<string>("all");
   const [hasUserFilter, setHasUserFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"createdAt" | "body">("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -68,6 +73,7 @@ export default function MessagesPage() {
         params.set("sortOrder", sortOrder);
         if (search) params.set("search", search);
         if (localeFilter !== "all") params.set("locale", localeFilter);
+        if (subjectFilter !== "all") params.set("subject", subjectFilter);
         if (hasUserFilter === "yes") params.set("hasUser", "true");
         if (hasUserFilter === "no") params.set("hasUser", "false");
         const res = await axios.get(`/api/admin/messages?${params}`);
@@ -82,7 +88,7 @@ export default function MessagesPage() {
         setLoadingMore(false);
       }
     },
-    [search, localeFilter, hasUserFilter, sortBy, sortOrder]
+    [search, localeFilter, subjectFilter, hasUserFilter, sortBy, sortOrder]
   );
 
   useEffect(() => {
@@ -93,7 +99,7 @@ export default function MessagesPage() {
   useEffect(() => {
     setPage(1);
     fetchMessages(1, false);
-  }, [search, localeFilter, hasUserFilter, sortBy, sortOrder, fetchMessages]);
+  }, [search, localeFilter, subjectFilter, hasUserFilter, sortBy, sortOrder, fetchMessages]);
 
   const loadMore = () => {
     const next = page + 1;
@@ -137,7 +143,7 @@ export default function MessagesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0 space-y-4" dir="rtl">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4">
               <div className="space-y-2 text-right">
                 <label className="text-[11px] font-medium text-slate-500">بحث في النص</label>
                 <Input
@@ -171,6 +177,22 @@ export default function MessagesPage() {
                     <SelectItem value="all" className="text-xs">الكل</SelectItem>
                     <SelectItem value="yes" className="text-xs">مستخدم مسجل</SelectItem>
                     <SelectItem value="no" className="text-xs">زائر</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 text-right">
+                <label className="text-[11px] font-medium text-slate-500">القسم / النوع</label>
+                <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+                  <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50">
+                    <SelectValue placeholder="الكل" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs">الكل</SelectItem>
+                    {MESSAGE_SUBJECTS.map((s) => (
+                      <SelectItem key={s} value={s} className="text-xs">
+                        {subjectLabel(s, locale)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -214,6 +236,7 @@ export default function MessagesPage() {
                     <tr className="border-b border-slate-200 bg-slate-50/80">
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">الرسالة</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">المرسل</th>
+                      <th className="text-right py-3 px-4 font-semibold text-slate-700">القسم</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">اللغة</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">التاريخ</th>
                       <th className="text-left py-3 px-4 font-semibold text-slate-700">الإجراء</th>
@@ -222,13 +245,13 @@ export default function MessagesPage() {
                   <tbody>
                     {loading && messages.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-12 text-center">
+                        <td colSpan={6} className="py-12 text-center">
                           <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" />
                         </td>
                       </tr>
                     ) : messages.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-12 text-center text-slate-500">
+                        <td colSpan={6} className="py-12 text-center text-slate-500">
                           لا توجد رسائل مطابقة
                         </td>
                       </tr>
@@ -280,6 +303,11 @@ export default function MessagesPage() {
                             )}
                           </td>
                           <td className="py-3 px-4">
+                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+                              {subjectLabel(m.subject, locale)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
                             <span className="inline-flex items-center gap-1 text-slate-600">
                               <Globe className="w-3.5 h-3.5" />
                               {localeLabel(m.locale)}
@@ -298,7 +326,7 @@ export default function MessagesPage() {
                               type="button"
                               variant="ghost"
                               size="sm"
-                              className="gap-1.5 text-sky-600 hover:text-sky-700 hover:bg-sky-50"
+                              className="gap-1.5 text-[#025EB8] hover:text-[#025EB8] hover:bg-[#025EB8]/8"
                               onClick={() => setSelectedMessage(m)}
                             >
                               <Eye className="w-4 h-4" />
@@ -335,14 +363,14 @@ export default function MessagesPage() {
 
         {/* Full message popup – social post style */}
         <Dialog open={!!selectedMessage} onOpenChange={(open) => !open && setSelectedMessage(null)}>
-          <DialogContent hideCloseButton className="sm:max-w-md md:max-w-lg p-0 overflow-hidden rounded-2xl border-0 shadow-xl bg-white dark:bg-slate-900" dir="rtl">
+          <DialogContent hideCloseButton className="sm:max-w-md md:max-w-lg p-0 overflow-hidden rounded-2xl border-0 shadow-xl bg-white " dir="rtl">
             {selectedMessage && (
               <>
                 <DialogTitle className="sr-only">عرض الرسالة</DialogTitle>
-                <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 overflow-hidden">
+                <div className="rounded-2xl border border-slate-200  bg-slate-50/50  overflow-hidden">
                   {/* Post header – author */}
-                  <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 dark:border-slate-700">
-                    <Avatar className="h-11 w-11 rounded-full ring-2 ring-white dark:ring-slate-800 shadow-sm">
+                  <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 ">
+                    <Avatar className="h-11 w-11 rounded-full ring-2 ring-white shadow-sm">
                       <AvatarImage src={selectedMessage.user?.image ?? undefined} alt="" />
                       <AvatarFallback className="bg-gradient-to-br from-sky-500 to-indigo-500 text-white text-sm font-semibold rounded-full">
                         {selectedMessage.user
@@ -351,26 +379,31 @@ export default function MessagesPage() {
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-900 dark:text-slate-100 truncate">
+                      <p className="font-semibold text-slate-900  truncate">
                         {selectedMessage.user?.name ?? selectedMessage.guestName ?? "زائر"}
                       </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                      <p className="text-xs text-slate-500  truncate">
                         {selectedMessage.user?.email ?? selectedMessage.guestEmail ?? "—"}
                       </p>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 shrink-0">
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500  shrink-0">
                       <Globe className="w-3.5 h-3.5" />
                       {localeLabel(selectedMessage.locale)}
                     </div>
                   </div>
+                  <div className="px-4 py-2 border-b border-slate-200 ">
+                    <span className="inline-flex items-center rounded-full bg-slate-100  px-2 py-0.5 text-xs text-slate-700 ">
+                      {subjectLabel(selectedMessage.subject, locale)}
+                    </span>
+                  </div>
                   {/* Post body */}
                   <div className="px-4 py-4">
-                    <p className="text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words leading-relaxed">
+                    <p className="text-slate-800  whitespace-pre-wrap break-words leading-relaxed">
                       {selectedMessage.body}
                     </p>
                   </div>
                   {/* Post footer – time */}
-                  <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-700/80 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  <div className="px-4 py-2.5 border-t border-slate-100 /80 flex items-center gap-2 text-xs text-slate-500 ">
                     <Calendar className="w-3.5 h-3.5 shrink-0" />
                     {new Date(selectedMessage.createdAt).toLocaleDateString("ar-EG", {
                       dateStyle: "long",

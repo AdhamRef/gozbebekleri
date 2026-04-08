@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 
 function getDateRange(period: string, startParam?: string | null, endParam?: string | null) {
   let endDate: Date;
@@ -32,13 +33,12 @@ function toDateStr(d: Date) {
   return d.toISOString().split("T")[0];
 }
 
-/** GET /api/admin/subscriptions/chart — time series for donations linked to subscriptions only */
+/** GET /api/admin/subscriptions/overview/chart — time series for donations linked to subscriptions only */
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, "monthly");
+    if (denied) return denied;
 
     const searchParams = request.nextUrl.searchParams;
     const categoryId = searchParams.get("categoryId");

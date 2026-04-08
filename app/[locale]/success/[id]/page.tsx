@@ -112,7 +112,7 @@ const DonationSuccessPage = () => {
 
   return (
     <main
-      className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-emerald-50/30"
+      className="min-h-screen bg-gray-50"
       dir={isRtl ? 'rtl' : 'ltr'}
     >
       <div className="max-w-3xl mx-auto px-4 py-12 sm:py-16">
@@ -123,7 +123,7 @@ const DonationSuccessPage = () => {
           transition={{ duration: 0.4 }}
           className="text-center mb-10"
         >
-          <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/25 mb-6">
+          <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-[#025EB8] text-white shadow-lg shadow-[#025EB8]/25 mb-6">
             <HandHeartIcon className="w-12 h-12" strokeWidth={1.5} />
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
@@ -321,6 +321,11 @@ const DonationSuccessPage = () => {
                             <p className="font-medium text-slate-900 truncate">{title}</p>
                             <p className="text-sm text-emerald-600 font-medium" dir="ltr">
                               {item.amount.toLocaleString()} {donation.currency}
+                              {item.shareCount != null && item.shareCount > 0 && (
+                                <span className="block text-xs text-violet-700 mt-0.5">
+                                  {t("itemShares", { count: item.shareCount })}
+                                </span>
+                              )}
                             </p>
                           </div>
                         </div>
@@ -367,7 +372,7 @@ const DonationSuccessPage = () => {
         >
           <Button
             onClick={() => router.push('/campaigns')}
-            className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-6 px-6 rounded-xl shadow-md"
+            className="gap-2 bg-[#FA5D17] hover:bg-[#e04d0f] text-white font-medium py-6 px-6 rounded-xl shadow-md"
           >
             <Heart className="w-5 h-5" />
             {t('browseCampaigns')}

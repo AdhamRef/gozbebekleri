@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Globe, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import ReactCountryFlag from "react-country-flag";
 
 import { SUPPORTED_LOCALES, LOCALE_LABELS } from "@/lib/locales";
@@ -10,7 +10,7 @@ import { SUPPORTED_LOCALES, LOCALE_LABELS } from "@/lib/locales";
 type Locale = (typeof SUPPORTED_LOCALES)[number];
 
 const COUNTRY_CODES: Record<Locale, string> = {
-  ar: "EG", en: "US", fr: "FR", tr: "TR", id: "ID", pt: "PT", es: "ES",
+  ar: "SA", en: "US", fr: "FR", tr: "TR", id: "ID", pt: "PT", es: "ES",
 };
 
 const languages: { code: Locale; name: string; countryCode: string }[] =
@@ -20,86 +20,80 @@ const languages: { code: Locale; name: string; countryCode: string }[] =
     countryCode: COUNTRY_CODES[code],
   }));
 
-export default function LanguageSwitcher() {
+export default function LanguageSwitcher({ onDark = true }: { onDark?: boolean }) {
   const pathname = usePathname();
-
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
-  /**
-   * Extract current locale from URL
-   * /en/blog/123 → en
-   */
   const currentLocale = pathname.split("/")[1] as Locale;
-
   const currentLang =
     languages.find((l) => l.code === currentLocale) ?? languages[0];
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleLanguageChange = (newLocale: Locale): void => {
     if (newLocale === currentLocale) {
       setOpen(false);
       return;
     }
-
-    /**
-     * Build path with new locale and do a full page navigation so the server
-     * and backend re-render with the new locale (translations apply).
-     * Handles both pathnames: /en/campaign/123 or /campaign/123 (no locale in path).
-     */
     const segments = pathname.split("/").filter(Boolean);
     const localeInPath = SUPPORTED_LOCALES.includes(segments[0] as Locale);
     const pathWithoutLocale = localeInPath ? segments.slice(1).join("/") : segments.join("/");
     const newPath = pathWithoutLocale ? `/${newLocale}/${pathWithoutLocale}` : `/${newLocale}`;
-
     setOpen(false);
     window.location.assign(newPath);
   };
 
   return (
-    <div className="relative">
+    <div className="relative" ref={ref}>
       {/* Trigger */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-lg px-3 py-2
-                   text-sm font-medium
-                   hover:bg-gray-50
-                   transition"
+        className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors text-sm font-medium ${
+          onDark
+            ? "text-white/90 hover:text-white hover:bg-white/10"
+            : "text-gray-700 hover:text-[#025EB8] hover:bg-gray-100"
+        }`}
       >
         <ReactCountryFlag
           svg
           countryCode={currentLang.countryCode}
-          style={{ width: "1.25em", height: "1.25em" }}
+          style={{ width: "1.1em", height: "1.1em" }}
         />
-
         <span>{currentLang.code.toUpperCase()}</span>
-
         <ChevronDown
-          className={`h-4 w-4 transition-transform ${
-            open ? "rotate-180" : ""
-          }`}
+          className={`w-3 h-3 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
         />
       </button>
 
       {/* Dropdown */}
       {open && (
-        <div
-          className="absolute right-0 z-50 mt-2 w-48 rounded-lg border
-                     bg-white p-2 shadow-md"
-        >
+        <div className="absolute right-0 top-full mt-2 z-50 w-44 rounded-xl border border-gray-100 bg-white shadow-lg overflow-hidden">
           {languages.map((lang) => (
             <button
               key={lang.code}
               type="button"
               onClick={() => handleLanguageChange(lang.code)}
-              className="flex w-full items-center gap-3 rounded-lg p-2
-                         text-sm text-left
-                         hover:bg-emerald-50 transition
-                         cursor-pointer"
+              className={`flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors
+                ${
+                  lang.code === currentLocale
+                    ? "bg-blue-50 text-[#025EB8] font-semibold"
+                    : "text-gray-700 hover:bg-gray-50"
+                }`}
             >
               <ReactCountryFlag
                 svg
                 countryCode={lang.countryCode}
-                style={{ width: "1.25em", height: "1.25em" }}
+                style={{ width: "1.1em", height: "1.1em" }}
               />
               <span>{lang.name}</span>
             </button>

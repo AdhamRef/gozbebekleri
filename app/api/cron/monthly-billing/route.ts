@@ -37,7 +37,19 @@ export async function GET(request: NextRequest) {
     });
 
     let processed = 0;
+    let skipped = 0;
+    let attempted = 0;
+    const errors: Array<{ subscriptionId: string; reason: string }> = [];
+
     for (const sub of dueSubscriptions) {
+      // We can only do real automatic monthly billing if we have a bank-supported token/reference transaction.
+      // Never charge by storing CVV; that is not allowed.
+      if (!sub.payforToken) {
+        skipped++;
+        continue;
+      }
+
+      attempted++;
       const transactionDate = sub.nextBillingDate || now;
       const amountUSD = sub.amountUSD ?? sub.amount ?? 0;
       const totalAmount = sub.amount ?? 0;
@@ -54,11 +66,12 @@ export async function GET(request: NextRequest) {
             teamSupport: sub.teamSupport ?? 0,
             coverFees: sub.coverFees,
             fees,
+            status: "PENDING",
             donorId: sub.donorId,
             referralId: sub.referralId ?? undefined,
             subscriptionId: sub.id,
             paymentMethod: sub.paymentMethod,
-            cardDetails: sub.cardDetails ?? undefined,
+            cardDetails: null,
             items: sub.items.length
               ? {
                   create: sub.items.map((item) => ({
@@ -79,19 +92,17 @@ export async function GET(request: NextRequest) {
               : undefined,
           },
         });
-
-        for (const item of sub.items) {
-          await tx.campaign.update({
-            where: { id: item.campaignId },
-            data: { currentAmount: { increment: item.amountUSD ?? item.amount ?? 0 } },
-          });
-        }
-        for (const item of sub.categoryItems) {
-          await tx.category.update({
-            where: { id: item.categoryId },
-            data: { currentAmount: { increment: item.amountUSD ?? item.amount ?? 0 } },
-          });
-        }
+        // TODO: Call PayFor 2D recurring charge using sub.payforToken.
+        // Only on success (ProcReturnCode=00) should we mark donation PAID and increment totals.
+        await tx.donation.update({
+          where: { id: donation.id },
+          data: {
+            status: "FAILED",
+            provider: "PAYFOR",
+            providerErrorMessage:
+              "Recurring charge not implemented: bank token/reference transaction spec is required.",
+          },
+        });
 
         const nextBilling = getNextBillingDate(transactionDate, sub.billingDay);
 
@@ -106,7 +117,16 @@ export async function GET(request: NextRequest) {
       processed++;
     }
 
-    return NextResponse.json({ ok: true, processed, total: dueSubscriptions.length });
+    return NextResponse.json({
+      ok: true,
+      totalDue: dueSubscriptions.length,
+      processed,
+      attempted,
+      skipped,
+      errors,
+      note:
+        "Automatic PayFor recurring charges require bank token/reference transactions. Subscriptions without payforToken are skipped.",
+    });
   } catch (error) {
     console.error("Monthly billing cron error:", error);
     return NextResponse.json(

@@ -1,4 +1,7 @@
 {
+  "BlogCard": {
+    "readMore": "اقرأ المزيد"
+  },
   "Navbar": {
     "profile": "الحساب",
     "dashboard": "لوحة التحكم",
@@ -21,7 +24,11 @@
     "noCategories": "لا توجد أقسام",
     "myProfile": "حسابي",
     "myDonations": "تبرعاتي",
-    "signOut": "تسجيل الخروج"
+    "signOut": "تسجيل الخروج",
+    "activities": "الأنشطة",
+    "searchPlaceholder": "بحث...",
+    "donate": "تبرع الآن",
+    "signIn": "تسجيل الدخول"
   },
   "HomePage": {
     "donationCategories": "مجالات التبرع",
@@ -38,7 +45,16 @@
     "faq4Question": "هل أستطيع التطوع عن بعد؟",
     "faq4Answer": "نعم! لدينا فرص تطوع رقمية تشمل إدارة المحتوى، تصميم الجرافيك، التسويق الإلكتروني، والتواصل مع الجهات الداعمة.",
     "faq5Question": "كيف يمكنني اقتراح مبادرة خاصة بي؟",
-    "faq5Answer": "إذا كانت لديك فكرة مشروع إنساني، يمكن لفريق قرة العيون مساعدتك في تنفيذها عبر توفير الموارد والدعم اللوجستي."
+    "faq5Answer": "إذا كانت لديك فكرة مشروع إنساني، يمكن لفريق قرة العيون مساعدتك في تنفيذها عبر توفير الموارد والدعم اللوجستي.",
+    "featuredProjects": "المشاريع المميزة",
+    "currentProjects": "المشاريع الحالية",
+    "viewAll": "عرض الكل",
+    "weHelp": "نساعد",
+    "latestNews": "آخر الأخبار",
+    "stat1Label": "عائلة مستفيدة",
+    "stat2Label": "طفل مستفيد",
+    "stat3Label": "دولة",
+    "stat4Label": "قارة"
   },
   "HeroSlider": {
     "quickDonate": "التبرع السريع"
@@ -48,7 +64,9 @@
     "viewAll": "عرض الكل",
     "donations": "تبرعات",
     "remaining": "تبقى",
-    "contributor": "متبرع"
+    "contributor": "متبرع",
+    "openGoal": "هدف مفتوح",
+    "sharesMode": "سهوم — {currency}{price} للسهم"
   },
   "QuickDonate": {
     "associationName": "جمعية قرة العيون للإغاثة والتكافل",
@@ -144,17 +162,27 @@
     "successTitle": "تم إرسال رسالتك بنجاح!",
     "successMessage": "شكراً لتواصلك معنا، سنرد عليك قريباً",
     "requiredFields": "الرجاء ملء جميع الحقول المطلوبة",
-    "ourLocation": "موقعنا"
+    "ourLocation": "موقعنا",
+    "subtitle": "نحن هنا للمساعدة",
+    "name": "الاسم الكامل",
+    "message": "الرسالة",
+    "messageType": "الموضوع",
+    "submit": "إرسال",
+    "errorOccurred": "حدث خطأ. يرجى المحاولة مرة أخرى."
   },
   "Blog": {
     "metaTitleSuffix": " - قرة العيون",
     "sharePost": "شارك المقال",
     "similarPosts": "مقالات مشابهة",
-    "relatedCampaign": "الحملة ذات الصلة",
+    "relatedCampaign": "حملات ذات صلة",
     "viewCampaign": "عرض الحملة",
     "donateNow": "تبرع الآن",
     "campaignDonations": "تبرعات",
     "campaignRemaining": "تبقى",
+    "campaignOpenBadge": "هدف مفتوح",
+    "campaignSharesBadge": "سهوم",
+    "campaignOpenGoal": "جمع مفتوح",
+    "sharePriceUsd": "سعر السهم",
     "article": "مقال",
     "linkCopied": "تم نسخ الرابط",
     "all": "الكل",
@@ -177,7 +205,10 @@
     "retry": "إعادة المحاولة",
     "noResults": "لم يتم العثور على نتائج للبحث",
     "tryDifferentSearch": "جرب استخدام كلمات بحث مختلفة",
-    "checkBackLater": "يمكنك العودة لاحقاً لمشاهدة المقالات الجديدة"
+    "checkBackLater": "يمكنك العودة لاحقاً لمشاهدة المقالات الجديدة",
+    "title": "أخبار",
+    "subtitle": "آخر الأخبار والتحديثات",
+    "news": "أخبار"
   },
   "CampaignsPage": {
     "browse": "تصفح",
@@ -197,6 +228,8 @@
     "allCampaigns": "كل الحملات",
     "donations": "تبرعات",
     "remaining": "تبقى",
+    "openGoalLabel": "هدف مفتوح",
+    "sharesCampaignLabel": "سهوم",
     "loading": "جاري التحميل...",
     "loadMore": "تحميل المزيد",
     "error": "حدث خطأ",
@@ -204,7 +237,17 @@
     "noResults": "لم يتم العثور على نتائج للبحث",
     "noCampaigns": "لا توجد حملات متاحة حالياً",
     "tryDifferentSearch": "جرب استخدام كلمات بحث مختلفة",
-    "checkBackLater": "يمكنك العودة لاحقاً لمشاهدة الحملات الجديدة"
+    "checkBackLater": "يمكنك العودة لاحقاً لمشاهدة الحملات الجديدة",
+    "projects": "مشاريعنا",
+    "filter": "تصفية",
+    "resetFilters": "إعادة ضبط",
+    "donateNow": "تبرع الآن",
+    "details": "التفاصيل",
+    "raised": "جُمع",
+    "goal": "الهدف",
+    "home": "الرئيسية",
+    "heroDescription": "ادعم قضايا هادفة وأحدث فارقاً حقيقياً في حياة الناس.",
+    "resultsFound": "حملة موجودة"
   },
   "Campaign": {
     "story": "القصة",
@@ -218,6 +261,8 @@
     "completed": "مكتمل",
     "image": "صورة",
     "from": "من",
+    "openGoalBadge": "هدف مفتوح",
+    "sharesCampaignBadge": "سهوم — تبرع بالأسهم",
     "donateNow": "تبرع الآن",
     "outOfGoal": "من أصل هدف",
     "peopleDonated": "شخصا تبرعوا للتو لدعم هذة الحالة",
@@ -259,7 +304,12 @@
     "termsAgreement": "بتسجيل دخولك، فإنك توافق على",
     "termsOfUse": "شروط الاستخدام",
     "and": "و",
-    "privacyPolicy": "سياسة الخصوصية"
+    "privacyPolicy": "سياسة الخصوصية",
+    "orContinueWith": "أو",
+    "secure": "آمن",
+    "trusted": "موثوق",
+    "community": "مجتمع",
+    "donationHint": "سجّل دخولك لتتابع تبرعاتك وإدارة حسابك."
   },
   "SharePopup": {
     "shareCampaign": "شارك الحملة مع الآخرين",
@@ -288,6 +338,11 @@
     "hadithText": "(قالَ اللَّهُ: أنْفِقْ يا ابْنَ آدَمَ أُنْفِقْ عَلَيْكَ)",
     "collected": "تم جمع",
     "goal": "الهدف",
+    "sharePriceLabel": "سعر السهم الواحد:",
+    "sharesLabel": "سهمًا",
+    "sharesPickHint": "اختر عدد الأسهم (سهوم) التي تود التبرع بها",
+    "donationTotal": "إجمالي التبرع",
+    "sharesLine": "{count} سهم (سهوم)",
     "enterDonationAmount": "أدخل مبلغ التبرع",
     "addToCart": "أضف إلى السلة",
     "addedToCart": "تم إضافة المبلغ إلى السلة",
@@ -348,8 +403,8 @@
     "processing": "جاري التبرع ...",
     "donationSuccess": "تم التبرع بنجاح",
     "donationFailed": "فشل في عملية التبرع",
-    "successRedirecting": "تم التبرع بنجاح!",
-    "successRedirectingDesc": "جاري تحويلك إلى صفحة الإيصال...",
+    "successRedirecting": "جارٍ التحويل إلى بوابة الدفع",
+    "successRedirectingDesc": "سيتم تحويلك الآن بشكل آمن لإتمام عملية الدفع",
     "paymentFeesPercent": "رسوم الدفع (3%)"
   },
   "DonationSuccess": {
@@ -366,6 +421,7 @@
     "transactionFees": "رسوم المعاملة",
     "supportedCampaign": "الحملة المدعومة",
     "campaignsDonatedTo": "الحملات التي تم التبرع لها",
+    "itemShares": "{count} سهم (سهوم)",
     "categoriesDonatedTo": "الفئات التي تم التبرع لها",
     "campaignsAndCategoriesDonatedTo": "الحملات والفئات التي تم التبرع لها",
     "donateToAnotherCampaign": "تبرع لحملة أخرى",
@@ -396,7 +452,8 @@
     "subtotal": "المجموع الفرعي",
     "total": "الإجمالي",
     "proceedToDonate": "متابعة للتبرع",
-    "secureCheckout": "تبرعك آمن ومشفر"
+    "secureCheckout": "تبرعك آمن ومشفر",
+    "sharesLine": "{count} سهم (سهوم)"
   },
   "LiveDonationsTicker": {
     "donated": "تبرع بـ",
@@ -444,7 +501,8 @@
       "notSpecified": "غير محدد",
       "editTitle": "تعديل {title}",
       "enterPlaceholder": "أدخل {title}",
-      "saveChanges": "حفظ التغييرات"
+      "saveChanges": "حفظ التغييرات",
+      "cancel": "إلغاء"
     },
     "settings": {
       "notifications": "الإشعارات",
@@ -465,6 +523,10 @@
     "donations": {
       "donation": "تبرع",
       "totalDonations": "إجمالي التبرعات",
+      "totalInPeriodTitle": "الإجمالي في الفترة",
+      "recordsInPeriodLabel": "{count} سجل في هذه الفترة",
+      "historyTableTitle": "سجل التبرعات",
+      "emptyHistoryList": "لا توجد تبرعات للفترة المحددة.",
       "donationsCount": "{count} تبرع",
 
       "perDonation": "لكل تبرع",
@@ -494,6 +556,9 @@
       "actions": "إجراءات"
     },
     "subscriptions": {
+      "settingsTableTitle": "الاشتراكات الشهرية والإعدادات",
+      "emptySubscriptionsList": "لا توجد لديك اشتراكات شهرية.",
+      "sinceDate": "منذ",
       "activeMonthlyDonations": "التبرعات الشهرية النشطة",
       "ofSubscriptions": "من أصل {count} اشتراك",
       "totalMonthlyDonations": "إجمالي التبرعات الشهرية",
@@ -506,12 +571,14 @@
       "nextRenewal": "التجديد القادم:",
       "active": "نشط",
       "paused": "متوقف مؤقتاً",
+      "pause": "إيقاف مؤقت",
       "pauseSubscription": "إيقاف مؤقت",
       "resume": "استئناف",
       "billingDay": "يوم الخصم الشهري",
       "manage": "إدارة",
       "manageSubscription": "إعدادات الاشتراك",
       "cancelSubscription": "إلغاء الاشتراك",
+      "cancel": "إلغاء الاشتراك",
       "subscriptionSettings": "إعدادات التبرع الشهري",
       "cancelled": "ملغي",
       "perMonth": "شهرياً"
@@ -562,5 +629,13 @@
       "openMenu": "فتح القائمة",
       "closeMenu": "إغلاق القائمة"
     }
+  },
+  "MessageSubjects": {
+    "COMPLAINT": "شكوى",
+    "DONATION_ISSUE": "مشكلة تبرع",
+    "CAMPAIGN_SUPPORT": "دعم حملة",
+    "PARTNERSHIP": "شراكة",
+    "VOLUNTEERING": "تطوع",
+    "GENERAL": "استفسار عام"
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import axios from 'axios';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -59,19 +59,36 @@ import {
 import { format } from 'date-fns';
 import { ar, enUS, fr } from 'date-fns/locale';
 import { useLocale } from 'next-intl';
+import {
+  parseSuggestedDonations,
+  type SuggestedDonationsConfig,
+} from '@/lib/campaign/suggested-donations';
+import {
+  parseSuggestedShareCounts,
+  type SuggestedShareCountsConfig,
+} from '@/lib/campaign/campaign-modes';
+import {
+  SuggestedDonationsSection,
+  type SuggestedDonationsSectionRef,
+} from '../../_components/SuggestedDonationsSection';
+import {
+  SuggestedShareCountsSection,
+  type SuggestedShareCountsSectionRef,
+} from '../../_components/SuggestedShareCountsSection';
 
 // ✅ Enhanced schema with translations
-const formSchema = z.object({
-  // Arabic (default) fields
+const formSchema = z
+  .object({
   title: z.string()
     .min(1, 'العنوان مطلوب')
     .max(100, 'العنوان طويل جداً'),
   description: z.string()
     .min(1, 'الوصف مطلوب')
     .max(10000, 'الوصف طويل جداً'),
-  targetAmount: z.number()
-    .min(1, 'المبلغ المستهدف ($) مطلوب')
-    .max(1000000, 'المبلغ المستهدف ($) كبير جداً'),
+  targetAmount: z.number().min(0).max(1000000),
+  goalType: z.enum(['FIXED', 'OPEN']),
+  fundraisingMode: z.enum(['AMOUNT', 'SHARES']),
+  sharePriceUSD: z.number().min(0).max(1000000).optional(),
   categoryId: z.string()
     .min(1, 'القسم مطلوب'),
   isActive: z.boolean(),
@@ -80,15 +97,27 @@ const formSchema = z.object({
     .max(5, 'الحد الأقصى 5 صور'),
   videoUrl: z.string().optional(),
   currentAmount: z.number(),
-  
-  // English translations (optional)
   title_en: z.string().optional(),
   description_en: z.string().optional(),
-  
-  // French translations (optional)
   title_fr: z.string().optional(),
   description_fr: z.string().optional(),
-});
+})
+  .superRefine((data, ctx) => {
+    if (data.goalType === 'FIXED' && (!data.targetAmount || data.targetAmount < 1)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'المبلغ المستهدف مطلوب (≥ 1) عند هدف ثابت',
+        path: ['targetAmount'],
+      });
+    }
+    if (data.fundraisingMode === 'SHARES' && (!data.sharePriceUSD || data.sharePriceUSD <= 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'سعر السهم بالدولار مطلوب لحملات السهوم',
+        path: ['sharePriceUSD'],
+      });
+    }
+  });
 
 // ✅ Update schema with translations
 const updateSchema = z.object({
@@ -150,6 +179,14 @@ export default function EditCampaignPage() {
   const [updateImage, setUpdateImage] = useState<string>("");
   const [activeTab, setActiveTab] = useState<'ar' | 'en' | 'fr'>('ar');
   const [updateActiveTab, setUpdateActiveTab] = useState<'ar' | 'en' | 'fr'>('ar');
+  const [suggestedSeed, setSuggestedSeed] = useState<
+    SuggestedDonationsConfig | undefined
+  >(undefined);
+  const [shareCountsSeed, setShareCountsSeed] = useState<
+    SuggestedShareCountsConfig | undefined
+  >(undefined);
+  const suggestedDonationsRef = useRef<SuggestedDonationsSectionRef>(null);
+  const suggestedShareCountsRef = useRef<SuggestedShareCountsSectionRef>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -157,6 +194,9 @@ export default function EditCampaignPage() {
       title: '',
       description: '',
       targetAmount: 0,
+      goalType: 'FIXED',
+      fundraisingMode: 'AMOUNT',
+      sharePriceUSD: 0,
       currentAmount: 0,
       categoryId: '',
       isActive: true,
@@ -198,6 +238,8 @@ export default function EditCampaignPage() {
 
         const campaign = campaignRes.data;
         setCategories(categoriesRes.data.items);
+        setSuggestedSeed(parseSuggestedDonations(campaign.suggestedDonations));
+        setShareCountsSeed(parseSuggestedShareCounts(campaign.suggestedShareCounts));
 
         // ✅ Fetch all translations for the campaign
         const allTranslationsRes = await axios.get(`/api/campaigns/${params.id}/translations`);
@@ -211,6 +253,9 @@ export default function EditCampaignPage() {
           title: campaign.title,
           description: campaign.description,
           targetAmount: campaign.targetAmount,
+          goalType: campaign.goalType ?? 'FIXED',
+          fundraisingMode: campaign.fundraisingMode ?? 'AMOUNT',
+          sharePriceUSD: campaign.sharePriceUSD ?? 0,
           currentAmount: campaign.currentAmount,
           categoryId: campaign.category.id,
           isActive: campaign.isActive,
@@ -260,7 +305,11 @@ export default function EditCampaignPage() {
       const requestData = {
         title: values.title,
         description: values.description,
-        targetAmount: values.targetAmount,
+        goalType: values.goalType,
+        fundraisingMode: values.fundraisingMode,
+        targetAmount: values.goalType === 'OPEN' ? 0 : values.targetAmount,
+        sharePriceUSD:
+          values.fundraisingMode === 'SHARES' ? values.sharePriceUSD : null,
         categoryId: values.categoryId,
         isActive: values.isActive,
         images: values.images,
@@ -275,6 +324,14 @@ export default function EditCampaignPage() {
             description: values.description_fr,
           },
         },
+        suggestedDonations:
+          values.fundraisingMode === 'AMOUNT'
+            ? suggestedDonationsRef.current?.getPayload()
+            : null,
+        suggestedShareCounts:
+          values.fundraisingMode === 'SHARES'
+            ? suggestedShareCountsRef.current?.getPayload()
+            : null,
       };
 
       await axios.put(`/api/campaigns/${params.id}`, requestData);
@@ -503,7 +560,7 @@ export default function EditCampaignPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#025EB8]" />
       </div>
     );
   }
@@ -527,7 +584,7 @@ export default function EditCampaignPage() {
               <CheckCircle2 className="w-4 h-4 text-green-600" title="English available" />
             )}
             {translationStatus.hasFr && (
-              <CheckCircle2 className="w-4 h-4 text-blue-600" title="French available" />
+              <CheckCircle2 className="w-4 h-4 text-[#025EB8]" title="French available" />
             )}
           </div>
         </div>
@@ -719,18 +776,24 @@ export default function EditCampaignPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
-                name="targetAmount"
+                name="goalType"
                 render={({ field }) => (
-                  <FormItem dir='rtl'>
-                    <FormLabel>المبلغ المستهدف ($)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value))}
-                        placeholder="أدخل المبلغ المستهدف ($)"
-                      />
-                    </FormControl>
+                  <FormItem dir="rtl">
+                    <FormLabel>نوع الهدف</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="اختر نوع الهدف" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="FIXED">هدف محدد (شريط تقدم)</SelectItem>
+                        <SelectItem value="OPEN">هدف مفتوح (بدون هدف نهائي)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      الهدف المفتوح يخفي المبلغ المستهدف وشريط النسبة؛ يبقى إجمالي ما جُمع ظاهرًا.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -738,9 +801,85 @@ export default function EditCampaignPage() {
 
               <FormField
                 control={form.control}
+                name="fundraisingMode"
+                render={({ field }) => (
+                  <FormItem dir="rtl">
+                    <FormLabel>طريقة التبرع</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="طريقة التبرع" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="AMOUNT">مبلغ حر</SelectItem>
+                        <SelectItem value="SHARES">سهوم (سعر السهم × العدد)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      في وضع السهوم يحدد المتبرع عدد الأسهم؛ المبلغ = العدد × سعر السهم (بالدولار).
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {form.watch('goalType') === 'FIXED' && (
+                <FormField
+                  control={form.control}
+                  name="targetAmount"
+                  render={({ field }) => (
+                    <FormItem dir="rtl">
+                      <FormLabel>المبلغ المستهدف ($) *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          {...field}
+                          onChange={(e) =>
+                            field.onChange(parseFloat(e.target.value) || 0)
+                          }
+                          placeholder="أدخل المبلغ المستهدف ($)"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {form.watch('fundraisingMode') === 'SHARES' && (
+                <FormField
+                  control={form.control}
+                  name="sharePriceUSD"
+                  render={({ field }) => (
+                    <FormItem dir="rtl">
+                      <FormLabel>سعر السهم الواحد (USD) *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          value={field.value ?? ''}
+                          onChange={(e) =>
+                            field.onChange(parseFloat(e.target.value) || 0)
+                          }
+                          placeholder="مثال: 100"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        سعر كل سهم بالدولار؛ يُحوَّل تلقائيًا لعملة العرض للمتبرع.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              <FormField
+                control={form.control}
                 name="currentAmount"
                 render={({ field }) => (
-                  <FormItem dir='rtl'>
+                  <FormItem dir="rtl">
                     <FormLabel>المبلغ الحالي</FormLabel>
                     <FormControl>
                       <Input
@@ -775,6 +914,28 @@ export default function EditCampaignPage() {
                 )}
               />
             </div>
+            {!loading &&
+              shareCountsSeed !== undefined &&
+              form.watch('fundraisingMode') === 'SHARES' && (
+                <div className="mt-6">
+                  <SuggestedShareCountsSection
+                    ref={suggestedShareCountsRef}
+                    key={`${params?.id}-shares`}
+                    initialConfig={shareCountsSeed}
+                  />
+                </div>
+              )}
+            {!loading &&
+              suggestedSeed !== undefined &&
+              form.watch('fundraisingMode') === 'AMOUNT' && (
+                <div className="mt-6">
+                  <SuggestedDonationsSection
+                    ref={suggestedDonationsRef}
+                    key={`${params?.id}-amount`}
+                    initialConfig={suggestedSeed}
+                  />
+                </div>
+              )}
           </Card>
 
           {/* Images */}
@@ -817,10 +978,10 @@ export default function EditCampaignPage() {
                             />
                             <label
                               htmlFor="images"
-                              className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-emerald-500 transition-colors"
+                              className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#025EB8] transition-colors"
                             >
                               {uploadingImage ? (
-                                <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
+                                <Loader2 className="w-6 h-6 animate-spin text-[#025EB8]" />
                               ) : (
                                 <>
                                   <Upload className="w-6 h-6 text-gray-400" />
@@ -1107,7 +1268,7 @@ export default function EditCampaignPage() {
                           <h3 className="font-semibold text-lg">{update.title}</h3>
                           <div className="flex gap-1">
                             {enTrans && (
-                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded" title="English available">
+                              <span className="text-xs bg-[#025EB8]/10 text-[#025EB8] px-2 py-0.5 rounded" title="English available">
                                 EN
                               </span>
                             )}
@@ -1127,7 +1288,7 @@ export default function EditCampaignPage() {
                           />
                         )}
                         {update.videoUrl && (
-                          <div className="text-blue-600 hover:underline">
+                          <div className="text-[#025EB8] hover:underline">
                             <a href={update.videoUrl} target="_blank" rel="noopener noreferrer">
                               مشاهدة الفيديو
                             </a>
@@ -1179,7 +1340,7 @@ export default function EditCampaignPage() {
             </Button>
             <Button
               type="submit"
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-[#025EB8] hover:bg-[#014fa0]"
               disabled={saving}
             >
               {saving && <Loader2 className="w-4 h-4 ml-2 animate-spin" />}

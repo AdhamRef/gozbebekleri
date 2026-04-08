@@ -207,7 +207,7 @@ export default function DonationsPage() {
         <div className="flex gap-2">
           <Button
             onClick={() => router.push('/dashboard/donations/new')}
-            className="bg-emerald-600 hover:bg-emerald-700 gap-2"
+            className="bg-[#025EB8] hover:bg-[#014fa0] gap-2"
           >
             <Plus className="w-4 h-4" />
             تسجيل تبرع
@@ -256,7 +256,7 @@ export default function DonationsPage() {
                       setSelectedDonations([]);
                     }
                   }}
-                  className="w-5 h-5 rounded border border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="w-5 h-5 rounded border border-gray-300 text-[#025EB8] focus:ring-[#025EB8]"
                 />
               </TableHead>
               <TableHead className="text-right">المتبرع</TableHead>
@@ -295,7 +295,7 @@ export default function DonationsPage() {
       className="w-8 h-8 rounded-full"
     />
   ) : (
-    <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white font-medium">
+    <div className="w-8 h-8 rounded-full bg-[#025EB8] flex items-center justify-center text-white font-medium">
       {donation.donor.name.charAt(0).toUpperCase()}
     </div>
   )}
@@ -316,8 +316,8 @@ export default function DonationsPage() {
                 <TableCell>
                   <div className="flex flex-col gap-1">
                     {donation.items.map((item) => (
-                      <Link href={`/campaign/${item.campaign.id}`} key={item.campaign.id} className="text-sm text-blue-700 flex gap-2">
-                        <Link2 className='w-5 h-5 text-blue-700' />
+                      <Link href={`/campaign/${item.campaign.id}`} key={item.campaign.id} className="text-sm text-[#025EB8] flex gap-2">
+                        <Link2 className='w-5 h-5 text-[#025EB8]' />
                         {item.campaign.title}
                       </Link>
                     ))}

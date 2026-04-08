@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useLocale } from "next-intl";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -54,6 +55,7 @@ import CountUp from "react-countup";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import { formatUtcCalendarMonthLong } from "@/lib/admin/current-calendar-month-utc";
 
 interface ChartDataPoint {
   date: string;
@@ -63,6 +65,8 @@ interface ChartDataPoint {
   countOneTime: number;
   amountMonthly: number;
   countMonthly: number;
+  amountFailed: number;
+  countFailed: number;
   teamSupport: number;
   fees: number;
 }
@@ -93,10 +97,14 @@ interface DonationRow {
   teamSupport: number;
   fees: number;
   type: string;
+  status: string;
+  provider?: string | null;
+  providerErrorMessage?: string | null;
   createdAt: string;
   donor: { id: string; name: string | null; email: string };
   campaigns: { id: string; title: string }[];
   categories: { id: string; name: string }[];
+  referral: { id: string; code: string; name?: string | null } | null;
 }
 
 interface DashboardStats {
@@ -106,6 +114,10 @@ interface DashboardStats {
   totalUsers: number;
   totalAmount: number;
   allTimeRevenue?: number;
+  paidCount?: number;
+  failedCount?: number;
+  pendingCount?: number;
+  failedTotalAmount?: number;
   oneTimeCount: number;
   monthlyCount: number;
   activeMonthlyCount: number;
@@ -128,6 +140,8 @@ interface DashboardStats {
     currency: string;
     donorName: string;
     type: string;
+    status?: string;
+    provider?: string | null;
     campaignTitle: string | null;
     categoryName: string | null;
     createdAt: string;
@@ -177,6 +191,7 @@ function getDonationsDateRange(
 
 export default function DashboardPage() {
   const locale = useLocale() as string;
+  const thisMonthRevenueTitle = `إيرادات شهر ${formatUtcCalendarMonthLong(new Date(), locale || "ar")}`;
   const searchParams = useSearchParams();
   const { convertToCurrency, getSelectedCurrency } = useCurrency();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -184,7 +199,9 @@ export default function DashboardPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
-  const [usersSearch, setUsersSearch] = useState("");
+  const [usersSearchInput, setUsersSearchInput] = useState("");
+  const [usersSearchCommitted, setUsersSearchCommitted] = useState("");
+  const [usersSearchLoading, setUsersSearchLoading] = useState(false);
   const [statCardSet, setStatCardSet] = useState<StatCardSet>("revenue");
 
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -219,6 +236,8 @@ export default function DashboardPage() {
   const [dateTo, setDateTo] = useState("");
   const [donationsSortBy, setDonationsSortBy] = useState<"date" | "amount">("date");
   const [donationsSortOrder, setDonationsSortOrder] = useState<"asc" | "desc">("desc");
+  const [showFailed, setShowFailed] = useState(false);
+  const [donationsStatusFilter, setDonationsStatusFilter] = useState<"all" | "PAID" | "FAILED" | "PENDING">("all");
 
   const [donations, setDonations] = useState<DonationRow[]>([]);
   const [donationsPage, setDonationsPage] = useState(1);
@@ -247,28 +266,59 @@ export default function DashboardPage() {
     fetchFilters();
   }, [locale]);
 
-  // Fetch users when search changes (for user filter dropdown)
+  const commitUsersSearch = useCallback(() => {
+    setUsersSearchCommitted(usersSearchInput.trim());
+  }, [usersSearchInput]);
+
+  // Donor search runs only after Enter / search click (usersSearchCommitted)
   useEffect(() => {
-    if (!usersSearch || usersSearch.length < 1) {
-      setUsers([]);
-      return;
-    }
+    if (!usersSearchCommitted) return;
     const controller = new AbortController();
-    const fetchUsers = async () => {
+    setUsersSearchLoading(true);
+    const run = async () => {
       try {
         const res = await fetch(
-          `/api/users?search=${encodeURIComponent(usersSearch)}&limit=20`,
+          `/api/users?search=${encodeURIComponent(usersSearchCommitted)}`,
           { signal: controller.signal }
         );
         const data = await res.json();
+        if (!res.ok) {
+          toast.error(typeof data?.error === "string" ? data.error : "فشل البحث عن المستخدمين");
+          setUsers([]);
+          return;
+        }
         setUsers(data.users ?? []);
       } catch (e) {
         if ((e as { name?: string }).name !== "AbortError") setUsers([]);
+      } finally {
+        setUsersSearchLoading(false);
       }
     };
-    fetchUsers();
+    run();
     return () => controller.abort();
-  }, [usersSearch]);
+  }, [usersSearchCommitted]);
+
+  // When not in "search results" mode, keep list small so selected donor still shows a label
+  useEffect(() => {
+    if (usersSearchCommitted) return;
+    if (selectedUserId === "all") {
+      setUsers([]);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/users/${selectedUserId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const u = data?.user;
+        if (u)
+          setUsers([{ id: u.id, name: u.name ?? null, email: u.email ?? "" }]);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [usersSearchCommitted, selectedUserId]);
 
   // Chart data (filters + period + from/to + user — user from state or URL when coming via link)
   useEffect(() => {
@@ -286,6 +336,7 @@ export default function DashboardPage() {
         if (selectedCategory !== "all") params.append("categoryId", selectedCategory);
         if (selectedCampaign !== "all") params.append("campaignId", selectedCampaign);
         if (effectiveUserId !== "all") params.append("userId", effectiveUserId);
+        if (showFailed) params.set("showFailed", "true");
         const response = await axios.get(`/api/admin/donations/chart?${params}`);
         setChartData(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
@@ -297,7 +348,7 @@ export default function DashboardPage() {
       }
     };
     fetchChartData();
-  }, [selectedCategory, selectedCampaign, selectedUserId, searchParams, chartPeriod, dateFrom, dateTo]);
+  }, [selectedCategory, selectedCampaign, selectedUserId, searchParams, chartPeriod, dateFrom, dateTo, showFailed]);
 
   // Stats — affected by فترة (period + dateFrom/dateTo) and category/campaign filters
   useEffect(() => {
@@ -345,6 +396,7 @@ export default function DashboardPage() {
         if (selectedUserId !== "all") params.append("userId", selectedUserId);
         if (start) params.set("start", start);
         if (end) params.set("end", end);
+        if (donationsStatusFilter !== "all") params.set("status", donationsStatusFilter);
         const res = await fetch(`/api/donations?${params}`);
         const data = await res.json();
         if (!res.ok) {
@@ -371,6 +423,7 @@ export default function DashboardPage() {
       dateTo,
       donationsSortBy,
       donationsSortOrder,
+      donationsStatusFilter,
     ]
   );
 
@@ -379,7 +432,7 @@ export default function DashboardPage() {
     if (loading) return;
     setDonationsPage(1);
     fetchDonations(1, false);
-  }, [loading, selectedCategory, selectedCampaign, selectedUserId, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, fetchDonations]);
+  }, [loading, selectedCategory, selectedCampaign, selectedUserId, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, donationsStatusFilter, fetchDonations]);
 
   const loadMoreDonations = () => {
     const next = donationsPage + 1;
@@ -451,6 +504,27 @@ export default function DashboardPage() {
     },
   ].filter((d) => d.value > 0 || d.count > 0);
 
+  const paidFailedSplitData = [
+    {
+      name: "مدفوعة",
+      value: stats?.totalAmount ?? 0,
+      count: stats?.paidCount ?? 0,
+      color: "#22c55e",
+    },
+    {
+      name: "فاشلة",
+      value: stats?.failedTotalAmount ?? 0,
+      count: stats?.failedCount ?? 0,
+      color: "#ef4444",
+    },
+    {
+      name: "معلقة",
+      value: 0,
+      count: stats?.pendingCount ?? 0,
+      color: "#f59e0b",
+    },
+  ].filter((d) => d.value > 0 || d.count > 0);
+
   return (
     <div className="min-h-0" dir="rtl">
       <div className="space-y-6 sm:space-y-8 p-0 sm:p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto">
@@ -474,7 +548,7 @@ export default function DashboardPage() {
               )}
             </p>
           </div>
-          <CurrencySelector />
+          <CurrencySelector showDefaultCurrencyOption />
         </header>
 
         {/* المؤشرات — تختفي عند عرض تبرعات مستخدم معين عبر الرابط */}
@@ -522,7 +596,7 @@ export default function DashboardPage() {
                   format="money"
                 />
                 <StatsCard
-                  title="إيرادات هذا الشهر"
+                  title={thisMonthRevenueTitle}
                   value={stats?.thisMonthRevenue ?? 0}
                   icon={Calendar}
                   accent="emerald"
@@ -548,6 +622,26 @@ export default function DashboardPage() {
                   icon={Percent}
                   accent="orange"
                   format="money"
+                />
+                <StatsCard
+                  title="تبرعات ناجحة"
+                  value={stats?.paidCount ?? 0}
+                  icon={Receipt}
+                  accent="teal"
+                  subtitle={`${formatMoney(stats?.totalAmount ?? 0, undefined, undefined, true)}`}
+                />
+                <StatsCard
+                  title="تبرعات فاشلة"
+                  value={stats?.failedCount ?? 0}
+                  icon={Receipt}
+                  accent="orange"
+                  subtitle={stats?.failedTotalAmount ? formatMoney(stats.failedTotalAmount, undefined, undefined, true) : "—"}
+                />
+                <StatsCard
+                  title="تبرعات معلقة"
+                  value={stats?.pendingCount ?? 0}
+                  icon={Receipt}
+                  accent="amber"
                 />
               </>
             )}
@@ -609,6 +703,20 @@ export default function DashboardPage() {
                   format="money"
                   subtitle={`عدد: ${stats?.monthlyStoppedCount ?? 0}`}
                 />
+                <StatsCard
+                  title="تبرعات مقبولة"
+                  value={stats?.paidCount ?? 0}
+                  icon={Receipt}
+                  accent="teal"
+                  subtitle={`${formatMoney(stats?.totalAmount ?? 0, undefined, stats?.totalAmount)}`}
+                />
+                <StatsCard
+                  title="تبرعات فاشلة"
+                  value={stats?.failedCount ?? 0}
+                  icon={Receipt}
+                  accent="orange"
+                  subtitle={`${formatMoney(stats?.failedTotalAmount ?? 0, undefined, stats?.failedTotalAmount)}`}
+                />
               </>
             )}
           </div>
@@ -668,7 +776,7 @@ export default function DashboardPage() {
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
             />
           </div>
           <div className="space-y-1">
@@ -677,7 +785,7 @@ export default function DashboardPage() {
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
             />
           </div>
         </div>
@@ -745,18 +853,51 @@ export default function DashboardPage() {
       <label className="text-[11px] font-medium text-slate-500">
         المستخدم
       </label>
-      <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+      <Select
+        value={selectedUserId}
+        onValueChange={(v) => {
+          setSelectedUserId(v);
+          if (v === "all") {
+            setUsersSearchInput("");
+            setUsersSearchCommitted("");
+            setUsers([]);
+          }
+        }}
+      >
         <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
           <SelectValue placeholder="اختر المستخدم" />
         </SelectTrigger>
         <SelectContent>
-          <div className="p-2 border-b border-slate-100">
+          <div className="p-2 border-b border-slate-100 flex gap-1.5 flex-row-reverse items-center">
             <Input
-              placeholder="بحث..."
-              value={usersSearch}
-              onChange={(e) => setUsersSearch(e.target.value)}
-              className="w-full h-8 text-xs"
+              placeholder="بحث… ثم Enter أو زر البحث"
+              value={usersSearchInput}
+              onChange={(e) => setUsersSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitUsersSearch();
+                }
+              }}
+              className="w-full h-8 text-xs flex-1 min-w-0"
             />
+            <button
+              type="button"
+              title="بحث"
+              disabled={usersSearchLoading}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                commitUsersSearch();
+              }}
+              className="shrink-0 h-8 w-8 inline-flex items-center justify-center rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 disabled:opacity-50"
+            >
+              {usersSearchLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />
+              ) : (
+                <Search className="w-3.5 h-3.5 text-slate-600" />
+              )}
+            </button>
           </div>
           <SelectItem value="all" className="text-xs">الكل</SelectItem>
           {users.map((u) => (
@@ -803,6 +944,24 @@ export default function DashboardPage() {
     </Select>
   </div>
 
+  {/* Donation Status Filter */}
+  <div className="space-y-1 text-right">
+    <label className="text-[11px] font-medium text-slate-500">
+      حالة التبرع
+    </label>
+    <Select value={donationsStatusFilter} onValueChange={(v) => setDonationsStatusFilter(v as typeof donationsStatusFilter)}>
+      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectValue placeholder="الحالة" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all" className="text-xs">كل الحالات</SelectItem>
+        <SelectItem value="PAID" className="text-xs">ناجح</SelectItem>
+        <SelectItem value="FAILED" className="text-xs">فاشل</SelectItem>
+        <SelectItem value="PENDING" className="text-xs">معلق</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+
 </div>
 
 </CardContent>
@@ -822,7 +981,7 @@ export default function DashboardPage() {
                   <div className="h-[400px] w-full">
                     {chartLoading ? (
                       <div className="h-full flex items-center justify-center bg-slate-50 rounded-lg">
-                        <Loader2 className="w-9 h-9 animate-spin text-blue-500" />
+                        <Loader2 className="w-9 h-9 animate-spin text-[#025EB8]" />
                       </div>
                     ) : chartView === "bar" ? (
                       chartMetric === "amount" ? (
@@ -868,12 +1027,13 @@ export default function DashboardPage() {
                               formatter={(value: number, name: string) => {
                                 if (name === "amountOneTime") return [formatMoney(Number(value), undefined, undefined, true), "مبلغ مرة واحدة"];
                                 if (name === "amountMonthly") return [formatMoney(Number(value), undefined, undefined, true), "مبلغ شهري"];
+                                if (name === "amountFailed") return [formatMoney(Number(value), undefined, undefined, true), "مبلغ فاشل"];
                                 return [formatMoney(Number(value), undefined, undefined, true), name];
                               }}
                               content={({ active, payload, label }) => {
                                 if (!active || !payload?.length) return null;
                                 const point = chartData.find((d) => d.date === label);
-                                const isAmount = (key: string) => key === "amountOneTime" || key === "amountMonthly" || key === "مبلغ مرة واحدة" || key === "مبلغ شهري";
+                                const isAmount = (key: string) => key === "amountOneTime" || key === "amountMonthly" || key === "amountFailed" || key === "مبلغ مرة واحدة" || key === "مبلغ شهري" || key === "مبلغ فاشل";
                                 return (
                                   <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-sm">
                                     <p className="text-sm font-medium text-slate-700 mb-1.5">
@@ -917,6 +1077,15 @@ export default function DashboardPage() {
                               maxBarSize={32}
                               name="مبلغ شهري"
                             />
+                            {showFailed && (
+                              <Bar
+                                dataKey="amountFailed"
+                                fill="#ef4444"
+                                radius={[4, 4, 0, 0]}
+                                maxBarSize={32}
+                                name="مبلغ فاشل"
+                              />
+                            )}
                           </BarChart>
                         </ResponsiveContainer>
                       ) : (
@@ -1181,7 +1350,7 @@ export default function DashboardPage() {
                 </TabsContent>
 
                 <TabsContent value="split" className="mt-0" dir="rtl">
-                  <Tabs defaultValue="one-time-monthly" className="w-full" dir="rtl">
+                  <Tabs defaultValue="paid-failed" className="w-full" dir="rtl">
                     <TabsList className="bg-slate-100 p-1 rounded-lg mb-4 inline-flex flex-row-reverse">
                       <TabsTrigger
                         value="campaign-category"
@@ -1194,6 +1363,12 @@ export default function DashboardPage() {
                         className="data-[state=active]:bg-card data-[state=active]:shadow-sm text-sm"
                       >
                         مرة واحدة vs شهرية
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="paid-failed"
+                        className="data-[state=active]:bg-card data-[state=active]:shadow-sm text-sm"
+                      >
+                        مقبول vs فاشل
                       </TabsTrigger>
                     </TabsList>
                     <TabsContent value="campaign-category" className="mt-0">
@@ -1274,24 +1449,80 @@ export default function DashboardPage() {
                         )}
                       </div>
                     </TabsContent>
+                    <TabsContent value="paid-failed" className="mt-0" dir="rtl">
+                      <div className="h-[340px] w-full flex items-center justify-center">
+                        {paidFailedSplitData.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={paidFailedSplitData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={70}
+                                outerRadius={110}
+                                paddingAngle={2}
+                                dataKey="count"
+                                nameKey="name"
+                                label={({ name, percent }) =>
+                                  `${name} ${(percent * 100).toFixed(0)}%`
+                                }
+                              >
+                                {paidFailedSplitData.map((entry) => (
+                                  <Cell key={entry.name} fill={entry.color} />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                formatter={(value: number, _name: string, props: { payload?: { value?: number; count?: number } }) => {
+                                  const amount = props?.payload?.value ?? 0;
+                                  return [
+                                    `عدد: ${value}${amount > 0 ? ` — ${formatMoney(Number(amount), undefined, undefined, true)}` : ""}`,
+                                    "التبرعات",
+                                  ];
+                                }}
+                              />
+                              <Legend />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <p className="text-slate-500">لا توجد بيانات</p>
+                        )}
+                      </div>
+                    </TabsContent>
                   </Tabs>
                 </TabsContent>
-                <TabsList className="bg-slate-100 p-1 rounded-lg mt-6 flex-row-reverse w-full justify-end max-w-max">
-                  <TabsTrigger
-                    value="split"
-                    className="data-[state=active]:bg-card data-[state=active]:shadow-sm gap-2"
-                  >
-                    <PieChartIcon className="w-4 h-4" />
-                    توزيع الإيرادات
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="time-series"
-                    className="data-[state=active]:bg-card data-[state=active]:shadow-sm gap-2"
-                  >
-                    <BarChart3 className="w-4 h-4" />
-                    التبرعات عبر الزمن
-                  </TabsTrigger>
-                </TabsList>
+                <div className="flex items-center gap-4 mt-6 flex-row-reverse flex-wrap">
+                  <TabsList className="bg-slate-100 p-1 rounded-lg flex-row-reverse max-w-max">
+                    <TabsTrigger
+                      value="split"
+                      className="data-[state=active]:bg-card data-[state=active]:shadow-sm gap-2"
+                    >
+                      <PieChartIcon className="w-4 h-4" />
+                      توزيع الإيرادات
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="time-series"
+                      className="data-[state=active]:bg-card data-[state=active]:shadow-sm gap-2"
+                    >
+                      <BarChart3 className="w-4 h-4" />
+                      التبرعات عبر الزمن
+                    </TabsTrigger>
+                  </TabsList>
+                  {chartView === "bar" && chartMetric === "amount" && (
+                    <button
+                      type="button"
+                      onClick={() => setShowFailed((p) => !p)}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors",
+                        showFailed
+                          ? "bg-red-50 border-red-200 text-red-600"
+                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                      )}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: showFailed ? "#ef4444" : "#94a3b8" }} />
+                      {showFailed ? "إخفاء الفاشلة" : "إظهار الفاشلة"}
+                    </button>
+                  )}
+                </div>
               </Tabs>
             </CardContent>
           </Card>
@@ -1340,6 +1571,12 @@ export default function DashboardPage() {
                         التبرع
                       </th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                        الحالة
+                      </th>
+                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                        البوابة
+                      </th>
+                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
                         دعم الفريق
                       </th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">
@@ -1347,6 +1584,9 @@ export default function DashboardPage() {
                       </th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">
                         النوع
+                      </th>
+                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                        الإحالة
                       </th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">
                         الحملة / الفئة
@@ -1359,19 +1599,19 @@ export default function DashboardPage() {
                   <tbody>
                     {donationsLoading && donations.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-12 text-center">
+                        <td colSpan={10} className="py-12 text-center">
                           <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" />
                         </td>
                       </tr>
                     ) : !donationsFetchedOnce ? (
                       <tr>
-                        <td colSpan={7} className="py-12 text-center text-slate-500">
+                        <td colSpan={10} className="py-12 text-center text-slate-500">
                           جاري التحميل...
                         </td>
                       </tr>
                     ) : donations.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-12 text-center text-slate-500">
+                        <td colSpan={10} className="py-12 text-center text-slate-500">
                           لا توجد تبرعات تطابق التصفية
                         </td>
                       </tr>
@@ -1396,6 +1636,40 @@ export default function DashboardPage() {
                               {formatMoney((d.amount ?? d.totalAmount ?? 0) as number, d.currency, d.amountUSD)}
                             </span>
                           </td>
+                          <td className="py-3 px-4">
+                            <span
+                              className={cn(
+                                "inline-block px-2 py-0.5 rounded-full text-xs font-medium",
+                                d.status === "PAID"
+                                  ? "bg-green-100 text-green-700"
+                                  : d.status === "FAILED"
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-amber-100 text-amber-700"
+                              )}
+                            >
+                              {d.status === "PAID" ? "ناجح" : d.status === "FAILED" ? "فاشل" : "معلق"}
+                            </span>
+                            {d.status === "FAILED" && d.providerErrorMessage && (
+                              <p className="text-[10px] text-red-500 mt-0.5 max-w-[140px] leading-tight" title={d.providerErrorMessage}>
+                                {d.providerErrorMessage.length > 50 ? d.providerErrorMessage.slice(0, 50) + "…" : d.providerErrorMessage}
+                              </p>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            {d.provider === "STRIPE" ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-[#635bff]/10 text-[#635bff]">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
+                                Stripe
+                              </span>
+                            ) : d.provider === "PAYFOR" ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-red-50 text-red-700">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+                                PayFor
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-xs">—</span>
+                            )}
+                          </td>
                           <td className="py-3 px-4 font-medium text-slate-800" dir="rtl">
                             {(d.teamSupport ?? 0) > 0 ? (
                               <span dir="ltr">
@@ -1419,12 +1693,24 @@ export default function DashboardPage() {
                               className={cn(
                                 "inline-block px-2 py-0.5 rounded-full text-xs",
                                 d.type === "MONTHLY"
-                                  ? "bg-violet-100 text-violet-700"
-                                  : "bg-slate-100 text-slate-600"
+                                  ? "bg-[#025EB8]/10 text-[#025EB8]"
+                                  : "bg-gray-100 text-gray-600"
                               )}
                             >
                               {d.type === "MONTHLY" ? "شهري" : "مرة واحدة"}
                             </span>
+                          </td>
+                          <td className="py-3 px-4 align-top">
+                            {d.referral ? (
+                              <Link
+                                href={`/dashboard/referrals/${d.referral.id}`}
+                                className="text-sm font-medium text-[#025EB8] hover:text-[#025EB8] hover:underline"
+                              >
+                                {d.referral.code}
+                              </Link>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
                           </td>
                           <td className="py-3 px-4 text-slate-600 max-w-[240px]">
                             {d.campaigns?.length > 0 ? (
@@ -1484,37 +1770,16 @@ const ACCENT_STYLES: Record<
   string,
   { bg: string; text: string; border: string }
 > = {
-  teal: { bg: "bg-teal-50", text: "text-teal-600", border: "border-teal-200" },
-  indigo: {
-    bg: "bg-indigo-50",
-    text: "text-indigo-600",
-    border: "border-indigo-200",
-  },
-  amber: {
-    bg: "bg-amber-50",
-    text: "text-amber-600",
-    border: "border-amber-200",
-  },
-  violet: {
-    bg: "bg-violet-50",
-    text: "text-violet-600",
-    border: "border-violet-200",
-  },
-  emerald: {
-    bg: "bg-emerald-50",
-    text: "text-emerald-600",
-    border: "border-emerald-200",
-  },
-  slate: {
-    bg: "bg-slate-100",
-    text: "text-slate-600",
-    border: "border-slate-200",
-  },
-  orange: {
-    bg: "bg-orange-50",
-    text: "text-orange-600",
-    border: "border-orange-200",
-  },
+  // Brand blue — primary accent
+  teal:    { bg: "bg-[#025EB8]/8",  text: "text-[#025EB8]", border: "border-[#025EB8]/15" },
+  indigo:  { bg: "bg-[#025EB8]/8",  text: "text-[#025EB8]", border: "border-[#025EB8]/15" },
+  emerald: { bg: "bg-[#025EB8]/8",  text: "text-[#025EB8]", border: "border-[#025EB8]/15" },
+  // Brand orange — secondary accent
+  amber:   { bg: "bg-[#FA5D17]/8",  text: "text-[#FA5D17]", border: "border-[#FA5D17]/15" },
+  orange:  { bg: "bg-[#FA5D17]/8",  text: "text-[#FA5D17]", border: "border-[#FA5D17]/15" },
+  violet:  { bg: "bg-[#FA5D17]/8",  text: "text-[#FA5D17]", border: "border-[#FA5D17]/15" },
+  // Neutral fallback
+  slate:   { bg: "bg-gray-100",     text: "text-gray-500",   border: "border-gray-200"     },
 };
 
 interface StatsCardProps {
@@ -1552,37 +1817,22 @@ function StatsCard({
   const moneyEnd = moneyResult?.convertedValue ?? displayValue;
 
   return (
-    <Card className={cn("border border-border shadow-sm overflow-hidden", styles.border)} dir="rtl">
-      <div className="p-5 flex items-start gap-4">
-        <div className={cn("p-2.5 rounded-lg shrink-0", styles.bg, styles.text)}>
-          <Icon className="w-5 h-5" />
-        </div>
-        <div className="min-w-0 text-right">
-          <p className="text-xs font-medium text-slate-500 truncate">{title}</p>
-          <p className="text-xl font-bold text-slate-900 mt-0.5 tabular-nums">
-            {isMoney ? (
-              <CountUp
-                end={typeof moneyEnd === "number" ? moneyEnd : displayValue}
-                prefix={moneyPrefix}
-                separator=","
-                decimal="."
-                decimals={0}
-              />
-            ) : (
-              <CountUp
-                end={displayValue}
-                separator=","
-                decimal="."
-                decimals={0}
-              />
-            )}
-          </p>
-          {subtitle && (
-            <p className="text-xs text-slate-500 mt-1">{subtitle}</p>
-          )}
-        </div>
+    <div className={cn("bg-white rounded-xl border shadow-sm overflow-hidden p-5 flex items-start gap-4", styles.border)} dir="rtl">
+      <div className={cn("p-2.5 rounded-xl shrink-0", styles.bg, styles.text)}>
+        <Icon className="w-5 h-5" />
       </div>
-    </Card>
+      <div className="min-w-0 text-right flex-1">
+        <p className="text-xs font-medium text-gray-500 truncate">{title}</p>
+        <p className="text-xl font-bold text-gray-900 mt-0.5 tabular-nums">
+          {isMoney ? (
+            <CountUp end={typeof moneyEnd === "number" ? moneyEnd : displayValue} prefix={moneyPrefix} separator="," decimal="." decimals={0} />
+          ) : (
+            <CountUp end={displayValue} separator="," decimal="." decimals={0} />
+          )}
+        </p>
+        {subtitle && <p className="text-[11px] text-gray-400 mt-1">{subtitle}</p>}
+      </div>
+    </div>
   );
 }
 

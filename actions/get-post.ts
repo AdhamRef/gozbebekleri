@@ -1,21 +1,43 @@
 import { prisma } from "@/lib/prisma";
+import { orderCampaignsByIds } from "@/lib/blog/campaign-ids";
 
 export default async function getPost(postId: string) {
-    try {
-      const post = await prisma.post.findUnique({
-        where: {
-          id: postId,
-        },
-        include: {
-          category: true,
-          campaign: { select: { id: true, title: true } },
-          translations: true,
-        },
-      });
+  try {
+    const post = await prisma.post.findUnique({
+      where: {
+        id: postId,
+      },
+      include: {
+        category: true,
+        translations: true,
+      },
+    });
 
-      return post;
-    } catch (error) {
-      console.error("Error fetching post:", error);
-      return null;
-    }
+    if (!post) return null;
+
+    const ids = post.campaignIds ?? [];
+    const campaignRows =
+      ids.length === 0
+        ? []
+        : await prisma.campaign.findMany({
+            where: { id: { in: ids } },
+            select: {
+              id: true,
+              title: true,
+              currentAmount: true,
+              targetAmount: true,
+              images: true,
+              goalType: true,
+              fundraisingMode: true,
+              sharePriceUSD: true,
+              suggestedShareCounts: true,
+            },
+          });
+    const campaigns = orderCampaignsByIds(ids, campaignRows);
+
+    return { ...post, campaigns };
+  } catch (error) {
+    console.error("Error fetching post:", error);
+    return null;
   }
+}

@@ -3,6 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/options';
 import { SubscriptionStatus } from '@prisma/client';
+import { userHasDashboardPermission } from '@/lib/dashboard/permissions';
+import { isRevenueDashboardUser, requireAdminOrDashboardPermission } from '@/lib/dashboard/api-auth';
+import {
+  writeAuditLog,
+  auditActorFromDashboardSession,
+  auditActorFromSiteSession,
+  auditStreamForRole,
+} from '@/lib/audit-log';
 
 // GET /api/donations/[id] - Get donation (transaction) by ID; include type/status from subscription when applicable
 export async function GET(
@@ -79,21 +87,18 @@ export async function GET(
       );
     }
 
-    if (
-      session.user.role !== 'ADMIN' &&
-      session.user.id !== donation.donorId
-    ) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      );
+    const canViewAllDonations =
+      userHasDashboardPermission(session.user, 'revenue');
+    if (!canViewAllDonations && session.user.id !== donation.donorId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const sub = donation.subscription;
     const response = {
       ...donation,
       type: donation.subscriptionId ? ('MONTHLY' as const) : ('ONE_TIME' as const),
-      status: sub?.status ?? null,
+      paymentStatus: donation.status,
+      subscriptionStatus: sub?.status ?? null,
       billingDay: sub?.billingDay ?? null,
       nextBillingDate: sub?.nextBillingDate ?? null,
       lastBillingDate: sub?.lastBillingDate ?? null,
@@ -159,7 +164,7 @@ export async function PUT(
       );
     }
 
-    const isAdmin = session.user.role === 'ADMIN';
+    const isAdmin = isRevenueDashboardUser(session);
     const isOwner = session.user.id === currentDonation.donorId;
 
     if (!currentDonation.subscriptionId) {
@@ -242,6 +247,26 @@ export async function PUT(
       data: updates,
     });
 
+    const subActor = isAdmin
+      ? auditActorFromDashboardSession(session!)
+      : auditActorFromSiteSession(session!);
+    const subStream = isAdmin
+      ? ("TEAM" as const)
+      : auditStreamForRole(subActor.actorRole);
+    await writeAuditLog({
+      ...subActor,
+      action: "SUBSCRIPTION_UPDATE",
+      messageAr: `${subActor.actorName ?? "مستخدم"} عدّل الاشتراك الشهري المرتبط بالتبرع (${Object.keys(updates).join("، ")})`,
+      entityType: "Subscription",
+      entityId: currentDonation.subscriptionId!,
+      metadata: {
+        donationId: id,
+        ...(updates.status !== undefined && { status: updates.status }),
+        ...(updates.billingDay !== undefined && { billingDay: updates.billingDay }),
+      },
+      stream: subStream,
+    });
+
     const updatedDonation = await prisma.donation.findUnique({
       where: { id },
       omit: { cardDetails: true },
@@ -283,12 +308,8 @@ export async function DELETE(
   try {
     const { id } = await params;
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const denied = requireAdminOrDashboardPermission(session, 'revenue');
+    if (denied) return denied;
 
     // Get donation details with items and categoryItems before deletion
     const donation = await prisma.donation.findUnique({
@@ -323,6 +344,15 @@ export async function DELETE(
       await tx.donation.delete({
         where: { id },
       });
+    });
+
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "DONATION_DELETE",
+      messageAr: `${actor.actorName ?? "مسؤول"} حذف تبرعًا من السجلات (مع تعديل مبالغ الحملات/الأقسام إن وُجدت)`,
+      entityType: "Donation",
+      entityId: id,
     });
 
     return NextResponse.json(

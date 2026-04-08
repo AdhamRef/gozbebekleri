@@ -5,8 +5,6 @@ import axios from "axios";
 import { Button } from "@/components/ui/button";
 import {
   Clock,
-  ChevronDown,
-  ChevronUp,
   MessageCircle,
   Edit2,
   Trash2,
@@ -17,6 +15,13 @@ import {
   Bell,
   Info,
   Book,
+  ChevronLeft,
+  ChevronRight,
+  Users,
+  TrendingUp,
+  Trophy,
+  Heart,
+  Star,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSession } from "next-auth/react";
@@ -28,13 +33,17 @@ import { useCurrency } from "@/context/CurrencyContext";
 import SignInDialog from "@/components/SignInDialog";
 import DonationSidebar from "../_components/DonationSidebar";
 import { useTranslations, useLocale } from "next-intl";
+import { Link } from "@/i18n/routing";
+import CategoryIcon from "@/components/CategoryIcon";
 
 // Types
 interface Category {
+  id?: string;
   nameAr?: string;
   nameEn?: string;
   nameFr?: string;
   name?: string;
+  icon?: string;
 }
 
 interface Campaign {
@@ -53,6 +62,11 @@ interface Campaign {
   currentAmount?: number;
   donationCount: number;
   progress: number;
+  showProgress?: boolean;
+  goalType?: string;
+  fundraisingMode?: string;
+  sharePriceUSD?: number | null;
+  suggestedShareCounts?: { counts: number[] };
   category: Category;
   donationStats: {
     first: DonationStat | null;
@@ -91,14 +105,14 @@ interface Comment {
   };
 }
 
-// Main Component
+const FALLBACK = "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg";
+
 const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale?: string }) => {
   const t = useTranslations("Campaign");
   const localeFromHook = useLocale() as "ar" | "en" | "fr";
   const locale = (propLocale as any) || localeFromHook;
   const { data: session } = useSession();
 
-  // State management
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,34 +123,19 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalContent, setModalContent] = useState<{
-    type: "image" | "video";
-    src: string;
-    alt?: string;
-  } | null>(null);
+  const [modalContent, setModalContent] = useState<{ type: "image" | "video"; src: string; alt?: string } | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
-  const [activeTab, setActiveTab] = useState<
-    "description" | "updates" | "comments" | "info"
-  >("description");
+  const [activeTab, setActiveTab] = useState<"description" | "updates" | "comments" | "info">("description");
   const [isSignInOpen, setIsSignInOpen] = useState(false);
 
-  // Helper function to get locale-specific property
   const getLocalizedProperty = (obj: any, key: string) => {
     if (!obj) return "";
-    
-    // First try to get the main property (already localized from API)
     if (obj[key]) return obj[key];
-    
-    // Fallback to locale-specific property
     const localeKey = `${key}${locale.charAt(0).toUpperCase() + locale.slice(1)}`;
     if (obj[localeKey]) return obj[localeKey];
-    
-    // Final fallback to Arabic
-    const arKey = `${key}Ar`;
-    return obj[arKey] || "";
+    return obj[`${key}Ar`] || "";
   };
 
-  // Fetch campaign data
   useEffect(() => {
     const fetchCampaignData = async () => {
       try {
@@ -145,10 +144,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
           `/api/campaigns/${id}?locale=${encodeURIComponent(locale)}`,
           { headers: { "x-locale": locale } }
         );
-        if (!response.data) {
-          throw new Error("Campaign not found");
-        }
-        console.log("Fetched campaign:", response.data);
+        if (!response.data) throw new Error("Campaign not found");
         setCampaign(response.data);
       } catch (err) {
         const msg = err instanceof Error ? err.message : t("fetchError");
@@ -158,122 +154,75 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
         setLoading(false);
       }
     };
-
     fetchCampaignData();
-  }, [id, locale]); // Add locale to dependencies
+  }, [id, locale]);
 
-  // Fetch comments
   useEffect(() => {
-    const fetchComments = async () => {
-      try {
-        const response = await axios.get(`/api/campaigns/${id}/comments`);
-        setComments(response.data);
-      } catch (error) {
-        console.error("Error fetching comments:", error);
-        toast.error(t("failedToLoadComments"));
-      }
-    };
-
-    if (campaign) {
-      fetchComments();
-    }
+    if (!campaign) return;
+    axios.get(`/api/campaigns/${id}/comments`)
+      .then(r => setComments(r.data))
+      .catch(() => toast.error(t("failedToLoadComments")));
   }, [id, campaign]);
 
-  // Add a comment
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim()) return;
-
-    if (!session) {
-      setIsSignInOpen(true);
-      return;
-    }
-
+    if (!session) { setIsSignInOpen(true); return; }
     setIsSubmitting(true);
     try {
-      const response = await axios.post(`/api/campaigns/${id}/comments`, {
-        text: newComment,
-      });
-      setComments([response.data, ...comments]);
+      const r = await axios.post(`/api/campaigns/${id}/comments`, { text: newComment });
+      setComments([r.data, ...comments]);
       setNewComment("");
       toast.success(t("commentAdded"));
-    } catch (error) {
-      console.error("Error adding comment:", error);
-      toast.error(t("failedToAddComment"));
-    } finally {
-      setIsSubmitting(false);
-    }
+    } catch { toast.error(t("failedToAddComment")); }
+    finally { setIsSubmitting(false); }
   };
 
-  // Edit a comment
   const handleEditComment = async (commentId: string) => {
     if (!editText.trim()) return;
-
     setIsSubmitting(true);
     try {
-      const response = await axios.patch(
-        `/api/campaigns/${id}/comments/${commentId}`,
-        {
-          text: editText,
-        }
-      );
-      setComments(
-        comments.map((comment) =>
-          comment.id === commentId ? response.data : comment
-        )
-      );
+      const r = await axios.patch(`/api/campaigns/${id}/comments/${commentId}`, { text: editText });
+      setComments(comments.map(c => c.id === commentId ? r.data : c));
       setEditingComment(null);
       toast.success(t("commentUpdated"));
-    } catch (error) {
-      console.error("Error updating comment:", error);
-      toast.error(t("failedToUpdateComment"));
-    } finally {
-      setIsSubmitting(false);
-    }
+    } catch { toast.error(t("failedToUpdateComment")); }
+    finally { setIsSubmitting(false); }
   };
 
-  // Delete a comment
   const handleDeleteComment = async (commentId: string) => {
     if (!window.confirm(t("confirmDeleteComment"))) return;
-
     try {
       await axios.delete(`/api/campaigns/${id}/comments/${commentId}`);
-      setComments(comments.filter((comment) => comment.id !== commentId));
+      setComments(comments.filter(c => c.id !== commentId));
       toast.success(t("commentDeleted"));
-    } catch (error) {
-      console.error("Error deleting comment:", error);
-      toast.error(t("failedToDeleteComment"));
-    }
+    } catch { toast.error(t("failedToDeleteComment")); }
   };
 
-  // Tab configuration (labels from i18n)
   const tabs = [
     { id: "description", labelKey: "story" as const, icon: Book },
-    { id: "updates", labelKey: "updates" as const, icon: Bell, badge: campaign?.updates?.length || 0 },
+    { id: "updates", labelKey: "updates" as const, icon: Bell, badge: campaign?.updates?.length ?? 0 },
     { id: "comments", labelKey: "comments" as const, icon: MessageCircle, badge: comments.length },
     { id: "info", labelKey: "info" as const, icon: Info },
   ];
 
-  // Loading state
-  if (loading) {
-    return <LoadingSkeleton />;
-  }
+  const fmtDate = (iso: string) =>
+    new Date(iso).toLocaleDateString(locale === "ar" ? "ar-SA" : locale === "fr" ? "fr-FR" : "en-US", {
+      year: "numeric", month: "long", day: "numeric",
+    });
 
-  // Error state
+  if (loading) return <LoadingSkeleton />;
+
   if (error || !campaign) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-white">
-        <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-          <h2 className="text-3xl font-bold text-gray-800 mb-4">
-            {t("campaignNotFound")}
-          </h2>
-          <p className="text-gray-600 mb-8">
-            {error || t("campaignNotFoundDescription")}
-          </p>
-          <Button
-            onClick={() => window.history.back()}
-            className="bg-emerald-600 hover:bg-emerald-700"
-          >
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Info className="w-8 h-8 text-red-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">{t("campaignNotFound")}</h2>
+          <p className="text-gray-500 mb-6">{error || t("campaignNotFoundDescription")}</p>
+          <Button onClick={() => window.history.back()} className="bg-[#025EB8] hover:bg-[#014fa0]">
             {t("goBack")}
           </Button>
         </div>
@@ -281,143 +230,116 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
     );
   }
 
+  const currentImg = campaign.images[selectedImage] || FALLBACK;
+
   return (
     <>
-      <main className="min-h-screen bg-gray-100 pb-6 max-lg:pt-4">
-        <div className="max-w-7xl mx-auto sm:px-4 py-6 sm:py-8">
-          {/* Hero Section */}
-          <div className="grid lg:grid-cols-12 gap-6 lg:gap-8 mb-8">
-            {/* Left Side - Images and Content */}
-            <div className="lg:col-span-8 sm:bg-white sm:border sm:rounded-lg overflow-hidden">
-              {/* Mobile Hero Image */}
-              <div className="relative -mx-3 sm:mx-0 sm:hidden">
-                <div className="relative h-[65vh] w-full overflow-hidden">
-                  <img
-                    src={campaign.images[selectedImage] || "/placeholder.jpg"}
-                    alt={getLocalizedProperty(campaign, "title")}
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
+      <main className="min-h-screen bg-gray-50/80 pb-24 sm:pb-8">
+        <div className="max-w-7xl mx-auto sm:px-4 sm:py-8">
+          <div className="grid lg:grid-cols-12 gap-0 lg:gap-8">
 
-                  {/* Black Fade */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
+            {/* ── Left: media + tabs ── */}
+            <div className="lg:col-span-8 flex flex-col gap-0 sm:gap-5">
 
-                  {/* Text Overlay */}
-                  <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                    <span className="inline-block mb-2 bg-white/20 backdrop-blur text-xs font-bold px-3 py-1 rounded-full">
+              {/* ── Image block ── */}
+              <div className="sm:rounded-2xl overflow-hidden sm:shadow-sm sm:border sm:border-gray-100 bg-gray-950">
+                {/* Main image — full-width, no letterbox */}
+                <div className="relative w-full aspect-[16/9] sm:aspect-[16/8] overflow-hidden bg-gray-950">
+                  {/* Subtle blurred bg for portrait images that don't fill 16:9 */}
+                  <img src={currentImg} alt="" aria-hidden
+                    className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110 opacity-40 pointer-events-none" />
+                  <AnimatePresence mode="wait">
+                    <motion.img
+                      key={selectedImage}
+                      src={currentImg}
+                      alt={getLocalizedProperty(campaign, "title")}
+                      initial={{ opacity: 0, scale: 1.03 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  </AnimatePresence>
+
+                  {/* Gradient overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent pointer-events-none" />
+
+                  {/* Category + title overlay */}
+                  <div className="absolute bottom-0 inset-x-0 p-4 sm:p-6">
+                    <Link
+                      href={`/category/${campaign.category.id}`}
+                      className="inline-flex items-center gap-1.5 mb-2 bg-[#FA5D17] hover:bg-[#e04a08] text-white text-[10px] sm:text-xs font-bold px-2.5 py-1.5 rounded-full uppercase tracking-wide transition-colors"
+                    >
+                      <CategoryIcon name={campaign.category.icon} className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                       {getLocalizedProperty(campaign.category, "name")}
-                    </span>
-
-                    <h1 className="text-2xl font-extrabold leading-snug">
+                    </Link>
+                    <h1 className="text-lg sm:text-2xl lg:text-3xl font-extrabold text-white leading-tight drop-shadow-sm">
                       {getLocalizedProperty(campaign, "title")}
                     </h1>
                   </div>
-                </div>
-              </div>
 
-              {/* Desktop Image */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.15 }}
-                className="relative rounded-lg overflow-hidden shadow-lg mb-4 group hidden sm:block"
-              >
-                <img
-                  src={campaign.images[selectedImage] || "/placeholder.jpg"}
-                  alt={getLocalizedProperty(campaign, "title")}
-                  className="w-full h-[360px] lg:h-[420px] object-cover"
-                />
-
-                {/* Soft gradient */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
-
-                {/* Desktop overlay content */}
-                <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                  <span className="inline-block mb-2 bg-white/20 backdrop-blur text-xs font-bold px-3 py-1 rounded-full">
-                    {getLocalizedProperty(campaign.category, "name")}
-                  </span>
-
-                  <h1 className="text-2xl lg:text-3xl font-extrabold leading-tight max-w-[90%]">
-                    {getLocalizedProperty(campaign, "title")}
-                  </h1>
-                </div>
-              </motion.div>
-
-              {/* Image Thumbnails */}
-              <div className="mt-4 sm:mx-4">
-                {campaign.images.length > 1 && (
-                  <div className="flex gap-2 mb-4 overflow-visible pb-2">
-                    {campaign.images.map((image, index) => (
+                  {/* Image nav arrows (multi-image) */}
+                  {campaign.images.length > 1 && (
+                    <>
                       <button
-                        key={index}
-                        onClick={() => setSelectedImage(index)}
-                        className={`relative flex-shrink-0 rounded-lg overflow-hidden transition-all ${
-                          selectedImage === index
-                            ? "ring-2 ring-blue-500"
-                            : "ring-2 ring-gray-200 hover:ring-blue-300"
+                        onClick={() => setSelectedImage(i => Math.max(0, i - 1))}
+                        disabled={selectedImage === 0}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-all disabled:opacity-30"
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => setSelectedImage(i => Math.min(campaign.images.length - 1, i + 1))}
+                        disabled={selectedImage === campaign.images.length - 1}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-all disabled:opacity-30"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {/* Thumbnails */}
+                {campaign.images.length > 1 && (
+                  <div className="flex gap-2 p-3 sm:p-4 bg-gray-900/95 overflow-x-auto scrollbar-hide">
+                    {campaign.images.map((img, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setSelectedImage(i)}
+                        className={`flex-shrink-0 rounded-lg overflow-hidden transition-all ring-2 ${
+                          selectedImage === i ? "ring-[#FA5D17] scale-105" : "ring-transparent opacity-60 hover:opacity-100"
                         }`}
                       >
-                        <img
-                          src={image}
-                          alt={`${t("image")} ${index + 1}`}
-                          className="w-16 h-16 sm:w-20 sm:h-20 object-cover"
-                        />
+                        <img src={img} alt="" className="w-14 h-14 sm:w-16 sm:h-16 object-cover" />
                       </button>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Tabs */}
-              <div className="bg-white max-sm:border sm:border-y max-sm:rounded-lg shadow-md mb-6 -mt-8 relative top-8 z-30">
-                <div className="grid grid-cols-4 border-b border-gray-200">
-                  {tabs.map((tab) => {
-                    const Icon = tab.icon;
-                    const isActive = activeTab === tab.id;
-
+              {/* ── Tabs card ── */}
+              <div className="bg-white sm:rounded-2xl sm:border sm:border-gray-100 sm:shadow-sm overflow-hidden">
+                {/* Tab bar */}
+                <div className="grid grid-cols-4 border-b border-gray-100">
+                  {tabs.map(({ id: tabId, labelKey, icon: Icon, badge }) => {
+                    const active = activeTab === tabId;
                     return (
                       <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id as any)}
-                        className={`
-                          flex flex-col sm:flex-row
-                          items-center justify-center
-                          gap-1 sm:gap-1.5
-                          px-1 sm:px-3
-                          py-3
-                          min-w-0
-                          text-[10.5px] sm:text-sm
-                          font-semibold
-                          leading-tight
-                          transition-all
-                          relative
-                          rounded-t-2xl
-                          ${
-                            isActive
-                              ? "text-blue-600 border-b-2 border-blue-600 bg-white"
-                              : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                          }
-                        `}
+                        key={tabId}
+                        onClick={() => setActiveTab(tabId as "description" | "updates" | "comments" | "info")}
+                        className={`relative flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 py-3.5 px-1 sm:px-3 text-[10px] sm:text-sm font-semibold transition-all ${
+                          active
+                            ? "text-[#025EB8] border-b-2 border-[#025EB8]"
+                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-50/80"
+                        }`}
                       >
-                        <Icon className="w-4 h-4 flex-shrink-0" />
-
-                        <span className="truncate max-w-full text-center">
-                          {t(tab.labelKey)}
-                        </span>
-
-                        {tab.badge !== undefined && tab.badge > 0 && (
-                          <span
-                            className="
-                              absolute top-1 right-1
-                              sm:static sm:ml-1
-                              bg-blue-100 text-blue-700
-                              text-[9px] sm:text-xs
-                              font-bold
-                              px-1 py-0.5
-                              rounded-full
-                              leading-none
-                            "
-                          >
-                            {tab.badge}
+                        <Icon className={`w-4 h-4 flex-shrink-0 ${active ? "text-[#025EB8]" : ""}`} />
+                        <span className="truncate">{t(labelKey)}</span>
+                        {badge !== undefined && badge > 0 && (
+                          <span className={`absolute top-1.5 right-1.5 sm:static sm:ms-1 text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none ${
+                            active ? "bg-[#025EB8]/10 text-[#025EB8]" : "bg-gray-100 text-gray-500"
+                          }`}>
+                            {badge}
                           </span>
                         )}
                       </button>
@@ -425,394 +347,231 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                   })}
                 </div>
 
-                {/* Tab Content */}
-                <div className="p-4 sm:p-5">
+                {/* Tab content */}
+                <div className="p-4 sm:p-6">
                   <AnimatePresence mode="wait">
+
+                    {/* Description */}
                     {activeTab === "description" && (
-                      <motion.div
-                        key="description"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ duration: 0.3 }}
-                      >
-                        <p className="text-gray-800 text-lg leading-relaxed whitespace-pre-line">
+                      <motion.div key="desc" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+                        <p className="text-gray-700 text-sm sm:text-base leading-relaxed sm:leading-loose whitespace-pre-line">
                           {getLocalizedProperty(campaign, "description")}
                         </p>
                       </motion.div>
                     )}
 
+                    {/* Updates */}
                     {activeTab === "updates" && (
-                      <motion.div
-                        key="updates"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ duration: 0.3 }}
-                        className="space-y-4"
-                      >
-                        {campaign.updates && campaign.updates.length > 0 ? (
-                          campaign.updates.map((update, index) => (
-                            <motion.div
-                              key={update.id}
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: index * 0.1 }}
-                              className="border-b border-gray-200 pb-4 last:border-0"
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                  <Bell className="w-5 h-5 text-blue-600" />
-                                </div>
-                                <div className="flex-1">
-                                  <h3 className="text-lg font-bold text-gray-900 mb-1.5">
-                                    {getLocalizedProperty(update, "title")}
-                                  </h3>
-                                  <p className="text-xs text-gray-500 mb-2 flex items-center gap-1.5">
-                                    <Clock className="w-3.5 h-3.5" />
-                                    {new Date(update.createdAt).toLocaleDateString(
-                                      locale === "ar"
-                                        ? "ar-SA"
-                                        : locale === "fr"
-                                        ? "fr-FR"
-                                        : "en-US",
-                                      {
-                                        year: "numeric",
-                                        month: "long",
-                                        day: "numeric",
-                                      }
-                                    )}
-                                  </p>
-                                  <p className="text-gray-700 text-sm leading-relaxed mb-3 whitespace-pre-line">
-                                    {getLocalizedProperty(update, "description")}
-                                  </p>
-                                  <div className="flex gap-4 mt-4">
-                                    {update.image && (
-                                      <button
-                                        onClick={() => {
-                                          setModalContent({
-                                            type: "image",
-                                            src: update.image!,
-                                            alt: getLocalizedProperty(update, "title"),
-                                          });
-                                          setIsModalOpen(true);
-                                        }}
-                                        className="relative group"
-                                      >
-                                        <img
-                                          src={update.image}
-                                          alt={getLocalizedProperty(update, "title")}
-                                          className="rounded-xl shadow-md w-28 h-28 object-cover group-hover:opacity-90 transition-opacity"
-                                        />
-                                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-opacity rounded-xl" />
-                                      </button>
-                                    )}
-                                    {update.videoUrl && (
-                                      <button
-                                        onClick={() => {
-                                          setModalContent({
-                                            type: "video",
-                                            src: `${update.videoUrl}?autoplay=1`,
-                                          });
-                                          setIsModalOpen(true);
-                                        }}
-                                        className="relative group"
-                                      >
-                                        <img
-                                          src={`https://img.youtube.com/vi/${
-                                            new URL(update.videoUrl).pathname.split("/")[2]
-                                          }/hqdefault.jpg`}
-                                          alt={t("videoThumbnail")}
-                                          className="rounded-xl shadow-md w-28 h-28 object-cover group-hover:opacity-90 transition-opacity"
-                                        />
-                                        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 rounded-xl opacity-90 group-hover:opacity-100 transition-opacity">
-                                          <Play className="w-8 h-8 text-white" />
-                                        </div>
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
+                      <motion.div key="updates" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="space-y-5">
+                        {campaign.updates?.length > 0 ? campaign.updates.map((update, i) => (
+                          <motion.div key={update.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
+                            className="flex gap-4 pb-5 border-b border-gray-100 last:border-0 last:pb-0">
+                            <div className="flex-shrink-0">
+                              <div className="w-9 h-9 rounded-full bg-[#025EB8]/10 flex items-center justify-center">
+                                <Bell className="w-4 h-4 text-[#025EB8]" />
                               </div>
-                            </motion.div>
-                          ))
-                        ) : (
-                          <p className="text-gray-500 text-center py-8">
-                            {t("noUpdates")}
-                          </p>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-sm sm:text-base font-bold text-gray-900 mb-0.5">
+                                {getLocalizedProperty(update, "title")}
+                              </h3>
+                              <p className="text-xs text-gray-400 flex items-center gap-1 mb-2">
+                                <Clock className="w-3 h-3" />
+                                {fmtDate(update.createdAt)}
+                              </p>
+                              <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line mb-3">
+                                {getLocalizedProperty(update, "description")}
+                              </p>
+                              {(update.image || update.videoUrl) && (
+                                <div className="flex gap-2 flex-wrap">
+                                  {update.image && (
+                                    <button onClick={() => { setModalContent({ type: "image", src: update.image!, alt: getLocalizedProperty(update, "title") }); setIsModalOpen(true); }}
+                                      className="group relative rounded-xl overflow-hidden ring-1 ring-gray-200 hover:ring-[#025EB8] transition-all">
+                                      <img src={update.image} alt="" className="w-24 h-24 object-cover group-hover:scale-105 transition-transform duration-300" />
+                                    </button>
+                                  )}
+                                  {update.videoUrl && (
+                                    <button onClick={() => { setModalContent({ type: "video", src: `${update.videoUrl}?autoplay=1` }); setIsModalOpen(true); }}
+                                      className="group relative rounded-xl overflow-hidden ring-1 ring-gray-200 hover:ring-[#025EB8] transition-all">
+                                      <img src={`https://img.youtube.com/vi/${new URL(update.videoUrl).pathname.split("/")[2]}/hqdefault.jpg`} alt="" className="w-24 h-24 object-cover group-hover:scale-105 transition-transform duration-300" />
+                                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
+                                        <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center">
+                                          <Play className="w-4 h-4 text-gray-900 ms-0.5" />
+                                        </div>
+                                      </div>
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        )) : (
+                          <div className="text-center py-12">
+                            <Bell className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                            <p className="text-gray-400 text-sm">{t("noUpdates")}</p>
+                          </div>
                         )}
                       </motion.div>
                     )}
 
+                    {/* Comments */}
                     {activeTab === "comments" && (
-                      <motion.div
-                        key="comments"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ duration: 0.3 }}
-                      >
-                        {/* Add Comment Form */}
+                      <motion.div key="comments" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+                        {/* Add comment */}
                         <div className="mb-5">
                           {session ? (
-                            <form
-                              onSubmit={handleAddComment}
-                              className="flex gap-2.5 bg-gray-50 rounded-lg p-3 border border-gray-200 focus-within:border-blue-500 transition-all"
-                            >
-                              <Avatar className="w-9 h-9">
+                            <form onSubmit={handleAddComment} className="flex gap-3 bg-gray-50 rounded-xl p-3 border border-gray-200 focus-within:border-[#025EB8]/40 focus-within:ring-2 focus-within:ring-[#025EB8]/10 transition-all">
+                              <Avatar className="w-8 h-8 flex-shrink-0 mt-0.5">
                                 <AvatarImage src={session.user?.image || ""} />
-                                <AvatarFallback className="bg-blue-100 text-blue-700 text-sm">
+                                <AvatarFallback className="bg-[#025EB8]/10 text-[#025EB8] text-xs font-bold">
                                   {session.user?.name?.[0] || "U"}
                                 </AvatarFallback>
                               </Avatar>
-                              <div className="flex-1">
+                              <div className="flex-1 min-w-0">
                                 <Textarea
                                   value={newComment}
-                                  onChange={(e) => setNewComment(e.target.value)}
+                                  onChange={e => setNewComment(e.target.value)}
                                   placeholder={t("commentPlaceholder")}
-                                  className="w-full resize-none border-none focus:ring-0 text-sm bg-transparent"
+                                  className="w-full resize-none border-none shadow-none focus-visible:ring-0 text-sm bg-transparent p-0 min-h-[40px]"
                                   rows={2}
                                 />
-                                <div className="flex justify-end mt-1.5">
-                                  <Button
-                                    type="submit"
-                                    disabled={!newComment.trim() || isSubmitting}
-                                    className="bg-blue-600 hover:bg-blue-700 text-sm h-8 text-white"
-                                  >
-                                    {isSubmitting ? (
-                                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
-                                    ) : (
-                                      <Send className="w-3.5 h-3.5 mr-1" />
-                                    )}
+                                <div className="flex justify-end mt-2">
+                                  <Button type="submit" disabled={!newComment.trim() || isSubmitting} size="sm"
+                                    className="bg-[#025EB8] hover:bg-[#014fa0] text-white h-8 gap-1.5 rounded-lg">
+                                    {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                                     {t("send")}
                                   </Button>
                                 </div>
                               </div>
                             </form>
                           ) : (
-                            <div className="bg-gray-50 p-4 rounded-lg text-center mb-5">
-                              <p className="text-gray-600 mb-2">
-                                {t("signInToComment")}
-                              </p>
-                              <Button
-                                onClick={() => setIsSignInOpen(true)}
-                                className="bg-blue-600 hover:bg-blue-700"
-                              >
-                                {t("signIn")}
-                              </Button>
-                            </div>
+                            <button onClick={() => setIsSignInOpen(true)}
+                              className="w-full flex items-center gap-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl p-3.5 text-sm text-gray-500 transition-colors">
+                              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                                <MessageCircle className="w-4 h-4 text-gray-400" />
+                              </div>
+                              <span>{t("signInToComment")}</span>
+                            </button>
                           )}
                         </div>
 
-                        {/* Comments List */}
-                        <div className="space-y-4">
-                          {comments.length > 0 ? (
-                            comments.map((comment, index) => (
-                              <motion.div
-                                key={comment.id}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.05 }}
-                                className="flex gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
-                              >
-                                <Avatar className="w-9 h-9 flex-shrink-0">
-                                  <AvatarImage src={comment.user.image} />
-                                  <AvatarFallback className="text-sm">
-                                    {comment.user.name[0]}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-semibold text-gray-900 text-sm">
-                                        {comment.user.name}
-                                      </span>
-                                      <span className="text-xs text-gray-500">
-                                        {new Date(comment.createdAt).toLocaleDateString(
-                                          locale === "ar"
-                                            ? "ar-SA"
-                                            : locale === "fr"
-                                            ? "fr-FR"
-                                            : "en-US"
-                                        )}
-                                      </span>
-                                    </div>
-                                    {session?.user?.email === comment.user.email && (
-                                      <div className="relative">
-                                        <button
-                                          className="p-2 text-gray-600 hover:text-gray-800"
-                                          onClick={() =>
-                                            setOpenDropdownId(
-                                              openDropdownId === comment.id
-                                                ? null
-                                                : comment.id
-                                            )
-                                          }
-                                        >
-                                          <MoreHorizontal className="w-4 h-4" />
-                                        </button>
-                                        {openDropdownId === comment.id && (
-                                          <div className="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10">
-                                            <button
-                                              className="flex gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                              onClick={() => {
-                                                setEditingComment(comment.id);
-                                                setEditText(comment.text);
-                                                setOpenDropdownId(null);
-                                              }}
-                                            >
-                                              <Edit2 className="w-4 h-4" />
-                                              {t("edit")}
-                                            </button>
-                                            <button
-                                              className="flex gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-100"
-                                              onClick={() => {
-                                                handleDeleteComment(comment.id);
-                                                setOpenDropdownId(null);
-                                              }}
-                                            >
-                                              <Trash2 className="w-4 h-4" />
-                                              {t("delete")}
-                                            </button>
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
+                        {/* Comments list */}
+                        <div className="space-y-1">
+                          {comments.length > 0 ? comments.map((comment, i) => (
+                            <motion.div key={comment.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
+                              className="flex gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group">
+                              <Avatar className="w-8 h-8 flex-shrink-0">
+                                <AvatarImage src={comment.user.image} />
+                                <AvatarFallback className="text-xs font-bold bg-gray-100 text-gray-600">
+                                  {comment.user.name[0]}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-sm font-semibold text-gray-900">{comment.user.name}</span>
+                                    <span className="text-[11px] text-gray-400">{new Date(comment.createdAt).toLocaleDateString(locale === "ar" ? "ar-SA" : locale === "fr" ? "fr-FR" : "en-US")}</span>
                                   </div>
-                                  {editingComment === comment.id ? (
-                                    <div className="mt-2">
-                                      <Textarea
-                                        value={editText}
-                                        onChange={(e) => setEditText(e.target.value)}
-                                        className="mb-2"
-                                      />
-                                      <div className="flex gap-2">
-                                        <Button
-                                          onClick={() => handleEditComment(comment.id)}
-                                          disabled={isSubmitting}
-                                          size="sm"
-                                        >
-                                          {isSubmitting ? (
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                          ) : (
-                                            t("save")
-                                          )}
-                                        </Button>
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => setEditingComment(null)}
-                                        >
-                                          {t("cancel")}
-                                        </Button>
-                                      </div>
+                                  {session?.user?.email === comment.user.email && (
+                                    <div className="relative flex-shrink-0">
+                                      <button onClick={() => setOpenDropdownId(openDropdownId === comment.id ? null : comment.id)}
+                                        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all">
+                                        <MoreHorizontal className="w-4 h-4" />
+                                      </button>
+                                      {openDropdownId === comment.id && (
+                                        <div className="absolute end-0 mt-1 w-40 bg-white border border-gray-100 rounded-xl shadow-lg z-20 overflow-hidden">
+                                          <button onClick={() => { setEditingComment(comment.id); setEditText(comment.text); setOpenDropdownId(null); }}
+                                            className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                                            <Edit2 className="w-3.5 h-3.5" />{t("edit")}
+                                          </button>
+                                          <button onClick={() => { handleDeleteComment(comment.id); setOpenDropdownId(null); }}
+                                            className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                                            <Trash2 className="w-3.5 h-3.5" />{t("delete")}
+                                          </button>
+                                        </div>
+                                      )}
                                     </div>
-                                  ) : (
-                                    <p className="text-gray-700 text-sm leading-relaxed">
-                                      {comment.text}
-                                    </p>
                                   )}
                                 </div>
-                              </motion.div>
-                            ))
-                          ) : (
-                            <p className="text-gray-500 text-center py-8">
-                              {t("noComments")}
-                            </p>
+                                {editingComment === comment.id ? (
+                                  <div>
+                                    <Textarea value={editText} onChange={e => setEditText(e.target.value)} className="mb-2 text-sm" rows={2} />
+                                    <div className="flex gap-2">
+                                      <Button onClick={() => handleEditComment(comment.id)} disabled={isSubmitting} size="sm" className="bg-[#025EB8] hover:bg-[#014fa0] text-white h-8">
+                                        {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : t("save")}
+                                      </Button>
+                                      <Button variant="outline" size="sm" onClick={() => setEditingComment(null)} className="h-8">{t("cancel")}</Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p className="text-sm text-gray-700 leading-relaxed">{comment.text}</p>
+                                )}
+                              </div>
+                            </motion.div>
+                          )) : (
+                            <div className="text-center py-12">
+                              <MessageCircle className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                              <p className="text-gray-400 text-sm">{t("noComments")}</p>
+                            </div>
                           )}
                         </div>
                       </motion.div>
                     )}
 
+                    {/* Info */}
                     {activeTab === "info" && (
-                      <motion.div
-                        key="info"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ duration: 0.3 }}
-                        className="space-y-5"
-                      >
-                        <div>
-                          <h3 className="text-lg font-bold text-gray-900 mb-3">
-                            {t("campaignStats")}
-                          </h3>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="bg-blue-50 rounded-lg p-3">
-                              <div className="text-2xl font-bold text-blue-600 mb-0.5">
-                                {campaign.donationCount}
-                              </div>
-                              <div className="text-xs text-gray-600">
-                                {t("donor")}
-                              </div>
+                      <motion.div key="info" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="space-y-6">
+                        {/* Stats grid */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-[#025EB8]/6 rounded-xl p-4 flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5 text-[#025EB8] mb-1">
+                              <Users className="w-4 h-4" />
+                              <span className="text-xs font-semibold uppercase tracking-wide">{t("donor")}</span>
                             </div>
-                            <div className="bg-blue-50 rounded-lg p-3">
-                              <div className="text-2xl font-bold text-blue-600 mb-0.5">
-                                {campaign.progress.toFixed(0)}%
-                              </div>
-                              <div className="text-xs text-gray-600">
-                                {t("completed")}
-                              </div>
+                            <span className="text-2xl sm:text-3xl font-extrabold text-gray-900">{campaign.donationCount.toLocaleString()}</span>
+                          </div>
+                          <div className="bg-[#FA5D17]/6 rounded-xl p-4 flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5 text-[#FA5D17] mb-1">
+                              <TrendingUp className="w-4 h-4" />
+                              <span className="text-xs font-semibold uppercase tracking-wide">{t("completed")}</span>
                             </div>
+                            <span className="text-2xl sm:text-3xl font-extrabold text-gray-900">{campaign.progress.toFixed(0)}%</span>
                           </div>
                         </div>
 
-                        {/* Donation Stats */}
-                        {campaign.donationStats && (
+                        {/* Top donors */}
+                        {/* {campaign.donationStats && (campaign.donationStats.first || campaign.donationStats.largest || campaign.donationStats.last) && (
                           <div>
-                            <h3 className="text-lg font-bold text-gray-900 mb-3">
-                              {t("topDonors")}
-                            </h3>
+                            <h3 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-3">{t("topDonors")}</h3>
                             <div className="space-y-2">
-                              {campaign.donationStats.first && (
-                                <div className="bg-gray-50 rounded-lg p-3">
-                                  <div className="text-xs text-gray-600 mb-1">
-                                    {t("firstDonor")}
+                              {[
+                                { stat: campaign.donationStats.first, label: t("firstDonor"), icon: Star, color: "text-amber-500 bg-amber-50" },
+                                { stat: campaign.donationStats.largest, label: t("largestDonor"), icon: Trophy, color: "text-[#025EB8] bg-[#025EB8]/8" },
+                                { stat: campaign.donationStats.last, label: t("latestDonor"), icon: Heart, color: "text-rose-500 bg-rose-50" },
+                              ].filter(d => d.stat).map(({ stat, label, icon: Icon, color }) => (
+                                <div key={label} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
+                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${color}`}>
+                                    <Icon className="w-4 h-4" />
                                   </div>
-                                  <div className="font-semibold">
-                                    {campaign.donationStats.first.donor}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[11px] text-gray-400 font-medium">{label}</p>
+                                    <p className="text-sm font-bold text-gray-900 truncate">{stat!.donor}</p>
                                   </div>
-                                  <div className="text-sm text-gray-700">
-                                    {campaign.donationStats.first.amount.toLocaleString()}
-                                  </div>
+                                  <span className="text-sm font-bold text-[#025EB8] flex-shrink-0">{stat!.amount.toLocaleString()}</span>
                                 </div>
-                              )}
-                              {campaign.donationStats.largest && (
-                                <div className="bg-gray-50 rounded-lg p-3">
-                                  <div className="text-xs text-gray-600 mb-1">
-                                    {t("largestDonor")}
-                                  </div>
-                                  <div className="font-semibold">
-                                    {campaign.donationStats.largest.donor}
-                                  </div>
-                                  <div className="text-sm text-gray-700">
-                                    {campaign.donationStats.largest.amount.toLocaleString()}
-                                  </div>
-                                </div>
-                              )}
-                              {campaign.donationStats.last && (
-                                <div className="bg-gray-50 rounded-lg p-3">
-                                  <div className="text-xs text-gray-600 mb-1">
-                                    {t("latestDonor")}
-                                  </div>
-                                  <div className="font-semibold">
-                                    {campaign.donationStats.last.donor}
-                                  </div>
-                                  <div className="text-sm text-gray-700">
-                                    {campaign.donationStats.last.amount.toLocaleString()}
-                                  </div>
-                                </div>
-                              )}
+                              ))}
                             </div>
                           </div>
-                        )}
+                        )} */}
                       </motion.div>
                     )}
+
                   </AnimatePresence>
                 </div>
               </div>
             </div>
 
-            {/* Right Sidebar - Desktop */}
+            {/* ── Right sidebar ── */}
             <div className="lg:col-span-4 max-sm:hidden">
               <div className="sticky top-24">
                 <DonationSidebar campaign={campaign} />
@@ -821,68 +580,64 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
           </div>
         </div>
 
-        {/* Mobile Sticky Bottom Bar */}
+        {/* Mobile sticky donate bar */}
         <div className="sm:hidden">
           <DonationSidebar campaign={campaign} isMobileSticky />
         </div>
       </main>
 
-      {/* Modal for image/video preview */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        content={modalContent}
-      />
-
-      {/* Sign In Dialog */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} content={modalContent} />
       <SignInDialog isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} />
     </>
   );
 };
 
-// Loading Skeleton Component
+// Loading Skeleton
 const LoadingSkeleton = () => (
-  <div className="min-h-screen bg-gray-100 pb-6">
-    <div className="max-w-7xl mx-auto sm:px-4 py-6 sm:py-8">
-      <div className="grid lg:grid-cols-12 gap-6 lg:gap-8">
-        <div className="lg:col-span-8">
-          <div className="bg-white rounded-lg overflow-hidden">
-            {/* Image skeleton */}
-            <div className="w-full h-[360px] lg:h-[420px] bg-gray-200 animate-pulse" />
+  <div className="min-h-screen bg-[#f4f6fb] pb-28 sm:pb-10">
+    <div className="w-full sm:px-4 sm:py-8">
+      <div className="grid lg:grid-cols-12 gap-0 lg:gap-7">
 
-            {/* Thumbnails skeleton */}
-            <div className="flex gap-2 p-4">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="w-20 h-20 bg-gray-200 rounded-lg animate-pulse"
-                />
+        {/* Left column */}
+        <div className="lg:col-span-8 flex flex-col gap-4 sm:gap-5">
+
+          {/* Hero image skeleton */}
+          <div className="sm:rounded-3xl overflow-hidden bg-gray-100 animate-pulse aspect-[16/9] sm:aspect-[16/8] w-full" />
+
+          {/* Tabs card skeleton */}
+          <div className="bg-white sm:rounded-3xl sm:border sm:border-gray-100 overflow-hidden">
+            {/* Tab bar */}
+            <div className="flex gap-1 p-2 sm:p-3 bg-gray-50/80 border-b border-gray-100">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="flex-1 h-9 bg-gray-100 rounded-xl animate-pulse" />
               ))}
             </div>
-
-            {/* Tabs skeleton */}
-            <div className="border-t border-gray-200">
-              <div className="grid grid-cols-4 gap-4 p-4">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="h-10 bg-gray-200 rounded animate-pulse" />
-                ))}
-              </div>
-            </div>
-
-            {/* Content skeleton */}
-            <div className="p-4 space-y-3">
-              <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
-              <div className="h-4 bg-gray-200 rounded animate-pulse w-5/6" />
-              <div className="h-4 bg-gray-200 rounded animate-pulse w-4/6" />
+            {/* Content lines */}
+            <div className="p-4 sm:p-6 lg:p-7 space-y-3">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} className={`h-3.5 bg-gray-100 rounded-full animate-pulse ${
+                  i === 3 ? "w-4/5" : i === 5 ? "w-2/3" : i === 6 ? "w-3/4" : "w-full"
+                }`} />
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="lg:col-span-4 max-sm:hidden">
-          <div className="bg-white rounded-lg p-6">
-            <div className="h-48 bg-gray-200 rounded animate-pulse" />
+        {/* Sidebar skeleton */}
+        <div className="lg:col-span-4 hidden lg:block">
+          <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden">
+            <div className="h-6 bg-gray-100 rounded-full animate-pulse mx-5 mt-5 w-1/2" />
+            <div className="p-5 space-y-3 mt-1">
+              <div className="h-10 bg-gray-100 rounded-xl animate-pulse" />
+              <div className="h-10 bg-gray-100 rounded-xl animate-pulse" />
+              <div className="h-3.5 bg-gray-100 rounded-full animate-pulse w-3/4" />
+              <div className="h-3.5 bg-gray-100 rounded-full animate-pulse w-full" />
+              <div className="h-3.5 bg-gray-100 rounded-full animate-pulse w-5/6" />
+              <div className="h-11 bg-gray-100 rounded-2xl animate-pulse mt-4" />
+            </div>
           </div>
         </div>
+
       </div>
     </div>
   </div>

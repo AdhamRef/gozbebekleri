@@ -92,14 +92,14 @@ export const authOptions: NextAuthOptions = {
         session.user.email = token.email;
         
         try {
-          // Fetch user role from database
           const dbUser = await prisma.user.findUnique({
             where: { id: token.sub },
-            select: { role: true }
+            select: { role: true, dashboardPermissions: true },
           });
           
           if (dbUser) {
             session.user.role = dbUser.role;
+            session.user.dashboardPermissions = dbUser.dashboardPermissions ?? [];
           }
         } catch (error) {
           console.error('Error fetching user role:', error);
@@ -109,8 +109,9 @@ export const authOptions: NextAuthOptions = {
     },
     async jwt({ token, user, account }) {
       if (user) {
-        token.role = user.role;
+        token.role = user.role as "ADMIN" | "DONOR" | "STAFF" | undefined;
         token.email = user.email;
+        token.dashboardPermissions = (user as { dashboardPermissions?: string[] }).dashboardPermissions ?? [];
       }
       if (account) {
         token.accessToken = account.access_token;

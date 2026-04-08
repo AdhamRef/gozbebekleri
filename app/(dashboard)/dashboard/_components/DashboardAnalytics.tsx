@@ -184,7 +184,9 @@ export default function DashboardPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
-  const [usersSearch, setUsersSearch] = useState("");
+  const [usersSearchInput, setUsersSearchInput] = useState("");
+  const [usersSearchCommitted, setUsersSearchCommitted] = useState("");
+  const [usersSearchLoading, setUsersSearchLoading] = useState(false);
   const [statCardSet, setStatCardSet] = useState<StatCardSet>("revenue");
 
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -247,28 +249,57 @@ export default function DashboardPage() {
     fetchFilters();
   }, [locale]);
 
-  // Fetch users when search changes (for user filter dropdown)
+  const commitUsersSearch = useCallback(() => {
+    setUsersSearchCommitted(usersSearchInput.trim());
+  }, [usersSearchInput]);
+
   useEffect(() => {
-    if (!usersSearch || usersSearch.length < 1) {
-      setUsers([]);
-      return;
-    }
+    if (!usersSearchCommitted) return;
     const controller = new AbortController();
-    const fetchUsers = async () => {
+    setUsersSearchLoading(true);
+    const run = async () => {
       try {
         const res = await fetch(
-          `/api/users?search=${encodeURIComponent(usersSearch)}&limit=20`,
+          `/api/users?search=${encodeURIComponent(usersSearchCommitted)}`,
           { signal: controller.signal }
         );
         const data = await res.json();
+        if (!res.ok) {
+          toast.error(typeof data?.error === "string" ? data.error : "فشل البحث عن المستخدمين");
+          setUsers([]);
+          return;
+        }
         setUsers(data.users ?? []);
       } catch (e) {
         if ((e as { name?: string }).name !== "AbortError") setUsers([]);
+      } finally {
+        setUsersSearchLoading(false);
       }
     };
-    fetchUsers();
+    run();
     return () => controller.abort();
-  }, [usersSearch]);
+  }, [usersSearchCommitted]);
+
+  useEffect(() => {
+    if (usersSearchCommitted) return;
+    if (selectedUserId === "all") {
+      setUsers([]);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/users/${selectedUserId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const u = data?.user;
+        if (u)
+          setUsers([{ id: u.id, name: u.name ?? null, email: u.email ?? "" }]);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [usersSearchCommitted, selectedUserId]);
 
   // Chart data (filters + period + from/to + user — user from state or URL when coming via link)
   useEffect(() => {
@@ -474,7 +505,7 @@ export default function DashboardPage() {
               )}
             </p>
           </div>
-          <CurrencySelector />
+          <CurrencySelector showDefaultCurrencyOption />
         </header>
 
         {/* المؤشرات — تختفي عند عرض تبرعات مستخدم معين عبر الرابط */}
@@ -668,7 +699,7 @@ export default function DashboardPage() {
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
             />
           </div>
           <div className="space-y-1">
@@ -677,7 +708,7 @@ export default function DashboardPage() {
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
             />
           </div>
         </div>
@@ -745,18 +776,51 @@ export default function DashboardPage() {
       <label className="text-[11px] font-medium text-slate-500">
         المستخدم
       </label>
-      <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+      <Select
+        value={selectedUserId}
+        onValueChange={(v) => {
+          setSelectedUserId(v);
+          if (v === "all") {
+            setUsersSearchInput("");
+            setUsersSearchCommitted("");
+            setUsers([]);
+          }
+        }}
+      >
         <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
           <SelectValue placeholder="اختر المستخدم" />
         </SelectTrigger>
         <SelectContent>
-          <div className="p-2 border-b border-slate-100">
+          <div className="p-2 border-b border-slate-100 flex gap-1.5 flex-row-reverse items-center">
             <Input
-              placeholder="بحث..."
-              value={usersSearch}
-              onChange={(e) => setUsersSearch(e.target.value)}
-              className="w-full h-8 text-xs"
+              placeholder="بحث… ثم Enter أو زر البحث"
+              value={usersSearchInput}
+              onChange={(e) => setUsersSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitUsersSearch();
+                }
+              }}
+              className="w-full h-8 text-xs flex-1 min-w-0"
             />
+            <button
+              type="button"
+              title="بحث"
+              disabled={usersSearchLoading}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                commitUsersSearch();
+              }}
+              className="shrink-0 h-8 w-8 inline-flex items-center justify-center rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 disabled:opacity-50"
+            >
+              {usersSearchLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />
+              ) : (
+                <Search className="w-3.5 h-3.5 text-slate-600" />
+              )}
+            </button>
           </div>
           <SelectItem value="all" className="text-xs">الكل</SelectItem>
           {users.map((u) => (
@@ -822,7 +886,7 @@ export default function DashboardPage() {
                   <div className="h-[400px] w-full">
                     {chartLoading ? (
                       <div className="h-full flex items-center justify-center bg-slate-50 rounded-lg">
-                        <Loader2 className="w-9 h-9 animate-spin text-blue-500" />
+                        <Loader2 className="w-9 h-9 animate-spin text-[#025EB8]" />
                       </div>
                     ) : chartView === "bar" ? (
                       chartMetric === "amount" ? (
@@ -1419,7 +1483,7 @@ export default function DashboardPage() {
                               className={cn(
                                 "inline-block px-2 py-0.5 rounded-full text-xs",
                                 d.type === "MONTHLY"
-                                  ? "bg-violet-100 text-violet-700"
+                                  ? "bg-[#025EB8] text-[#025EB8]"
                                   : "bg-slate-100 text-slate-600"
                               )}
                             >
@@ -1484,26 +1548,26 @@ const ACCENT_STYLES: Record<
   string,
   { bg: string; text: string; border: string }
 > = {
-  teal: { bg: "bg-teal-50", text: "text-teal-600", border: "border-teal-200" },
+  teal: { bg: "bg-[#025EB8]/8", text: "text-[#025EB8]", border: "border-[#025EB8]/20" },
   indigo: {
-    bg: "bg-indigo-50",
-    text: "text-indigo-600",
-    border: "border-indigo-200",
+    bg: "bg-[#025EB8]/8",
+    text: "text-[#025EB8]",
+    border: "border-[#025EB8]/20",
   },
   amber: {
-    bg: "bg-amber-50",
-    text: "text-amber-600",
-    border: "border-amber-200",
+    bg: "bg-[#FA5D17]/8",
+    text: "text-[#FA5D17]",
+    border: "border-[#FA5D17]/20",
   },
   violet: {
-    bg: "bg-violet-50",
-    text: "text-violet-600",
-    border: "border-violet-200",
+    bg: "bg-[#025EB8]",
+    text: "text-[#025EB8]",
+    border: "border-gray-200",
   },
   emerald: {
-    bg: "bg-emerald-50",
-    text: "text-emerald-600",
-    border: "border-emerald-200",
+    bg: "bg-[#025EB8]/8",
+    text: "text-[#025EB8]",
+    border: "border-[#025EB8]/20",
   },
   slate: {
     bg: "bg-slate-100",
@@ -1511,9 +1575,9 @@ const ACCENT_STYLES: Record<
     border: "border-slate-200",
   },
   orange: {
-    bg: "bg-orange-50",
-    text: "text-orange-600",
-    border: "border-orange-200",
+    bg: "bg-[#FA5D17]/8",
+    text: "text-[#FA5D17]",
+    border: "border-[#FA5D17]/20",
   },
 };
 

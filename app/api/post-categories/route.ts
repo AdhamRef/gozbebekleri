@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from "../auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 
 // GET: list post categories with locale-aware translations, search, and paging
 export async function GET(request: NextRequest) {
@@ -68,9 +70,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized - Only admins can create categories' }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, "blog");
+    if (denied) return denied;
 
     const data = await request.json();
     const { name, title, description, image, translations } = data;
@@ -100,6 +101,15 @@ export async function POST(request: NextRequest) {
     });
 
     const full = await prisma.postCategory.findUnique({ where: { id: category.id }, select: { id: true, name: true, title: true, description: true, image: true, translations: { select: { locale: true, name: true, title: true, description: true, image: true } } } });
+
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "POST_CATEGORY_CREATE",
+      messageAr: `${actor.actorName ?? "مسؤول"} أنشأ تصنيفًا للمدونة: ${full?.name ?? name}`,
+      entityType: "PostCategory",
+      entityId: category.id,
+    });
 
     return NextResponse.json(full, { status: 201 });
   } catch (error) {

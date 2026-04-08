@@ -208,7 +208,7 @@ export function DataTable<TData, TValue>({
               <DialogTrigger asChild>
                 <Button
                   variant="outline"
-                  className="flex items-center gap-2 hover:bg-sky-50 transition-colors"
+                  className="flex items-center gap-2 hover:bg-[#025EB8]/8 transition-colors"
                 >
                   <Calendar className="h-4 w-4 text-black" />
                   <span className="text-black font-medium">فلتر تاريخ</span>
@@ -267,7 +267,7 @@ export function DataTable<TData, TValue>({
                   </Button>
                   <Button
                     onClick={applyDateFilter}
-                    className="flex-1 bg-black hover:bg-blue-950 text-white transition-colors"
+                    className="flex-1 bg-black hover:bg-[#014fa0] text-white transition-colors"
                   >
                     تأكيد الفلتر
                   </Button>

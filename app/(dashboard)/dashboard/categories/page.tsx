@@ -225,7 +225,7 @@ export default function CategoriesPage() {
           <ReorderDialog categories={categories} onReorder={fetchCategories} />
           <Button
             onClick={() => router.push('/dashboard/categories/new')}
-            className="bg-emerald-600 hover:bg-emerald-700 gap-2"
+            className="bg-[#025EB8] hover:bg-[#014fa0] gap-2"
           >
             <Plus className="w-4 h-4" />
             قسم جديد

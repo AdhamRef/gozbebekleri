@@ -2,23 +2,34 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import Cards from "react-credit-cards-2";
+import "react-credit-cards-2/dist/es/styles-compiled.css";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Calendar,
-  CheckCircle2,
   Heart,
   CreditCard as CardIcon,
   ShoppingCart,
   Check,
   Loader2,
+  ExternalLink,
 } from "lucide-react";
 import axios from "axios";
-import Cards from "react-credit-cards-2";
-import "react-credit-cards-2/dist/es/styles-compiled.css";
 import { toast } from "react-hot-toast";
 import { useConfettiStore } from "@/hooks/use-confetti-store";
 import { getCurrency } from "@/hooks/useCampaignValue";
+import {
+  DEFAULT_SUGGESTED_DONATION_AMOUNTS,
+  parseSuggestedDonations,
+  resolveSuggestedAmountsForCurrency,
+  type SuggestedDonationsConfig,
+} from "@/lib/campaign/suggested-donations";
+import {
+  FUNDRAISING_SHARES,
+  GOAL_TYPE_OPEN,
+  parseSuggestedShareCounts,
+} from "@/lib/campaign/campaign-modes";
 import useConvetToUSD from "@/hooks/useConvetToUSD";
 import { useReferralCode } from "@/hooks/useReferralCode";
 import { useCurrency } from "@/context/CurrencyContext";
@@ -55,13 +66,12 @@ interface DonationDialogProps {
   categoryImage?: string;
   /** Pre-fill amount (e.g. from QuickDonate) */
   initialDonationAmount?: number;
-}
-
-interface CardDetails {
-  cardNumber: string;
-  expiryDate: string;
-  cvv: string;
-  cardholderName: string;
+  /** Campaign quick-pick amounts; per-currency overrides resolved with current cookie currency */
+  suggestedDonations?: SuggestedDonationsConfig | null;
+  goalType?: string;
+  fundraisingMode?: string;
+  sharePriceUSD?: number | null;
+  suggestedShareCounts?: { counts: number[] } | null;
 }
 
 const DonationDialog = ({
@@ -69,7 +79,7 @@ const DonationDialog = ({
   onClose,
   campaignTitle = "",
   campaignId = "",
-  campaignImage = "/placeholder.jpg",
+  campaignImage = "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg",
   targetAmount = 0,
   amountRaised = 0,
   monthlyOnly = false,
@@ -77,8 +87,24 @@ const DonationDialog = ({
   categoryName = "",
   categoryImage,
   initialDonationAmount,
+  suggestedDonations,
+  goalType = "FIXED",
+  fundraisingMode = "AMOUNT",
+  sharePriceUSD,
+  suggestedShareCounts,
 }: DonationDialogProps) => {
   const isCategoryMode = Boolean(categoryId);
+  const openGoal = goalType === GOAL_TYPE_OPEN;
+  const shareMode =
+    !isCategoryMode &&
+    Boolean(campaignId) &&
+    fundraisingMode === FUNDRAISING_SHARES &&
+    sharePriceUSD != null &&
+    sharePriceUSD > 0;
+  const sharePickCounts = useMemo(
+    () => parseSuggestedShareCounts(suggestedShareCounts).counts,
+    [suggestedShareCounts]
+  );
   const t = useTranslations("DonationDialog");
   const locale = useLocale() as "ar" | "en" | "fr";
   const getReferralCode = useReferralCode();
@@ -143,21 +169,21 @@ const DonationDialog = ({
   const [coverFees, setCoverFees] = useState(false);
   const [billingDay, setBillingDay] = useState<number>(1);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(null);
+  const [use3D, setUse3D] = useState(true);
+  const [cardDetails, setCardDetails] = useState({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" });
+  const [cardFocus, setCardFocus] = useState("");
   const [loading, setLoading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
-  const [cardDetails, setCardDetails] = useState<CardDetails>({
-    cardNumber: "",
-    expiryDate: "",
-    cvv: "",
-    cardholderName: "",
-  });
+  const [payforSwitching, setPayforSwitching] = useState(false);
+  const payforPopupRef = useRef<Window | null>(null);
+  const payforPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [focus, setFocus] = useState("");
   const [phoneValue, setPhoneValue] = useState("");
   const [phoneCountry, setPhoneCountry] = useState<string>("");
   const [currentUser, setCurrentUser] = useState<{ phone: string | null; country: string | null } | null>(null);
   const { data: session } = useSession();
-  const { convertToCurrency } = useCurrency();
+  const { convertToCurrency, exchangeRates } = useCurrency();
+  const [shareCount, setShareCount] = useState(1);
   const { addItem, setItems } = useCart();
   const tracking = useTracking();
   const router = useRouter();
@@ -180,6 +206,11 @@ const DonationDialog = ({
       .catch(() => setCurrentUser(null));
   }, [isOpen, session?.user?.id]);
 
+  // Reset 3D preference when dialog opens
+  useEffect(() => {
+    if (isOpen) setUse3D(true);
+  }, [isOpen]);
+
   // When monthlyOnly (e.g. QuickDonate category), pre-select monthly and skip type step
   useEffect(() => {
     if (isOpen && monthlyOnly && !donationType) {
@@ -187,6 +218,24 @@ const DonationDialog = ({
       setCurrentStep(0);
     }
   }, [isOpen, monthlyOnly, donationType]);
+
+  useEffect(() => {
+    if (isOpen && shareMode) {
+      setDonationType("ONE_TIME");
+      setCurrentStep(0);
+      setShareCount(1);
+    }
+  }, [isOpen, shareMode]);
+
+  useEffect(() => {
+    if (!isOpen || !shareMode || sharePriceUSD == null || sharePriceUSD <= 0) return;
+    const r = convertToCurrency(sharePriceUSD);
+    const unit =
+      r?.convertedValue != null && Number.isFinite(r.convertedValue)
+        ? r.convertedValue
+        : sharePriceUSD;
+    setDonationAmount(Math.round(shareCount * unit * 100) / 100);
+  }, [isOpen, shareMode, shareCount, sharePriceUSD, exchangeRates, convertToCurrency]);
 
   // Pre-fill amount and skip amount step when opening with initialDonationAmount (e.g. from QuickDonate)
   useEffect(() => {
@@ -198,15 +247,35 @@ const DonationDialog = ({
 
   const confetti = useConfettiStore();
 
+  const presetDonationAmounts = useMemo(() => {
+    if (!campaignId || isCategoryMode) {
+      return DEFAULT_SUGGESTED_DONATION_AMOUNTS;
+    }
+    const cfg = parseSuggestedDonations(suggestedDonations);
+    return resolveSuggestedAmountsForCurrency(cfg, getCurrency());
+  }, [campaignId, isCategoryMode, suggestedDonations, isOpen]);
+
   const progress =
-    ((amountRaised + donationAmount) /
-      convertToCurrency(targetAmount).convertedValue) *
-    100;
+    openGoal ||
+    !targetAmount ||
+    convertToCurrency(targetAmount).convertedValue == null ||
+    convertToCurrency(targetAmount).convertedValue === 0
+      ? 0
+      : Math.min(
+          100,
+          ((amountRaised + donationAmount) /
+            (convertToCurrency(targetAmount).convertedValue as number)) *
+            100
+        );
   const fees = (donationAmount + teamSupport) * 0.03;
   const totalAmount = donationAmount + teamSupport + (coverFees ? fees : 0);
 
   const handleTypeSelect = (type: DonationType) => {
     setDonationType(type);
+    // Monthly always uses Stripe (CARD); pre-select it so the payment method step is pre-filled
+    if (type === "MONTHLY") setPaymentMethod("CARD");
+    else setPaymentMethod(null);
+    setCardDetails({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" });
     setCurrentStep(0);
   };
 
@@ -237,16 +306,12 @@ const DonationDialog = ({
   const renderStepIndicator = () => {
     const steps = getSteps();
     return (
-      <div className="flex items-center justify-center gap-2 mb-6">
+      <div className="flex items-center gap-1 mb-4 px-6">
         {steps.map((step, index) => (
           <div
             key={index}
-            className={`w-2.5 h-2.5 rounded-full transition-colors ${
-              index === currentStep
-                ? "bg-blue-500"
-                : index < currentStep
-                ? "bg-blue-200"
-                : "bg-gray-200"
+            className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+              index <= currentStep ? "bg-[#025EB8]" : "bg-gray-200"
             }`}
           />
         ))}
@@ -254,19 +319,10 @@ const DonationDialog = ({
     );
   };
 
-  const isCardDetailsValid = () => {
-    return (
-      cardDetails.cardNumber.length === 16 &&
-      cardDetails.expiryDate.length === 5 &&
-      cardDetails.cvv.length === 3 &&
-      cardDetails.cardholderName.length > 0
-    );
-  };
-
   const getStepContent = () => {
     if (!mounted) return null;
 
-    if (!donationType && !monthlyOnly) {
+    if (!donationType && !monthlyOnly && !shareMode) {
       return (
         <div className="space-y-6">
           <div className="text-center mb-8">
@@ -282,11 +338,11 @@ const DonationDialog = ({
             <Button
               onClick={() => handleTypeSelect("ONE_TIME")}
               variant="outline"
-              className="h-auto p-6 hover:border-blue-500 hover:bg-blue-50 group"
+              className="h-auto p-6 hover:border-[#025EB8] hover:bg-[#025EB8]/5 group transition-all duration-200"
             >
               <div className="text-center space-y-2">
-                <div className="w-12 h-12 mx-auto rounded-full bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                  <Heart className="w-6 h-6 text-blue-600" />
+                <div className="w-12 h-12 mx-auto rounded-full bg-[#025EB8]/10 flex items-center justify-center group-hover:bg-[#025EB8]/20 transition-colors">
+                  <Heart className="w-6 h-6 text-[#025EB8]" />
                 </div>
                 <h3 className="font-semibold text-gray-900">{t("oneTimeDonation")}</h3>
                 <p className="text-sm text-gray-500">{t("oneTimeDonationDesc")}</p>
@@ -296,11 +352,11 @@ const DonationDialog = ({
             <Button
               onClick={() => handleTypeSelect("MONTHLY")}
               variant="outline"
-              className="h-auto p-6 hover:border-blue-500 hover:bg-blue-50 group"
+              className="h-auto p-6 hover:border-[#025EB8] hover:bg-[#025EB8]/5 group transition-all duration-200"
             >
               <div className="text-center space-y-2">
-                <div className="w-12 h-12 mx-auto rounded-full bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                  <Calendar className="w-6 h-6 text-blue-600" />
+                <div className="w-12 h-12 mx-auto rounded-full bg-[#025EB8]/10 flex items-center justify-center group-hover:bg-[#025EB8]/20 transition-colors">
+                  <Calendar className="w-6 h-6 text-[#025EB8]" />
                 </div>
                 <h3 className="font-semibold text-gray-900">{t("monthlyDonation")}</h3>
                 <p className="text-sm text-gray-500">{t("monthlyDonationDesc")}</p>
@@ -329,31 +385,31 @@ const DonationDialog = ({
               </h3>
               <p className="text-gray-600 text-sm flex flex-col items-center gap-1">
                 {t("hadithQuote")}
-                <span className="text-blue-600 text-base">
+                <span className="text-[#025EB8] text-base">
                   {t("hadithText")}
                 </span>
               </p>
             </div>
-            {donationType === "ONE_TIME" && campaignId && (
+            {donationType === "ONE_TIME" && campaignId && !openGoal && (
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">
                     {t("collected")} {getCurrency()}
                     {formatNumber(
-                      convertToCurrency(Math.round(amountRaised))
-                        .convertedValue + donationAmount
+                      (convertToCurrency(Math.round(amountRaised)).convertedValue ?? 0) +
+                        donationAmount
                     )}
                   </span>
                   <span className="text-gray-600">
                     {t("goal")} {getCurrency()}
                     {formatNumber(
-                      convertToCurrency(Math.round(targetAmount)).convertedValue
+                      convertToCurrency(Math.round(targetAmount)).convertedValue ?? 0
                     )}
                   </span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2">
                   <div
-                    className="bg-blue-500 h-2 rounded-full max-w-full transition-all duration-500 ease-in-out"
+                    className="bg-[#025EB8] h-2 rounded-full max-w-full transition-all duration-500 ease-in-out"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
@@ -361,29 +417,87 @@ const DonationDialog = ({
             )}
 
             <div className="space-y-4">
-              <Input
-                type="number"
-                value={donationAmount || ""}
-                onChange={(e) => setDonationAmount(Number(e.target.value))}
-                placeholder={t("enterDonationAmount")}
-              />
+              {shareMode && sharePriceUSD != null ? (
+                <>
+                  <p className="text-sm text-center text-gray-600">
+                    {t("sharePriceLabel")}{" "}
+                    {getCurrency()}
+                    {formatNumber(
+                      convertToCurrency(sharePriceUSD).convertedValue ?? sharePriceUSD
+                    )}
+                  </p>
+                  <p className="text-xs text-center text-gray-500">{t("sharesPickHint")}</p>
+                  <div className="flex items-center justify-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShareCount((c) => Math.max(1, c - 1))}
+                    >
+                      −
+                    </Button>
+                    <div className="min-w-[5rem] text-center">
+                      <span className="text-2xl font-bold text-gray-900">{shareCount}</span>
+                      <p className="text-xs text-gray-500">{t("sharesLabel")}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShareCount((c) => c + 1)}
+                    >
+                      +
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {sharePickCounts.map((c) => (
+                      <Button
+                        key={c}
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShareCount(c)}
+                        className={
+                          shareCount === c
+                            ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]"
+                            : ""
+                        }
+                      >
+                        {c}
+                      </Button>
+                    ))}
+                  </div>
+                  <p className="text-center text-base font-semibold text-[#025EB8]">
+                    {t("donationTotal")}: {getCurrency()}
+                    {formatNumber(donationAmount)}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Input
+                    type="number"
+                    value={donationAmount || ""}
+                    onChange={(e) => setDonationAmount(Number(e.target.value))}
+                    placeholder={t("enterDonationAmount")}
+                  />
 
-              <div className="grid grid-cols-3 gap-2">
-                {[10, 25, 50, 100, 250, 500].map((amount) => (
-                  <Button
-                    key={amount}
-                    variant="outline"
-                    onClick={() => setDonationAmount(amount)}
-                    className={`${
-                      donationAmount === amount
-                        ? "border-blue-500 bg-blue-50 text-blue-600"
-                        : ""
-                    }`}
-                  >
-                    {getCurrency()} {amount}
-                  </Button>
-                ))}
-              </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {presetDonationAmounts.map((amount) => (
+                      <Button
+                        key={amount}
+                        variant="outline"
+                        onClick={() => setDonationAmount(amount)}
+                        className={`${
+                          donationAmount === amount
+                            ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]"
+                            : ""
+                        }`}
+                      >
+                        {getCurrency()} {amount}
+                      </Button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex justify-between gap-4 mt-6">
@@ -392,12 +506,16 @@ const DonationDialog = ({
                   variant="outline"
                   onClick={async () => {
                     try {
-                      const amountUSD = useConvetToUSD(donationAmount, getCurrency());
+                      const amountUSD =
+                        shareMode && sharePriceUSD != null
+                          ? shareCount * sharePriceUSD
+                          : useConvetToUSD(donationAmount, getCurrency());
                       const response = await axios.post("/api/cart", {
                         campaignId: campaignId,
                         amount: donationAmount,
                         amountUSD,
                         currency: getCurrency(),
+                        ...(shareMode ? { shareCount } : {}),
                       });
                       addItem(response.data || []);
                       tracking?.trackAddToCart({
@@ -415,7 +533,7 @@ const DonationDialog = ({
                       onClose();
                     }
                   }}
-                  className="flex-1 flex justify-center items-center gap-2 bg-blue-100 text-blue-800 hover:bg-blue-200 !border-none !shadow-none"
+                  className="flex-1 flex justify-center items-center gap-2 bg-[#025EB8]/10 text-[#025EB8] hover:bg-[#025EB8]/20 !border-none !shadow-none"
                 >
                   <ShoppingCart className="w-4 h-4" />
                   {t("addToCart")}
@@ -424,7 +542,7 @@ const DonationDialog = ({
               <Button
                 onClick={handleNext}
                 disabled={!donationAmount}
-                className={`${isCategoryMode || !campaignId ? "w-full" : "flex-1"} bg-blue-600 hover:bg-blue-700 text-white`}
+                className={`${isCategoryMode || !campaignId ? "w-full" : "flex-1"} bg-[#025EB8] hover:bg-[#014fa0] text-white`}
               >
                 {t("next")}
               </Button>
@@ -458,7 +576,7 @@ const DonationDialog = ({
                     onClick={() => setTeamSupport(option.value)}
                     className={`${
                       teamSupport === option.value
-                        ? "border-blue-500 bg-blue-50 text-blue-600"
+                        ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]"
                         : ""
                     }`}
                   >
@@ -474,7 +592,7 @@ const DonationDialog = ({
               </Button>
               <Button
                 onClick={handleNext}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white"
               >
                 {t("next")}
               </Button>
@@ -494,59 +612,45 @@ const DonationDialog = ({
               </p>
             </div>
 
-            <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+            <div dir={locale === "ar" ? "rtl" : "ltr"} className="bg-gray-50 p-4 rounded-lg space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">{t("amount")}</span>
-                <span className="font-medium">
-                  {" "}
-                  {getCurrency()} {formatNumber(donationAmount)}
-                </span>
+                <span className="font-medium">{getCurrency()} {formatNumber(donationAmount)}</span>
               </div>
               {teamSupport > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">{t("teamSupport")}</span>
-                  <span className="font-medium">
-                    {getCurrency()} {formatNumber(teamSupport)}
-                  </span>
+                  <span className="font-medium">{getCurrency()} {formatNumber(teamSupport)}</span>
                 </div>
               )}
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">{t("paymentFeesPercent")}</span>
-                <span className="font-medium">
-                  {getCurrency()} {fees.toFixed(2)}
-                </span>
+                <span className="font-medium">{getCurrency()} {fees.toFixed(2)}</span>
               </div>
             </div>
 
-            <Button
-              variant="outline"
+            <button
+              type="button"
+              dir={locale === "ar" ? "rtl" : "ltr"}
               onClick={() => setCoverFees(!coverFees)}
-              className={`w-full h-auto p-4 !justify-start ${
+              className={`w-full flex items-start gap-3 p-4 rounded-lg border transition-all duration-200 ${
                 coverFees
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-gray-200"
+                  ? "border-[#025EB8] bg-[#025EB8]/5"
+                  : "border-gray-200 hover:border-gray-400"
               }`}
             >
-              <div className="flex items-start text-right gap-2 ">
-                <div
-                  className={`w-5 h-5 flex justify-center items-center rounded-full border-2 flex-shrink-0 mr-3 mt-0.5 ${
-                    coverFees
-                      ? "bg-blue-500 border-blue-500"
-                      : "border-gray-300"
-                  }`}
-                >
-                  {coverFees && <Check className="w-1 h-1 text-white" />}
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">
-                    {t("yesCoverFees")}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {t("feesWillBeAdded", { amount: `${getCurrency()} ${fees.toFixed(2)}` })}
-                  </p>
-                </div>
+              <div className={`w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-full border-2 mt-0.5 transition-all duration-200 ${
+                coverFees ? "bg-[#025EB8] border-[#025EB8]" : "border-gray-300"
+              }`}>
+                {coverFees && <Check className="w-3 h-3 text-white" />}
               </div>
-            </Button>
+              <div className="flex-1 text-start">
+                <p className="font-medium text-gray-900">{t("yesCoverFees")}</p>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  {t("feesWillBeAdded", { amount: `${getCurrency()} ${fees.toFixed(2)}` })}
+                </p>
+              </div>
+            </button>
 
             <div className="flex justify-between gap-4">
               <Button variant="outline" onClick={handleBack} className="flex-1">
@@ -554,7 +658,7 @@ const DonationDialog = ({
               </Button>
               <Button
                 onClick={handleNext}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white"
               >
                 {t("next")}
               </Button>
@@ -569,7 +673,7 @@ const DonationDialog = ({
             {(campaignImage || categoryImage || isCategoryMode) && (
               <div className="relative h-48 rounded-lg overflow-hidden">
                 <img
-                  src={isCategoryMode ? (categoryImage || "/placeholder.jpg") : campaignImage}
+                  src={isCategoryMode ? (categoryImage || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg") : campaignImage}
                   alt={isCategoryMode ? categoryName : campaignTitle}
                   className="w-full h-full object-cover"
                 />
@@ -614,7 +718,7 @@ const DonationDialog = ({
               <div className="pt-4 border-t">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-gray-900">{t("total")}</span>
-                  <span className="font-bold text-blue-600 text-xl">
+                  <span className="font-bold text-[#025EB8] text-xl">
                     {getCurrency()} {totalAmount.toFixed(2)}
                   </span>
                 </div>
@@ -632,7 +736,7 @@ const DonationDialog = ({
               </Button>
               <Button
                 onClick={handleNext}
-                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white"
+                className="flex-1 py-3 bg-[#025EB8] hover:bg-[#014fa0] text-white"
               >
                 {t("next")}
               </Button>
@@ -641,11 +745,11 @@ const DonationDialog = ({
             {/* Footer Note */}
             <p className="text-xs text-center text-gray-500 mt-4">
               {t("byContinuing")}{" "}
-              <a href="#" className="text-blue-600 hover:underline">
+              <a href="#" className="text-[#025EB8] hover:underline">
                 {t("termsOfUseLink")}
               </a>{" "}
               {t("and")}{" "}
-              <a href="#" className="text-blue-600 hover:underline">
+              <a href="#" className="text-[#025EB8] hover:underline">
                 {t("privacyPolicyLink")}
               </a>
             </p>
@@ -673,7 +777,7 @@ const DonationDialog = ({
                     onClick={() => setBillingDay(day)}
                     className={`${
                       billingDay === day
-                        ? "border-blue-500 bg-blue-50 text-blue-600"
+                        ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]"
                         : ""
                     }`}
                   >
@@ -692,7 +796,7 @@ const DonationDialog = ({
                 </Button>
                 <Button
                   onClick={handleNext}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                  className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white"
                 >
                   {t("next")}
                 </Button>
@@ -717,14 +821,14 @@ const DonationDialog = ({
 
             {/* Payment Methods Section */}
             <div className="space-y-4">
-              {PAYMENT_METHODS.map((method) => (
+              {PAYMENT_METHODS.filter((m) => donationType === "MONTHLY" ? m.id === "CARD" : true).map((method) => (
                 <div
                   key={method.id}
                   onClick={() => setPaymentMethod(method.id as PaymentMethod)}
                   className={`w-full p-4 rounded-lg cursor-pointer transition-all duration-300 ${
                     paymentMethod === method.id
-                      ? "border border-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-md"
-                      : "border border-gray-200 hover:border-blue-300 hover:shadow-sm"
+                      ? "border border-[#025EB8] bg-[#025EB8]/5 shadow-md"
+                      : "border border-gray-200 hover:border-[#025EB8]/50 hover:shadow-sm"
                   }`}
                 >
                   <div className="flex items-center gap-4">
@@ -732,7 +836,7 @@ const DonationDialog = ({
                     <div
                       className={`p-3 rounded-lg ${
                         paymentMethod === method.id
-                          ? "bg-gradient-to-bl from-blue-500 to-indigo-500"
+                          ? "bg-[#025EB8]"
                           : "bg-gray-100"
                       }`}
                     >
@@ -769,7 +873,7 @@ const DonationDialog = ({
               <Button
                 onClick={handleNext}
                 disabled={!paymentMethod}
-                className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white"
+                className="flex-1 py-3 bg-[#025EB8] hover:bg-[#014fa0] text-white"
               >
                 {t("continue")}
               </Button>
@@ -780,106 +884,111 @@ const DonationDialog = ({
         return (
           <div className="space-y-6 overflow-visible">
             {paymentMethod === "CARD" ? (
-              <div className="space-y-6">
-                <div className="flex justify-center mb-6">
-                  <Cards
-                    number={cardDetails.cardNumber}
-                    expiry={cardDetails.expiryDate.replace("/", "")}
-                    cvc={cardDetails.cvv}
-                    name={cardDetails.cardholderName}
-                    focused={focus as "name" | "number" | "expiry" | "cvc"}
-                  />
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {t("cardNumber")}
-                    </label>
-                    <Input
-                      type="text"
-                      maxLength={16}
-                      value={cardDetails.cardNumber}
-                      onChange={(e) =>
-                        setCardDetails({
-                          ...cardDetails,
-                          cardNumber: e.target.value.replace(/\D/g, ""),
-                        })
-                      }
-                      onFocus={() => setFocus("number")}
-                      placeholder={t("cardNumberPlaceholder")}
-                      className="text-lg"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {t("cardholderName")}
-                    </label>
-                    <Input
-                      type="text"
-                      value={cardDetails.cardholderName}
-                      onChange={(e) =>
-                        setCardDetails({
-                          ...cardDetails,
-                          cardholderName: e.target.value.toUpperCase(),
-                        })
-                      }
-                      onFocus={() => setFocus("name")}
-                      placeholder={t("cardholderNamePlaceholder")}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        {t("expiryDate")}
-                      </label>
-                      <Input
-                        type="text"
-                        maxLength={5}
-                        value={cardDetails.expiryDate}
-                        onChange={(e) => {
-                          let value = e.target.value.replace(/\D/g, "");
-                          if (value.length > 2) {
-                            value = value.slice(0, 2) + "/" + value.slice(2);
-                          }
-                          setCardDetails({
-                            ...cardDetails,
-                            expiryDate: value,
-                          });
-                        }}
-                        onFocus={() => setFocus("expiry")}
-                        placeholder={t("expiryDatePlaceholder")}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        {t("securityCode")}
-                      </label>
-                      <Input
-                        type="text"
-                        maxLength={3}
-                        value={cardDetails.cvv}
-                        onChange={(e) =>
-                          setCardDetails({
-                            ...cardDetails,
-                            cvv: e.target.value.replace(/\D/g, ""),
-                          })
-                        }
-                        onFocus={() => setFocus("cvc")}
-                        placeholder={t("securityCodePlaceholder")}
-                      />
-                    </div>
-                  </div>
-                </div>
+              <div className="text-center space-y-3">
+                <p className="text-gray-900 font-semibold">{t("bankCard")}</p>
+                <p className="text-sm text-gray-600">
+                  {donationType === "MONTHLY"
+                    ? "You will be redirected to Stripe’s secure payment page to set up your monthly donation."
+                    : use3D
+                    ? "أدخل بيانات بطاقتك أدناه. ستُعالَج عملية الدفع عبر بروتوكول 3D Secure الآمن."
+                    : "You will be redirected to Stripe’s secure payment page to complete your donation."}
+                </p>
               </div>
             ) : (
               <div className="text-center">
                 <p className="text-gray-600">
                   {t("paypalRedirect")}
                 </p>
+              </div>
+            )}
+
+            {/* 3D Secure toggle — only for one-time card payments */}
+            {donationType === "ONE_TIME" && paymentMethod === "CARD" && (
+              <button
+                type="button"
+                onClick={() => setUse3D(!use3D)}
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded border text-xs transition-all duration-200 ${
+                  use3D ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]" : "border-gray-200 text-gray-500 hover:border-gray-400"
+                }`}
+              >
+                <div className={`w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center rounded border transition-all duration-200 ${use3D ? "bg-[#025EB8] border-[#025EB8]" : "border-gray-300 bg-white"}`}>
+                  {use3D && <Check className="w-2 h-2 text-white" />}
+                </div>
+                <span className="font-medium">3D Secure (Ziraat Sanal POS)</span>
+                <span className="text-gray-400 ms-auto">{use3D ? "✓ مُفعَّل" : "Stripe 2D"}</span>
+              </button>
+            )}
+
+            {/* Card details form — shown for ONE_TIME + CARD + 3D */}
+            {donationType === "ONE_TIME" && paymentMethod === "CARD" && use3D && (
+              <div className="space-y-4" dir="ltr">
+                <div className="flex justify-center">
+                  <Cards
+                    number={cardDetails.cardNumber}
+                    expiry={cardDetails.expiryDate.replace("/", "")}
+                    cvc={cardDetails.cvv}
+                    name={cardDetails.cardholderName}
+                    focused={cardFocus as "name" | "number" | "expiry" | "cvc"}
+                  />
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">رقم البطاقة</label>
+                    <Input
+                      value={cardDetails.cardNumber}
+                      onChange={(e) => setCardDetails({ ...cardDetails, cardNumber: e.target.value.replace(/\D/g, "").slice(0, 16) })}
+                      onFocus={() => setCardFocus("number")}
+                      placeholder="0000 0000 0000 0000"
+                      maxLength={16}
+                      inputMode="numeric"
+                      autoComplete="cc-number"
+                      className="font-mono tracking-widest"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">اسم حامل البطاقة</label>
+                    <Input
+                      value={cardDetails.cardholderName}
+                      onChange={(e) => setCardDetails({ ...cardDetails, cardholderName: e.target.value.toUpperCase() })}
+                      onFocus={() => setCardFocus("name")}
+                      placeholder="JOHN DOE"
+                      autoComplete="cc-name"
+                      className="uppercase"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">تاريخ الانتهاء</label>
+                      <Input
+                        value={cardDetails.expiryDate}
+                        onChange={(e) => {
+                          let v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                          if (v.length >= 3) v = v.slice(0, 2) + "/" + v.slice(2);
+                          setCardDetails({ ...cardDetails, expiryDate: v });
+                        }}
+                        onFocus={() => setCardFocus("expiry")}
+                        placeholder="MM/YY"
+                        maxLength={5}
+                        inputMode="numeric"
+                        autoComplete="cc-exp"
+                        className="font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">CVV</label>
+                      <Input
+                        value={cardDetails.cvv}
+                        onChange={(e) => setCardDetails({ ...cardDetails, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+                        onFocus={() => setCardFocus("cvc")}
+                        placeholder="•••"
+                        maxLength={4}
+                        inputMode="numeric"
+                        autoComplete="cc-csc"
+                        className="font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -909,9 +1018,14 @@ const DonationDialog = ({
   disabled={
     loading ||
     !isPhoneValid() ||
-    (paymentMethod === "CARD" && !isCardDetailsValid())
+    (donationType === "ONE_TIME" && paymentMethod === "CARD" && use3D && (
+      cardDetails.cardNumber.length < 13 ||
+      cardDetails.expiryDate.length < 5 ||
+      cardDetails.cvv.length < 3 ||
+      !cardDetails.cardholderName.trim()
+    ))
   }
-  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
+  className="flex-1 bg-[#FA5D17] hover:bg-[#e04d0f] text-white flex items-center justify-center gap-2"
 >
   {loading ? (
     <Loader2 className="h-4 w-4 animate-spin" />
@@ -920,6 +1034,10 @@ const DonationDialog = ({
   )}
 </Button>
 
+            </div>
+            <div className="flex items-center justify-center gap-2 pt-2 text-gray-400 text-[11px]">
+              <svg className="w-3.5 h-3.5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+              <span>256-bit SSL encrypted · Secure payment</span>
             </div>
           </div>
         );
@@ -939,14 +1057,17 @@ const DonationDialog = ({
           country: phoneCountry || undefined,
         });
       }
-      const amountUSD = await useConvetToUSD(donationAmount, getCurrency());
+      const amountUSD =
+        shareMode && sharePriceUSD != null
+          ? shareCount * sharePriceUSD
+          : await useConvetToUSD(donationAmount, getCurrency());
       const donationData: Record<string, unknown> = {
         currency: getCurrency(),
         teamSupport,
         coverFees,
         type: donationType,
         paymentMethod,
-        cardDetails: paymentMethod === "CARD" ? cardDetails : null,
+        cardDetails: null,
         billingDay: donationType === "MONTHLY" ? billingDay : null,
         locale,
       };
@@ -958,16 +1079,168 @@ const DonationDialog = ({
         ];
       } else if (campaignId) {
         donationData.items = [
-          { campaignId, amount: donationAmount, amountUSD },
+          {
+            campaignId,
+            amount: donationAmount,
+            amountUSD,
+            ...(shareMode ? { shareCount } : {}),
+          },
         ];
       }
 
       const response = await axios.post("/api/donations", donationData);
 
       if (response.data.success) {
+        const donationId = response.data.donation.id as string;
+
+        // Monthly donations: always use Stripe
+        if (donationType === "MONTHLY") {
+          isRedirecting = true;
+          setRedirecting(true);
+          const stripeRes = await axios.post("/api/stripe/checkout", { donationId, locale });
+          window.location.href = stripeRes.data.url;
+          return;
+        }
+
+        if (paymentMethod === "CARD") {
+          isRedirecting = true;
+          setRedirecting(true);
+
+          if (use3D) {
+            // 3D Secure via Ziraat Sanal POS (PayFor)
+            const init = await axios.post("/api/payfor/3dpay/initiate", {
+              donationId,
+              locale,
+            });
+
+            const { actionUrl, fields } = init.data as {
+              actionUrl: string;
+              fields: Record<string, string>;
+            };
+
+            // Build the POST form
+            const form = document.createElement("form");
+            form.method = "POST";
+            form.action = actionUrl;
+            Object.entries(fields).forEach(([name, value]) => {
+              const input = document.createElement("input");
+              input.type = "hidden";
+              input.name = name;
+              input.value = String(value ?? "");
+              form.appendChild(input);
+            });
+
+            // Card data goes directly browser → bank (never touches our server)
+            // Ziraat Katılım PayFor field names:
+            const cardFields: Record<string, string> = {
+              CardNumber: cardDetails.cardNumber,
+              ExpiryDate: cardDetails.expiryDate.replace("/", ""), // "05/28" → "0528" (MMYY)
+              Cvv2: cardDetails.cvv,
+              CardholderName: cardDetails.cardholderName,
+            };
+            Object.entries(cardFields).forEach(([name, value]) => {
+              const input = document.createElement("input");
+              input.type = "hidden";
+              input.name = name;
+              input.value = value;
+              form.appendChild(input);
+            });
+
+            // Try to open a popup so our page keeps running (enables polling + auto-fallback)
+            const pw = 600, ph = 700;
+            const pl = Math.round((screen.width - pw) / 2);
+            const pt = Math.round((screen.height - ph) / 2);
+            const popup = window.open(
+              "about:blank",
+              "payfor3d",
+              `width=${pw},height=${ph},left=${pl},top=${pt},scrollbars=yes,resizable=yes`
+            );
+
+            form.target = popup ? "payfor3d" : "_self";
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
+
+            if (!popup) {
+              // Popup blocked — browser navigated away; nothing more to do here
+              return;
+            }
+
+            payforPopupRef.current = popup;
+            isRedirecting = true;
+            setRedirecting(true);
+
+            // Helper: close popup, show "switching" message, redirect to Stripe
+            const fallbackToStripe = async () => {
+              if (payforPollRef.current) {
+                clearInterval(payforPollRef.current);
+                payforPollRef.current = null;
+              }
+              if (payforPopupRef.current && !payforPopupRef.current.closed) {
+                payforPopupRef.current.close();
+              }
+              setPayforSwitching(true);
+              try {
+                const res = await axios.post("/api/stripe/fallback", { donationId, locale });
+                window.location.href = res.data.url;
+              } catch {
+                window.location.href = `/${locale}/campaigns?payment=failed&donationId=${encodeURIComponent(donationId)}`;
+              }
+            };
+
+            // Poll donation status every 2 s; auto-fallback after ~50 s of PENDING
+            let polls = 0;
+            const FALLBACK_AFTER_POLLS = 25; // 50 seconds
+
+            payforPollRef.current = setInterval(async () => {
+              polls++;
+              try {
+                const res = await fetch(`/api/donations/${donationId}`);
+                if (!res.ok) return;
+                const data = await res.json();
+
+                if (data.status === "PAID") {
+                  clearInterval(payforPollRef.current!);
+                  payforPollRef.current = null;
+                  if (payforPopupRef.current && !payforPopupRef.current.closed) {
+                    payforPopupRef.current.close();
+                  }
+                  router.push(`/${locale}/success/${donationId}`);
+                  return;
+                }
+
+                if (data.status === "FAILED") {
+                  await fallbackToStripe();
+                  return;
+                }
+
+                // Popup closed by user or stuck on bank error page
+                if (payforPopupRef.current?.closed) {
+                  await fallbackToStripe();
+                  return;
+                }
+
+                // Timeout — bank never responded (e.g. 500 error page)
+                if (polls >= FALLBACK_AFTER_POLLS) {
+                  await fallbackToStripe();
+                }
+              } catch {
+                // Ignore transient errors, keep polling
+              }
+            }, 2000);
+
+            return;
+          } else {
+            // 2D via Stripe
+            const stripeRes = await axios.post("/api/stripe/checkout", { donationId, locale });
+            window.location.href = stripeRes.data.url;
+          }
+          return;
+        }
+
         isRedirecting = true;
         setRedirecting(true);
-        router.push(`/success/${response.data.donation.id}`);
+        router.push(`/success/${donationId}`);
         return;
       }
       onClose();
@@ -980,27 +1253,42 @@ const DonationDialog = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-visible p-0" aria-describedby={undefined}>
+    <Dialog open={isOpen} onOpenChange={() => {
+      // Clean up PayFor polling if dialog is closed mid-flow
+      if (payforPollRef.current) {
+        clearInterval(payforPollRef.current);
+        payforPollRef.current = null;
+      }
+      if (payforPopupRef.current && !payforPopupRef.current.closed) {
+        payforPopupRef.current.close();
+      }
+      onClose();
+    }}>
+      <DialogContent className="w-full h-full sm:h-auto sm:max-w-lg sm:max-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden p-0 rounded-none sm:rounded-lg top-0 sm:top-[50%] translate-y-0 sm:translate-y-[-50%]" aria-describedby={undefined}>
         <DialogTitle className="sr-only">{t("donationAmount")}</DialogTitle>
         {mounted && (
           <>
-            <div className="p-6 pb-0">
-              {donationType && (
-                <>
-                  {/* {renderStepIndicator()}
-                    <div className="text-center mb-6">
-                      <h2 className="text-xl font-bold text-gray-900">
-                        {getSteps()[currentStep].title}
-                      </h2>
-                      <p className="text-gray-600 text-sm mt-1">
-                        {getSteps()[currentStep].subtitle}
-                      </p>
-                    </div> */}
-                </>
-              )}
+            {/* Branded header */}
+            <div className="relative h-28 overflow-hidden rounded-t-lg">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={isCategoryMode ? (categoryImage || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg") : (campaignImage || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg")}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-[#025EB8]/80" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
+                <p className="text-white/70 text-[11px] font-semibold uppercase tracking-wider mb-1">
+                  {donationType === "MONTHLY" ? t("monthlyDonation") : t("oneTimeDonation")}
+                </p>
+                <h2 className="text-white font-bold text-base line-clamp-2 leading-snug">
+                  {isCategoryMode ? categoryName : campaignTitle}
+                </h2>
+              </div>
             </div>
-            <div className="relative z-10 p-6 pt-0 bg-white overflow-visible">
+            {/* Step progress bar */}
+            {donationType && renderStepIndicator()}
+            <div className="relative z-10 px-6 pb-6 bg-white overflow-visible">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={redirecting ? "redirecting" : currentStep}
@@ -1011,17 +1299,29 @@ const DonationDialog = ({
                   transition={{ duration: 0.2 }}
                 >
                   {redirecting ? (
-                    <div className="flex flex-col items-center justify-center py-10 gap-4 text-center">
-                      <CheckCircle2 className="h-16 w-16 text-green-500" />
+                    <div className="flex flex-col items-center justify-center py-10 gap-5 text-center">
+                      <div className="relative">
+                        <div className={`w-20 h-20 rounded-full flex items-center justify-center transition-colors ${payforSwitching ? "bg-[#635bff]/10" : "bg-[#025EB8]/8"}`}>
+                          <CardIcon className={`h-9 w-9 transition-colors ${payforSwitching ? "text-[#635bff]" : "text-[#025EB8]"}`} />
+                        </div>
+                        <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-white border-2 border-[#025EB8]/20 rounded-full flex items-center justify-center">
+                          <ExternalLink className="h-3 w-3 text-[#025EB8]" />
+                        </span>
+                      </div>
                       <div>
-                        <p className="text-lg font-semibold text-gray-900">
-                          {t("successRedirecting")}
+                        <p className="text-base font-semibold text-gray-900">
+                          {payforSwitching ? "جارٍ التحويل إلى Stripe…" : t("successRedirecting")}
                         </p>
-                        <p className="text-sm text-gray-500 mt-1">
-                          {t("successRedirectingDesc")}
+                        <p className="text-sm text-gray-400 mt-1 max-w-xs mx-auto">
+                          {payforSwitching
+                            ? "حدث خطأ في بوابة الدفع، سيتم توجيهك تلقائياً لإتمام الدفع عبر Stripe"
+                            : t("successRedirectingDesc")}
                         </p>
                       </div>
-                      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                      <div className={`flex items-center gap-2 text-xs px-4 py-2 rounded-full transition-colors ${payforSwitching ? "text-[#635bff] bg-[#635bff]/8" : "text-[#025EB8] bg-[#025EB8]/6"}`}>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>{payforSwitching ? "جارٍ التحويل…" : "جارٍ الاتصال بالبوابة…"}</span>
+                      </div>
                     </div>
                   ) : (
                     getStepContent()

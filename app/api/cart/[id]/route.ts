@@ -2,17 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, "revenue");
+    if (denied) return denied;
 
     const cartItem = await prisma.cartItem.findUnique({
       where: { id },
+      include: { campaign: { select: { title: true } } },
     });
     if (!cartItem) {
       return NextResponse.json(
@@ -25,8 +27,20 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       where: { id },
     });
 
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      stream: "TEAM",
+      action: "CART_ITEM_DELETE_ADMIN",
+      messageAr: `${actor.actorName ?? "مسؤول"} حذف عنصرًا من سلة مستخدم («${cartItem.campaign?.title ?? cartItem.campaignId}»، مبلغ: ${cartItem.amount})`,
+      entityType: "CartItem",
+      entityId: id,
+      metadata: { userId: cartItem.userId, campaignId: cartItem.campaignId },
+    });
+
     const remainingCartItems = await prisma.cartItem.findMany({
-      include: { campaign: true },
+      where: { userId: cartItem.userId },
+      include: { campaign: { select: { id: true, title: true, images: true } } },
     });
 
     return NextResponse.json(

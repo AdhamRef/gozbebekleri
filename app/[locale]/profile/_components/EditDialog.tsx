@@ -1,57 +1,141 @@
 "use client";
-import React, { useEffect, useState } from 'react';
-import { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@radix-ui/react-dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Edit2 } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import React, { useEffect, useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Edit2, Loader2, LucideIcon } from "lucide-react";
+import { useTranslations, useLocale } from "next-intl";
 
-const EditDialog = ({ title, value, onSave, type = "text", icon: Icon }) => {
-    const t = useTranslations('Profile.editDialog');
-    const [newValue, setNewValue] = useState(value);
-    const [isOpen, setIsOpen] = useState(false);
-  
-    const handleSave = async () => {
+interface EditDialogProps {
+  title: string;
+  value: string;
+  onSave: (value: string) => Promise<void>;
+  type?: string;
+  icon?: LucideIcon;
+}
+
+const EditDialog = ({ title, value, onSave, type = "text", icon: Icon }: EditDialogProps) => {
+  const t = useTranslations("Profile.editDialog");
+  const locale = useLocale();
+  const isRTL = locale === "ar";
+
+  const [newValue, setNewValue] = useState(value);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setNewValue(value);
+  }, [value]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
       await onSave(newValue);
       setIsOpen(false);
-    };
-  
-    useEffect(() => {
-      setNewValue(value);
-    }, [value]);
-  
-    return (
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") handleSave();
+  };
+
+  return (
+    <>
+      {/* Row trigger */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(true)}
+        dir={isRTL ? "rtl" : "ltr"}
+        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors group"
+      >
+        {/* Icon */}
+        {Icon && (
+          <div className="w-8 h-8 rounded-lg bg-[#025EB8]/8 flex items-center justify-center flex-shrink-0">
+            <Icon className="w-4 h-4 text-[#025EB8]" />
+          </div>
+        )}
+
+        {/* Label + value */}
+        <div className="flex-1 min-w-0 text-start">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide leading-none mb-0.5">
+            {title}
+          </p>
+          <p className="text-sm font-medium text-gray-900 truncate">
+            {value || (
+              <span className="text-gray-400 italic">{t("notSpecified")}</span>
+            )}
+          </p>
+        </div>
+
+        {/* Edit pencil */}
+        <Edit2 className="w-3.5 h-3.5 text-gray-300 group-hover:text-[#025EB8] flex-shrink-0 transition-colors" />
+      </button>
+
+      {/* Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogTrigger asChild>
-          <button className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-lg">
+        <DialogContent
+          dir={isRTL ? "rtl" : "ltr"}
+          className="sm:max-w-md rounded-2xl px-0 overflow-hidden"
+        >
+          {/* Dialog header */}
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-100">
             <div className="flex items-center gap-3">
-              {Icon && <Icon className="w-8 h-8 text-sky-700" />}
-              <div className="flex-1 flex flex-col gap-[2px] text-right">
-                <p className="text-gray-500 text-sm">{title}</p>
-                <p className="text-gray-900 text-[14px]">{newValue || t("notSpecified")}</p>
-              </div>
+              {Icon && (
+                <div className="w-9 h-9 rounded-xl bg-[#025EB8]/10 flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-4.5 h-4.5 text-[#025EB8]" />
+                </div>
+              )}
+              <DialogTitle className="text-base font-semibold text-gray-900 text-start">
+                {t("editTitle", { title })}
+              </DialogTitle>
             </div>
-            <Edit2 className="w-4 h-4 text-gray-400" />
-          </button>
-        </DialogTrigger>
-        <DialogContent>
-        
-            <DialogTitle>{t("editTitle", { title })}</DialogTitle>
-       
-          <div className="space-y-4 py-4">
+          </DialogHeader>
+
+          {/* Dialog body */}
+          <div className="px-6 pb-5 space-y-4">
             <Input
               type={type}
               value={newValue || ""}
               onChange={(e) => setNewValue(e.target.value)}
+              onKeyDown={handleKeyDown}
               placeholder={t("enterPlaceholder", { title })}
+              dir={isRTL ? "rtl" : "ltr"}
+              className="h-11 rounded-lg border-gray-200 focus:border-[#025EB8] focus:ring-[#025EB8]/20 text-start"
+              autoFocus
             />
-            <Button onClick={handleSave} className="w-full">
-              {t("saveChanges")}
-            </Button>
+
+            <div className="flex gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="flex-1 h-10 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                {t("cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving}
+                className="flex-1 h-10 rounded-lg bg-[#025EB8] hover:bg-[#014fa0] text-white text-sm font-semibold transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {isSaving ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  t("saveChanges")
+                )}
+              </button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
-    );
-  };
+    </>
+  );
+};
 
 export default EditDialog;

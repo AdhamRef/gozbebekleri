@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from "../../auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 
 // GET: localized categories with optional campaigns (limited per-category), cursor pagination
 export async function GET(request: NextRequest) {
@@ -101,9 +103,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized - Only admins can create categories' }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, 'categories');
+    if (denied) return denied;
 
     const data = await request.json();
     const { name, description, image, icon, order, translations } = data;
@@ -139,6 +140,15 @@ export async function POST(request: NextRequest) {
     });
 
     const full = await prisma.category.findUnique({ where: { id: category.id }, select: { id: true, name: true, description: true, image: true, icon: true, order: true, translations: { select: { locale: true, name: true, description: true } } } });
+
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "CATEGORY_CREATE",
+      messageAr: `${actor.actorName ?? "مسؤول"} أنشأ قسمًا (من الواجهة التفصيلية): ${full?.name ?? name}`,
+      entityType: "Category",
+      entityId: category.id,
+    });
 
     return NextResponse.json(full, { status: 201 });
 

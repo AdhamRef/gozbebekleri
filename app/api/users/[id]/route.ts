@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/options';
+import {
+  sanitizeDashboardPermissions,
+  userCanViewUserProfilesInDashboard,
+} from '@/lib/dashboard/permissions';
+import { requireAdminSession } from '@/lib/dashboard/api-auth';
+import { writeAuditLog } from '@/lib/audit-log';
+
+function roleLabelAr(r: string) {
+  if (r === 'ADMIN') return 'مدير';
+  if (r === 'STAFF') return 'طاقم';
+  return 'متبرع';
+}
 
 // GET /api/users/[id] - Get user by ID
 export async function GET(
@@ -18,12 +30,11 @@ export async function GET(
       );
     }
 
-    // Only allow users to view their own profile or admins to view any profile
-    if (session.user.role !== 'ADMIN' && session.user.id !== id) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      );
+    const canViewOthers =
+      session.user.role === 'ADMIN' ||
+      userCanViewUserProfilesInDashboard(session.user);
+    if (!canViewOthers && session.user.id !== id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const user = await prisma.user.findUnique({
@@ -31,7 +42,14 @@ export async function GET(
       include: {
         donations: {
           include: {
-            subscription: { select: { status: true } },
+            subscription: {
+              select: {
+                id: true,
+                status: true,
+                billingDay: true,
+                nextBillingDate: true,
+              },
+            },
             items: {
               include: {
                 campaign: {
@@ -59,11 +77,16 @@ export async function GET(
     const oneTimeDonations = user.donations.filter((d) => d.subscriptionId == null);
     const monthlyDonations = user.donations.filter((d) => d.subscriptionId != null);
 
-    const withType = (d: typeof user.donations[0], type: 'ONE_TIME' | 'MONTHLY') => ({
-      ...d,
-      type,
-      status: type === 'MONTHLY' ? (d.subscription?.status ?? null) : null,
-    });
+    const withType = (d: typeof user.donations[0], type: 'ONE_TIME' | 'MONTHLY') => {
+      const sub = d.subscription;
+      return {
+        ...d,
+        type,
+        status: type === 'MONTHLY' ? (sub?.status ?? null) : null,
+        billingDay: type === 'MONTHLY' ? (sub?.billingDay ?? null) : null,
+        nextBillingDate: type === 'MONTHLY' ? (sub?.nextBillingDate ?? null) : null,
+      };
+    };
 
     const donationsForUser = [
       ...oneTimeDonations.map((d) => withType(d, 'ONE_TIME')),
@@ -99,26 +122,48 @@ export async function PUT(
       );
     }
 
-    // Only allow users to update their own profile or admins to update any profile
-    if (session.user.role !== 'ADMIN' && session.user.id !== id) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      );
-    }
-
     const body = await request.json();
-    const { name, email, country, phone, birthdate, role, preferredLang } = body;
+    const {
+      name,
+      email,
+      country,
+      phone,
+      birthdate,
+      role,
+      preferredLang,
+      dashboardPermissions: rawDashboardPermissions,
+    } = body;
 
-    // Only admins can change roles
-    if (role && session.user.role !== 'ADMIN') {
+    const isSelf = session.user.id === id;
+    const wantsAuthorityChange =
+      role !== undefined || rawDashboardPermissions !== undefined;
+
+    const existing = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        role: true,
+        dashboardPermissions: true,
+        name: true,
+        email: true,
+      },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const isAdmin = session.user.role === 'ADMIN';
+
+    if (!isSelf && !isAdmin) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    if (wantsAuthorityChange && !isAdmin) {
       return NextResponse.json(
-        { error: 'Only admins can change user roles' },
+        { error: 'Only admins can change roles or dashboard access' },
         { status: 403 }
       );
     }
 
-    // Check if email is being changed and already exists
     if (email) {
       const existingUser = await prisma.user.findFirst({
         where: {
@@ -137,6 +182,51 @@ export async function PUT(
       }
     }
 
+    let nextDashboardPermissions: string[] | undefined;
+
+    if (
+      isAdmin &&
+      (role !== undefined || rawDashboardPermissions !== undefined)
+    ) {
+      const effectiveRole = role ?? existing.role;
+
+      if (role !== undefined) {
+        if (role === 'STAFF') {
+          nextDashboardPermissions =
+            rawDashboardPermissions !== undefined
+              ? sanitizeDashboardPermissions(rawDashboardPermissions)
+              : (existing.dashboardPermissions ?? []);
+          if (nextDashboardPermissions.length === 0) {
+            return NextResponse.json(
+              {
+                error:
+                  'Staff members need at least one dashboard section enabled',
+              },
+              { status: 400 }
+            );
+          }
+        } else {
+          nextDashboardPermissions = [];
+        }
+      } else if (
+        rawDashboardPermissions !== undefined &&
+        effectiveRole === 'STAFF'
+      ) {
+        nextDashboardPermissions = sanitizeDashboardPermissions(
+          rawDashboardPermissions
+        );
+        if (nextDashboardPermissions.length === 0) {
+          return NextResponse.json(
+            {
+              error:
+                'Staff members need at least one dashboard section enabled',
+            },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id },
       data: {
@@ -145,10 +235,35 @@ export async function PUT(
         ...(country !== undefined && { country }),
         ...(phone !== undefined && { phone }),
         ...(birthdate !== undefined && { birthdate }),
-        ...(role && { role }),
-        ...(preferredLang !== undefined && { preferredLang: preferredLang === '' ? null : preferredLang }),
+        ...(role !== undefined && { role }),
+        ...(preferredLang !== undefined && {
+          preferredLang: preferredLang === '' ? null : preferredLang,
+        }),
+        ...(nextDashboardPermissions !== undefined && {
+          dashboardPermissions: nextDashboardPermissions,
+        }),
       },
     });
+
+    if (isAdmin && wantsAuthorityChange) {
+      const actor = session.user;
+      const targetName = existing.name ?? existing.email ?? id;
+      const newR = role ?? existing.role;
+      await writeAuditLog({
+        actorId: actor.id,
+        actorName: actor.name,
+        actorRole: actor.role ?? 'ADMIN',
+        action: 'USER_AUTHORITY_UPDATE',
+        messageAr: `${actor.name ?? 'مدير'} عدّل صلاحيات ${targetName}: الدور ${roleLabelAr(newR)}`,
+        messageEn: `${actor.name ?? 'Admin'} updated authority for ${targetName} → ${newR}`,
+        entityType: 'User',
+        entityId: id,
+        metadata: {
+          role: newR,
+          dashboardPermissions: updatedUser.dashboardPermissions,
+        },
+      });
+    }
 
     return NextResponse.json(updatedUser);
   } catch (error) {
@@ -168,17 +283,12 @@ export async function DELETE(
   try {
     const { id } = await params;
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const adminDenied = requireAdminSession(session);
+    if (adminDenied) return adminDenied;
 
-    // Check if user exists
     const user = await prisma.user.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, name: true, email: true },
     });
 
     if (!user) {
@@ -194,6 +304,18 @@ export async function DELETE(
       await tx.user.delete({ where: { id } });
     });
 
+    const actor = session!.user;
+    await writeAuditLog({
+      actorId: actor.id,
+      actorName: actor.name,
+      actorRole: actor.role ?? 'ADMIN',
+      action: 'USER_DELETE',
+      messageAr: `${actor.name ?? 'مدير'} حذف المستخدم ${user.name ?? user.email ?? id}`,
+      messageEn: `${actor.name ?? 'Admin'} deleted user ${user.email}`,
+      entityType: 'User',
+      entityId: id,
+    });
+
     return NextResponse.json(
       { message: 'User, donations and subscriptions deleted successfully' },
       { status: 200 }
@@ -205,4 +327,4 @@ export async function DELETE(
       { status: 500 }
     );
   }
-} 
+}

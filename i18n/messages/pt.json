@@ -21,7 +21,11 @@
     "noCategories": "Sem categorias",
     "myProfile": "Meu perfil",
     "myDonations": "Minhas doações",
-    "signOut": "Sair"
+    "signOut": "Sair",
+    "activities": "Atividades",
+    "searchPlaceholder": "Pesquisar...",
+    "donate": "DOAR AGORA",
+    "signIn": "Entrar"
   },
   "HomePage": {
     "donationCategories": "Categorias de doação",
@@ -38,7 +42,16 @@
     "faq4Question": "Posso ser voluntário à distância?",
     "faq4Answer": "Sim! Temos oportunidades de voluntariado digital, incluindo gestão de conteúdo, design gráfico, marketing digital e comunicação com as partes de apoio.",
     "faq5Question": "Como posso sugerir a minha própria iniciativa?",
-    "faq5Answer": "Se tiver uma ideia de projeto humanitário, a equipa gozbebekleri pode ajudá-lo a implementá-la, fornecendo recursos e apoio logístico."
+    "faq5Answer": "Se tiver uma ideia de projeto humanitário, a equipa gozbebekleri pode ajudá-lo a implementá-la, fornecendo recursos e apoio logístico.",
+    "featuredProjects": "PROJETOS EM DESTAQUE",
+    "currentProjects": "Projetos Atuais",
+    "viewAll": "Ver Tudo",
+    "weHelp": "AJUDAMOS",
+    "latestNews": "ÚLTIMAS NOTÍCIAS",
+    "stat1Label": "Beneficiários",
+    "stat2Label": "Voluntários",
+    "stat3Label": "Projetos Concluídos",
+    "stat4Label": "Parceiros"
   },
   "HeroSlider": {
     "quickDonate": "Doação rápida"
@@ -48,7 +61,9 @@
     "viewAll": "Ver tudo",
     "donations": "angariado",
     "remaining": "restante",
-    "contributor": "contribuidor"
+    "contributor": "contribuidor",
+    "openGoal": "Meta aberta",
+    "sharesMode": "Cotas — {currency}{price} cada"
   },
   "QuickDonate": {
     "associationName": "Associação de Socorro e Solidariedade Qurrat Al-Ayun",
@@ -144,13 +159,19 @@
     "successTitle": "A sua mensagem foi enviada com sucesso!",
     "successMessage": "Obrigado por nos contactar, responderemos em breve",
     "requiredFields": "Por favor, preencha todos os campos obrigatórios",
-    "ourLocation": "A nossa localização"
+    "ourLocation": "A nossa localização",
+    "subtitle": "Estamos aqui para ajudar",
+    "name": "Nome Completo",
+    "message": "Mensagem",
+    "messageType": "Assunto",
+    "submit": "Enviar",
+    "errorOccurred": "Ocorreu um erro. Por favor, tente novamente."
   },
   "Blog": {
     "metaTitleSuffix": " - Qurrat Al-Ayun",
     "sharePost": "Partilhar artigo",
     "similarPosts": "Artigos semelhantes",
-    "relatedCampaign": "Campanha relacionada",
+    "relatedCampaign": "Campanhas relacionadas",
     "viewCampaign": "Ver campanha",
     "donateNow": "Doar agora",
     "campaignDonations": "doações",
@@ -177,7 +198,10 @@
     "retry": "Tentar novamente",
     "noResults": "Nenhum resultado encontrado para a sua pesquisa",
     "tryDifferentSearch": "Tente usar outros termos de pesquisa",
-    "checkBackLater": "Volte mais tarde para novos artigos"
+    "checkBackLater": "Volte mais tarde para novos artigos",
+    "title": "Notícias",
+    "subtitle": "Últimas notícias e atualizações",
+    "news": "NOTÍCIAS"
   },
   "CampaignsPage": {
     "browse": "Explorar",
@@ -204,7 +228,17 @@
     "noResults": "Nenhum resultado encontrado para a sua pesquisa",
     "noCampaigns": "Não há campanhas disponíveis de momento",
     "tryDifferentSearch": "Tente usar outros termos de pesquisa",
-    "checkBackLater": "Volte mais tarde para novas campanhas"
+    "checkBackLater": "Volte mais tarde para novas campanhas",
+    "projects": "NOSSOS PROJETOS",
+    "filter": "Filtrar",
+    "resetFilters": "Redefinir",
+    "donateNow": "Doar Agora",
+    "details": "Detalhes",
+    "raised": "Arrecadado",
+    "goal": "Meta",
+    "home": "Início",
+    "heroDescription": "Apoie causas significativas e faça uma diferença duradoura na vida das pessoas.",
+    "resultsFound": "campanhas encontradas"
   },
   "Campaign": {
     "story": "História",
@@ -348,8 +382,8 @@
     "processing": "A processar...",
     "donationSuccess": "Doação realizada com sucesso",
     "donationFailed": "Doação falhada",
-    "successRedirecting": "Obrigado!",
-    "successRedirectingDesc": "A redirecionar para o seu recibo...",
+    "successRedirecting": "Redirecionando para o Gateway de Pagamento",
+    "successRedirectingDesc": "Será redirecionado com segurança para concluir o pagamento.",
     "paymentFeesPercent": "Taxas de pagamento (3%)"
   },
   "DonationSuccess": {
@@ -444,7 +478,8 @@
       "notSpecified": "Não especificado",
       "editTitle": "Editar {title}",
       "enterPlaceholder": "Introduzir {title}",
-      "saveChanges": "Guardar alterações"
+      "saveChanges": "Guardar alterações",
+      "cancel": "Cancelar"
     },
     "settings": {
       "notifications": "Notificações",
@@ -465,6 +500,10 @@
     "donations": {
       "donation": "Doação",
       "totalDonations": "Total de doações",
+      "totalInPeriodTitle": "Total (este período)",
+      "recordsInPeriodLabel": "{count} registo(s) neste período",
+      "historyTableTitle": "Histórico de doações",
+      "emptyHistoryList": "Sem doações para o período selecionado.",
       "donationsCount": "{count} doação",
       "perDonation": "por doação",
       "monthlyDonations": "Doações mensais",
@@ -493,6 +532,9 @@
       "actions": "Ações"
     },
     "subscriptions": {
+      "settingsTableTitle": "Subscrições e definições",
+      "emptySubscriptionsList": "Não tem subscrições mensais.",
+      "sinceDate": "Desde",
       "activeMonthlyDonations": "Doações mensais ativas",
       "ofSubscriptions": "de {count} subscrição(ões)",
       "totalMonthlyDonations": "Total de doações mensais",
@@ -505,12 +547,14 @@
       "nextRenewal": "Próxima renovação:",
       "active": "Ativa",
       "paused": "Pausada",
+      "pause": "Pausar",
       "pauseSubscription": "Pausar",
       "resume": "Retomar",
       "billingDay": "Dia de débito",
       "manage": "Gerir",
       "manageSubscription": "Gerir subscrição",
       "cancelSubscription": "Cancelar subscrição",
+      "cancel": "Cancelar subscrição",
       "subscriptionSettings": "Definições de doação mensal",
       "cancelled": "Cancelada",
       "perMonth": "/ mês"
@@ -562,5 +606,13 @@
       "openMenu": "Abrir menu",
       "closeMenu": "Fechar menu"
     }
+  },
+  "MessageSubjects": {
+    "COMPLAINT": "Reclamação",
+    "DONATION_ISSUE": "Problema na doação",
+    "CAMPAIGN_SUPPORT": "Suporte de campanha",
+    "PARTNERSHIP": "Parceria",
+    "VOLUNTEERING": "Voluntariado",
+    "GENERAL": "Consulta geral"
   }
 }

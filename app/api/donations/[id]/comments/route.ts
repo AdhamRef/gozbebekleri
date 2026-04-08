@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../auth/[...nextauth]/options';
+import { userHasDashboardPermission } from '@/lib/dashboard/permissions';
+import {
+  writeAuditLog,
+  auditActorFromSiteSession,
+  auditStreamForRole,
+} from '@/lib/audit-log';
 
 // GET /api/donations/[id]/comments - Get comments for a donation
 export async function GET(
@@ -119,6 +125,17 @@ export async function POST(
       },
     });
 
+    const actor = auditActorFromSiteSession(session);
+    await writeAuditLog({
+      ...actor,
+      action: "DONATION_COMMENT_CREATE",
+      messageAr: `${actor.actorName ?? "متبرع"} أضاف تعليقًا على تبرعه`,
+      entityType: "Comment",
+      entityId: comment.id,
+      metadata: { donationId: id },
+      stream: auditStreamForRole(actor.actorRole),
+    });
+
     return NextResponse.json(comment);
   } catch (error) {
     console.error('Error creating comment:', error);
@@ -166,11 +183,8 @@ export async function DELETE(
       );
     }
 
-    // Check if user has permission to delete this comment
-    if (
-      session.user.role !== 'ADMIN' &&
-      session.user.id !== comment.donorId
-    ) {
+    const canModerate = userHasDashboardPermission(session.user, 'revenue');
+    if (!canModerate && session.user.id !== comment.donorId) {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403 }
@@ -180,6 +194,20 @@ export async function DELETE(
     // Delete comment
     await prisma.comment.delete({
       where: { id: commentId },
+    });
+
+    const actor = auditActorFromSiteSession(session);
+    const stream = canModerate ? ("TEAM" as const) : auditStreamForRole(actor.actorRole);
+    await writeAuditLog({
+      ...actor,
+      action: "DONATION_COMMENT_DELETE",
+      messageAr: canModerate
+        ? `${actor.actorName ?? "مسؤول"} حذف تعليقًا على تبرع (إشراف)`
+        : `${actor.actorName ?? "متبرع"} حذف تعليقه على تبرعه`,
+      entityType: "Comment",
+      entityId: commentId,
+      metadata: { donationId: comment.donationId },
+      stream,
     });
 
     return NextResponse.json(

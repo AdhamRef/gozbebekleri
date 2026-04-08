@@ -15,6 +15,12 @@ import { ar as dateAr } from "date-fns/locale";
 import Link from "next/link";
 import ShareButton from "./_components/ShareButton";
 import BlogPostContent from "./_components/BlogPostContent";
+import {
+  computeCampaignProgressPercent,
+  normalizeGoalType,
+  FUNDRAISING_SHARES,
+  GOAL_TYPE_OPEN,
+} from "@/lib/campaign/campaign-modes";
 
 interface BlogPostProps {
   params: Promise<{ locale: string; postId: string }>;
@@ -130,11 +136,9 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
                   <CardTitle className="text-3xl font-bold leading-tight">{localizedTitle}</CardTitle>
                 </CardHeader>
 
-                {post?.image && (
-                  <div className="relative w-full aspect-video overflow-hidden">
-                    <Image src={post.image} alt={localizedTitle || "Post Image"} fill sizes="(max-width: 768px) 100vw, 66vw" className="object-cover" />
-                  </div>
-                )}
+                <div className="relative w-full aspect-video overflow-hidden">
+                  <Image src={post?.image || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"} alt={localizedTitle || "Post Image"} fill sizes="(max-width: 768px) 100vw, 66vw" className="object-cover" />
+                </div>
 
                 <CardContent className="p-6">
                   {localizedDescription && <p className="lead text-muted-foreground">{localizedDescription}</p>}
@@ -149,54 +153,97 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
             </div>
 
             <aside className="flex flex-col gap-4 sticky top-[6.5rem] self-start">
-              {post.campaign && (() => {
-                const camp = post.campaign as { id: string; title: string; currentAmount: number; targetAmount: number; images?: string[] };
-                const progress = camp.targetAmount > 0 ? Math.min(100, (camp.currentAmount / camp.targetAmount) * 100) : 0;
-                const remaining = Math.max(0, camp.targetAmount - camp.currentAmount);
+              {(() => {
+                const raw = post.campaigns ?? (post.campaign ? [post.campaign] : []);
+                const list = raw as {
+                  id: string;
+                  title: string;
+                  currentAmount: number;
+                  targetAmount: number;
+                  images?: string[];
+                  goalType?: string;
+                  fundraisingMode?: string;
+                  sharePriceUSD?: number | null;
+                }[];
+                if (!list.length) return null;
                 return (
                   <Card className="overflow-hidden">
                     <CardHeader>
                       <CardTitle className="text-lg font-bold">{t("relatedCampaign")}</CardTitle>
                     </CardHeader>
                     <CardContent className="p-4 pt-0 flex flex-col gap-4">
-                      <Link
-                        href={`/${locale}/campaign/${camp.id}`}
-                        className="group block rounded-xl overflow-hidden border border-gray-200/80 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-sky-200/80"
-                      >
-                        <div className="relative aspect-[4/2.5] overflow-hidden bg-gray-100">
-                          <Image
-                            src={camp.images?.[0] || "/placeholder.jpg"}
-                            alt={camp.title}
-                            fill
-                            sizes="(max-width: 768px) 100vw, 400px"
-                            className="object-cover transition-transform duration-500 group-hover:scale-110"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
-                          <div className="absolute top-2 right-2 rounded-lg bg-white/95 px-2 py-0.5 text-xs font-bold text-sky-600 shadow-sm">
-                            {progress.toFixed(0)}%
-                          </div>
-                        </div>
-                        <div className="p-3">
-                          <h3 className="text-sm font-bold text-gray-900 mb-2 line-clamp-1">
-                            {camp.title}
-                          </h3>
-                          <div className="flex justify-between text-xs mb-1.5 gap-1">
-                            <span className="text-gray-700 whitespace-nowrap">
-                              <span className="font-bold text-sky-600">{Number(camp.currentAmount).toLocaleString()}</span> {t("campaignDonations")}
-                            </span>
-                            <span className="text-gray-600 text-right whitespace-nowrap">
-                              {t("campaignRemaining")} <span className="font-semibold">{Number(remaining).toLocaleString()}</span>
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-100 rounded-full h-1.5">
-                            <div
-                              className="bg-gradient-to-r from-sky-500 to-sky-600 h-1.5 rounded-full transition-all duration-500"
-                              style={{ width: `${progress}%` }}
-                            />
-                          </div>
-                          <p className="text-center text-xs font-semibold text-sky-600 mt-2">{t("donateNow")}</p>
-                        </div>
-                      </Link>
+                      {list.map((camp) => {
+                        const g = normalizeGoalType(camp.goalType);
+                        const showBar = g !== GOAL_TYPE_OPEN;
+                        const progress = showBar
+                          ? computeCampaignProgressPercent(
+                              camp.currentAmount,
+                              camp.targetAmount,
+                              g
+                            )
+                          : 0;
+                        const remaining = Math.max(0, camp.targetAmount - camp.currentAmount);
+                        const isShares = camp.fundraisingMode === FUNDRAISING_SHARES;
+                        return (
+                          <Link
+                            key={camp.id}
+                            href={`/${locale}/campaign/${camp.id}`}
+                            className="group block rounded-xl overflow-hidden border border-gray-200/80 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-[#025EB8]/30"
+                          >
+                            <div className="relative aspect-[4/2.5] overflow-hidden bg-gray-100">
+                              <Image
+                                src={camp.images?.[0] || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"}
+                                alt={camp.title}
+                                fill
+                                sizes="(max-width: 768px) 100vw, 400px"
+                                className="object-cover transition-transform duration-500 group-hover:scale-110"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+                              {showBar ? (
+                                <div className="absolute top-2 right-2 rounded-lg bg-white/95 px-2 py-0.5 text-xs font-bold text-[#025EB8] shadow-sm">
+                                  {progress.toFixed(0)}%
+                                </div>
+                              ) : (
+                                <div className="absolute top-2 right-2 rounded-lg bg-white/95 px-2 py-0.5 text-xs font-bold text-violet-700 shadow-sm">
+                                  {isShares ? t("campaignSharesBadge") : t("campaignOpenBadge")}
+                                </div>
+                              )}
+                            </div>
+                            <div className="p-3">
+                              <h3 className="text-sm font-bold text-gray-900 mb-2 line-clamp-1">
+                                {camp.title}
+                              </h3>
+                              <div className="flex justify-between text-xs mb-1.5 gap-1">
+                                <span className="text-gray-700 whitespace-nowrap">
+                                  <span className="font-bold text-[#025EB8]">{Number(camp.currentAmount).toLocaleString()}</span> {t("campaignDonations")}
+                                </span>
+                                {showBar ? (
+                                  <span className="text-gray-600 text-right whitespace-nowrap">
+                                    {t("campaignRemaining")}{" "}
+                                    <span className="font-semibold">{Number(remaining).toLocaleString()}</span>
+                                  </span>
+                                ) : isShares && camp.sharePriceUSD != null && camp.sharePriceUSD > 0 ? (
+                                  <span className="text-gray-600 text-right whitespace-nowrap">
+                                    {t("sharePriceUsd")}{" "}
+                                    <span className="font-semibold">${Number(camp.sharePriceUSD).toLocaleString()}</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-600 text-right whitespace-nowrap">{t("campaignOpenGoal")}</span>
+                                )}
+                              </div>
+                              {showBar ? (
+                              <div className="w-full bg-gray-100 rounded-full h-1.5">
+                                <div
+                                  className="bg-[#025EB8] h-1.5 rounded-full transition-all duration-500"
+                                  style={{ width: `${progress}%` }}
+                                />
+                              </div>
+                              ) : null}
+                              <p className="text-center text-xs font-semibold text-[#025EB8] mt-2">{t("donateNow")}</p>
+                            </div>
+                          </Link>
+                        );
+                      })}
                     </CardContent>
                   </Card>
                 );
@@ -211,7 +258,7 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
                   {(similarPosts as { id: string; title?: string; image?: string }[]).map((sp) => (
                     <Link key={sp.id} href={`/${locale}/blog/${sp.id}`} className="group relative rounded-xl overflow-hidden border bg-background shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
                       <div className="relative aspect-[4/2.5] overflow-hidden">
-                        <Image src={sp.image || ''} alt={sp.title || ''} fill sizes="600px" className="object-cover transition-transform duration-500 group-hover:scale-110" />
+                        <Image src={sp.image || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"} alt={sp.title || ''} fill sizes="600px" className="object-cover transition-transform duration-500 group-hover:scale-110" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
                       </div>
 

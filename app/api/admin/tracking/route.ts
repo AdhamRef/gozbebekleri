@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 
 // GET /api/admin/tracking — get full settings (admin only)
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user?.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, "pixels");
+    if (denied) return denied;
     const settings = await prisma.trackingSettings.findFirst();
     if (!settings) {
       return NextResponse.json({
@@ -35,9 +36,8 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user?.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, "pixels");
+    if (denied) return denied;
     const body = await request.json();
     const {
       facebookPixelId,
@@ -64,6 +64,16 @@ export async function PUT(request: NextRequest) {
       : await prisma.trackingSettings.create({
           data,
         });
+
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      stream: "TEAM",
+      action: "TRACKING_SETTINGS_UPDATE",
+      messageAr: `${actor.actorName ?? "مسؤول"} عدّل إعدادات التتبع والبكسلات (فيسبوك، GA، تيك توك، X)`,
+      entityType: "TrackingSettings",
+      entityId: settings.id,
+    });
 
     return NextResponse.json(settings);
   } catch (e) {

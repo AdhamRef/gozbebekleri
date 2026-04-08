@@ -2,13 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { motion } from "framer-motion";
+import { Search, HandHeart, ChevronRight, X, ArrowRight } from "lucide-react"; // Search used conditionally via SHOW_SEARCH
 import { Link } from "@/i18n/routing";
-import { Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { getCurrency } from "@/hooks/useCampaignValue";
-import { useCurrency } from "@/context/CurrencyContext";
-import { formatNumber } from "@/hooks/formatNumber";
+import CampaignCard from "@/app/[locale]/_components/CampaignCard";
+import { useLocale, useTranslations } from "next-intl";
 
 interface Campaign {
   id: string;
@@ -17,9 +14,13 @@ interface Campaign {
   description: string;
   currentAmount: number;
   targetAmount: number;
-  category: {
-    name: string;
-  };
+  progress?: number;
+  showProgress?: boolean;
+  fundraisingMode?: string;
+  isActive?: boolean;
+  categoryId?: string;
+  category: { id?: string; name: string; icon?: string };
+  createdAt: string;
 }
 
 interface Category {
@@ -29,61 +30,84 @@ interface Category {
   image: string;
 }
 
-const MainPage = ({ id, locale }: { id: string; locale?: string }) => {
+const SHOW_SEARCH = false;
+const FALLBACK_IMAGE = "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg";
+
+const MainPage = ({ id, locale: localeProp }: { id: string; locale?: string }) => {
+  const t = useTranslations("CampaignsPage");
+  const locale = useLocale();
+  const isRTL = locale === "ar";
+
   const [category, setCategory] = useState<Category | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const { convertToCurrency } = useCurrency();
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [cursor, setCursor] = useState<string | null>(null);
+
+  const effectiveLocale = localeProp || locale;
+
+  const fetchData = async (cursorParam?: string | null) => {
+    try {
+      setIsLoadingMore(true);
+      const [categoryRes, campaignsRes] = await Promise.all([
+        !category
+          ? axios.get(`/api/categories/${id}?locale=${effectiveLocale}&counts=true`)
+          : Promise.resolve({ data: category }),
+        axios.get(`/api/categories/${id}/campaigns`, {
+          params: { locale: effectiveLocale, limit: 12, cursor: cursorParam },
+        }),
+      ]);
+      if (!category) setCategory(categoryRes.data);
+      const newCampaigns = (campaignsRes.data.items || []).map((c: Campaign) => ({
+        ...c,
+        categoryId: c.categoryId || id,
+        category: { ...c.category, id: c.category?.id || id },
+      }));
+      if (cursorParam) {
+        setCampaigns((prev) => [...prev, ...newCampaigns]);
+      } else {
+        setCampaigns(newCampaigns);
+      }
+      setHasMore(Boolean(campaignsRes.data.hasMore));
+      setCursor(campaignsRes.data.nextCursor || null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load data");
+    } finally {
+      setIsLoadingMore(false);
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const effectiveLocale = locale || (typeof window !== 'undefined' ? (window.location.pathname.split('/')[1] || 'ar') : 'ar');
-        const [categoryRes, campaignsRes] = await Promise.all([
-          axios.get(`/api/categories/${id}?locale=${effectiveLocale}&counts=true`),
-          axios.get(`/api/categories/${id}/campaigns?locale=${effectiveLocale}&limit=100`),
-        ]);
-
-        setCategory(categoryRes.data);
-        setCampaigns(campaignsRes.data.items || []);
-        console.log(campaignsRes.data.items);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load data");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
-  }, [id, locale]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, effectiveLocale]);
 
   const filteredCampaigns = campaigns.filter(
-    (campaign) =>
-      campaign.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      campaign.description.toLowerCase().includes(searchQuery.toLowerCase())
+    (c) =>
+      c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (loading) {
-    return <LoadingSkeleton />;
-  }
+  if (loading) return <LoadingSkeleton />;
 
   if (error || !category) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-white py-16">
-        <div className="max-w-2xl mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold text-gray-800 mb-4">
-            لم يتم العثور على القسم
-          </h2>
-          <p className="text-gray-600 mb-8">
-            {error || "القسم الذي تبحث عنه غير موجود."}
-          </p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center bg-white rounded-2xl p-10 shadow-sm border border-gray-100 max-w-sm mx-4">
+          <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+            <X className="w-7 h-7 text-red-400" />
+          </div>
+          <p className="text-gray-700 font-semibold mb-1">{t("error") || "Something went wrong"}</p>
+          <p className="text-gray-400 text-sm mb-6">{error || t("noCampaigns")}</p>
           <Link
             href="/"
-            className="inline-block bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg transition-colors"
+            className="bg-[#025EB8] hover:bg-[#014fa0] text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors inline-block"
           >
-            العودة للرئيسية
+            {t("home") || "Home"}
           </Link>
         </div>
       </div>
@@ -91,187 +115,181 @@ const MainPage = ({ id, locale }: { id: string; locale?: string }) => {
   }
 
   return (
-    <main className="min-h-screen bg-white">
-      {/* Hero Section */}
-      <div
-        className="relative py-8 max-sm:py-6 flex items-center bg-gradient-to-bl from-stone-100 to-[#fafafa] sm:bg-none"
-        style={{
-          backgroundImage: `url(${category.image})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      >
-        <div className="w-full h-full bg-black absolute opacity-60" />
-        <div className="relative z-10 w-full max-w-7xl mx-auto px-6 flex items-center justify-center flex-col sm:flex-row">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex-[2] text-center sm:text-start"
-          >
-            <h1 className="text-4xl md:text-5xl font-semibold text-white mb-6">
-              تبرع لحالات{" "}
-              <span className="bg-gradient-to-r rounded-lg from-sky-200 to-sky-300 text-transparent bg-clip-text leading-[1.24]">
-                {category.name}{" "}
-              </span>
-            </h1>
+    <main className="min-h-screen bg-gray-50" dir={isRTL ? "rtl" : "ltr"}>
 
-            <p className="text-xl max-sm:text-sm text-white mb-8 ">
-              {category.description}
-            </p>
+      {/* ── Hero Header ── */}
+      <section className="relative">
+        {/* Background layers */}
+        <div className="absolute inset-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={category.image || FALLBACK_IMAGE} alt="" aria-hidden className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/75" />
+          <div className="absolute inset-0 bg-[#025EB8]/30" />
+          <div className="absolute inset-0 opacity-[0.04] bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:20px_20px]" />
+        </div>
 
-            <div className="flex gap-4 items-center justify-center sm:justify-start">
-              <div className="relative flex-1 max-w-xl">
-                <Input
-                  type="text"
-                  placeholder="ابحث عن حملة..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-white/90 backdrop-blur-sm border-0 rounded-lg text-lg placeholder:text-gray-500 focus:ring-2 focus:ring-emerald-500"
-                />
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-              </div>
+        <div className="relative z-10 max-w-7xl mx-auto px-4 pt-12 pb-20">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-1.5 text-white/60 text-xs mb-6">
+            <Link href="/" className="hover:text-white transition-colors">{t("home") || "Home"}</Link>
+            <ChevronRight className={`w-3 h-3 flex-shrink-0 ${isRTL ? "rotate-180" : ""}`} />
+            <Link href="/campaigns" className="hover:text-white transition-colors">{t("campaigns") || "Campaigns"}</Link>
+            <ChevronRight className={`w-3 h-3 flex-shrink-0 ${isRTL ? "rotate-180" : ""}`} />
+            <span className="text-white/90 font-medium">{category.name}</span>
+          </div>
+
+          {/* Title */}
+          <div className="text-center max-w-2xl mx-auto">
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-1.5 rounded-full text-xs font-semibold text-white/90 mb-4">
+              <HandHeart className="w-3.5 h-3.5 text-[#FA5D17]" />
+              <span>{t("projects") || "OUR PROJECTS"}</span>
             </div>
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex-1 flex justify-end items-center sm:block hidden"
-          >
-            <img
-              src={category.image || "/images/default-category.jpg"}
-              alt={category.name}
-              className="max-h-96 rounded-xl"
-            />
-          </motion.div>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white leading-tight mb-3">
+              <span className="text-[#FA5D17]">{category.name}</span>
+            </h1>
+            {category.description && (
+              <p className="text-white/70 text-sm sm:text-base leading-relaxed">
+                {category.description}
+              </p>
+            )}
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* Campaigns Grid */}
-      <div className="max-w-7xl mx-auto px-6 py-12">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {filteredCampaigns.map((campaign, index) => (
-            <motion.div
-              key={campaign.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <Link
-                href={`/campaign/${campaign.id}`}
-                prefetch={true}
-                className="block bg-white rounded-lg overflow-hidden"
-              >
-                <div className="relative">
-                  <img
-                    src={campaign.images[0]}
-                    alt={campaign.title}
-                    className="w-full h-48 object-cover"
-                  />
-                </div>
-
-                <div className="p-4">
-                  <div className="flex flex-col gap-2 mb-4">
-                    <h3 className="text-lg font-bold text-gray-800 truncate">
-                      {campaign.title}
-                    </h3>
-                    <p className="text-gray-600 text-sm truncate">
-                      {campaign.description}
-                    </p>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-sm text-gray-700 mb-2">
-                      <span>
-                        <span className="font-semibold">
-                          {getCurrency()}
-                          {formatNumber(
-                            convertToCurrency(
-                              Math.round(campaign.currentAmount)
-                            ).convertedValue
-                          )}
-                        </span>{" "}
-                        تبرعات
-                      </span>
-                      <span>
-                        تبقي{" "}
-                        <span className="font-semibold">
-                          {getCurrency()}
-                          {formatNumber(
-                            convertToCurrency(Math.round(campaign.targetAmount))
-                              .convertedValue
-                          )}
-                        </span>
-                      </span>
-                    </div>
-                    <div className="w-full bg-emerald-100 rounded-full h-2">
-                      <div
-                        className="bg-emerald-500 h-2 rounded-full"
-                        style={{
-                          width: `${Math.min(
-                            (campaign.currentAmount / campaign.targetAmount) *
-                              100,
-                            100
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            </motion.div>
-          ))}
+      {/* ── Search bar — floats between hero and grid ── */}
+      {SHOW_SEARCH && (
+        <div className="relative z-30 max-w-2xl mx-auto px-4 -mt-6">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-2 flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 ${isRTL ? "right-3" : "left-3"}`} />
+              <input
+                type="text"
+                placeholder={t("searchPlaceholder") || "Search campaigns..."}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={`w-full ${isRTL ? "pr-9 pl-3" : "pl-9 pr-3"} py-2.5 rounded-xl text-sm text-gray-800 bg-gray-50 outline-none focus:bg-white transition-colors`}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className={`absolute top-1/2 -translate-y-1/2 ${isRTL ? "left-3" : "right-3"} text-gray-400 hover:text-gray-600`}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
+      )}
 
-        {filteredCampaigns.length === 0 && (
-          <div className="text-center py-12">
-            <h3 className="text-2xl font-bold text-gray-800 mb-2">
-              {searchQuery
-                ? "لم يتم العثور على نتائج للبحث"
-                : "لا توجد حملات في هذا القسم حالياً"}
-            </h3>
-            <p className="text-gray-600">
-              {searchQuery
-                ? "جرب استخدام كلمات بحث مختلفة"
-                : "يمكنك العودة لاحقاً لمشاهدة الحملات الجديدة"}
+      {/* ── Campaign Grid ── */}
+      <section className={`max-w-7xl mx-auto px-4 ${SHOW_SEARCH ? "py-10" : "pt-6 pb-10"}`}>
+        {/* Results count */}
+        {filteredCampaigns.length > 0 && (
+          <div className="flex items-center justify-between mb-6">
+            <p className="text-sm text-gray-500">
+              <span className="font-semibold text-gray-800">{filteredCampaigns.length}</span>{" "}
+              {t("resultsFound") || "campaigns found"}
             </p>
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="flex items-center gap-1 text-xs text-[#FA5D17] font-semibold hover:underline"
+              >
+                <X className="w-3 h-3" /> {t("clearSearch") || "Clear search"}
+              </button>
+            )}
           </div>
         )}
-      </div>
+
+        {filteredCampaigns.length === 0 && !isLoadingMore ? (
+          <div className="text-center py-20">
+            <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+              <HandHeart className="w-9 h-9 text-gray-300" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-700 mb-1">
+              {searchQuery ? t("noResults") : t("noCampaigns")}
+            </h3>
+            <p className="text-gray-400 text-sm">
+              {searchQuery ? t("tryDifferentSearch") : t("checkBackLater")}
+            </p>
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="mt-4 text-[#025EB8] text-sm font-semibold hover:underline"
+              >
+                {t("clearSearch") || "Clear search"}
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredCampaigns.map((campaign) => (
+              <CampaignCard key={campaign.id} campaign={campaign} />
+            ))}
+            {isLoadingMore && Array.from({ length: 3 }).map((_, i) => (
+              <CardSkeleton key={`more-${i}`} />
+            ))}
+          </div>
+        )}
+
+        {/* Load more */}
+        {hasMore && !isLoadingMore && filteredCampaigns.length > 0 && (
+          <div className="text-center mt-12">
+            <button
+              onClick={() => fetchData(cursor)}
+              className="inline-flex items-center gap-2 bg-[#025EB8] hover:bg-[#014fa0] text-white font-semibold px-8 py-3 rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
+            >
+              {t("loadMore") || "Load More"}
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </section>
     </main>
   );
 };
 
+/* ── Skeleton card ── */
+const CardSkeleton = () => (
+  <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+    <div className="h-52 bg-gray-100 animate-pulse" />
+    <div className="p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="h-5 w-5 rounded-full bg-gray-100 animate-pulse" />
+        <div className="h-3 w-20 bg-gray-100 rounded animate-pulse" />
+      </div>
+      <div className="h-4 bg-gray-100 rounded animate-pulse w-4/5" />
+      <div className="h-3 bg-gray-100 rounded animate-pulse w-full" />
+      <div className="h-3 bg-gray-100 rounded animate-pulse w-3/5" />
+      <div className="h-2 bg-gray-100 rounded-full animate-pulse mt-2" />
+      <div className="flex justify-between pt-1">
+        <div className="h-3 w-16 bg-gray-100 rounded animate-pulse" />
+        <div className="h-3 w-12 bg-gray-100 rounded animate-pulse" />
+      </div>
+      <div className="h-9 bg-gray-100 rounded-lg animate-pulse mt-1" />
+    </div>
+  </div>
+);
+
+/* ── Full page loading skeleton ── */
 const LoadingSkeleton = () => (
-  <div className="min-h-screen bg-[#fafafa]">
-    {/* Hero Section Skeleton */}
-    <div className="relative h-[500px] bg-gray-200 animate-pulse">
-      <div className="absolute inset-0 bg-black/20" />
-      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 h-full flex items-center">
-        <div className="max-w-3xl space-y-6">
-          <div className="h-16 bg-gray-300 rounded-lg w-2/3" />
-          <div className="h-20 bg-gray-300 rounded-lg w-full" />
-          <div className="h-12 bg-gray-300 rounded-lg w-96" />
-        </div>
+  <div className="min-h-screen bg-gray-50">
+    {/* Hero skeleton */}
+    <div className="relative h-64 bg-[#025EB8] overflow-hidden">
+      <div className="relative z-10 flex flex-col items-center justify-center h-full gap-3 px-4">
+        <div className="h-3 w-28 bg-white/20 rounded-full animate-pulse" />
+        <div className="h-8 w-64 bg-white/20 rounded-xl animate-pulse" />
+        <div className="h-3 w-48 bg-white/15 rounded animate-pulse" />
       </div>
     </div>
-
-    {/* Campaigns Grid Skeleton */}
-    <div className="max-w-7xl mx-auto px-6 py-12 max-sm:py-8">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-          <div
-            key={i}
-            className="bg-white rounded-lg shadow-sm overflow-hidden"
-          >
-            <div className="w-full h-48 bg-gray-200 animate-pulse" />
-            <div className="p-4">
-              <div className="h-6 bg-gray-200 rounded mb-2 animate-pulse" />
-              <div className="h-4 bg-gray-200 rounded mb-4 animate-pulse" />
-              <div className="h-2 bg-gray-200 rounded animate-pulse" />
-            </div>
-          </div>
-        ))}
-      </div>
+    {/* Search skeleton */}
+    <div className="max-w-2xl mx-auto px-4 -mt-6 relative z-10">
+      <div className="h-14 bg-white rounded-2xl shadow-xl animate-pulse" />
+    </div>
+    {/* Grid skeleton */}
+    <div className="max-w-7xl mx-auto px-4 py-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
     </div>
   </div>
 );

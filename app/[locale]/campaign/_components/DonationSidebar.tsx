@@ -124,6 +124,11 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
           targetAmount={campaign.targetAmount}
           amountRaised={campaign.amountRaised}
           campaignId={campaign.id}
+          suggestedDonations={campaign.suggestedDonations}
+          goalType={campaign.goalType}
+          fundraisingMode={campaign.fundraisingMode}
+          sharePriceUSD={campaign.sharePriceUSD}
+          suggestedShareCounts={campaign.suggestedShareCounts}
         />
 
         <SignInDialog
@@ -137,13 +142,23 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
             {/* Progress Info - Compact */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex lg:flex-col gap-4">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-lg font-bold text-gray-900">
                     {formatMoney(campaign.currentAmount)}
                   </span>
-                  <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-md">
-                    {t("from")} {formatMoney(campaign.targetAmount)}
-                  </span>
+                  {campaign.showProgress !== false ? (
+                    <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-md">
+                      {t("from")} {formatMoney(campaign.targetAmount)}
+                    </span>
+                  ) : campaign.fundraisingMode === "SHARES" ? (
+                    <span className="text-xs text-violet-700 bg-violet-50 px-2 py-1 rounded-md">
+                      {t("sharesCampaignBadge")}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md">
+                      {t("openGoalBadge")}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-600">
                   <HandHeart className="w-4 h-4" />
@@ -151,39 +166,39 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
                 </div>
               </div>
 
-              {/* Circular Progress */}
-              
-              <div className="relative w-10 h-10 lg:w-14 lg:h-14 flex-shrink-0">
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                  <path
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    fill="none"
-                    stroke="#E8E8E8"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    fill="none"
-                    stroke="#0EA5E9"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeDasharray={`${campaign.progress}, 100`}
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-xs font-semibold text-gray-700">
-                    {Math.round(campaign.progress)}%
-                  </span>
+              {campaign.showProgress !== false ? (
+                <div className="relative w-10 h-10 lg:w-14 lg:h-14 flex-shrink-0">
+                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="#E8E8E8"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="#0EA5E9"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeDasharray={`${campaign.progress}, 100`}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-xs font-semibold text-gray-700">
+                      {Math.round(campaign.progress)}%
+                    </span>
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </div>
 
             {/* Action Buttons */}
             <div className="flex gap-2">
               <Button
                 onClick={handleDonate}
-                className="flex-1 flex gap-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:opacity-90 text-white font-semibold py-3 text-base rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                className="flex-1 flex gap-2 bg-[#FA5D17] hover:bg-[#e04d0f] text-white font-semibold py-3 text-base rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
               >
                 <HandCoins className="w-5 h-5" />
                 {t("donateNow")}
@@ -222,6 +237,11 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
         targetAmount={campaign.targetAmount}
         amountRaised={campaign.amountRaised}
         campaignId={campaign.id}
+        suggestedDonations={campaign.suggestedDonations}
+        goalType={campaign.goalType}
+        fundraisingMode={campaign.fundraisingMode}
+        sharePriceUSD={campaign.sharePriceUSD}
+        suggestedShareCounts={campaign.suggestedShareCounts}
       />
 
       <SignInDialog
@@ -240,55 +260,73 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
                   <h2 className="text-[2rem] font-bold text-gray-900 leading-none">
                     {formatMoney(campaign.currentAmount)}
                   </h2>
-                  <div className="flex items-center gap-2">
-                    <p className="text-white bg-primary px-2 py-1 rounded-md text-sm font-medium">
-                      {t("outOfGoal")} {formatMoney(campaign.targetAmount)}
-                    </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {campaign.showProgress !== false ? (
+                      <p className="text-white bg-primary px-2 py-1 rounded-md text-sm font-medium">
+                        {t("outOfGoal")} {formatMoney(campaign.targetAmount)}
+                      </p>
+                    ) : (
+                      <>
+                        {campaign.fundraisingMode === "SHARES" &&
+                        campaign.sharePriceUSD != null &&
+                        campaign.sharePriceUSD > 0 ? (
+                          <p className="text-white bg-violet-600 px-2 py-1 rounded-md text-sm font-medium">
+                            {t("sharesCampaignBadge")}
+                          </p>
+                        ) : (
+                          <p className="text-white bg-emerald-600 px-2 py-1 rounded-md text-sm font-medium">
+                            {t("openGoalBadge")}
+                          </p>
+                        )}
+                      </>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 text-sm text-stone-800">
                     <HandHeart className="w-5 h-5" />
                     {campaign.donationCount} {t("peopleDonated")}
                   </div>
                 </div>
-                <div className="relative w-16 h-16">
-                  <svg className="w-full h-full" viewBox="0 0 36 36">
-                    <path
-                      d="M18 2.0845
+                {campaign.showProgress !== false ? (
+                  <div className="relative w-16 h-16">
+                    <svg className="w-full h-full" viewBox="0 0 36 36">
+                      <path
+                        d="M18 2.0845
                     a 15.9155 15.9155 0 0 1 0 31.831
                     a 15.9155 15.9155 0 0 1 0 -31.831"
-                      fill="none"
-                      stroke="#E8E8E8"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                    />
-                    <path
-                      d="M18 2.0845
+                        fill="none"
+                        stroke="#E8E8E8"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                      />
+                      <path
+                        d="M18 2.0845
                     a 15.9155 15.9155 0 0 1 0 31.831
                     a 15.9155 15.9155 0 0 1 0 -31.831"
-                      fill="none"
-                      stroke="#0EA5E9"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeDasharray={`${campaign.progress}, 100`}
-                    />
-                    <text
-                      x="18"
-                      y="20.35"
-                      className="text-[0.5em]"
-                      textAnchor="middle"
-                      fill="#666"
-                    >
-                      {Math.round(campaign.progress)}%
-                    </text>
-                  </svg>
-                </div>
+                        fill="none"
+                        stroke="#0EA5E9"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeDasharray={`${campaign.progress}, 100`}
+                      />
+                      <text
+                        x="18"
+                        y="20.35"
+                        className="text-[0.5em]"
+                        textAnchor="middle"
+                        fill="#666"
+                      >
+                        {Math.round(campaign.progress)}%
+                      </text>
+                    </svg>
+                  </div>
+                ) : null}
               </div>
             </div>
 
             <div className="space-y-3">
               <Button
                 onClick={handleDonate}
-                className="flex gap-2 w-full bg-gradient-to-r from-sky-600 to-indigo-600 hover:opacity-90 text-white font-semibold py-6 text-lg rounded-md transition-all duration-200 shadow-md hover:shadow-lg"
+                className="flex gap-2 w-full bg-[#FA5D17] hover:bg-[#e04d0f] text-white font-semibold py-6 text-lg rounded-md transition-all duration-200 shadow-md hover:shadow-lg"
               >
                 <HandCoins className="w-5 h-5" />
                 {t("donateNow")}

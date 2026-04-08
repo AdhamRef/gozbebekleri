@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
+import {
+  computeCampaignProgressPercent,
+  normalizeFundraisingMode,
+  normalizeGoalType,
+  parseSuggestedShareCounts,
+  showCampaignProgress,
+} from "@/lib/campaign/campaign-modes";
 
 export async function GET(
   request: NextRequest,
@@ -97,6 +104,10 @@ export async function GET(
         priority: true,
         createdAt: true,
         updatedAt: true,
+        goalType: true,
+        fundraisingMode: true,
+        sharePriceUSD: true,
+        suggestedShareCounts: true,
         translations: { where: { locale }, take: 1, select: { title: true, description: true, locale: true } },
         _count: { select: { donations: true } },
         category: {
@@ -114,8 +125,12 @@ export async function GET(
     let sorted = [...campaigns];
     if (sortBy === 'progress') {
       sorted.sort((a, b) => {
-        const pa = a.currentAmount / Math.max(a.targetAmount, 1);
-        const pb = b.currentAmount / Math.max(b.targetAmount, 1);
+        const ga = normalizeGoalType(a.goalType);
+        const gb = normalizeGoalType(b.goalType);
+        const pa =
+          computeCampaignProgressPercent(a.currentAmount, a.targetAmount, ga) / 100;
+        const pb =
+          computeCampaignProgressPercent(b.currentAmount, b.targetAmount, gb) / 100;
         return pb - pa;
       });
     }
@@ -124,26 +139,41 @@ export async function GET(
     const pageItems = hasMore ? sorted.slice(0, -1) : sorted;
     const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.id : null;
 
-    const transformed = pageItems.map(c => ({
-      id: c.id,
-      title: c.translations[0]?.title || c.title,
-      description: c.translations[0]?.description || c.description,
-      images: c.images,
-      videoUrl: c.videoUrl,
-      targetAmount: c.targetAmount,
-      currentAmount: c.currentAmount,
-      isActive: c.isActive,
-      priority: c.priority,
-      donationCount: c._count?.donations ?? 0,
-      progress: (c.currentAmount / Math.max(c.targetAmount, 1)) * 100,
-      createdAt: c.createdAt,
-      updatedAt: c.updatedAt,
-      category: c.category ? {
-        id: c.category.id,
-        name: c.category.translations[0]?.name || c.category.name,
-        icon: c.category.icon,
-      } : null
-    }));
+    const transformed = pageItems.map((c) => {
+      const goalType = normalizeGoalType(c.goalType);
+      const fundraisingMode = normalizeFundraisingMode(c.fundraisingMode);
+      return {
+        id: c.id,
+        title: c.translations[0]?.title || c.title,
+        description: c.translations[0]?.description || c.description,
+        images: c.images,
+        videoUrl: c.videoUrl,
+        targetAmount: c.targetAmount,
+        currentAmount: c.currentAmount,
+        isActive: c.isActive,
+        priority: c.priority,
+        donationCount: c._count?.donations ?? 0,
+        progress: computeCampaignProgressPercent(
+          c.currentAmount,
+          c.targetAmount,
+          goalType
+        ),
+        showProgress: showCampaignProgress(goalType),
+        goalType,
+        fundraisingMode,
+        sharePriceUSD: c.sharePriceUSD ?? null,
+        suggestedShareCounts: parseSuggestedShareCounts(c.suggestedShareCounts),
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        category: c.category
+          ? {
+              id: c.category.id,
+              name: c.category.translations[0]?.name || c.category.name,
+              icon: c.category.icon,
+            }
+          : null,
+      };
+    });
 
     // Localized category response
     const localizedCategory = {

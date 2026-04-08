@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getCurrentCalendarMonthUtcRange } from "@/lib/admin/current-calendar-month-utc";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 
 function getDateRange(period: string, startParam?: string | null, endParam?: string | null) {
   let endDate: Date;
@@ -34,9 +36,8 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, "referrals");
+    if (denied) return denied;
     const { id: referralId } = await params;
     const referral = await prisma.referral.findUnique({
       where: { id: referralId },
@@ -87,12 +88,19 @@ export async function GET(
       ];
     }
 
-    const last30End = new Date();
-    last30End.setUTCHours(23, 59, 59, 999);
-    const last30Start = new Date(last30End);
-    last30Start.setUTCDate(last30Start.getUTCDate() - 30);
-    last30Start.setUTCHours(0, 0, 0, 0);
-    const last30DonationWhere = { ...donationWhere, createdAt: { gte: last30Start, lte: last30End } };
+    const { monthStart, monthEnd } = getCurrentCalendarMonthUtcRange();
+    const thisMonthDonationWhere: Prisma.DonationWhereInput = {
+      referralId,
+      createdAt: { gte: monthStart, lte: monthEnd },
+    };
+    if (campaignId && campaignId !== "all") {
+      thisMonthDonationWhere.items = { some: { campaignId } };
+    } else if (categoryId && categoryId !== "all") {
+      thisMonthDonationWhere.OR = [
+        { items: { some: { campaign: { categoryId } } } },
+        { categoryItems: { some: { categoryId } } },
+      ];
+    }
 
     const [
       totalDonations,
@@ -104,7 +112,7 @@ export async function GET(
       monthlyStoppedAmountResult,
       oneTimeTotalResult,
       fromSubscriptionTotalResult,
-      last30TotalResult,
+      thisMonthTotalResult,
       allTimeRevenueResult,
       campaignDonationsSum,
       categoryDonationsSum,
@@ -135,7 +143,7 @@ export async function GET(
       }),
       prisma.donation.aggregate({
         _sum: { amountUSD: true },
-        where: last30DonationWhere,
+        where: thisMonthDonationWhere,
       }),
       prisma.donation.aggregate({
         _sum: { amountUSD: true },
@@ -177,7 +185,7 @@ export async function GET(
     const monthlyRecurringRevenue = monthlyRecurringRevenueResult._sum?.amountUSD ?? 0;
     const activeMonthlyAmountUSD = monthlyRecurringRevenue;
     const monthlyStoppedAmountUSD = monthlyStoppedAmountResult._sum?.amountUSD ?? 0;
-    const thisMonthRevenue = last30TotalResult._sum?.amountUSD ?? 0;
+    const thisMonthRevenue = thisMonthTotalResult._sum?.amountUSD ?? 0;
     const allTimeRevenue = allTimeRevenueResult._sum?.amountUSD ?? 0;
     const campaignDonationsTotal = campaignDonationsSum._sum?.amountUSD ?? campaignDonationsSum._sum?.amount ?? 0;
     const categoryDonationsTotal = categoryDonationsSum._sum?.amountUSD ?? categoryDonationsSum._sum?.amount ?? 0;

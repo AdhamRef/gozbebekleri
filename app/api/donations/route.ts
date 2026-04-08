@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/options";
 import { resolveReferralId } from "@/lib/referral-server";
+import { isRevenueDashboardUser } from "@/lib/dashboard/api-auth";
+import { writeAuditLog, auditStreamForRole } from "@/lib/audit-log";
 
 // GET /api/donations - Get all donations (admin) or user's donations
 export async function GET(request: NextRequest) {
@@ -30,10 +32,11 @@ export async function GET(request: NextRequest) {
     if (startParam) dateFilter.gte = new Date(startParam + "T00:00:00.000Z");
     if (endParam) dateFilter.lte = new Date(endParam + "T23:59:59.999Z");
 
-    const isAdmin = session.user.role === "ADMIN";
+    const isAdmin = isRevenueDashboardUser(session);
     const subscriptionOnly =
       isAdmin &&
       (searchParams.get("subscriptionOnly") === "true" || searchParams.get("subscriptionOnly") === "1");
+    const statusFilter = isAdmin ? searchParams.get("status") : null;
 
     const where: Record<string, unknown> = {
       ...(campaignId && { items: { some: { campaignId } } }),
@@ -43,6 +46,7 @@ export async function GET(request: NextRequest) {
       ...(!isAdmin && { donorId: session.user.id }),
       ...(search && isAdmin && { donor: { name: { contains: search } } }),
       ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
+      ...(statusFilter && ["PAID", "FAILED", "PENDING"].includes(statusFilter) && { status: statusFilter }),
     };
     if (categoryId && isAdmin) {
       where.OR = [
@@ -128,19 +132,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate card details
-    if (
-      paymentMethod === "CARD" &&
-      (!cardDetails?.cardNumber ||
-        !cardDetails.expiryDate ||
-        !cardDetails.cvv ||
-        !cardDetails.cardholderName)
-    ) {
-      return NextResponse.json(
-        { error: "Card details are required for card payments" },
-        { status: 400 }
-      );
-    }
+    // Card payments are handled via PayFor 3D Secure redirect flow (we do not store PAN/CVV).
 
     // Calculate totals from both items and categoryItems
     const campaignTotal = hasCampaignItems ? items.reduce((sum: number, item: { amount: number }) => sum + item.amount, 0) : 0;
@@ -228,11 +220,21 @@ export async function POST(request: NextRequest) {
             lastBillingDate: new Date(),
             items: hasCampaignItems
               ? {
-                  create: items.map((item: { campaignId: string; amount: number; amountUSD?: number }) => ({
-                    campaignId: item.campaignId,
-                    amount: item.amount,
-                    amountUSD: item.amountUSD,
-                  })),
+                  create: items.map(
+                    (item: {
+                      campaignId: string;
+                      amount: number;
+                      amountUSD?: number;
+                      shareCount?: number;
+                    }) => ({
+                      campaignId: item.campaignId,
+                      amount: item.amount,
+                      amountUSD: item.amountUSD,
+                      ...(item.shareCount != null && item.shareCount > 0
+                        ? { shareCount: Math.floor(item.shareCount) }
+                        : {}),
+                    })
+                  ),
                 }
               : undefined,
             categoryItems: hasCategoryItems
@@ -257,18 +259,30 @@ export async function POST(request: NextRequest) {
             currency,
             fees: coverFees ? fees : 0,
             totalAmount: finalTotalAmount,
+            status: "PENDING",
+            locale: validLocale ?? undefined,
             donorId: session.user.id,
             referralId: referralId ?? undefined,
             subscriptionId: sub.id,
             paymentMethod,
-            cardDetails: paymentMethod === "CARD" ? cardDetails : null,
+            cardDetails: null,
             items: hasCampaignItems
               ? {
-                  create: items.map((item: { campaignId: string; amount: number; amountUSD?: number }) => ({
-                    campaignId: item.campaignId,
-                    amount: item.amount,
-                    amountUSD: item.amountUSD,
-                  })),
+                  create: items.map(
+                    (item: {
+                      campaignId: string;
+                      amount: number;
+                      amountUSD?: number;
+                      shareCount?: number;
+                    }) => ({
+                      campaignId: item.campaignId,
+                      amount: item.amount,
+                      amountUSD: item.amountUSD,
+                      ...(item.shareCount != null && item.shareCount > 0
+                        ? { shareCount: Math.floor(item.shareCount) }
+                        : {}),
+                    })
+                  ),
                 }
               : undefined,
             categoryItems: hasCategoryItems
@@ -288,19 +302,6 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        for (const item of hasCampaignItems ? items : []) {
-          await tx.campaign.update({
-            where: { id: item.campaignId },
-            data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
-          });
-        }
-        for (const item of hasCategoryItems ? categoryItems : []) {
-          await tx.category.update({
-            where: { id: item.categoryId },
-            data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
-          });
-        }
-
         if (validLocale) {
           const donor = await tx.user.findUnique({
             where: { id: session.user.id },
@@ -316,6 +317,20 @@ export async function POST(request: NextRequest) {
 
         return { subscription: sub, donation };
       }, { timeout: 15000 });
+
+      const d = subscription.donation;
+      const actorRole = session.user.role ?? "DONOR";
+      await writeAuditLog({
+        actorId: session.user.id,
+        actorName: session.user.name,
+        actorRole,
+        action: "DONATION_MONTHLY_CHECKOUT_START",
+        messageAr: `${session.user.name ?? "متبرع"} بدأ عملية دفع اشتراك شهري (≈ ${totalAmountUSD.toFixed(0)} USD لكل دورة)`,
+        entityType: "Donation",
+        entityId: d.id,
+        metadata: { amountUSD: totalAmountUSD, status: "PENDING", provider: "PAYFOR" },
+        stream: auditStreamForRole(actorRole),
+      });
 
       return NextResponse.json({
         success: true,
@@ -335,17 +350,29 @@ export async function POST(request: NextRequest) {
           currency,
           fees: coverFees ? fees : 0,
           totalAmount: finalTotalAmount,
+          status: "PENDING",
+          locale: validLocale ?? undefined,
           donorId: session.user.id,
           referralId: referralId ?? undefined,
           paymentMethod,
-          cardDetails: paymentMethod === "CARD" ? cardDetails : null,
+          cardDetails: null,
           items: hasCampaignItems
             ? {
-                create: items.map((item: { campaignId: string; amount: number; amountUSD?: number }) => ({
-                  campaignId: item.campaignId,
-                  amount: item.amount,
-                  amountUSD: item.amountUSD,
-                })),
+                create: items.map(
+                  (item: {
+                    campaignId: string;
+                    amount: number;
+                    amountUSD?: number;
+                    shareCount?: number;
+                  }) => ({
+                    campaignId: item.campaignId,
+                    amount: item.amount,
+                    amountUSD: item.amountUSD,
+                    ...(item.shareCount != null && item.shareCount > 0
+                      ? { shareCount: Math.floor(item.shareCount) }
+                      : {}),
+                  })
+                ),
               }
             : undefined,
           categoryItems: hasCategoryItems
@@ -365,19 +392,6 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      for (const item of hasCampaignItems ? items : []) {
-        await tx.campaign.update({
-          where: { id: item.campaignId },
-          data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
-        });
-      }
-      for (const item of hasCategoryItems ? categoryItems : []) {
-        await tx.category.update({
-          where: { id: item.categoryId },
-          data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
-        });
-      }
-
       if (validLocale) {
         const donor = await tx.user.findUnique({
           where: { id: session.user.id },
@@ -393,6 +407,19 @@ export async function POST(request: NextRequest) {
 
       return d;
     }, { timeout: 15000 });
+
+    const actorRole = session.user.role ?? "DONOR";
+    await writeAuditLog({
+      actorId: session.user.id,
+      actorName: session.user.name,
+      actorRole,
+      action: "DONATION_ONE_TIME_CHECKOUT_START",
+      messageAr: `${session.user.name ?? "متبرع"} بدأ عملية دفع تبرع لمرة واحدة (≈ ${totalAmountUSD.toFixed(0)} USD)`,
+      entityType: "Donation",
+      entityId: donation.id,
+      metadata: { amountUSD: totalAmountUSD, status: "PENDING", provider: "PAYFOR" },
+      stream: auditStreamForRole(actorRole),
+    });
 
     return NextResponse.json({
       success: true,

@@ -1,7 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/options";
+import { validateSuggestedDonationsBody } from "@/lib/campaign/suggested-donations";
+import {
+  computeCampaignProgressPercent,
+  normalizeFundraisingMode,
+  normalizeGoalType,
+  parseSuggestedShareCounts,
+  showCampaignProgress,
+  validateSuggestedShareCountsBody,
+  FUNDRAISING_SHARES,
+  GOAL_TYPE_OPEN,
+} from "@/lib/campaign/campaign-modes";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog } from "@/lib/audit-log";
+import { parseIncludeInactive } from "@/lib/campaign/include-inactive-query";
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,7 +30,7 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'newest';
     const minAmount = Number(searchParams.get('minAmount')) || 0;
     const maxAmount = Number(searchParams.get('maxAmount')) || Infinity;
-    const isActive = searchParams.get('isActive') === 'true';
+    const includeInactive = parseIncludeInactive(searchParams);
     const hasPriority = searchParams.get('hasPriority') === 'true';
 
     // Build where clause for main fields
@@ -24,8 +39,8 @@ export async function GET(request: NextRequest) {
         // Amount range
         { targetAmount: { gte: minAmount } },
         maxAmount < Infinity ? { targetAmount: { lte: maxAmount } } : {},
-        // Active status
-        isActive ? { isActive: true } : {},
+        // Default: active campaigns only; isActiveFalse=true includes inactive
+        includeInactive ? {} : { isActive: true },
         // Priority filter
         hasPriority ? { NOT: { priority: null } } : {}
       ].filter(condition => Object.keys(condition).length > 0)
@@ -96,8 +111,10 @@ export async function GET(request: NextRequest) {
     let sortedCampaigns = [...filteredCampaigns];
     if (sortBy === 'progress') {
       sortedCampaigns.sort((a, b) => {
-        const progressA = a.currentAmount / a.targetAmount;
-        const progressB = b.currentAmount / b.targetAmount;
+        const ga = normalizeGoalType(a.goalType);
+        const gb = normalizeGoalType(b.goalType);
+        const progressA = computeCampaignProgressPercent(a.currentAmount, a.targetAmount, ga) / 100;
+        const progressB = computeCampaignProgressPercent(b.currentAmount, b.targetAmount, gb) / 100;
         return progressB - progressA;
       });
     }
@@ -106,27 +123,41 @@ export async function GET(request: NextRequest) {
     const items = hasMore ? sortedCampaigns.slice(0, -1) : sortedCampaigns;
     const nextCursor = hasMore ? sortedCampaigns[sortedCampaigns.length - 2].id : null;
 
-    const transformedCampaigns = items.map(campaign => ({
-      id: campaign.id,
-      // Use translated fields if available, otherwise fall back to default (Arabic)
-      title: campaign.translations[0]?.title || campaign.title,
-      description: campaign.translations[0]?.description || campaign.description,
-      images: campaign.images,
-      videoUrl: campaign.videoUrl,
-      targetAmount: campaign.targetAmount,
-      currentAmount: campaign.currentAmount,
-      isActive: campaign.isActive,
-      priority: campaign.priority,
-      category: campaign.category ? {
-        id: campaign.category.id,
-        name: campaign.category.translations[0]?.name || campaign.category.name,
-        icon: campaign.category.icon,
-      } : null,
-      donationCount: campaign._count.donations,
-      progress: (campaign.currentAmount / campaign.targetAmount) * 100,
-      createdAt: campaign.createdAt,
-      updatedAt: campaign.updatedAt,
-    }));
+    const transformedCampaigns = items.map((campaign) => {
+      const goalType = normalizeGoalType(campaign.goalType);
+      const fundraisingMode = normalizeFundraisingMode(campaign.fundraisingMode);
+      return {
+        id: campaign.id,
+        title: campaign.translations[0]?.title || campaign.title,
+        description: campaign.translations[0]?.description || campaign.description,
+        images: campaign.images,
+        videoUrl: campaign.videoUrl,
+        targetAmount: campaign.targetAmount,
+        currentAmount: campaign.currentAmount,
+        isActive: campaign.isActive,
+        priority: campaign.priority,
+        category: campaign.category
+          ? {
+              id: campaign.category.id,
+              name: campaign.category.translations[0]?.name || campaign.category.name,
+              icon: campaign.category.icon,
+            }
+          : null,
+        donationCount: campaign._count.donations,
+        progress: computeCampaignProgressPercent(
+          campaign.currentAmount,
+          campaign.targetAmount,
+          goalType
+        ),
+        showProgress: showCampaignProgress(goalType),
+        goalType,
+        fundraisingMode,
+        sharePriceUSD: campaign.sharePriceUSD ?? null,
+        suggestedShareCounts: parseSuggestedShareCounts(campaign.suggestedShareCounts),
+        createdAt: campaign.createdAt,
+        updatedAt: campaign.updatedAt,
+      };
+    });
 
     return NextResponse.json({
       items: transformedCampaigns,
@@ -137,7 +168,7 @@ export async function GET(request: NextRequest) {
         sortBy,
         minAmount,
         maxAmount,
-        isActive,
+        includeInactive,
         hasPriority,
         locale
       }
@@ -155,21 +186,39 @@ export async function POST(request: NextRequest) {
   try {
     // ✅ STEP 1: Authentication check
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: "Unauthorized - Only admins can create campaigns" },
-        { status: 401 }
-      );
-    }
+    const denied = requireAdminOrDashboardPermission(session, "campaigns");
+    if (denied) return denied;
 
     const data = await request.json();
 
-    // ✅ STEP 2: Validate required fields
-    if (!data.title || !data.description || !data.targetAmount || !data.categoryId) {
+    const goalType = normalizeGoalType(data.goalType);
+    const fundraisingMode = normalizeFundraisingMode(data.fundraisingMode);
+
+    let targetAmount = Number(data.targetAmount);
+    if (goalType === GOAL_TYPE_OPEN) {
+      targetAmount = 0;
+    } else if (!Number.isFinite(targetAmount) || targetAmount < 1) {
       return NextResponse.json(
-        { error: "Missing required fields: title, description, targetAmount, categoryId" },
+        { error: "For fixed-goal campaigns, targetAmount must be at least 1" },
         { status: 400 }
       );
+    }
+
+    if (!data.title || !data.description || !data.categoryId) {
+      return NextResponse.json(
+        { error: "Missing required fields: title, description, categoryId" },
+        { status: 400 }
+      );
+    }
+
+    if (fundraisingMode === FUNDRAISING_SHARES) {
+      const sp = Number(data.sharePriceUSD);
+      if (!Number.isFinite(sp) || sp <= 0) {
+        return NextResponse.json(
+          { error: "sharePriceUSD is required and must be positive for share-based (سهوم) campaigns" },
+          { status: 400 }
+        );
+      }
     }
 
     if (!data.images || data.images.length === 0) {
@@ -177,6 +226,28 @@ export async function POST(request: NextRequest) {
         { error: "At least one image is required" },
         { status: 400 }
       );
+    }
+
+    let suggestedDonations: Prisma.InputJsonValue | undefined;
+    if (data.suggestedDonations !== undefined) {
+      try {
+        const v = validateSuggestedDonationsBody(data.suggestedDonations);
+        if (v) suggestedDonations = v as unknown as Prisma.InputJsonValue;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Invalid suggestedDonations";
+        return NextResponse.json({ error: msg }, { status: 400 });
+      }
+    }
+
+    let suggestedShareCounts: Prisma.InputJsonValue | undefined;
+    if (data.suggestedShareCounts !== undefined) {
+      try {
+        const v = validateSuggestedShareCountsBody(data.suggestedShareCounts);
+        if (v) suggestedShareCounts = v as unknown as Prisma.InputJsonValue;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Invalid suggestedShareCounts";
+        return NextResponse.json({ error: msg }, { status: 400 });
+      }
     }
 
     // ✅ STEP 3: Validate category exists
@@ -214,17 +285,27 @@ export async function POST(request: NextRequest) {
     // ✅ STEP 5: Create campaign with translations in a transaction
     const campaign = await prisma.$transaction(async (tx) => {
       // Create main campaign (Arabic)
+      const sharePriceUSD =
+        fundraisingMode === FUNDRAISING_SHARES ? Number(data.sharePriceUSD) : null;
+
       const newCampaign = await tx.campaign.create({
         data: {
           title: data.title,
           description: data.description,
-          targetAmount: data.targetAmount,
+          targetAmount,
           currentAmount: 0,
           categoryId: data.categoryId,
           isActive: data.isActive ?? true,
           images: data.images,
           videoUrl: data.videoUrl || null,
           priority: data.priority || null,
+          goalType,
+          fundraisingMode,
+          sharePriceUSD: Number.isFinite(sharePriceUSD) && sharePriceUSD > 0 ? sharePriceUSD : null,
+          ...(suggestedDonations !== undefined ? { suggestedDonations } : {}),
+          ...(suggestedShareCounts !== undefined
+            ? { suggestedShareCounts }
+            : {}),
         },
       });
 
@@ -259,6 +340,11 @@ export async function POST(request: NextRequest) {
         categoryId: true,
         createdAt: true,
         updatedAt: true,
+        suggestedDonations: true,
+        goalType: true,
+        fundraisingMode: true,
+        sharePriceUSD: true,
+        suggestedShareCounts: true,
         translations: {
           select: {
             locale: true,
@@ -274,6 +360,19 @@ export async function POST(request: NextRequest) {
           },
         },
       },
+    });
+
+    const actor = session!.user;
+    await writeAuditLog({
+      actorId: actor.id,
+      actorName: actor.name,
+      actorRole: actor.role ?? "ADMIN",
+      action: "CAMPAIGN_CREATE",
+      messageAr: `${actor.name ?? "مسؤول"} أنشأ حملة جديدة: ${fullCampaign?.title ?? data.title}`,
+      messageEn: `${actor.name ?? "Admin"} created campaign ${fullCampaign?.title ?? data.title}`,
+      entityType: "Campaign",
+      entityId: campaign.id,
+      metadata: { title: fullCampaign?.title ?? data.title },
     });
 
     return NextResponse.json(fullCampaign, { status: 201 });

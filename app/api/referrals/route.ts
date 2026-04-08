@@ -3,14 +3,15 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/options";
 import { isValidReferralCode } from "@/lib/referral";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog } from "@/lib/audit-log";
 
 /** GET /api/referrals - List all referrals (admin only) */
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, "referrals");
+    if (denied) return denied;
     const referrals = await prisma.referral.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -40,9 +41,8 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, "referrals");
+    if (denied) return denied;
     const body = await request.json();
     const { code, name, cookieExpiryDays: rawExpiry } = body;
     const raw = typeof code === "string" ? code.trim() : "";
@@ -81,6 +81,19 @@ export async function POST(request: NextRequest) {
         cookieExpiryDays,
       },
     });
+
+    const actor = session!.user;
+    await writeAuditLog({
+      actorId: actor.id,
+      actorName: actor.name,
+      actorRole: actor.role ?? "ADMIN",
+      stream: "TEAM",
+      action: "REFERRAL_CREATE",
+      messageAr: `${actor.name ?? "مسؤول"} أنشأ رابط تتبع: ${codeLower}${referral.name ? ` (${referral.name})` : ""}`,
+      entityType: "Referral",
+      entityId: referral.id,
+    });
+
     return NextResponse.json(referral);
   } catch (error) {
     console.error("Error creating referral:", error);

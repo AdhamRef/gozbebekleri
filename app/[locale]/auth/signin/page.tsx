@@ -1,42 +1,108 @@
 'use client';
 
 import { signIn } from 'next-auth/react';
-import { motion } from 'framer-motion';
+import { useLocale } from 'next-intl';
+import { Link } from '@/i18n/routing';
+import { Heart, ArrowRight } from 'lucide-react';
+
+const LOGO_URL = 'https://i.ibb.co/ZwcJcN1/logo.webp';
 
 export default function SignIn() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-white py-12 px-4 sm:px-6 lg:px-8" >
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            تسجيل دخول
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            قم بتسجيل دخول للمتابعة
-          </p>
-        </div>
-        <div className="mt-8 space-y-4">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => signIn('google', { callbackUrl: '/' })}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-transparent text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 shadow-sm transition-all"
-          >
-            <img src="/google.svg" alt="Google" className="w-5 h-5" />
-            <span>تسجيل دخول باستخدام Google</span>
-          </motion.button>
+  const locale = useLocale();
+  const isTr = locale === 'tr';
+  const isAr = locale === 'ar';
 
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => signIn('facebook', { callbackUrl: '/' })}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-transparent text-sm font-medium rounded-md text-white bg-[#1877F2] hover:bg-[#1874EA] shadow-sm transition-all"
+  const labels = {
+    headline: isTr ? 'HALA ÜYE DEĞİL MİSİNİZ?' : isAr ? 'هل أنت عضو جديد؟' : 'NOT A MEMBER YET?',
+    sub: isTr
+      ? 'Üye olarak bağışlarınızı takip edebilir, özel kampanyalara katılabilirsiniz.'
+      : isAr
+      ? 'سجّل للمتابعة وتتبع تبرعاتك والمشاركة في الحملات.'
+      : 'Register to track your donations and join exclusive campaigns.',
+    signIn: isTr ? 'GİRİŞ YAP' : isAr ? 'تسجيل الدخول' : 'SIGN IN',
+    register: isTr ? 'KAYIT OL' : isAr ? 'إنشاء حساب' : 'REGISTER',
+    orContinue: isTr ? 'ile devam et' : isAr ? 'تابع باستخدام' : 'continue with',
+    title: isTr ? 'Giriş Yap' : isAr ? 'تسجيل الدخول' : 'Sign In',
+    welcome: isTr ? 'Tekrar hoş geldiniz' : isAr ? 'مرحباً بعودتك' : 'Welcome back',
+    noAccount: isTr ? 'Hesabınız yok mu?' : isAr ? 'ليس لديك حساب؟' : "Don't have an account?",
+    createOne: isTr ? 'Üye ol' : isAr ? 'أنشئ حساباً' : 'Create one',
+    google: isTr ? "Google ile giriş yap" : isAr ? "الدخول عبر Google" : "Sign in with Google",
+    facebook: isTr ? "Facebook ile giriş yap" : isAr ? "الدخول عبر Facebook" : "Sign in with Facebook",
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Left: decorative panel */}
+      <div className="hidden lg:flex lg:w-1/2 bg-[#025EB8] flex-col items-center justify-center p-12 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#025EB8] to-[#013a75]" />
+        {/* Decorative circles */}
+        <div className="absolute top-[-80px] right-[-80px] w-80 h-80 rounded-full bg-white/5" />
+        <div className="absolute bottom-[-60px] left-[-60px] w-64 h-64 rounded-full bg-white/5" />
+
+        <div className="relative z-10 text-center text-white max-w-sm">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={LOGO_URL} alt="Logo" className="h-20 w-auto object-contain mx-auto mb-8 brightness-0 invert" />
+          <div className="w-12 h-1 bg-[#FA5D17] mx-auto mb-6 rounded-full" />
+          <h2 className="text-2xl font-extrabold mb-4 uppercase tracking-wide">{labels.headline}</h2>
+          <p className="text-white/75 text-sm leading-relaxed mb-8">{labels.sub}</p>
+          <Link
+            href="/campaigns"
+            className="inline-flex items-center gap-2 bg-[#FA5D17] hover:bg-[#e04d0f] text-white font-bold px-6 py-3 rounded-lg transition-colors"
           >
-            <img src="/facebook.svg" alt="Facebook" className="w-5 h-5" />
-            <span>تسجيل دخول باستخدام Facebook</span>
-          </motion.button>
+            <Heart className="w-4 h-4" />
+            {isTr ? 'Bağış Yap' : isAr ? 'تبرع الآن' : 'Donate Now'}
+          </Link>
+        </div>
+      </div>
+
+      {/* Right: form panel */}
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-12">
+        <div className="w-full max-w-md">
+          {/* Mobile logo */}
+          <div className="lg:hidden text-center mb-8">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={LOGO_URL} alt="Logo" className="h-14 w-auto object-contain mx-auto" />
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+            <h1 className="text-2xl font-extrabold text-gray-900 mb-1">{labels.title}</h1>
+            <p className="text-sm text-gray-500 mb-8">{labels.welcome}</p>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => signIn('google', { callbackUrl: '/' })}
+                className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-sm"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/google.svg" alt="Google" className="w-5 h-5" />
+                {labels.google}
+              </button>
+
+              <button
+                onClick={() => signIn('facebook', { callbackUrl: '/' })}
+                className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-transparent rounded-lg text-sm font-semibold text-white bg-[#1877F2] hover:bg-[#1874EA] transition-colors shadow-sm"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/facebook.svg" alt="Facebook" className="w-5 h-5" />
+                {labels.facebook}
+              </button>
+            </div>
+
+            <div className="mt-6 flex items-center gap-3">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-xs text-gray-400">{labels.orContinue}</span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+
+            <p className="mt-6 text-center text-sm text-gray-500">
+              {labels.noAccount}{" "}
+              <Link href="/campaigns" className="text-[#025EB8] font-semibold hover:text-[#FA5D17] transition-colors inline-flex items-center gap-1">
+                {labels.createOne} <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>
   );
-} 
+}

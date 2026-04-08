@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import cloudinary from '@/lib/cloudinary';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/options';
+import {
+  writeAuditLog,
+  auditActorFromSiteSession,
+  auditStreamForRole,
+} from '@/lib/audit-log';
 
 export async function POST(request: Request) {
   try {
@@ -26,6 +31,16 @@ export async function POST(request: Request) {
     const result = await cloudinary.uploader.upload(fileBase64, {
       folder: 'campaigns',
       resource_type: 'auto',
+    });
+
+    const actor = auditActorFromSiteSession(session);
+    await writeAuditLog({
+      ...actor,
+      action: "MEDIA_UPLOAD",
+      messageAr: `${actor.actorName ?? "مستخدم"} رفع ملفًا إلى التخزين (${file.name || "ملف"})`,
+      entityType: "Media",
+      metadata: { publicId: result.public_id },
+      stream: auditStreamForRole(actor.actorRole),
     });
 
     return NextResponse.json({
@@ -54,6 +69,16 @@ export async function DELETE(request: Request) {
 
     // Delete from Cloudinary
     await cloudinary.uploader.destroy(`campaigns/${publicId}`);
+
+    const actor = auditActorFromSiteSession(session);
+    await writeAuditLog({
+      ...actor,
+      action: "MEDIA_DELETE",
+      messageAr: `${actor.actorName ?? "مستخدم"} حذف صورة من التخزين`,
+      entityType: "Media",
+      metadata: { publicId },
+      stream: auditStreamForRole(actor.actorRole),
+    });
 
     return NextResponse.json({ message: 'Image deleted successfully' });
   } catch (error) {

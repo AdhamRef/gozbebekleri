@@ -59,7 +59,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description: campaign.description,
       images: [
         {
-          url: campaign.images[0] || "/placeholder.jpg",
+          url: campaign.images[0] || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg",
           width: 1200,
           height: 630,
           alt: campaign.title,
@@ -72,7 +72,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       card: "summary_large_image",
       title: `${campaign.title} - قرة العيون`,
       description: campaign.description,
-      images: [campaign.images[0] || "/placeholder.jpg"],
+      images: [campaign.images[0] || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"],
     },
     alternates: {
       canonical: `https://gozbebekleri.vercel.app/${locale}/campaigns/${id}`,

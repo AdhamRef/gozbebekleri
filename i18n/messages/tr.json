@@ -21,7 +21,11 @@
     "noCategories": "Kategori yok",
     "myProfile": "Profilim",
     "myDonations": "Bağışlarım",
-    "signOut": "Çıkış"
+    "signOut": "Çıkış",
+    "activities": "Etkinlikler",
+    "searchPlaceholder": "Ara...",
+    "donate": "BAĞIŞ YAP",
+    "signIn": "Giriş Yap"
   },
   "HomePage": {
     "donationCategories": "Bağış Kategorileri",
@@ -38,7 +42,16 @@
     "faq4Question": "Uzaktan gönüllü olabilir miyim?",
     "faq4Answer": "Evet! İçerik yönetimi, grafik tasarım, dijital pazarlama ve destek taraflarla iletişim gibi dijital gönüllülük fırsatlarımız var.",
     "faq5Question": "Kendi girişimimi nasıl önerebilirim?",
-    "faq5Answer": "İnsani bir proje fikriniz varsa, gözbebekleri ekibi kaynak ve lojistik destek sağlayarak uygulamanıza yardımcı olabilir."
+    "faq5Answer": "İnsani bir proje fikriniz varsa, gözbebekleri ekibi kaynak ve lojistik destek sağlayarak uygulamanıza yardımcı olabilir.",
+    "featuredProjects": "ÖNE ÇIKAN PROJELER",
+    "currentProjects": "Güncel Projeler",
+    "viewAll": "Tümünü Gör",
+    "weHelp": "YARDIM EDİYORUZ",
+    "latestNews": "SON HABERLER",
+    "stat1Label": "Yararlanıcılar",
+    "stat2Label": "Gönüllüler",
+    "stat3Label": "Tamamlanan Projeler",
+    "stat4Label": "Ortaklar"
   },
   "HeroSlider": {
     "quickDonate": "Hızlı Bağış"
@@ -48,7 +61,9 @@
     "viewAll": "Tümünü Gör",
     "donations": "toplanan",
     "remaining": "kalan",
-    "contributor": "katkıda bulunan"
+    "contributor": "katkıda bulunan",
+    "openGoal": "Açık hedef",
+    "sharesMode": "Hisse — hisse başı {currency}{price}"
   },
   "QuickDonate": {
     "associationName": "Kurratül-Ayn Yardım ve Dayanışma Derneği",
@@ -144,13 +159,19 @@
     "successTitle": "Mesajınız başarıyla gönderildi!",
     "successMessage": "Bize ulaştığınız için teşekkürler, en kısa sürede size dönüş yapacağız",
     "requiredFields": "Lütfen zorunlu alanları doldurun",
-    "ourLocation": "Konumumuz"
+    "ourLocation": "Konumumuz",
+    "subtitle": "Size yardımcı olmak için buradayız",
+    "name": "Ad Soyad",
+    "message": "Mesaj",
+    "messageType": "Konu",
+    "submit": "Gönder",
+    "errorOccurred": "Bir hata oluştu. Lütfen tekrar deneyin."
   },
   "Blog": {
     "metaTitleSuffix": " - Kurratül-Ayn",
     "sharePost": "Yazıyı Paylaş",
     "similarPosts": "Benzer Yazılar",
-    "relatedCampaign": "İlgili Kampanya",
+    "relatedCampaign": "İlgili Kampanyalar",
     "viewCampaign": "Kampanyayı görüntüle",
     "donateNow": "Bağış Yap",
     "campaignDonations": "bağış",
@@ -177,7 +198,10 @@
     "retry": "Tekrar dene",
     "noResults": "Aramanızla eşleşen sonuç bulunamadı",
     "tryDifferentSearch": "Farklı arama terimleri deneyin",
-    "checkBackLater": "Yeni yazılar için daha sonra tekrar bakın"
+    "checkBackLater": "Yeni yazılar için daha sonra tekrar bakın",
+    "title": "Haberler",
+    "subtitle": "Son haberler ve güncellemeler",
+    "news": "HABERLER"
   },
   "CampaignsPage": {
     "browse": "Gözat",
@@ -204,7 +228,17 @@
     "noResults": "Aramanızla eşleşen sonuç bulunamadı",
     "noCampaigns": "Şu an kampanya bulunmuyor",
     "tryDifferentSearch": "Farklı arama terimleri deneyin",
-    "checkBackLater": "Yeni kampanyalar için daha sonra tekrar bakın"
+    "checkBackLater": "Yeni kampanyalar için daha sonra tekrar bakın",
+    "projects": "PROJELERİMİZ",
+    "filter": "Filtre",
+    "resetFilters": "Sıfırla",
+    "donateNow": "Bağış Yap",
+    "details": "Detaylar",
+    "raised": "Toplanan",
+    "goal": "Hedef",
+    "home": "Ana Sayfa",
+    "heroDescription": "Anlamlı davalara destek olun ve insanların hayatında kalıcı bir fark yaratın.",
+    "resultsFound": "kampanya bulundu"
   },
   "Campaign": {
     "story": "Hikaye",
@@ -348,8 +382,8 @@
     "processing": "İşleniyor...",
     "donationSuccess": "Bağış başarılı",
     "donationFailed": "Bağış başarısız",
-    "successRedirecting": "Teşekkürler!",
-    "successRedirectingDesc": "Makbuzunuza yönlendiriliyorsunuz...",
+    "successRedirecting": "Ödeme Sayfasına Yönlendiriliyor",
+    "successRedirectingDesc": "Ödemenizi tamamlamak için güvenli şekilde yönlendiriliyorsunuz.",
     "paymentFeesPercent": "Ödeme Ücretleri (%3)"
   },
   "DonationSuccess": {
@@ -444,7 +478,8 @@
       "notSpecified": "Belirtilmemiş",
       "editTitle": "{title} Düzenle",
       "enterPlaceholder": "{title} girin",
-      "saveChanges": "Değişiklikleri kaydet"
+      "saveChanges": "Değişiklikleri kaydet",
+      "cancel": "İptal"
     },
     "settings": {
       "notifications": "Bildirimler",
@@ -465,6 +500,10 @@
     "donations": {
       "donation": "Bağış",
       "totalDonations": "Toplam Bağışlar",
+      "totalInPeriodTitle": "Toplam (bu dönem)",
+      "recordsInPeriodLabel": "Bu dönemde {count} kayıt",
+      "historyTableTitle": "Bağış geçmişi",
+      "emptyHistoryList": "Seçilen dönem için bağış yok.",
       "donationsCount": "{count} bağış",
       "perDonation": "bağış başına",
       "monthlyDonations": "Aylık Bağışlar",
@@ -493,6 +532,9 @@
       "actions": "İşlemler"
     },
     "subscriptions": {
+      "settingsTableTitle": "Abonelikler ve ayarlar",
+      "emptySubscriptionsList": "Aylık aboneliğiniz yok.",
+      "sinceDate": "Başlangıç",
       "activeMonthlyDonations": "Aktif Aylık Bağışlar",
       "ofSubscriptions": "{count} abonelikten",
       "totalMonthlyDonations": "Toplam Aylık Bağışlar",
@@ -505,12 +547,14 @@
       "nextRenewal": "Sonraki yenileme:",
       "active": "Aktif",
       "paused": "Duraklatıldı",
+      "pause": "Duraklat",
       "pauseSubscription": "Duraklat",
       "resume": "Devam Et",
       "billingDay": "Ödeme günü",
       "manage": "Yönet",
       "manageSubscription": "Aboneliği yönet",
       "cancelSubscription": "Aboneliği iptal et",
+      "cancel": "Aboneliği iptal et",
       "subscriptionSettings": "Aylık bağış ayarları",
       "cancelled": "İptal edildi",
       "perMonth": "/ ay"
@@ -562,5 +606,13 @@
       "openMenu": "Menüyü aç",
       "closeMenu": "Menüyü kapat"
     }
+  },
+  "MessageSubjects": {
+    "COMPLAINT": "Sikayet",
+    "DONATION_ISSUE": "Bağış sorunu",
+    "CAMPAIGN_SUPPORT": "Kampanya desteği",
+    "PARTNERSHIP": "Ortaklık",
+    "VOLUNTEERING": "Gönüllülük",
+    "GENERAL": "Genel talep"
   }
 }

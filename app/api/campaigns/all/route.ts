@@ -1,17 +1,20 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/options';
+import { requireAdminOrDashboardPermission } from '@/lib/dashboard/api-auth';
+import { parseIncludeInactive } from '@/lib/campaign/include-inactive-query';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, 'campaigns');
+    if (denied) return denied;
 
-    // Get all campaigns without pagination
+    const includeInactive = parseIncludeInactive(request.nextUrl.searchParams);
+
     const campaigns = await prisma.campaign.findMany({
+      where: includeInactive ? undefined : { isActive: true },
       include: {
         donations: {
           select: {

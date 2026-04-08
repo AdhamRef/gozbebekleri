@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/form';
 import { ArrowLeft, Loader2, Upload, X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import CategoryIcon, { CATEGORY_ICON_NAMES } from '@/components/CategoryIcon';
 
 const formSchema = z.object({
   name: z.string().min(1, 'اسم القسم مطلوب').max(50, 'اسم القسم طويل جداً'),
@@ -216,10 +217,10 @@ export default function NewCategoryPage() {
                             />
                             <label
                               htmlFor="image"
-                              className="flex flex-col items-center justify-center w-40 h-40 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-emerald-500 transition-colors"
+                              className="flex flex-col items-center justify-center w-40 h-40 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#025EB8] transition-colors"
                             >
                               {uploadingImage ? (
-                                <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
+                                <Loader2 className="w-6 h-6 animate-spin text-[#025EB8]" />
                               ) : (
                                 <>
                                   <Upload className="w-6 h-6 text-gray-400" />
@@ -241,23 +242,44 @@ export default function NewCategoryPage() {
                 )}
               />
 
-              {/* Icon */}
+              {/* Icon Picker */}
               <FormField
                 control={form.control}
                 name="icon"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>أيقونة SVG</FormLabel>
+                    <FormLabel>أيقونة القسم</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="<svg>...</svg>"
-                        className="resize-y"
-                        {...field}
-                      />
+                      <div className="space-y-3">
+                        {field.value && (
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <div className="w-9 h-9 rounded-lg bg-[#025EB8]/10 flex items-center justify-center">
+                              <CategoryIcon name={field.value} className="w-5 h-5 text-[#025EB8]" />
+                            </div>
+                            <span className="font-medium">{field.value}</span>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
+                          {CATEGORY_ICON_NAMES.map((name) => (
+                            <button
+                              key={name}
+                              type="button"
+                              title={name}
+                              onClick={() => field.onChange(name)}
+                              className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-all ${
+                                field.value === name
+                                  ? 'border-[#025EB8] bg-[#025EB8]/10 text-[#025EB8]'
+                                  : 'border-gray-200 text-gray-500 hover:border-[#025EB8]/50 hover:text-[#025EB8]'
+                              }`}
+                            >
+                              <CategoryIcon name={name} className="w-5 h-5" />
+                              <span className="text-[9px] leading-tight text-center truncate w-full">{name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </FormControl>
-                    <FormDescription>
-                      أدخل كود SVG الخاص بالأيقونة هنا
-                    </FormDescription>
+                    <FormDescription>اختر أيقونة للقسم</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -276,7 +298,7 @@ export default function NewCategoryPage() {
             </Button>
             <Button
               type="submit"
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-[#025EB8] hover:bg-[#014fa0]"
               disabled={saving}
             >
               {saving && <Loader2 className="w-4 h-4 ml-2 animate-spin" />}

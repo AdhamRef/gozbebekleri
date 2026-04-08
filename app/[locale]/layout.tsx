@@ -87,7 +87,7 @@ export default async function Rootlayout({
           <CurrencyProvider>
             <SessionProvider session={session}>
               <Navbar />
-            <main className="pt-20 lg:pt-32">
+            <main className="pt-16 lg:pt-[104px]">
               {children}
             </main>
             <Footer />

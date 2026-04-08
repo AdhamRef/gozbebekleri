@@ -36,19 +36,20 @@ import {
   Trash2, 
   Eye,
   ArrowUpDown,
-  Filter,
   MoreVertical,
   Download,
   Loader2,
-  AlertCircle
+  Power,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { CampaignReorderDialog } from './_components/CampaignReorderDialog';
+import { Switch } from '@/components/ui/switch';
 
 interface Campaign {
+  goalType: string;
   id: string;
   title: string;
   targetAmount: number;
@@ -83,12 +84,15 @@ export default function CampaignsPage() {
   const [itemsPerPage] = useState(10);
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [activeToggleId, setActiveToggleId] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
       const lc = locale || 'ar';
       const [campaignsRes, categoriesRes] = await Promise.all([
-        axios.get('/api/campaigns/all', { params: { locale: lc } }),
+        axios.get('/api/campaigns/all', {
+          params: { locale: lc, isActiveFalse: true },
+        }),
         axios.get('/api/categories', { params: { locale: lc, counts: true, limit: 200 } })
       ]);
 
@@ -115,6 +119,26 @@ export default function CampaignsPage() {
     } else {
       setSortField(field);
       setSortDirection('asc');
+    }
+  };
+
+  const handleToggleActive = async (campaign: Campaign, nextActive: boolean) => {
+    if (activeToggleId) return;
+    setActiveToggleId(campaign.id);
+    try {
+      await axios.put(`/api/campaigns/${campaign.id}`, { isActive: nextActive });
+      setCampaigns((prev) =>
+        prev.map((c) => (c.id === campaign.id ? { ...c, isActive: nextActive } : c))
+      );
+      toast.success(nextActive ? 'تم تفعيل الحملة' : 'تم إيقاف الحملة');
+    } catch (error: unknown) {
+      console.error('Error updating campaign status:', error);
+      const msg = axios.isAxiosError(error)
+        ? error.response?.data?.error || error.message
+        : 'تعذّر تحديث حالة الحملة';
+      toast.error(typeof msg === 'string' ? msg : 'تعذّر تحديث حالة الحملة');
+    } finally {
+      setActiveToggleId(null);
     }
   };
 
@@ -247,7 +271,7 @@ export default function CampaignsPage() {
         <div className="flex flex-wrap gap-2">
           <Button
             onClick={() => window.location.href = '/dashboard/campaigns/new'}
-            className="bg-emerald-600 hover:bg-emerald-700 gap-2"
+            className="bg-[#025EB8] hover:bg-[#014fa0] gap-2"
           >
             <Plus className="w-4 h-4" />
             إنشاء حملة جديدة
@@ -393,24 +417,26 @@ export default function CampaignsPage() {
                 <TableCell>${campaign.targetAmount.toLocaleString()}</TableCell>
                 <TableCell>${campaign.currentAmount.toLocaleString()}</TableCell>
                 <TableCell>
-                  <div className="w-full min-w-[4rem] bg-muted rounded-full h-2.5">
+                  {campaign.goalType === "OPEN" ? "_" : <>                  <div className="w-full min-w-[4rem] bg-muted rounded-full h-2.5">
                     <div
-                      className="bg-emerald-600 h-2.5 rounded-full transition-all"
+                      className="bg-[#025EB8] h-2.5 rounded-full transition-all"
                       style={{ width: `${Math.min((campaign.currentAmount / campaign.targetAmount) * 100, 100)}%` }}
                     />
                   </div>
                   <span className="text-xs text-muted-foreground mt-1">
                     {Math.round((campaign.currentAmount / campaign.targetAmount) * 100)}%
-                  </span>
+                  </span></>}
+
                 </TableCell>
                 <TableCell>
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    campaign.isActive 
-                      ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300' 
-                      : 'bg-muted text-muted-foreground'
-                  }`}>
-                    {campaign.isActive ? 'نشط' : 'متوقف'}
-                  </span>
+                  <div className="flex items-center justify-end gap-2 flex-wrap">
+                    <Switch
+                      checked={campaign.isActive}
+                      disabled={activeToggleId === campaign.id}
+                      onCheckedChange={(checked) => handleToggleActive(campaign, checked)}
+                      aria-label={campaign.isActive ? 'إيقاف الحملة' : 'تفعيل الحملة'}
+                    />
+                  </div>
                 </TableCell>
                 <TableCell>
                   {format(new Date(campaign.createdAt), 'PPP', { locale: ar })}
@@ -432,6 +458,13 @@ export default function CampaignsPage() {
                         <DropdownMenuItem onClick={() => router.push(`/dashboard/campaigns/edit/${campaign.id}`)}>
                           <Edit className="w-4 h-4 ml-2" />
                           تعديل
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={activeToggleId === campaign.id}
+                          onClick={() => handleToggleActive(campaign, !campaign.isActive)}
+                        >
+                          <Power className="w-4 h-4 ml-2" />
+                          {campaign.isActive ? 'إيقاف الحملة' : 'تفعيل الحملة'}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem

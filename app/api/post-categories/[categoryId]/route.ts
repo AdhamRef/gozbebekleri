@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from "../../auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 
 export async function GET(
   req: NextRequest,
@@ -73,7 +75,8 @@ export async function PATCH(
   try {
     const { categoryId } = await params;
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const denied = requireAdminOrDashboardPermission(session, 'blog');
+    if (denied) return denied;
     const body = await req.json();
 
     const updateData: any = {};
@@ -112,6 +115,15 @@ export async function PATCH(
 
     const full = await prisma.postCategory.findUnique({ where: { id: updated.id }, select: { id: true, name: true, title: true, description: true, image: true, translations: { select: { locale: true, name: true, title: true, description: true, image: true } } } });
 
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "POST_CATEGORY_UPDATE",
+      messageAr: `${actor.actorName ?? "مسؤول"} عدّل تصنيف المدونة: ${full?.name ?? categoryId}`,
+      entityType: "PostCategory",
+      entityId: categoryId,
+    });
+
     return NextResponse.json(full);
   } catch (error) {
     console.error('[CATEGORY_PATCH]', error);
@@ -126,8 +138,14 @@ export async function DELETE(
   try {
     const { categoryId } = await params;
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const denied = requireAdminOrDashboardPermission(session, 'blog');
+    if (denied) return denied;
     const force = req.nextUrl.searchParams.get('force') === 'true';
+
+    const catMeta = await prisma.postCategory.findUnique({
+      where: { id: categoryId },
+      select: { name: true },
+    });
 
     const postCount = await prisma.post.count({ where: { categoryId } });
     if (postCount > 0 && !force) return NextResponse.json({ error: 'Category has posts. Use force=true to delete.' }, { status: 400 });
@@ -138,6 +156,16 @@ export async function DELETE(
       }
       await tx.postCategoryTranslation.deleteMany({ where: { categoryId } });
       await tx.postCategory.delete({ where: { id: categoryId } });
+    });
+
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "POST_CATEGORY_DELETE",
+      messageAr: `${actor.actorName ?? "مسؤول"} حذف تصنيف المدونة: ${catMeta?.name ?? categoryId}${force ? " (مع المقالات)" : ""}`,
+      entityType: "PostCategory",
+      entityId: categoryId,
+      metadata: { force },
     });
 
     return NextResponse.json({ message: 'Category deleted' });

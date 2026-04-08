@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -46,19 +46,28 @@ import {
   Globe 
 } from 'lucide-react';
 import { useLocale } from 'next-intl';
+import {
+  SuggestedDonationsSection,
+  type SuggestedDonationsSectionRef,
+} from '../_components/SuggestedDonationsSection';
+import {
+  SuggestedShareCountsSection,
+  type SuggestedShareCountsSectionRef,
+} from '../_components/SuggestedShareCountsSection';
 
 // ✅ Enhanced schema with translations
-const formSchema = z.object({
-  // Arabic (required)
+const formSchema = z
+  .object({
   title: z.string()
     .min(1, 'العنوان مطلوب')
     .max(100, 'العنوان طويل جداً'),
   description: z.string()
     .min(1, 'الوصف مطلوب')
     .max(10000, 'الوصف طويل جداً'),
-  targetAmount: z.number()
-    .min(1, 'المبلغ المستهدف مطلوب')
-    .max(1000000, 'المبلغ المستهدف كبير جداً'),
+  targetAmount: z.number().min(0).max(1000000),
+  goalType: z.enum(['FIXED', 'OPEN']),
+  fundraisingMode: z.enum(['AMOUNT', 'SHARES']),
+  sharePriceUSD: z.number().min(0).max(1000000).optional(),
   categoryId: z.string()
     .min(1, 'القسم مطلوب'),
   isActive: z.boolean(),
@@ -67,7 +76,6 @@ const formSchema = z.object({
     .max(5, 'الحد الأقصى 5 صور'),
   videoUrl: z.string().optional(),
   
-  // Optional translations
   title_en: z.string().optional(),
   description_en: z.string().optional(),
   title_fr: z.string().optional(),
@@ -80,7 +88,23 @@ const formSchema = z.object({
   description_pt: z.string().optional(),
   title_es: z.string().optional(),
   description_es: z.string().optional(),
-});
+})
+  .superRefine((data, ctx) => {
+    if (data.goalType === 'FIXED' && (!data.targetAmount || data.targetAmount < 1)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'المبلغ المستهدف مطلوب (≥ 1) عند اختيار هدف ثابت',
+        path: ['targetAmount'],
+      });
+    }
+    if (data.fundraisingMode === 'SHARES' && (!data.sharePriceUSD || data.sharePriceUSD <= 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'أدخل سعر السهم الواحد بالدولار الأمريكي لحملات السهوم',
+        path: ['sharePriceUSD'],
+      });
+    }
+  });
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -97,6 +121,8 @@ export default function NewCampaignPage() {
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [activeTab, setActiveTab] = useState<'ar' | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es'>('ar');
+  const suggestedDonationsRef = useRef<SuggestedDonationsSectionRef>(null);
+  const suggestedShareCountsRef = useRef<SuggestedShareCountsSectionRef>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -104,6 +130,9 @@ export default function NewCampaignPage() {
       title: '',
       description: '',
       targetAmount: 0,
+      goalType: 'FIXED',
+      fundraisingMode: 'AMOUNT',
+      sharePriceUSD: 0,
       categoryId: '',
       isActive: true,
       images: [],
@@ -155,7 +184,11 @@ export default function NewCampaignPage() {
       const requestData = {
         title: values.title,
         description: values.description,
-        targetAmount: values.targetAmount,
+        goalType: values.goalType,
+        fundraisingMode: values.fundraisingMode,
+        targetAmount: values.goalType === 'OPEN' ? 0 : values.targetAmount,
+        sharePriceUSD:
+          values.fundraisingMode === 'SHARES' ? values.sharePriceUSD : undefined,
         categoryId: values.categoryId,
         isActive: values.isActive,
         images: values.images,
@@ -170,6 +203,14 @@ export default function NewCampaignPage() {
           ...(values.title_pt && values.description_pt ? { pt: { title: values.title_pt, description: values.description_pt } } : {}),
           ...(values.title_es && values.description_es ? { es: { title: values.title_es, description: values.description_es } } : {}),
         },
+        suggestedDonations:
+          values.fundraisingMode === 'AMOUNT'
+            ? suggestedDonationsRef.current?.getPayload()
+            : undefined,
+        suggestedShareCounts:
+          values.fundraisingMode === 'SHARES'
+            ? suggestedShareCountsRef.current?.getPayload()
+            : undefined,
       };
 
       await axios.post('/api/campaigns', requestData);
@@ -252,7 +293,7 @@ const getTranslationStatus = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#025EB8]" />
       </div>
     );
   }
@@ -275,7 +316,7 @@ const getTranslationStatus = () => {
             {translationStatus.hasEn && (
               <CheckCircle2 className="w-4 h-4 text-green-600" title="English ready" />
             )}
-            {translationStatus.hasFr && <CheckCircle2 className="w-4 h-4 text-blue-600" title="French ready" />}
+            {translationStatus.hasFr && <CheckCircle2 className="w-4 h-4 text-[#025EB8]" title="French ready" />}
             {translationStatus.hasTr && <CheckCircle2 className="w-4 h-4 text-green-600" title="Turkish ready" />}
             {translationStatus.hasId && <CheckCircle2 className="w-4 h-4 text-green-600" title="Indonesian ready" />}
             {translationStatus.hasPt && <CheckCircle2 className="w-4 h-4 text-green-600" title="Portuguese ready" />}
@@ -313,7 +354,7 @@ const getTranslationStatus = () => {
                 </TabsTrigger>
                 <TabsTrigger value="fr" className="gap-2">
                   🇫🇷 Français
-                  {translationStatus.hasFr && <CheckCircle2 className="w-3 h-3 text-blue-600" />}
+                  {translationStatus.hasFr && <CheckCircle2 className="w-3 h-3 text-[#025EB8]" />}
                 </TabsTrigger>
                 <TabsTrigger value="tr" className="gap-2">
                   🇹🇷 Türkçe
@@ -557,6 +598,57 @@ const getTranslationStatus = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
+                name="goalType"
+                render={({ field }) => (
+                  <FormItem dir="rtl">
+                    <FormLabel>نوع الهدف</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="اختر نوع الهدف" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="FIXED">هدف محدد (شريط تقدم)</SelectItem>
+                        <SelectItem value="OPEN">هدف مفتوح (بدون هدف نهائي)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      الهدف المفتوح يخفي المبلغ المستهدف وشريط النسبة؛ يبقى إجمالي ما جُمع ظاهرًا.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="fundraisingMode"
+                render={({ field }) => (
+                  <FormItem dir="rtl">
+                    <FormLabel>طريقة التبرع</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="طريقة التبرع" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="AMOUNT">مبلغ حر</SelectItem>
+                        <SelectItem value="SHARES">سهوم (سعر السهم × العدد)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      في وضع السهوم يحدد المتبرع عدد الأسهم؛ المبلغ = العدد × سعر السهم (بالدولار).
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {form.watch('goalType') === 'FIXED' && (
+              <FormField
+                control={form.control}
                 name="targetAmount"
                 render={({ field }) => (
                   <FormItem dir='rtl'>
@@ -576,6 +668,33 @@ const getTranslationStatus = () => {
                   </FormItem>
                 )}
               />
+              )}
+
+              {form.watch('fundraisingMode') === 'SHARES' && (
+                <FormField
+                  control={form.control}
+                  name="sharePriceUSD"
+                  render={({ field }) => (
+                    <FormItem dir="rtl">
+                      <FormLabel>سعر السهم الواحد (USD) *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          {...field}
+                          value={field.value ?? ''}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          placeholder="مثال: 100"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        سعر كل سهم بالدولار؛ يُحوَّل تلقائيًا لعملة العرض للمتبرع.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
@@ -597,6 +716,16 @@ const getTranslationStatus = () => {
                 )}
               />
             </div>
+            {form.watch('fundraisingMode') === 'SHARES' && (
+              <div className="mt-6">
+                <SuggestedShareCountsSection ref={suggestedShareCountsRef} />
+              </div>
+            )}
+            {form.watch('fundraisingMode') === 'AMOUNT' && (
+              <div className="mt-6">
+                <SuggestedDonationsSection ref={suggestedDonationsRef} />
+              </div>
+            )}
           </Card>
 
           {/* Images */}
@@ -625,7 +754,7 @@ const getTranslationStatus = () => {
                               <X className="w-4 h-4" />
                             </button>
                             {index === 0 && (
-                              <div className="absolute bottom-2 left-2 px-2 py-1 bg-emerald-600 text-white text-xs rounded">
+                              <div className="absolute bottom-2 left-2 px-2 py-1 bg-[#025EB8] text-white text-xs rounded">
                                 صورة رئيسية
                               </div>
                             )}
@@ -644,10 +773,10 @@ const getTranslationStatus = () => {
                             />
                             <label
                               htmlFor="images"
-                              className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-emerald-500 transition-colors"
+                              className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#025EB8] transition-colors"
                             >
                               {uploadingImage ? (
-                                <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
+                                <Loader2 className="w-6 h-6 animate-spin text-[#025EB8]" />
                               ) : (
                                 <>
                                   <Upload className="w-6 h-6 text-gray-400" />
@@ -697,12 +826,12 @@ const getTranslationStatus = () => {
 
           {/* ✅ Translation Summary */}
           {(translationStatus.hasEn || translationStatus.hasFr || translationStatus.hasTr || translationStatus.hasId || translationStatus.hasPt || translationStatus.hasEs) && (
-            <Card className="p-6 bg-blue-50 border-blue-200">
+            <Card className="p-6 bg-[#025EB8]/8 border-blue-200">
               <div className="flex items-start gap-3">
-                <Globe className="w-5 h-5 text-blue-600 mt-0.5" />
+                <Globe className="w-5 h-5 text-[#025EB8] mt-0.5" />
                 <div>
-                  <h3 className="font-semibold text-blue-900 mb-2">ملخص الترجمات</h3>
-                  <div className="space-y-1 text-sm text-blue-800">
+                  <h3 className="font-semibold text-[#025EB8] mb-2">ملخص الترجمات</h3>
+                  <div className="space-y-1 text-sm text-[#025EB8]">
                     <p>✓ المحتوى العربي: مكتمل (مطلوب)</p>
                     {translationStatus.hasEn && (
                       <p>✓ الترجمة الإنجليزية: مكتملة</p>
@@ -712,12 +841,12 @@ const getTranslationStatus = () => {
                     {translationStatus.hasId && <p>✓ الترجمة الإندونيسية: مكتملة</p>}
                     {translationStatus.hasPt && <p>✓ الترجمة البرتغالية: مكتملة</p>}
                     {translationStatus.hasEs && <p>✓ الترجمة الإسبانية: مكتملة</p>}
-                    {!translationStatus.hasEn && <p className="text-blue-600">○ الترجمة الإنجليزية: غير مكتملة (اختياري)</p>}
-                    {!translationStatus.hasFr && <p className="text-blue-600">○ الترجمة الفرنسية: غير مكتملة (اختياري)</p>}
-                    {!translationStatus.hasTr && <p className="text-blue-600">○ الترجمة التركية: غير مكتملة (اختياري)</p>}
-                    {!translationStatus.hasId && <p className="text-blue-600">○ الترجمة الإندونيسية: غير مكتملة (اختياري)</p>}
-                    {!translationStatus.hasPt && <p className="text-blue-600">○ الترجمة البرتغالية: غير مكتملة (اختياري)</p>}
-                    {!translationStatus.hasEs && <p className="text-blue-600">○ الترجمة الإسبانية: غير مكتملة (اختياري)</p>}
+                    {!translationStatus.hasEn && <p className="text-[#025EB8]">○ الترجمة الإنجليزية: غير مكتملة (اختياري)</p>}
+                    {!translationStatus.hasFr && <p className="text-[#025EB8]">○ الترجمة الفرنسية: غير مكتملة (اختياري)</p>}
+                    {!translationStatus.hasTr && <p className="text-[#025EB8]">○ الترجمة التركية: غير مكتملة (اختياري)</p>}
+                    {!translationStatus.hasId && <p className="text-[#025EB8]">○ الترجمة الإندونيسية: غير مكتملة (اختياري)</p>}
+                    {!translationStatus.hasPt && <p className="text-[#025EB8]">○ الترجمة البرتغالية: غير مكتملة (اختياري)</p>}
+                    {!translationStatus.hasEs && <p className="text-[#025EB8]">○ الترجمة الإسبانية: غير مكتملة (اختياري)</p>}
                   </div>
                 </div>
               </div>
@@ -735,7 +864,7 @@ const getTranslationStatus = () => {
             </Button>
             <Button
               type="submit"
-              className="bg-emerald-600 hover:bg-emerald-700 gap-2"
+              className="bg-[#025EB8] hover:bg-[#014fa0] gap-2"
               disabled={saving}
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />}

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 
 export async function GET(
   request: NextRequest,
@@ -9,9 +11,8 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, "badges");
+    if (denied) return denied;
     const { id } = await params;
     const badge = await prisma.badge.findUnique({
       where: { id },
@@ -31,9 +32,8 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, "badges");
+    if (denied) return denied;
     const { id } = await params;
     const body = await request.json();
     const { name, color, criteria, order, translations } = body;
@@ -60,6 +60,16 @@ export async function PUT(
       data: updateData,
       include: { translations: true },
     });
+
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "BADGE_UPDATE",
+      messageAr: `${actor.actorName ?? "مسؤول"} عدّل الشارة: ${badge.name}`,
+      entityType: "Badge",
+      entityId: id,
+    });
+
     return NextResponse.json(badge);
   } catch (error) {
     console.error("Error updating badge:", error);
@@ -73,11 +83,24 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, "badges");
+    if (denied) return denied;
     const { id } = await params;
+    const existing = await prisma.badge.findUnique({
+      where: { id },
+      select: { name: true },
+    });
     await prisma.badge.delete({ where: { id } });
+
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "BADGE_DELETE",
+      messageAr: `${actor.actorName ?? "مسؤول"} حذف الشارة: ${existing?.name ?? id}`,
+      entityType: "Badge",
+      entityId: id,
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting badge:", error);

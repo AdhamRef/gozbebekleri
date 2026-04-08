@@ -14,6 +14,7 @@ const emptyEditorPost = {
   categoryId: null,
   category_id: undefined,
   category: null,
+  campaignIds: [],
   campaignId: null,
   campaign_id: undefined,
   titleAR: undefined,

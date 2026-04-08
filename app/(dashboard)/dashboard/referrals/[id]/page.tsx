@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useLocale } from "next-intl";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CountUp from "react-countup";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import { formatUtcCalendarMonthLong } from "@/lib/admin/current-calendar-month-utc";
 
 interface ChartDataPoint {
   date: string;
@@ -161,13 +163,13 @@ function getDonationsDateRange(
 }
 
 const ACCENT_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-  teal: { bg: "bg-teal-50", text: "text-teal-600", border: "border-teal-200" },
-  indigo: { bg: "bg-indigo-50", text: "text-indigo-600", border: "border-indigo-200" },
-  amber: { bg: "bg-amber-50", text: "text-amber-600", border: "border-amber-200" },
-  violet: { bg: "bg-violet-50", text: "text-violet-600", border: "border-violet-200" },
-  emerald: { bg: "bg-emerald-50", text: "text-emerald-600", border: "border-emerald-200" },
-  slate: { bg: "bg-slate-100", text: "text-slate-600", border: "border-slate-200" },
-  orange: { bg: "bg-orange-50", text: "text-orange-600", border: "border-orange-200" },
+  teal: { bg: "bg-[#025EB8]/8", text: "text-[#025EB8]", border: "border-[#025EB8]/20" },
+  indigo: { bg: "bg-[#025EB8]/8", text: "text-[#025EB8]", border: "border-[#025EB8]/20" },
+  amber: { bg: "bg-[#FA5D17]/8", text: "text-[#FA5D17]", border: "border-[#FA5D17]/20" },
+  violet: { bg: "bg-[#FA5D17]/8", text: "text-[#FA5D17]", border: "border-[#FA5D17]/20" },
+  emerald: { bg: "bg-[#025EB8]/8", text: "text-[#025EB8]", border: "border-[#025EB8]/20" },
+  slate: { bg: "bg-gray-100", text: "text-gray-500", border: "border-gray-200" },
+  orange: { bg: "bg-[#FA5D17]/8", text: "text-[#FA5D17]", border: "border-[#FA5D17]/20" },
 };
 
 function StatsCard({
@@ -219,6 +221,8 @@ function StatsCard({
 export default function ReferralAnalyticsPage() {
   const params = useParams();
   const router = useRouter();
+  const locale = useLocale() as string;
+  const thisMonthRevenueTitle = `إيرادات شهر ${formatUtcCalendarMonthLong(new Date(), locale || "ar")}`;
   const { convertToCurrency, getSelectedCurrency } = useCurrency();
   const id = params?.id as string | undefined;
   const [stats, setStats] = useState<ReferralStats | null>(null);
@@ -435,7 +439,7 @@ export default function ReferralAnalyticsPage() {
               رمز التتبع: <code className="bg-muted px-1 rounded">{referral.code}</code>
             </p>
           </div>
-          <CurrencySelector />
+          <CurrencySelector showDefaultCurrencyOption />
         </header>
 
         {/* المؤشرات */}
@@ -456,7 +460,7 @@ export default function ReferralAnalyticsPage() {
             {statCardSet === "revenue" && (
               <>
                 <StatsCard title="إيرادات إجمالية" value={stats.allTimeRevenue ?? stats.totalAmount ?? 0} icon={DollarSign} accent="emerald" format="money" />
-                <StatsCard title="إيرادات هذا الشهر" value={stats.thisMonthRevenue ?? 0} icon={Calendar} accent="emerald" format="money" />
+                <StatsCard title={thisMonthRevenueTitle} value={stats.thisMonthRevenue ?? 0} icon={Calendar} accent="emerald" format="money" />
                 <StatsCard title="إيرادات شهرية متكررة" value={stats.monthlyRecurringRevenue ?? 0} icon={Repeat} accent="emerald" format="money" />
                 <StatsCard title="دعم الفريق" value={stats.teamSupportTotal ?? 0} icon={HandCoins} accent="amber" format="money" />
                 <StatsCard title="الرسوم" value={stats.feesTotal ?? 0} icon={Percent} accent="orange" format="money" />
@@ -522,11 +526,11 @@ export default function ReferralAnalyticsPage() {
                   <div className="flex gap-2 pt-1 border-slate-100">
                     <div className="space-y-1">
                       <label className="text-[11px] font-medium text-slate-500">من</label>
-                      <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                      <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[11px] font-medium text-slate-500">إلى</label>
-                      <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                      <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]" />
                     </div>
                   </div>
                 )}
@@ -607,7 +611,7 @@ export default function ReferralAnalyticsPage() {
                   <div className="h-[400px] w-full">
                     {chartLoading ? (
                       <div className="h-full flex items-center justify-center bg-slate-50 rounded-lg">
-                        <Loader2 className="w-9 h-9 animate-spin text-blue-500" />
+                        <Loader2 className="w-9 h-9 animate-spin text-[#025EB8]" />
                       </div>
                     ) : chartView === "bar" ? (
                       chartMetric === "amount" ? (
@@ -825,7 +829,7 @@ export default function ReferralAnalyticsPage() {
                             {(d.fees ?? 0) > 0 ? <span dir="ltr">{formatMoney(d.fees ?? 0, d.currency, (d.totalAmount && (d.amountUSD != null)) ? ((d.fees ?? 0) / d.totalAmount) * d.amountUSD : undefined)}</span> : <span className="text-slate-500">—</span>}
                           </td>
                           <td className="py-3 px-4">
-                            <span className={cn("inline-block px-2 py-0.5 rounded-full text-xs", d.type === "MONTHLY" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600")}>
+                            <span className={cn("inline-block px-2 py-0.5 rounded-full text-xs", d.type === "MONTHLY" ? "bg-[#025EB8] text-[#025EB8]" : "bg-slate-100 text-slate-600")}>
                               {d.type === "MONTHLY" ? "شهري" : "مرة واحدة"}
                             </span>
                           </td>

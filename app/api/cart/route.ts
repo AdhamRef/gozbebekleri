@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await request.json();
-    const { campaignId, amount, currency, amountUSD } = data;
+    const { campaignId, amount, currency, amountUSD, shareCount } = data;
 
     // Validate input
     if (!campaignId || amount <= 0 || !currency || !amountUSD) {
@@ -64,6 +64,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const sc =
+      shareCount != null && Number(shareCount) > 0
+        ? Math.floor(Number(shareCount))
+        : undefined;
+
     const newCartItem = await prisma.cartItem.create({
       data: {
         campaignId,
@@ -71,6 +76,7 @@ export async function POST(request: NextRequest) {
         amountUSD,
         currency,
         userId: session.user.id,
+        ...(sc != null ? { shareCount: sc } : {}),
       },
       include: {
         campaign: {

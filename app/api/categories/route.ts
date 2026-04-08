@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from "../auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog } from "@/lib/audit-log";
 
 // GET: supports locale-aware translations, search, cursor pagination, optional counts, and sorting
 export async function GET(request: NextRequest) {
@@ -88,9 +90,8 @@ export async function POST(request: NextRequest) {
   try {
     // Auth check: only admins can create categories
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized - Only admins can create categories' }, { status: 401 });
-    }
+    const denied = requireAdminOrDashboardPermission(session, 'categories');
+    if (denied) return denied;
 
     const data = await request.json();
     const { name, description, image, icon, order, translations } = data;
@@ -148,6 +149,17 @@ export async function POST(request: NextRequest) {
         order: true,
         translations: { select: { locale: true, name: true, description: true } }
       }
+    });
+
+    const actor = session!.user;
+    await writeAuditLog({
+      actorId: actor.id,
+      actorName: actor.name,
+      actorRole: actor.role ?? "ADMIN",
+      action: "CATEGORY_CREATE",
+      messageAr: `${actor.name ?? "مسؤول"} أنشأ قسمًا جديدًا: ${full?.name ?? name}`,
+      entityType: "Category",
+      entityId: category.id,
     });
 
     return NextResponse.json(full, { status: 201 });

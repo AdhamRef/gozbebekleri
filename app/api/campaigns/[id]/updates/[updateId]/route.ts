@@ -8,6 +8,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../../auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 
 type ParamsPromise = { params: Promise<{ id: string; updateId: string }> };
 
@@ -79,18 +81,14 @@ export async function PATCH(request: NextRequest, { params }: ParamsPromise) {
     const { updateId } = await params;
     // ✅ STEP 1: Authentication check
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: "Unauthorized - Only admins can modify updates" },
-        { status: 401 }
-      );
-    }
+    const denied = requireAdminOrDashboardPermission(session, "campaigns");
+    if (denied) return denied;
     const data = await request.json();
 
     // ✅ STEP 2: Validate update exists
     const existingUpdate = await prisma.update.findUnique({
       where: { id: updateId },
-      select: { id: true },
+      select: { id: true, title: true, campaignId: true },
     });
 
     if (!existingUpdate) {
@@ -178,6 +176,16 @@ export async function PATCH(request: NextRequest, { params }: ParamsPromise) {
       },
     });
 
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "CAMPAIGN_UPDATE_EDIT",
+      messageAr: `${actor.actorName ?? "مسؤول"} عدّل تحديث الحملة: ${fullUpdate?.title ?? existingUpdate.title}`,
+      entityType: "Update",
+      entityId: updateId,
+      metadata: { campaignId: fullUpdate?.campaignId },
+    });
+
     return NextResponse.json(fullUpdate);
     
   } catch (error) {
@@ -195,17 +203,13 @@ export async function DELETE(request: NextRequest, { params }: ParamsPromise) {
     const { updateId } = await params;
     // ✅ STEP 1: Authentication check
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: "Unauthorized - Only admins can delete updates" },
-        { status: 401 }
-      );
-    }
+    const denied = requireAdminOrDashboardPermission(session, "campaigns");
+    if (denied) return denied;
 
     // ✅ STEP 2: Validate update exists
     const existingUpdate = await prisma.update.findUnique({
       where: { id: updateId },
-      select: { id: true, campaignId: true },
+      select: { id: true, campaignId: true, title: true },
     });
 
     if (!existingUpdate) {
@@ -218,6 +222,16 @@ export async function DELETE(request: NextRequest, { params }: ParamsPromise) {
     // ✅ STEP 3: Delete update (translations will cascade delete due to onDelete: Cascade)
     await prisma.update.delete({
       where: { id: updateId },
+    });
+
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: "CAMPAIGN_UPDATE_DELETE",
+      messageAr: `${actor.actorName ?? "مسؤول"} حذف تحديثًا من الحملة: ${existingUpdate.title}`,
+      entityType: "Update",
+      entityId: updateId,
+      metadata: { campaignId: existingUpdate.campaignId },
     });
 
     return NextResponse.json({ 

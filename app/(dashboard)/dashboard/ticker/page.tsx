@@ -368,7 +368,7 @@ export default function TickerAdminPanel() {
           ))}
 
           {config.amountRanges.length > 0 && (
-            <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-[#025EB8]/8 rounded-lg">
               <span className="font-medium">إجمالي الاحتمالات:</span>
               <span className="text-lg font-bold">
                 {calculateTotalProbability()}

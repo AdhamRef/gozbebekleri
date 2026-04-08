@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from '../../../../auth/[...nextauth]/options';
+import { userHasDashboardPermission } from '@/lib/dashboard/permissions';
+import {
+  writeAuditLog,
+  auditActorFromSiteSession,
+  auditStreamForRole,
+} from '@/lib/audit-log';
 
 type ParamsPromise = { params: Promise<{ id: string; commentId: string }> };
 
@@ -28,8 +34,8 @@ export async function DELETE(request: NextRequest, { params }: ParamsPromise) {
       );
     }
 
-    // Only allow comment owner or admin to delete
-    if (comment.userId !== session.user.id && session.user.role !== 'ADMIN') {
+    const canModerate = userHasDashboardPermission(session.user, 'campaigns');
+    if (comment.userId !== session.user.id && !canModerate) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 403 }
@@ -38,6 +44,20 @@ export async function DELETE(request: NextRequest, { params }: ParamsPromise) {
 
     await prisma.comment.delete({
       where: { id: commentId },
+    });
+
+    const actor = auditActorFromSiteSession(session);
+    const stream = canModerate ? ("TEAM" as const) : auditStreamForRole(actor.actorRole);
+    await writeAuditLog({
+      ...actor,
+      action: "CAMPAIGN_COMMENT_DELETE",
+      messageAr: canModerate
+        ? `${actor.actorName ?? "مسؤول"} حذف تعليقًا (مسار مباشر)`
+        : `${actor.actorName ?? "مستخدم"} حذف تعليقه`,
+      entityType: "Comment",
+      entityId: commentId,
+      metadata: { campaignId: comment.campaignId },
+      stream,
     });
 
     return NextResponse.json({ success: true });
@@ -96,6 +116,17 @@ export async function PATCH(request: NextRequest, { params }: ParamsPromise) {
           },
         },
       },
+    });
+
+    const actor = auditActorFromSiteSession(session);
+    await writeAuditLog({
+      ...actor,
+      action: "CAMPAIGN_COMMENT_UPDATE",
+      messageAr: `${actor.actorName ?? "مستخدم"} عدّل تعليقه`,
+      entityType: "Comment",
+      entityId: commentId,
+      metadata: { campaignId: comment.campaignId },
+      stream: auditStreamForRole(actor.actorRole),
     });
 
     return NextResponse.json(updatedComment);

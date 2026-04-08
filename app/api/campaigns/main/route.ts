@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { parseIncludeInactive } from "@/lib/campaign/include-inactive-query";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const includeInactive = parseIncludeInactive(request.nextUrl.searchParams);
+
     const prioritizedCampaigns = await prisma.campaign.findMany({
       where: {
         priority: {
-          not: null, // Assuming that a non-null priority indicates a prioritized campaign
+          not: null,
         },
+        ...(includeInactive ? {} : { isActive: true }),
       },
       orderBy: { priority: "asc" }, // Order by priority
       include: {
