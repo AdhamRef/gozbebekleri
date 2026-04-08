@@ -405,7 +405,15 @@
     "donationFailed": "فشل في عملية التبرع",
     "successRedirecting": "جارٍ التحويل إلى بوابة الدفع",
     "successRedirectingDesc": "سيتم تحويلك الآن بشكل آمن لإتمام عملية الدفع",
-    "paymentFeesPercent": "رسوم الدفع (3%)"
+    "paymentFeesPercent": "رسوم الدفع (3%)",
+    "secure3DLabel": "الدفع الآمن بتحقق ثلاثي",
+    "secure3DEnabled": "✓ مُفعَّل",
+    "secure3DDisabled": "الدفع المعتاد",
+    "secure3DCardPrompt": "أدخل بيانات بطاقتك أدناه لإتمام الدفع الآمن.",
+    "monthlyStripeRedirect": "سيتم تحويلك إلى صفحة الدفع الآمنة لإعداد تبرعك الشهري.",
+    "standardStripeRedirect": "سيتم تحويلك إلى صفحة الدفع الآمنة لإتمام تبرعك.",
+    "paymentSwitching": "جارٍ التحويل إلى بوابة دفع بديلة…",
+    "paymentSwitchingDesc": "حدث خطأ في بوابة الدفع، سيتم توجيهك تلقائياً لإتمام الدفع عبر بوابة بديلة"
   },
   "DonationSuccess": {
     "thankYou": "شكراً جزيلاً",

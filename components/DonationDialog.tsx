@@ -888,10 +888,10 @@ const DonationDialog = ({
                 <p className="text-gray-900 font-semibold">{t("bankCard")}</p>
                 <p className="text-sm text-gray-600">
                   {donationType === "MONTHLY"
-                    ? "You will be redirected to Stripe’s secure payment page to set up your monthly donation."
+                    ? t("monthlyStripeRedirect")
                     : use3D
-                    ? "أدخل بيانات بطاقتك أدناه. ستُعالَج عملية الدفع عبر بروتوكول 3D Secure الآمن."
-                    : "You will be redirected to Stripe’s secure payment page to complete your donation."}
+                    ? t("secure3DCardPrompt")
+                    : t("standardStripeRedirect")}
                 </p>
               </div>
             ) : (
@@ -914,8 +914,8 @@ const DonationDialog = ({
                 <div className={`w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center rounded border transition-all duration-200 ${use3D ? "bg-[#025EB8] border-[#025EB8]" : "border-gray-300 bg-white"}`}>
                   {use3D && <Check className="w-2 h-2 text-white" />}
                 </div>
-                <span className="font-medium">3D Secure (Ziraat Sanal POS)</span>
-                <span className="text-gray-400 ms-auto">{use3D ? "✓ مُفعَّل" : "Stripe 2D"}</span>
+                <span className="font-medium">{t("secure3DLabel")}</span>
+                <span className="text-gray-400 ms-auto">{use3D ? t("secure3DEnabled") : t("secure3DDisabled")}</span>
               </button>
             )}
 
@@ -1310,17 +1310,17 @@ const DonationDialog = ({
                       </div>
                       <div>
                         <p className="text-base font-semibold text-gray-900">
-                          {payforSwitching ? "جارٍ التحويل إلى Stripe…" : t("successRedirecting")}
+                          {payforSwitching ? t("paymentSwitching") : t("successRedirecting")}
                         </p>
                         <p className="text-sm text-gray-400 mt-1 max-w-xs mx-auto">
                           {payforSwitching
-                            ? "حدث خطأ في بوابة الدفع، سيتم توجيهك تلقائياً لإتمام الدفع عبر Stripe"
+                            ? t("paymentSwitchingDesc")
                             : t("successRedirectingDesc")}
                         </p>
                       </div>
                       <div className={`flex items-center gap-2 text-xs px-4 py-2 rounded-full transition-colors ${payforSwitching ? "text-[#635bff] bg-[#635bff]/8" : "text-[#025EB8] bg-[#025EB8]/6"}`}>
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        <span>{payforSwitching ? "جارٍ التحويل…" : "جارٍ الاتصال بالبوابة…"}</span>
+                        <span>{payforSwitching ? t("paymentSwitching") : t("successRedirectingDesc")}</span>
                       </div>
                     </div>
                   ) : (

@@ -387,7 +387,15 @@
     "donationFailed": "Échec du don",
     "successRedirecting": "Redirection vers la passerelle de paiement",
     "successRedirectingDesc": "Vous allez être redirigé en toute sécurité pour finaliser votre paiement.",
-    "paymentFeesPercent": "Frais de paiement (3%)"
+    "paymentFeesPercent": "Frais de paiement (3%)",
+    "secure3DLabel": "Paiement sécurisé 3D",
+    "secure3DEnabled": "✓ Activé",
+    "secure3DDisabled": "Paiement standard",
+    "secure3DCardPrompt": "Entrez les détails de votre carte pour finaliser le paiement sécurisé.",
+    "monthlyStripeRedirect": "Vous serez redirigé vers la page de paiement sécurisée pour configurer votre don mensuel.",
+    "standardStripeRedirect": "Vous serez redirigé vers la page de paiement sécurisée pour finaliser votre don.",
+    "paymentSwitching": "Transfert vers une passerelle de paiement alternative…",
+    "paymentSwitchingDesc": "Une erreur s'est produite avec la passerelle de paiement. Vous serez automatiquement redirigé pour finaliser votre paiement via une passerelle alternative."
   },
   "DonationSuccess": {
     "thankYou": "Merci beaucoup",

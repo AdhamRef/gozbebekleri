@@ -405,7 +405,15 @@
     "donationFailed": "Donation failed",
     "successRedirecting": "Redirecting to Payment Gateway",
     "successRedirectingDesc": "You will be securely redirected to complete your payment.",
-    "paymentFeesPercent": "Payment Fees (3%)"
+    "paymentFeesPercent": "Payment Fees (3%)",
+    "secure3DLabel": "3D Secure Payment",
+    "secure3DEnabled": "✓ Enabled",
+    "secure3DDisabled": "Standard Payment",
+    "secure3DCardPrompt": "Enter your card details below to complete the secure payment.",
+    "monthlyStripeRedirect": "You will be redirected to the secure payment page to set up your monthly donation.",
+    "standardStripeRedirect": "You will be redirected to the secure payment page to complete your donation.",
+    "paymentSwitching": "Switching to backup payment gateway…",
+    "paymentSwitchingDesc": "An error occurred with the payment gateway. You will be automatically redirected to complete your payment via an alternative gateway."
   },
   "DonationSuccess": {
     "thankYou": "Thank you very much",
