@@ -247,11 +247,11 @@ export default function ReferralsPage() {
                                 
                               </span>
                             ) : daysLeft !== null && daysLeft > 0 ? (
-                              <span className="text-xs font-medium text-[#025EB8]"
+                              <span className="text-xs font-medium text-[#025EB8]">
                                 متبقي {daysLeft} {daysLeft === 1 ? "يوم" : "يوم"}
                               </span>
                             ) : (
-                              <span className="text-xs text-[#FA5D17]"
+                              <span className="text-xs text-[#FA5D17]">
                                 انتهت صلاحية التتبع
                               </span>
                             )}
