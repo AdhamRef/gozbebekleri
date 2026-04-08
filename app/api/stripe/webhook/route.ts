@@ -6,11 +6,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
 });
 
-// Disable body parsing — Stripe needs the raw body for signature verification
-export const config = {
-  api: { bodyParser: false },
-};
-
 export async function POST(req: NextRequest) {
   const sig = req.headers.get("stripe-signature");
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -95,7 +90,7 @@ export async function POST(req: NextRequest) {
       case "invoice.payment_succeeded": {
         // Subsequent monthly billing cycles
         const invoice = event.data.object as Stripe.Invoice;
-        const stripeSubscriptionId = invoice.subscription as string;
+        const stripeSubscriptionId = (invoice as any).subscription as string;
         if (!stripeSubscriptionId) break;
 
         // Find our subscription record by Stripe subscription ID (stored in payforToken)
@@ -124,7 +119,7 @@ export async function POST(req: NextRequest) {
             dbSubscription.teamSupport +
             (dbSubscription.coverFees ? fees : 0);
 
-          const newDonation = await tx.donation.create({
+          await tx.donation.create({
             data: {
               amount: dbSubscription.amount,
               amountUSD: dbSubscription.amountUSD ?? dbSubscription.amount,
@@ -196,7 +191,7 @@ export async function POST(req: NextRequest) {
       case "invoice.payment_failed": {
         // Monthly billing failed
         const invoice = event.data.object as Stripe.Invoice;
-        const stripeSubscriptionId = invoice.subscription as string;
+        const stripeSubscriptionId = (invoice as any).subscription as string;
         if (!stripeSubscriptionId) break;
 
         const dbSubscription = await prisma.subscription.findFirst({
