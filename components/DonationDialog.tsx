@@ -1,7 +1,4 @@
 import { loadStripe } from "@stripe/stripe-js";
-import type { Stripe, StripeElements } from "@stripe/stripe-js";
-import { Elements } from "@stripe/react-stripe-js";
-import { StripeCardForm } from "@/components/StripeCardForm";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,8 +75,6 @@ interface DonationDialogProps {
   suggestedShareCounts?: { counts: number[] } | null;
 }
 
-// Singleton — created once, shared across renders
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 const DonationDialog = ({
   isOpen,
@@ -177,16 +172,8 @@ const DonationDialog = ({
   const [billingDay, setBillingDay] = useState<number>(1);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(null);
   const [use3D, setUse3D] = useState(true);
-  // PayFor (3D) custom form state
   const [cardDetails, setCardDetails] = useState({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" });
   const [cardFocus, setCardFocus] = useState("");
-  // Stripe Elements state
-  const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(null);
-  const [stripeDonationId, setStripeDonationId] = useState<string | null>(null);
-  const [stripeLoading, setStripeLoading] = useState(false);
-  const [holderName, setHolderName] = useState("");
-  const stripeRef = useRef<Stripe | null>(null);
-  const elementsRef = useRef<StripeElements | null>(null);
   const [loading, setLoading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const [payforSwitching, setPayforSwitching] = useState(false);
@@ -302,66 +289,13 @@ const DonationDialog = ({
   // Alias: useConvetToUSD is a plain utility (not a React hook) — alias to avoid rules-of-hooks lint errors
   const convertToUSD = useConvetToUSD;
 
-  const isStripeFlow = paymentMethod === "CARD" && !use3D;
-
-  const buildDonationPayload = (amountUSD: number) => {
-    const payload: Record<string, unknown> = {
-      currency: getCurrency(),
-      teamSupport,
-      coverFees,
-      type: donationType,
-      paymentMethod,
-      billingDay: donationType === "MONTHLY" ? billingDay : null,
-      locale,
-    };
-    const refCode = getReferralCode();
-    if (refCode) payload.referralCode = refCode;
-    if (isCategoryMode && categoryId) {
-      payload.categoryItems = [{ categoryId, amount: donationAmount, amountUSD }];
-    } else if (campaignId) {
-      payload.items = [
-        { campaignId, amount: donationAmount, amountUSD, ...(shareMode ? { shareCount } : {}) },
-      ];
-    }
-    return payload;
-  };
-
-  const handleNext = async () => {
+  const handleNext = () => {
     const steps = getSteps();
-    const isLastStep = currentStep === steps.length - 1;
-
-    if (isLastStep) {
+    if (currentStep < steps.length - 1) {
+      setCurrentStep(currentStep + 1);
+    } else {
       handleSubmit();
-      return;
     }
-
-    const isEnteringPaymentInfo = currentStep === steps.length - 2 &&
-      steps[steps.length - 1].title === t("paymentInfo");
-
-    // When stepping onto the payment info step for a Stripe flow,
-    // create the donation + PaymentIntent now so Elements has a clientSecret.
-    if (isEnteringPaymentInfo && isStripeFlow) {
-      setStripeLoading(true);
-      setStripeClientSecret(null);
-      setStripeDonationId(null);
-      try {
-        const amountUSD =
-          shareMode && sharePriceUSD != null
-            ? shareCount * sharePriceUSD
-            : convertToUSD(donationAmount, getCurrency());
-        const payload = buildDonationPayload(amountUSD);
-        const { data } = await axios.post("/api/stripe/intent", payload);
-        setStripeClientSecret(data.clientSecret);
-        setStripeDonationId(data.donationId);
-      } catch {
-        toast.error(t("donationFailed"));
-        setStripeLoading(false);
-        return;
-      }
-      setStripeLoading(false);
-    }
-
-    setCurrentStep(currentStep + 1);
   };
 
   const handleBack = () => {
@@ -969,24 +903,8 @@ const DonationDialog = ({
               </div>
             )}
 
-            {/* Stripe Elements — non-3D and monthly */}
-            {paymentMethod === "CARD" && isStripeFlow && stripeClientSecret && (
-              <Elements stripe={stripePromise} options={{ clientSecret: stripeClientSecret }}>
-                <StripeCardForm
-                  holderName={holderName}
-                  onHolderNameChange={setHolderName}
-                  onReady={(s, e) => { stripeRef.current = s; elementsRef.current = e; }}
-                />
-              </Elements>
-            )}
-            {paymentMethod === "CARD" && isStripeFlow && !stripeClientSecret && (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-[#025EB8]" />
-              </div>
-            )}
-
-            {/* PayFor 3D — custom card form (data sent directly to bank) */}
-            {paymentMethod === "CARD" && !isStripeFlow && (
+            {/* Card details — shown for all card payments */}
+            {paymentMethod === "CARD" && (
               <div className="space-y-4" dir="ltr">
                 <div className="flex justify-center">
                   <Cards
@@ -1058,7 +976,7 @@ const DonationDialog = ({
               </div>
             )}
 
-                        {/* 3D Secure toggle — only for one-time card payments */}
+            {/* 3D Secure toggle — only for one-time card payments */}
             {donationType === "ONE_TIME" && paymentMethod === "CARD" && (
               <button
                 type="button"
@@ -1101,8 +1019,7 @@ const DonationDialog = ({
   disabled={
     loading ||
     !isPhoneValid() ||
-    (paymentMethod === "CARD" && isStripeFlow && (!stripeClientSecret || !holderName.trim())) ||
-    (paymentMethod === "CARD" && !isStripeFlow && (
+    (paymentMethod === "CARD" && (
       cardDetails.cardNumber.length < 13 ||
       cardDetails.expiryDate.length < 5 ||
       cardDetails.cvv.length < 3 ||
@@ -1172,12 +1089,30 @@ const DonationDialog = ({
         ];
       }
 
-      // ── Stripe Elements path (non-3D card / monthly) ─────────────────────
-      if (paymentMethod === "CARD" && isStripeFlow) {
-        const stripe = stripeRef.current;
-        const elements = elementsRef.current;
-        if (!stripe || !elements || !stripeClientSecret || !stripeDonationId) {
-          toast.error(t("donationFailed"));
+      // ── Stripe direct-charge path (non-3D card / monthly) ───────────────
+      if (paymentMethod === "CARD" && !use3D) {
+        const response = await axios.post("/api/donations", donationData);
+        if (!response.data.success) { onClose(); return; }
+        const donationId = response.data.donation.id as string;
+
+        const stripeJs = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+        if (!stripeJs) throw new Error("Stripe failed to load");
+
+        const [expMonth, expYear] = cardDetails.expiryDate.split("/");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { paymentMethod: pm, error: pmError } = await (stripeJs as any).createPaymentMethod({
+          type: "card",
+          card: {
+            number: cardDetails.cardNumber.replace(/\s/g, ""),
+            exp_month: parseInt(expMonth ?? "0", 10),
+            exp_year: parseInt(`20${expYear ?? "0"}`, 10),
+            cvc: cardDetails.cvv,
+          },
+          billing_details: { name: cardDetails.cardholderName },
+        });
+
+        if (pmError || !pm) {
+          toast.error(pmError?.message ?? t("donationFailed"));
           setLoading(false);
           return;
         }
@@ -1185,21 +1120,30 @@ const DonationDialog = ({
         isRedirecting = true;
         setRedirecting(true);
 
-        const { error } = await stripe.confirmCardPayment(stripeClientSecret, {
-          payment_method: {
-            card: elements.getElement("cardNumber")!,
-            billing_details: { name: holderName },
-          },
-        });
+        const endpoint = donationType === "MONTHLY" ? "/api/stripe/subscribe" : "/api/stripe/charge";
+        const chargeRes = await axios.post(endpoint, { donationId, paymentMethodId: pm.id, locale });
 
-        if (error) {
-          toast.error(error.message ?? t("donationFailed"));
-          setLoading(false);
-          setRedirecting(false);
-          isRedirecting = false;
-        } else {
-          router.push(`/${locale}/success/${stripeDonationId}`);
+        if (chargeRes.data.status === "succeeded") {
+          router.push(`/${locale}/success/${donationId}`);
+          return;
         }
+
+        if (chargeRes.data.status === "requires_action" && chargeRes.data.clientSecret) {
+          const result = await stripeJs.confirmCardPayment(chargeRes.data.clientSecret);
+          if (result.error) {
+            toast.error(result.error.message ?? t("donationFailed"));
+            setLoading(false);
+            setRedirecting(false);
+            isRedirecting = false;
+          } else {
+            router.push(`/${locale}/success/${donationId}`);
+          }
+          return;
+        }
+
+        toast.error(chargeRes.data.error ?? t("donationFailed"));
+        setLoading(false);
+        setRedirecting(false);
         return;
       }
 
