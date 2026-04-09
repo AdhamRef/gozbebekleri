@@ -933,7 +933,7 @@ const DonationDialog = ({
                     <label className="block text-xs font-medium text-gray-600 mb-1">{t("cardholderName")}</label>
                     <Input
                       value={cardDetails.cardholderName}
-                      onChange={(e) => setCardDetails({ ...cardDetails, cardholderName: e.target.value.toUpperCase() })}
+                      onChange={(e) => setCardDetails({ ...cardDetails, cardholderName: e.target.value.replace(/\d/g, "").toUpperCase() })}
                       onFocus={() => setCardFocus("name")}
                       placeholder={t("cardholderNamePlaceholder")}
                       autoComplete="cc-name"
@@ -1120,11 +1120,12 @@ const DonationDialog = ({
           exp_year: parseInt(`20${expYear ?? "0"}`, 10),
           cvc: cardDetails.cvv,
         };
+        const holderName = cardDetails.cardholderName.replace(/\d/g, "").trim();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { error: confirmError } = await (stripeJs as any).confirmCardPayment(clientSecret, {
           payment_method: {
             card: cardData,
-            billing_details: { name: cardDetails.cardholderName },
+            billing_details: { name: holderName || undefined },
           },
         });
 
