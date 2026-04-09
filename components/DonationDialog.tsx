@@ -1092,7 +1092,7 @@ const DonationDialog = ({
           return;
         }
 
-        router.push(`/${locale}/success/${targetDonationId}`);
+        router.push(`/success/${targetDonationId}`);
         return;
       }
 
@@ -1201,7 +1201,7 @@ const DonationDialog = ({
                   if (payforPopupRef.current && !payforPopupRef.current.closed) {
                     payforPopupRef.current.close();
                   }
-                  router.push(`/${locale}/success/${donationId}`);
+                  router.push(`/success/${donationId}`);
                   return;
                 }
                 if (data.status === "FAILED" || payforPopupRef.current?.closed || polls >= FALLBACK_AFTER_POLLS) {

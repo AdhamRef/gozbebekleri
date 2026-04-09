@@ -16,8 +16,6 @@ import {
   ExternalLink,
 } from "lucide-react";
 import axios from "axios";
-import Cards from "react-credit-cards-2";
-import "react-credit-cards-2/dist/es/styles-compiled.css";
 import { toast } from "react-hot-toast";
 import { useConfettiStore } from "@/hooks/use-confetti-store";
 import { getCurrency } from "@/hooks/useCampaignValue";
@@ -78,14 +76,18 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
   const [coverFees,   setCoverFees]       = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"CARD" | "PAYPAL" | null>(null);
   const [use3D, setUse3D]                 = useState(true);
-  const [cardDetails, setCardDetails]     = useState({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" });
+  // PayFor manual card inputs (use3D === true)
+  const [cardDetails, setCardDetails]     = useState<PayForCardState>({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" });
   const [cardFocus, setCardFocus]         = useState("");
-  const [stripeInstance, setStripeInstance] = useState<Stripe | null>(null);
-  const [stripeElements, setStripeElements] = useState<StripeElements | null>(null);
-  const [stripeCardComplete, setStripeCardComplete] = useState(false);
-  const [stripeHolderName, setStripeHolderName] = useState("");
+  // Stripe Elements — ready state tracked here, confirmation done via ref
+  const [stripeReady, setStripeReady]     = useState(false);
+  const stripeFormRef = useRef<StripePaymentHandle | null>(null);
+  const onStripeReadyChange = useCallback((ready: boolean) => setStripeReady(ready), []);
+  // Set when PayFor fails and we get a fallback clientSecret from the server
   const [fallbackClientSecret, setFallbackClientSecret] = useState<string | null>(null);
   const [fallbackDonationId, setFallbackDonationId] = useState<string | null>(null);
+  // Guard against duplicate fallback execution
+  const hasFallenBackRef = useRef(false);
   const [loading, setLoading]             = useState(false);
   const [redirecting, setRedirecting]     = useState(false);
   const [payforSwitching, setPayforSwitching] = useState(false);
@@ -127,7 +129,17 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
     tracking.trackInitiateCheckout({ value: amount, currency: "USD", numItems: cartItems.length, contentIds: ids.length ? ids : undefined });
   }, [isOpen, tracking, cartItems, amount]);
 
-  useEffect(() => { if (!isOpen) checkoutTrackedRef.current = false; }, [isOpen]);
+  useEffect(() => {
+    if (!isOpen) {
+      checkoutTrackedRef.current = false;
+    } else {
+      // Reset fallback guard and state when dialog re-opens
+      hasFallenBackRef.current = false;
+      setFallbackClientSecret(null);
+      setFallbackDonationId(null);
+      setUse3D(true);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || !session?.user?.id) return;
@@ -197,14 +209,16 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
       if (refCode) basePayload.referralCode = refCode;
 
       // ── Stripe Elements direct charge (no 3D) ─────────────────────────
+      // stripeFormRef.current.confirmPayment() calls stripe.confirmCardPayment()
+      // with CardNumberElement inside the Elements context — card data goes
+      // browser → Stripe directly, never touches our server.
       if (paymentMethod === "CARD" && !use3D) {
-        if (!stripeInstance || !stripeElements) throw new Error("Stripe not ready");
-        const cardElement = stripeElements.getElement(CardNumberElement);
-        if (!cardElement) throw new Error("Card element not found");
+        if (!stripeFormRef.current) throw new Error("Stripe form not ready");
 
         let targetDonationId: string;
         let clientSecret: string;
 
+        // Re-use fallback intent if PayFor previously failed
         if (fallbackClientSecret && fallbackDonationId) {
           targetDonationId = fallbackDonationId;
           clientSecret = fallbackClientSecret;
@@ -225,13 +239,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
         isRedirecting = true;
         setRedirecting(true);
 
-        const { error: confirmError } = await stripeInstance.confirmCardPayment(clientSecret, {
-          payment_method: {
-            card: cardElement,
-            billing_details: { name: stripeHolderName.trim() || undefined },
-          },
-        });
-
+        const { error: confirmError } = await stripeFormRef.current.confirmPayment(clientSecret);
         if (confirmError) {
           toast.error(confirmError.message ?? t("donationFailed"));
           setLoading(false); setRedirecting(false); isRedirecting = false;
@@ -239,7 +247,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
         }
 
         clearItems(); confetti.onOpen();
-        router.push(`/${locale}/success/${targetDonationId}`);
+        router.push(`/success/${targetDonationId}`);
         return;
       }
 
@@ -291,12 +299,17 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
         setRedirecting(true);
 
         const fallbackToStripe = async () => {
+          // Guard: only run once even if poll fires multiple times
+          if (hasFallenBackRef.current) return;
+          hasFallenBackRef.current = true;
+
           if (payforPollRef.current) { clearInterval(payforPollRef.current); payforPollRef.current = null; }
           if (payforPopupRef.current && !payforPopupRef.current.closed) payforPopupRef.current.close();
           setPayforSwitching(true);
           try {
             const fbRes = await axios.post("/api/stripe/fallback", { donationId, locale });
             if (!fbRes.data.clientSecret) { toast.error(t("donationFailed")); return; }
+            // Store clientSecret + donationId, switch to Stripe Elements form
             setFallbackClientSecret(fbRes.data.clientSecret);
             setFallbackDonationId(fbRes.data.donationId ?? donationId);
             setUse3D(false);
@@ -305,6 +318,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
             setLoading(false);
             isRedirecting = false;
           } catch {
+            hasFallenBackRef.current = false; // allow retry on network error
             toast.error(t("donationFailed"));
           }
         };
@@ -322,7 +336,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
               clearInterval(payforPollRef.current!); payforPollRef.current = null;
               if (payforPopupRef.current && !payforPopupRef.current.closed) payforPopupRef.current.close();
               clearItems(); confetti.onOpen();
-              router.push(`/${locale}/success/${donationId}`);
+              router.push(`/success/${donationId}`);
               return;
             }
             if (data.status === "FAILED" || payforPopupRef.current?.closed || polls >= FALLBACK_AFTER) {
@@ -339,7 +353,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
       if (res.data?.success) {
         isRedirecting = true; setRedirecting(true);
         clearItems(); confetti.onOpen();
-        router.push(`/${locale}/success/${res.data.donation.id}`);
+        router.push(`/success/${res.data.donation.id}`);
       } else {
         onClose();
       }
@@ -540,66 +554,21 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
           </button>
         )}
 
-        {/* Card form — Stripe Elements when direct charge, raw inputs when PayFor 3D */}
+        {/* Stripe Elements — only mounted when use3D is false. Never mixed with PayFor. */}
         {paymentMethod === "CARD" && !use3D && (
-          <Elements stripe={getStripePromise()} options={fallbackClientSecret ? { clientSecret: fallbackClientSecret } : undefined}>
-            <StripeCardForm
-              holderName={stripeHolderName}
-              onHolderNameChange={setStripeHolderName}
-              onReady={(s, e) => { setStripeInstance(s); setStripeElements(e); }}
-              onComplete={setStripeCardComplete}
-            />
+          <Elements stripe={getStripePromise()}>
+            <StripePaymentStep ref={stripeFormRef} onReadyChange={onStripeReadyChange} />
           </Elements>
         )}
 
+        {/* PayFor manual inputs — only shown when use3D is true. No Stripe involvement. */}
         {paymentMethod === "CARD" && use3D && (
-          <div className="space-y-4" dir="ltr">
-            <div className="flex justify-center">
-              <Cards
-                number={cardDetails.cardNumber}
-                expiry={cardDetails.expiryDate.replace("/", "")}
-                cvc={cardDetails.cvv}
-                name={cardDetails.cardholderName}
-                focused={cardFocus as "name" | "number" | "expiry" | "cvc"}
-              />
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">{t("cardNumber")}</label>
-                <Input value={cardDetails.cardNumber}
-                  onChange={(e) => setCardDetails({ ...cardDetails, cardNumber: e.target.value.replace(/\D/g, "").slice(0, 16) })}
-                  onFocus={() => setCardFocus("number")}
-                  placeholder={t("cardNumberPlaceholder")} maxLength={16} inputMode="numeric" autoComplete="cc-number" className="font-mono tracking-widest" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">{t("cardholderName")}</label>
-                <Input value={cardDetails.cardholderName}
-                  onChange={(e) => setCardDetails({ ...cardDetails, cardholderName: e.target.value.replace(/\d/g, "").toUpperCase() })}
-                  onFocus={() => setCardFocus("name")}
-                  placeholder={t("cardholderNamePlaceholder")} autoComplete="cc-name" className="uppercase" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">{t("expiryDate")}</label>
-                  <Input value={cardDetails.expiryDate}
-                    onChange={(e) => {
-                      let v = e.target.value.replace(/\D/g, "").slice(0, 4);
-                      if (v.length >= 3) v = v.slice(0, 2) + "/" + v.slice(2);
-                      setCardDetails({ ...cardDetails, expiryDate: v });
-                    }}
-                    onFocus={() => setCardFocus("expiry")}
-                    placeholder={t("expiryDatePlaceholder")} maxLength={5} inputMode="numeric" autoComplete="cc-exp" className="font-mono" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">{t("securityCode")}</label>
-                  <Input value={cardDetails.cvv}
-                    onChange={(e) => setCardDetails({ ...cardDetails, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) })}
-                    onFocus={() => setCardFocus("cvc")}
-                    placeholder={t("securityCodePlaceholder")} maxLength={4} inputMode="numeric" autoComplete="cc-csc" className="font-mono" />
-                </div>
-              </div>
-            </div>
-          </div>
+          <PayForCardForm
+            cardDetails={cardDetails}
+            setCardDetails={setCardDetails}
+            cardFocus={cardFocus}
+            setCardFocus={setCardFocus}
+          />
         )}
 
         {/* Phone */}
@@ -619,7 +588,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
             disabled={
               loading ||
               !isPhoneValid() ||
-              (paymentMethod === "CARD" && !use3D && (!stripeCardComplete || !stripeHolderName.trim())) ||
+              (paymentMethod === "CARD" && !use3D && !stripeReady) ||
               (paymentMethod === "CARD" && use3D && !isCardValid())
             }
             className="flex-1 bg-[#FA5D17] hover:bg-[#e04d0f] text-white flex items-center justify-center gap-2">
