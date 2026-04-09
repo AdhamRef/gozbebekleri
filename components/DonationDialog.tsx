@@ -1,4 +1,7 @@
 import { loadStripe } from "@stripe/stripe-js";
+import type { Stripe, StripeElements } from "@stripe/stripe-js";
+import { Elements } from "@stripe/react-stripe-js";
+import { StripeCardForm } from "@/components/StripeCardForm";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,6 +77,9 @@ interface DonationDialogProps {
   sharePriceUSD?: number | null;
   suggestedShareCounts?: { counts: number[] } | null;
 }
+
+// Singleton — created once, shared across renders
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 const DonationDialog = ({
   isOpen,
@@ -171,8 +177,16 @@ const DonationDialog = ({
   const [billingDay, setBillingDay] = useState<number>(1);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(null);
   const [use3D, setUse3D] = useState(true);
+  // PayFor (3D) custom form state
   const [cardDetails, setCardDetails] = useState({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" });
   const [cardFocus, setCardFocus] = useState("");
+  // Stripe Elements state
+  const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(null);
+  const [stripeDonationId, setStripeDonationId] = useState<string | null>(null);
+  const [stripeLoading, setStripeLoading] = useState(false);
+  const [holderName, setHolderName] = useState("");
+  const stripeRef = useRef<Stripe | null>(null);
+  const elementsRef = useRef<StripeElements | null>(null);
   const [loading, setLoading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const [payforSwitching, setPayforSwitching] = useState(false);
@@ -285,13 +299,69 @@ const DonationDialog = ({
     return p.length >= 10;
   };
 
-  const handleNext = () => {
-    const steps = getSteps();
-    if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      handleSubmit();
+  // Alias: useConvetToUSD is a plain utility (not a React hook) — alias to avoid rules-of-hooks lint errors
+  const convertToUSD = useConvetToUSD;
+
+  const isStripeFlow = paymentMethod === "CARD" && !use3D;
+
+  const buildDonationPayload = (amountUSD: number) => {
+    const payload: Record<string, unknown> = {
+      currency: getCurrency(),
+      teamSupport,
+      coverFees,
+      type: donationType,
+      paymentMethod,
+      billingDay: donationType === "MONTHLY" ? billingDay : null,
+      locale,
+    };
+    const refCode = getReferralCode();
+    if (refCode) payload.referralCode = refCode;
+    if (isCategoryMode && categoryId) {
+      payload.categoryItems = [{ categoryId, amount: donationAmount, amountUSD }];
+    } else if (campaignId) {
+      payload.items = [
+        { campaignId, amount: donationAmount, amountUSD, ...(shareMode ? { shareCount } : {}) },
+      ];
     }
+    return payload;
+  };
+
+  const handleNext = async () => {
+    const steps = getSteps();
+    const isLastStep = currentStep === steps.length - 1;
+
+    if (isLastStep) {
+      handleSubmit();
+      return;
+    }
+
+    const isEnteringPaymentInfo = currentStep === steps.length - 2 &&
+      steps[steps.length - 1].title === t("paymentInfo");
+
+    // When stepping onto the payment info step for a Stripe flow,
+    // create the donation + PaymentIntent now so Elements has a clientSecret.
+    if (isEnteringPaymentInfo && isStripeFlow) {
+      setStripeLoading(true);
+      setStripeClientSecret(null);
+      setStripeDonationId(null);
+      try {
+        const amountUSD =
+          shareMode && sharePriceUSD != null
+            ? shareCount * sharePriceUSD
+            : convertToUSD(donationAmount, getCurrency());
+        const payload = buildDonationPayload(amountUSD);
+        const { data } = await axios.post("/api/stripe/intent", payload);
+        setStripeClientSecret(data.clientSecret);
+        setStripeDonationId(data.donationId);
+      } catch {
+        toast.error(t("donationFailed"));
+        setStripeLoading(false);
+        return;
+      }
+      setStripeLoading(false);
+    }
+
+    setCurrentStep(currentStep + 1);
   };
 
   const handleBack = () => {
@@ -899,7 +969,96 @@ const DonationDialog = ({
               </div>
             )}
 
-            {/* 3D Secure toggle — only for one-time card payments */}
+            {/* Stripe Elements — non-3D and monthly */}
+            {paymentMethod === "CARD" && isStripeFlow && stripeClientSecret && (
+              <Elements stripe={stripePromise} options={{ clientSecret: stripeClientSecret }}>
+                <StripeCardForm
+                  holderName={holderName}
+                  onHolderNameChange={setHolderName}
+                  onReady={(s, e) => { stripeRef.current = s; elementsRef.current = e; }}
+                />
+              </Elements>
+            )}
+            {paymentMethod === "CARD" && isStripeFlow && !stripeClientSecret && (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-[#025EB8]" />
+              </div>
+            )}
+
+            {/* PayFor 3D — custom card form (data sent directly to bank) */}
+            {paymentMethod === "CARD" && !isStripeFlow && (
+              <div className="space-y-4" dir="ltr">
+                <div className="flex justify-center">
+                  <Cards
+                    number={cardDetails.cardNumber}
+                    expiry={cardDetails.expiryDate.replace("/", "")}
+                    cvc={cardDetails.cvv}
+                    name={cardDetails.cardholderName}
+                    focused={cardFocus as "name" | "number" | "expiry" | "cvc"}
+                  />
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">{t("cardNumber")}</label>
+                    <Input
+                      value={cardDetails.cardNumber}
+                      onChange={(e) => setCardDetails({ ...cardDetails, cardNumber: e.target.value.replace(/\D/g, "").slice(0, 16) })}
+                      onFocus={() => setCardFocus("number")}
+                      placeholder={t("cardNumberPlaceholder")}
+                      maxLength={16}
+                      inputMode="numeric"
+                      autoComplete="cc-number"
+                      className="font-mono tracking-widest"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">{t("cardholderName")}</label>
+                    <Input
+                      value={cardDetails.cardholderName}
+                      onChange={(e) => setCardDetails({ ...cardDetails, cardholderName: e.target.value.toUpperCase() })}
+                      onFocus={() => setCardFocus("name")}
+                      placeholder={t("cardholderNamePlaceholder")}
+                      autoComplete="cc-name"
+                      className="uppercase"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">{t("expiryDate")}</label>
+                      <Input
+                        value={cardDetails.expiryDate}
+                        onChange={(e) => {
+                          let v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                          if (v.length >= 3) v = v.slice(0, 2) + "/" + v.slice(2);
+                          setCardDetails({ ...cardDetails, expiryDate: v });
+                        }}
+                        onFocus={() => setCardFocus("expiry")}
+                        placeholder={t("expiryDatePlaceholder")}
+                        maxLength={5}
+                        inputMode="numeric"
+                        autoComplete="cc-exp"
+                        className="font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">{t("securityCode")}</label>
+                      <Input
+                        value={cardDetails.cvv}
+                        onChange={(e) => setCardDetails({ ...cardDetails, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+                        onFocus={() => setCardFocus("cvc")}
+                        placeholder={t("securityCodePlaceholder")}
+                        maxLength={4}
+                        inputMode="numeric"
+                        autoComplete="cc-csc"
+                        className="font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+                        {/* 3D Secure toggle — only for one-time card payments */}
             {donationType === "ONE_TIME" && paymentMethod === "CARD" && (
               <button
                 type="button"
@@ -914,79 +1073,6 @@ const DonationDialog = ({
                 <span className="font-medium">{t("secure3DLabel")}</span>
                 <span className="text-gray-400 ms-auto">{use3D ? t("secure3DEnabled") : t("secure3DDisabled")}</span>
               </button>
-            )}
-
-            {/* Card details form — shown for all card payments */}
-            {paymentMethod === "CARD" && (
-              <div className="space-y-4" dir="ltr">
-                <div className="flex justify-center">
-                  <Cards
-                    number={cardDetails.cardNumber}
-                    expiry={cardDetails.expiryDate.replace("/", "")}
-                    cvc={cardDetails.cvv}
-                    name={cardDetails.cardholderName}
-                    focused={cardFocus as "name" | "number" | "expiry" | "cvc"}
-                  />
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">رقم البطاقة</label>
-                    <Input
-                      value={cardDetails.cardNumber}
-                      onChange={(e) => setCardDetails({ ...cardDetails, cardNumber: e.target.value.replace(/\D/g, "").slice(0, 16) })}
-                      onFocus={() => setCardFocus("number")}
-                      placeholder="0000 0000 0000 0000"
-                      maxLength={16}
-                      inputMode="numeric"
-                      autoComplete="cc-number"
-                      className="font-mono tracking-widest"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">اسم حامل البطاقة</label>
-                    <Input
-                      value={cardDetails.cardholderName}
-                      onChange={(e) => setCardDetails({ ...cardDetails, cardholderName: e.target.value.toUpperCase() })}
-                      onFocus={() => setCardFocus("name")}
-                      placeholder="JOHN DOE"
-                      autoComplete="cc-name"
-                      className="uppercase"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">تاريخ الانتهاء</label>
-                      <Input
-                        value={cardDetails.expiryDate}
-                        onChange={(e) => {
-                          let v = e.target.value.replace(/\D/g, "").slice(0, 4);
-                          if (v.length >= 3) v = v.slice(0, 2) + "/" + v.slice(2);
-                          setCardDetails({ ...cardDetails, expiryDate: v });
-                        }}
-                        onFocus={() => setCardFocus("expiry")}
-                        placeholder="MM/YY"
-                        maxLength={5}
-                        inputMode="numeric"
-                        autoComplete="cc-exp"
-                        className="font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">CVV</label>
-                      <Input
-                        value={cardDetails.cvv}
-                        onChange={(e) => setCardDetails({ ...cardDetails, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) })}
-                        onFocus={() => setCardFocus("cvc")}
-                        placeholder="•••"
-                        maxLength={4}
-                        inputMode="numeric"
-                        autoComplete="cc-csc"
-                        className="font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
             )}
 
             <div className="space-y-2 overflow-visible pt-2 border-t border-border" dir={locale}>
@@ -1015,7 +1101,8 @@ const DonationDialog = ({
   disabled={
     loading ||
     !isPhoneValid() ||
-    (paymentMethod === "CARD" && (
+    (paymentMethod === "CARD" && isStripeFlow && (!stripeClientSecret || !holderName.trim())) ||
+    (paymentMethod === "CARD" && !isStripeFlow && (
       cardDetails.cardNumber.length < 13 ||
       cardDetails.expiryDate.length < 5 ||
       cardDetails.cvv.length < 3 ||
@@ -1057,7 +1144,7 @@ const DonationDialog = ({
       const amountUSD =
         shareMode && sharePriceUSD != null
           ? shareCount * sharePriceUSD
-          : await useConvetToUSD(donationAmount, getCurrency());
+          : convertToUSD(donationAmount, getCurrency());
       const donationData: Record<string, unknown> = {
         currency: getCurrency(),
         teamSupport,
@@ -1085,39 +1172,44 @@ const DonationDialog = ({
         ];
       }
 
+      // ── Stripe Elements path (non-3D card / monthly) ─────────────────────
+      if (paymentMethod === "CARD" && isStripeFlow) {
+        const stripe = stripeRef.current;
+        const elements = elementsRef.current;
+        if (!stripe || !elements || !stripeClientSecret || !stripeDonationId) {
+          toast.error(t("donationFailed"));
+          setLoading(false);
+          return;
+        }
+
+        isRedirecting = true;
+        setRedirecting(true);
+
+        const { error } = await stripe.confirmCardPayment(stripeClientSecret, {
+          payment_method: {
+            card: elements.getElement("cardNumber")!,
+            billing_details: { name: holderName },
+          },
+        });
+
+        if (error) {
+          toast.error(error.message ?? t("donationFailed"));
+          setLoading(false);
+          setRedirecting(false);
+          isRedirecting = false;
+        } else {
+          router.push(`/${locale}/success/${stripeDonationId}`);
+        }
+        return;
+      }
+
+      // ── PayFor 3D path ────────────────────────────────────────────────────
       const response = await axios.post("/api/donations", donationData);
 
       if (response.data.success) {
         const donationId = response.data.donation.id as string;
 
-        if (paymentMethod === "CARD") {
-          // Tokenise card client-side via Stripe.js — card data never hits our server
-          const stripeJs = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
-          if (!stripeJs) throw new Error("Stripe failed to load");
-
-          const [expMonth, expYear] = cardDetails.expiryDate.split("/");
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { paymentMethod: pm, error: pmError } = await (stripeJs as any).createPaymentMethod({
-            type: "card",
-            card: {
-              number: cardDetails.cardNumber.replace(/\s/g, ""),
-              exp_month: parseInt(expMonth ?? "0", 10),
-              exp_year: parseInt(`20${expYear ?? "0"}`, 10),
-              cvc: cardDetails.cvv,
-            },
-            billing_details: { name: cardDetails.cardholderName },
-          });
-
-          if (pmError || !pm) {
-            toast.error(pmError?.message ?? t("donationFailed"));
-            setLoading(false);
-            return;
-          }
-
-          const stripePaymentMethodId = pm.id;
-
-          if (use3D) {
-            // 3D Secure via Ziraat Sanal POS (PayFor) with Stripe fallback
+        if (paymentMethod === "CARD" && use3D) {
             const init = await axios.post("/api/payfor/3dpay/initiate", { donationId, locale });
             const { actionUrl, fields } = init.data as {
               actionUrl: string;
@@ -1135,7 +1227,6 @@ const DonationDialog = ({
               form.appendChild(input);
             });
 
-            // ExpiryDate format for PayFor: YYMM
             const [mm, yy] = cardDetails.expiryDate.split("/");
             const expiryYYMM = `${yy ?? ""}${mm ?? ""}`;
             const cardFields: Record<string, string> = {
@@ -1172,7 +1263,7 @@ const DonationDialog = ({
             isRedirecting = true;
             setRedirecting(true);
 
-            // Fallback: charge directly via Stripe (no redirect)
+            // Fallback: show Elements form to retry via Stripe
             const fallbackToStripe = async () => {
               if (payforPollRef.current) {
                 clearInterval(payforPollRef.current);
@@ -1183,20 +1274,16 @@ const DonationDialog = ({
               }
               setPayforSwitching(true);
               try {
-                const res = await axios.post("/api/stripe/fallback", {
-                  donationId,
-                  paymentMethodId: stripePaymentMethodId,
-                  locale,
-                });
-                if (res.data.status === "succeeded") {
-                  router.push(`/${locale}/success/${res.data.donationId ?? donationId}`);
-                } else if (res.data.status === "requires_action" && res.data.clientSecret) {
-                  const result = await stripeJs.confirmCardPayment(res.data.clientSecret);
-                  if (result.error) {
-                    toast.error(result.error.message ?? t("donationFailed"));
-                  } else {
-                    router.push(`/${locale}/success/${res.data.donationId ?? donationId}`);
-                  }
+                // Create a new Stripe intent for this existing donation
+                const res = await axios.post("/api/stripe/fallback", { donationId, locale });
+                if (res.data.clientSecret) {
+                  setStripeClientSecret(res.data.clientSecret);
+                  setStripeDonationId(res.data.donationId ?? donationId);
+                  // Switch to Stripe Elements flow
+                  setUse3D(false);
+                  setRedirecting(false);
+                  setPayforSwitching(false);
+                  setLoading(false);
                 } else {
                   toast.error(t("donationFailed"));
                 }
@@ -1233,40 +1320,6 @@ const DonationDialog = ({
             }, 2000);
 
             return;
-          }
-
-          // Direct Stripe charge (non-3D / monthly)
-          isRedirecting = true;
-          setRedirecting(true);
-
-          const endpoint = donationType === "MONTHLY" ? "/api/stripe/subscribe" : "/api/stripe/charge";
-          const chargeRes = await axios.post(endpoint, {
-            donationId,
-            paymentMethodId: stripePaymentMethodId,
-            locale,
-          });
-
-          if (chargeRes.data.status === "succeeded") {
-            router.push(`/${locale}/success/${donationId}`);
-            return;
-          }
-
-          if (chargeRes.data.status === "requires_action" && chargeRes.data.clientSecret) {
-            const result = await stripeJs.confirmCardPayment(chargeRes.data.clientSecret);
-            if (result.error) {
-              toast.error(result.error.message ?? t("donationFailed"));
-              setLoading(false);
-              setRedirecting(false);
-            } else {
-              router.push(`/${locale}/success/${donationId}`);
-            }
-            return;
-          }
-
-          toast.error(chargeRes.data.error ?? t("donationFailed"));
-          setLoading(false);
-          setRedirecting(false);
-          return;
         }
 
         isRedirecting = true;
