@@ -1,11 +1,14 @@
 "use client";
 
-import { loadStripe } from "@stripe/stripe-js";
+import { Elements } from "@stripe/react-stripe-js";
+import { getStripePromise } from "@/lib/stripe-client";
+import { StripePaymentStep, type StripePaymentHandle } from "@/components/StripePaymentStep";
+import { PayForCardForm, type PayForCardState } from "@/components/PayForCardForm";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   CreditCard as CardIcon,
   Check,
@@ -77,6 +80,12 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
   const [use3D, setUse3D]                 = useState(true);
   const [cardDetails, setCardDetails]     = useState({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" });
   const [cardFocus, setCardFocus]         = useState("");
+  const [stripeInstance, setStripeInstance] = useState<Stripe | null>(null);
+  const [stripeElements, setStripeElements] = useState<StripeElements | null>(null);
+  const [stripeCardComplete, setStripeCardComplete] = useState(false);
+  const [stripeHolderName, setStripeHolderName] = useState("");
+  const [fallbackClientSecret, setFallbackClientSecret] = useState<string | null>(null);
+  const [fallbackDonationId, setFallbackDonationId] = useState<string | null>(null);
   const [loading, setLoading]             = useState(false);
   const [redirecting, setRedirecting]     = useState(false);
   const [payforSwitching, setPayforSwitching] = useState(false);
@@ -187,40 +196,39 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
       const refCode = getReferralCode();
       if (refCode) basePayload.referralCode = refCode;
 
-      // ── Stripe direct charge (no 3D / non-PayFor) ──────────────────────
+      // ── Stripe Elements direct charge (no 3D) ─────────────────────────
       if (paymentMethod === "CARD" && !use3D) {
-        const res = await axios.post("/api/cart/payment", basePayload);
-        if (!res.data?.success) { onClose(); return; }
-        const donationId = res.data.donation.id as string;
+        if (!stripeInstance || !stripeElements) throw new Error("Stripe not ready");
+        const cardElement = stripeElements.getElement(CardNumberElement);
+        if (!cardElement) throw new Error("Card element not found");
 
-        const stripeJs = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
-        if (!stripeJs) throw new Error("Stripe failed to load");
+        let targetDonationId: string;
+        let clientSecret: string;
 
-        const intentRes = await axios.post("/api/stripe/charge", { donationId, locale });
-        if (intentRes.data.error) {
-          toast.error(intentRes.data.error ?? t("donationFailed"));
-          setLoading(false);
-          return;
+        if (fallbackClientSecret && fallbackDonationId) {
+          targetDonationId = fallbackDonationId;
+          clientSecret = fallbackClientSecret;
+        } else {
+          const res = await axios.post("/api/cart/payment", basePayload);
+          if (!res.data?.success) { onClose(); return; }
+          targetDonationId = res.data.donation.id as string;
+
+          const intentRes = await axios.post("/api/stripe/charge", { donationId: targetDonationId, locale });
+          if (intentRes.data.error) {
+            toast.error(intentRes.data.error ?? t("donationFailed"));
+            setLoading(false);
+            return;
+          }
+          clientSecret = intentRes.data.clientSecret as string;
         }
-
-        const { clientSecret } = intentRes.data as { clientSecret: string };
-        const [expMonth, expYear] = cardDetails.expiryDate.split("/");
-        const cardData = {
-          number: cardDetails.cardNumber.replace(/\s/g, ""),
-          exp_month: parseInt(expMonth ?? "0", 10),
-          exp_year:  parseInt(`20${expYear ?? "0"}`, 10),
-          cvc: cardDetails.cvv,
-        };
 
         isRedirecting = true;
         setRedirecting(true);
 
-        const holderName = cardDetails.cardholderName.replace(/\d/g, "").trim();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error: confirmError } = await (stripeJs as any).confirmCardPayment(clientSecret, {
+        const { error: confirmError } = await stripeInstance.confirmCardPayment(clientSecret, {
           payment_method: {
-            card: cardData,
-            billing_details: { name: holderName || undefined },
+            card: cardElement,
+            billing_details: { name: stripeHolderName.trim() || undefined },
           },
         });
 
@@ -231,7 +239,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
         }
 
         clearItems(); confetti.onOpen();
-        router.push(`/${locale}/success/${donationId}`);
+        router.push(`/${locale}/success/${targetDonationId}`);
         return;
       }
 
@@ -282,31 +290,20 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
         isRedirecting = true;
         setRedirecting(true);
 
-        const stripeJs = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
-
         const fallbackToStripe = async () => {
           if (payforPollRef.current) { clearInterval(payforPollRef.current); payforPollRef.current = null; }
           if (payforPopupRef.current && !payforPopupRef.current.closed) payforPopupRef.current.close();
           setPayforSwitching(true);
           try {
-            if (!stripeJs) throw new Error("Stripe unavailable");
             const fbRes = await axios.post("/api/stripe/fallback", { donationId, locale });
             if (!fbRes.data.clientSecret) { toast.error(t("donationFailed")); return; }
-            const targetId = fbRes.data.donationId ?? donationId;
-            const [em, ey] = cardDetails.expiryDate.split("/");
-            const cardData = {
-              number:    cardDetails.cardNumber.replace(/\s/g, ""),
-              exp_month: parseInt(em ?? "0", 10),
-              exp_year:  parseInt(`20${ey ?? "0"}`, 10),
-              cvc:       cardDetails.cvv,
-            };
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const { error: confirmError } = await (stripeJs as any).confirmCardPayment(fbRes.data.clientSecret, {
-              payment_method: { card: cardData, billing_details: { name: cardDetails.cardholderName } },
-            });
-            if (confirmError) { toast.error(confirmError.message ?? t("donationFailed")); return; }
-            clearItems(); confetti.onOpen();
-            router.push(`/${locale}/success/${targetId}`);
+            setFallbackClientSecret(fbRes.data.clientSecret);
+            setFallbackDonationId(fbRes.data.donationId ?? donationId);
+            setUse3D(false);
+            setRedirecting(false);
+            setPayforSwitching(false);
+            setLoading(false);
+            isRedirecting = false;
           } catch {
             toast.error(t("donationFailed"));
           }
@@ -543,8 +540,19 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
           </button>
         )}
 
-        {/* Card form */}
-        {paymentMethod === "CARD" && (
+        {/* Card form — Stripe Elements when direct charge, raw inputs when PayFor 3D */}
+        {paymentMethod === "CARD" && !use3D && (
+          <Elements stripe={getStripePromise()} options={fallbackClientSecret ? { clientSecret: fallbackClientSecret } : undefined}>
+            <StripeCardForm
+              holderName={stripeHolderName}
+              onHolderNameChange={setStripeHolderName}
+              onReady={(s, e) => { setStripeInstance(s); setStripeElements(e); }}
+              onComplete={setStripeCardComplete}
+            />
+          </Elements>
+        )}
+
+        {paymentMethod === "CARD" && use3D && (
           <div className="space-y-4" dir="ltr">
             <div className="flex justify-center">
               <Cards
@@ -608,7 +616,12 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
         <div className={`flex justify-between gap-4 ${locale === "ar" ? "flex-row-reverse" : ""}`}>
           <Button variant="outline" onClick={handleBack} className="flex-1">{t("back")}</Button>
           <Button onClick={handleSubmit}
-            disabled={loading || !isPhoneValid() || (paymentMethod === "CARD" && !isCardValid())}
+            disabled={
+              loading ||
+              !isPhoneValid() ||
+              (paymentMethod === "CARD" && !use3D && (!stripeCardComplete || !stripeHolderName.trim())) ||
+              (paymentMethod === "CARD" && use3D && !isCardValid())
+            }
             className="flex-1 bg-[#FA5D17] hover:bg-[#e04d0f] text-white flex items-center justify-center gap-2">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t("confirmDonation")}
           </Button>
