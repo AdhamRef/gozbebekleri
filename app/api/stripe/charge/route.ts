@@ -9,8 +9,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 });
 
 // POST /api/stripe/charge
-// Directly charge a card via PaymentIntent (no redirect to Stripe Checkout).
-// The client passes a Stripe PaymentMethod ID created client-side by stripe.js.
+// Creates a PaymentIntent for the given donation and returns its clientSecret.
+// The client then calls stripe.confirmCardPayment(clientSecret, { payment_method: { card: rawData } })
+// so card data goes directly from browser to Stripe — never through this server.
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -18,20 +19,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json() as {
-      donationId?: string;
-      paymentMethodId?: string;
-      locale?: string;
-    };
-
+    const body = await req.json() as { donationId?: string; locale?: string };
     const donationId = String(body.donationId || "").trim();
-    const paymentMethodId = String(body.paymentMethodId || "").trim();
 
-    if (!donationId || !paymentMethodId) {
-      return NextResponse.json(
-        { error: "donationId and paymentMethodId are required" },
-        { status: 400 }
-      );
+    if (!donationId) {
+      return NextResponse.json({ error: "donationId is required" }, { status: 400 });
     }
 
     const donation = await prisma.donation.findUnique({
@@ -63,68 +55,23 @@ export async function POST(req: NextRequest) {
     const categoryNames = donation.categoryItems.map((i) => i.category.name).join(", ");
     const description = campaignNames || categoryNames || "Donation";
 
-    const origin = new URL(req.url).origin;
-    const returnUrl = `${origin}/${locale}/success/${donationId}`;
-
+    // Create PaymentIntent without confirming — client confirms with raw card data via stripe.js
     const intent = await stripe.paymentIntents.create({
       amount: amountInSmallestUnit,
       currency,
-      payment_method: paymentMethodId,
       description,
-      confirm: true,
-      // Allow 3DS challenge if the issuing bank requires it
-      automatic_payment_methods: {
-        enabled: true,
-        allow_redirects: "never",
-      },
-      metadata: {
-        donationId,
-        userId: session.user.id,
-      },
-      return_url: returnUrl,
+      automatic_payment_methods: { enabled: true, allow_redirects: "never" },
+      metadata: { donationId, userId: session.user.id },
     });
 
-    // Update donation with provider info
     await prisma.donation.update({
       where: { id: donationId },
-      data: {
-        provider: "STRIPE",
-        providerOrderId: intent.id,
-        locale,
-      },
+      data: { provider: "STRIPE", providerOrderId: intent.id, locale },
     });
 
-    if (intent.status === "succeeded") {
-      await prisma.donation.update({
-        where: { id: donationId },
-        data: { status: "PAID" },
-      });
-      return NextResponse.json({ status: "succeeded" });
-    }
-
-    if (intent.status === "requires_action") {
-      // 3DS challenge required — send clientSecret back to frontend to confirm
-      return NextResponse.json({
-        status: "requires_action",
-        clientSecret: intent.client_secret,
-      });
-    }
-
-    // Any other terminal failure
-    await prisma.donation.update({
-      where: { id: donationId },
-      data: { status: "FAILED" },
-    });
-
-    return NextResponse.json(
-      { error: `Payment failed with status: ${intent.status}` },
-      { status: 400 }
-    );
+    return NextResponse.json({ clientSecret: intent.client_secret });
   } catch (error) {
     console.error("[Stripe Charge] error:", error);
-    return NextResponse.json(
-      { error: "Failed to process payment" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to create payment intent" }, { status: 500 });
   }
 }

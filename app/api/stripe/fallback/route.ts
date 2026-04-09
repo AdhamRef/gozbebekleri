@@ -9,8 +9,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 });
 
 // POST /api/stripe/fallback
-// Called when PayFor 3D fails. If a paymentMethodId is supplied, charges the
-// card directly. Otherwise (legacy path) creates a Stripe Checkout session.
+// Called when PayFor 3D fails. Creates a new PaymentIntent for the donation and
+// returns clientSecret so the client can confirm with raw card data via stripe.js.
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -18,14 +18,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json() as {
-      donationId?: string;
-      paymentMethodId?: string;
-      locale?: string;
-    };
-
+    const body = await req.json() as { donationId?: string; locale?: string };
     const donationId = String(body.donationId || "").trim();
-    const paymentMethodId = String(body.paymentMethodId || "").trim();
 
     if (!donationId) {
       return NextResponse.json({ error: "donationId is required" }, { status: 400 });
@@ -57,7 +51,7 @@ export async function POST(req: NextRequest) {
     const categoryNames = donation.categoryItems.map((i) => i.category.name).join(", ");
     const description = campaignNames || categoryNames || "Donation";
 
-    // Clone into a fresh PENDING donation if the original failed (so we have a clean record)
+    // Clone into a fresh PENDING donation if the original failed
     let targetDonationId = donationId;
 
     if (donation.status === "FAILED") {
@@ -100,74 +94,33 @@ export async function POST(req: NextRequest) {
       });
       targetDonationId = newDonation.id;
     } else {
-      // PENDING: reset provider to STRIPE on the existing donation
+      // PENDING: switch provider to STRIPE
       await prisma.donation.update({
         where: { id: donationId },
         data: { provider: "STRIPE" },
       });
     }
 
-    // Direct charge path — no redirect
-    if (paymentMethodId) {
-      const origin = new URL(req.url).origin;
-      const returnUrl = `${origin}/${locale}/success/${targetDonationId}`;
+    // Create PaymentIntent without confirming — client confirms with raw card data via stripe.js
+    const intent = await stripe.paymentIntents.create({
+      amount: amountInSmallestUnit,
+      currency,
+      description,
+      automatic_payment_methods: { enabled: true, allow_redirects: "never" },
+      metadata: {
+        donationId: targetDonationId,
+        userId: session.user.id,
+        payforFallback: "true",
+        originalDonationId: donationId,
+      },
+    });
 
-      const intent = await stripe.paymentIntents.create({
-        amount: amountInSmallestUnit,
-        currency,
-        payment_method: paymentMethodId,
-        description,
-        confirm: true,
-        automatic_payment_methods: {
-          enabled: true,
-          allow_redirects: "never",
-        },
-        metadata: {
-          donationId: targetDonationId,
-          userId: session.user.id,
-          payforFallback: "true",
-          originalDonationId: donationId,
-        },
-        return_url: returnUrl,
-      });
+    await prisma.donation.update({
+      where: { id: targetDonationId },
+      data: { providerOrderId: intent.id },
+    });
 
-      await prisma.donation.update({
-        where: { id: targetDonationId },
-        data: { providerOrderId: intent.id },
-      });
-
-      if (intent.status === "succeeded") {
-        await prisma.donation.update({
-          where: { id: targetDonationId },
-          data: { status: "PAID" },
-        });
-        return NextResponse.json({ status: "succeeded", donationId: targetDonationId });
-      }
-
-      if (intent.status === "requires_action") {
-        return NextResponse.json({
-          status: "requires_action",
-          clientSecret: intent.client_secret,
-          donationId: targetDonationId,
-        });
-      }
-
-      await prisma.donation.update({
-        where: { id: targetDonationId },
-        data: { status: "FAILED" },
-      });
-
-      return NextResponse.json(
-        { error: `Payment failed with status: ${intent.status}` },
-        { status: 400 }
-      );
-    }
-
-    // Legacy path: no paymentMethodId — return nothing (caller should handle gracefully)
-    return NextResponse.json(
-      { error: "paymentMethodId is required for direct charge" },
-      { status: 400 }
-    );
+    return NextResponse.json({ clientSecret: intent.client_secret, donationId: targetDonationId });
   } catch (error) {
     console.error("[Stripe Fallback] error:", error);
     return NextResponse.json({ error: "Failed to process payment" }, { status: 500 });

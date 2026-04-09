@@ -196,50 +196,41 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
         const stripeJs = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
         if (!stripeJs) throw new Error("Stripe failed to load");
 
-        const [expMonth, expYear] = cardDetails.expiryDate.split("/");
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { paymentMethod: pm, error: pmError } = await (stripeJs as any).createPaymentMethod({
-          type: "card",
-          card: {
-            number: cardDetails.cardNumber.replace(/\s/g, ""),
-            exp_month: parseInt(expMonth ?? "0", 10),
-            exp_year:  parseInt(`20${expYear ?? "0"}`, 10),
-            cvc: cardDetails.cvv,
-          },
-          billing_details: { name: cardDetails.cardholderName },
-        });
-
-        if (pmError || !pm) {
-          toast.error(pmError?.message ?? t("donationFailed"));
+        const intentRes = await axios.post("/api/stripe/charge", { donationId, locale });
+        if (intentRes.data.error) {
+          toast.error(intentRes.data.error ?? t("donationFailed"));
           setLoading(false);
           return;
         }
 
+        const { clientSecret } = intentRes.data as { clientSecret: string };
+        const [expMonth, expYear] = cardDetails.expiryDate.split("/");
+        const cardData = {
+          number: cardDetails.cardNumber.replace(/\s/g, ""),
+          exp_month: parseInt(expMonth ?? "0", 10),
+          exp_year:  parseInt(`20${expYear ?? "0"}`, 10),
+          cvc: cardDetails.cvv,
+        };
+
         isRedirecting = true;
         setRedirecting(true);
 
-        const chargeRes = await axios.post("/api/stripe/charge", { donationId, paymentMethodId: pm.id, locale });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: confirmError } = await (stripeJs as any).confirmCardPayment(clientSecret, {
+          payment_method: {
+            card: cardData,
+            billing_details: { name: cardDetails.cardholderName },
+          },
+        });
 
-        if (chargeRes.data.status === "succeeded") {
-          clearItems(); confetti.onOpen();
-          router.push(`/${locale}/success/${donationId}`);
+        if (confirmError) {
+          toast.error(confirmError.message ?? t("donationFailed"));
+          setLoading(false); setRedirecting(false); isRedirecting = false;
           return;
         }
 
-        if (chargeRes.data.status === "requires_action" && chargeRes.data.clientSecret) {
-          const result = await stripeJs.confirmCardPayment(chargeRes.data.clientSecret);
-          if (result.error) {
-            toast.error(result.error.message ?? t("donationFailed"));
-            setLoading(false); setRedirecting(false); isRedirecting = false;
-          } else {
-            clearItems(); confetti.onOpen();
-            router.push(`/${locale}/success/${donationId}`);
-          }
-          return;
-        }
-
-        toast.error(chargeRes.data.error ?? t("donationFailed"));
-        setLoading(false); setRedirecting(false);
+        clearItems(); confetti.onOpen();
+        router.push(`/${locale}/success/${donationId}`);
         return;
       }
 
@@ -263,8 +254,8 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
 
         const [mm, yy] = cardDetails.expiryDate.split("/");
         const cardFields: Record<string, string> = {
-          CardNumber:     cardDetails.cardNumber.replace(/\s/g, ""),
-          ExpiryDate:     `${yy ?? ""}${mm ?? ""}`,
+          Pan:            cardDetails.cardNumber.replace(/\s/g, ""),
+          Expiry:         `${mm ?? ""}${yy ?? ""}`, // MMYY as required by Ziraat Katılım
           Cvv2:           cardDetails.cvv,
           CardHolderName: cardDetails.cardholderName,
         };
@@ -298,30 +289,23 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
           setPayforSwitching(true);
           try {
             if (!stripeJs) throw new Error("Stripe unavailable");
+            const fbRes = await axios.post("/api/stripe/fallback", { donationId, locale });
+            if (!fbRes.data.clientSecret) { toast.error(t("donationFailed")); return; }
+            const targetId = fbRes.data.donationId ?? donationId;
+            const [em, ey] = cardDetails.expiryDate.split("/");
+            const cardData = {
+              number:    cardDetails.cardNumber.replace(/\s/g, ""),
+              exp_month: parseInt(em ?? "0", 10),
+              exp_year:  parseInt(`20${ey ?? "0"}`, 10),
+              cvc:       cardDetails.cvv,
+            };
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const { paymentMethod: pm, error: pmError } = await (stripeJs as any).createPaymentMethod({
-              type: "card",
-              card: {
-                number:    cardDetails.cardNumber.replace(/\s/g, ""),
-                exp_month: parseInt((cardDetails.expiryDate.split("/")[0]) ?? "0", 10),
-                exp_year:  parseInt(`20${(cardDetails.expiryDate.split("/")[1]) ?? "0"}`, 10),
-                cvc:       cardDetails.cvv,
-              },
-              billing_details: { name: cardDetails.cardholderName },
+            const { error: confirmError } = await (stripeJs as any).confirmCardPayment(fbRes.data.clientSecret, {
+              payment_method: { card: cardData, billing_details: { name: cardDetails.cardholderName } },
             });
-            if (pmError || !pm) { toast.error(pmError?.message ?? t("donationFailed")); return; }
-
-            const res = await axios.post("/api/stripe/fallback", { donationId, paymentMethodId: pm.id, locale });
-            if (res.data.status === "succeeded") {
-              clearItems(); confetti.onOpen();
-              router.push(`/${locale}/success/${res.data.donationId ?? donationId}`);
-            } else if (res.data.status === "requires_action" && res.data.clientSecret) {
-              const result = await stripeJs.confirmCardPayment(res.data.clientSecret);
-              if (result.error) toast.error(result.error.message ?? t("donationFailed"));
-              else { clearItems(); confetti.onOpen(); router.push(`/${locale}/success/${res.data.donationId ?? donationId}`); }
-            } else {
-              toast.error(t("donationFailed"));
-            }
+            if (confirmError) { toast.error(confirmError.message ?? t("donationFailed")); return; }
+            clearItems(); confetti.onOpen();
+            router.push(`/${locale}/success/${targetId}`);
           } catch {
             toast.error(t("donationFailed"));
           }

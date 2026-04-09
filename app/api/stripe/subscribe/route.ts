@@ -9,8 +9,10 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 });
 
 // POST /api/stripe/subscribe
-// Create a Stripe Subscription directly (no Checkout redirect).
-// The client passes a Stripe PaymentMethod ID created client-side by stripe.js.
+// Creates a Stripe Subscription for the given donation and returns the clientSecret
+// of the subscription's first invoice PaymentIntent.
+// The client then calls stripe.confirmCardPayment(clientSecret, { payment_method: { card: rawData } })
+// which also saves the card for future monthly billing.
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -18,20 +20,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json() as {
-      donationId?: string;
-      paymentMethodId?: string;
-      locale?: string;
-    };
-
+    const body = await req.json() as { donationId?: string; locale?: string };
     const donationId = String(body.donationId || "").trim();
-    const paymentMethodId = String(body.paymentMethodId || "").trim();
 
-    if (!donationId || !paymentMethodId) {
-      return NextResponse.json(
-        { error: "donationId and paymentMethodId are required" },
-        { status: 400 }
-      );
+    if (!donationId) {
+      return NextResponse.json({ error: "donationId is required" }, { status: 400 });
     }
 
     const donation = await prisma.donation.findUnique({
@@ -64,7 +57,7 @@ export async function POST(req: NextRequest) {
     const categoryNames = donation.categoryItems.map((i) => i.category.name).join(", ");
     const productName = campaignNames || categoryNames || "Monthly Donation";
 
-    // Get or create Stripe Customer for this user
+    // Get or create Stripe Customer (no payment method yet — card attached on confirmation)
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { email: true, stripeCustomerId: true } as never,
@@ -78,12 +71,9 @@ export async function POST(req: NextRequest) {
     } else {
       const customer = await stripe.customers.create({
         email: session.user.email ?? undefined,
-        payment_method: paymentMethodId,
-        invoice_settings: { default_payment_method: paymentMethodId },
         metadata: { userId: session.user.id },
       });
       customerId = customer.id;
-      // Persist customer ID — ignore if column doesn't exist on the schema
       try {
         await prisma.user.update({
           where: { id: session.user.id },
@@ -94,20 +84,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Attach the payment method to the customer and set as default
-    try {
-      await stripe.paymentMethods.attach(paymentMethodId, { customer: customerId });
-    } catch {
-      // Already attached — fine
-    }
-    await stripe.customers.update(customerId, {
-      invoice_settings: { default_payment_method: paymentMethodId },
-    });
-
-    // Create the subscription with incomplete payment behaviour so we get a client_secret
-    // Create a one-off price inline — Stripe's SubscriptionCreateParams.Item requires
-    // price_data to be typed as SubscriptionItemCreateParams.PriceData which uses
-    // product_data. Cast to satisfy the SDK's strict types.
     const priceData = {
       currency,
       product_data: { name: productName },
@@ -115,6 +91,8 @@ export async function POST(req: NextRequest) {
       recurring: { interval: "month" as const },
     };
 
+    // Create subscription with incomplete payment — client confirms with card data
+    // save_default_payment_method ensures the card is stored for recurring billing
     const subscription = await stripe.subscriptions.create({
       customer: customerId,
       items: [
@@ -131,57 +109,31 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Store Stripe subscription ID in payforToken field so webhook can find it
+    if (donation.subscriptionId) {
+      await prisma.subscription.update({
+        where: { id: donation.subscriptionId },
+        data: { payforToken: subscription.id },
+      });
+    }
+
     const invoice = subscription.latest_invoice as Stripe.Invoice & {
       payment_intent: Stripe.PaymentIntent | null;
     };
+    const clientSecret = invoice?.payment_intent?.client_secret;
 
-    const paymentIntent = invoice?.payment_intent;
+    if (!clientSecret) {
+      return NextResponse.json({ error: "Could not get payment intent" }, { status: 500 });
+    }
 
-    // Update donation with provider info
     await prisma.donation.update({
       where: { id: donationId },
-      data: {
-        provider: "STRIPE",
-        providerOrderId: subscription.id,
-        locale,
-      },
+      data: { provider: "STRIPE", providerOrderId: subscription.id, locale },
     });
 
-    if (paymentIntent?.status === "succeeded") {
-      await prisma.donation.update({
-        where: { id: donationId },
-        data: { status: "PAID" },
-      });
-      return NextResponse.json({ status: "succeeded" });
-    }
-
-    if (
-      paymentIntent?.status === "requires_action" ||
-      paymentIntent?.status === "requires_confirmation"
-    ) {
-      return NextResponse.json({
-        status: "requires_action",
-        clientSecret: paymentIntent.client_secret,
-      });
-    }
-
-    if (paymentIntent?.status === "requires_payment_method") {
-      return NextResponse.json(
-        { error: "Card was declined. Please try a different card." },
-        { status: 400 }
-      );
-    }
-
-    // Fallback — return clientSecret so frontend can attempt confirm
-    return NextResponse.json({
-      status: paymentIntent?.status ?? subscription.status,
-      clientSecret: paymentIntent?.client_secret ?? null,
-    });
+    return NextResponse.json({ clientSecret });
   } catch (error) {
     console.error("[Stripe Subscribe] error:", error);
-    return NextResponse.json(
-      { error: "Failed to create subscription" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to create subscription" }, { status: 500 });
   }
 }
