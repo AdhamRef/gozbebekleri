@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (result.ok) {
-      return NextResponse.redirect(new URL(`/${locale}/success/${donationId}`, origin));
+      return NextResponse.redirect(new URL(`/success/${donationId}`, origin));
     }
 
     // PayFor failed — attempt Stripe fallback if we have donation data
@@ -177,8 +177,8 @@ export async function POST(req: NextRequest) {
               quantity: 1,
             },
           ],
-          success_url: `${origin}/${locale}/success/${newDonation.id}?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${origin}/${locale}/campaigns?payment=cancelled&donationId=${encodeURIComponent(newDonation.id)}`,
+          success_url: `${origin}/success/${newDonation.id}?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${origin}/campaigns?payment=cancelled&donationId=${encodeURIComponent(newDonation.id)}`,
           metadata: {
             donationId: newDonation.id,
             userId: failed.donorId,
