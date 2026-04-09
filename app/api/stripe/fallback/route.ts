@@ -9,10 +9,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 });
 
 // POST /api/stripe/fallback
-// Called when PayFor 3D fails (bank error, timeout, user closed popup).
-// Handles both PENDING donations (bank never responded) and FAILED donations
-// (bank responded with failure). Creates a Stripe Checkout Session and returns
-// the URL to redirect the user to — no extra clicks needed.
+// Called when PayFor 3D fails. If a paymentMethodId is supplied, charges the
+// card directly. Otherwise (legacy path) creates a Stripe Checkout session.
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -20,8 +18,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json() as { donationId?: string; locale?: string };
+    const body = await req.json() as {
+      donationId?: string;
+      paymentMethodId?: string;
+      locale?: string;
+    };
+
     const donationId = String(body.donationId || "").trim();
+    const paymentMethodId = String(body.paymentMethodId || "").trim();
+
     if (!donationId) {
       return NextResponse.json({ error: "donationId is required" }, { status: 400 });
     }
@@ -44,19 +49,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Donation already paid" }, { status: 400 });
     }
 
-    const origin = new URL(req.url).origin;
     const locale = (body.locale ?? donation.locale ?? "en").toLowerCase();
-
-    const campaignNames = donation.items.map((i) => i.campaign.title).join(", ");
-    const categoryNames = donation.categoryItems.map((i) => i.category.name).join(", ");
-    const productName = campaignNames || categoryNames || "Donation";
     const currency = (donation.currency || "USD").toLowerCase();
     const amountInSmallestUnit = Math.round(donation.totalAmount * 100);
 
+    const campaignNames = donation.items.map((i) => i.campaign.title).join(", ");
+    const categoryNames = donation.categoryItems.map((i) => i.category.name).join(", ");
+    const description = campaignNames || categoryNames || "Donation";
+
+    // Clone into a fresh PENDING donation if the original failed (so we have a clean record)
     let targetDonationId = donationId;
 
     if (donation.status === "FAILED") {
-      // Clone into a fresh PENDING donation so the Stripe session has a clean record
       const newDonation = await prisma.donation.create({
         data: {
           amount: donation.amount,
@@ -103,41 +107,69 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const stripeSession = await stripe.checkout.sessions.create({
-      mode: "payment",
-      line_items: [
-        {
-          price_data: {
-            currency,
-            product_data: { name: productName },
-            unit_amount: amountInSmallestUnit,
-          },
-          quantity: 1,
+    // Direct charge path — no redirect
+    if (paymentMethodId) {
+      const origin = new URL(req.url).origin;
+      const returnUrl = `${origin}/${locale}/success/${targetDonationId}`;
+
+      const intent = await stripe.paymentIntents.create({
+        amount: amountInSmallestUnit,
+        currency,
+        payment_method: paymentMethodId,
+        description,
+        confirm: true,
+        automatic_payment_methods: {
+          enabled: true,
+          allow_redirects: "never",
         },
-      ],
-      success_url: `${origin}/${locale}/success/${targetDonationId}?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/${locale}/campaigns?payment=cancelled&donationId=${encodeURIComponent(targetDonationId)}`,
-      metadata: {
-        donationId: targetDonationId,
-        userId: session.user.id,
-        payforFallback: "true",
-        originalDonationId: donationId,
-      },
-      customer_email: session.user.email ?? undefined,
-    });
+        metadata: {
+          donationId: targetDonationId,
+          userId: session.user.id,
+          payforFallback: "true",
+          originalDonationId: donationId,
+        },
+        return_url: returnUrl,
+      });
 
-    await prisma.donation.update({
-      where: { id: targetDonationId },
-      data: { providerOrderId: stripeSession.id },
-    });
+      await prisma.donation.update({
+        where: { id: targetDonationId },
+        data: { providerOrderId: intent.id },
+      });
 
-    console.log(
-      `[Stripe Fallback] PayFor donation ${donationId} (${donation.status}) → Stripe session ${stripeSession.id} for donation ${targetDonationId}`
+      if (intent.status === "succeeded") {
+        await prisma.donation.update({
+          where: { id: targetDonationId },
+          data: { status: "PAID" },
+        });
+        return NextResponse.json({ status: "succeeded", donationId: targetDonationId });
+      }
+
+      if (intent.status === "requires_action") {
+        return NextResponse.json({
+          status: "requires_action",
+          clientSecret: intent.client_secret,
+          donationId: targetDonationId,
+        });
+      }
+
+      await prisma.donation.update({
+        where: { id: targetDonationId },
+        data: { status: "FAILED" },
+      });
+
+      return NextResponse.json(
+        { error: `Payment failed with status: ${intent.status}` },
+        { status: 400 }
+      );
+    }
+
+    // Legacy path: no paymentMethodId — return nothing (caller should handle gracefully)
+    return NextResponse.json(
+      { error: "paymentMethodId is required for direct charge" },
+      { status: 400 }
     );
-
-    return NextResponse.json({ url: stripeSession.url });
   } catch (error) {
-    console.error("Stripe fallback error:", error);
-    return NextResponse.json({ error: "Failed to create Stripe fallback session" }, { status: 500 });
+    console.error("[Stripe Fallback] error:", error);
+    return NextResponse.json({ error: "Failed to process payment" }, { status: 500 });
   }
 }

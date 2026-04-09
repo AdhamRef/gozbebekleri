@@ -1,3 +1,4 @@
+import { loadStripe } from "@stripe/stripe-js";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -887,11 +888,7 @@ const DonationDialog = ({
               <div className="text-center space-y-3">
                 <p className="text-gray-900 font-semibold">{t("bankCard")}</p>
                 <p className="text-sm text-gray-600">
-                  {donationType === "MONTHLY"
-                    ? t("monthlyStripeRedirect")
-                    : use3D
-                    ? t("secure3DCardPrompt")
-                    : t("standardStripeRedirect")}
+                  {t("secure3DCardPrompt")}
                 </p>
               </div>
             ) : (
@@ -919,8 +916,8 @@ const DonationDialog = ({
               </button>
             )}
 
-            {/* Card details form — shown for ONE_TIME + CARD + 3D */}
-            {donationType === "ONE_TIME" && paymentMethod === "CARD" && use3D && (
+            {/* Card details form — shown for all card payments */}
+            {paymentMethod === "CARD" && (
               <div className="space-y-4" dir="ltr">
                 <div className="flex justify-center">
                   <Cards
@@ -1018,7 +1015,7 @@ const DonationDialog = ({
   disabled={
     loading ||
     !isPhoneValid() ||
-    (donationType === "ONE_TIME" && paymentMethod === "CARD" && use3D && (
+    (paymentMethod === "CARD" && (
       cardDetails.cardNumber.length < 13 ||
       cardDetails.expiryDate.length < 5 ||
       cardDetails.cvv.length < 3 ||
@@ -1093,32 +1090,40 @@ const DonationDialog = ({
       if (response.data.success) {
         const donationId = response.data.donation.id as string;
 
-        // Monthly donations: always use Stripe
-        if (donationType === "MONTHLY") {
-          isRedirecting = true;
-          setRedirecting(true);
-          const stripeRes = await axios.post("/api/stripe/checkout", { donationId, locale });
-          window.location.href = stripeRes.data.url;
-          return;
-        }
-
         if (paymentMethod === "CARD") {
-          isRedirecting = true;
-          setRedirecting(true);
+          // Tokenise card client-side via Stripe.js — card data never hits our server
+          const stripeJs = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+          if (!stripeJs) throw new Error("Stripe failed to load");
+
+          const [expMonth, expYear] = cardDetails.expiryDate.split("/");
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { paymentMethod: pm, error: pmError } = await (stripeJs as any).createPaymentMethod({
+            type: "card",
+            card: {
+              number: cardDetails.cardNumber.replace(/\s/g, ""),
+              exp_month: parseInt(expMonth ?? "0", 10),
+              exp_year: parseInt(`20${expYear ?? "0"}`, 10),
+              cvc: cardDetails.cvv,
+            },
+            billing_details: { name: cardDetails.cardholderName },
+          });
+
+          if (pmError || !pm) {
+            toast.error(pmError?.message ?? t("donationFailed"));
+            setLoading(false);
+            return;
+          }
+
+          const stripePaymentMethodId = pm.id;
 
           if (use3D) {
-            // 3D Secure via Ziraat Sanal POS (PayFor)
-            const init = await axios.post("/api/payfor/3dpay/initiate", {
-              donationId,
-              locale,
-            });
-
+            // 3D Secure via Ziraat Sanal POS (PayFor) with Stripe fallback
+            const init = await axios.post("/api/payfor/3dpay/initiate", { donationId, locale });
             const { actionUrl, fields } = init.data as {
               actionUrl: string;
               fields: Record<string, string>;
             };
 
-            // Build the POST form
             const form = document.createElement("form");
             form.method = "POST";
             form.action = actionUrl;
@@ -1130,13 +1135,14 @@ const DonationDialog = ({
               form.appendChild(input);
             });
 
-            // Card data goes directly browser → bank (never touches our server)
-            // Ziraat Katılım PayFor field names:
+            // ExpiryDate format for PayFor: YYMM
+            const [mm, yy] = cardDetails.expiryDate.split("/");
+            const expiryYYMM = `${yy ?? ""}${mm ?? ""}`;
             const cardFields: Record<string, string> = {
-              CardNumber: cardDetails.cardNumber,
-              ExpiryDate: cardDetails.expiryDate.replace("/", ""), // "05/28" → "0528" (MMYY)
+              CardNumber: cardDetails.cardNumber.replace(/\s/g, ""),
+              ExpiryDate: expiryYYMM,
               Cvv2: cardDetails.cvv,
-              CardholderName: cardDetails.cardholderName,
+              CardHolderName: cardDetails.cardholderName,
             };
             Object.entries(cardFields).forEach(([name, value]) => {
               const input = document.createElement("input");
@@ -1146,7 +1152,6 @@ const DonationDialog = ({
               form.appendChild(input);
             });
 
-            // Try to open a popup so our page keeps running (enables polling + auto-fallback)
             const pw = 600, ph = 700;
             const pl = Math.round((screen.width - pw) / 2);
             const pt = Math.round((screen.height - ph) / 2);
@@ -1161,16 +1166,13 @@ const DonationDialog = ({
             form.submit();
             document.body.removeChild(form);
 
-            if (!popup) {
-              // Popup blocked — browser navigated away; nothing more to do here
-              return;
-            }
+            if (!popup) return;
 
             payforPopupRef.current = popup;
             isRedirecting = true;
             setRedirecting(true);
 
-            // Helper: close popup, show "switching" message, redirect to Stripe
+            // Fallback: charge directly via Stripe (no redirect)
             const fallbackToStripe = async () => {
               if (payforPollRef.current) {
                 clearInterval(payforPollRef.current);
@@ -1181,16 +1183,30 @@ const DonationDialog = ({
               }
               setPayforSwitching(true);
               try {
-                const res = await axios.post("/api/stripe/fallback", { donationId, locale });
-                window.location.href = res.data.url;
+                const res = await axios.post("/api/stripe/fallback", {
+                  donationId,
+                  paymentMethodId: stripePaymentMethodId,
+                  locale,
+                });
+                if (res.data.status === "succeeded") {
+                  router.push(`/${locale}/success/${res.data.donationId ?? donationId}`);
+                } else if (res.data.status === "requires_action" && res.data.clientSecret) {
+                  const result = await stripeJs.confirmCardPayment(res.data.clientSecret);
+                  if (result.error) {
+                    toast.error(result.error.message ?? t("donationFailed"));
+                  } else {
+                    router.push(`/${locale}/success/${res.data.donationId ?? donationId}`);
+                  }
+                } else {
+                  toast.error(t("donationFailed"));
+                }
               } catch {
-                window.location.href = `/${locale}/campaigns?payment=failed&donationId=${encodeURIComponent(donationId)}`;
+                toast.error(t("donationFailed"));
               }
             };
 
-            // Poll donation status every 2 s; auto-fallback after ~50 s of PENDING
             let polls = 0;
-            const FALLBACK_AFTER_POLLS = 25; // 50 seconds
+            const FALLBACK_AFTER_POLLS = 25;
 
             payforPollRef.current = setInterval(async () => {
               polls++;
@@ -1208,33 +1224,48 @@ const DonationDialog = ({
                   router.push(`/${locale}/success/${donationId}`);
                   return;
                 }
-
-                if (data.status === "FAILED") {
-                  await fallbackToStripe();
-                  return;
-                }
-
-                // Popup closed by user or stuck on bank error page
-                if (payforPopupRef.current?.closed) {
-                  await fallbackToStripe();
-                  return;
-                }
-
-                // Timeout — bank never responded (e.g. 500 error page)
-                if (polls >= FALLBACK_AFTER_POLLS) {
+                if (data.status === "FAILED" || payforPopupRef.current?.closed || polls >= FALLBACK_AFTER_POLLS) {
                   await fallbackToStripe();
                 }
               } catch {
-                // Ignore transient errors, keep polling
+                // Ignore transient errors
               }
             }, 2000);
 
             return;
-          } else {
-            // 2D via Stripe
-            const stripeRes = await axios.post("/api/stripe/checkout", { donationId, locale });
-            window.location.href = stripeRes.data.url;
           }
+
+          // Direct Stripe charge (non-3D / monthly)
+          isRedirecting = true;
+          setRedirecting(true);
+
+          const endpoint = donationType === "MONTHLY" ? "/api/stripe/subscribe" : "/api/stripe/charge";
+          const chargeRes = await axios.post(endpoint, {
+            donationId,
+            paymentMethodId: stripePaymentMethodId,
+            locale,
+          });
+
+          if (chargeRes.data.status === "succeeded") {
+            router.push(`/${locale}/success/${donationId}`);
+            return;
+          }
+
+          if (chargeRes.data.status === "requires_action" && chargeRes.data.clientSecret) {
+            const result = await stripeJs.confirmCardPayment(chargeRes.data.clientSecret);
+            if (result.error) {
+              toast.error(result.error.message ?? t("donationFailed"));
+              setLoading(false);
+              setRedirecting(false);
+            } else {
+              router.push(`/${locale}/success/${donationId}`);
+            }
+            return;
+          }
+
+          toast.error(chargeRes.data.error ?? t("donationFailed"));
+          setLoading(false);
+          setRedirecting(false);
           return;
         }
 
