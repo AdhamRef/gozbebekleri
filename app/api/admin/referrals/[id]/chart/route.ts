@@ -61,6 +61,7 @@ export async function GET(
     const donationWhere: Prisma.DonationWhereInput = {
       referralId,
       createdAt: { gte: startDate, lte: endDate },
+      status: "PAID",
     };
     if (campaignId && campaignId !== "all") {
       donationWhere.items = { some: { campaignId } };

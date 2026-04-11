@@ -30,6 +30,7 @@ import SignInDialog from "@/components/SignInDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import CartPaymentDialog from "./CartPaymentDialog";
 import { AnimatePresence, motion } from "framer-motion";
+import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
 
 interface CartItem {
   id: string;
@@ -71,7 +72,7 @@ const Navbar = () => {
   useEffect(() => {
     if (searchParams.get("openCartPayment") === "1") {
       setIsCartPaymentDialogOpen(true);
-      router.replace(pathname);
+      router.replace(appendCurrencyQuery(pathname, getCurrencyCodeForLinks()));
     }
   }, [searchParams, pathname, router]);
 
@@ -122,7 +123,12 @@ const Navbar = () => {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      router.push(`/campaigns?search=${encodeURIComponent(searchQuery.trim())}`);
+      router.push(
+        appendCurrencyQuery(
+          `/campaigns?search=${encodeURIComponent(searchQuery.trim())}`,
+          getCurrencyCodeForLinks()
+        )
+      );
       setSearchQuery("");
       setIsMobileMenuOpen(false);
     }
@@ -132,7 +138,11 @@ const Navbar = () => {
     if (session?.user) {
       setIsCartOpen(true);
     } else {
-      setSignInCallbackUrl(typeof window !== "undefined" ? window.location.pathname : undefined);
+      setSignInCallbackUrl(
+        typeof window !== "undefined"
+          ? appendCurrencyQuery(pathname, getCurrencyCodeForLinks())
+          : undefined
+      );
       setIsSignInOpen(true);
     }
   };
@@ -213,7 +223,7 @@ const Navbar = () => {
             </div>
 
             {/* Desktop: Search */}
-            <form
+            {/* <form
               onSubmit={handleSearch}
               className="hidden lg:flex items-center border border-gray-300 rounded-lg overflow-hidden flex-shrink-0"
             >
@@ -230,7 +240,7 @@ const Navbar = () => {
               >
                 <Search className="w-4 h-4 text-gray-500" />
               </button>
-            </form>
+            </form> */}
 
             {/* Desktop: Donate button */}
             <Link
@@ -295,14 +305,14 @@ const Navbar = () => {
                         <p className="text-xs text-gray-500 truncate">{session.user.email}</p>
                       </div>
                            {(session.user.role === "ADMIN" || session.user.role === "STAFF") && (
-                        <Link
+                        <a
                           href="/dashboard"
                           onClick={() => setIsUserMenuOpen(false)}
                           className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-t border-gray-100"
                         >
                           <LayoutDashboard className="w-4 h-4 text-[#025EB8]" />
                           {isRTL ? "لوحة التحكم" : "Dashboard"}
-                        </Link>
+                        </a>
                       )}
                       <Link
                         href="/profile"
@@ -329,7 +339,11 @@ const Navbar = () => {
               <button
                 type="button"
                 onClick={() => {
-                  setSignInCallbackUrl(typeof window !== "undefined" ? window.location.pathname : undefined);
+                  setSignInCallbackUrl(
+        typeof window !== "undefined"
+          ? appendCurrencyQuery(pathname, getCurrencyCodeForLinks())
+          : undefined
+      );
                   setIsSignInOpen(true);
                 }}
                 className="hidden lg:flex items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-[#025EB8] transition-colors flex-shrink-0"
@@ -360,7 +374,7 @@ const Navbar = () => {
                 className="lg:hidden overflow-hidden border-t border-gray-200 bg-white"
               >
                 {/* Search */}
-                <form
+                {/* <form
                   onSubmit={handleSearch}
                   className="flex items-center gap-2 px-4 py-3 border-b border-gray-100"
                 >
@@ -374,7 +388,7 @@ const Navbar = () => {
                   <button type="submit" className="text-gray-400 hover:text-[#025EB8] transition-colors">
                     <Search className="w-4 h-4" />
                   </button>
-                </form>
+                </form> */}
 
                 {/* Nav links */}
                 {navLinks.map((link) => (

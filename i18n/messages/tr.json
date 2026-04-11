@@ -27,6 +27,9 @@
     "donate": "BAĞIŞ YAP",
     "signIn": "Giriş Yap"
   },
+  "BlogCard": {
+    "readMore": "Devamını oku"
+  },
   "HomePage": {
     "donationCategories": "Bağış Kategorileri",
     "news": "Haberlerimiz",
@@ -176,6 +179,10 @@
     "donateNow": "Bağış Yap",
     "campaignDonations": "bağış",
     "campaignRemaining": "kalan",
+    "campaignOpenBadge": "Açık hedef",
+    "campaignSharesBadge": "Hisse (سهوم)",
+    "campaignOpenGoal": "Açık bağış toplama",
+    "sharePriceUsd": "Hisse başına",
     "article": "Makale",
     "linkCopied": "Bağlantı kopyalandı",
     "all": "Tümü",
@@ -238,7 +245,9 @@
     "goal": "Hedef",
     "home": "Ana Sayfa",
     "heroDescription": "Anlamlı davalara destek olun ve insanların hayatında kalıcı bir fark yaratın.",
-    "resultsFound": "kampanya bulundu"
+    "resultsFound": "kampanya bulundu",
+    "openGoalLabel": "Açık hedef",
+    "sharesCampaignLabel": "Hisse (سهوم)"
   },
   "Campaign": {
     "story": "Hikaye",
@@ -252,6 +261,8 @@
     "completed": "Tamamlandı",
     "image": "Görsel",
     "from": " / ",
+    "openGoalBadge": "Açık hedef",
+    "sharesCampaignBadge": "Hisse (سهوم)",
     "donateNow": "Bağış Yap",
     "outOfGoal": "hedeften",
     "peopleDonated": "kişi bu vakayı destekledi",
@@ -293,7 +304,12 @@
     "termsAgreement": "Giriş yaparak kabul etmiş olursunuz",
     "termsOfUse": "Kullanım Koşulları",
     "and": "ve",
-    "privacyPolicy": "Gizlilik Politikası"
+    "privacyPolicy": "Gizlilik Politikası",
+    "orContinueWith": "veya",
+    "secure": "Güvenli",
+    "trusted": "Güvenilir",
+    "community": "Topluluk",
+    "donationHint": "Bağışlarınızı takip etmek ve hesabınızı yönetmek için giriş yapın."
   },
   "SharePopup": {
     "shareCampaign": "Kampanyayı Başkalarıyla Paylaş",
@@ -322,6 +338,11 @@
     "hadithText": "(Allah buyurdu: Infak et ey Ademoğlu, Ben de sana infak ederim)",
     "collected": "Toplanan",
     "goal": "Hedef",
+    "sharePriceLabel": "Hisse başına fiyat:",
+    "sharesLabel": "hisse",
+    "sharesPickHint": "Kaç hisse (سهوم) bağışlamak istediğinizi seçin",
+    "donationTotal": "Bağış toplamı",
+    "sharesLine": "{count} hisse (سهوم)",
     "enterDonationAmount": "Bağış tutarını girin",
     "addToCart": "Sepete Ekle",
     "addedToCart": "Tutar sepete başarıyla eklendi",
@@ -384,7 +405,16 @@
     "donationFailed": "Bağış başarısız",
     "successRedirecting": "Ödeme Sayfasına Yönlendiriliyor",
     "successRedirectingDesc": "Ödemenizi tamamlamak için güvenli şekilde yönlendiriliyorsunuz.",
-    "paymentFeesPercent": "Ödeme Ücretleri (%3)"
+    "paymentFeesPercent": "Ödeme Ücretleri (%3)",
+    "secure3DLabel": "3D Secure ödeme",
+    "secure3DEnabled": "✓ Etkin",
+    "secure3DDisabled": "Standart ödeme",
+    "secure3DCardPrompt": "Güvenli ödemeyi tamamlamak için aşağıya kart bilgilerinizi girin.",
+    "monthlyStripeRedirect": "Aylık bağışınızı ayarlamak için güvenli ödeme sayfasına yönlendirileceksiniz.",
+    "standardStripeRedirect": "Bağışınızı tamamlamak için güvenli ödeme sayfasına yönlendirileceksiniz.",
+    "paymentSwitching": "Yedek ödeme ağ geçidine geçiliyor…",
+    "paymentSwitchingDesc": "Ödeme ağ geçidinde bir hata oluştu. Ödemenizi alternatif bir ağ geçidi üzerinden tamamlamak için otomatik olarak yönlendirileceksiniz.",
+    "sslSecurePayment": "256 bit SSL şifreli · Güvenli ödeme"
   },
   "DonationSuccess": {
     "thankYou": "Çok teşekkür ederiz",
@@ -400,6 +430,7 @@
     "transactionFees": "İşlem Ücretleri",
     "supportedCampaign": "Desteklenen Kampanya",
     "campaignsDonatedTo": "Bağış Yaptığınız Kampanyalar",
+    "itemShares": "{count} hisse (سهوم)",
     "categoriesDonatedTo": "Bağış Yaptığınız Kategoriler",
     "campaignsAndCategoriesDonatedTo": "Bağış Yaptığınız Kampanyalar ve Kategoriler",
     "donateToAnotherCampaign": "Başka Bir Kampanyaya Bağış Yap",
@@ -430,7 +461,8 @@
     "subtotal": "Ara Toplam",
     "total": "Toplam",
     "proceedToDonate": "Bağışa Devam Et",
-    "secureCheckout": "Bağışınız güvenli ve şifrelidir"
+    "secureCheckout": "Bağışınız güvenli ve şifrelidir",
+    "sharesLine": "{count} hisse (سهوم)"
   },
   "LiveDonationsTicker": {
     "donated": "bağışladı",
@@ -468,6 +500,11 @@
       "name": "Ad",
       "email": "E-posta",
       "country": "Ülke",
+      "location": "Konum",
+      "countryName": "Ülke adı",
+      "countryCode": "Ülke kodu (ISO)",
+      "region": "Bölge",
+      "city": "Şehir",
       "phone": "Telefon",
       "birthdate": "Doğum Tarihi",
       "verified": "Doğrulanmış",
@@ -502,6 +539,7 @@
       "totalDonations": "Toplam Bağışlar",
       "totalInPeriodTitle": "Toplam (bu dönem)",
       "recordsInPeriodLabel": "Bu dönemde {count} kayıt",
+      "successfulPaymentsInPeriod": "Bu dönemde {count} başarılı ödeme",
       "historyTableTitle": "Bağış geçmişi",
       "emptyHistoryList": "Seçilen dönem için bağış yok.",
       "donationsCount": "{count} bağış",
@@ -529,7 +567,29 @@
       "total": "Toplam",
       "monthlyDonationLabel": "Aylık bağış",
       "date": "Tarih",
-      "actions": "İşlemler"
+      "actions": "İşlemler",
+      "historyTableSubtitle": "Her satır tek bir tahsilatı gösterir. Ödeme sonucunu, desteklenen kampanyaları görün; yalnızca başarılı ödemeler için resmi PDF makbuzu indirin.",
+      "campaignsColumn": "Kampanya / proje",
+      "paymentResult": "Ödeme",
+      "paymentSucceeded": "Başarılı",
+      "paymentFailed": "Başarısız",
+      "paymentPending": "Beklemede",
+      "paymentUnknown": "Bilinmiyor",
+      "filterByPayment": "Ödeme durumu",
+      "filterPaymentAll": "Tüm durumlar",
+      "filterPaymentPaid": "Yalnızca başarılı",
+      "filterPaymentFailed": "Yalnızca başarısız",
+      "filterPaymentPending": "Yalnızca beklemede",
+      "breakdown": "Ayrıntı",
+      "referenceShort": "Ref.",
+      "receipt": "Makbuz",
+      "paidAt": "Ödeme tarihi",
+      "noCampaignTitle": "—",
+      "sharesCount": "{count} hisse",
+      "paymentMethodCard": "Kart",
+      "paymentMethodPaypal": "PayPal",
+      "coverFeesYes": "İşlem ücretlerini karşıladınız",
+      "emptyHistoryFiltered": "Filtrelere uyan bağış yok. Başka bir durum veya dönem deneyin."
     },
     "subscriptions": {
       "settingsTableTitle": "Abonelikler ve ayarlar",
@@ -582,7 +642,12 @@
       "download": "İndir",
       "receiptLabel": "Makbuz #{id}",
       "downloadReceipt": "Makbuz İndir",
-      "noReceiptsMatch": "Seçilen kriterlere uyan makbuz yok"
+      "noReceiptsMatch": "Seçilen kriterlere uyan makbuz yok",
+      "downloadAllPdf": "Tüm PDF makbuzlarını indir ({count})",
+      "downloadAllHint": "PDF makbuzları yalnızca başarıyla tamamlanan ödemeler için oluşturulur.",
+      "downloadPdfReceipt": "PDF makbuzu indir",
+      "downloadPdfShort": "PDF",
+      "receiptNotAvailableReason": "Ödeme başarılı olduktan sonra kullanılabilir."
     },
     "support": {
       "newSupportRequest": "Yeni Destek Talebi",

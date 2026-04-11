@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { countryNameFromIsoCode } from '../lib/geo/intl-country-name';
 
 const prisma = new PrismaClient();
 
@@ -65,7 +66,11 @@ async function main() {
       email: 'admin@alafiya.org',
       role: 'ADMIN',
       emailVerified: new Date(),
-      country: 'SA',
+      countryCode: 'SA',
+      countryName: countryNameFromIsoCode('SA', 'ar'),
+      country: countryNameFromIsoCode('SA', 'ar'),
+      city: 'الرياض',
+      region: 'منطقة الرياض',
       preferredLang: 'ar',
     },
   });
@@ -76,7 +81,11 @@ async function main() {
       email: 'sara@alafiya.org',
       role: 'STAFF',
       emailVerified: new Date(),
-      country: 'SA',
+      countryCode: 'SA',
+      countryName: countryNameFromIsoCode('SA', 'ar'),
+      country: countryNameFromIsoCode('SA', 'ar'),
+      city: 'جدة',
+      region: 'منطقة مكة المكرمة',
       preferredLang: 'ar',
       dashboardPermissions: ['campaigns', 'categories', 'posts', 'users', 'badges', 'slides'],
     },
@@ -88,7 +97,11 @@ async function main() {
       email: 'khalid@alafiya.org',
       role: 'STAFF',
       emailVerified: new Date(),
-      country: 'AE',
+      countryCode: 'AE',
+      countryName: countryNameFromIsoCode('AE', 'ar'),
+      country: countryNameFromIsoCode('AE', 'ar'),
+      city: 'دبي',
+      region: 'دبي',
       preferredLang: 'ar',
       dashboardPermissions: ['donations', 'subscriptions', 'messages', 'referrals', 'tracking'],
     },
@@ -125,7 +138,9 @@ async function main() {
           email: d.email,
           role: 'DONOR',
           emailVerified: new Date(),
-          country: d.country,
+          countryCode: d.country,
+          countryName: countryNameFromIsoCode(d.country, 'en'),
+          country: countryNameFromIsoCode(d.country, 'en'),
           phone: d.phone,
           preferredLang: d.lang,
           createdAt: randomDate(monthsAgo(18), monthsAgo(2)),

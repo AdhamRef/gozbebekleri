@@ -2,7 +2,7 @@
 
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter, usePathname } from "next/navigation";
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import {
   Heart, FolderOpen, Users, LogOut, Menu, X,
@@ -18,6 +18,8 @@ import { NextIntlClientProvider } from "next-intl";
 import { Toaster } from "react-hot-toast";
 import { ConfettiProvider } from "@/components/providers/confetti-provider";
 import { CurrencyProvider } from "@/context/CurrencyContext";
+import CurrencySelector from "@/components/CurrencySelector";
+import { CurrencyFromUrlSync } from "@/components/CurrencyFromUrlSync";
 import { DashboardThemeProvider } from "@/context/DashboardThemeContext";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -97,6 +99,7 @@ function DashboardContent({
 
   const isActiveHref = (href: string) => {
     if (href === '/dashboard/referrals') return pathname === href || pathname.startsWith('/dashboard/referrals/');
+    if (href === '/dashboard/link-generator') return pathname === href || pathname.startsWith('/dashboard/link-generator/');
     if (href === '/dashboard/monthly') return pathname === href || pathname.startsWith('/dashboard/monthly/');
     return pathname === href;
   };
@@ -221,17 +224,21 @@ function DashboardContent({
 
       {/* Mobile topbar */}
       <div className={cn(
-        "lg:hidden fixed top-0 left-0 right-0 z-20 h-14 flex items-center justify-between px-4",
+        "lg:hidden fixed top-0 left-0 right-0 z-20 h-14 flex items-center justify-between gap-2 px-3 sm:px-4",
         "bg-white border-b border-gray-200 shadow-sm"
       )}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="https://i.ibb.co/ZwcJcN1/logo.webp" alt="Logo" className="h-7 w-auto object-contain" />
-        <button
-          onClick={() => setIsSidebarOpen(true)}
-          className="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
+        <img src="https://i.ibb.co/ZwcJcN1/logo.webp" alt="Logo" className="h-7 w-auto object-contain shrink-0" />
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <CurrencySelector showDefaultCurrencyOption onDark={false} />
+          <button
+            type="button"
+            onClick={() => setIsSidebarOpen(true)}
+            className="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Main */}
@@ -254,11 +261,12 @@ function DashboardContent({
               </>
             )}
           </div>
-          {/* Right side: user */}
-          <div className="flex items-center gap-3">
+          {/* Actions */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <CurrencySelector showDefaultCurrencyOption onDark={false} />
             <Link
               href="/"
-              className="text-xs text-gray-500 hover:text-[#025EB8] transition-colors font-medium"
+              className="text-xs text-gray-500 hover:text-[#025EB8] transition-colors font-medium whitespace-nowrap"
               target="_blank"
             >
               عرض الموقع ↗
@@ -302,6 +310,9 @@ export default function DashboardLayoutClient({
   return (
     <NextIntlClientProvider messages={messages} locale={locale}>
       <CurrencyProvider>
+        <Suspense fallback={null}>
+          <CurrencyFromUrlSync />
+        </Suspense>
         <SessionProvider session={session}>
           <DashboardThemeProvider>
             <DashboardContent locale={locale}>

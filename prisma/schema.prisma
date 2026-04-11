@@ -55,7 +55,12 @@ model User {
   emailVerified DateTime?
   image         String?
   password      String?
+  /// @deprecated Prefer countryName + countryCode; kept for legacy receipts / data
   country       String?
+  countryCode   String?
+  countryName   String?
+  region        String?
+  city          String?
   phone         String?
   birthdate     String?
   role          Role     @default(DONOR)

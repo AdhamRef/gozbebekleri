@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/routing";
+import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
 import { useSearchParams } from "next/navigation";
 import { getCurrencySymbol } from "@/hooks/useCampaignValue";
 import { formatNumber } from "@/hooks/formatNumber";
@@ -12,6 +13,7 @@ import DonationDialog from "@/components/DonationDialog";
 import SignInDialog from "@/components/SignInDialog";
 import CategoryIcon from "@/components/CategoryIcon";
 import { Heart } from "lucide-react";
+import type { SuggestedDonationsConfig } from "@/lib/campaign/suggested-donations";
 
 const RESUME_KEY = "campaignDonateResume";
 const FALLBACK_IMG = "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg";
@@ -27,8 +29,19 @@ export interface CampaignCardData {
   showProgress?: boolean;
   fundraisingMode?: string;
   goalType?: string;
+  sharePriceUSD?: number | null;
+  suggestedShareCounts?: { counts: number[] } | null;
+  suggestedDonations?: SuggestedDonationsConfig | null;
   category?: { id?: string; name?: string; icon?: string };
 }
+
+type DonationDialogCampaignContext = {
+  goalType?: string;
+  fundraisingMode?: string;
+  sharePriceUSD?: number | null;
+  suggestedShareCounts?: { counts: number[] } | null;
+  suggestedDonations?: SuggestedDonationsConfig | null;
+};
 
 interface CampaignCardProps {
   campaign: CampaignCardData;
@@ -44,7 +57,16 @@ export function CampaignCard({ campaign, className, onClick }: CampaignCardProps
   const router = useRouter();
   const searchParams = useSearchParams();
   const [donationOpen, setDonationOpen] = useState(false);
+  const [donationContext, setDonationContext] = useState<DonationDialogCampaignContext | null>(null);
   const [signInOpen, setSignInOpen] = useState(false);
+
+  const snapshotDonationContext = (): DonationDialogCampaignContext => ({
+    goalType: campaign.goalType,
+    fundraisingMode: campaign.fundraisingMode,
+    sharePriceUSD: campaign.sharePriceUSD ?? null,
+    suggestedShareCounts: campaign.suggestedShareCounts ?? null,
+    suggestedDonations: campaign.suggestedDonations ?? null,
+  });
 
   const progress = Math.min(Number(campaign.progress ?? 0), 100);
   const raised = convertToCurrency(Math.round(campaign.currentAmount)).convertedValue ?? 0;
@@ -59,15 +81,17 @@ export function CampaignCard({ campaign, className, onClick }: CampaignCardProps
       const data = JSON.parse(stored) as { campaignId?: string };
       if (data.campaignId !== campaign.id) return;
       sessionStorage.removeItem(RESUME_KEY);
+      setDonationContext(snapshotDonationContext());
       setDonationOpen(true);
     } catch { /* ignore */ }
-    router.replace(pathname);
+    router.replace(appendCurrencyQuery(pathname, getCurrencyCodeForLinks()));
   }, [searchParams, campaign.id, pathname, router]);
 
   const handleDonateClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (session?.user) {
+      setDonationContext(snapshotDonationContext());
       setDonationOpen(true);
     } else {
       if (typeof window !== "undefined") {
@@ -169,14 +193,20 @@ export function CampaignCard({ campaign, className, onClick }: CampaignCardProps
 
       <DonationDialog
         isOpen={donationOpen}
-        onClose={() => setDonationOpen(false)}
+        onClose={() => {
+          setDonationOpen(false);
+          setDonationContext(null);
+        }}
         campaignId={campaign.id}
         campaignTitle={campaign.title}
         campaignImage={imgSrc}
-        fundraisingMode={campaign.fundraisingMode}
+        fundraisingMode={donationContext?.fundraisingMode ?? campaign.fundraisingMode}
         targetAmount={campaign.targetAmount}
         amountRaised={campaign.currentAmount}
-        goalType={campaign.goalType}
+        goalType={donationContext?.goalType ?? campaign.goalType}
+        sharePriceUSD={donationContext?.sharePriceUSD ?? campaign.sharePriceUSD ?? null}
+        suggestedShareCounts={donationContext?.suggestedShareCounts ?? campaign.suggestedShareCounts ?? null}
+        suggestedDonations={donationContext?.suggestedDonations ?? campaign.suggestedDonations ?? null}
       />
 
       <SignInDialog
@@ -184,7 +214,10 @@ export function CampaignCard({ campaign, className, onClick }: CampaignCardProps
         onClose={() => setSignInOpen(false)}
         callbackUrl={
           typeof window !== "undefined"
-            ? `${window.location.pathname}?openCampaignDonation=1`
+            ? appendCurrencyQuery(
+                `${pathname}?openCampaignDonation=1`,
+                getCurrencyCodeForLinks()
+              )
             : undefined
         }
       />

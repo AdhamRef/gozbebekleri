@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
         if (ids.length === 0) return [];
         const gRows = await prisma.donation.groupBy({
           by: ['donorId'],
-          where: { donorId: { in: ids } },
+          where: { donorId: { in: ids }, status: "PAID" },
           _count: { id: true },
           _sum: { amountUSD: true, totalAmount: true },
         });
@@ -169,6 +169,10 @@ export async function GET(request: NextRequest) {
       dashboardPermissions: true,
       preferredLang: true,
       country: true,
+      countryCode: true,
+      countryName: true,
+      region: true,
+      city: true,
       phone: true,
       createdAt: true,
       updatedAt: true,
@@ -214,10 +218,11 @@ export async function GET(request: NextRequest) {
     const totalsByUser =
       userIds.length > 0
         ? await prisma.donation.groupBy({
-            by: ['donorId'],
-            where: { donorId: { in: userIds } },
+            by: ["donorId"],
+            where: { donorId: { in: userIds }, status: "PAID" },
             _sum: { totalAmount: true, amountUSD: true },
             _max: { createdAt: true },
+            _count: { id: true },
           })
         : [];
     const totalByDonorId = new Map(
@@ -227,6 +232,7 @@ export async function GET(request: NextRequest) {
           totalAmount: r._sum.totalAmount ?? 0,
           amountUSD: r._sum.amountUSD ?? 0,
           lastDonationAt: r._max.createdAt ?? null,
+          paidDonationCount: r._count.id,
         },
       ])
     );
@@ -244,7 +250,7 @@ export async function GET(request: NextRequest) {
 
     const usersWithTotals = users.map((u) => ({
       ...u,
-      totalDonationsCount: u._count.donations,
+      totalDonationsCount: totalByDonorId.get(u.id)?.paidDonationCount ?? 0,
       totalDonatedAmount: totalByDonorId.get(u.id)?.totalAmount ?? 0,
       totalDonatedAmountUSD: totalByDonorId.get(u.id)?.amountUSD ?? 0,
       lastDonationAt: totalByDonorId.get(u.id)?.lastDonationAt ?? null,

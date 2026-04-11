@@ -82,7 +82,9 @@ export async function GET(
       return {
         ...d,
         type,
-        status: type === 'MONTHLY' ? (sub?.status ?? null) : null,
+        /** Donation charge status (PAID / FAILED / PENDING) — unchanged for revenue totals */
+        paymentStatus: d.status,
+        status: type === 'MONTHLY' ? (sub?.status ?? null) : d.status,
         billingDay: type === 'MONTHLY' ? (sub?.billingDay ?? null) : null,
         nextBillingDate: type === 'MONTHLY' ? (sub?.nextBillingDate ?? null) : null,
       };
@@ -127,6 +129,10 @@ export async function PUT(
       name,
       email,
       country,
+      countryCode,
+      countryName,
+      region,
+      city,
       phone,
       birthdate,
       role,
@@ -232,7 +238,23 @@ export async function PUT(
       data: {
         ...(name !== undefined && { name }),
         ...(email !== undefined && { email }),
-        ...(country !== undefined && { country }),
+        ...(countryCode !== undefined && {
+          countryCode: countryCode === "" ? null : countryCode,
+        }),
+        ...(countryName !== undefined && {
+          countryName: countryName === "" ? null : countryName,
+          ...(country === undefined && {
+            country: countryName === "" ? null : countryName,
+          }),
+        }),
+        ...(country !== undefined && {
+          country: country === "" ? null : country,
+          ...(countryName === undefined && {
+            countryName: country === "" ? null : country,
+          }),
+        }),
+        ...(region !== undefined && { region: region === "" ? null : region }),
+        ...(city !== undefined && { city: city === "" ? null : city }),
         ...(phone !== undefined && { phone }),
         ...(birthdate !== undefined && { birthdate }),
         ...(role !== undefined && { role }),

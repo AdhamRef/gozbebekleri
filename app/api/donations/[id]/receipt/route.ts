@@ -31,6 +31,7 @@ const RECEIPT_LABELS = {
     email: 'Email',
     phone: 'Phone',
     country: 'Country',
+    cityRegion: 'City / Region',
     donationDetails: 'Donation Details',
     donatedTo: 'Your donation supports',
     type: 'Type',
@@ -68,6 +69,7 @@ const RECEIPT_LABELS = {
     email: 'البريد الإلكتروني',
     phone: 'الهاتف',
     country: 'الدولة',
+    cityRegion: 'المدينة / المنطقة',
     donationDetails: 'تفاصيل التبرع',
     donatedTo: 'تبرعكم يدعم',
     type: 'النوع',
@@ -105,6 +107,7 @@ const RECEIPT_LABELS = {
     email: 'E-mail',
     phone: 'Téléphone',
     country: 'Pays',
+    cityRegion: 'Ville / Région',
     donationDetails: 'Détails du don',
     donatedTo: 'Votre don soutient',
     type: 'Type',
@@ -172,7 +175,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (locale === 'ar') {
       locale = 'en';
     }
-        const session = await getServerSession(authOptions);
+    const session = await getServerSession(authOptions);
 
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -188,6 +191,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             email: true,
             phone: true,
             country: true,
+            countryName: true,
+            countryCode: true,
+            city: true,
+            region: true,
           },
         },
         subscription: {
@@ -312,8 +319,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       addText(`${L.phone}: ${donation.donor.phone}`, margin, y);
       y += 7;
     }
-    if (donation.donor.country) {
-      addText(`${L.country}: ${donation.donor.country}`, margin, y);
+    const donorCountryLine =
+      donation.donor.countryName?.trim() ||
+      donation.donor.country?.trim() ||
+      '';
+    if (donorCountryLine) {
+      addText(`${L.country}: ${donorCountryLine}`, margin, y);
+      y += 7;
+    }
+    const donorCityRegion = [donation.donor.city?.trim(), donation.donor.region?.trim()]
+      .filter(Boolean)
+      .join(', ');
+    if (donorCityRegion) {
+      addText(`${L.cityRegion}: ${donorCityRegion}`, margin, y);
       y += 7;
     }
     y += 10;

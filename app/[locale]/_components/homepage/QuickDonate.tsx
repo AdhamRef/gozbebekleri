@@ -8,6 +8,7 @@ import { useSession } from "next-auth/react";
 import DonationDialog from "@/components/DonationDialog";
 import SignInDialog from "@/components/SignInDialog";
 import { Link } from "@/i18n/routing";
+import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
 
 interface CategoryOption {
   id: string;
@@ -60,7 +61,9 @@ const QuickDonate = () => {
       /* ignore */
     }
     setDonationDialogOpen(true);
-    router.replace(`${pathname}#quick_donate`);
+    router.replace(
+      appendCurrencyQuery(`${pathname}#quick_donate`, getCurrencyCodeForLinks())
+    );
   }, [searchParams, pathname, router]);
 
   // Close category dropdown on outside click
@@ -330,7 +333,10 @@ const QuickDonate = () => {
         onClose={() => setSignInOpen(false)}
         callbackUrl={
           typeof window !== "undefined"
-            ? `${window.location.pathname}?openDonation=1#quick_donate`
+            ? appendCurrencyQuery(
+                `${pathname}?openDonation=1#quick_donate`,
+                getCurrencyCodeForLinks()
+              )
             : undefined
         }
       />

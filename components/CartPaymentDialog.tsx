@@ -14,6 +14,8 @@ import {
   Check,
   Loader2,
   ExternalLink,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
@@ -24,6 +26,7 @@ import { useTracking } from "@/components/TrackingPixels";
 import useConvetToUSD from "@/hooks/useConvetToUSD";
 import { useReferralCode } from "@/hooks/useReferralCode";
 import { useRouter } from "@/i18n/routing";
+import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
 import { useTranslations, useLocale } from "next-intl";
 import { useSession } from "next-auth/react";
 import { PhoneInput } from "react-international-phone";
@@ -52,12 +55,34 @@ interface CartPaymentDialogProps {
 const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDialogProps) => {
   const t = useTranslations("DonationDialog");
   const locale = useLocale() as "ar" | "en" | "fr";
+  const isRTL = locale === "ar";
+  const navRow = "inline-flex items-center justify-center gap-2";
+  const backLabel = (
+    <span className={navRow}>
+      {!isRTL && <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />}
+      {t("back")}
+      {isRTL && <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />}
+    </span>
+  );
+  const nextLabel = (
+    <span className={navRow}>
+      {isRTL && <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />}
+      {t("next")}
+      {!isRTL && <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />}
+    </span>
+  );
+  const confirmDonationLabel = (
+    <span className={navRow}>
+      {isRTL && <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />}
+      {t("confirmDonation")}
+      {!isRTL && <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />}
+    </span>
+  );
 
   const STEPS = [
     { title: t("teamSupport"),    subtitle: t("teamSupportDesc") },
     { title: t("paymentFees"),    subtitle: t("paymentFeesDesc") },
     { title: t("confirmation"),   subtitle: t("confirmationDesc") },
-    { title: t("paymentMethod"),  subtitle: t("paymentMethodDesc") },
     { title: t("paymentInfo"),    subtitle: t("paymentInfoDesc") },
   ];
 
@@ -74,7 +99,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
   const [currentStep, setCurrentStep]     = useState(0);
   const [teamSupport, setTeamSupport]     = useState(0);
   const [coverFees,   setCoverFees]       = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"CARD" | "PAYPAL" | null>(null);
+  const paymentMethod = "CARD";
   const [use3D, setUse3D]                 = useState(true);
   // PayFor manual card inputs (use3D === true)
   const [cardDetails, setCardDetails]     = useState<PayForCardState>({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" });
@@ -93,7 +118,6 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
   const [payforSwitching, setPayforSwitching] = useState(false);
   const [mounted, setMounted]             = useState(false);
   const [phoneValue, setPhoneValue]       = useState("");
-  const [phoneCountry, setPhoneCountry]   = useState("");
   const [currentUser, setCurrentUser]     = useState<{ phone: string | null } | null>(null);
 
   const payforPopupRef = useRef<Window | null>(null);
@@ -181,7 +205,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
 
       // Save phone if new
       if (session?.user?.id && !currentUser?.phone && phoneValue.trim()) {
-        await axios.put(`/api/users/${session.user.id}`, { phone: phoneValue.trim(), country: phoneCountry || undefined });
+        await axios.put(`/api/users/${session.user.id}`, { phone: phoneValue.trim() });
       }
 
       // Build items with USD amounts
@@ -247,7 +271,9 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
         }
 
         clearItems(); confetti.onOpen();
-        router.push(`/success/${targetDonationId}`);
+        router.push(
+          appendCurrencyQuery(`/success/${targetDonationId}`, getCurrencyCodeForLinks())
+        );
         return;
       }
 
@@ -336,7 +362,9 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
               clearInterval(payforPollRef.current!); payforPollRef.current = null;
               if (payforPopupRef.current && !payforPopupRef.current.closed) payforPopupRef.current.close();
               clearItems(); confetti.onOpen();
-              router.push(`/success/${donationId}`);
+              router.push(
+                appendCurrencyQuery(`/success/${donationId}`, getCurrencyCodeForLinks())
+              );
               return;
             }
             if (data.status === "FAILED" || payforPopupRef.current?.closed || polls >= FALLBACK_AFTER) {
@@ -353,7 +381,9 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
       if (res.data?.success) {
         isRedirecting = true; setRedirecting(true);
         clearItems(); confetti.onOpen();
-        router.push(`/success/${res.data.donation.id}`);
+        router.push(
+          appendCurrencyQuery(`/success/${res.data.donation.id}`, getCurrencyCodeForLinks())
+        );
       } else {
         onClose();
       }
@@ -383,14 +413,14 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
             {TEAM_SUPPORT_OPTIONS.map((o) => (
               <Button key={o.value} variant="outline" onClick={() => setTeamSupport(o.value)}
                 className={`transition-all duration-200 ${teamSupport === o.value ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8] shadow-sm" : "hover:border-gray-400"}`}>
-                <span className="font-medium">{o.label === t("noThanks") ? o.label : `${getCurrency()} ${o.value}`}</span>
+                <span className="font-medium" dir={o.label === t("noThanks") ? undefined : "ltr"}>{o.label === t("noThanks") ? o.label : `${o.value} ${getCurrency()}`}</span>
               </Button>
             ))}
           </div>
         </div>
         <div className={`flex gap-4 ${locale === "ar" ? "flex-row-reverse" : ""}`}>
-          <Button variant="outline" onClick={handleBack} className="flex-1">{t("back")}</Button>
-          <Button onClick={handleNext} className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white">{t("next")}</Button>
+          <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">{backLabel}</Button>
+          <Button onClick={handleNext} className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2">{nextLabel}</Button>
         </div>
       </div>
     );
@@ -405,17 +435,17 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
         <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-5 rounded-xl space-y-3 border border-gray-200">
           <div className={`flex justify-between text-sm ${locale === "ar" ? "flex-row-reverse" : ""}`}>
             <span className="text-gray-600">{t("amount")}</span>
-            <span className="font-semibold">{getCurrency()} {amount}</span>
+            <span className="font-semibold" dir="ltr">{amount} {getCurrency()}</span>
           </div>
           {teamSupport > 0 && (
             <div className={`flex justify-between text-sm ${locale === "ar" ? "flex-row-reverse" : ""}`}>
               <span className="text-gray-600">{t("teamSupport")}</span>
-              <span className="font-semibold">{getCurrency()} {teamSupport}</span>
+              <span className="font-semibold" dir="ltr">{teamSupport} {getCurrency()}</span>
             </div>
           )}
           <div className={`flex justify-between text-sm ${locale === "ar" ? "flex-row-reverse" : ""}`}>
             <span className="text-gray-600">{t("paymentFeesPercent")}</span>
-            <span className="font-semibold text-[#025EB8]">{getCurrency()} {fees.toFixed(2)}</span>
+            <span className="font-semibold text-[#025EB8]" dir="ltr">{fees.toFixed(2)} {getCurrency()}</span>
           </div>
         </div>
         <button type="button" onClick={() => setCoverFees(!coverFees)}
@@ -425,12 +455,12 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
           </div>
           <div className="flex-1 text-start">
             <p className="font-semibold text-gray-900">{t("yesCoverFees")}</p>
-            <p className="text-sm text-gray-500 mt-0.5">{t("feesWillBeAdded", { amount: `${getCurrency()} ${fees.toFixed(2)}` })}</p>
+            <p className="text-sm text-gray-500 mt-0.5">{t("feesWillBeAdded", { amount: `${fees.toFixed(2)} ${getCurrency()}` })}</p>
           </div>
         </button>
         <div className={`flex gap-4 ${locale === "ar" ? "flex-row-reverse" : ""}`}>
-          <Button variant="outline" onClick={handleBack} className="flex-1">{t("back")}</Button>
-          <Button onClick={handleNext} className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white">{t("next")}</Button>
+          <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">{backLabel}</Button>
+          <Button onClick={handleNext} className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2">{nextLabel}</Button>
         </div>
       </div>
     );
@@ -456,32 +486,32 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
                     )}
                   </div>
                 </div>
-                <span className="font-semibold text-gray-900 text-sm flex-shrink-0 whitespace-nowrap">{getCurrency()} {item.amount}</span>
+                <span className="font-semibold text-gray-900 text-sm flex-shrink-0 whitespace-nowrap" dir="ltr">{item.amount} {getCurrency()}</span>
               </div>
             );
           })}
           {teamSupport > 0 && (
             <div className={`flex items-center gap-2 pt-2 w-full min-w-0 ${locale === "ar" ? "flex-row-reverse" : ""}`}>
               <span className="text-gray-600 text-sm flex-1 min-w-0 truncate">{t("teamSupport")}</span>
-              <span className="font-semibold text-gray-900 text-sm flex-shrink-0 whitespace-nowrap">{getCurrency()} {teamSupport}</span>
+              <span className="font-semibold text-gray-900 text-sm flex-shrink-0 whitespace-nowrap" dir="ltr">{teamSupport} {getCurrency()}</span>
             </div>
           )}
           {coverFees && (
             <div className={`flex items-center gap-2 w-full min-w-0 ${locale === "ar" ? "flex-row-reverse" : ""}`}>
               <span className="text-gray-600 text-sm flex-1 min-w-0 truncate">{t("paymentFeesLabel")}</span>
-              <span className="font-semibold text-gray-900 text-sm flex-shrink-0 whitespace-nowrap">{getCurrency()} {fees.toFixed(2)}</span>
+              <span className="font-semibold text-gray-900 text-sm flex-shrink-0 whitespace-nowrap" dir="ltr">{fees.toFixed(2)} {getCurrency()}</span>
             </div>
           )}
           <div className="pt-3 border-t border-gray-300">
             <div className={`flex items-center gap-2 w-full min-w-0 ${locale === "ar" ? "flex-row-reverse" : ""}`}>
               <span className="font-semibold text-gray-900 text-base flex-1 min-w-0">{t("total")}</span>
-              <span className="font-bold text-[#025EB8] text-lg flex-shrink-0 whitespace-nowrap">{getCurrency()} {totalAmount.toFixed(2)}</span>
+              <span className="font-bold text-[#025EB8] text-lg flex-shrink-0 whitespace-nowrap" dir="ltr">{totalAmount.toFixed(2)} {getCurrency()}</span>
             </div>
           </div>
         </div>
         <div className={`flex gap-4 w-full ${locale === "ar" ? "flex-row-reverse" : ""}`}>
-          <Button variant="outline" onClick={handleBack} className="flex-1">{t("back")}</Button>
-          <Button onClick={handleNext} className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white">{t("next")}</Button>
+          <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">{backLabel}</Button>
+          <Button onClick={handleNext} className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2">{nextLabel}</Button>
         </div>
         <p className="text-xs text-center text-gray-500 leading-relaxed px-2 break-words">
           {t("byContinuing")}{" "}
@@ -489,42 +519,6 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
           {t("and")}{" "}
           <a href="#" className="text-[#025EB8] hover:underline font-medium">{t("privacyPolicyLink")}</a>
         </p>
-      </div>
-    );
-
-    // Payment Method
-    if (step.title === t("paymentMethod")) return (
-      <div className="space-y-6">
-        <div className="text-center space-y-2">
-          <h3 className="text-xl font-semibold text-gray-900">{t("choosePaymentMethod")}</h3>
-          <p className="text-gray-600 text-sm">{t("choosePaymentMethodDesc")}</p>
-        </div>
-        <div className="space-y-3">
-          {[
-            { id: "CARD",   label: t("bankCard"),  desc: t("cardDescription") },
-            { id: "PAYPAL", label: "PayPal",        desc: t("paypalDescription") },
-          ].map((m) => (
-            <Button key={m.id} variant="outline" onClick={() => setPaymentMethod(m.id as "CARD" | "PAYPAL")}
-              className={`w-full h-auto p-5 transition-all duration-200 ${paymentMethod === m.id ? "border-[#025EB8] bg-[#025EB8]/5 shadow-sm" : "hover:border-gray-400"}`}>
-              <div className={`flex items-center gap-4 w-full ${locale === "ar" ? "flex-row-reverse text-right" : "text-left"}`}>
-                <div className={`p-3 rounded-lg transition-colors duration-200 ${paymentMethod === m.id ? "bg-[#025EB8]/10" : "bg-gray-100"}`}>
-                  <CardIcon className={`w-6 h-6 ${paymentMethod === m.id ? "text-[#025EB8]" : "text-gray-600"}`} />
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-900">{m.label}</p>
-                  <p className="text-sm text-gray-500 mt-0.5">{m.desc}</p>
-                </div>
-              </div>
-            </Button>
-          ))}
-        </div>
-        <div className={`flex gap-4 ${locale === "ar" ? "flex-row-reverse" : ""}`}>
-          <Button variant="outline" onClick={handleBack} className="flex-1">{t("back")}</Button>
-          <Button onClick={handleNext} disabled={!paymentMethod}
-            className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white disabled:opacity-50 disabled:cursor-not-allowed">
-            {t("continue")}
-          </Button>
-        </div>
       </div>
     );
 
@@ -572,18 +566,18 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
         )}
 
         {/* Phone */}
-        <div className="space-y-2 overflow-visible pt-2 border-t border-border" dir={locale}>
+        <div className="space-y-2 overflow-visible pt-2 border-t border-border" dir={locale === "ar" ? "rtl" : "ltr"}>
           <label className={`block text-sm font-medium text-gray-700 ${locale === "ar" ? "text-right" : "text-left"}`}>{t("contactPhone")}</label>
           <div className="overflow-visible phone-input-wrapper">
             <PhoneInput defaultCountry="sy" value={phoneValue}
-              onChange={(phone, meta) => { setPhoneValue(phone); setPhoneCountry(meta.country?.name ?? meta.country?.iso2 ?? ""); }}
+              onChange={(phone) => setPhoneValue(phone)}
               className="w-full overflow-visible"
               inputClassName="w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent" required />
           </div>
         </div>
 
         <div className={`flex justify-between gap-4 ${locale === "ar" ? "flex-row-reverse" : ""}`}>
-          <Button variant="outline" onClick={handleBack} className="flex-1">{t("back")}</Button>
+          <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">{backLabel}</Button>
           <Button onClick={handleSubmit}
             disabled={
               loading ||
@@ -591,8 +585,8 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
               (paymentMethod === "CARD" && !use3D && !stripeReady) ||
               (paymentMethod === "CARD" && use3D && !isCardValid())
             }
-            className="flex-1 bg-[#FA5D17] hover:bg-[#e04d0f] text-white flex items-center justify-center gap-2">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t("confirmDonation")}
+            className="flex-1 bg-[#FA5D17] hover:bg-[#e04d0f] text-white inline-flex items-center justify-center gap-2">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : confirmDonationLabel}
           </Button>
         </div>
 
@@ -600,7 +594,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
           <svg className="w-3.5 h-3.5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
           </svg>
-          <span>256-bit SSL encrypted · Secure payment</span>
+          <span>{t("sslSecurePayment")}</span>
         </div>
       </div>
     );
@@ -615,7 +609,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
       if (payforPopupRef.current && !payforPopupRef.current.closed) payforPopupRef.current.close();
       onClose();
     }}>
-      <DialogContent className="w-full h-full sm:h-auto sm:max-w-lg sm:max-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden p-0 rounded-none sm:rounded-lg top-0 sm:top-[50%] translate-y-0 sm:translate-y-[-50%]" aria-describedby={undefined}>
+      <DialogContent dir={isRTL ? "rtl" : "ltr"} className="w-full h-full sm:h-auto sm:max-w-lg sm:max-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden p-0 rounded-none sm:rounded-lg top-0 sm:top-[50%] translate-y-0 sm:translate-y-[-50%]" closeClassName="text-white hover:text-white/80" aria-describedby={undefined}>
         <DialogTitle className="sr-only">{t("confirmation")}</DialogTitle>
         {mounted && (
           <>

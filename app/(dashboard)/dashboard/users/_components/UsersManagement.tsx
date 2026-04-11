@@ -44,7 +44,9 @@ import {
   Calendar,
   Hash,
   Award,
+  MapPin,
 } from "lucide-react";
+import ReactCountryFlag from "react-country-flag";
 import { useCurrency } from "@/context/CurrencyContext";
 import { cn } from "@/lib/utils";
 import { useSession } from "next-auth/react";
@@ -62,6 +64,10 @@ interface UserRow {
   dashboardPermissions?: string[];
   preferredLang: string | null;
   country: string | null;
+  countryCode: string | null;
+  countryName: string | null;
+  region: string | null;
+  city: string | null;
   phone: string | null;
   createdAt: string;
   updatedAt: string;
@@ -80,6 +86,10 @@ interface BadgeOption {
 }
 
 type Scope = "donors" | "team";
+
+function tableColSpan(scope: Scope): number {
+  return scope === "donors" ? 11 : 8;
+}
 
 export default function UsersManagement({ scope }: { scope: Scope }) {
   const { data: session } = useSession();
@@ -439,6 +449,9 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">الدور</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">اللغة المفضلة</th>
                       {scope === "donors" && (
+                      <th className="text-right py-3 px-4 font-semibold text-slate-700">الموقع</th>
+                      )}
+                      {scope === "donors" && (
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">الشارات</th>
                       )}
                       {scope === "team" && (
@@ -457,13 +470,13 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                   <tbody>
                     {loading && users.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="py-12 text-center">
+                        <td colSpan={tableColSpan(scope)} className="py-12 text-center">
                           <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" />
                         </td>
                       </tr>
                     ) : users.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="py-12 text-center text-slate-500">
+                        <td colSpan={tableColSpan(scope)} className="py-12 text-center text-slate-500">
                           لا يوجد مستخدمين مطابقين
                         </td>
                       </tr>
@@ -506,6 +519,23 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                           <td className="py-3 px-4 text-slate-600">
                             {LOCALE_LABELS[u.preferredLang as keyof typeof LOCALE_LABELS] ?? "—"}
                           </td>
+                          {scope === "donors" && (
+                          <td className="py-3 px-4 text-slate-700 max-w-[160px]">
+                            <span className="inline-flex items-center gap-1.5 min-w-0">
+                              {u.countryCode && /^[A-Za-z]{2}$/.test(u.countryCode) ? (
+                                <ReactCountryFlag
+                                  countryCode={u.countryCode.toUpperCase()}
+                                  svg
+                                  style={{ width: "1.1em", height: "1.1em" }}
+                                  title={u.countryCode}
+                                />
+                              ) : null}
+                              <span className="truncate" title={[u.city, u.region].filter(Boolean).join(" · ") || undefined}>
+                                {u.countryName ?? u.country ?? "—"}
+                              </span>
+                            </span>
+                          </td>
+                          )}
                           {scope === "donors" && (
                           <td className="py-3 px-4">
                             <div className="flex flex-wrap gap-1">
@@ -774,8 +804,29 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                       <div className="flex items-center gap-2 text-sm">
                         <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
                         <span className="text-muted-foreground shrink-0">الدولة:</span>
-                        <span className="font-medium">{viewUser.country ?? "—"}</span>
+                        <span className="font-medium inline-flex items-center gap-1.5 min-w-0">
+                          {viewUser.countryCode && /^[A-Za-z]{2}$/.test(viewUser.countryCode) ? (
+                            <ReactCountryFlag
+                              countryCode={viewUser.countryCode.toUpperCase()}
+                              svg
+                              style={{ width: "1.15em", height: "1.15em" }}
+                            />
+                          ) : null}
+                          <span className="truncate">{viewUser.countryName ?? viewUser.country ?? "—"}</span>
+                          {viewUser.countryCode ? (
+                            <span className="text-muted-foreground text-xs shrink-0">({viewUser.countryCode})</span>
+                          ) : null}
+                        </span>
                       </div>
+                      {(viewUser.city || viewUser.region) && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <span className="text-muted-foreground shrink-0">المدينة / المنطقة:</span>
+                        <span className="font-medium">
+                          {[viewUser.city, viewUser.region].filter(Boolean).join(" — ") || "—"}
+                        </span>
+                      </div>
+                      )}
                       <div className="flex items-center gap-2 text-sm">
                         <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
                         <span className="text-muted-foreground shrink-0">الهاتف:</span>

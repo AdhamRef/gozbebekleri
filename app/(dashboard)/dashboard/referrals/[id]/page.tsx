@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
 import Link from "next/link";
@@ -21,7 +21,6 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
-import CurrencySelector from "@/components/CurrencySelector";
 import {
   ResponsiveContainer,
   XAxis,
@@ -46,10 +45,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import CountUp from "react-countup";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { formatUtcCalendarMonthLong } from "@/lib/admin/current-calendar-month-utc";
+import { StatsMetricCard } from "@/components/dashboard/StatsMetricCard";
+import { getDashboardChartPeriodLabelAr } from "@/lib/dashboard/chart-period-label-ar";
 
 interface ChartDataPoint {
   date: string;
@@ -83,6 +83,8 @@ interface DonationRow {
   teamSupport: number;
   fees: number;
   type: string;
+  status?: string | null;
+  providerErrorMessage?: string | null;
   createdAt: string;
   donor: { id: string; name: string | null; email: string };
   campaigns: { id: string; title: string }[];
@@ -92,8 +94,15 @@ interface DonationRow {
 interface ReferralStats {
   referral: { id: string; code: string; name: string | null };
   totalDonations: number;
+  paidCount?: number;
+  failedCount?: number;
+  pendingCount?: number;
+  failedTotalAmount?: number;
+  pendingTotalAmount?: number;
   totalAmount: number;
   allTimeRevenue?: number;
+  /** All PAID for this referral (USD) — ignores category/campaign filters */
+  paidRevenueAllTimeUnfiltered?: number;
   oneTimeCount: number;
   monthlyCount: number;
   activeMonthlyCount: number;
@@ -143,6 +152,19 @@ const CHART_COLORS = {
   text: "#334155",
 };
 
+const DASHBOARD_CURRENCY_SYMBOL: Record<string, string> = {
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  TRY: "₺",
+  SAR: "﷼",
+  AED: "د.إ",
+  KWD: "د.ك",
+  EGP: "EGP ",
+  QAR: "﷼",
+  BHD: "ب.د",
+};
+
 const PAGE_SIZE = 10;
 
 function getDonationsDateRange(
@@ -160,62 +182,6 @@ function getDonationsDateRange(
     start: start.toISOString().slice(0, 10),
     end: end.toISOString().slice(0, 10),
   };
-}
-
-const ACCENT_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-  teal: { bg: "bg-[#025EB8]/8", text: "text-[#025EB8]", border: "border-[#025EB8]/20" },
-  indigo: { bg: "bg-[#025EB8]/8", text: "text-[#025EB8]", border: "border-[#025EB8]/20" },
-  amber: { bg: "bg-[#FA5D17]/8", text: "text-[#FA5D17]", border: "border-[#FA5D17]/20" },
-  violet: { bg: "bg-[#FA5D17]/8", text: "text-[#FA5D17]", border: "border-[#FA5D17]/20" },
-  emerald: { bg: "bg-[#025EB8]/8", text: "text-[#025EB8]", border: "border-[#025EB8]/20" },
-  slate: { bg: "bg-gray-100", text: "text-gray-500", border: "border-gray-200" },
-  orange: { bg: "bg-[#FA5D17]/8", text: "text-[#FA5D17]", border: "border-[#FA5D17]/20" },
-};
-
-function StatsCard({
-  title,
-  value,
-  icon: Icon,
-  accent,
-  format,
-  subtitle,
-}: {
-  title: string;
-  value: number;
-  icon: React.ElementType;
-  accent: keyof typeof ACCENT_STYLES;
-  format?: "money";
-  subtitle?: string;
-}) {
-  const { convertToCurrency } = useCurrency();
-  const styles = ACCENT_STYLES[accent] ?? ACCENT_STYLES.teal;
-  const isMoney = format === "money";
-  const displayValue = isMoney ? value : Math.round(value);
-  const moneyResult = isMoney ? convertToCurrency(displayValue) : null;
-  const moneyPrefix =
-    moneyResult?.currency === "USD" ? "$" : moneyResult?.currency === "EUR" ? "€" : moneyResult?.currency === "GBP" ? "£" : moneyResult?.currency === "TRY" ? "₺" : moneyResult?.currency ?? "$";
-  const moneyEnd = moneyResult?.convertedValue ?? displayValue;
-
-  return (
-    <Card className={cn("border border-border shadow-sm overflow-hidden", styles.border)} dir="rtl">
-      <div className="p-5 flex items-start gap-4">
-        <div className={cn("p-2.5 rounded-lg shrink-0", styles.bg, styles.text)}>
-          <Icon className="w-5 h-5" />
-        </div>
-        <div className="min-w-0 text-right">
-          <p className="text-xs font-medium text-slate-500 truncate">{title}</p>
-          <p className="text-xl font-bold text-slate-900 mt-0.5 tabular-nums">
-            {isMoney ? (
-              <CountUp end={typeof moneyEnd === "number" ? moneyEnd : displayValue} prefix={moneyPrefix} separator="," decimal="." decimals={0} />
-            ) : (
-              <CountUp end={displayValue} separator="," decimal="." decimals={0} />
-            )}
-          </p>
-          {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
-        </div>
-      </div>
-    </Card>
-  );
 }
 
 export default function ReferralAnalyticsPage() {
@@ -241,12 +207,18 @@ export default function ReferralAnalyticsPage() {
   const [dateTo, setDateTo] = useState("");
   const [donationsSortBy, setDonationsSortBy] = useState<"date" | "amount">("date");
   const [donationsSortOrder, setDonationsSortOrder] = useState<"asc" | "desc">("desc");
+  const [donationsStatusFilter, setDonationsStatusFilter] = useState<"all" | "PAID" | "FAILED" | "PENDING">("all");
   const [donations, setDonations] = useState<DonationRow[]>([]);
   const [donationsPage, setDonationsPage] = useState(1);
   const [donationsTotal, setDonationsTotal] = useState(0);
   const [donationsLoading, setDonationsLoading] = useState(false);
   const [donationsFetchedOnce, setDonationsFetchedOnce] = useState(false);
   const [searchCampaign, setSearchCampaign] = useState("");
+
+  const chartFilterPeriodLabelAr = useMemo(
+    () => getDashboardChartPeriodLabelAr(chartPeriod, dateFrom, dateTo),
+    [chartPeriod, dateFrom, dateTo]
+  );
 
   // Fetch categories and campaigns
   useEffect(() => {
@@ -343,6 +315,7 @@ export default function ReferralAnalyticsPage() {
         if (selectedCampaign !== "all") searchParams.append("campaignId", selectedCampaign);
         if (start) searchParams.set("start", start);
         if (end) searchParams.set("end", end);
+        if (donationsStatusFilter !== "all") searchParams.set("status", donationsStatusFilter);
         const res = await fetch(`/api/donations?${searchParams}`);
         const data = await res.json();
         if (!res.ok) {
@@ -359,14 +332,14 @@ export default function ReferralAnalyticsPage() {
         setDonationsFetchedOnce(true);
       }
     },
-    [id, selectedCategory, selectedCampaign, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder]
+    [id, selectedCategory, selectedCampaign, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, donationsStatusFilter]
   );
 
   useEffect(() => {
     if (!id || loading) return;
     setDonationsPage(1);
     fetchDonations(1, false);
-  }, [id, loading, selectedCategory, selectedCampaign, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, fetchDonations]);
+  }, [id, loading, selectedCategory, selectedCampaign, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, donationsStatusFilter, fetchDonations]);
 
   const loadMoreDonations = () => {
     const next = donationsPage + 1;
@@ -439,7 +412,6 @@ export default function ReferralAnalyticsPage() {
               رمز التتبع: <code className="bg-muted px-1 rounded">{referral.code}</code>
             </p>
           </div>
-          <CurrencySelector showDefaultCurrencyOption />
         </header>
 
         {/* المؤشرات */}
@@ -456,29 +428,64 @@ export default function ReferralAnalyticsPage() {
               </TabsList>
             </Tabs>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
             {statCardSet === "revenue" && (
               <>
-                <StatsCard title="إيرادات إجمالية" value={stats.allTimeRevenue ?? stats.totalAmount ?? 0} icon={DollarSign} accent="emerald" format="money" />
-                <StatsCard title={thisMonthRevenueTitle} value={stats.thisMonthRevenue ?? 0} icon={Calendar} accent="emerald" format="money" />
-                <StatsCard title="إيرادات شهرية متكررة" value={stats.monthlyRecurringRevenue ?? 0} icon={Repeat} accent="emerald" format="money" />
-                <StatsCard title="دعم الفريق" value={stats.teamSupportTotal ?? 0} icon={HandCoins} accent="amber" format="money" />
-                <StatsCard title="الرسوم" value={stats.feesTotal ?? 0} icon={Percent} accent="orange" format="money" />
+                <StatsMetricCard
+                  compact
+                  title={`إيرادات ناجحة (${chartFilterPeriodLabelAr})`}
+                  value={stats.totalAmount ?? 0}
+                  icon={DollarSign}
+                  accent="emerald"
+                  format="money"
+                  variant="hero"
+                  subtitle="من التبرعات المدفوعة فقط — حسب الفترة والتصفية"
+                />
+                <StatsMetricCard
+                  compact
+                  title="إيرادات ناجحة (كل الوقت)"
+                  value={stats.paidRevenueAllTimeUnfiltered ?? 0}
+                  icon={DollarSign}
+                  accent="emerald"
+                  format="money"
+                  subtitle="كل تبرعات الرابط الناجحة — دون تصفية الفئة أو الحملة"
+                />
+                <StatsMetricCard compact title={thisMonthRevenueTitle} value={stats.thisMonthRevenue ?? 0} icon={Calendar} accent="emerald" format="money" subtitle="ناجح — الشهر الحالي (UTC)" />
+                <StatsMetricCard compact title="إيرادات شهرية متكررة" value={stats.monthlyRecurringRevenue ?? 0} icon={Repeat} accent="emerald" format="money" subtitle="اشتراكات نشطة" />
+                <StatsMetricCard compact title="دعم الفريق" value={stats.teamSupportTotal ?? 0} icon={HandCoins} accent="amber" format="money" subtitle="من التبرعات الناجحة" />
+                <StatsMetricCard compact title="الرسوم" value={stats.feesTotal ?? 0} icon={Percent} accent="orange" format="money" subtitle="من التبرعات الناجحة" />
+                <StatsMetricCard compact title="تبرعات ناجحة" value={stats.paidCount ?? 0} icon={Receipt} accent="teal" subtitle={`إجمالي: ${formatMoney(stats.totalAmount ?? 0, undefined, undefined, true)}`} />
+                <StatsMetricCard compact title="تبرعات فاشلة" value={stats.failedCount ?? 0} icon={Receipt} accent="orange" subtitle={stats.failedTotalAmount ? formatMoney(stats.failedTotalAmount, undefined, undefined, true) : "—"} />
+                <StatsMetricCard
+                  compact
+                  title="تبرعات معلقة"
+                  value={stats.pendingCount ?? 0}
+                  icon={Receipt}
+                  accent="amber"
+                  subtitle={stats.pendingTotalAmount ? formatMoney(stats.pendingTotalAmount, undefined, undefined, true) : undefined}
+                />
               </>
             )}
             {statCardSet === "overview" && (
               <>
-                <StatsCard title="عدد التبرعات" value={stats.totalDonations ?? 0} icon={Receipt} accent="violet" />
-                <StatsCard title="مرة واحدة (عدد)" value={stats.oneTimeCount ?? 0} icon={Receipt} accent="slate" />
-                <StatsCard title="شهرية (عدد)" value={stats.monthlyCount ?? 0} icon={Repeat} accent="slate" />
+                <StatsMetricCard
+                  compact
+                  title={`كل المحاولات (${chartFilterPeriodLabelAr})`}
+                  value={stats.totalDonations ?? 0}
+                  icon={Receipt}
+                  accent="violet"
+                  subtitle="ناجح + فاشل + معلق"
+                />
+                <StatsMetricCard compact title="مرة واحدة (ناجح)" value={stats.oneTimeCount ?? 0} icon={Receipt} accent="slate" />
+                <StatsMetricCard compact title="شهرية (ناجح)" value={stats.monthlyCount ?? 0} icon={Repeat} accent="slate" />
               </>
             )}
             {statCardSet === "breakdown" && (
               <>
-                <StatsCard title="مرة واحدة (عدد)" value={stats.oneTimeCount ?? 0} icon={Receipt} accent="slate" />
-                <StatsCard title="شهرية (عدد)" value={stats.monthlyCount ?? 0} icon={Repeat} accent="slate" />
-                <StatsCard title="التبرعات الشهرية الناشطة" value={stats.activeMonthlyAmountUSD ?? 0} icon={Repeat} accent="teal" format="money" subtitle={`عدد: ${stats.activeMonthlyCount ?? 0}`} />
-                <StatsCard title="التبرعات الشهرية المتوقفة" value={stats.monthlyStoppedAmountUSD ?? 0} icon={Repeat} accent="indigo" format="money" subtitle={`عدد: ${stats.monthlyStoppedCount ?? 0}`} />
+                <StatsMetricCard compact title="مرة واحدة (عدد)" value={stats.oneTimeCount ?? 0} icon={Receipt} accent="slate" />
+                <StatsMetricCard compact title="شهرية (عدد)" value={stats.monthlyCount ?? 0} icon={Repeat} accent="slate" />
+                <StatsMetricCard compact title="التبرعات الشهرية الناشطة" value={stats.activeMonthlyAmountUSD ?? 0} icon={Repeat} accent="teal" format="money" subtitle={`عدد: ${stats.activeMonthlyCount ?? 0}`} />
+                <StatsMetricCard compact title="التبرعات الشهرية المتوقفة" value={stats.monthlyStoppedAmountUSD ?? 0} icon={Repeat} accent="indigo" format="money" subtitle={`عدد: ${stats.monthlyStoppedCount ?? 0}`} />
               </>
             )}
           </div>
@@ -493,7 +500,7 @@ export default function ReferralAnalyticsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0 space-y-4" dir="rtl">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               <div className="space-y-2 text-right">
                 <label className="text-[11px] font-medium text-slate-500">الفترة</label>
                 <Select
@@ -582,6 +589,20 @@ export default function ReferralAnalyticsPage() {
                     <SelectItem value="amount" className="text-xs">المبلغ</SelectItem>
                     <SelectItem value="teamSupport" className="text-xs">دعم الفريق</SelectItem>
                     <SelectItem value="fees" className="text-xs">الرسوم</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 text-right">
+                <label className="text-[11px] font-medium text-slate-500">حالة التبرع (الجدول)</label>
+                <Select value={donationsStatusFilter} onValueChange={(v) => setDonationsStatusFilter(v as typeof donationsStatusFilter)}>
+                  <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+                    <SelectValue placeholder="الحالة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs">كل الحالات</SelectItem>
+                    <SelectItem value="PAID" className="text-xs">ناجح</SelectItem>
+                    <SelectItem value="FAILED" className="text-xs">فاشل</SelectItem>
+                    <SelectItem value="PENDING" className="text-xs">معلق</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -760,9 +781,12 @@ export default function ReferralAnalyticsPage() {
           <Card className="border-border shadow-sm">
             <CardHeader className="border-b border-slate-100 py-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-row-reverse">
-                <CardTitle className="text-base font-semibold text-slate-900 text-right">
-                  أحدث التبرعات (تصفية من الأعلى + الفترة الزمنية)
-                </CardTitle>
+                <div className="text-right space-y-1">
+                  <CardTitle className="text-base font-semibold text-slate-900">أحدث التبرعات</CardTitle>
+                  <p className="text-[11px] text-slate-500 max-w-xl">
+                    يعرض الجدول كل المحاولات حسب «حالة التبرع» في التصفية أعلاه، مع الفترة والرابط.
+                  </p>
+                </div>
                 <Select
                   value={`${donationsSortBy}-${donationsSortOrder}`}
                   onValueChange={(v) => {
@@ -790,6 +814,7 @@ export default function ReferralAnalyticsPage() {
                     <tr className="border-b border-slate-200 bg-slate-50/80">
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">المتبرع</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">التبرع</th>
+                      <th className="text-right py-3 px-4 font-semibold text-slate-700">الحالة</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">دعم الفريق</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">مشاركة الرسوم</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">النوع</th>
@@ -800,17 +825,17 @@ export default function ReferralAnalyticsPage() {
                   <tbody>
                     {donationsLoading && donations.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-12 text-center">
+                        <td colSpan={8} className="py-12 text-center">
                           <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" />
                         </td>
                       </tr>
                     ) : !donationsFetchedOnce ? (
                       <tr>
-                        <td colSpan={7} className="py-12 text-center text-slate-500">جاري التحميل...</td>
+                        <td colSpan={8} className="py-12 text-center text-slate-500">جاري التحميل...</td>
                       </tr>
                     ) : donations.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-12 text-center text-slate-500">لا توجد تبرعات تطابق التصفية</td>
+                        <td colSpan={8} className="py-12 text-center text-slate-500">لا توجد تبرعات تطابق التصفية</td>
                       </tr>
                     ) : (
                       donations.map((d) => (
@@ -822,6 +847,25 @@ export default function ReferralAnalyticsPage() {
                           <td className="py-3 px-4 font-medium text-slate-800" dir="ltr">
                             <span dir="ltr">{formatMoney((d.amount ?? d.totalAmount ?? 0) as number, d.currency, d.amountUSD)}</span>
                           </td>
+                          <td className="py-3 px-4">
+                            <span
+                              className={cn(
+                                "inline-block px-2 py-0.5 rounded-full text-xs font-medium",
+                                d.status === "PAID"
+                                  ? "bg-green-100 text-green-700"
+                                  : d.status === "FAILED"
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-amber-100 text-amber-700"
+                              )}
+                            >
+                              {d.status === "PAID" ? "ناجح" : d.status === "FAILED" ? "فاشل" : "معلق"}
+                            </span>
+                            {d.status === "FAILED" && d.providerErrorMessage && (
+                              <p className="text-[10px] text-red-500 mt-0.5 max-w-[140px] leading-tight" title={d.providerErrorMessage}>
+                                {d.providerErrorMessage.length > 50 ? d.providerErrorMessage.slice(0, 50) + "…" : d.providerErrorMessage}
+                              </p>
+                            )}
+                          </td>
                           <td className="py-3 px-4 font-medium text-slate-800" dir="ltr">
                             {(d.teamSupport ?? 0) > 0 ? <span dir="ltr">{formatMoney(d.teamSupport ?? 0, d.currency, (d.totalAmount && (d.amountUSD != null)) ? ((d.teamSupport ?? 0) / d.totalAmount) * d.amountUSD : undefined)}</span> : <span className="text-slate-500">—</span>}
                           </td>
@@ -829,7 +873,7 @@ export default function ReferralAnalyticsPage() {
                             {(d.fees ?? 0) > 0 ? <span dir="ltr">{formatMoney(d.fees ?? 0, d.currency, (d.totalAmount && (d.amountUSD != null)) ? ((d.fees ?? 0) / d.totalAmount) * d.amountUSD : undefined)}</span> : <span className="text-slate-500">—</span>}
                           </td>
                           <td className="py-3 px-4">
-                            <span className={cn("inline-block px-2 py-0.5 rounded-full text-xs", d.type === "MONTHLY" ? "bg-[#025EB8] text-[#025EB8]" : "bg-slate-100 text-slate-600")}>
+                            <span className={cn("inline-block px-2 py-0.5 rounded-full text-xs", d.type === "MONTHLY" ? "bg-[#025EB8] text-white" : "bg-slate-100 text-slate-600")}>
                               {d.type === "MONTHLY" ? "شهري" : "مرة واحدة"}
                             </span>
                           </td>

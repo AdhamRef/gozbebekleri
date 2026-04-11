@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
+import { appendCurrencyQuery, getCurrencyCodeForLinks } from '@/lib/currency-link';
 import { useTranslations } from 'next-intl';
 import { useLocale } from 'next-intl';
 import { motion } from 'framer-motion';
@@ -371,14 +372,16 @@ const DonationSuccessPage = () => {
           className="flex flex-col sm:flex-row gap-3 justify-center"
         >
           <Button
-            onClick={() => router.push('/campaigns')}
+            onClick={() =>
+              router.push(appendCurrencyQuery('/campaigns', getCurrencyCodeForLinks()))
+            }
             className="gap-2 bg-[#FA5D17] hover:bg-[#e04d0f] text-white font-medium py-6 px-6 rounded-xl shadow-md"
           >
             <Heart className="w-5 h-5" />
             {t('browseCampaigns')}
           </Button>
           <Button
-            onClick={() => router.push('/')}
+            onClick={() => router.push(appendCurrencyQuery('/', getCurrencyCodeForLinks()))}
             variant="outline"
             className="gap-2 border-slate-300 text-slate-700 hover:bg-slate-50 font-medium py-6 px-6 rounded-xl"
           >

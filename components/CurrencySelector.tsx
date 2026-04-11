@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Cookies from "js-cookie";
 import { ChevronDown } from "lucide-react";
+import {
+  isValidCurrencyParam,
+  normalizeCurrencyParamToCookie,
+} from "@/lib/currency-link";
+import { CURRENCY_COOKIE_UPDATED_EVENT } from "@/components/CurrencyFromUrlSync";
 
 export const DEFAULT_CURRENCY_CODE = "DEFAULT";
 
@@ -29,10 +35,11 @@ type CurrencySelectorProps = {
   onDark?: boolean;
 };
 
-export default function CurrencySelector({
+function CurrencySelectorInner({
   showDefaultCurrencyOption = false,
   onDark = true,
 }: CurrencySelectorProps) {
+  const searchParams = useSearchParams();
   const [selectedCurrency, setSelectedCurrency] = useState(
     showDefaultCurrencyOption ? DEFAULT_CURRENCY_CODE : "USD"
   );
@@ -46,6 +53,39 @@ export default function CurrencySelector({
 
   const exchangeRateApiKey = "db9e1f2395aac69fe3648487";
 
+  const applyCookieToUi = useCallback(
+    (saved: string | undefined) => {
+      if (!showDefaultCurrencyOption) {
+        if (!saved || saved === DEFAULT_CURRENCY_CODE) {
+          Cookies.set("currency", "USD", { expires: 365 });
+          setSelectedCurrency("USD");
+          return;
+        }
+        setSelectedCurrency(saved);
+        return;
+      }
+      setSelectedCurrency(saved || DEFAULT_CURRENCY_CODE);
+    },
+    [showDefaultCurrencyOption]
+  );
+
+  /** URL param wins; then cookie. Keeps selector in sync on client navigations (?currency=). */
+  const syncFromUrlAndCookie = useCallback(() => {
+    const raw = searchParams.get("currency");
+    if (raw && isValidCurrencyParam(raw)) {
+      const normalized = normalizeCurrencyParamToCookie(raw);
+      if (!showDefaultCurrencyOption && normalized === DEFAULT_CURRENCY_CODE) {
+        Cookies.set("currency", "USD", { expires: 365 });
+        setSelectedCurrency("USD");
+        return;
+      }
+      Cookies.set("currency", normalized, { expires: 365 });
+      setSelectedCurrency(normalized);
+      return;
+    }
+    applyCookieToUi(Cookies.get("currency"));
+  }, [searchParams, showDefaultCurrencyOption, applyCookieToUi]);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -57,17 +97,23 @@ export default function CurrencySelector({
   }, []);
 
   useEffect(() => {
-    const saved = Cookies.get("currency");
-    if (!showDefaultCurrencyOption) {
-      if (!saved || saved === DEFAULT_CURRENCY_CODE) {
+    syncFromUrlAndCookie();
+  }, [syncFromUrlAndCookie]);
+
+  useEffect(() => {
+    const onExternalCookie = (e: Event) => {
+      const code = (e as CustomEvent<{ code?: string }>).detail?.code;
+      if (!code || !isValidCurrencyParam(code)) return;
+      const normalized = normalizeCurrencyParamToCookie(code);
+      if (!showDefaultCurrencyOption && normalized === DEFAULT_CURRENCY_CODE) {
         Cookies.set("currency", "USD", { expires: 365 });
         setSelectedCurrency("USD");
         return;
       }
-      setSelectedCurrency(saved);
-      return;
-    }
-    setSelectedCurrency(saved || DEFAULT_CURRENCY_CODE);
+      setSelectedCurrency(normalized);
+    };
+    window.addEventListener(CURRENCY_COOKIE_UPDATED_EVENT, onExternalCookie);
+    return () => window.removeEventListener(CURRENCY_COOKIE_UPDATED_EVENT, onExternalCookie);
   }, [showDefaultCurrencyOption]);
 
   useEffect(() => {
@@ -108,7 +154,6 @@ export default function CurrencySelector({
 
   return (
     <div className="relative" ref={ref}>
-      {/* Trigger */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -127,7 +172,6 @@ export default function CurrencySelector({
         />
       </button>
 
-      {/* Dropdown */}
       {open && (
         <div className="absolute right-0 top-full mt-2 z-50 w-44 rounded-xl border border-gray-100 bg-white shadow-lg overflow-hidden">
           {visibleCurrencies.map((curr) => (
@@ -149,5 +193,26 @@ export default function CurrencySelector({
         </div>
       )}
     </div>
+  );
+}
+
+function CurrencySelectorFallback({ onDark = true }: { onDark?: boolean }) {
+  return (
+    <div
+      className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-sm font-medium min-h-[28px] min-w-[52px] ${
+        onDark ? "text-white/50" : "text-gray-400"
+      }`}
+      aria-hidden
+    >
+      <span className="inline-block h-3 w-8 rounded bg-current opacity-30" />
+    </div>
+  );
+}
+
+export default function CurrencySelector(props: CurrencySelectorProps) {
+  return (
+    <Suspense fallback={<CurrencySelectorFallback onDark={props.onDark} />}>
+      <CurrencySelectorInner {...props} />
+    </Suspense>
   );
 }

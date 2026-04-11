@@ -24,7 +24,6 @@ import {
   Percent,
 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
-import CurrencySelector from "@/components/CurrencySelector";
 import {
   ResponsiveContainer,
   XAxis,
@@ -505,7 +504,6 @@ export default function DashboardPage() {
               )}
             </p>
           </div>
-          <CurrencySelector showDefaultCurrencyOption />
         </header>
 
         {/* المؤشرات — تختفي عند عرض تبرعات مستخدم معين عبر الرابط */}

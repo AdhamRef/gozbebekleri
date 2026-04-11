@@ -7,6 +7,7 @@ import { usePathname, useRouter } from '@/i18n/routing';
 import { Link } from '@/i18n/routing';
 import { useSearchParams } from 'next/navigation';
 import SignInDialog from '@/components/SignInDialog';
+import { appendCurrencyQuery, getCurrencyCodeForLinks } from '@/lib/currency-link';
 
 const LOGO_URL = 'https://i.ibb.co/ZwcJcN1/logo.webp';
 
@@ -34,10 +35,10 @@ const Footer = () => {
     const run = async () => {
       try {
         const raw = window.sessionStorage.getItem(pendingMessageKey);
-        if (!raw) { router.replace(pathname); return; }
+        if (!raw) { router.replace(appendCurrencyQuery(pathname, getCurrencyCodeForLinks())); return; }
         const parsed = JSON.parse(raw) as { body?: string; locale?: string };
         const trimmed = (parsed.body || '').trim();
-        if (!trimmed) { window.sessionStorage.removeItem(pendingMessageKey); router.replace(pathname); return; }
+        if (!trimmed) { window.sessionStorage.removeItem(pendingMessageKey); router.replace(appendCurrencyQuery(pathname, getCurrencyCodeForLinks())); return; }
         const res = await fetch('/api/messages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -52,7 +53,7 @@ const Footer = () => {
         setSubmitMessage(t('sendError'));
         setTimeout(() => setSubmitMessage(''), 3000);
       } finally {
-        router.replace(pathname);
+        router.replace(appendCurrencyQuery(pathname, getCurrencyCodeForLinks()));
       }
     };
     run();

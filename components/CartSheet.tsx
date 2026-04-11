@@ -7,6 +7,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useRouter } from "@/i18n/routing";
+import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ShoppingCart, Heart, Trash2 } from "lucide-react";
@@ -120,7 +121,10 @@ const CartSheet: React.FC<CartSheetProps> = ({
                   {t('emptyCartMessage')}
                 </p>
                 <button
-                  onClick={() => { onOpenChange(false); router.push('/campaigns'); }}
+                  onClick={() => {
+                    onOpenChange(false);
+                    router.push(appendCurrencyQuery("/campaigns", getCurrencyCodeForLinks()));
+                  }}
                   className="flex items-center gap-2 px-5 py-2.5 bg-[#025EB8] hover:bg-[#0150a0] text-white text-sm font-semibold rounded-lg transition-colors"
                 >
                   <Heart className="h-4 w-4" />

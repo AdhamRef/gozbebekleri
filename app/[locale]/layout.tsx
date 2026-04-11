@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Navbar from "@/components/Navbar";
+import { CurrencyFromUrlSync } from "@/components/CurrencyFromUrlSync";
 import IntlProviderClient from "./IntlProviderClient";
 import ar from "../../i18n/messages/ar.json";
 import en from "../../i18n/messages/en.json";
@@ -85,6 +87,9 @@ export default async function Rootlayout({
         <ReferralTracker />
         <div dir={dir} lang={locale === "ar" ? "ar" : locale === "fr" ? "fr" : locale === "tr" ? "tr" : locale === "id" ? "id" : locale === "pt" ? "pt" : locale === "es" ? "es" : "en"}>
           <CurrencyProvider>
+            <Suspense fallback={null}>
+              <CurrencyFromUrlSync />
+            </Suspense>
             <SessionProvider session={session}>
               <Navbar />
             <main className="pt-16 lg:pt-[104px]">

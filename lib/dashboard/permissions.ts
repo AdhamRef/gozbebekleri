@@ -91,6 +91,7 @@ export function userCanViewUserProfilesInDashboard(
 /** Longer prefixes first — first match wins */
 const PATH_RULES: { prefix: string; key: DashboardPermissionKey }[] = [
   { prefix: "/dashboard/monthly", key: "monthly" },
+  { prefix: "/dashboard/link-generator", key: "referrals" },
   { prefix: "/dashboard/referrals", key: "referrals" },
   { prefix: "/dashboard/users/donors", key: "donors" },
   { prefix: "/dashboard/users/team", key: "team" },

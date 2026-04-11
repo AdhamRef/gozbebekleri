@@ -27,6 +27,9 @@
     "donate": "DONASI SEKARANG",
     "signIn": "Masuk"
   },
+  "BlogCard": {
+    "readMore": "Baca selengkapnya"
+  },
   "HomePage": {
     "donationCategories": "Kategori Donasi",
     "news": "Berita Kami",
@@ -176,6 +179,10 @@
     "donateNow": "Donasi Sekarang",
     "campaignDonations": "donasi",
     "campaignRemaining": "tersisa",
+    "campaignOpenBadge": "Target terbuka",
+    "campaignSharesBadge": "Saham (سهوم)",
+    "campaignOpenGoal": "Penggalangan terbuka",
+    "sharePriceUsd": "Per saham",
     "article": "Artikel",
     "linkCopied": "Tautan disalin",
     "all": "Semua",
@@ -238,7 +245,9 @@
     "goal": "Target",
     "home": "Beranda",
     "heroDescription": "Dukung tujuan yang bermakna dan buat perbedaan nyata dalam kehidupan orang-orang.",
-    "resultsFound": "kampanye ditemukan"
+    "resultsFound": "kampanye ditemukan",
+    "openGoalLabel": "Target terbuka",
+    "sharesCampaignLabel": "Saham (سهوم)"
   },
   "Campaign": {
     "story": "Cerita",
@@ -252,6 +261,8 @@
     "completed": "Selesai",
     "image": "Gambar",
     "from": "dari",
+    "openGoalBadge": "Target terbuka",
+    "sharesCampaignBadge": "Saham (سهوم)",
     "donateNow": "Donasi Sekarang",
     "outOfGoal": "dari target",
     "peopleDonated": "orang mendukung kasus ini",
@@ -293,7 +304,12 @@
     "termsAgreement": "Dengan masuk, Anda setuju dengan",
     "termsOfUse": "Ketentuan Penggunaan",
     "and": "dan",
-    "privacyPolicy": "Kebijakan Privasi"
+    "privacyPolicy": "Kebijakan Privasi",
+    "orContinueWith": "atau",
+    "secure": "Aman",
+    "trusted": "Terpercaya",
+    "community": "Komunitas",
+    "donationHint": "Masuk untuk melacak donasi Anda dan mengelola akun."
   },
   "SharePopup": {
     "shareCampaign": "Bagikan Kampanye dengan Orang Lain",
@@ -322,6 +338,11 @@
     "hadithText": "(Allah berfirman: Berinfaklah, wahai anak Adam, niscaya Aku akan berinfak kepadamu)",
     "collected": "Terkumpul",
     "goal": "Target",
+    "sharePriceLabel": "Harga per saham:",
+    "sharesLabel": "saham",
+    "sharesPickHint": "Pilih berapa saham (سهوم) yang ingin Anda sumbangkan",
+    "donationTotal": "Total donasi",
+    "sharesLine": "{count} saham (سهوم)",
     "enterDonationAmount": "Masukkan jumlah donasi",
     "addToCart": "Tambah ke Keranjang",
     "addedToCart": "Jumlah berhasil ditambahkan ke keranjang",
@@ -384,7 +405,16 @@
     "donationFailed": "Donasi gagal",
     "successRedirecting": "Mengalihkan ke Gateway Pembayaran",
     "successRedirectingDesc": "Anda akan dialihkan dengan aman untuk menyelesaikan pembayaran.",
-    "paymentFeesPercent": "Biaya Pembayaran (3%)"
+    "paymentFeesPercent": "Biaya Pembayaran (3%)",
+    "secure3DLabel": "Pembayaran 3D Secure",
+    "secure3DEnabled": "✓ Diaktifkan",
+    "secure3DDisabled": "Pembayaran standar",
+    "secure3DCardPrompt": "Masukkan detail kartu Anda di bawah untuk menyelesaikan pembayaran aman.",
+    "monthlyStripeRedirect": "Anda akan diarahkan ke halaman pembayaran aman untuk mengatur donasi bulanan.",
+    "standardStripeRedirect": "Anda akan diarahkan ke halaman pembayaran aman untuk menyelesaikan donasi.",
+    "paymentSwitching": "Beralih ke gerbang pembayaran cadangan…",
+    "paymentSwitchingDesc": "Terjadi kesalahan pada gerbang pembayaran. Anda akan dialihkan secara otomatis untuk menyelesaikan pembayaran melalui gerbang alternatif.",
+    "sslSecurePayment": "Enkripsi SSL 256-bit · Pembayaran aman"
   },
   "DonationSuccess": {
     "thankYou": "Terima kasih banyak",
@@ -400,6 +430,7 @@
     "transactionFees": "Biaya Transaksi",
     "supportedCampaign": "Kampanye Didukung",
     "campaignsDonatedTo": "Kampanye yang Anda Donasikan",
+    "itemShares": "{count} saham (سهوم)",
     "categoriesDonatedTo": "Kategori yang Anda Donasikan",
     "campaignsAndCategoriesDonatedTo": "Kampanye & Kategori yang Anda Donasikan",
     "donateToAnotherCampaign": "Donasi ke Kampanye Lain",
@@ -430,7 +461,8 @@
     "subtotal": "Subtotal",
     "total": "Total",
     "proceedToDonate": "Lanjutkan Donasi",
-    "secureCheckout": "Donasi Anda aman dan terenkripsi"
+    "secureCheckout": "Donasi Anda aman dan terenkripsi",
+    "sharesLine": "{count} saham (سهوم)"
   },
   "LiveDonationsTicker": {
     "donated": "mendonasikan",
@@ -468,6 +500,11 @@
       "name": "Nama",
       "email": "Email",
       "country": "Negara",
+      "location": "Lokasi",
+      "countryName": "Nama negara",
+      "countryCode": "Kode negara (ISO)",
+      "region": "Wilayah",
+      "city": "Kota",
       "phone": "Nomor Telepon",
       "birthdate": "Tanggal Lahir",
       "verified": "Terverifikasi",
@@ -502,6 +539,7 @@
       "totalDonations": "Total Donasi",
       "totalInPeriodTitle": "Total (periode ini)",
       "recordsInPeriodLabel": "{count} entri dalam periode ini",
+      "successfulPaymentsInPeriod": "{count} pembayaran berhasil dalam periode ini",
       "historyTableTitle": "Riwayat donasi",
       "emptyHistoryList": "Tidak ada donasi untuk periode yang dipilih.",
       "donationsCount": "{count} donasi",
@@ -529,7 +567,29 @@
       "total": "Total",
       "monthlyDonationLabel": "Donasi bulanan",
       "date": "Tanggal",
-      "actions": "Tindakan"
+      "actions": "Tindakan",
+      "historyTableSubtitle": "Setiap baris adalah satu pembayaran. Lihat hasil pembayaran, kampanye yang didukung, dan unduh tanda terima PDF resmi hanya untuk pembayaran yang berhasil.",
+      "campaignsColumn": "Kampanye / proyek",
+      "paymentResult": "Pembayaran",
+      "paymentSucceeded": "Berhasil",
+      "paymentFailed": "Gagal",
+      "paymentPending": "Menunggu",
+      "paymentUnknown": "Tidak diketahui",
+      "filterByPayment": "Status pembayaran",
+      "filterPaymentAll": "Semua status",
+      "filterPaymentPaid": "Hanya berhasil",
+      "filterPaymentFailed": "Hanya gagal",
+      "filterPaymentPending": "Hanya tertunda",
+      "breakdown": "Rincian",
+      "referenceShort": "Ref.",
+      "receipt": "Tanda terima",
+      "paidAt": "Dibayar pada",
+      "noCampaignTitle": "—",
+      "sharesCount": "{count} saham",
+      "paymentMethodCard": "Kartu",
+      "paymentMethodPaypal": "PayPal",
+      "coverFeesYes": "Anda menanggung biaya transaksi",
+      "emptyHistoryFiltered": "Tidak ada donasi yang cocok dengan filter. Coba status atau periode lain."
     },
     "subscriptions": {
       "settingsTableTitle": "Langganan & pengaturan",
@@ -582,7 +642,12 @@
       "download": "Unduh",
       "receiptLabel": "Struk #{id}",
       "downloadReceipt": "Unduh Struk",
-      "noReceiptsMatch": "Tidak ada struk yang sesuai dengan kriteria yang dipilih"
+      "noReceiptsMatch": "Tidak ada struk yang sesuai dengan kriteria yang dipilih",
+      "downloadAllPdf": "Unduh semua tanda terima PDF ({count})",
+      "downloadAllHint": "Tanda terima PDF hanya dibuat untuk pembayaran yang berhasil.",
+      "downloadPdfReceipt": "Unduh tanda terima PDF",
+      "downloadPdfShort": "PDF",
+      "receiptNotAvailableReason": "Tersedia setelah pembayaran berhasil."
     },
     "support": {
       "newSupportRequest": "Permintaan Dukungan Baru",

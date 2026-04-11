@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCurrency } from "@/context/CurrencyContext";
 import { usePathname, useRouter } from "@/i18n/routing";
+import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
 import { Award, Clock, Gift, HandCoins, HandHeart, Share2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
@@ -41,12 +42,12 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
     if (openDonationHandledThisLoad) return;
     openDonationHandledThisLoad = true;
     setIsDonationOpen(true);
-    router.replace(pathname);
+    router.replace(appendCurrencyQuery(pathname, getCurrencyCodeForLinks()));
   }, [searchParams, pathname, router]);
 
   const donationCallbackUrl =
     typeof window !== "undefined"
-      ? `${window.location.pathname}?openDonation=1`
+      ? appendCurrencyQuery(`${pathname}?openDonation=1`, getCurrencyCodeForLinks())
       : undefined;
 
   // Helper function to get locale-specific property

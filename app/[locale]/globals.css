@@ -216,3 +216,9 @@ input[type="checkbox"]:checked::before {
 [dir="rtl"] .phone-input-wrapper .react-international-phone-input {
   border-radius: 4px 0 0 4px;
 }
+
+/* RTL: anchor dropdown to the right edge so it extends leftward (stays in dialog) */
+[dir="rtl"] .phone-input-wrapper .react-international-phone-country-selector-dropdown {
+  right: 0 !important;
+  left: auto !important;
+}

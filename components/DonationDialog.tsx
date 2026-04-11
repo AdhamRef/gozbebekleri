@@ -17,6 +17,8 @@ import {
   Check,
   Loader2,
   ExternalLink,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
@@ -40,6 +42,7 @@ import { formatNumber } from "@/hooks/formatNumber";
 import { useCart } from "@/hooks/useCart";
 import { useTracking } from "@/components/TrackingPixels";
 import { useRouter } from "@/i18n/routing";
+import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
 import { useTranslations, useLocale } from "next-intl";
 import { useSession } from "next-auth/react";
 import { PhoneInput } from "react-international-phone";
@@ -111,8 +114,31 @@ const DonationDialog = ({
   );
   const t = useTranslations("DonationDialog");
   const locale = useLocale() as "ar" | "en" | "fr";
+  const isRTL = locale === "ar";
+  const navRow = "inline-flex items-center justify-center gap-2";
+  const backLabel = (
+    <span className={navRow}>
+      {!isRTL && <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />}
+      {t("back")}
+      {isRTL && <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />}
+    </span>
+  );
+  const nextLabel = (
+    <span className={navRow}>
+      {isRTL && <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />}
+      {t("next")}
+      {!isRTL && <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />}
+    </span>
+  );
+  const confirmDonationLabel = (
+    <span className={navRow}>
+      {isRTL && <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />}
+      {t("confirmDonation")}
+      {!isRTL && <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />}
+    </span>
+  );
   const getReferralCode = useReferralCode();
-  
+
   // Helper function to get locale-specific property
   const getLocalizedProperty = (obj: any, key: string) => {
     const localeKey = `${key}${locale.charAt(0).toUpperCase() + locale.slice(1)}`;
@@ -128,28 +154,12 @@ const DonationDialog = ({
     { label: "100", value: 100 },
   ];
 
-  const PAYMENT_METHODS = [
-    {
-      id: "CARD",
-      name: t("bankCard"),
-      icon: CardIcon,
-      description: t("cardDescription"),
-    },
-    {
-      id: "PAYPAL",
-      name: "PayPal",
-      icon: CardIcon,
-      description: t("paypalDescription"),
-    },
-  ];
-
   const DONATION_STEPS: Record<DonationType, DonationStep[]> = {
     ONE_TIME: [
       { title: t("donationAmount"), subtitle: t("donationAmountDesc") },
       { title: t("teamSupport"), subtitle: t("teamSupportDesc") },
       { title: t("paymentFees"), subtitle: t("paymentFeesDesc") },
       { title: t("confirmation"), subtitle: t("confirmationDesc") },
-      { title: t("paymentMethod"), subtitle: t("paymentMethodDesc") },
       { title: t("paymentInfo"), subtitle: t("paymentInfoDesc") },
     ],
     MONTHLY: [
@@ -161,7 +171,6 @@ const DonationDialog = ({
       { title: t("teamSupport"), subtitle: t("teamSupportDesc") },
       { title: t("paymentFees"), subtitle: t("paymentFeesDesc") },
       { title: t("confirmation"), subtitle: t("confirmationDesc") },
-      { title: t("paymentMethod"), subtitle: t("paymentMethodDesc") },
       { title: t("paymentInfo"), subtitle: t("paymentInfoDesc") },
     ],
   };
@@ -172,7 +181,7 @@ const DonationDialog = ({
   const [teamSupport, setTeamSupport] = useState<number>(0);
   const [coverFees, setCoverFees] = useState(false);
   const [billingDay, setBillingDay] = useState<number>(1);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
   const [use3D, setUse3D] = useState(true);
   // PayFor manual card inputs (use3D === true)
   const [cardDetails, setCardDetails] = useState<PayForCardState>({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" });
@@ -194,8 +203,14 @@ const DonationDialog = ({
   const payforPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [mounted, setMounted] = useState(false);
   const [phoneValue, setPhoneValue] = useState("");
-  const [phoneCountry, setPhoneCountry] = useState<string>("");
-  const [currentUser, setCurrentUser] = useState<{ phone: string | null; country: string | null } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{
+    phone: string | null;
+    country: string | null;
+    countryCode?: string | null;
+    countryName?: string | null;
+    city?: string | null;
+    region?: string | null;
+  } | null>(null);
   const { data: session } = useSession();
   const { convertToCurrency, exchangeRates } = useCurrency();
   const [shareCount, setShareCount] = useState(1);
@@ -214,7 +229,14 @@ const DonationDialog = ({
       .then((res) => {
         const user = res.data?.user;
         if (user) {
-          setCurrentUser({ phone: user.phone ?? null, country: user.country ?? null });
+          setCurrentUser({
+            phone: user.phone ?? null,
+            country: user.country ?? null,
+            countryCode: user.countryCode ?? null,
+            countryName: user.countryName ?? null,
+            city: user.city ?? null,
+            region: user.region ?? null,
+          });
           if (user.phone) setPhoneValue(user.phone);
         }
       })
@@ -292,9 +314,7 @@ const DonationDialog = ({
 
   const handleTypeSelect = (type: DonationType) => {
     setDonationType(type);
-    // Monthly always uses Stripe (CARD); pre-select it so the payment method step is pre-filled
-    if (type === "MONTHLY") setPaymentMethod("CARD");
-    else setPaymentMethod(null);
+    setPaymentMethod("CARD");
     setCardDetails({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" });
     setCurrentStep(0);
   };
@@ -320,6 +340,20 @@ const DonationDialog = ({
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
     }
+  };
+
+  /** Donation Value step: return to type choice, previous step, or close dialog. */
+  const handleBackFromDonationValueStep = () => {
+    if (!monthlyOnly && !shareMode && donationType) {
+      setDonationType(null);
+      setCurrentStep(0);
+      return;
+    }
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+      return;
+    }
+    onClose();
   };
 
   const getSteps = () => {
@@ -368,7 +402,7 @@ const DonationDialog = ({
                   <Heart className="w-6 h-6 text-[#025EB8]" />
                 </div>
                 <h3 className="font-semibold text-gray-900">{t("oneTimeDonation")}</h3>
-                <p className="text-sm text-gray-500">{t("oneTimeDonationDesc")}</p>
+                <p className="text-sm text-gray-500 whitespace-normal break-words">{t("oneTimeDonationDesc")}</p>
               </div>
             </Button>
 
@@ -382,7 +416,7 @@ const DonationDialog = ({
                   <Calendar className="w-6 h-6 text-[#025EB8]" />
                 </div>
                 <h3 className="font-semibold text-gray-900">{t("monthlyDonation")}</h3>
-                <p className="text-sm text-gray-500">{t("monthlyDonationDesc")}</p>
+                <p className="text-sm text-gray-500 whitespace-normal break-words">{t("monthlyDonationDesc")}</p>
               </div>
             </Button>
           </div>
@@ -417,17 +451,12 @@ const DonationDialog = ({
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">
-                    {t("collected")} {getCurrency()}
-                    {formatNumber(
-                      (convertToCurrency(Math.round(amountRaised)).convertedValue ?? 0) +
-                        donationAmount
-                    )}
+                    {t("collected")}{" "}
+                    <span dir="ltr">{formatNumber((convertToCurrency(Math.round(amountRaised)).convertedValue ?? 0) + donationAmount)} {getCurrency()}</span>
                   </span>
                   <span className="text-gray-600">
-                    {t("goal")} {getCurrency()}
-                    {formatNumber(
-                      convertToCurrency(Math.round(targetAmount)).convertedValue ?? 0
-                    )}
+                    {t("goal")}{" "}
+                    <span dir="ltr">{formatNumber(convertToCurrency(Math.round(targetAmount)).convertedValue ?? 0)} {getCurrency()}</span>
                   </span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2">
@@ -444,10 +473,7 @@ const DonationDialog = ({
                 <>
                   <p className="text-sm text-center text-gray-600">
                     {t("sharePriceLabel")}{" "}
-                    {getCurrency()}
-                    {formatNumber(
-                      convertToCurrency(sharePriceUSD).convertedValue ?? sharePriceUSD
-                    )}
+                    <span dir="ltr">{formatNumber(convertToCurrency(sharePriceUSD).convertedValue ?? sharePriceUSD)} {getCurrency()}</span>
                   </p>
                   <p className="text-xs text-center text-gray-500">{t("sharesPickHint")}</p>
                   <div className="flex items-center justify-center gap-3">
@@ -490,8 +516,7 @@ const DonationDialog = ({
                     ))}
                   </div>
                   <p className="text-center text-base font-semibold text-[#025EB8]">
-                    {t("donationTotal")}: {getCurrency()}
-                    {formatNumber(donationAmount)}
+                    {t("donationTotal")}: <span dir="ltr">{formatNumber(donationAmount)} {getCurrency()}</span>
                   </p>
                 </>
               ) : (
@@ -515,7 +540,7 @@ const DonationDialog = ({
                             : ""
                         }`}
                       >
-                        {getCurrency()} {amount}
+                        <span dir="ltr">{amount} {getCurrency()}</span>
                       </Button>
                     ))}
                   </div>
@@ -523,7 +548,15 @@ const DonationDialog = ({
               )}
             </div>
 
-            <div className="flex justify-between gap-4 mt-6">
+            <div className="flex justify-between gap-4 mt-6 flex-wrap">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleBackFromDonationValueStep}
+                className="flex-1 min-w-[6rem] inline-flex items-center justify-center gap-2"
+              >
+                {backLabel}
+              </Button>
               {!isCategoryMode && campaignId && (
                 <Button
                   variant="outline"
@@ -556,7 +589,7 @@ const DonationDialog = ({
                       onClose();
                     }
                   }}
-                  className="flex-1 flex justify-center items-center gap-2 bg-[#025EB8]/10 text-[#025EB8] hover:bg-[#025EB8]/20 !border-none !shadow-none"
+                  className="flex-1 min-w-[6rem] flex justify-center items-center gap-2 bg-[#025EB8]/10 text-[#025EB8] hover:bg-[#025EB8]/20 !border-none !shadow-none"
                 >
                   <ShoppingCart className="w-4 h-4" />
                   {t("addToCart")}
@@ -565,9 +598,9 @@ const DonationDialog = ({
               <Button
                 onClick={handleNext}
                 disabled={!donationAmount}
-                className={`${isCategoryMode || !campaignId ? "w-full" : "flex-1"} bg-[#025EB8] hover:bg-[#014fa0] text-white`}
+                className="flex-1 min-w-[6rem] bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2"
               >
-                {t("next")}
+                {nextLabel}
               </Button>
             </div>
           </div>
@@ -603,21 +636,21 @@ const DonationDialog = ({
                         : ""
                     }`}
                   >
-                    {getCurrency()} {option.value}
+                    <span dir="ltr">{option.value} {getCurrency()}</span>
                   </Button>
                 ))}
               </div>
             </div>
 
             <div className="flex justify-between gap-4">
-              <Button variant="outline" onClick={handleBack} className="flex-1">
-                {t("back")}
+              <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">
+                {backLabel}
               </Button>
               <Button
                 onClick={handleNext}
-                className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white"
+                className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2"
               >
-                {t("next")}
+                {nextLabel}
               </Button>
             </div>
           </div>
@@ -638,17 +671,17 @@ const DonationDialog = ({
             <div dir={locale === "ar" ? "rtl" : "ltr"} className="bg-gray-50 p-4 rounded-lg space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">{t("amount")}</span>
-                <span className="font-medium">{getCurrency()} {formatNumber(donationAmount)}</span>
+                <span className="font-medium" dir="ltr">{formatNumber(donationAmount)} {getCurrency()}</span>
               </div>
               {teamSupport > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">{t("teamSupport")}</span>
-                  <span className="font-medium">{getCurrency()} {formatNumber(teamSupport)}</span>
+                  <span className="font-medium" dir="ltr">{formatNumber(teamSupport)} {getCurrency()}</span>
                 </div>
               )}
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">{t("paymentFeesPercent")}</span>
-                <span className="font-medium">{getCurrency()} {fees.toFixed(2)}</span>
+                <span className="font-medium" dir="ltr">{fees.toFixed(2)} {getCurrency()}</span>
               </div>
             </div>
 
@@ -670,20 +703,20 @@ const DonationDialog = ({
               <div className="flex-1 text-start">
                 <p className="font-medium text-gray-900">{t("yesCoverFees")}</p>
                 <p className="text-sm text-gray-500 mt-0.5">
-                  {t("feesWillBeAdded", { amount: `${getCurrency()} ${fees.toFixed(2)}` })}
+                  {t("feesWillBeAdded", { amount: `${fees.toFixed(2)} ${getCurrency()}` })}
                 </p>
               </div>
             </button>
 
             <div className="flex justify-between gap-4">
-              <Button variant="outline" onClick={handleBack} className="flex-1">
-                {t("back")}
+              <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">
+                {backLabel}
               </Button>
               <Button
                 onClick={handleNext}
-                className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white"
+                className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2"
               >
-                {t("next")}
+                {nextLabel}
               </Button>
             </div>
           </div>
@@ -718,32 +751,24 @@ const DonationDialog = ({
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">{t("amount")}</span>
-                <span className="font-medium text-gray-900">
-                  {getCurrency()} {formatNumber(donationAmount)}
-                </span>
+                <span className="font-medium text-gray-900" dir="ltr">{formatNumber(donationAmount)} {getCurrency()}</span>
               </div>
               {teamSupport > 0 && (
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">{t("teamSupport")}</span>
-                  <span className="font-medium text-gray-900">
-                    {getCurrency()} {formatNumber(teamSupport)}
-                  </span>
+                  <span className="font-medium text-gray-900" dir="ltr">{formatNumber(teamSupport)} {getCurrency()}</span>
                 </div>
               )}
               {coverFees && (
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">{t("paymentFeesLabel")}</span>
-                  <span className="font-medium text-gray-900">
-                    {getCurrency()} {fees.toFixed(2)}
-                  </span>
+                  <span className="font-medium text-gray-900" dir="ltr">{fees.toFixed(2)} {getCurrency()}</span>
                 </div>
               )}
               <div className="pt-4 border-t">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-gray-900">{t("total")}</span>
-                  <span className="font-bold text-[#025EB8] text-xl">
-                    {getCurrency()} {totalAmount.toFixed(2)}
-                  </span>
+                  <span className="font-bold text-[#025EB8] text-xl" dir="ltr">{totalAmount.toFixed(2)} {getCurrency()}</span>
                 </div>
               </div>
             </div>
@@ -753,15 +778,15 @@ const DonationDialog = ({
               <Button
                 variant="outline"
                 onClick={handleBack}
-                className="flex-1 py-3 text-gray-700 border-gray-300 hover:bg-gray-50"
+                className="flex-1 py-3 text-gray-700 border-gray-300 hover:bg-gray-50 inline-flex items-center justify-center gap-2"
               >
-                {t("back")}
+                {backLabel}
               </Button>
               <Button
                 onClick={handleNext}
-                className="flex-1 py-3 bg-[#025EB8] hover:bg-[#014fa0] text-white"
+                className="flex-1 py-3 bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2"
               >
-                {t("next")}
+                {nextLabel}
               </Button>
             </div>
 
@@ -780,125 +805,47 @@ const DonationDialog = ({
         );
 
       case t("billingDay"):
-        if (donationType === "MONTHLY") {
-          return (
-            <div className="space-y-6">
-              <div className="text-center space-y-2">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {t("chooseBillingDay")}
-                </h3>
-                <p className="text-gray-600 text-sm">
-                  {t("billingDayInfo")}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-7 gap-2">
-                {Array.from({ length: 28 }, (_, i) => i + 1).map((day) => (
-                  <Button
-                    key={day}
-                    variant="outline"
-                    onClick={() => setBillingDay(day)}
-                    className={`${
-                      billingDay === day
-                        ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]"
-                        : ""
-                    }`}
-                  >
-                    {day}
-                  </Button>
-                ))}
-              </div>
-
-              <div className="flex justify-between gap-4">
-                <Button
-                  variant="outline"
-                  onClick={handleBack}
-                  className="flex-1"
-                >
-                  {t("back")}
-                </Button>
-                <Button
-                  onClick={handleNext}
-                  className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white"
-                >
-                  {t("next")}
-                </Button>
-              </div>
-            </div>
-          );
-        }
-      // Fall through to payment method selection if not monthly
-
-      case t("paymentMethod"):
         return (
-          <div className="space-y-8">
-            {/* Header Section */}
-            <div className="text-center space-y-3">
-              <h3 className="text-2xl font-bold text-gray-900">
-                {t("choosePaymentMethod")}
+          <div className="space-y-6">
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {t("chooseBillingDay")}
               </h3>
               <p className="text-gray-600 text-sm">
-                {t("choosePaymentMethodDesc")}
+                {t("billingDayInfo")}
               </p>
             </div>
 
-            {/* Payment Methods Section */}
-            <div className="space-y-4">
-              {PAYMENT_METHODS.filter((m) => donationType === "MONTHLY" ? m.id === "CARD" : true).map((method) => (
-                <div
-                  key={method.id}
-                  onClick={() => setPaymentMethod(method.id as PaymentMethod)}
-                  className={`w-full p-4 rounded-lg cursor-pointer transition-all duration-300 ${
-                    paymentMethod === method.id
-                      ? "border border-[#025EB8] bg-[#025EB8]/5 shadow-md"
-                      : "border border-gray-200 hover:border-[#025EB8]/50 hover:shadow-sm"
+            <div className="grid grid-cols-7 gap-2">
+              {Array.from({ length: 28 }, (_, i) => i + 1).map((day) => (
+                <Button
+                  key={day}
+                  variant="outline"
+                  onClick={() => setBillingDay(day)}
+                  className={`${
+                    billingDay === day
+                      ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]"
+                      : ""
                   }`}
                 >
-                  <div className="flex items-center gap-4">
-                    {/* Icon with Colorful Background */}
-                    <div
-                      className={`p-3 rounded-lg ${
-                        paymentMethod === method.id
-                          ? "bg-[#025EB8]"
-                          : "bg-gray-100"
-                      }`}
-                    >
-                      <method.icon
-                        className={`w-6 h-6 ${
-                          paymentMethod === method.id
-                            ? "text-white"
-                            : "text-gray-700"
-                        }`}
-                      />
-                    </div>
-
-                    {/* Method Details */}
-                    <div className="text-right flex-1">
-                      <p className="font-medium text-gray-900">{method.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {method.description}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                  {day}
+                </Button>
               ))}
             </div>
 
-            {/* Buttons Section */}
             <div className="flex justify-between gap-4">
               <Button
                 variant="outline"
                 onClick={handleBack}
-                className="flex-1 py-3 text-gray-700 border-gray-300 hover:bg-gray-50"
+                className="flex-1 inline-flex items-center justify-center gap-2"
               >
-                {t("back")}
+                {backLabel}
               </Button>
               <Button
                 onClick={handleNext}
-                disabled={!paymentMethod}
-                className="flex-1 py-3 bg-[#025EB8] hover:bg-[#014fa0] text-white"
+                className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2"
               >
-                {t("continue")}
+                {nextLabel}
               </Button>
             </div>
           </div>
@@ -955,16 +902,13 @@ const DonationDialog = ({
               </button>
             )}
 
-            <div className="space-y-2 overflow-visible pt-2 border-t border-border" dir={locale}>
+            <div className="space-y-2 overflow-visible pt-2 border-t border-border" dir={locale === "ar" ? "rtl" : "ltr"}>
               <label className={`block text-sm font-medium text-gray-700 ${locale === "ar" ? "text-right" : "text-left"}`}>{t("contactPhone")}</label>
               <div className="overflow-visible phone-input-wrapper">
                 <PhoneInput
                   defaultCountry="sy"
                   value={phoneValue}
-                  onChange={(phone, meta) => {
-                    setPhoneValue(phone);
-                    setPhoneCountry(meta.country?.name ?? meta.country?.iso2 ?? "");
-                  }}
+                  onChange={(phone) => setPhoneValue(phone)}
                   className="w-full overflow-visible"
                   inputClassName="w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                   required
@@ -973,35 +917,35 @@ const DonationDialog = ({
             </div>
 
             <div className={`flex justify-between gap-4 ${locale === "ar" ? "flex-row-reverse" : ""}`}>
-              <Button variant="outline" onClick={handleBack} className="flex-1">
-                {t("back")}
+              <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">
+                {backLabel}
               </Button>
               <Button
-  onClick={handleSubmit}
-  disabled={
-    loading ||
-    !isPhoneValid() ||
-    (paymentMethod === "CARD" && !use3D && !stripeReady) ||
-    (paymentMethod === "CARD" && use3D && (
-      cardDetails.cardNumber.length < 13 ||
-      cardDetails.expiryDate.length < 5 ||
-      cardDetails.cvv.length < 3 ||
-      !cardDetails.cardholderName.trim()
-    ))
-  }
-  className="flex-1 bg-[#FA5D17] hover:bg-[#e04d0f] text-white flex items-center justify-center gap-2"
->
-  {loading ? (
-    <Loader2 className="h-4 w-4 animate-spin" />
-  ) : (
-    t("confirmDonation")
-  )}
-</Button>
+                onClick={handleSubmit}
+                disabled={
+                  loading ||
+                  !isPhoneValid() ||
+                  (paymentMethod === "CARD" && !use3D && !stripeReady) ||
+                  (paymentMethod === "CARD" && use3D && (
+                    cardDetails.cardNumber.length < 13 ||
+                    cardDetails.expiryDate.length < 5 ||
+                    cardDetails.cvv.length < 3 ||
+                    !cardDetails.cardholderName.trim()
+                  ))
+                }
+                className="flex-1 bg-[#FA5D17] hover:bg-[#e04d0f] text-white inline-flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                ) : (
+                  confirmDonationLabel
+                )}
+              </Button>
 
             </div>
             <div className="flex items-center justify-center gap-2 pt-2 text-gray-400 text-[11px]">
               <svg className="w-3.5 h-3.5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-              <span>256-bit SSL encrypted · Secure payment</span>
+              <span>{t("sslSecurePayment")}</span>
             </div>
           </div>
         );
@@ -1018,7 +962,6 @@ const DonationDialog = ({
       if (session?.user?.id && !currentUser?.phone && phoneValue.trim()) {
         await axios.put(`/api/users/${session.user.id}`, {
           phone: phoneValue.trim(),
-          country: phoneCountry || undefined,
         });
       }
       const amountUSD =
@@ -1092,7 +1035,9 @@ const DonationDialog = ({
           return;
         }
 
-        router.push(`/success/${targetDonationId}`);
+        router.push(
+          appendCurrencyQuery(`/success/${targetDonationId}`, getCurrencyCodeForLinks())
+        );
         return;
       }
 
@@ -1201,7 +1146,9 @@ const DonationDialog = ({
                   if (payforPopupRef.current && !payforPopupRef.current.closed) {
                     payforPopupRef.current.close();
                   }
-                  router.push(`/success/${donationId}`);
+                  router.push(
+                    appendCurrencyQuery(`/success/${donationId}`, getCurrencyCodeForLinks())
+                  );
                   return;
                 }
                 if (data.status === "FAILED" || payforPopupRef.current?.closed || polls >= FALLBACK_AFTER_POLLS) {
@@ -1217,7 +1164,9 @@ const DonationDialog = ({
 
         isRedirecting = true;
         setRedirecting(true);
-        router.push(`/success/${donationId}`);
+        router.push(
+          appendCurrencyQuery(`/success/${donationId}`, getCurrencyCodeForLinks())
+        );
         return;
       }
       onClose();
@@ -1241,7 +1190,7 @@ const DonationDialog = ({
       }
       onClose();
     }}>
-      <DialogContent className="w-full h-full sm:h-auto sm:max-w-lg sm:max-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden p-0 rounded-none sm:rounded-lg top-0 sm:top-[50%] translate-y-0 sm:translate-y-[-50%]" aria-describedby={undefined}>
+      <DialogContent dir={isRTL ? "rtl" : "ltr"} className="w-full h-full sm:h-auto sm:max-w-lg sm:max-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden p-0 rounded-none sm:rounded-lg top-0 sm:top-[50%] translate-y-0 sm:translate-y-[-50%]" closeClassName="text-white hover:text-white/80" aria-describedby={undefined}>
         <DialogTitle className="sr-only">{t("donationAmount")}</DialogTitle>
         {mounted && (
           <>

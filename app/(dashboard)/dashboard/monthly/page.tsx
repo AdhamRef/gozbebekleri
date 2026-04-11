@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useLocale } from "next-intl";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -22,7 +22,6 @@ import {
   LayoutList,
 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
-import CurrencySelector from "@/components/CurrencySelector";
 import {
   ResponsiveContainer,
   XAxis,
@@ -47,11 +46,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import CountUp from "react-countup";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { formatUtcCalendarMonthLong } from "@/lib/admin/current-calendar-month-utc";
+import { StatsMetricCard } from "@/components/dashboard/StatsMetricCard";
+import { getDashboardChartPeriodLabelAr } from "@/lib/dashboard/chart-period-label-ar";
 
 interface ChartDataPoint {
   date: string;
@@ -126,6 +126,8 @@ interface DashboardStats {
   totalUsers: number;
   totalAmount: number;
   allTimeRevenue?: number;
+  /** All PAID subscription charges (USD) ever — ignores category/campaign/referral filters */
+  paidRevenueAllTimeUnfiltered?: number;
   oneTimeCount: number;
   monthlyCount: number;
   activeMonthlyCount: number;
@@ -152,6 +154,7 @@ interface DashboardStats {
   failedCount?: number;
   pendingCount?: number;
   failedTotalAmount?: number;
+  pendingTotalAmount?: number;
   recentDonations: Array<{
     id: string;
     amount: number;
@@ -185,6 +188,19 @@ const CHART_COLORS = {
   secondary: "#1d4ed8",
   grid: "#e2e8f0",
   text: "#334155",
+};
+
+const DASHBOARD_CURRENCY_SYMBOL: Record<string, string> = {
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  TRY: "₺",
+  SAR: "﷼",
+  AED: "د.إ",
+  KWD: "د.ك",
+  EGP: "EGP ",
+  QAR: "﷼",
+  BHD: "ب.د",
 };
 
 const PAGE_SIZE = 10;
@@ -262,6 +278,11 @@ export default function MonthlySubscriptionsDashboardPage() {
   const [donationsLoading, setDonationsLoading] = useState(false);
   const [donationsFetchedOnce, setDonationsFetchedOnce] = useState(false);
   const [searchCampaign, setSearchCampaign] = useState("");
+
+  const chartFilterPeriodLabelAr = useMemo(
+    () => getDashboardChartPeriodLabelAr(chartPeriod, dateFrom, dateTo),
+    [chartPeriod, dateFrom, dateTo]
+  );
 
   const [subStatusFilter, setSubStatusFilter] = useState<SubscriptionStatusFilter>("ACTIVE");
   const [subsRows, setSubsRows] = useState<SubscriptionRow[]>([]);
@@ -652,7 +673,6 @@ export default function MonthlySubscriptionsDashboardPage() {
               )}
             </p>
           </div>
-          <CurrencySelector showDefaultCurrencyOption />
         </header>
 
         {/* المؤشرات — تختفي عند عرض تبرعات مستخدم معين عبر الرابط */}
@@ -689,88 +709,119 @@ export default function MonthlySubscriptionsDashboardPage() {
               </TabsList>
             </Tabs>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
             {statCardSet === "revenue" && (
               <>
-                <StatsCard
-                  title="إيرادات إجمالية (دفعات شهرية)"
-                  value={stats?.allTimeRevenue ?? stats?.totalAmount ?? 0}
+                <StatsMetricCard
+                  compact
+                  title={`إيرادات ناجحة (${chartFilterPeriodLabelAr})`}
+                  value={stats?.totalAmount ?? 0}
                   icon={DollarSign}
                   accent="emerald"
                   format="money"
-                  subtitle="منذ البداية (حسب التصفية)"
+                  variant="hero"
+                  subtitle="دفعات الاشتراك المدفوعة فقط — حسب الفترة والتصفية أعلاه"
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
+                  title="إيرادات ناجحة (كل الوقت)"
+                  value={stats?.paidRevenueAllTimeUnfiltered ?? 0}
+                  icon={DollarSign}
+                  accent="emerald"
+                  format="money"
+                  subtitle="كل دفعات الاشتراك الناجحة — دون تصفية الفئة أو الحملة أو الفترة"
+                />
+                <StatsMetricCard
+                  compact
                   title={thisMonthRevenueTitle}
                   value={stats?.thisMonthRevenue ?? 0}
                   icon={Calendar}
                   accent="emerald"
                   format="money"
-                  subtitle="دفعات مرتبطة بالاشتراك"
+                  subtitle="دفعات ناجحة في الشهر الحالي (UTC)"
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="إيرادات شهرية متكررة (MRR)"
                   value={stats?.monthlyRecurringRevenue ?? 0}
                   icon={Repeat}
                   accent="emerald"
                   format="money"
-                  subtitle="مجموع الاشتراكات النشطة"
+                  subtitle="اشتراكات نشطة — مبالغ مخططة"
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="دعم الفريق"
                   value={stats?.teamSupportTotal ?? 0}
                   icon={HandCoins}
                   accent="amber"
                   format="money"
+                  subtitle={`من الدفعات الناجحة (${chartFilterPeriodLabelAr})`}
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="الرسوم"
                   value={stats?.feesTotal ?? 0}
                   icon={Percent}
                   accent="orange"
                   format="money"
+                  subtitle={`من الدفعات الناجحة (${chartFilterPeriodLabelAr})`}
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="دفعات ناجحة"
                   value={stats?.paidCount ?? 0}
                   icon={Receipt}
                   accent="teal"
+                  subtitle={`إجمالي ناجح: ${formatMoney(stats?.totalAmount ?? 0, undefined, undefined, true)}`}
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="دفعات فاشلة"
                   value={stats?.failedCount ?? 0}
                   icon={Receipt}
                   accent="orange"
+                  subtitle={stats?.failedTotalAmount ? formatMoney(stats.failedTotalAmount, undefined, undefined, true) : "—"}
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="دفعات معلقة"
                   value={stats?.pendingCount ?? 0}
                   icon={Receipt}
                   accent="amber"
+                  subtitle={
+                    stats?.pendingTotalAmount
+                      ? formatMoney(stats.pendingTotalAmount, undefined, undefined, true)
+                      : undefined
+                  }
                 />
               </>
             )}
             {statCardSet === "overview" && (
               <>
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="إجمالي الاشتراكات (بالتصفية)"
                   value={stats?.totalSubscriptionsMatching ?? 0}
                   icon={Repeat}
                   accent="teal"
                 />
-                <StatsCard
-                  title="جديدة في الفترة"
+                <StatsMetricCard
+                  compact
+                  title={`جديدة (${chartFilterPeriodLabelAr})`}
                   value={stats?.newSubscriptionsInPeriod ?? 0}
                   icon={Calendar}
                   accent="indigo"
                 />
-                <StatsCard
-                  title="دفعات شهرية في الفترة"
+                <StatsMetricCard
+                  compact
+                  title={`دفعات شهرية (${chartFilterPeriodLabelAr})`}
                   value={stats?.totalDonations ?? 0}
                   icon={Receipt}
                   accent="violet"
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="اشتراكات نشطة"
                   value={stats?.activeMonthlyCount ?? 0}
                   icon={Heart}
@@ -780,32 +831,37 @@ export default function MonthlySubscriptionsDashboardPage() {
             )}
             {statCardSet === "breakdown" && (
               <>
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="اشتراكات نشطة (عدد)"
                   value={stats?.activeMonthlyCount ?? 0}
                   icon={Repeat}
                   accent="teal"
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="موقوفة (عدد)"
                   value={stats?.pausedSubscriptionCount ?? 0}
                   icon={Receipt}
                   accent="amber"
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="ملغاة (عدد)"
                   value={stats?.cancelledSubscriptionCount ?? 0}
                   icon={Receipt}
                   accent="slate"
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="مبلغ اشتراكات نشطة"
                   value={stats?.activeMonthlyAmountUSD ?? 0}
                   icon={Repeat}
                   accent="emerald"
                   format="money"
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="مجموع موقوف + ملغى"
                   value={stats?.monthlyStoppedAmountUSD ?? 0}
                   icon={Repeat}
@@ -829,7 +885,7 @@ export default function MonthlySubscriptionsDashboardPage() {
           </CardHeader>
           <CardContent className="pt-0 space-y-4" dir="rtl">
 
-<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
 
     {/* Period — مع من/إلى/مسح تحته عند مخصص */}
     <div className="space-y-2 text-right">
@@ -1553,9 +1609,14 @@ export default function MonthlySubscriptionsDashboardPage() {
           <Card className="border-border shadow-sm">
             <CardHeader className="border-b border-slate-100 py-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-row-reverse">
-                <CardTitle className="text-base font-semibold text-slate-900 text-right">
-                  أحدث الدفعات الشهرية (تصفية من الأعلى + الفترة الزمنية)
-                </CardTitle>
+                <div className="text-right space-y-1">
+                  <CardTitle className="text-base font-semibold text-slate-900">
+                    أحدث الدفعات الشهرية
+                  </CardTitle>
+                  <p className="text-[11px] text-slate-500 max-w-xl">
+                    الجدول يعرض كل الدفعات حسب «حالة التبرع» في تصفية النتائج (الكل / ناجح / فاشل / معلق)، مع الفترة والفلاتر.
+                  </p>
+                </div>
                 <Select
                   value={`${donationsSortBy}-${donationsSortOrder}`}
                   onValueChange={(v) => {
@@ -1664,7 +1725,13 @@ export default function MonthlySubscriptionsDashboardPage() {
                             {d.provider === "STRIPE" ? (
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-[#635bff]/10 text-[#635bff]">Stripe</span>
                             ) : d.provider === "PAYFOR" ? (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-red-50 text-red-700">PayFor</span>
+                                                            <span className="inline-flex items-center">
+                                <img
+                                  src="/ziraat.jpg"
+                                  alt="PayFor"
+                                  className="h-14 w-auto max-w-[120px] object-contain rounded"
+                                />
+                              </span>
                             ) : (
                               <span className="text-slate-400 text-xs">—</span>
                             )}
@@ -1836,7 +1903,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                       value={subStatusFilter}
                       onValueChange={(v) => setSubStatusFilter(v as SubscriptionStatusFilter)}
                     >
-                      <SelectTrigger className="w-full sm:w-[180px] h-9 text-xs rounded-lg border-gray-200 bg-white/80 ">
+                      <SelectTrigger className="w-max h-9 text-xs rounded-lg border-gray-200 bg-white/80 ">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent dir="rtl">
@@ -1929,7 +1996,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                             </span>
                           </td>
                           <td className="py-3 px-4 align-top min-w-[150px]">
-                            <div className="flex items-center gap-2 justify-end flex-row-reverse">
+                            <div className="flex items-center justify-end flex-row-reverse">
                               <Select
                                 value={s.status}
                                 disabled={subsStatusUpdatingId === s.id}
@@ -1943,7 +2010,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               >
                                 <SelectTrigger
                                   className={cn(
-                                    "h-8 text-xs w-[132px] border-gray-200 bg-white/90",
+                                    "h-8 text-xs w-full border-gray-200 bg-white/90",
                                     s.status === "ACTIVE" && "text-[#025EB8] border-[#025EB8]/20",
                                     s.status === "PAUSED" && "text-[#FA5D17] border-[#FA5D17]/20",
                                     s.status === "CANCELLED" && "text-slate-700 border-slate-200"
@@ -2053,118 +2120,12 @@ export default function MonthlySubscriptionsDashboardPage() {
   );
 }
 
-const ACCENT_STYLES: Record<
-  string,
-  { bg: string; text: string; border: string }
-> = {
-  teal: { bg: "bg-[#025EB8]/8", text: "text-[#025EB8]", border: "border-[#025EB8]/20" },
-  indigo: {
-    bg: "bg-[#025EB8]/8",
-    text: "text-[#025EB8]",
-    border: "border-[#025EB8]/20",
-  },
-  amber: {
-    bg: "bg-[#FA5D17]/8",
-    text: "text-[#FA5D17]",
-    border: "border-[#FA5D17]/20",
-  },
-  violet: {
-    bg: "bg-[#025EB8]",
-    text: "text-[#025EB8]",
-    border: "border-gray-200",
-  },
-  emerald: {
-    bg: "bg-[#025EB8]/8",
-    text: "text-[#025EB8]",
-    border: "border-[#025EB8]/20",
-  },
-  slate: {
-    bg: "bg-slate-100",
-    text: "text-slate-600",
-    border: "border-slate-200",
-  },
-  orange: {
-    bg: "bg-[#FA5D17]/8",
-    text: "text-[#FA5D17]",
-    border: "border-[#FA5D17]/20",
-  },
-};
-
-interface StatsCardProps {
-  title: string;
-  value: number;
-  icon: React.ElementType;
-  accent: keyof typeof ACCENT_STYLES;
-  format?: "money";
-  subtitle?: string;
-}
-
-function StatsCard({
-  title,
-  value,
-  icon: Icon,
-  accent,
-  format,
-  subtitle,
-}: StatsCardProps) {
-  const { convertToCurrency } = useCurrency();
-  const styles = ACCENT_STYLES[accent] ?? ACCENT_STYLES.slate;
-  const isMoney = format === "money";
-  const displayValue = isMoney ? value : Math.round(value);
-  const moneyResult = isMoney ? convertToCurrency(displayValue) : null;
-  const moneyPrefix =
-    moneyResult?.currency === "USD"
-      ? "$"
-      : moneyResult?.currency === "EUR"
-        ? "€"
-        : moneyResult?.currency === "GBP"
-          ? "£"
-          : moneyResult?.currency === "TRY"
-            ? "₺"
-            : moneyResult?.currency ?? "$";
-  const moneyEnd = moneyResult?.convertedValue ?? displayValue;
-
-  return (
-    <Card className={cn("border border-border shadow-sm overflow-hidden", styles.border)} dir="rtl">
-      <div className="p-5 flex items-start gap-4">
-        <div className={cn("p-2.5 rounded-lg shrink-0", styles.bg, styles.text)}>
-          <Icon className="w-5 h-5" />
-        </div>
-        <div className="min-w-0 text-right">
-          <p className="text-xs font-medium text-slate-500 truncate">{title}</p>
-          <p className="text-xl font-bold text-slate-900 mt-0.5 tabular-nums">
-            {isMoney ? (
-              <CountUp
-                end={typeof moneyEnd === "number" ? moneyEnd : displayValue}
-                prefix={moneyPrefix}
-                separator=","
-                decimal="."
-                decimals={0}
-              />
-            ) : (
-              <CountUp
-                end={displayValue}
-                separator=","
-                decimal="."
-                decimals={0}
-              />
-            )}
-          </p>
-          {subtitle && (
-            <p className="text-xs text-slate-500 mt-1">{subtitle}</p>
-          )}
-        </div>
-      </div>
-    </Card>
-  );
-}
-
 function LoadingSkeleton() {
   return (
     <div className="space-y-6 p-4 sm:p-6 md:p-8 max-w-[1600px] mx-auto" dir="rtl">
       <div className="h-16 rounded-lg bg-slate-200 animate-pulse" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map((i) => (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+        {[1, 2, 3, 4, 5].map((i) => (
           <div key={i} className="h-24 rounded-lg bg-slate-200 animate-pulse" />
         ))}
       </div>

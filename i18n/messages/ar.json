@@ -413,7 +413,8 @@
     "monthlyStripeRedirect": "سيتم تحويلك إلى صفحة الدفع الآمنة لإعداد تبرعك الشهري.",
     "standardStripeRedirect": "سيتم تحويلك إلى صفحة الدفع الآمنة لإتمام تبرعك.",
     "paymentSwitching": "جارٍ التحويل إلى بوابة دفع بديلة…",
-    "paymentSwitchingDesc": "حدث خطأ في بوابة الدفع، سيتم توجيهك تلقائياً لإتمام الدفع عبر بوابة بديلة"
+    "paymentSwitchingDesc": "حدث خطأ في بوابة الدفع، سيتم توجيهك تلقائياً لإتمام الدفع عبر بوابة بديلة",
+    "sslSecurePayment": "مشفَّر بـ SSL 256-بت · دفع آمن"
   },
   "DonationSuccess": {
     "thankYou": "شكراً جزيلاً",
@@ -499,6 +500,11 @@
       "name": "الاسم",
       "email": "البريد الإلكتروني",
       "country": "البلد",
+      "location": "الموقع",
+      "countryName": "اسم الدولة",
+      "countryCode": "رمز الدولة (ISO)",
+      "region": "المنطقة / المحافظة",
+      "city": "المدينة",
       "phone": "رقم الهاتف",
       "birthdate": "تاريخ الميلاد",
       "verified": "موثق",
@@ -533,6 +539,7 @@
       "totalDonations": "إجمالي التبرعات",
       "totalInPeriodTitle": "الإجمالي في الفترة",
       "recordsInPeriodLabel": "{count} سجل في هذه الفترة",
+      "successfulPaymentsInPeriod": "{count} دفعة ناجحة في هذه الفترة",
       "historyTableTitle": "سجل التبرعات",
       "emptyHistoryList": "لا توجد تبرعات للفترة المحددة.",
       "donationsCount": "{count} تبرع",
@@ -561,7 +568,29 @@
       "total": "الإجمالي",
       "monthlyDonationLabel": "تبرع شهري",
       "date": "التاريخ",
-      "actions": "إجراءات"
+      "actions": "إجراءات",
+      "historyTableSubtitle": "كل صف يمثل عملية دفع واحدة. اطّلع على نتيجة الدفع والحملات التي دعمتها، وحمّل إيصال PDF رسمي للمدفوعات الناجحة فقط.",
+      "campaignsColumn": "الحملة / المشروع",
+      "paymentResult": "الدفع",
+      "paymentSucceeded": "ناجح",
+      "paymentFailed": "فشل",
+      "paymentPending": "قيد الانتظار",
+      "paymentUnknown": "غير معروف",
+      "filterByPayment": "حالة الدفع",
+      "filterPaymentAll": "كل الحالات",
+      "filterPaymentPaid": "الناجحة فقط",
+      "filterPaymentFailed": "الفاشلة فقط",
+      "filterPaymentPending": "المعلّقة فقط",
+      "breakdown": "التفصيل",
+      "referenceShort": "مرجع",
+      "receipt": "الإيصال",
+      "paidAt": "تاريخ التأكيد",
+      "noCampaignTitle": "—",
+      "sharesCount": "{count} سهمًا",
+      "paymentMethodCard": "بطاقة",
+      "paymentMethodPaypal": "باي بال",
+      "coverFeesYes": "غطيتَ رسوم المعاملة",
+      "emptyHistoryFiltered": "لا توجد تبرعات مطابقة للتصفية. جرّب حالة دفع أخرى أو فترة زمنية مختلفة."
     },
     "subscriptions": {
       "settingsTableTitle": "الاشتراكات الشهرية والإعدادات",
@@ -601,6 +630,7 @@
     "receipts": {
       "receiptsCount": "عدد الإيصالات",
       "totalDonations": "إجمالي التبرعات",
+      "averageDonation": "متوسط التبرع",
       "timePeriod": "الفترة الزمنية",
       "allPeriods": "كل الفترات",
       "thisMonth": "هذا الشهر",
@@ -613,7 +643,12 @@
       "download": "تحميل",
       "receiptLabel": "إيصال #{id}",
       "downloadReceipt": "تحميل الإيصال",
-      "noReceiptsMatch": "لا توجد إيصالات متطابقة مع المعايير المحددة"
+      "noReceiptsMatch": "لا توجد إيصالات متطابقة مع المعايير المحددة",
+      "downloadAllPdf": "تنزيل كل إيصالات PDF ({count})",
+      "downloadAllHint": "تُنشأ إيصالات PDF للمدفوعات التي اكتملت بنجاح فقط.",
+      "downloadPdfReceipt": "تنزيل إيصال PDF",
+      "downloadPdfShort": "PDF",
+      "receiptNotAvailableReason": "يُتاح بعد نجاح الدفع."
     },
     "support": {
       "newSupportRequest": "طلب دعم جديد",

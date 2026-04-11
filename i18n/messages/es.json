@@ -27,6 +27,9 @@
     "donate": "DONAR AHORA",
     "signIn": "Iniciar sesión"
   },
+  "BlogCard": {
+    "readMore": "Leer más"
+  },
   "HomePage": {
     "donationCategories": "Categorías de donación",
     "news": "Nuestras noticias",
@@ -176,6 +179,10 @@
     "donateNow": "Donar ahora",
     "campaignDonations": "donaciones",
     "campaignRemaining": "restante",
+    "campaignOpenBadge": "Meta abierta",
+    "campaignSharesBadge": "Acciones (سهوم)",
+    "campaignOpenGoal": "Recaudación abierta",
+    "sharePriceUsd": "Por acción",
     "article": "Artículo",
     "linkCopied": "Enlace copiado",
     "all": "Todos",
@@ -238,7 +245,9 @@
     "goal": "Meta",
     "home": "Inicio",
     "heroDescription": "Apoya causas significativas y marca una diferencia duradera en la vida de las personas.",
-    "resultsFound": "campañas encontradas"
+    "resultsFound": "campañas encontradas",
+    "openGoalLabel": "Meta abierta",
+    "sharesCampaignLabel": "Acciones (سهوم)"
   },
   "Campaign": {
     "story": "Historia",
@@ -252,6 +261,8 @@
     "completed": "Completado",
     "image": "Imagen",
     "from": "de",
+    "openGoalBadge": "Meta abierta",
+    "sharesCampaignBadge": "Acciones (سهوم)",
     "donateNow": "Donar ahora",
     "outOfGoal": "del objetivo",
     "peopleDonated": "personas apoyaron este caso",
@@ -293,7 +304,12 @@
     "termsAgreement": "Al iniciar sesión, aceptas los",
     "termsOfUse": "Términos de uso",
     "and": "y la",
-    "privacyPolicy": "Política de privacidad"
+    "privacyPolicy": "Política de privacidad",
+    "orContinueWith": "o",
+    "secure": "Seguro",
+    "trusted": "De confianza",
+    "community": "Comunidad",
+    "donationHint": "Inicia sesión para seguir tus donaciones y gestionar tu cuenta."
   },
   "SharePopup": {
     "shareCampaign": "Compartir campaña con otros",
@@ -322,6 +338,11 @@
     "hadithText": "(Allah dijo: Gasta, oh hijo de Adán, que Yo gastaré en ti)",
     "collected": "Recaudado",
     "goal": "Objetivo",
+    "sharePriceLabel": "Precio por acción:",
+    "sharesLabel": "acciones",
+    "sharesPickHint": "Elige cuántas acciones (سهوم) quieres donar",
+    "donationTotal": "Total de la donación",
+    "sharesLine": "{count} acciones (سهوم)",
     "enterDonationAmount": "Introduce la cantidad a donar",
     "addToCart": "Añadir al carrito",
     "addedToCart": "Cantidad añadida al carrito correctamente",
@@ -384,7 +405,16 @@
     "donationFailed": "Donación fallida",
     "successRedirecting": "Redirigiendo a la pasarela de pago",
     "successRedirectingDesc": "Serás redirigido de forma segura para completar tu pago.",
-    "paymentFeesPercent": "Comisiones de pago (3%)"
+    "paymentFeesPercent": "Comisiones de pago (3%)",
+    "secure3DLabel": "Pago 3D Secure",
+    "secure3DEnabled": "✓ Activado",
+    "secure3DDisabled": "Pago estándar",
+    "secure3DCardPrompt": "Introduce los datos de tu tarjeta para completar el pago seguro.",
+    "monthlyStripeRedirect": "Serás redirigido a la página de pago segura para configurar tu donación mensual.",
+    "standardStripeRedirect": "Serás redirigido a la página de pago segura para completar tu donación.",
+    "paymentSwitching": "Cambiando a la pasarela de pago alternativa…",
+    "paymentSwitchingDesc": "Se produjo un error con la pasarela de pago. Serás redirigido automáticamente para completar el pago por otra vía.",
+    "sslSecurePayment": "Cifrado SSL de 256 bits · Pago seguro"
   },
   "DonationSuccess": {
     "thankYou": "Muchas gracias",
@@ -400,6 +430,7 @@
     "transactionFees": "Comisiones de transacción",
     "supportedCampaign": "Campaña apoyada",
     "campaignsDonatedTo": "Campañas a las que has donado",
+    "itemShares": "{count} acciones (سهوم)",
     "categoriesDonatedTo": "Categorías a las que has donado",
     "campaignsAndCategoriesDonatedTo": "Campañas y categorías a las que has donado",
     "donateToAnotherCampaign": "Donar a otra campaña",
@@ -430,7 +461,8 @@
     "subtotal": "Subtotal",
     "total": "Total",
     "proceedToDonate": "Proceder a donar",
-    "secureCheckout": "Tu donación es segura y está cifrada"
+    "secureCheckout": "Tu donación es segura y está cifrada",
+    "sharesLine": "{count} acciones (سهوم)"
   },
   "LiveDonationsTicker": {
     "donated": "donó",
@@ -468,6 +500,11 @@
       "name": "Nombre",
       "email": "Correo electrónico",
       "country": "País",
+      "location": "Ubicación",
+      "countryName": "Nombre del país",
+      "countryCode": "Código de país (ISO)",
+      "region": "Región",
+      "city": "Ciudad",
       "phone": "Teléfono",
       "birthdate": "Fecha de nacimiento",
       "verified": "Verificado",
@@ -502,6 +539,7 @@
       "totalDonations": "Total de donaciones",
       "totalInPeriodTitle": "Total (este periodo)",
       "recordsInPeriodLabel": "{count} movimiento(s) en este periodo",
+      "successfulPaymentsInPeriod": "{count} pago(s) completado(s) en este periodo",
       "historyTableTitle": "Historial de donaciones",
       "emptyHistoryList": "No hay donaciones para el periodo seleccionado.",
       "donationsCount": "{count} donación",
@@ -529,7 +567,29 @@
       "total": "Total",
       "monthlyDonationLabel": "Donación mensual",
       "date": "Fecha",
-      "actions": "Acciones"
+      "actions": "Acciones",
+      "historyTableSubtitle": "Cada fila es un cargo. Consulta el resultado del pago, las campañas apoyadas y descarga un recibo PDF oficial solo para pagos completados con éxito.",
+      "campaignsColumn": "Campaña / proyecto",
+      "paymentResult": "Pago",
+      "paymentSucceeded": "Correcto",
+      "paymentFailed": "Fallido",
+      "paymentPending": "Pendiente",
+      "paymentUnknown": "Desconocido",
+      "filterByPayment": "Estado del pago",
+      "filterPaymentAll": "Todos los estados",
+      "filterPaymentPaid": "Solo correctos",
+      "filterPaymentFailed": "Solo fallidos",
+      "filterPaymentPending": "Solo pendientes",
+      "breakdown": "Desglose",
+      "referenceShort": "Ref.",
+      "receipt": "Recibo",
+      "paidAt": "Pagado el",
+      "noCampaignTitle": "—",
+      "sharesCount": "{count} acciones",
+      "paymentMethodCard": "Tarjeta",
+      "paymentMethodPaypal": "PayPal",
+      "coverFeesYes": "Cubriste las comisiones",
+      "emptyHistoryFiltered": "Ninguna donación coincide con los filtros. Prueba otro estado o periodo."
     },
     "subscriptions": {
       "settingsTableTitle": "Suscripciones y ajustes",
@@ -582,7 +642,12 @@
       "download": "Descargar",
       "receiptLabel": "Recibo #{id}",
       "downloadReceipt": "Descargar recibo",
-      "noReceiptsMatch": "Ningún recibo coincide con los criterios seleccionados"
+      "noReceiptsMatch": "Ningún recibo coincide con los criterios seleccionados",
+      "downloadAllPdf": "Descargar todos los recibos PDF ({count})",
+      "downloadAllHint": "Los recibos PDF solo existen para pagos completados con éxito.",
+      "downloadPdfReceipt": "Descargar recibo PDF",
+      "downloadPdfShort": "PDF",
+      "receiptNotAvailableReason": "Disponible cuando el pago se complete correctamente."
     },
     "support": {
       "newSupportRequest": "Nueva solicitud de soporte",

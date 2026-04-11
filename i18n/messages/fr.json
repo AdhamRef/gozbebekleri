@@ -179,6 +179,10 @@
     "donateNow": "Faire un don maintenant",
     "campaignDonations": "dons",
     "campaignRemaining": "restant",
+    "campaignOpenBadge": "Objectif ouvert",
+    "campaignSharesBadge": "Parts (سهوم)",
+    "campaignOpenGoal": "Collecte ouverte",
+    "sharePriceUsd": "Par part",
     "article": "Article",
     "linkCopied": "Lien copié",
     "all": "Tous",
@@ -241,7 +245,9 @@
     "goal": "Objectif",
     "home": "Accueil",
     "heroDescription": "Soutenez des causes qui comptent et faites une vraie différence dans la vie des gens.",
-    "resultsFound": "campagnes trouvées"
+    "resultsFound": "campagnes trouvées",
+    "openGoalLabel": "Objectif ouvert",
+    "sharesCampaignLabel": "Parts (سهوم)"
   },
   "Campaign": {
     "story": "Histoire",
@@ -255,6 +261,8 @@
     "completed": "Terminé",
     "image": "Image",
     "from": "de",
+    "openGoalBadge": "Objectif ouvert",
+    "sharesCampaignBadge": "Parts (سهوم)",
     "donateNow": "Faire un don maintenant",
     "outOfGoal": "sur un objectif de",
     "peopleDonated": "personnes viennent de faire un don pour soutenir ce cas",
@@ -296,7 +304,12 @@
     "termsAgreement": "En vous connectant, vous acceptez",
     "termsOfUse": "Conditions d'utilisation",
     "and": "et",
-    "privacyPolicy": "Politique de confidentialité"
+    "privacyPolicy": "Politique de confidentialité",
+    "orContinueWith": "ou",
+    "secure": "Sécurisé",
+    "trusted": "Fiable",
+    "community": "Communauté",
+    "donationHint": "Connectez-vous pour suivre vos dons et gérer votre compte."
   },
   "SharePopup": {
     "shareCampaign": "Partager la campagne avec d'autres",
@@ -325,6 +338,11 @@
     "hadithText": "(Allah a dit : Dépense, ô fils d'Adam, et Je dépenserai pour toi)",
     "collected": "Collecté",
     "goal": "Objectif",
+    "sharePriceLabel": "Prix par part :",
+    "sharesLabel": "parts",
+    "sharesPickHint": "Choisissez combien de parts (سهوم) offrir",
+    "donationTotal": "Total du don",
+    "sharesLine": "{count} parts (سهوم)",
     "enterDonationAmount": "Entrez le montant du don",
     "addToCart": "Ajouter au panier",
     "addedToCart": "Montant ajouté au panier avec succès",
@@ -395,7 +413,8 @@
     "monthlyStripeRedirect": "Vous serez redirigé vers la page de paiement sécurisée pour configurer votre don mensuel.",
     "standardStripeRedirect": "Vous serez redirigé vers la page de paiement sécurisée pour finaliser votre don.",
     "paymentSwitching": "Transfert vers une passerelle de paiement alternative…",
-    "paymentSwitchingDesc": "Une erreur s'est produite avec la passerelle de paiement. Vous serez automatiquement redirigé pour finaliser votre paiement via une passerelle alternative."
+    "paymentSwitchingDesc": "Une erreur s'est produite avec la passerelle de paiement. Vous serez automatiquement redirigé pour finaliser votre paiement via une passerelle alternative.",
+    "sslSecurePayment": "Chiffré SSL 256 bits · Paiement sécurisé"
   },
   "DonationSuccess": {
     "thankYou": "Merci beaucoup",
@@ -411,6 +430,7 @@
     "transactionFees": "Frais de transaction",
     "supportedCampaign": "Campagne soutenue",
     "campaignsDonatedTo": "Campagnes auxquelles vous avez fait un don",
+    "itemShares": "{count} parts (سهوم)",
     "categoriesDonatedTo": "Catégories auxquelles vous avez fait un don",
     "campaignsAndCategoriesDonatedTo": "Campagnes et catégories auxquelles vous avez fait un don",
     "donateToAnotherCampaign": "Faire un don à une autre campagne",
@@ -441,7 +461,8 @@
     "subtotal": "Sous-total",
     "total": "Total",
     "proceedToDonate": "Procéder au don",
-    "secureCheckout": "Votre don est sécurisé et crypté"
+    "secureCheckout": "Votre don est sécurisé et crypté",
+    "sharesLine": "{count} parts (سهوم)"
   },
   "LiveDonationsTicker": {
     "donated": "a donné",
@@ -479,6 +500,11 @@
       "name": "Nom",
       "email": "E-mail",
       "country": "Pays",
+      "location": "Localisation",
+      "countryName": "Nom du pays",
+      "countryCode": "Code pays (ISO)",
+      "region": "Région",
+      "city": "Ville",
       "phone": "Numéro de téléphone",
       "birthdate": "Date de naissance",
       "verified": "Vérifié",
@@ -513,6 +539,7 @@
       "totalDonations": "Total des dons",
       "totalInPeriodTitle": "Total (cette période)",
       "recordsInPeriodLabel": "{count} mouvement(s) sur cette période",
+      "successfulPaymentsInPeriod": "{count} paiement(s) réussi(s) sur cette période",
       "historyTableTitle": "Historique des dons",
       "emptyHistoryList": "Aucun don pour la période sélectionnée.",
       "donationsCount": "{count} don(s)",
@@ -540,7 +567,29 @@
       "total": "Total",
       "monthlyDonationLabel": "Don mensuel",
       "date": "Date",
-      "actions": "Actions"
+      "actions": "Actions",
+      "historyTableSubtitle": "Chaque ligne est un prélèvement. Voir le résultat du paiement, les campagnes soutenues et télécharger un reçu PDF officiel pour les paiements réussis uniquement.",
+      "campaignsColumn": "Campagne / projet",
+      "paymentResult": "Paiement",
+      "paymentSucceeded": "Réussi",
+      "paymentFailed": "Échoué",
+      "paymentPending": "En attente",
+      "paymentUnknown": "Inconnu",
+      "filterByPayment": "Statut du paiement",
+      "filterPaymentAll": "Tous les statuts",
+      "filterPaymentPaid": "Réussis seulement",
+      "filterPaymentFailed": "Échoués seulement",
+      "filterPaymentPending": "En attente seulement",
+      "breakdown": "Détail",
+      "referenceShort": "Réf.",
+      "receipt": "Reçu",
+      "paidAt": "Payé le",
+      "noCampaignTitle": "—",
+      "sharesCount": "{count} parts",
+      "paymentMethodCard": "Carte",
+      "paymentMethodPaypal": "PayPal",
+      "coverFeesYes": "Vous avez couvert les frais",
+      "emptyHistoryFiltered": "Aucun don ne correspond aux filtres. Essayez un autre statut ou une autre période."
     },
     "subscriptions": {
       "settingsTableTitle": "Abonnements et paramètres",
@@ -593,7 +642,12 @@
       "download": "Télécharger",
       "receiptLabel": "Reçu #{id}",
       "downloadReceipt": "Télécharger le reçu",
-      "noReceiptsMatch": "Aucun reçu ne correspond aux critères sélectionnés"
+      "noReceiptsMatch": "Aucun reçu ne correspond aux critères sélectionnés",
+      "downloadAllPdf": "Télécharger tous les reçus PDF ({count})",
+      "downloadAllHint": "Les reçus PDF ne sont générés que pour les paiements réussis.",
+      "downloadPdfReceipt": "Télécharger le reçu PDF",
+      "downloadPdfShort": "PDF",
+      "receiptNotAvailableReason": "Disponible après un paiement réussi."
     },
     "support": {
       "newSupportRequest": "Nouvelle demande d'assistance",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useLocale } from "next-intl";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -25,7 +25,6 @@ import {
   Percent,
 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
-import CurrencySelector from "@/components/CurrencySelector";
 import {
   ResponsiveContainer,
   XAxis,
@@ -51,11 +50,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import CountUp from "react-countup";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { formatUtcCalendarMonthLong } from "@/lib/admin/current-calendar-month-utc";
+import { StatsMetricCard } from "@/components/dashboard/StatsMetricCard";
+import { getDashboardChartPeriodLabelAr } from "@/lib/dashboard/chart-period-label-ar";
 
 interface ChartDataPoint {
   date: string;
@@ -114,10 +114,13 @@ interface DashboardStats {
   totalUsers: number;
   totalAmount: number;
   allTimeRevenue?: number;
+  /** Sum of all PAID donations (USD) — ignores period / category / campaign filters */
+  paidRevenueAllTimeUnfiltered?: number;
   paidCount?: number;
   failedCount?: number;
   pendingCount?: number;
   failedTotalAmount?: number;
+  pendingTotalAmount?: number;
   oneTimeCount: number;
   monthlyCount: number;
   activeMonthlyCount: number;
@@ -169,6 +172,20 @@ const CHART_COLORS = {
   text: "#334155",
 };
 
+/** Display symbols aligned with `CurrencySelector` / exchange API */
+const DASHBOARD_CURRENCY_SYMBOL: Record<string, string> = {
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  TRY: "₺",
+  SAR: "﷼",
+  AED: "د.إ",
+  KWD: "د.ك",
+  EGP: "EGP ",
+  QAR: "﷼",
+  BHD: "ب.د",
+};
+
 const PAGE_SIZE = 10;
 
 /** Returns { start, end } in YYYY-MM-DD for the donations API; null = no filter (all time) */
@@ -194,6 +211,36 @@ export default function DashboardPage() {
   const thisMonthRevenueTitle = `إيرادات شهر ${formatUtcCalendarMonthLong(new Date(), locale || "ar")}`;
   const searchParams = useSearchParams();
   const { convertToCurrency, getSelectedCurrency } = useCurrency();
+
+  /** Stats API + chart series are USD; scale for selected display currency */
+  const convertUsdToDisplay = useCallback(
+    (usd: number) => {
+      const code = getSelectedCurrency?.() ?? "DEFAULT";
+      if (code === "DEFAULT") return usd;
+      const r = convertToCurrency(usd);
+      return typeof r?.convertedValue === "number" ? r.convertedValue : usd;
+    },
+    [getSelectedCurrency, convertToCurrency]
+  );
+
+  /** Format values already in display currency (used for chart series after `convertUsdToDisplay`) */
+  const formatInSelectedCurrency = useCallback(
+    (n: number, approximate?: boolean) => {
+      const selected = getSelectedCurrency?.() ?? "DEFAULT";
+      const decimals = approximate
+        ? { minimumFractionDigits: 0, maximumFractionDigits: 0 }
+        : { minimumFractionDigits: 0, maximumFractionDigits: 2 };
+      const val = typeof n === "number" ? (approximate ? Math.round(n) : n) : 0;
+      if (selected === "DEFAULT") {
+        const sym = DASHBOARD_CURRENCY_SYMBOL.USD ?? "$";
+        return sym + val.toLocaleString(undefined, decimals);
+      }
+      const sym = DASHBOARD_CURRENCY_SYMBOL[selected] ?? `${selected} `;
+      return sym + val.toLocaleString(undefined, decimals);
+    },
+    [getSelectedCurrency]
+  );
+
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -228,6 +275,21 @@ export default function DashboardPage() {
   }, [searchParams]);
 
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+
+  const displayChartData = useMemo(
+    () =>
+      chartData.map((d) => ({
+        ...d,
+        amountUSD: convertUsdToDisplay(d.amountUSD),
+        amountOneTime: convertUsdToDisplay(d.amountOneTime),
+        amountMonthly: convertUsdToDisplay(d.amountMonthly),
+        amountFailed: convertUsdToDisplay(d.amountFailed),
+        teamSupport: convertUsdToDisplay(d.teamSupport),
+        fees: convertUsdToDisplay(d.fees),
+      })),
+    [chartData, convertUsdToDisplay]
+  );
+
   const [chartLoading, setChartLoading] = useState(true);
   const [chartView, setChartView] = useState<ChartViewType>("bar");
   const [chartPeriod, setChartPeriod] = useState<ChartPeriod>("month");
@@ -245,6 +307,11 @@ export default function DashboardPage() {
   const [donationsLoading, setDonationsLoading] = useState(false);
   const [donationsFetchedOnce, setDonationsFetchedOnce] = useState(false);
   const [searchCampaign, setSearchCampaign] = useState("");
+
+  const chartFilterPeriodLabelAr = useMemo(
+    () => getDashboardChartPeriodLabelAr(chartPeriod, dateFrom, dateTo),
+    [chartPeriod, dateFrom, dateTo]
+  );
 
   // Fetch categories and campaigns
   useEffect(() => {
@@ -447,24 +514,23 @@ export default function DashboardPage() {
     return <LoadingSkeleton />;
   }
 
-  const currencySymbol: Record<string, string> = { USD: "$", EUR: "€", GBP: "£", TRY: "₺", EGP: "EGP " };
   const formatMoney = (n: number, sourceCurrency?: string, amountUSD?: number, approximate?: boolean) => {
     const decimals = approximate ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : { minimumFractionDigits: 0, maximumFractionDigits: 2 };
     const selected = getSelectedCurrency?.() ?? "DEFAULT";
     if (selected === "DEFAULT" && sourceCurrency) {
-      const sym = currencySymbol[sourceCurrency] ?? sourceCurrency + " ";
+      const sym = DASHBOARD_CURRENCY_SYMBOL[sourceCurrency] ?? sourceCurrency + " ";
       const val = typeof n === "number" ? (approximate ? Math.round(n) : n) : 0;
       return sym + val.toLocaleString(undefined, decimals);
     }
     if (sourceCurrency && sourceCurrency === selected) {
-      const sym = currencySymbol[sourceCurrency] ?? sourceCurrency + " ";
+      const sym = DASHBOARD_CURRENCY_SYMBOL[sourceCurrency] ?? sourceCurrency + " ";
       const val = typeof n === "number" ? (approximate ? Math.round(n) : n) : 0;
       return sym + val.toLocaleString(undefined, decimals);
     }
     const valueToConvert = amountUSD != null ? amountUSD : n;
     const r = convertToCurrency(valueToConvert);
     if (r?.convertedValue != null && r?.currency) {
-      const sym = currencySymbol[r.currency] ?? r.currency + " ";
+      const sym = DASHBOARD_CURRENCY_SYMBOL[r.currency] ?? r.currency + " ";
       const val = typeof r.convertedValue === "number" ? (approximate ? Math.round(r.convertedValue) : r.convertedValue) : 0;
       return sym + val.toLocaleString(undefined, decimals);
     }
@@ -519,7 +585,7 @@ export default function DashboardPage() {
     },
     {
       name: "معلقة",
-      value: 0,
+      value: stats?.pendingTotalAmount ?? 0,
       count: stats?.pendingCount ?? 0,
       color: "#f59e0b",
     },
@@ -548,7 +614,6 @@ export default function DashboardPage() {
               )}
             </p>
           </div>
-          <CurrencySelector showDefaultCurrencyOption />
         </header>
 
         {/* المؤشرات — تختفي عند عرض تبرعات مستخدم معين عبر الرابط */}
@@ -585,87 +650,119 @@ export default function DashboardPage() {
               </TabsList>
             </Tabs>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
             {statCardSet === "revenue" && (
               <>
-                <StatsCard
-                  title="إيرادات إجمالية"
-                  value={stats?.allTimeRevenue ?? stats?.totalAmount ?? 0}
+                <StatsMetricCard
+                  compact
+                  title={`إيرادات ناجحة (${chartFilterPeriodLabelAr})`}
+                  value={stats?.totalAmount ?? 0}
                   icon={DollarSign}
                   accent="emerald"
                   format="money"
+                  variant="hero"
+                  subtitle="مجموع التبرعات المدفوعة فقط — حسب الفترة والتصفية أعلاه"
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
+                  title="إيرادات ناجحة (كل الوقت)"
+                  value={stats?.paidRevenueAllTimeUnfiltered ?? 0}
+                  icon={DollarSign}
+                  accent="emerald"
+                  format="money"
+                  subtitle="جميع التبرعات الناجحة بشكل عام دول فلتر"
+                />
+                <StatsMetricCard
+                  compact
                   title={thisMonthRevenueTitle}
                   value={stats?.thisMonthRevenue ?? 0}
                   icon={Calendar}
                   accent="emerald"
                   format="money"
+                  subtitle="دفعات ناجحة في الشهر الحالي (UTC)"
                 />
-                <StatsCard
-                  title="إيرادات شهرية متكررة"
+                <StatsMetricCard
+                  compact
+                  title="إيرادات شهرية متكررة (MRR)"
                   value={stats?.monthlyRecurringRevenue ?? 0}
                   icon={Repeat}
                   accent="emerald"
                   format="money"
+                  subtitle="اشتراكات نشطة — مبالغ مخططة"
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="دعم الفريق"
                   value={stats?.teamSupportTotal ?? 0}
                   icon={HandCoins}
                   accent="amber"
                   format="money"
+                  subtitle={`من التبرعات الناجحة (${chartFilterPeriodLabelAr})`}
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="الرسوم"
                   value={stats?.feesTotal ?? 0}
                   icon={Percent}
                   accent="orange"
                   format="money"
+                  subtitle={`من التبرعات الناجحة (${chartFilterPeriodLabelAr})`}
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="تبرعات ناجحة"
                   value={stats?.paidCount ?? 0}
                   icon={Receipt}
                   accent="teal"
-                  subtitle={`${formatMoney(stats?.totalAmount ?? 0, undefined, undefined, true)}`}
+                  subtitle={`إجمالي مبالغ ناجحة: ${formatMoney(stats?.totalAmount ?? 0, undefined, undefined, true)}`}
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="تبرعات فاشلة"
                   value={stats?.failedCount ?? 0}
                   icon={Receipt}
                   accent="orange"
                   subtitle={stats?.failedTotalAmount ? formatMoney(stats.failedTotalAmount, undefined, undefined, true) : "—"}
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="تبرعات معلقة"
                   value={stats?.pendingCount ?? 0}
                   icon={Receipt}
                   accent="amber"
+                  subtitle={
+                    stats?.pendingTotalAmount
+                      ? formatMoney(stats.pendingTotalAmount, undefined, undefined, true)
+                      : undefined
+                  }
                 />
               </>
             )}
             {statCardSet === "overview" && (
               <>
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="الحملات"
                   value={stats?.totalCampaigns ?? 0}
                   icon={Heart}
                   accent="teal"
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="الفئات"
                   value={stats?.totalCategories ?? 0}
                   icon={FolderTree}
                   accent="indigo"
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="المستخدمين"
                   value={stats?.totalUsers ?? 0}
                   icon={Users}
                   accent="amber"
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="عدد التبرعات"
                   value={stats?.totalDonations ?? 0}
                   icon={Receipt}
@@ -675,19 +772,22 @@ export default function DashboardPage() {
             )}
             {statCardSet === "breakdown" && (
               <>
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="مرة واحدة (عدد)"
                   value={stats?.oneTimeCount ?? 0}
                   icon={Receipt}
                   accent="slate"
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="شهرية (عدد)"
                   value={stats?.monthlyCount ?? 0}
                   icon={Repeat}
                   accent="slate"
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="التبرعات الشهرية الناشطة"
                   value={stats?.activeMonthlyAmountUSD ?? 0}
                   icon={Repeat}
@@ -695,7 +795,8 @@ export default function DashboardPage() {
                   format="money"
                   subtitle={`عدد: ${stats?.activeMonthlyCount ?? 0}`}
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="التبرعات الشهرية المتوقفة"
                   value={stats?.monthlyStoppedAmountUSD ?? 0}
                   icon={Repeat}
@@ -703,19 +804,13 @@ export default function DashboardPage() {
                   format="money"
                   subtitle={`عدد: ${stats?.monthlyStoppedCount ?? 0}`}
                 />
-                <StatsCard
+                <StatsMetricCard
+                  compact
                   title="تبرعات مقبولة"
                   value={stats?.paidCount ?? 0}
                   icon={Receipt}
                   accent="teal"
                   subtitle={`${formatMoney(stats?.totalAmount ?? 0, undefined, stats?.totalAmount)}`}
-                />
-                <StatsCard
-                  title="تبرعات فاشلة"
-                  value={stats?.failedCount ?? 0}
-                  icon={Receipt}
-                  accent="orange"
-                  subtitle={`${formatMoney(stats?.failedTotalAmount ?? 0, undefined, stats?.failedTotalAmount)}`}
                 />
               </>
             )}
@@ -733,7 +828,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="pt-0 space-y-4" dir="rtl">
 
-<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
 
     {/* Period — مع من/إلى/مسح تحته عند مخصص */}
     <div className="space-y-2 text-right">
@@ -987,7 +1082,7 @@ export default function DashboardPage() {
                       chartMetric === "amount" ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart
-                            data={chartData}
+                            data={displayChartData}
                             barCategoryGap="16%"
                             barGap={6}
                             margin={{ top: 10, right: 24, left: 10, bottom: 0 }}
@@ -1006,7 +1101,7 @@ export default function DashboardPage() {
                             />
                             <YAxis
                               tick={{ fill: CHART_COLORS.text, fontSize: 11 }}
-                              tickFormatter={(v) => formatMoney(Number(v))}
+                              tickFormatter={(v) => formatInSelectedCurrency(Number(v))}
                               domain={[0, "auto"]}
                             />
                             <Tooltip
@@ -1025,14 +1120,14 @@ export default function DashboardPage() {
                                 })
                               }
                               formatter={(value: number, name: string) => {
-                                if (name === "amountOneTime") return [formatMoney(Number(value), undefined, undefined, true), "مبلغ مرة واحدة"];
-                                if (name === "amountMonthly") return [formatMoney(Number(value), undefined, undefined, true), "مبلغ شهري"];
-                                if (name === "amountFailed") return [formatMoney(Number(value), undefined, undefined, true), "مبلغ فاشل"];
-                                return [formatMoney(Number(value), undefined, undefined, true), name];
+                                if (name === "amountOneTime") return [formatInSelectedCurrency(Number(value), true), "مبلغ مرة واحدة"];
+                                if (name === "amountMonthly") return [formatInSelectedCurrency(Number(value), true), "مبلغ شهري"];
+                                if (name === "amountFailed") return [formatInSelectedCurrency(Number(value), true), "مبلغ فاشل"];
+                                return [formatInSelectedCurrency(Number(value), true), name];
                               }}
                               content={({ active, payload, label }) => {
                                 if (!active || !payload?.length) return null;
-                                const point = chartData.find((d) => d.date === label);
+                                const point = displayChartData.find((d) => d.date === label);
                                 const isAmount = (key: string) => key === "amountOneTime" || key === "amountMonthly" || key === "amountFailed" || key === "مبلغ مرة واحدة" || key === "مبلغ شهري" || key === "مبلغ فاشل";
                                 return (
                                   <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-sm">
@@ -1044,14 +1139,14 @@ export default function DashboardPage() {
                                       const showAsMoney = isAmount(String(dataKey)) || isAmount(String(entry.name));
                                       return (
                                         <p key={String(entry.name)} className="text-sm text-slate-600" style={{ color: entry.color }}>
-                                          {entry.name}: {showAsMoney ? formatMoney(Number(entry.value), undefined, undefined, true) : String(entry.value)}
+                                          {entry.name}: {showAsMoney ? formatInSelectedCurrency(Number(entry.value), true) : String(entry.value)}
                                         </p>
                                       );
                                     })}
                                     {point != null && (
                                       <>
                                         <p className="text-sm font-medium text-slate-700 mt-1.5 pt-1 border-t border-slate-100">
-                                          الإجمالي: {formatMoney(Number(point.amountUSD ?? 0), undefined, undefined, true)}
+                                          الإجمالي: {formatInSelectedCurrency(Number(point.amountUSD ?? 0), true)}
                                         </p>
                                         <p className="text-sm text-slate-500 mt-0.5">
                                           عدد التبرعات: {Math.round(Number(point.count))}
@@ -1091,7 +1186,7 @@ export default function DashboardPage() {
                       ) : (
                         <ResponsiveContainer width="100%" height="100%">
                           <ComposedChart
-                            data={chartData}
+                            data={displayChartData}
                             barCategoryGap="20%"
                             barGap={8}
                           >
@@ -1111,7 +1206,7 @@ export default function DashboardPage() {
                               yAxisId="amount"
                               orientation="left"
                               tick={{ fill: CHART_COLORS.text, fontSize: 11 }}
-                              tickFormatter={(v) => formatMoney(Number(v))}
+                              tickFormatter={(v) => formatInSelectedCurrency(Number(v))}
                               domain={[0, "auto"]}
                             />
                             <YAxis
@@ -1138,8 +1233,8 @@ export default function DashboardPage() {
                               }
                               formatter={(value: number, name: string) => {
                                 if (name === "count" || name === "عدد التبرعات") return [String(Math.round(Number(value))), "عدد التبرعات"];
-                                if (chartMetric === "teamSupport") return [formatMoney(Number(value), undefined, undefined, true), "دعم الفريق"];
-                                if (chartMetric === "fees") return [formatMoney(Number(value), undefined, undefined, true), "الرسوم"];
+                                if (chartMetric === "teamSupport") return [formatInSelectedCurrency(Number(value), true), "دعم الفريق"];
+                                if (chartMetric === "fees") return [formatInSelectedCurrency(Number(value), true), "الرسوم"];
                                 return [String(Math.round(Number(value))), "العدد"];
                               }}
                             />
@@ -1166,7 +1261,7 @@ export default function DashboardPage() {
                       )
                     ) : chartView === "line" ? (
                       <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={chartData}>
+                        <ComposedChart data={displayChartData}>
                           <CartesianGrid
                             strokeDasharray="3 3"
                             stroke={CHART_COLORS.grid}
@@ -1186,7 +1281,7 @@ export default function DashboardPage() {
                             yAxisId="amount"
                             orientation="right"
                             tick={{ fill: CHART_COLORS.text, fontSize: 11 }}
-                            tickFormatter={(v) => formatMoney(Number(v))}
+                            tickFormatter={(v) => formatInSelectedCurrency(Number(v))}
                           />
                           <YAxis
                             yAxisId="count"
@@ -1212,9 +1307,9 @@ export default function DashboardPage() {
                             }
                             formatter={(value: number, name: string) => {
                               if (name === "count" || name === "عدد التبرعات") return [String(Math.round(Number(value))), "عدد التبرعات"];
-                              if (chartMetric === "amount") return [formatMoney(Number(value), undefined, undefined, true), "المبلغ"];
-                              if (chartMetric === "teamSupport") return [formatMoney(Number(value), undefined, undefined, true), "دعم الفريق"];
-                              if (chartMetric === "fees") return [formatMoney(Number(value), undefined, undefined, true), "الرسوم"];
+                              if (chartMetric === "amount") return [formatInSelectedCurrency(Number(value), true), "المبلغ"];
+                              if (chartMetric === "teamSupport") return [formatInSelectedCurrency(Number(value), true), "دعم الفريق"];
+                              if (chartMetric === "fees") return [formatInSelectedCurrency(Number(value), true), "الرسوم"];
                               return [String(Math.round(Number(value))), "العدد"];
                             }}
                           />
@@ -1253,7 +1348,7 @@ export default function DashboardPage() {
                       </ResponsiveContainer>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={chartData}>
+                        <ComposedChart data={displayChartData}>
                           <CartesianGrid
                             strokeDasharray="3 3"
                             stroke={CHART_COLORS.grid}
@@ -1273,7 +1368,7 @@ export default function DashboardPage() {
                             yAxisId="amount"
                             orientation="right"
                             tick={{ fill: CHART_COLORS.text, fontSize: 11 }}
-                            tickFormatter={(v) => formatMoney(Number(v))}
+                            tickFormatter={(v) => formatInSelectedCurrency(Number(v))}
                           />
                           <YAxis
                             yAxisId="count"
@@ -1299,9 +1394,9 @@ export default function DashboardPage() {
                             }
                             formatter={(value: number, name: string) => {
                               if (name === "count" || name === "عدد التبرعات") return [String(Math.round(Number(value))), "عدد التبرعات"];
-                              if (chartMetric === "amount") return [formatMoney(Number(value), undefined, undefined, true), "المبلغ"];
-                              if (chartMetric === "teamSupport") return [formatMoney(Number(value), undefined, undefined, true), "دعم الفريق"];
-                              if (chartMetric === "fees") return [formatMoney(Number(value), undefined, undefined, true), "الرسوم"];
+                              if (chartMetric === "amount") return [formatInSelectedCurrency(Number(value), true), "المبلغ"];
+                              if (chartMetric === "teamSupport") return [formatInSelectedCurrency(Number(value), true), "دعم الفريق"];
+                              if (chartMetric === "fees") return [formatInSelectedCurrency(Number(value), true), "الرسوم"];
                               return [String(Math.round(Number(value))), "العدد"];
                             }}
                           />
@@ -1536,9 +1631,14 @@ export default function DashboardPage() {
           <Card className="border-border shadow-sm">
             <CardHeader className="border-b border-slate-100 py-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-row-reverse">
-                <CardTitle className="text-base font-semibold text-slate-900 text-right">
-                  أحدث التبرعات (تصفية من الأعلى + الفترة الزمنية)
-                </CardTitle>
+                <div className="text-right space-y-1">
+                  <CardTitle className="text-base font-semibold text-slate-900">
+                    أحدث التبرعات
+                  </CardTitle>
+                  <p className="text-[11px] text-slate-500 max-w-xl">
+                    يعرض الجدول كل المحاولات حسب «حالة التبرع» في تصفية النتائج أعلاه (الكل / ناجح / فاشل / معلق)، مع الفترة والفئة والحملة.
+                  </p>
+                </div>
                 <Select
                   value={`${donationsSortBy}-${donationsSortOrder}`}
                   onValueChange={(v) => {
@@ -1658,13 +1758,16 @@ export default function DashboardPage() {
                           <td className="py-3 px-4">
                             {d.provider === "STRIPE" ? (
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-[#635bff]/10 text-[#635bff]">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
                                 Stripe
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
                               </span>
                             ) : d.provider === "PAYFOR" ? (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-red-50 text-red-700">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
-                                PayFor
+                              <span className="inline-flex items-center">
+                                <img
+                                  src="/ziraat.jpg"
+                                  alt="PayFor"
+                                  className="h-14 w-auto max-w-[120px] object-contain rounded"
+                                />
                               </span>
                             ) : (
                               <span className="text-slate-400 text-xs">—</span>
@@ -1691,7 +1794,7 @@ export default function DashboardPage() {
                           <td className="py-3 px-4">
                             <span
                               className={cn(
-                                "inline-block px-2 py-0.5 rounded-full text-xs",
+                                "inline-block w-max px-2 py-0.5 rounded-full text-[12px]",
                                 d.type === "MONTHLY"
                                   ? "bg-[#025EB8]/10 text-[#025EB8]"
                                   : "bg-gray-100 text-gray-600"
@@ -1766,82 +1869,12 @@ export default function DashboardPage() {
   );
 }
 
-const ACCENT_STYLES: Record<
-  string,
-  { bg: string; text: string; border: string }
-> = {
-  // Brand blue — primary accent
-  teal:    { bg: "bg-[#025EB8]/8",  text: "text-[#025EB8]", border: "border-[#025EB8]/15" },
-  indigo:  { bg: "bg-[#025EB8]/8",  text: "text-[#025EB8]", border: "border-[#025EB8]/15" },
-  emerald: { bg: "bg-[#025EB8]/8",  text: "text-[#025EB8]", border: "border-[#025EB8]/15" },
-  // Brand orange — secondary accent
-  amber:   { bg: "bg-[#FA5D17]/8",  text: "text-[#FA5D17]", border: "border-[#FA5D17]/15" },
-  orange:  { bg: "bg-[#FA5D17]/8",  text: "text-[#FA5D17]", border: "border-[#FA5D17]/15" },
-  violet:  { bg: "bg-[#FA5D17]/8",  text: "text-[#FA5D17]", border: "border-[#FA5D17]/15" },
-  // Neutral fallback
-  slate:   { bg: "bg-gray-100",     text: "text-gray-500",   border: "border-gray-200"     },
-};
-
-interface StatsCardProps {
-  title: string;
-  value: number;
-  icon: React.ElementType;
-  accent: keyof typeof ACCENT_STYLES;
-  format?: "money";
-  subtitle?: string;
-}
-
-function StatsCard({
-  title,
-  value,
-  icon: Icon,
-  accent,
-  format,
-  subtitle,
-}: StatsCardProps) {
-  const { convertToCurrency } = useCurrency();
-  const styles = ACCENT_STYLES[accent] ?? ACCENT_STYLES.slate;
-  const isMoney = format === "money";
-  const displayValue = isMoney ? value : Math.round(value);
-  const moneyResult = isMoney ? convertToCurrency(displayValue) : null;
-  const moneyPrefix =
-    moneyResult?.currency === "USD"
-      ? "$"
-      : moneyResult?.currency === "EUR"
-        ? "€"
-        : moneyResult?.currency === "GBP"
-          ? "£"
-          : moneyResult?.currency === "TRY"
-            ? "₺"
-            : moneyResult?.currency ?? "$";
-  const moneyEnd = moneyResult?.convertedValue ?? displayValue;
-
-  return (
-    <div className={cn("bg-white rounded-xl border shadow-sm overflow-hidden p-5 flex items-start gap-4", styles.border)} dir="rtl">
-      <div className={cn("p-2.5 rounded-xl shrink-0", styles.bg, styles.text)}>
-        <Icon className="w-5 h-5" />
-      </div>
-      <div className="min-w-0 text-right flex-1">
-        <p className="text-xs font-medium text-gray-500 truncate">{title}</p>
-        <p className="text-xl font-bold text-gray-900 mt-0.5 tabular-nums">
-          {isMoney ? (
-            <CountUp end={typeof moneyEnd === "number" ? moneyEnd : displayValue} prefix={moneyPrefix} separator="," decimal="." decimals={0} />
-          ) : (
-            <CountUp end={displayValue} separator="," decimal="." decimals={0} />
-          )}
-        </p>
-        {subtitle && <p className="text-[11px] text-gray-400 mt-1">{subtitle}</p>}
-      </div>
-    </div>
-  );
-}
-
 function LoadingSkeleton() {
   return (
     <div className="space-y-6 p-4 sm:p-6 md:p-8 max-w-[1600px] mx-auto" dir="rtl">
       <div className="h-16 rounded-lg bg-slate-200 animate-pulse" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map((i) => (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+        {[1, 2, 3, 4, 5].map((i) => (
           <div key={i} className="h-24 rounded-lg bg-slate-200 animate-pulse" />
         ))}
       </div>

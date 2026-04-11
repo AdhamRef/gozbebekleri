@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
     const whereClause: {
       subscriptionId: { not: null };
       createdAt: { gte: Date; lte: Date };
+      status: "PAID";
       referralId?: string;
       donorId?: string;
       items?: { some: { campaignId: string } };
@@ -71,6 +72,7 @@ export async function GET(request: NextRequest) {
     } = {
       subscriptionId: { not: null },
       createdAt: { gte: startDate, lte: endDate },
+      status: "PAID",
     };
 
     if (referralIdParam) {
