@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 
 const TOKEN_EXPIRY_HOURS = 24;
+const AUTO_SIGN_IN_EXPIRY_MINUTES = 15;
 const RESEND_COOLDOWN_SECONDS = 60;
 
 /** Generate a cryptographically random 64-char hex verification token. */
@@ -12,7 +13,8 @@ export function generateVerificationToken(): string {
 /** Create a new verification token, invalidating any previous unused ones for this email+purpose. */
 export async function createVerificationToken(
   email: string,
-  purpose = "VERIFY_EMAIL"
+  purpose = "VERIFY_EMAIL",
+  expiryMinutes?: number
 ): Promise<string> {
   // Invalidate all previous tokens for this email+purpose
   await prisma.otpCode.updateMany({
@@ -21,13 +23,19 @@ export async function createVerificationToken(
   });
 
   const token = generateVerificationToken();
-  const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
+  const minutes = expiryMinutes ?? TOKEN_EXPIRY_HOURS * 60;
+  const expiresAt = new Date(Date.now() + minutes * 60 * 1000);
 
   await prisma.otpCode.create({
     data: { email, code: token, purpose, expiresAt },
   });
 
   return token;
+}
+
+/** Create a short-lived (15 min) one-time auto-sign-in token for post-email-verification. */
+export async function createAutoSignInToken(email: string): Promise<string> {
+  return createVerificationToken(email, "AUTO_SIGN_IN", AUTO_SIGN_IN_EXPIRY_MINUTES);
 }
 
 type VerifyResult =

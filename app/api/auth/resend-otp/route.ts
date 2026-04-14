@@ -28,7 +28,8 @@ export async function POST(req: NextRequest) {
       `${req.nextUrl.protocol}//${req.nextUrl.host}`;
 
     const safeCallback = typeof callbackUrl === "string" && callbackUrl.startsWith("/") ? callbackUrl : "/";
-    const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}&email=${encodeURIComponent(normalizedEmail)}&callbackUrl=${encodeURIComponent(safeCallback)}`;
+    const safeLocale = typeof locale === "string" && /^[a-z]{2}$/.test(locale) ? locale : "en";
+    const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}&email=${encodeURIComponent(normalizedEmail)}&callbackUrl=${encodeURIComponent(safeCallback)}&locale=${safeLocale}`;
 
     await sendVerificationEmail(normalizedEmail, verificationUrl, locale);
 

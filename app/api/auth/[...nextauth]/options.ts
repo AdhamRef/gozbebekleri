@@ -5,6 +5,7 @@ import GoogleProvider from "next-auth/providers/google";
 import FacebookProvider from "next-auth/providers/facebook";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
+import { verifyToken } from "@/lib/otp";
 
 if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
   throw new Error('Missing Google OAuth Credentials');
@@ -44,31 +45,38 @@ providers.push(
     id: "credentials",
     name: "Email & Password",
     credentials: {
-      email:    { label: "Email",    type: "email" },
-      password: { label: "Password", type: "password" },
+      email:           { label: "Email",           type: "email" },
+      password:        { label: "Password",        type: "password" },
+      autoSignInToken: { label: "Auto Sign-In Token", type: "text" },
     },
     async authorize(credentials) {
-      if (!credentials?.email || !credentials?.password) return null;
+      if (!credentials?.email) return null;
 
-      const user = await prisma.user.findUnique({
-        where: { email: credentials.email.toLowerCase().trim() },
-      });
+      const email = credentials.email.toLowerCase().trim();
 
+      // ── Auto-sign-in path (post email verification) ──────────────────────
+      if (credentials.autoSignInToken) {
+        const result = await verifyToken(email, credentials.autoSignInToken, "AUTO_SIGN_IN");
+        if (!result.success) return null;
+
+        const user = await prisma.user.findUnique({ where: { email } });
+        if (!user) return null;
+
+        return { id: user.id, email: user.email, name: user.name, role: user.role };
+      }
+
+      // ── Normal password path ──────────────────────────────────────────────
+      if (!credentials.password) return null;
+
+      const user = await prisma.user.findUnique({ where: { email } });
       if (!user || !user.password) return null;
 
-      if (!user.emailVerified) {
-        throw new Error("EMAIL_NOT_VERIFIED");
-      }
+      if (!user.emailVerified) throw new Error("EMAIL_NOT_VERIFIED");
 
       const valid = await bcrypt.compare(credentials.password, user.password);
       if (!valid) return null;
 
-      return {
-        id:   user.id,
-        email: user.email,
-        name:  user.name,
-        role:  user.role,
-      };
+      return { id: user.id, email: user.email, name: user.name, role: user.role };
     },
   })
 );
