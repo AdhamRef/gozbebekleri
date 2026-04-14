@@ -26,7 +26,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next"
 // Global metadata
 export const metadata: Metadata = {
   title: {
-    default: "فريق قرة العيون في رمضان 25 | قرة العيون",
+    default:"جمعية قرة العيون للإغاثة والتكافل",
     template: "%s | قرة العيون",
   },
   description: "منصة قرة العيون لجمع التبرعات للقضايا الإنسانية الطبية في سوريا. ساعدنا في إحداث فرق في حياة المحتاجين.",
@@ -35,13 +35,13 @@ export const metadata: Metadata = {
     icon: "https://i.ibb.co/ZwcJcN1/logo.webp",
   },
   openGraph: {
-    title: "فريق قرة العيون في رمضان 25 | قرة العيون",
-    description: "منصة قرة العيون لجمع التبرعات للقضايا الإنسانية الطبية في سوريا. ساعدنا في إحداث فرق في حياة المحتاجين.",
-    url: "https://gozbebekleri.vercel.app", // Replace with your actual domain
+    title: "جمعية قرة العيون للإغاثة والتكافل",
+    description: "منصة جمعية قرة العيون لجمع التبرعات للقضايا الإنسانية الطبية في سوريا. ساعدنا في إحداث فرق في حياة المحتاجين.",
+    url: "https://gozbebekleri.com", // Replace with your actual domain
     siteName: "قرة العيون",
     images: [
       {
-        url: "https://gozbebekleri.vercel.app/og-image.jpg", // Replace with your actual OG image
+        url: "https://gozbebekleri.com/og-image.jpg", // Replace with your actual OG image
         width: 1200,
         height: 630,
         alt: "قرة العيون",
@@ -52,12 +52,12 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "فريق قرة العيون في رمضان 25 | قرة العيون",
+    title: "جمعية قرة العيون للإغاثة والتكافل",
     description: "منصة قرة العيون لجمع التبرعات للقضايا الإنسانية الطبية في سوريا. ساعدنا في إحداث فرق في حياة المحتاجين.",
-    images: ["https://gozbebekleri.vercel.app/og-image.jpg"], // Replace with your actual OG image
+    images: ["https://gozbebekleri.com/og-image.jpg"], // Replace with your actual OG image
   },
   alternates: {
-    canonical: "https://gozbebekleri.vercel.app", // Replace with your actual domain
+    canonical: "https://gozbebekleri.com", // Replace with your actual domain
   },
 };
 
