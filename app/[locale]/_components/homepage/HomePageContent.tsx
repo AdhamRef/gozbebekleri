@@ -4,10 +4,10 @@ import React, { useState, useEffect } from "react";
 import { Globe, MoreHorizontal, Baby, Home, Map, ArrowRight } from "lucide-react";
 import CategoryIcon from "@/components/CategoryIcon";
 
-import CampaignsSlider from "./_components/homepage/CampaignsSlider";
-import QuickDonate from "./_components/homepage/QuickDonate";
-import HeroSlider from "./_components/homepage/HeroSlider";
-import BlogCard from "./_components/BlogCard";
+import CampaignsSlider from "./CampaignsSlider";
+import QuickDonate from "./QuickDonate";
+import HeroSlider from "./HeroSlider";
+import BlogCard from "../BlogCard";
 import LiveDonationsTicker from "@/components/LiveDonationsTicker";
 import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
