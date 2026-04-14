@@ -7,6 +7,8 @@ import axios from "axios";
 import CampaignCard from "@/app/[locale]/_components/CampaignCard";
 import type { CampaignCardData } from "@/app/[locale]/_components/CampaignCard";
 
+const DRAG_THRESHOLD = 6; // px movement before treating as a drag
+
 const CampaignsSlider = ({
   isGrid = false,
   isGridMobile = false,
@@ -15,14 +17,14 @@ const CampaignsSlider = ({
   const t = useTranslations("CampaignsSlider");
   const locale = useLocale();
   const sliderRef = useRef<HTMLDivElement>(null);
-  const justDraggedRef = useRef(false);
+  const isDraggingRef = useRef(false);
+  const hasDraggedRef = useRef(false);
+  const startXRef = useRef(0);
+  const scrollLeftRef = useRef(0);
 
   const [campaigns, setCampaigns] = useState<CampaignCardData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [scrollLeft, setScrollLeft] = useState(0);
 
   useEffect(() => {
     const fetchCampaigns = async () => {
@@ -58,45 +60,38 @@ const CampaignsSlider = ({
   const isAlwaysSlider = !isGrid;
   const allowDrag = isAlwaysSlider || isSliderOnMobile;
 
+  // Only block the link click if the user actually dragged (not a plain click)
   const handleLinkClick = (e: React.MouseEvent) => {
-    if (justDraggedRef.current) e.preventDefault();
+    if (hasDraggedRef.current) e.preventDefault();
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!sliderRef.current || !allowDrag) return;
-    setIsDragging(true);
-    setStartX(e.pageX - sliderRef.current.offsetLeft);
-    setScrollLeft(sliderRef.current.scrollLeft);
+    isDraggingRef.current = true;
+    hasDraggedRef.current = false;
+    startXRef.current = e.pageX - sliderRef.current.offsetLeft;
+    scrollLeftRef.current = sliderRef.current.scrollLeft;
     sliderRef.current.style.cursor = "grabbing";
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDragging || !sliderRef.current) return;
-    e.preventDefault();
+    if (!isDraggingRef.current || !sliderRef.current) return;
     const x = e.pageX - sliderRef.current.offsetLeft;
-    sliderRef.current.scrollLeft = scrollLeft - (x - startX) * 1.5;
+    const delta = x - startXRef.current;
+    if (Math.abs(delta) > DRAG_THRESHOLD) {
+      hasDraggedRef.current = true;
+      e.preventDefault();
+      sliderRef.current.scrollLeft = scrollLeftRef.current - delta * 1.5;
+    }
   };
 
   const stopDrag = () => {
-    if (isDragging) {
-      justDraggedRef.current = true;
-      setTimeout(() => { justDraggedRef.current = false; }, 0);
+    isDraggingRef.current = false;
+    // Keep hasDraggedRef true until the click event fires, then reset
+    if (hasDraggedRef.current) {
+      setTimeout(() => { hasDraggedRef.current = false; }, 0);
     }
-    setIsDragging(false);
     if (sliderRef.current) sliderRef.current.style.cursor = "grab";
-  };
-
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!sliderRef.current || !allowDrag) return;
-    setIsDragging(true);
-    setStartX(e.touches[0].pageX - sliderRef.current.offsetLeft);
-    setScrollLeft(sliderRef.current.scrollLeft);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!isDragging || !sliderRef.current) return;
-    const x = e.touches[0].pageX - sliderRef.current.offsetLeft;
-    sliderRef.current.scrollLeft = scrollLeft - (x - startX) * 2;
   };
 
   useEffect(() => {
@@ -129,10 +124,6 @@ const CampaignsSlider = ({
     );
   }
 
-  // Card className depending on mode
-  // isGrid + !isGridMobile → grid on sm+, horizontal scroll on mobile (80vw = 1.25 cards visible)
-  // isGridMobile           → always grid
-  // !isGrid                → always slider (80vw on mobile, fixed on desktop)
   const cardClassName = isGrid
     ? isGridMobile
       ? ""
@@ -142,8 +133,8 @@ const CampaignsSlider = ({
   const containerClassName = isGrid
     ? isGridMobile
       ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4"
-      : "flex gap-3 overflow-x-auto scrollbar-hide scroll-smooth pb-4 pt-1 sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"
-    : "flex gap-3 overflow-x-auto scrollbar-hide scroll-smooth pb-4 pt-1";
+      : "flex gap-3 overflow-x-auto scroll-smooth pb-4 pt-1 sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"
+    : "flex gap-3 overflow-x-auto scroll-smooth pb-4 pt-1 lg:scrollbar-hide";
 
   return (
     <div className="w-full mx-auto">
@@ -169,21 +160,16 @@ const CampaignsSlider = ({
             </>
           )}
 
+          {/* Touch devices: native overflow-x scroll (no JS interference).
+              Desktop: mouse-drag scrolling with click protection. */}
           <div
             ref={sliderRef}
             className={containerClassName}
-            style={
-              allowDrag
-                ? { scrollbarWidth: "none", msOverflowStyle: "none", userSelect: isDragging ? "none" : "auto" }
-                : {}
-            }
+            style={allowDrag ? { userSelect: "none" } : {}}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={stopDrag}
             onMouseLeave={stopDrag}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={stopDrag}
           >
             {campaigns.map((campaign) => (
               <CampaignCard
@@ -198,8 +184,25 @@ const CampaignsSlider = ({
       </div>
 
       <style jsx>{`
-        .scrollbar-hide::-webkit-scrollbar {
+        .lg\\:scrollbar-hide::-webkit-scrollbar {
           display: none;
+        }
+        @media (max-width: 1023px) {
+          div[class*="overflow-x-auto"] {
+            scrollbar-width: thin;
+            scrollbar-color: #025EB8 #e5e7eb;
+          }
+          div[class*="overflow-x-auto"]::-webkit-scrollbar {
+            height: 4px;
+          }
+          div[class*="overflow-x-auto"]::-webkit-scrollbar-track {
+            background: #e5e7eb;
+            border-radius: 9999px;
+          }
+          div[class*="overflow-x-auto"]::-webkit-scrollbar-thumb {
+            background: #025EB8;
+            border-radius: 9999px;
+          }
         }
       `}</style>
     </div>

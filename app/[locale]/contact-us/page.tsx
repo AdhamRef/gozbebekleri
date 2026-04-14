@@ -1,17 +1,42 @@
 "use client";
 
 import React, { useState } from "react";
-import { Mail, Phone, MapPin, Facebook, Instagram, Youtube, Twitter, Send, CheckCircle2, MessageCircle } from "lucide-react";
+import {
+  Mail,
+  Phone,
+  MapPin,
+  Facebook,
+  Instagram,
+  Youtube,
+  Twitter,
+  Send,
+  CheckCircle2,
+  MessageCircle,
+} from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
-import { MESSAGE_SUBJECTS, type MessageSubject, subjectLabel } from "@/lib/messages/subjects";
+import {
+  MESSAGE_SUBJECTS,
+  type MessageSubject,
+  subjectLabel,
+} from "@/lib/messages/subjects";
+
+const PHONE_RAW = "+902122885930";
+const PHONE_DISPLAY = "+90 212 288 59 30";
+const EMAIL = "info@gozbebekleri.org.tr";
+const ADDRESS_LINES = [
+  "ŞİRİNEVLER MAH. KAZIM KARABEKİR",
+  "3. SOKAK DISKAPINO:14",
+  "ZAKKUM AP İÇKAPINO:2",
+  "BAHÇELİEVLER / İSTANBUL",
+];
 
 const ContactPage = () => {
   const t = useTranslations("ContactUs");
   const locale = useLocale() as "ar" | "en" | "fr" | "tr";
-  const isTr = locale === "tr";
-  const isAr = locale === "ar";
 
-  const messageTypes: MessageSubject[] = MESSAGE_SUBJECTS.filter((s) => s !== "COMPLAINT");
+  const messageTypes: MessageSubject[] = MESSAGE_SUBJECTS.filter(
+    (s) => s !== "COMPLAINT",
+  );
 
   const [formData, setFormData] = useState({
     name: "",
@@ -24,7 +49,12 @@ const ContactPage = () => {
   const [isSuccess, setIsSuccess] = useState(false);
 
   const handleSubmit = async () => {
-    if (!formData.name || !formData.phone || !formData.email || !formData.message) {
+    if (
+      !formData.name ||
+      !formData.phone ||
+      !formData.email ||
+      !formData.message
+    ) {
       alert(t("requiredFields"));
       return;
     }
@@ -49,7 +79,13 @@ const ContactPage = () => {
       setIsSubmitting(false);
     }
     setTimeout(() => {
-      setFormData({ name: "", phone: "", email: "", messageType: "DONATION_ISSUE", message: "" });
+      setFormData({
+        name: "",
+        phone: "",
+        email: "",
+        messageType: "DONATION_ISSUE",
+        message: "",
+      });
       setIsSuccess(false);
     }, 4000);
   };
@@ -57,23 +93,57 @@ const ContactPage = () => {
   const contactItems = [
     {
       Icon: MapPin,
-      title: isTr ? "Adres" : isAr ? "العنوان" : "Address",
-      lines: ["Cihangir Mah. Sezai Selek Sk.", "No:24 Kat:2 Beyoğlu / İstanbul"],
+      title: t("address"),
+      content: (
+        <address className="not-italic" dir="ltr">
+          {ADDRESS_LINES.map((line) => (
+            <p key={line} className="text-gray-500 text-xs leading-relaxed">
+              {line}
+            </p>
+          ))}
+        </address>
+      ),
     },
     {
       Icon: Phone,
-      title: isTr ? "Telefon" : isAr ? "الهاتف" : "Phone",
-      lines: ["+90 212 288 59 30"],
+      title: t("phone"),
+      content: (
+        <a
+          href={`tel:${PHONE_RAW}`}
+          dir="ltr"
+          className="text-[#025EB8] text-xs font-medium hover:underline"
+        >
+          {PHONE_DISPLAY}
+        </a>
+      ),
     },
     {
       Icon: Mail,
-      title: isTr ? "E-Posta" : isAr ? "البريد الإلكتروني" : "Email",
-      lines: ["info@gozbebekleri.org"],
+      title: t("email"),
+      content: (
+        <a
+          href={`mailto:${EMAIL}`}
+          dir="ltr"
+          className="text-[#025EB8] text-xs font-medium hover:underline break-all"
+        >
+          {EMAIL}
+        </a>
+      ),
     },
     {
       Icon: MessageCircle,
-      title: "WhatsApp",
-      lines: ["+90 212 288 59 30"],
+      title: t("whatsapp"),
+      content: (
+        <a
+          href={`https://wa.me/${PHONE_RAW.replace("+", "")}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          dir="ltr"
+          className="text-[#025EB8] text-xs font-medium hover:underline"
+        >
+          {PHONE_DISPLAY}
+        </a>
+      ),
     },
   ];
 
@@ -83,24 +153,27 @@ const ContactPage = () => {
       <section className="bg-[#025EB8] text-white py-12 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <h1 className="text-3xl sm:text-4xl font-extrabold mb-2">
-            {isTr ? "İLETİŞİM" : isAr ? "تواصل معنا" : "CONTACT US"}
+            {t("pageTitle")}
           </h1>
-          <p className="text-white/80 text-sm max-w-md mx-auto">{t("subtitle") || ""}</p>
+          <p className="text-white/80 text-sm max-w-md mx-auto">
+            {t("subtitle")}
+          </p>
         </div>
       </section>
 
       {/* ── Info Cards ── */}
       <section className="max-w-7xl mx-auto px-4 py-10 sm:py-14">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-10">
-          {contactItems.map(({ Icon, title, lines }) => (
-            <div key={title} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col items-center text-center hover:shadow-md transition-shadow">
+          {contactItems.map(({ Icon, title, content }) => (
+            <div
+              key={title}
+              className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col items-center text-center hover:shadow-md transition-shadow"
+            >
               <div className="w-12 h-12 rounded-full bg-[#025EB8]/10 flex items-center justify-center mb-3">
                 <Icon className="w-5 h-5 text-[#025EB8]" />
               </div>
               <h3 className="font-bold text-gray-800 text-sm mb-1">{title}</h3>
-              {lines.map((line) => (
-                <p key={line} className="text-gray-500 text-xs">{line}</p>
-              ))}
+              {content}
             </div>
           ))}
         </div>
@@ -110,67 +183,96 @@ const ContactPage = () => {
           {/* Contact Form */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sm:p-8">
             <h2 className="text-xl font-bold text-gray-900 mb-6">
-              {isTr ? "Bize Yazın" : isAr ? "راسلنا" : "Send Us a Message"}
+              {t("contactForm")}
             </h2>
             {isSuccess ? (
               <div className="flex flex-col items-center justify-center py-10 gap-4">
                 <CheckCircle2 className="w-16 h-16 text-green-500" />
-                <p className="text-lg font-semibold text-gray-800">{t("successMessage") || "Mesajınız gönderildi!"}</p>
+                <p className="text-lg font-semibold text-gray-800">
+                  {t("successMessage")}
+                </p>
               </div>
             ) : (
               <div className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-semibold text-gray-600 mb-1 block">{t("name") || "Ad Soyad"} *</label>
+                    <label className="text-xs font-semibold text-gray-600 mb-1 block">
+                      {t("name")} *
+                    </label>
                     <input
                       type="text"
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
                       className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#025EB8] focus:ring-2 focus:ring-[#025EB8]/10 transition-all"
-                      placeholder={t("namePlaceholder") || "Adınız"}
+                      placeholder={t("namePlaceholder")}
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-gray-600 mb-1 block">{t("phone") || "Telefon"} *</label>
+                    <label className="text-xs font-semibold text-gray-600 mb-1 block">
+                      {t("phone")} *
+                    </label>
                     <input
                       type="tel"
+                      dir="ltr"
                       value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, phone: e.target.value })
+                      }
                       className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#025EB8] focus:ring-2 focus:ring-[#025EB8]/10 transition-all"
                       placeholder="+90 XXX XXX XX XX"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-gray-600 mb-1 block">{t("email") || "E-Posta"} *</label>
+                  <label className="text-xs font-semibold text-gray-600 mb-1 block">
+                    {t("email")} *
+                  </label>
                   <input
                     type="email"
+                    dir="ltr"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
                     className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#025EB8] focus:ring-2 focus:ring-[#025EB8]/10 transition-all"
-                    placeholder="ornek@email.com"
+                    placeholder="example@email.com"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-gray-600 mb-1 block">{t("messageType") || "Konu"}</label>
+                  <label className="text-xs font-semibold text-gray-600 mb-1 block">
+                    {t("messageType")}
+                  </label>
                   <select
                     value={formData.messageType}
-                    onChange={(e) => setFormData({ ...formData, messageType: e.target.value as MessageSubject })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        messageType: e.target.value as MessageSubject,
+                      })
+                    }
                     className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#025EB8] focus:ring-2 focus:ring-[#025EB8]/10 transition-all bg-white"
                   >
                     {messageTypes.map((type) => (
-                      <option key={type} value={type}>{subjectLabel(type, locale)}</option>
+                      <option key={type} value={type}>
+                        {subjectLabel(type, locale)}
+                      </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-gray-600 mb-1 block">{t("message") || "Mesaj"} *</label>
+                  <label className="text-xs font-semibold text-gray-600 mb-1 block">
+                    {t("message")} *
+                  </label>
                   <textarea
                     value={formData.message}
-                    onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, message: e.target.value })
+                    }
                     rows={4}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#025EB8] focus:ring-2 focus:ring-[#025EB8]/10 transition-all resize-none"
-                    placeholder={t("messagePlaceholder") || "Mesajınızı yazın..."}
+                    placeholder={t("messagePlaceholder")}
                   />
                 </div>
                 <button
@@ -183,7 +285,7 @@ const ContactPage = () => {
                   ) : (
                     <Send className="w-4 h-4" />
                   )}
-                  {t("submit") || "Gönder"}
+                  {isSubmitting ? t("sending") : t("submit")}
                 </button>
               </div>
             )}
@@ -205,18 +307,38 @@ const ContactPage = () => {
 
         {/* Social Media */}
         <div className="mt-10 flex flex-col items-center gap-4">
-          <p className="text-sm font-semibold text-gray-600">{isTr ? "Bizi Takip Edin" : isAr ? "تابعنا" : "Follow Us"}</p>
+          <p className="text-sm font-semibold text-gray-600">
+            {t("followUs")}
+          </p>
           <div className="flex items-center gap-3">
             {[
-              { Icon: Facebook, href: "https://www.facebook.com/gozbebeklerider/", label: "Facebook" },
-              { Icon: Instagram, href: "https://www.instagram.com/gozbebekleri_foundation/", label: "Instagram" },
-              { Icon: Twitter, href: "https://x.com/gozbebeklerider", label: "Twitter" },
-              { Icon: Youtube, href: "https://www.youtube.com/channel/UCvvSx8jtGafK9BI2hQnBYSQ", label: "YouTube" },
+              {
+                Icon: Facebook,
+                href: "https://www.facebook.com/gozbebeklerider/",
+                label: "Facebook",
+              },
+              {
+                Icon: Instagram,
+                href: "https://www.instagram.com/gozbebekleri_foundation/",
+                label: "Instagram",
+              },
+              {
+                Icon: Twitter,
+                href: "https://x.com/gozbebeklerider",
+                label: "Twitter",
+              },
+              {
+                Icon: Youtube,
+                href: "https://www.youtube.com/channel/UCvvSx8jtGafK9BI2hQnBYSQ",
+                label: "YouTube",
+              },
             ].map(({ Icon, href, label }) => (
               <a
                 key={label}
                 href={href}
                 aria-label={label}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-10 h-10 rounded-full bg-[#025EB8] hover:bg-[#FA5D17] text-white flex items-center justify-center transition-colors"
               >
                 <Icon className="w-5 h-5" />

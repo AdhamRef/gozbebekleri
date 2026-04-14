@@ -31,6 +31,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { useSession } from "next-auth/react";
 import { PhoneInput } from "react-international-phone";
 import "react-international-phone/style.css";
+import { useIpCountry } from "@/hooks/useIpCountry";
 
 interface CartItem {
   id: string;
@@ -49,33 +50,32 @@ interface CartPaymentDialogProps {
   isOpen: boolean;
   onClose: () => void;
   cartItems: CartItem[];
-  amount: number;
+  onSuccess?: () => void;
 }
 
-const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDialogProps) => {
+const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProps) => {
+  const amount = cartItems.reduce((sum, item) => sum + (item.amount ?? item.amountUSD), 0);
   const t = useTranslations("DonationDialog");
   const locale = useLocale() as "ar" | "en" | "fr";
   const isRTL = locale === "ar";
-  const navRow = "inline-flex items-center justify-center gap-2";
+  const dir = isRTL ? "rtl" : "ltr";
+  const navRow = `inline-flex items-center justify-center gap-2${isRTL ? " flex-row-reverse" : ""}`;
   const backLabel = (
-    <span className={navRow}>
-      {!isRTL && <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />}
+    <span dir={dir} className={navRow}>
+      <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />
       {t("back")}
-      {isRTL && <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />}
     </span>
   );
   const nextLabel = (
     <span className={navRow}>
-      {isRTL && <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />}
       {t("next")}
-      {!isRTL && <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />}
+      <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
     </span>
   );
   const confirmDonationLabel = (
     <span className={navRow}>
-      {isRTL && <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />}
       {t("confirmDonation")}
-      {!isRTL && <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />}
+      <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
     </span>
   );
 
@@ -118,6 +118,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
   const [payforSwitching, setPayforSwitching] = useState(false);
   const [mounted, setMounted]             = useState(false);
   const [phoneValue, setPhoneValue]       = useState("");
+  const ipCountry = useIpCountry();
   const [currentUser, setCurrentUser]     = useState<{ phone: string | null } | null>(null);
 
   const payforPopupRef = useRef<Window | null>(null);
@@ -408,7 +409,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
           <p className="text-gray-600 text-sm">{t("teamSupportHelp")}</p>
         </div>
         <div className="flex flex-col items-center gap-4">
-          <Input type="number" value={teamSupport || ""} onChange={(e) => setTeamSupport(Number(e.target.value))} placeholder={t("otherAmount")} className="text-center text-lg font-medium" />
+          <Input type="number" inputMode="numeric" min={0} step={1} value={teamSupport || ""} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ""); setTeamSupport(val ? parseInt(val, 10) : 0); }} onKeyDown={(e) => { if (e.key === "." || e.key === ",") e.preventDefault(); }} placeholder={t("otherAmount")} className="text-center text-lg font-medium" />
           <div className="grid grid-cols-3 gap-3 w-full">
             {TEAM_SUPPORT_OPTIONS.map((o) => (
               <Button key={o.value} variant="outline" onClick={() => setTeamSupport(o.value)}
@@ -418,7 +419,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
             ))}
           </div>
         </div>
-        <div className={`flex gap-4 ${locale === "ar" ? "flex-row-reverse" : ""}`}>
+        <div dir={dir} className={`flex justify-between gap-4 ${isRTL ? " flex-row-reverse" : ""}`}>
           <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">{backLabel}</Button>
           <Button onClick={handleNext} className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2">{nextLabel}</Button>
         </div>
@@ -458,7 +459,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
             <p className="text-sm text-gray-500 mt-0.5">{t("feesWillBeAdded", { amount: `${fees.toFixed(2)} ${getCurrency()}` })}</p>
           </div>
         </button>
-        <div className={`flex gap-4 ${locale === "ar" ? "flex-row-reverse" : ""}`}>
+        <div dir={dir} className={`flex justify-between gap-4 ${isRTL ? " flex-row-reverse" : ""}`}>
           <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">{backLabel}</Button>
           <Button onClick={handleNext} className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2">{nextLabel}</Button>
         </div>
@@ -509,7 +510,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
             </div>
           </div>
         </div>
-        <div className={`flex gap-4 w-full ${locale === "ar" ? "flex-row-reverse" : ""}`}>
+        <div dir={dir} className="flex gap-4 w-full">
           <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">{backLabel}</Button>
           <Button onClick={handleNext} className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2">{nextLabel}</Button>
         </div>
@@ -569,7 +570,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, amount }: CartPaymentDi
         <div className="space-y-2 overflow-visible pt-2 border-t border-border" dir={locale === "ar" ? "rtl" : "ltr"}>
           <label className={`block text-sm font-medium text-gray-700 ${locale === "ar" ? "text-right" : "text-left"}`}>{t("contactPhone")}</label>
           <div className="overflow-visible phone-input-wrapper">
-            <PhoneInput defaultCountry="sy" value={phoneValue}
+            <PhoneInput defaultCountry={ipCountry} value={phoneValue}
               onChange={(phone) => setPhoneValue(phone)}
               className="w-full overflow-visible"
               inputClassName="w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent" required />

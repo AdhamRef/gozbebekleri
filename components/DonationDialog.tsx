@@ -47,6 +47,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { useSession } from "next-auth/react";
 import { PhoneInput } from "react-international-phone";
 import "react-international-phone/style.css";
+import { useIpCountry } from "@/hooks/useIpCountry";
 
 type DonationType = "ONE_TIME" | "MONTHLY";
 type PaymentMethod = "CARD" | "PAYPAL" | null;
@@ -115,26 +116,24 @@ const DonationDialog = ({
   const t = useTranslations("DonationDialog");
   const locale = useLocale() as "ar" | "en" | "fr";
   const isRTL = locale === "ar";
-  const navRow = "inline-flex items-center justify-center gap-2";
+  const dir = isRTL ? "rtl" : "ltr";
+  const navRow = `inline-flex items-center justify-center gap-2${isRTL ? " flex-row-reverse" : ""}`;
   const backLabel = (
     <span className={navRow}>
-      {!isRTL && <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />}
+      <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />
       {t("back")}
-      {isRTL && <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />}
     </span>
   );
   const nextLabel = (
     <span className={navRow}>
-      {isRTL && <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />}
       {t("next")}
-      {!isRTL && <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />}
+      <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
     </span>
   );
   const confirmDonationLabel = (
     <span className={navRow}>
-      {isRTL && <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />}
       {t("confirmDonation")}
-      {!isRTL && <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />}
+      <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
     </span>
   );
   const getReferralCode = useReferralCode();
@@ -203,6 +202,7 @@ const DonationDialog = ({
   const payforPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [mounted, setMounted] = useState(false);
   const [phoneValue, setPhoneValue] = useState("");
+  const ipCountry = useIpCountry();
   const [currentUser, setCurrentUser] = useState<{
     phone: string | null;
     country: string | null;
@@ -523,8 +523,17 @@ const DonationDialog = ({
                 <>
                   <Input
                     type="number"
+                    inputMode="numeric"
+                    min={1}
+                    step={1}
                     value={donationAmount || ""}
-                    onChange={(e) => setDonationAmount(Number(e.target.value))}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, "");
+                      setDonationAmount(val ? parseInt(val, 10) : 0);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "." || e.key === ",") e.preventDefault();
+                    }}
                     placeholder={t("enterDonationAmount")}
                   />
 
@@ -553,7 +562,7 @@ const DonationDialog = ({
                 type="button"
                 variant="outline"
                 onClick={handleBackFromDonationValueStep}
-                className="flex-1 min-w-[6rem] inline-flex items-center justify-center gap-2"
+                className={`flex-1 min-w-[6rem] inline-flex items-center justify-center gap-2 ${isRTL ? " flex-row-reverse" : ""}`}
               >
                 {backLabel}
               </Button>
@@ -620,8 +629,17 @@ const DonationDialog = ({
             <div className="flex flex-col items-center gap-2">
               <Input
                 type="number"
+                inputMode="numeric"
+                min={0}
+                step={1}
                 value={teamSupport || ""}
-                onChange={(e) => setTeamSupport(Number(e.target.value))}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/[^0-9]/g, "");
+                  setTeamSupport(val ? parseInt(val, 10) : 0);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "." || e.key === ",") e.preventDefault();
+                }}
                 placeholder={t("otherAmount")}
               />
               <div className="grid grid-cols-3 gap-3 w-full">
@@ -636,14 +654,14 @@ const DonationDialog = ({
                         : ""
                     }`}
                   >
-                    <span dir="ltr">{option.value} {getCurrency()}</span>
+                    <span className="font-medium" dir={option.label === t("noThanks") ? undefined : "ltr"}>{option.label === t("noThanks") ? option.label : `${option.value} ${getCurrency()}`}</span>
                   </Button>
                 ))}
               </div>
             </div>
 
-            <div className="flex justify-between gap-4">
-              <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">
+            <div className={`flex justify-between gap-4 ${isRTL ? " flex-row-reverse" : ""}`}>
+              <Button variant="outline" onClick={handleBack} className={`flex-1 inline-flex items-center justify-center gap-2 ${isRTL ? " flex-row-reverse" : ""}`}>
                 {backLabel}
               </Button>
               <Button
@@ -708,8 +726,8 @@ const DonationDialog = ({
               </div>
             </button>
 
-            <div className="flex justify-between gap-4">
-              <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">
+            <div className={`flex justify-between gap-4 ${isRTL ? " flex-row-reverse" : ""}`}>
+              <Button variant="outline" onClick={handleBack} className={`flex-1 inline-flex items-center justify-center gap-2 ${isRTL ? " flex-row-reverse" : ""}`}>
                 {backLabel}
               </Button>
               <Button
@@ -774,7 +792,7 @@ const DonationDialog = ({
             </div>
 
             {/* Buttons Section */}
-            <div className="flex justify-between gap-4">
+            <div className={`flex justify-between gap-4 ${isRTL ? " flex-row-reverse" : ""}`}>
               <Button
                 variant="outline"
                 onClick={handleBack}
@@ -833,11 +851,11 @@ const DonationDialog = ({
               ))}
             </div>
 
-            <div className="flex justify-between gap-4">
+            <div className={`flex justify-between gap-4 ${isRTL ? " flex-row-reverse" : ""}`}>
               <Button
                 variant="outline"
                 onClick={handleBack}
-                className="flex-1 inline-flex items-center justify-center gap-2"
+                className={`flex-1 inline-flex items-center justify-center gap-2 ${isRTL ? " flex-row-reverse" : ""}`}
               >
                 {backLabel}
               </Button>
@@ -906,7 +924,7 @@ const DonationDialog = ({
               <label className={`block text-sm font-medium text-gray-700 ${locale === "ar" ? "text-right" : "text-left"}`}>{t("contactPhone")}</label>
               <div className="overflow-visible phone-input-wrapper">
                 <PhoneInput
-                  defaultCountry="sy"
+                  defaultCountry={ipCountry}
                   value={phoneValue}
                   onChange={(phone) => setPhoneValue(phone)}
                   className="w-full overflow-visible"
@@ -916,8 +934,8 @@ const DonationDialog = ({
               </div>
             </div>
 
-            <div className={`flex justify-between gap-4 ${locale === "ar" ? "flex-row-reverse" : ""}`}>
-              <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">
+            <div dir={dir} className={`flex justify-between gap-4 ${isRTL ? " flex-row-reverse" : ""}`}>
+              <Button variant="outline" onClick={handleBack} className={`flex-1 inline-flex items-center justify-center gap-2 ${isRTL ? " flex-row-reverse" : ""}`}>
                 {backLabel}
               </Button>
               <Button

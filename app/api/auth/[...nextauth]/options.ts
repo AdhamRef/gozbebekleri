@@ -3,6 +3,8 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import GoogleProvider from "next-auth/providers/google";
 import FacebookProvider from "next-auth/providers/facebook";
+import CredentialsProvider from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
 
 if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
   throw new Error('Missing Google OAuth Credentials');
@@ -37,6 +39,40 @@ if (process.env.FACEBOOK_CLIENT_ID && process.env.FACEBOOK_CLIENT_SECRET) {
   );
 }
 
+providers.push(
+  CredentialsProvider({
+    id: "credentials",
+    name: "Email & Password",
+    credentials: {
+      email:    { label: "Email",    type: "email" },
+      password: { label: "Password", type: "password" },
+    },
+    async authorize(credentials) {
+      if (!credentials?.email || !credentials?.password) return null;
+
+      const user = await prisma.user.findUnique({
+        where: { email: credentials.email.toLowerCase().trim() },
+      });
+
+      if (!user || !user.password) return null;
+
+      if (!user.emailVerified) {
+        throw new Error("EMAIL_NOT_VERIFIED");
+      }
+
+      const valid = await bcrypt.compare(credentials.password, user.password);
+      if (!valid) return null;
+
+      return {
+        id:   user.id,
+        email: user.email,
+        name:  user.name,
+        role:  user.role,
+      };
+    },
+  })
+);
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   secret: process.env.NEXTAUTH_SECRET,
@@ -51,8 +87,11 @@ export const authOptions: NextAuthOptions = {
     error: "/auth/error",
   },
   callbacks: {
-    async signIn({ user, account, profile, email }) {
+    async signIn({ user, account, profile }) {
       try {
+        // Credentials — authorize() already validated the user
+        if (account?.type === "credentials") return true;
+
         if (account && profile) {
           // Check if the user already exists
           const existingUser = await prisma.user.findUnique({

@@ -46,6 +46,19 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+model OtpCode {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String
+  code      String
+  purpose   String   @default("VERIFY_EMAIL")
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email, purpose])
+}
+
 /* ===================== USER ===================== */
 
 model User {

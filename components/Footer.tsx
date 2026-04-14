@@ -221,11 +221,11 @@ const Footer = () => {
               </li>
               <li>
                 <a
-                  href="mailto:info@gozbebekleri.org"
+                  href="mailto:info@gozbebekleri.org.tr"
                   className="flex items-center gap-3 text-sm text-white/70 hover:text-white transition-colors"
                 >
                   <Mail className="w-4 h-4 flex-shrink-0 text-[#FA5D17]" />
-                  info@gozbebekleri.org
+                  info@gozbebekleri.org.tr
                 </a>
               </li>
             </ul>

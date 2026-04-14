@@ -52,15 +52,14 @@ export function PayForCardForm({
           </label>
           <Input
             value={cardDetails.cardNumber}
-            onChange={(e) =>
-              setCardDetails({
-                ...cardDetails,
-                cardNumber: e.target.value.replace(/\D/g, "").slice(0, 16),
-              })
-            }
+            onChange={(e) => {
+              const digits = e.target.value.replace(/\D/g, "").slice(0, 16);
+              const formatted = digits.replace(/(.{4})/g, "$1 ").trimEnd();
+              setCardDetails({ ...cardDetails, cardNumber: formatted });
+            }}
             onFocus={() => setCardFocus("number")}
-            placeholder={t("cardNumberPlaceholder")}
-            maxLength={16}
+            placeholder="0000 0000 0000 0000"
+            maxLength={19}
             inputMode="numeric"
             autoComplete="cc-number"
             className="font-mono tracking-widest"

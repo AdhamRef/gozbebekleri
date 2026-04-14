@@ -55,8 +55,13 @@ const CartSheet: React.FC<CartSheetProps> = ({
   const items = useMemo(() => Array.isArray(cartItems) ? cartItems : [], [cartItems]);
 
   const totals = useMemo(() => {
-    const totalUSD = items.reduce((sum, item) => sum + (item.amountUSD || item.amount), 0);
-    return { totalUSD, itemCount: items.length };
+    const currencies = [...new Set(items.map((i) => i.currency).filter(Boolean))];
+    const allSameCurrency = currencies.length === 1;
+    const displayCurrency = allSameCurrency ? currencies[0] : "USD";
+    const total = allSameCurrency
+      ? items.reduce((sum, i) => sum + i.amount, 0)
+      : items.reduce((sum, i) => sum + (i.amountUSD || i.amount), 0);
+    return { total, displayCurrency, itemCount: items.length };
   }, [items]);
 
   const handleDelete = async (id: string) => {
@@ -212,12 +217,12 @@ const CartSheet: React.FC<CartSheetProps> = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm text-gray-500">
                 <span>{t('subtotal')}</span>
-                <span className="font-medium text-gray-700">{formatAmount(totals.totalUSD, 'USD')}</span>
+                <span className="font-medium text-gray-700">{formatAmount(totals.total, totals.displayCurrency)}</span>
               </div>
               <Separator />
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold text-gray-800">{t('total')}</span>
-                <span className="text-xl font-bold text-[#025EB8]">{formatAmount(totals.totalUSD, 'USD')}</span>
+                <span className="text-xl font-bold text-[#025EB8]">{formatAmount(totals.total, totals.displayCurrency)}</span>
               </div>
             </div>
 
