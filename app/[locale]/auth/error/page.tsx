@@ -1,6 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { signIn } from 'next-auth/react';
@@ -37,7 +38,7 @@ export default function AuthError() {
             onClick={() => signIn('google', { callbackUrl })}
             className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 text-gray-700"
           >
-            <img src="/google.svg" alt="Google" className="w-5 h-5" />
+            <Image src="/google.svg" alt="Google" width={20} height={20} />
             <span>تسجيل دخول باستخدام Google</span>
           </Button>
           
@@ -45,7 +46,7 @@ export default function AuthError() {
             onClick={() => signIn('facebook', { callbackUrl })}
             className="w-full flex items-center justify-center gap-3 bg-[#1877F2] hover:bg-[#1874EA] text-white"
           >
-            <img src="/facebook.svg" alt="Facebook" className="w-5 h-5" />
+            <Image src="/facebook.svg" alt="Facebook" width={20} height={20} />
             <span>تسجيل دخول باستخدام Facebook</span>
           </Button>
 

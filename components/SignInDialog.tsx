@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DialogClose } from "@/components/ui/dialog";
 import { signIn } from "next-auth/react";
@@ -320,8 +321,7 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl }: SignInDia
                 onClick={handleGoogleSignIn}
                 className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-xl border border-gray-200 shadow-sm hover:shadow transition-all active:scale-[0.98]"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/google.svg" alt="Google" className="w-5 h-5 flex-shrink-0" />
+                <Image src="/google.svg" alt="Google" width={20} height={20} className="flex-shrink-0" />
                 {t("signInWithGoogle")}
               </button>
 

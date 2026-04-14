@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Image from "next/image";
 import axios from "axios";
 import { Search, HandHeart, ChevronRight, X, ArrowRight } from "lucide-react"; // Search used conditionally via SHOW_SEARCH
 import { Link } from "@/i18n/routing";
@@ -121,8 +122,7 @@ const MainPage = ({ id, locale: localeProp }: { id: string; locale?: string }) =
       <section className="relative">
         {/* Background layers */}
         <div className="absolute inset-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={category.image || FALLBACK_IMAGE} alt="" aria-hidden className="w-full h-full object-cover" />
+          <Image src={category.image || FALLBACK_IMAGE} alt="" aria-hidden fill priority sizes="100vw" className="object-cover" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/75" />
           <div className="absolute inset-0 bg-[#025EB8]/30" />
           <div className="absolute inset-0 opacity-[0.04] bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:20px_20px]" />

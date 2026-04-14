@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Image from "next/image";
 import axios from "axios";
 import { Search, HandHeart, ArrowRight, SlidersHorizontal, X, ChevronRight } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -164,8 +165,7 @@ const CampaignsPage = () => {
       <section className="relative">
         {/* Background layers — clipped independently so the search bar can overflow the section */}
         <div className="absolute inset-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={HERO_IMAGE} alt="" aria-hidden className="w-full h-full object-cover" />
+          <Image src={HERO_IMAGE} alt="" aria-hidden fill priority sizes="100vw" className="object-cover" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/75" />
           <div className="absolute inset-0 bg-[#025EB8]/30" />
           <div className="absolute inset-0 opacity-[0.04] bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:20px_20px]" />

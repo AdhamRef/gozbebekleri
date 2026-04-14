@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { Mail, Phone, MapPin, Facebook, Instagram, Youtube, Twitter, Send, Heart, ChevronRight } from 'lucide-react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useSession } from 'next-auth/react';
@@ -137,8 +138,7 @@ const Footer = () => {
           {/* ── Brand ── */}
           <div className="sm:col-span-2 lg:col-span-1 flex flex-col">
             <Link href="/" className="inline-block mb-5">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={LOGO_URL} alt="Logo" className="h-14 w-auto object-contain brightness-0 invert" />
+              <Image src={LOGO_URL} alt="Logo" width={112} height={56} className="h-14 w-auto object-contain brightness-0 invert" />
             </Link>
             <p className="text-sm text-white/70 leading-relaxed mb-6 max-w-xs">
               {t('aboutUsDesc1')}

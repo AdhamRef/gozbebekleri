@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { Globe, MoreHorizontal, Baby, Home, Map, ArrowRight } from "lucide-react";
 import CategoryIcon from "@/components/CategoryIcon";
 
@@ -8,6 +9,10 @@ import CampaignsSlider from "./CampaignsSlider";
 import QuickDonate from "./QuickDonate";
 import HeroSlider from "./HeroSlider";
 import BlogCard from "../BlogCard";
+
+interface HomePageContentProps {
+  firstHeroImage?: string | null;
+}
 import LiveDonationsTicker from "@/components/LiveDonationsTicker";
 import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
@@ -40,8 +45,7 @@ function HomeLoadingScreen() {
   return (
     <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white">
       <div className="flex flex-col items-center gap-6">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={LOGO_URL} alt="" className="h-16 w-auto object-contain animate-pulse" />
+        <Image src={LOGO_URL} alt="" width={64} height={64} className="h-16 w-auto object-contain animate-pulse" />
         <div className="w-48 h-1 bg-gray-100 rounded-full overflow-hidden">
           <div className="h-full bg-[#025EB8] rounded-full animate-[shimmer_1.2s_ease-in-out_infinite] w-2/5" />
         </div>
@@ -58,7 +62,7 @@ const STATS = [
   { icon: Map, valueKey: "stat4Value", labelKey: "stat4Label", value: "4" },
 ];
 
-const HomePage: React.FC = () => {
+const HomePage: React.FC<HomePageContentProps> = ({ firstHeroImage }) => {
   const t = useTranslations("HomePage");
   const locale = useLocale();
   const [categories, setCategories] = useState<CategoryItem[]>([]);
@@ -105,7 +109,7 @@ const HomePage: React.FC = () => {
       <style dangerouslySetInnerHTML={{ __html: `@keyframes shimmer{0%,100%{transform:translateX(-100%)}50%{transform:translateX(150%)}}` }} />
 
       {/* ── Hero Slider ── */}
-      <HeroSlider />
+      <HeroSlider initialFirstImage={firstHeroImage ?? null} />
 
       {/* ── Featured Campaigns Slider ── */}
       <section className="bg-gray-50 pt-10 sm:pt-12 pb-5 sm:pb-6">
@@ -127,7 +131,7 @@ const HomePage: React.FC = () => {
       <section
         className="relative lg:py-10 sm:py-14 overflow-hidden bg-gray-50"
         style={{
-          backgroundImage: "url('/bg.png')",
+          backgroundImage: "url('/bg.webp')",
           // backgroundImage: "url('/confetti-doodles.svg')",
           backgroundRepeat: "repeat",
           backgroundSize: "320px",
@@ -162,7 +166,7 @@ const HomePage: React.FC = () => {
       {/* ── Donation Categories ── */}
       {categories.length > 0 && (
         <section className="bg-gray-50 py-7 border-y border-gray-100"         style={{
-          backgroundImage: "url('/bg.png')",
+          backgroundImage: "url('/bg.webp')",
           // backgroundImage: "url('/confetti-doodles.svg')",
           backgroundRepeat: "repeat",
           backgroundSize: "200px",

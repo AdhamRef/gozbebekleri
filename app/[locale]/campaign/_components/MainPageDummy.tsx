@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import {
@@ -245,20 +246,33 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
               <div className="sm:rounded-2xl overflow-hidden sm:shadow-sm sm:border sm:border-gray-100 bg-gray-950">
                 {/* Main image — full-width, no letterbox */}
                 <div className="relative w-full aspect-[16/9] sm:aspect-[16/8] overflow-hidden bg-gray-950">
-                  {/* Subtle blurred bg for portrait images that don't fill 16:9 */}
-                  <img src={currentImg} alt="" aria-hidden
-                    className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110 opacity-40 pointer-events-none" />
+                  {/* Blurred background fill for portrait images */}
+                  <Image
+                    src={currentImg}
+                    alt=""
+                    aria-hidden
+                    fill
+                    sizes="100vw"
+                    className="object-cover blur-2xl scale-110 opacity-40 pointer-events-none"
+                  />
                   <AnimatePresence mode="wait">
-                    <motion.img
+                    <motion.div
                       key={selectedImage}
-                      src={currentImg}
-                      alt={getLocalizedProperty(campaign, "title")}
                       initial={{ opacity: 0, scale: 1.03 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.3 }}
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
+                      className="absolute inset-0"
+                    >
+                      <Image
+                        src={currentImg}
+                        alt={getLocalizedProperty(campaign, "title")}
+                        fill
+                        priority={selectedImage === 0}
+                        sizes="(max-width: 1024px) 100vw, 66vw"
+                        className="object-cover"
+                      />
+                    </motion.div>
                   </AnimatePresence>
 
                   {/* Gradient overlay */}
@@ -310,7 +324,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                           selectedImage === i ? "ring-[#FA5D17] scale-105" : "ring-transparent opacity-60 hover:opacity-100"
                         }`}
                       >
-                        <img src={img} alt="" className="w-14 h-14 sm:w-16 sm:h-16 object-cover" />
+                        <Image src={img} alt="" width={64} height={64} className="w-14 h-14 sm:w-16 sm:h-16 object-cover" />
                       </button>
                     ))}
                   </div>
@@ -387,13 +401,13 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                                   {update.image && (
                                     <button onClick={() => { setModalContent({ type: "image", src: update.image!, alt: getLocalizedProperty(update, "title") }); setIsModalOpen(true); }}
                                       className="group relative rounded-xl overflow-hidden ring-1 ring-gray-200 hover:ring-[#025EB8] transition-all">
-                                      <img src={update.image} alt="" className="w-24 h-24 object-cover group-hover:scale-105 transition-transform duration-300" />
+                                      <Image src={update.image} alt="" width={96} height={96} className="w-24 h-24 object-cover group-hover:scale-105 transition-transform duration-300" />
                                     </button>
                                   )}
                                   {update.videoUrl && (
                                     <button onClick={() => { setModalContent({ type: "video", src: `${update.videoUrl}?autoplay=1` }); setIsModalOpen(true); }}
                                       className="group relative rounded-xl overflow-hidden ring-1 ring-gray-200 hover:ring-[#025EB8] transition-all">
-                                      <img src={`https://img.youtube.com/vi/${new URL(update.videoUrl).pathname.split("/")[2]}/hqdefault.jpg`} alt="" className="w-24 h-24 object-cover group-hover:scale-105 transition-transform duration-300" />
+                                      <Image src={`https://img.youtube.com/vi/${new URL(update.videoUrl).pathname.split("/")[2]}/hqdefault.jpg`} alt="" width={96} height={96} className="w-24 h-24 object-cover group-hover:scale-105 transition-transform duration-300" />
                                       <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
                                         <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center">
                                           <Play className="w-4 h-4 text-gray-900 ms-0.5" />

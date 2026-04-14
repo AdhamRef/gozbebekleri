@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Poppins, Noto_Kufi_Arabic } from "next/font/google";
-import Script from "next/script";
+
 import "./[locale]/globals.css";
 
 const poppins = Poppins({
@@ -18,7 +18,7 @@ const notoKufiArabic = Noto_Kufi_Arabic({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://gozbebekleri.com"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://www.gozbebekleri.com"),
   title: { default: "Gözbebekleri | قرة العيون", template: "%s | Gözbebekleri" },
   description: "Donate for urgent medical aid and humanitarian relief in Syria. Trusted charity platform for zakat, sadaqah, and emergency donations.",
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large" } },
@@ -37,9 +37,9 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="dns-prefetch" href="https://i.ibb.co" />
-        <link rel="dns-prefetch" href="https://v6.exchangerate-api.com" />
-        <link rel="dns-prefetch" href="https://ipapi.co" />
-        <link rel="preload" href="/bg.png" as="image" type="image/png" />
+        <link rel="preconnect" href="https://v6.exchangerate-api.com" />
+        <link rel="preconnect" href="https://ipapi.co" />
+        <link rel="preload" href="/bg.webp" as="image" type="image/webp" />
         <link
           href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
           rel="stylesheet"
@@ -52,11 +52,6 @@ export default function RootLayout({
       <body
         className={`${poppins.variable} ${notoKufiArabic.variable} font-arabic antialiased`}
       >
-        <Script
-          src="https://kit.fontawesome.com/e895f0e5f8.js"
-          crossOrigin="anonymous"
-          strategy="afterInteractive"
-        />
         {children}
       </body>
     </html>

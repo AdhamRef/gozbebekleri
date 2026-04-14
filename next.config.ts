@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "gozbebekleri.org" },
       { protocol: "https", hostname: "muslimglobalrelief.org" },
       { protocol: "https", hostname: "example.com" },
+      { protocol: "https", hostname: "img.youtube.com" },
     ],
   },
   eslint: {

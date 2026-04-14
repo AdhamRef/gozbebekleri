@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://gozbebekleri.com").replace(/\/$/, "");
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.gozbebekleri.com").replace(/\/$/, "");
 export const SITE_NAME = "Gözbebekleri";
 export const OG_IMAGE = `${SITE_URL}/og-image.jpg`;
 

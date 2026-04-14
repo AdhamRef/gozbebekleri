@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Elements } from "@stripe/react-stripe-js";
 import { getStripePromise } from "@/lib/stripe-client";
 import { StripePaymentStep, type StripePaymentHandle } from "@/components/StripePaymentStep";
@@ -479,7 +480,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
             return (
               <div key={item.id} className={`flex items-center gap-2 w-full min-w-0 ${locale === "ar" ? "flex-row-reverse" : ""}`}>
                 <div className={`flex items-center gap-2 flex-1 min-w-0 overflow-hidden ${locale === "ar" ? "flex-row-reverse" : ""}`}>
-                  <img src={item.campaign.images[0]} alt={title} className="w-20 h-20 rounded-lg object-cover flex-shrink-0 shadow-sm" />
+                  <Image src={item.campaign.images[0]} alt={title} width={80} height={80} className="w-20 h-20 rounded-lg object-cover flex-shrink-0 shadow-sm" />
                   <div className={`min-w-0 max-w-48 ${locale === "ar" ? "text-right" : "text-left"}`}>
                     <span className="text-gray-900 font-medium text-sm block line-clamp-3" title={title}>{title}</span>
                     {item.shareCount != null && item.shareCount > 0 && (

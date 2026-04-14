@@ -2,6 +2,7 @@
 
 import { signIn } from 'next-auth/react';
 import { useLocale } from 'next-intl';
+import Image from 'next/image';
 import { Link } from '@/i18n/routing';
 import { Heart, ArrowRight } from 'lucide-react';
 
@@ -40,8 +41,7 @@ export default function SignIn() {
         <div className="absolute bottom-[-60px] left-[-60px] w-64 h-64 rounded-full bg-white/5" />
 
         <div className="relative z-10 text-center text-white max-w-sm">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={LOGO_URL} alt="Logo" className="h-20 w-auto object-contain mx-auto mb-8 brightness-0 invert" />
+          <Image src={LOGO_URL} alt="Logo" width={80} height={80} className="h-20 w-auto object-contain mx-auto mb-8 brightness-0 invert" />
           <div className="w-12 h-1 bg-[#FA5D17] mx-auto mb-6 rounded-full" />
           <h2 className="text-2xl font-extrabold mb-4 uppercase tracking-wide">{labels.headline}</h2>
           <p className="text-white/75 text-sm leading-relaxed mb-8">{labels.sub}</p>
@@ -60,8 +60,7 @@ export default function SignIn() {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="lg:hidden text-center mb-8">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={LOGO_URL} alt="Logo" className="h-14 w-auto object-contain mx-auto" />
+            <Image src={LOGO_URL} alt="Logo" width={56} height={56} className="h-14 w-auto object-contain mx-auto" />
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
@@ -73,8 +72,7 @@ export default function SignIn() {
                 onClick={() => signIn('google', { callbackUrl: '/' })}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-sm"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/google.svg" alt="Google" className="w-5 h-5" />
+                <Image src="/google.svg" alt="Google" width={20} height={20} />
                 {labels.google}
               </button>
 
@@ -82,8 +80,7 @@ export default function SignIn() {
                 onClick={() => signIn('facebook', { callbackUrl: '/' })}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-transparent rounded-lg text-sm font-semibold text-white bg-[#1877F2] hover:bg-[#1874EA] transition-colors shadow-sm"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/facebook.svg" alt="Facebook" className="w-5 h-5" />
+                <Image src="/facebook.svg" alt="Facebook" width={20} height={20} />
                 {labels.facebook}
               </button>
             </div>

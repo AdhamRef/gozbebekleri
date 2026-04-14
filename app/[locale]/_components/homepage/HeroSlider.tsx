@@ -16,7 +16,11 @@ interface SlideItem {
   order: number;
 }
 
-const HeroSlider: React.FC = () => {
+interface HeroSliderProps {
+  initialFirstImage?: string | null;
+}
+
+const HeroSlider: React.FC<HeroSliderProps> = ({ initialFirstImage }) => {
   const t = useTranslations("HeroSlider");
   const locale = useLocale() as "ar" | "en" | "fr";
   const [slides, setSlides] = useState<SlideItem[]>([]);
@@ -57,7 +61,26 @@ const HeroSlider: React.FC = () => {
     };
   }, [isPlaying, nextSlide]);
 
-  if (slides.length === 0) return null;
+  // While slides are loading from API, show the SSR-provided first image immediately
+  // so the browser doesn't blank the hero for ~1,590ms
+  if (slides.length === 0) {
+    if (!initialFirstImage) return null;
+    return (
+      <div className="relative w-full h-[350px] sm:h-[400px] md:h-[450px] lg:h-[500px] xl:h-[550px] overflow-hidden">
+        <div className="absolute inset-0 bg-[#0f172a]">
+          <Image
+            src={initialFirstImage}
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover object-center"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-black/30 to-black/50 z-10" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

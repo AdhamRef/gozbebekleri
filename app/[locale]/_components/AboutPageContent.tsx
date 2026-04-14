@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import Image from 'next/image';
 import { Target, Users, Heart, MessageSquare, CheckCircle, Eye, Sparkles } from 'lucide-react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
@@ -90,10 +91,13 @@ const AboutUs = () => {
       {/* Compact Hero */}
       <section className="relative h-[250px] sm:h-[320px] overflow-hidden">
         <div className="absolute inset-0">
-          <img 
-            src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=1200&h=400&fit=crop" 
+          <Image
+            src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=1200&h=400&fit=crop"
             alt="أطفال سعداء"
-            className="w-full h-full object-cover"
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/50 to-black/60"></div>
         </div>
@@ -127,11 +131,13 @@ const AboutUs = () => {
               </div>
             </div>
             <div className="order-1 lg:order-2">
-              <div className="relative rounded-xl overflow-hidden shadow-lg">
-                <img 
-                  src="https://i.ibb.co/5X3jHptJ/insanligin-etkileyicileri-konferansi-2084.jpg" 
+              <div className="relative rounded-xl overflow-hidden shadow-lg h-[250px] sm:h-[300px]">
+                <Image
+                  src="https://i.ibb.co/5X3jHptJ/insanligin-etkileyicileri-konferansi-2084.jpg"
                   alt="أطفال يدرسون"
-                  className="w-full h-[250px] sm:h-[300px] object-cover"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  className="object-cover"
                 />
                 <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm px-3 py-2 rounded-lg shadow-md">
                   <div className="flex items-center gap-2">
@@ -152,13 +158,14 @@ const AboutUs = () => {
       <section className="py-10 sm:py-12 lg:py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-6 lg:gap-8 items-center">
-            <div className="relative rounded-xl overflow-hidden shadow-lg">
-              <img 
-                src="https://i.ibb.co/qt4f4cg/calisma-alanlarimiz-yardim-sektoru.jpg" 
+            <div className="relative rounded-xl overflow-hidden shadow-lg h-[250px] sm:h-[300px]">
+              <Image
+                src="https://i.ibb.co/qt4f4cg/calisma-alanlarimiz-yardim-sektoru.jpg"
                 alt="رؤيتنا"
-                className="w-full h-[250px] sm:h-[300px] object-cover"
+                fill
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                className="object-cover"
               />
-
             </div>
             <div>
               <div className="inline-flex items-center gap-2 bg-white text-[#025EB8] px-3 py-1.5 rounded-full text-xs font-semibold mb-4 shadow-sm">
@@ -208,10 +215,12 @@ const AboutUs = () => {
           <div className="grid lg:grid-cols-2 gap-6 lg:gap-8">
             {/* Image */}
             <div className="relative rounded-xl overflow-hidden shadow-lg h-[280px] sm:h-[350px]">
-              <img 
-                src="https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg" 
+              <Image
+                src="https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"
                 alt="أهدافنا"
-                className="w-full h-full object-cover"
+                fill
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                className="object-cover"
               />
               <div className="absolute inset-0 bg-[#025EB8]/70"></div>
               <div className="absolute inset-0 flex items-center justify-center p-6">
@@ -261,11 +270,13 @@ const AboutUs = () => {
           <div className="grid lg:grid-cols-3 gap-6 lg:gap-8">
             {/* President Image */}
             <div className="lg:col-span-1">
-              <div className="relative rounded-xl overflow-hidden shadow-lg sticky top-4">
-                <img 
-                  src="https://i.ibb.co/rKTrMkzj/gozbebekkleri-hakkimizda.jpg" 
+              <div className="relative rounded-xl overflow-hidden shadow-lg sticky top-4 h-[320px] sm:h-[380px]">
+                <Image
+                  src="https://i.ibb.co/rKTrMkzj/gozbebekkleri-hakkimizda.jpg"
                   alt="رئيسة الجمعية"
-                  className="w-full h-[320px] sm:h-[380px] object-cover"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 33vw"
+                  className="object-cover"
                 />
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
                   <h3 className="text-white font-bold text-base mb-0.5">{t('presidentName')}</h3>
@@ -293,10 +304,12 @@ const AboutUs = () => {
       {/* Compact CTA */}
       <section className="py-12 sm:py-16 bg-black relative overflow-hidden">
         <div className="absolute inset-0">
-          <img 
-            src="https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=1200&h=300&fit=crop" 
-            alt="background"
-            className="w-full h-full object-cover opacity-30 blur-sm"
+          <Image
+            src="https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=1200&h=300&fit=crop"
+            alt=""
+            fill
+            sizes="100vw"
+            className="object-cover opacity-30 blur-sm"
           />
         </div>
         <div className="max-w-7xl mx-auto px-4 text-center relative z-10">
