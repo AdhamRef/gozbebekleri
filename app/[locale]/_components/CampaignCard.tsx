@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
+import Image from "next/image";
 import { Link, usePathname, useRouter } from "@/i18n/routing";
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
 import { useSearchParams } from "next/navigation";
@@ -9,14 +11,24 @@ import { formatNumber } from "@/hooks/formatNumber";
 import { useCurrency } from "@/context/CurrencyContext";
 import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
-import DonationDialog from "@/components/DonationDialog";
 import SignInDialog from "@/components/SignInDialog";
+
+const DonationDialog = dynamic(() => import("@/components/DonationDialog"), { ssr: false });
 import CategoryIcon from "@/components/CategoryIcon";
 import { Heart } from "lucide-react";
 import type { SuggestedDonationsConfig } from "@/lib/campaign/suggested-donations";
 
 const RESUME_KEY = "campaignDonateResume";
 const FALLBACK_IMG = "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg";
+
+function buildImgSrc(src: string, width = 600, height = 480): string {
+  if (!src.includes("res.cloudinary.com")) return src;
+  // Insert Cloudinary transformation parameters after /upload/
+  return src.replace(
+    /\/upload\//,
+    `/upload/f_auto,q_auto:good,w_${width},h_${height},c_fill/`
+  );
+}
 
 export interface CampaignCardData {
   id: string;
@@ -101,7 +113,8 @@ export function CampaignCard({ campaign, className, onClick }: CampaignCardProps
     }
   };
 
-  const imgSrc = campaign.images[0] || FALLBACK_IMG;
+  const rawImgSrc = campaign.images[0] || FALLBACK_IMG;
+  const imgSrc = buildImgSrc(rawImgSrc);
 
   return (
     <>
@@ -111,13 +124,13 @@ export function CampaignCard({ campaign, className, onClick }: CampaignCardProps
         {/* Full image with everything overlaid */}
         <Link href={`/campaign/${campaign.id}`} prefetch={true} onClick={onClick} className="block relative flex-1">
           <div className="relative overflow-hidden h-64 lg:h-72">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src={imgSrc}
               alt={campaign.title}
-              className="w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-700 ease-out"
-              draggable="false"
-              loading="lazy"
+              fill
+              sizes="(max-width: 640px) 70vw, (max-width: 1024px) 300px, 380px"
+              className="object-cover group-hover/card:scale-105 transition-transform duration-700 ease-out"
+              draggable={false}
             />
 
             {/* Scrim: subtle top, heavy bottom */}
@@ -199,7 +212,7 @@ export function CampaignCard({ campaign, className, onClick }: CampaignCardProps
         }}
         campaignId={campaign.id}
         campaignTitle={campaign.title}
-        campaignImage={imgSrc}
+        campaignImage={rawImgSrc}
         fundraisingMode={donationContext?.fundraisingMode ?? campaign.fundraisingMode}
         targetAmount={campaign.targetAmount}
         amountRaised={campaign.currentAmount}

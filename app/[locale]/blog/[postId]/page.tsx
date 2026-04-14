@@ -30,7 +30,7 @@ interface BlogPostProps {
 export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
   try {
     const params = await args.params;
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.vercel.app";
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.com";
     const locale = (params?.locale as string) || "ar";
     const postId = params?.postId;
 
@@ -43,7 +43,7 @@ export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
     const descriptionText = post?.description || tr?.description || post?.descriptionAR || post?.descriptionEN || post?.descriptionFR || "";
     const imageUrl = post?.image || "/default-post-image.jpg";
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://gozbebekleri.vercel.app";
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://gozbebekleri.com";
     const canonicalUrl = `${siteUrl}/${locale}/blog/${postId}`;
 
     const msgs = await import(`../../../../i18n/messages/${locale}.json`).catch(() => null);
@@ -83,7 +83,7 @@ export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
 
 export default async function BlogPost({ params: paramsPromise }: BlogPostProps) {
   const params = await paramsPromise;
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.vercel.app";
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.com";
   const locale = params.locale || "ar";
   const msgs = await import(`../../../../i18n/messages/${locale}.json`);
   const t = (k: string) => msgs?.default?.Blog?.[k] ?? k;
@@ -147,7 +147,7 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
                 </CardContent>
 
                 <CardFooter>
-                  <ShareButton label={t('sharePost')} copiedMessage={t('linkCopied')} url={`https://gozbebekleri.vercel.app/${locale}/blog/${params.postId}`} />
+                  <ShareButton label={t('sharePost')} copiedMessage={t('linkCopied')} url={`https://gozbebekleri.com/${locale}/blog/${params.postId}`} />
                 </CardFooter>
               </Card>
             </div>

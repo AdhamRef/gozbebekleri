@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
@@ -72,11 +73,18 @@ const HeroSlider: React.FC = () => {
               current === index ? "opacity-100 z-10" : "opacity-0 z-0"
             }`}
           >
-            <div
-              className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-              style={{ backgroundImage: slide.image ? `url(${slide.image})` : undefined, backgroundColor: slide.image ? undefined : '#0f172a' }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-black/30 to-black/50"></div>
+            <div className="absolute inset-0 bg-[#0f172a]">
+                {slide.image && (
+                  <Image
+                    src={slide.image}
+                    alt=""
+                    fill
+                    priority={index === 0}
+                    sizes="100vw"
+                    className="object-cover object-center"
+                  />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-br from-black/30 to-black/50 z-10"></div>
             </div>
 
             <div className="relative h-full z-20 flex flex-col justify-center items-center text-center px-4 sm:px-6 md:px-8 lg:px-12">

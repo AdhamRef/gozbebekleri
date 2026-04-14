@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { LOCALE_SEO, OG_LOCALE_MAP, OG_IMAGE, SITE_URL, buildHreflang } from "@/lib/seo";
+import type { Locale } from "@/lib/seo";
 import { Suspense } from "react";
 import Navbar from "@/components/Navbar";
 import { CurrencyFromUrlSync } from "@/components/CurrencyFromUrlSync";
@@ -23,47 +25,43 @@ import { CurrencyProvider } from "@/context/CurrencyContext";
 import { Analytics } from "@vercel/analytics/react"
 import { SpeedInsights } from "@vercel/speed-insights/next"
 
-// Global metadata
-export const metadata: Metadata = {
-  title: {
-    default:"جمعية قرة العيون للإغاثة والتكافل",
-    template: "%s | قرة العيون",
-  },
-  description: "منصة قرة العيون لجمع التبرعات للقضايا الإنسانية الطبية في سوريا. ساعدنا في إحداث فرق في حياة المحتاجين.",
-  keywords: ["تبرع", "جمع تبرعات", "قضايا إنسانية", "قرة العيون", "منصة قرة العيون"],
-  icons: {
-    icon: "https://i.ibb.co/ZwcJcN1/logo.webp",
-  },
-  openGraph: {
-    title: "جمعية قرة العيون للإغاثة والتكافل",
-    description: "منصة جمعية قرة العيون لجمع التبرعات للقضايا الإنسانية الطبية في سوريا. ساعدنا في إحداث فرق في حياة المحتاجين.",
-    url: "https://gozbebekleri.com", // Replace with your actual domain
-    siteName: "قرة العيون",
-    images: [
-      {
-        url: "https://gozbebekleri.com/og-image.jpg", // Replace with your actual OG image
-        width: 1200,
-        height: 630,
-        alt: "قرة العيون",
-      },
-    ],
-    locale: "ar_SA",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "جمعية قرة العيون للإغاثة والتكافل",
-    description: "منصة قرة العيون لجمع التبرعات للقضايا الإنسانية الطبية في سوريا. ساعدنا في إحداث فرق في حياة المحتاجين.",
-    images: ["https://gozbebekleri.com/og-image.jpg"], // Replace with your actual OG image
-  },
-  alternates: {
-    canonical: "https://gozbebekleri.com", // Replace with your actual domain
-  },
-};
-
 const localeMessages: Record<string, Record<string, unknown>> = { ar, en, fr, tr, id, pt, es };
 const VALID_LOCALES = ["ar", "en", "fr", "tr", "id", "pt", "es"] as const;
 const DEFAULT_LOCALE = "ar";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale: rawLocale } = await params;
+  const locale = (VALID_LOCALES.includes(rawLocale as (typeof VALID_LOCALES)[number]) ? rawLocale : DEFAULT_LOCALE) as Locale;
+  const seo = LOCALE_SEO[locale];
+  const alternates = buildHreflang("/", locale);
+
+  return {
+    title: { default: seo.title, template: seo.titleTemplate },
+    description: seo.description,
+    keywords: seo.keywords,
+    icons: { icon: "https://i.ibb.co/ZwcJcN1/logo.webp" },
+    alternates,
+    openGraph: {
+      title: seo.title,
+      description: seo.description,
+      url: `${SITE_URL}/${locale}`,
+      siteName: seo.siteName,
+      images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: seo.siteName }],
+      locale: OG_LOCALE_MAP[locale],
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: seo.title,
+      description: seo.description,
+      images: [OG_IMAGE],
+    },
+  };
+}
 
 export default async function Rootlayout({
   children,

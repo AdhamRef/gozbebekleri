@@ -66,6 +66,7 @@ export default function LanguageSwitcher({ onDark = true }: { onDark?: boolean }
       >
         <ReactCountryFlag
           svg
+          alt={currentLang.name}
           countryCode={currentLang.countryCode}
           style={{ width: "1.1em", height: "1.1em" }}
         />

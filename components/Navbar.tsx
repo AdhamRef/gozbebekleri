@@ -28,7 +28,8 @@ import CurrencySelector from "./CurrencySelector";
 import LanguageSwitcher from "./LanguageSelector";
 import SignInDialog from "@/components/SignInDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import CartPaymentDialog from "./CartPaymentDialog";
+import dynamic from "next/dynamic";
+const CartPaymentDialog = dynamic(() => import("./CartPaymentDialog"), { ssr: false });
 import { AnimatePresence, motion } from "framer-motion";
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
 

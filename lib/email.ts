@@ -30,7 +30,7 @@ const copy: Record<string, Texts> = {
     note: "الرابط صالح لمرة واحدة فقط.",
     expires: "ينتهي هذا الرابط خلال 24 ساعة",
     ignore: "إذا لم تنشئ حساباً، يمكنك تجاهل هذا البريد بأمان.",
-    footer: "© 2024 قرة العيون · جميع الحقوق محفوظة",
+    footer: "© 2026 قرة العيون · جميع الحقوق محفوظة",
   },
   tr: {
     subject: "E-postanı Onayla ve Bağış Yapmaya Başla",
@@ -43,7 +43,7 @@ const copy: Record<string, Texts> = {
     note: "Bu bağlantı yalnızca bir kez kullanılabilir.",
     expires: "Bağlantı 24 saat içinde geçerliliğini yitirir",
     ignore: "Bir hesap oluşturmadıysanız bu e-postayı görmezden gelebilirsiniz.",
-    footer: "© 2024 Gözbebekleri · Tüm hakları saklıdır",
+    footer: "© 2026 Gözbebekleri · Tüm hakları saklıdır",
   },
   fr: {
     subject: "Confirmez votre e-mail et commencez à donner",
@@ -56,7 +56,7 @@ const copy: Record<string, Texts> = {
     note: "Ce lien n'est utilisable qu'une seule fois.",
     expires: "Ce lien expire dans 24 heures",
     ignore: "Si vous n'avez pas créé de compte, ignorez cet e-mail.",
-    footer: "© 2024 Gözbebekleri · Tous droits réservés",
+    footer: "© 2026 Gözbebekleri · Tous droits réservés",
   },
   es: {
     subject: "Confirma tu correo y empieza a donar",
@@ -69,7 +69,7 @@ const copy: Record<string, Texts> = {
     note: "Este enlace solo puede usarse una vez.",
     expires: "Este enlace caduca en 24 horas",
     ignore: "Si no creaste una cuenta, ignora este correo.",
-    footer: "© 2024 Gözbebekleri · Todos los derechos reservados",
+    footer: "© 2026 Gözbebekleri · Todos los derechos reservados",
   },
   pt: {
     subject: "Confirme o seu e-mail e comece a doar",
@@ -82,7 +82,7 @@ const copy: Record<string, Texts> = {
     note: "Este link só pode ser usado uma vez.",
     expires: "Este link expira em 24 horas",
     ignore: "Se não criou uma conta, ignore este e-mail.",
-    footer: "© 2024 Gözbebekleri · Todos os direitos reservados",
+    footer: "© 2026 Gözbebekleri · Todos os direitos reservados",
   },
   id: {
     subject: "Konfirmasi Email & Mulai Berdonasi",
@@ -95,7 +95,7 @@ const copy: Record<string, Texts> = {
     note: "Tautan ini hanya dapat digunakan sekali.",
     expires: "Tautan ini berlaku selama 24 jam",
     ignore: "Jika Anda tidak membuat akun, abaikan email ini.",
-    footer: "© 2024 Gözbebekleri · Semua hak dilindungi",
+    footer: "© 2026 Gözbebekleri · Semua hak dilindungi",
   },
   en: {
     subject: "Confirm Your Email & Start Donating",
@@ -108,7 +108,7 @@ const copy: Record<string, Texts> = {
     note: "This link can only be used once.",
     expires: "This link expires in 24 hours",
     ignore: "If you didn't create an account, you can safely ignore this email.",
-    footer: "© 2024 Gözbebekleri · All rights reserved",
+    footer: "© 2026 Gözbebekleri · All rights reserved",
   },
 };
 

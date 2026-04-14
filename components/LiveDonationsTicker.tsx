@@ -224,9 +224,9 @@ export default function LiveDonationsGlass() {
         {currentDonation && !exiting && (
           <motion.div
             key={currentDonation.id}
-            initial={{ opacity: 0, y: 8, filter: "blur(4px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            exit={{ opacity: 0, y: -6, filter: "blur(4px)" }}
+            initial={{ opacity: 0, y: 8, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.97 }}
             transition={{ duration: EXIT_DURATION_MS / 1000, ease: "easeOut" }}
             className="w-full"
           >

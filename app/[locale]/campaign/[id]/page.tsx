@@ -1,7 +1,7 @@
 import { Metadata } from "next";
-import axios from "axios";
-import MainPage from "../_components/MainPage";
 import MainPageDummy from "../_components/MainPageDummy";
+import { SITE_URL, LOCALE_SEO, OG_LOCALE_MAP, LOCALES, buildHreflang } from "@/lib/seo";
+import type { Locale } from "@/lib/seo";
 
 interface Props {
   params: Promise<{ id: string; locale: string }>;
@@ -13,69 +13,67 @@ interface Campaign {
   images: string[];
 }
 
-// Helper function to load messages
-async function getMessages(locale: string) {
+async function fetchCampaign(id: string, locale: string): Promise<Campaign | null> {
   try {
-    const messages = await import(`../../../../i18n/messages/${locale}.json`);
-    return messages.default;
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || "https://gozbebekleri.com";
+    const res = await fetch(`${baseUrl}/api/campaigns/${id}?locale=${locale}`, {
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return null;
+    return res.json();
   } catch {
-    const messages = await import(`../../../../i18n/messages/ar.json`);
-    return messages.default;
+    return null;
   }
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id, locale } = await params;
-  
-  // Fetch campaign data using axios
-  const fetchCampaignData = async (): Promise<Campaign | null> => {
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
-      const response = await axios.get(`${baseUrl}/api/campaigns/${id}?locale=${locale}`);
-      return response.data;
-    } catch (error) {
-      console.error("Failed to fetch campaign data:", error);
-      return null;
-    }
-  };
+  const campaign = await fetchCampaign(id, locale);
+  const seo = LOCALE_SEO[locale as Locale] ?? LOCALE_SEO.en;
 
-  const campaign = await fetchCampaignData();
-  const messages = await getMessages(locale);
-  const campaignMsg = messages?.Campaign || {};
-
-  // Provide fallback metadata if campaign data fails to load
   if (!campaign) {
     return {
-      title: `${campaignMsg.notFound || 'Campaign Not Found'} - قرة العيون`,
-      description: campaignMsg.errorOccurred || 'An error occurred',
+      title: seo.campaigns.title,
+      description: seo.campaigns.description,
     };
   }
 
+  const image = campaign.images[0] || `${SITE_URL}/og-image.jpg`;
+  const path = `/campaign/${id}`;
+  const alternates = buildHreflang(path, locale);
+
+  // Emotionally charged, urgency-driven title
+  const urgencyPrefixes: Record<string, string> = {
+    ar: "ساعد الآن — ",
+    en: "Urgent: ",
+    tr: "Acil: ",
+    fr: "Urgent : ",
+    es: "Urgente: ",
+    pt: "Urgente: ",
+    id: "Mendesak: ",
+  };
+  const prefix = urgencyPrefixes[locale] ?? "";
+  const title = `${prefix}${campaign.title} | ${seo.siteName}`;
+
   return {
-    title: `${campaign.title} - قرة العيون`,
-    description: campaign.description,
+    title,
+    description: campaign.description.slice(0, 160),
+    keywords: seo.keywords,
+    alternates,
     openGraph: {
-      title: `${campaign.title} - قرة العيون`,
-      description: campaign.description,
-      images: [
-        {
-          url: campaign.images[0] || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg",
-          width: 1200,
-          height: 630,
-          alt: campaign.title,
-        },
-      ],
-      url: `https://gozbebekleri.vercel.app/${locale}/campaigns/${id}`,
+      title,
+      description: campaign.description.slice(0, 200),
+      url: alternates.canonical,
+      siteName: seo.siteName,
+      locale: OG_LOCALE_MAP[locale as Locale] ?? "en_US",
       type: "website",
+      images: [{ url: image, width: 1200, height: 630, alt: campaign.title }],
     },
     twitter: {
       card: "summary_large_image",
-      title: `${campaign.title} - قرة العيون`,
-      description: campaign.description,
-      images: [campaign.images[0] || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"],
-    },
-    alternates: {
-      canonical: `https://gozbebekleri.vercel.app/${locale}/campaigns/${id}`,
+      title,
+      description: campaign.description.slice(0, 200),
+      images: [image],
     },
   };
 }

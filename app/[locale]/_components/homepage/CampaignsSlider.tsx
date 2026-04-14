@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import axios from "axios";
 import CampaignCard from "@/app/[locale]/_components/CampaignCard";
@@ -101,9 +101,24 @@ const CampaignsSlider = ({
   }, [isGrid, isGridMobile, allowDrag]);
 
   if (loading) {
+    const skeletonClass = isGrid
+      ? isGridMobile
+        ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4"
+        : "flex gap-3 overflow-x-hidden pb-4 pt-1 sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"
+      : "flex gap-3 overflow-x-hidden pb-4 pt-1";
+    const skeletonCardClass = isGrid && !isGridMobile ? "w-[70vw] flex-shrink-0 sm:w-auto sm:flex-shrink" : isGrid ? "" : "w-[70vw] flex-shrink-0 sm:w-[300px]";
     return (
-      <div className="flex items-center justify-center py-20 w-full">
-        <Loader2 className="w-8 h-8 animate-spin text-[#025EB8]" />
+      <div className="w-full mx-auto">
+        <div className="max-w-7xl mx-auto">
+          <div className={skeletonClass}>
+            {Array.from({ length: isGrid ? 6 : 4 }).map((_, i) => (
+              <div key={i} className={`bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm flex flex-col ${skeletonCardClass}`}>
+                <div className="h-64 lg:h-72 bg-gray-200 animate-pulse" />
+                <div className="h-10 bg-gray-100 animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

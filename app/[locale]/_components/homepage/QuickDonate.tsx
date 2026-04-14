@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { Heart, TrendingUp, Users, Award, CheckCircle, ArrowLeft, Sparkles, ChevronDown, Check } from "lucide-react";
 import { getCurrency } from "@/hooks/useCampaignValue";
 import { usePathname, useRouter } from "@/i18n/routing";
@@ -141,12 +142,14 @@ const QuickDonate = () => {
     <div id="quick_donate" className="relative rounded-none lg:rounded-2xl overflow-hidden shadow-xl">
 
       {/* Full-bleed background image */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src="https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"
         alt=""
         aria-hidden
-        className="absolute inset-0 w-full h-full object-cover"
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover"
       />
       <div className="absolute inset-0 bg-gradient-to-l from-[#014fa0]/80 via-[#014fa0]/60 to-[#014fa0]/40" />
       <div className="absolute inset-0 opacity-[0.06] bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:18px_18px]" />

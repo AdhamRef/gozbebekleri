@@ -18,8 +18,10 @@ const notoKufiArabic = Noto_Kufi_Arabic({
 });
 
 export const metadata: Metadata = {
-  title: { default: "قرة العيون", template: "%s | قرة العيون" },
-  description: "منصة قرة العيون لجمع التبرعات للقضايا الإنسانية الطبية في سوريا.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://gozbebekleri.com"),
+  title: { default: "Gözbebekleri | قرة العيون", template: "%s | Gözbebekleri" },
+  description: "Donate for urgent medical aid and humanitarian relief in Syria. Trusted charity platform for zakat, sadaqah, and emergency donations.",
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large" } },
 };
 
 export default function RootLayout({
@@ -30,6 +32,14 @@ export default function RootLayout({
   return (
     <html lang="en" dir="ltr" suppressHydrationWarning>
       <head>
+        {/* Preconnect to critical third-party origins to reduce LCP */}
+        <link rel="preconnect" href="https://res.cloudinary.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="dns-prefetch" href="https://i.ibb.co" />
+        <link rel="dns-prefetch" href="https://v6.exchangerate-api.com" />
+        <link rel="dns-prefetch" href="https://ipapi.co" />
+        <link rel="preload" href="/bg.png" as="image" type="image/png" />
         <link
           href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
           rel="stylesheet"
