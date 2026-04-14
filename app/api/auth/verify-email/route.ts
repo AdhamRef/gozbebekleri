@@ -6,13 +6,16 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const token = searchParams.get("token");
   const email = searchParams.get("email");
+  const rawCallback = searchParams.get("callbackUrl");
+  // Only allow relative paths to prevent open-redirect
+  const callbackPath = rawCallback && rawCallback.startsWith("/") ? rawCallback : "/";
 
   const baseUrl =
     process.env.NEXTAUTH_URL ??
     `${req.nextUrl.protocol}//${req.nextUrl.host}`;
 
   if (!token || !email) {
-    return NextResponse.redirect(`${baseUrl}/?verified=invalid`);
+    return NextResponse.redirect(`${baseUrl}${callbackPath}${callbackPath.includes("?") ? "&" : "?"}verified=invalid`);
   }
 
   const normalizedEmail = decodeURIComponent(email).toLowerCase().trim();
@@ -21,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   if (!result.success) {
     const reason = result.error === "EXPIRED" ? "expired" : "invalid";
-    return NextResponse.redirect(`${baseUrl}/?verified=${reason}`);
+    return NextResponse.redirect(`${baseUrl}${callbackPath}${callbackPath.includes("?") ? "&" : "?"}verified=${reason}`);
   }
 
   // Mark email as verified
@@ -30,5 +33,5 @@ export async function GET(req: NextRequest) {
     data: { emailVerified: new Date() },
   });
 
-  return NextResponse.redirect(`${baseUrl}/?verified=success`);
+  return NextResponse.redirect(`${baseUrl}${callbackPath}${callbackPath.includes("?") ? "&" : "?"}verified=success`);
 }

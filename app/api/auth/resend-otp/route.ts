@@ -4,7 +4,7 @@ import { sendVerificationEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, purpose = "VERIFY_EMAIL", locale = "en" } = await req.json();
+    const { email, purpose = "VERIFY_EMAIL", locale = "en", callbackUrl } = await req.json();
 
     if (!email) {
       return NextResponse.json({ error: "MISSING_FIELDS" }, { status: 400 });
@@ -27,7 +27,8 @@ export async function POST(req: NextRequest) {
       process.env.NEXTAUTH_URL ??
       `${req.nextUrl.protocol}//${req.nextUrl.host}`;
 
-    const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
+    const safeCallback = typeof callbackUrl === "string" && callbackUrl.startsWith("/") ? callbackUrl : "/";
+    const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}&email=${encodeURIComponent(normalizedEmail)}&callbackUrl=${encodeURIComponent(safeCallback)}`;
 
     await sendVerificationEmail(normalizedEmail, verificationUrl, locale);
 

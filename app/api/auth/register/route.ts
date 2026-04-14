@@ -6,7 +6,7 @@ import { sendVerificationEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
-    const { firstName, lastName, phone, email, password, locale } = await req.json();
+    const { firstName, lastName, phone, email, password, locale, callbackUrl } = await req.json();
 
     // ── Validate ──────────────────────────────────────────────────────────
     if (!firstName?.trim() || !lastName?.trim() || !email?.trim() || !password) {
@@ -46,7 +46,8 @@ export async function POST(req: NextRequest) {
       process.env.NEXTAUTH_URL ??
       `${req.nextUrl.protocol}//${req.nextUrl.host}`;
 
-    const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
+    const safeCallback = typeof callbackUrl === "string" && callbackUrl.startsWith("/") ? callbackUrl : "/";
+    const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}&email=${encodeURIComponent(normalizedEmail)}&callbackUrl=${encodeURIComponent(safeCallback)}`;
 
     await sendVerificationEmail(normalizedEmail, verificationUrl, locale ?? "en");
 

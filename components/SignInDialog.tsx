@@ -189,7 +189,7 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl }: SignInDia
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, locale }),
+        body: JSON.stringify({ ...form, locale, callbackUrl: callbackUrl ?? pathname }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -211,7 +211,7 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl }: SignInDia
     await fetch("/api/auth/resend-otp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, purpose: "VERIFY_EMAIL", locale }),
+      body: JSON.stringify({ email, purpose: "VERIFY_EMAIL", locale, callbackUrl: callbackUrl ?? pathname }),
     });
   };
 
@@ -222,7 +222,7 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl }: SignInDia
       const res = await fetch("/api/auth/resend-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: pendingEmail, purpose: "VERIFY_EMAIL", locale }),
+        body: JSON.stringify({ email: pendingEmail, purpose: "VERIFY_EMAIL", locale, callbackUrl: callbackUrl ?? pathname }),
       });
       const data = await res.json();
       if (res.ok) {
