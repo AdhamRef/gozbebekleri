@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Cookies from "js-cookie";
 import {
   isValidCurrencyParam,
@@ -19,28 +19,34 @@ function dispatchCurrencyCookieUpdated(code: string) {
 }
 
 /**
- * Syncs `?currency=` from the URL into the `currency` cookie (same as `CurrencySelector`),
- * and notifies listeners so the selector updates immediately on client navigation.
+ * Syncs `?currency=` from the URL into the `currency` cookie, then strips
+ * the param from the URL so shared links apply the currency silently.
  * When there is no URL param, ensures a default cookie (`USD`) if none is set.
  */
 export function CurrencyFromUrlSync() {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     const raw = searchParams.get("currency");
     if (raw && isValidCurrencyParam(raw)) {
       const normalized = normalizeCurrencyParamToCookie(raw);
-      if (Cookies.get("currency") !== normalized) {
-        Cookies.set("currency", normalized, { expires: 365 });
-      }
+      Cookies.set("currency", normalized, { expires: 365 });
       dispatchCurrencyCookieUpdated(normalized);
+
+      // Strip ?currency= from the URL so it doesn't persist
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("currency");
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname);
       return;
     }
     if (!Cookies.get("currency")) {
       Cookies.set("currency", "USD", { expires: 365 });
       dispatchCurrencyCookieUpdated("USD");
     }
-  }, [searchParams]);
+  }, [searchParams, pathname, router]);
 
   return null;
 }
