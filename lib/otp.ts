@@ -81,3 +81,4 @@ export async function canResendToken(
 // Backward-compat aliases used by existing route files
 export const createOtpRecord = createVerificationToken;
 export const canResendOtp = canResendToken;
+export const verifyOtpCode = verifyToken;
