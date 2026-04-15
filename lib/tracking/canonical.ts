@@ -119,7 +119,7 @@ export const META_EVENT_MAP: Partial<Record<CanonicalEventName, string>> = {
   add_to_cart:        "AddToCart",
   begin_checkout:     "InitiateCheckout",
   add_payment_info:   "AddPaymentInfo",
-  donation_complete:  "Purchase",
+  donation_complete:  "Donate",
   sign_up:            "CompleteRegistration",
 };
 
@@ -143,7 +143,7 @@ export const GA4_EVENT_MAP: Partial<Record<CanonicalEventName, string>> = {
   begin_checkout:     "begin_checkout",
   add_payment_info:   "add_payment_info",
   payment_failed:     "exception",
-  donation_complete:  "purchase",
+  donation_complete:  "donate",
   sign_up:            "sign_up",
   scroll_depth:       "scroll",
   user_engagement:    "user_engagement",

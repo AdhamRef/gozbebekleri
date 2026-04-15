@@ -109,7 +109,7 @@ interface TrackPaymentFailedOptions {
 interface TrackingContextValue {
   config: TrackingConfig | null;
   setUserData: (user: Partial<CanonicalUser>) => void;
-  trackPurchase: (options: TrackPurchaseOptions) => void;
+  trackDonate: (options: TrackPurchaseOptions) => void;
   trackCompleteRegistration: () => void;
   trackViewContent: (params?: TrackViewContentOptions) => void;
   trackAddToCart: (options: TrackAddToCartOptions) => void;
@@ -117,7 +117,7 @@ interface TrackingContextValue {
   trackPageView: (pagePath?: string, pageTitle?: string) => void;
   trackCustomizeProduct: (options: TrackCustomizeProductOptions) => void;
   trackAddPaymentInfo: (options: TrackAddPaymentInfoOptions) => void;
-  trackDonate: (options: TrackDonateOptions) => void;
+  trackPaymentSubmit: (options: TrackDonateOptions) => void;
   trackPaymentFailed: (options: TrackPaymentFailedOptions) => void;
   trackMissingEvent: (customEventName: string, data?: Record<string, unknown>) => void;
 }
@@ -581,7 +581,7 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
     });
   }, [sendCanonical]);
 
-  const trackDonate = useCallback((options: TrackDonateOptions) => {
+  const trackPaymentSubmit = useCallback((options: TrackDonateOptions) => {
     sendCanonical({
       event:    "payment_submit",
       event_id: generateEventId("don"),
@@ -618,7 +618,7 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
     });
   }, [sendCanonical]);
 
-  const trackPurchase = useCallback((options: TrackPurchaseOptions) => {
+  const trackDonate = useCallback((options: TrackPurchaseOptions) => {
     const { value, currency = "USD", orderId, numItems = 1, items, donationType, causeName, causeId, gateway } = options;
     const canonItems: CanonicalItem[] = items?.length
       ? items.map((i) => ({ ...i }))
@@ -667,7 +667,7 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
   const value: TrackingContextValue = {
     config,
     setUserData,
-    trackPurchase,
+    trackDonate,
     trackCompleteRegistration,
     trackViewContent,
     trackAddToCart,
@@ -675,7 +675,7 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
     trackPageView,
     trackCustomizeProduct,
     trackAddPaymentInfo,
-    trackDonate,
+    trackPaymentSubmit,
     trackPaymentFailed,
     trackMissingEvent,
   };

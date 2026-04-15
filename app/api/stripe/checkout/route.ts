@@ -63,8 +63,8 @@ export async function POST(req: NextRequest) {
 
     const isMonthly = Boolean(donation.subscriptionId);
 
-    const successUrl = `${origin}/success/${donationId}?session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = `${origin}/campaigns?payment=cancelled&donationId=${encodeURIComponent(donationId)}`;
+    const successUrl = `${origin}/${locale}/success/${donationId}?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${origin}/${locale}/campaigns?payment=cancelled&donationId=${encodeURIComponent(donationId)}`;
 
     const metadata: Record<string, string> = {
       donationId,

@@ -69,7 +69,7 @@ const DonationSuccessPage = () => {
       })),
     ];
 
-    tracking.trackPurchase({
+    tracking.trackDonate({
       value,
       currency:     'USD',
       orderId:      donation.id,

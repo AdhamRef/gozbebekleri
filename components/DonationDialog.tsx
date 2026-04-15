@@ -1055,7 +1055,7 @@ const DonationDialog = ({
       });
 
       // payment_submit event
-      tracking?.trackDonate({
+      tracking?.trackPaymentSubmit({
         value:        amountUSD,
         currency:     "USD",
         causeId:      campaignId || categoryId || undefined,

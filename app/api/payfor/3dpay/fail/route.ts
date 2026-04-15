@@ -114,8 +114,8 @@ export async function POST(req: NextRequest) {
               quantity: 1,
             },
           ],
-          success_url: `${origin}/success/${newDonation.id}?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${origin}/campaigns?payment=cancelled&donationId=${encodeURIComponent(newDonation.id)}`,
+          success_url: `${origin}/${locale}/success/${newDonation.id}?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${origin}/${locale}/campaigns?payment=cancelled&donationId=${encodeURIComponent(newDonation.id)}`,
           metadata: {
             donationId: newDonation.id,
             userId: donation.donorId,
