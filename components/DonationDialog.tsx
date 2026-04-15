@@ -243,14 +243,25 @@ const DonationDialog = ({
       .catch(() => setCurrentUser(null));
   }, [isOpen, session?.user?.id]);
 
-  // Reset state when dialog opens
+  // Reset state when dialog opens + fire view_donation_page
   useEffect(() => {
     if (isOpen) {
       setUse3D(true);
       setFallbackClientSecret(null);
       setFallbackDonationId(null);
       hasFallenBackRef.current = false;
+      // Track opening the donation flow
+      const amountUSD = initialDonationAmount
+        ? convertToUSD(initialDonationAmount, getCurrency())
+        : undefined;
+      tracking?.trackViewContent({
+        contentIds:  campaignId ? [campaignId] : categoryId ? [categoryId] : undefined,
+        contentName: campaignTitle || categoryName || undefined,
+        value:       amountUSD,
+        currency:    "USD",
+      });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   // When monthlyOnly (e.g. QuickDonate category), pre-select monthly and skip type step
@@ -317,6 +328,11 @@ const DonationDialog = ({
     setPaymentMethod("CARD");
     setCardDetails({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" });
     setCurrentStep(0);
+    tracking?.trackCustomizeProduct({
+      donationType: type,
+      causeId:   campaignId || categoryId || undefined,
+      causeName: campaignTitle || categoryName || undefined,
+    });
   };
 
   const isPhoneValid = () => {
@@ -329,8 +345,49 @@ const DonationDialog = ({
 
   const handleNext = () => {
     const steps = getSteps();
+    const nextStep = currentStep + 1;
+
     if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
+      setCurrentStep(nextStep);
+
+      // ── Funnel events on step transitions ──────────────────────────────────
+      const amountUSD = shareMode && sharePriceUSD != null
+        ? shareCount * sharePriceUSD
+        : convertToUSD(donationAmount, getCurrency());
+      const nextTitle = steps[nextStep]?.title;
+
+      // Reached confirmation step → InitiateCheckout
+      if (nextTitle === t("confirmation")) {
+        tracking?.trackInitiateCheckout({
+          value:       amountUSD,
+          currency:    "USD",
+          numItems:    1,
+          contentIds:  campaignId ? [campaignId] : categoryId ? [categoryId] : undefined,
+          donationType: donationType ?? undefined,
+        });
+      }
+
+      // Reached payment step → AddPaymentInfo
+      if (nextTitle === t("paymentInfo")) {
+        tracking?.trackAddPaymentInfo({
+          value:         amountUSD,
+          currency:      "USD",
+          causeId:       campaignId || categoryId || undefined,
+          causeName:     campaignTitle || categoryName || undefined,
+          paymentMethod: paymentMethod ?? "CARD",
+        });
+      }
+
+      // Amount step → CustomizeProduct with amount
+      if (steps[currentStep]?.title === t("donationAmount") || steps[currentStep]?.title === t("monthlyDonationAmount")) {
+        tracking?.trackCustomizeProduct({
+          donationType: donationType ?? undefined,
+          amount:       amountUSD,
+          currency:     "USD",
+          causeId:      campaignId || categoryId || undefined,
+          causeName:    campaignTitle || categoryName || undefined,
+        });
+      }
     } else {
       handleSubmit();
     }
@@ -986,6 +1043,27 @@ const DonationDialog = ({
         shareMode && sharePriceUSD != null
           ? shareCount * sharePriceUSD
           : convertToUSD(donationAmount, getCurrency());
+
+      // Push user data for enhanced matching
+      tracking?.setUserData({
+        external_id: session?.user?.id ?? undefined,
+        email:       (session?.user as { email?: string })?.email ?? undefined,
+        phone:       phoneValue.trim() || undefined,
+        country_code: currentUser?.countryCode ?? undefined,
+        city:         currentUser?.city ?? undefined,
+        state:        currentUser?.region ?? undefined,
+      });
+
+      // payment_submit event
+      tracking?.trackDonate({
+        value:        amountUSD,
+        currency:     "USD",
+        causeId:      campaignId || categoryId || undefined,
+        causeName:    campaignTitle || categoryName || undefined,
+        donationType: donationType ?? undefined,
+        gateway:      use3D ? "payfor" : "stripe",
+        is3ds:        use3D,
+      });
       const donationData: Record<string, unknown> = {
         currency: getCurrency(),
         teamSupport,
@@ -1191,6 +1269,17 @@ const DonationDialog = ({
     } catch (error) {
       console.error("Payment failed:", error);
       toast.error(t("donationFailed"));
+      const amountUSD =
+        shareMode && sharePriceUSD != null
+          ? shareCount * sharePriceUSD
+          : convertToUSD(donationAmount, getCurrency());
+      tracking?.trackPaymentFailed({
+        value:   amountUSD,
+        currency: "USD",
+        causeId: campaignId || categoryId || undefined,
+        reason:  error instanceof Error ? error.message : "unknown",
+        gateway: use3D ? "payfor" : "stripe",
+      });
     } finally {
       if (!isRedirecting) setLoading(false);
     }

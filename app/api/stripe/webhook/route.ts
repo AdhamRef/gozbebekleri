@@ -88,78 +88,115 @@ export async function POST(req: NextRequest) {
       }
 
       case "invoice.payment_succeeded": {
-        // Subsequent monthly billing cycles
         const invoice = event.data.object as Stripe.Invoice;
         const stripeSubscriptionId = (invoice as any).subscription as string;
         if (!stripeSubscriptionId) break;
 
-        // Find our subscription record by Stripe subscription ID (stored in payforToken)
+        // Find our DB subscription by Stripe subscription ID (stored in payforToken)
         const dbSubscription = await prisma.subscription.findFirst({
           where: { payforToken: stripeSubscriptionId },
-          include: {
-            items: true,
-            categoryItems: true,
-          },
+          include: { items: true, categoryItems: true },
         });
         if (!dbSubscription) break;
 
-        // Idempotency: skip if we already recorded this invoice as a donation
+        // Idempotency: skip if we already recorded a donation for this invoice
         const existingForInvoice = await prisma.donation.findFirst({
-          where: {
-            subscriptionId: dbSubscription.id,
-            providerOrderId: invoice.id,
-          },
+          where: { subscriptionId: dbSubscription.id, providerOrderId: invoice.id },
         });
         if (existingForInvoice) break;
 
-        await prisma.$transaction(async (tx) => {
-          const fees = (dbSubscription.amount + dbSubscription.teamSupport) * 0.03;
-          const finalTotal =
-            dbSubscription.amount +
-            dbSubscription.teamSupport +
-            (dbSubscription.coverFees ? fees : 0);
+        // Compute paidAt from invoice timestamp
+        const paidAt = new Date((invoice as any).created * 1000);
 
-          await tx.donation.create({
-            data: {
-              amount: dbSubscription.amount,
-              amountUSD: dbSubscription.amountUSD ?? dbSubscription.amount,
-              teamSupport: dbSubscription.teamSupport,
-              coverFees: dbSubscription.coverFees,
-              currency: dbSubscription.currency,
-              fees: dbSubscription.coverFees ? fees : 0,
-              totalAmount: finalTotal,
-              status: "PAID",
-              paidAt: new Date(),
-              donorId: dbSubscription.donorId,
+        // Compute nextBillingDate using the subscription's chosen billingDay.
+        // e.g. paid on May 19, billingDay = 19 → nextBillingDate = June 19
+        const bd = dbSubscription.billingDay;
+        const nextBillingDate = new Date(Date.UTC(paidAt.getUTCFullYear(), paidAt.getUTCMonth() + 1, 1));
+        if (bd != null && bd >= 1 && bd <= 31) {
+          const lastDay = new Date(Date.UTC(
+            nextBillingDate.getUTCFullYear(),
+            nextBillingDate.getUTCMonth() + 1,
+            0,
+          )).getUTCDate();
+          nextBillingDate.setUTCDate(Math.min(bd, lastDay));
+        }
+        nextBillingDate.setUTCHours(0, 0, 0, 0);
+
+        const fees = (dbSubscription.amount + dbSubscription.teamSupport) * 0.03;
+        const finalTotal =
+          dbSubscription.amount +
+          dbSubscription.teamSupport +
+          (dbSubscription.coverFees ? fees : 0);
+
+        await prisma.$transaction(async (tx) => {
+          // Check if there is an existing PENDING first donation for this invoice.
+          // This is the donation created by POST /api/donations before payment.
+          // We mark it PAID instead of creating a duplicate.
+          const existingPending = await tx.donation.findFirst({
+            where: {
               subscriptionId: dbSubscription.id,
-              paymentMethod: "CARD",
-              provider: "STRIPE",
               providerOrderId: invoice.id,
-              providerAuthCode: stripeSubscriptionId,
-              providerTxnResult: "Success",
-              providerRaw: invoice as any,
-              items: dbSubscription.items.length > 0
-                ? {
-                    create: dbSubscription.items.map((item) => ({
-                      campaignId: item.campaignId,
-                      amount: item.amount,
-                      amountUSD: item.amountUSD,
-                    })),
-                  }
-                : undefined,
-              categoryItems: dbSubscription.categoryItems.length > 0
-                ? {
-                    create: dbSubscription.categoryItems.map((item) => ({
-                      categoryId: item.categoryId,
-                      amount: item.amount,
-                      amountUSD: item.amountUSD,
-                    })),
-                  }
-                : undefined,
+              status: "PENDING",
             },
           });
 
-          // Apply increments
+          if (existingPending) {
+            // First invoice: update the existing PENDING donation to PAID
+            await tx.donation.update({
+              where: { id: existingPending.id },
+              data: {
+                status: "PAID",
+                paidAt,
+                providerOrderId: invoice.id,
+                providerAuthCode: stripeSubscriptionId,
+                providerTxnResult: "Success",
+                providerRaw: invoice as any,
+              },
+            });
+          } else {
+            // Recurring invoice: create a new PAID donation record
+            await tx.donation.create({
+              data: {
+                amount: dbSubscription.amount,
+                amountUSD: dbSubscription.amountUSD ?? dbSubscription.amount,
+                teamSupport: dbSubscription.teamSupport,
+                coverFees: dbSubscription.coverFees,
+                currency: dbSubscription.currency,
+                fees: dbSubscription.coverFees ? fees : 0,
+                totalAmount: finalTotal,
+                status: "PAID",
+                paidAt,
+                donorId: dbSubscription.donorId,
+                subscriptionId: dbSubscription.id,
+                paymentMethod: "CARD",
+                provider: "STRIPE",
+                providerOrderId: invoice.id,
+                providerAuthCode: stripeSubscriptionId,
+                providerTxnResult: "Success",
+                providerRaw: invoice as any,
+                items: dbSubscription.items.length > 0
+                  ? {
+                      create: dbSubscription.items.map((item) => ({
+                        campaignId: item.campaignId,
+                        amount: item.amount,
+                        amountUSD: item.amountUSD,
+                      })),
+                    }
+                  : undefined,
+                categoryItems: dbSubscription.categoryItems.length > 0
+                  ? {
+                      create: dbSubscription.categoryItems.map((item) => ({
+                        categoryId: item.categoryId,
+                        amount: item.amount,
+                        amountUSD: item.amountUSD,
+                      })),
+                    }
+                  : undefined,
+              },
+            });
+          }
+
+          // Apply campaign/category amount increments for every paid invoice
           for (const item of dbSubscription.items) {
             await tx.campaign.update({
               where: { id: item.campaignId },
@@ -173,14 +210,12 @@ export async function POST(req: NextRequest) {
             });
           }
 
-          // Update subscription billing dates
-          const nextBilling = new Date();
-          nextBilling.setUTCMonth(nextBilling.getUTCMonth() + 1);
+          // Update subscription billing dates respecting the chosen billingDay
           await tx.subscription.update({
             where: { id: dbSubscription.id },
             data: {
-              lastBillingDate: new Date(),
-              nextBillingDate: nextBilling,
+              lastBillingDate: paidAt,
+              nextBillingDate: nextBillingDate,
               status: "ACTIVE",
             },
           });
@@ -189,7 +224,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "invoice.payment_failed": {
-        // Monthly billing failed
+        // Monthly billing failed — log a FAILED donation for audit trail.
         const invoice = event.data.object as Stripe.Invoice;
         const stripeSubscriptionId = (invoice as any).subscription as string;
         if (!stripeSubscriptionId) break;
@@ -199,7 +234,12 @@ export async function POST(req: NextRequest) {
         });
         if (!dbSubscription) break;
 
-        // Create a failed donation record for tracking
+        // Idempotency: skip if already recorded
+        const existingFailed = await prisma.donation.findFirst({
+          where: { subscriptionId: dbSubscription.id, providerOrderId: invoice.id },
+        });
+        if (existingFailed) break;
+
         const fees = (dbSubscription.amount + dbSubscription.teamSupport) * 0.03;
         const finalTotal =
           dbSubscription.amount +
@@ -229,8 +269,12 @@ export async function POST(req: NextRequest) {
       }
 
       case "payment_intent.succeeded": {
-        // Direct PaymentIntent (via Elements, not Checkout)
+        // Direct PaymentIntent (via Elements, not Checkout).
+        // Skip if this PaymentIntent came from a Stripe Invoice (subscription payment).
+        // Those are fully handled by invoice.payment_succeeded to avoid duplicate donations.
         const intent = event.data.object as Stripe.PaymentIntent;
+        if ((intent as any).invoice) break;
+
         const donationId = intent.metadata?.donationId;
         if (!donationId) break;
 

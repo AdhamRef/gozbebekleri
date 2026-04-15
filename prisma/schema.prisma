@@ -630,12 +630,15 @@ type AmountRange {
 
 /* ===================== TRACKING PIXELS (dashboard configurable) ===================== */
 model TrackingSettings {
-  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
-  facebookPixelId      String?
-  facebookAccessToken  String?  // Server-side Conversion API token (never exposed to client)
-  gaMeasurementId      String?  // Google Analytics 4: G-XXXXXXXXXX
-  tiktokPixelId        String?
-  xPixelId             String?  // X (Twitter) Pixel ID
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                      String   @id @default(auto()) @map("_id") @db.ObjectId
+  facebookPixelId         String?
+  facebookAccessToken     String?  // Meta CAPI token (never exposed to client)
+  gaMeasurementId         String?  // Google Analytics 4: G-XXXXXXXXXX
+  tiktokPixelId           String?
+  tiktokAccessToken       String?  // TikTok Events API token (never exposed to client)
+  googleAdsConversionId   String?  // AW-XXXXXXXXX (never exposed to client — used server-side for EC)
+  googleAdsConversionLabel String? // Conversion label (e.g. AbCdEfGh1234)
+  xPixelId                String?  // X (Twitter) Pixel ID
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 }

@@ -56,6 +56,9 @@ interface TrackingSettings {
   facebookAccessToken: string | null;
   gaMeasurementId: string | null;
   tiktokPixelId: string | null;
+  tiktokAccessToken: string | null;
+  googleAdsConversionId: string | null;
+  googleAdsConversionLabel: string | null;
   xPixelId: string | null;
 }
 
@@ -64,6 +67,9 @@ const defaultSettings: TrackingSettings = {
   facebookAccessToken: null,
   gaMeasurementId: null,
   tiktokPixelId: null,
+  tiktokAccessToken: null,
+  googleAdsConversionId: null,
+  googleAdsConversionLabel: null,
   xPixelId: null,
 };
 
@@ -81,11 +87,14 @@ export default function PixelsSettingsPage() {
       const res = await axios.get("/api/admin/tracking");
       setSettings({
         id: res.data.id,
-        facebookPixelId: res.data.facebookPixelId ?? "",
-        facebookAccessToken: res.data.facebookAccessToken ?? "",
-        gaMeasurementId: res.data.gaMeasurementId ?? "",
-        tiktokPixelId: res.data.tiktokPixelId ?? "",
-        xPixelId: res.data.xPixelId ?? "",
+        facebookPixelId:          res.data.facebookPixelId          ?? "",
+        facebookAccessToken:      res.data.facebookAccessToken      ?? "",
+        gaMeasurementId:          res.data.gaMeasurementId          ?? "",
+        tiktokPixelId:            res.data.tiktokPixelId            ?? "",
+        tiktokAccessToken:        res.data.tiktokAccessToken        ?? "",
+        googleAdsConversionId:    res.data.googleAdsConversionId    ?? "",
+        googleAdsConversionLabel: res.data.googleAdsConversionLabel ?? "",
+        xPixelId:                 res.data.xPixelId                 ?? "",
       });
     } catch {
       toast.error("فشل تحميل إعدادات التتبع");
@@ -98,11 +107,14 @@ export default function PixelsSettingsPage() {
     setSaving(true);
     try {
       await axios.put("/api/admin/tracking", {
-        facebookPixelId: settings.facebookPixelId || null,
-        facebookAccessToken: settings.facebookAccessToken || null,
-        gaMeasurementId: settings.gaMeasurementId || null,
-        tiktokPixelId: settings.tiktokPixelId || null,
-        xPixelId: settings.xPixelId || null,
+        facebookPixelId:          settings.facebookPixelId          || null,
+        facebookAccessToken:      settings.facebookAccessToken      || null,
+        gaMeasurementId:          settings.gaMeasurementId          || null,
+        tiktokPixelId:            settings.tiktokPixelId            || null,
+        tiktokAccessToken:        settings.tiktokAccessToken        || null,
+        googleAdsConversionId:    settings.googleAdsConversionId    || null,
+        googleAdsConversionLabel: settings.googleAdsConversionLabel || null,
+        xPixelId:                 settings.xPixelId                 || null,
       });
       toast.success("تم حفظ إعدادات البكسل بنجاح");
     } catch {
@@ -200,15 +212,15 @@ export default function PixelsSettingsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TikTokIcon className="w-5 h-5 text-foreground" />
-            TikTok Pixel
+            TikTok Pixel + Events API
           </CardTitle>
           <CardDescription>
-            معرّف بكسل TikTok من مدير أحداث TikTok.
+            معرّف البكسل يظهر في الموقع. رمز الوصول يُستخدم فقط من الخادم (Events API) لتحسين المطابقة وإزالة التكرار.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="tiktok-pixel">معرّف بكسل TikTok</Label>
+            <Label htmlFor="tiktok-pixel">معرّف بكسل TikTok (Pixel Code)</Label>
             <Input
               id="tiktok-pixel"
               type="text"
@@ -216,6 +228,59 @@ export default function PixelsSettingsPage() {
               value={settings.tiktokPixelId ?? ""}
               onChange={(e) =>
                 setSettings((s) => ({ ...s, tiktokPixelId: e.target.value || null }))
+              }
+              className="font-mono"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="tiktok-token">رمز الوصول (Access Token) — Events API</Label>
+            <Input
+              id="tiktok-token"
+              type="password"
+              placeholder="إخفاء عند عدم التغيير"
+              value={settings.tiktokAccessToken ?? ""}
+              onChange={(e) =>
+                setSettings((s) => ({ ...s, tiktokAccessToken: e.target.value || null }))
+              }
+              className="font-mono"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <GoogleAnalyticsIcon className="w-5 h-5" />
+            Google Ads — Enhanced Conversions
+          </CardTitle>
+          <CardDescription>
+            معرّف التحويل والتسمية من إعدادات Google Ads. يُستخدم مع Enhanced Conversions لرفع دقة القياس والمزايدة.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="gads-id">معرّف التحويل (AW-XXXXXXXXX)</Label>
+            <Input
+              id="gads-id"
+              type="text"
+              placeholder="AW-1234567890"
+              value={settings.googleAdsConversionId ?? ""}
+              onChange={(e) =>
+                setSettings((s) => ({ ...s, googleAdsConversionId: e.target.value || null }))
+              }
+              className="font-mono"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="gads-label">تسمية التحويل (Conversion Label)</Label>
+            <Input
+              id="gads-label"
+              type="text"
+              placeholder="AbCdEfGh1234"
+              value={settings.googleAdsConversionLabel ?? ""}
+              onChange={(e) =>
+                setSettings((s) => ({ ...s, googleAdsConversionLabel: e.target.value || null }))
               }
               className="font-mono"
             />

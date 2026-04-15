@@ -1,6 +1,0 @@
-:root {
-    --mainColor: #04819C;
-    --containerWidth: 1020px;
-}
-
-.container {width: var(--containerWidth);}

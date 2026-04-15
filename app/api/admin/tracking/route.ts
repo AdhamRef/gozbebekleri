@@ -15,11 +15,14 @@ export async function GET() {
     if (!settings) {
       return NextResponse.json({
         id: null,
-        facebookPixelId: null,
-        facebookAccessToken: null,
-        gaMeasurementId: null,
-        tiktokPixelId: null,
-        xPixelId: null,
+        facebookPixelId:          null,
+        facebookAccessToken:      null,
+        gaMeasurementId:          null,
+        tiktokPixelId:            null,
+        tiktokAccessToken:        null,
+        googleAdsConversionId:    null,
+        googleAdsConversionLabel: null,
+        xPixelId:                 null,
       });
     }
     return NextResponse.json(settings);
@@ -44,16 +47,22 @@ export async function PUT(request: NextRequest) {
       facebookAccessToken,
       gaMeasurementId,
       tiktokPixelId,
+      tiktokAccessToken,
+      googleAdsConversionId,
+      googleAdsConversionLabel,
       xPixelId,
     } = body;
 
     const existing = await prisma.trackingSettings.findFirst();
     const data = {
-      ...(facebookPixelId !== undefined && { facebookPixelId: facebookPixelId || null }),
-      ...(facebookAccessToken !== undefined && { facebookAccessToken: facebookAccessToken || null }),
-      ...(gaMeasurementId !== undefined && { gaMeasurementId: gaMeasurementId || null }),
-      ...(tiktokPixelId !== undefined && { tiktokPixelId: tiktokPixelId || null }),
-      ...(xPixelId !== undefined && { xPixelId: xPixelId || null }),
+      ...(facebookPixelId          !== undefined && { facebookPixelId:          facebookPixelId          || null }),
+      ...(facebookAccessToken      !== undefined && { facebookAccessToken:      facebookAccessToken      || null }),
+      ...(gaMeasurementId          !== undefined && { gaMeasurementId:          gaMeasurementId          || null }),
+      ...(tiktokPixelId            !== undefined && { tiktokPixelId:            tiktokPixelId            || null }),
+      ...(tiktokAccessToken        !== undefined && { tiktokAccessToken:        tiktokAccessToken        || null }),
+      ...(googleAdsConversionId    !== undefined && { googleAdsConversionId:    googleAdsConversionId    || null }),
+      ...(googleAdsConversionLabel !== undefined && { googleAdsConversionLabel: googleAdsConversionLabel || null }),
+      ...(xPixelId                 !== undefined && { xPixelId:                 xPixelId                 || null }),
     };
 
     const settings = existing
@@ -70,7 +79,7 @@ export async function PUT(request: NextRequest) {
       ...actor,
       stream: "TEAM",
       action: "TRACKING_SETTINGS_UPDATE",
-      messageAr: `${actor.actorName ?? "مسؤول"} عدّل إعدادات التتبع والبكسلات (فيسبوك، GA، تيك توك، X)`,
+      messageAr: `${actor.actorName ?? "مسؤول"} عدّل إعدادات التتبع والبكسلات (فيسبوك، GA، تيك توك، Google Ads، X)`,
       entityType: "TrackingSettings",
       entityId: settings.id,
     });

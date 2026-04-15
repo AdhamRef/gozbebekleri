@@ -199,8 +199,16 @@ export async function POST(request: NextRequest) {
     if (type === "MONTHLY") {
       // Monthly: create Subscription + first Donation (transaction) linked to it
       const subscription = await prisma.$transaction(async (tx) => {
-        const nextBilling = new Date();
-        nextBilling.setUTCMonth(nextBilling.getUTCMonth() + 1);
+        // Compute nextBillingDate = billing day in NEXT calendar month.
+        // e.g. today = Apr 5, billingDay = 19 → nextBillingDate = May 19
+        const now = new Date();
+        const nextBilling = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+        const bd = typeof billingDay === "number" && billingDay >= 1 && billingDay <= 31 ? billingDay : null;
+        if (bd !== null) {
+          // Clamp to last day of target month (e.g. Feb 30 → Feb 28)
+          const lastDay = new Date(Date.UTC(nextBilling.getUTCFullYear(), nextBilling.getUTCMonth() + 1, 0)).getUTCDate();
+          nextBilling.setUTCDate(Math.min(bd, lastDay));
+        }
         nextBilling.setUTCHours(0, 0, 0, 0);
 
         const sub = await tx.subscription.create({

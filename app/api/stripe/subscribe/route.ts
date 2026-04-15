@@ -91,14 +91,40 @@ export async function POST(req: NextRequest) {
       recurring: { interval: "month" as const },
     };
 
-    // Create subscription with incomplete payment — client confirms with card data
-    // save_default_payment_method ensures the card is stored for recurring billing
+    // Compute billing_cycle_anchor = next billing day (next calendar month).
+    // e.g. today = Apr 5, billingDay = 19 → anchor = May 19 00:00 UTC
+    // This tells Stripe: charge immediately (first invoice = today),
+    // then charge again on May 19, June 19, July 19, etc.
+    const bd = donation.subscription?.billingDay;
+    const nowForAnchor = new Date();
+    const anchorDate = new Date(Date.UTC(
+      nowForAnchor.getUTCFullYear(),
+      nowForAnchor.getUTCMonth() + 1,
+      1,
+    ));
+    if (bd != null && bd >= 1 && bd <= 31) {
+      const lastDay = new Date(Date.UTC(
+        anchorDate.getUTCFullYear(),
+        anchorDate.getUTCMonth() + 1,
+        0,
+      )).getUTCDate();
+      anchorDate.setUTCDate(Math.min(bd, lastDay));
+    }
+    anchorDate.setUTCHours(0, 0, 0, 0);
+    const billingCycleAnchor = Math.floor(anchorDate.getTime() / 1000);
+
+    // Create subscription with incomplete payment — client confirms with card data.
+    // billing_cycle_anchor ensures future charges happen on the chosen billing day.
+    // proration_behavior: "none" so Stripe charges the full amount immediately (not prorated).
+    // save_default_payment_method stores the card for all future recurring charges.
     const subscription = await stripe.subscriptions.create({
       customer: customerId,
       items: [
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { price_data: priceData as any },
       ],
+      billing_cycle_anchor: billingCycleAnchor,
+      proration_behavior: "none",
       payment_behavior: "default_incomplete",
       payment_settings: { save_default_payment_method: "on_subscription" },
       expand: ["latest_invoice.payment_intent"],
@@ -126,9 +152,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Could not get payment intent" }, { status: 500 });
     }
 
+    // Store the first invoice ID as providerOrderId.
+    // The webhook (invoice.payment_succeeded) uses this for idempotency — it will find
+    // this PENDING donation by invoice ID and mark it PAID instead of creating a duplicate.
     await prisma.donation.update({
       where: { id: donationId },
-      data: { provider: "STRIPE", providerOrderId: subscription.id, locale },
+      data: { provider: "STRIPE", providerOrderId: invoice.id || subscription.id, locale },
     });
 
     return NextResponse.json({ clientSecret });

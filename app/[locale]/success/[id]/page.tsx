@@ -50,11 +50,35 @@ const DonationSuccessPage = () => {
     if (!donation || !id || purchaseTracked.current || !tracking) return;
     purchaseTracked.current = true;
     const value = Number(donation.amountUSD ?? donation.totalAmount ?? 0);
+
+    // Build items from donation items or category items
+    const itemsFromDonation = [
+      ...(donation.items ?? []).map((item: any) => ({
+        item_id:       item.campaign?.id ?? item.campaignId ?? "donation",
+        item_name:     item.campaign?.title ?? "Campaign Donation",
+        item_category: "donation",
+        price:         Number(item.amountUSD ?? item.amount ?? 0),
+        quantity:      1,
+      })),
+      ...(donation.categoryItems ?? []).map((ci: any) => ({
+        item_id:       ci.category?.id ?? ci.categoryId ?? "category",
+        item_name:     ci.category?.name ?? "Category Donation",
+        item_category: "donation",
+        price:         Number(ci.amountUSD ?? ci.amount ?? 0),
+        quantity:      1,
+      })),
+    ];
+
     tracking.trackPurchase({
       value,
-      currency: 'USD',
-      orderId: donation.id,
-      numItems: 1,
+      currency:     'USD',
+      orderId:      donation.id,
+      numItems:     itemsFromDonation.length || 1,
+      items:        itemsFromDonation.length ? itemsFromDonation : undefined,
+      donationType: donation.type as "ONE_TIME" | "MONTHLY",
+      causeId:      donation.items?.[0]?.campaignId ?? donation.categoryItems?.[0]?.categoryId,
+      causeName:    donation.items?.[0]?.campaign?.title ?? donation.categoryItems?.[0]?.category?.name,
+      gateway:      donation.provider,
     });
   }, [donation, id, tracking]);
 
