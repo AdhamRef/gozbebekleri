@@ -145,7 +145,7 @@ function buildVerificationHtml(verificationUrl: string, locale: string): string 
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="padding:36px 48px 32px;" align="center">
-                    <img src="https://i.ibb.co/ZwcJcN1/logo.webp" alt="Logo" height="44" style="height:44px;width:auto;display:block;margin:0 auto 20px;filter:brightness(0) invert(1);" />
+                    <img src="https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png" alt="Logo" height="44" style="height:44px;width:auto;display:block;margin:0 auto 20px;filter:brightness(0) invert(1);" />
                     <h1 style="color:#FFFFFF;font-size:20px;font-weight:700;margin:0;letter-spacing:-0.3px;">${tx.title}</h1>
                   </td>
                 </tr>

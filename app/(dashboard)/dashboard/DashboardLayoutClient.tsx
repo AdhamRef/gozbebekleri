@@ -118,7 +118,7 @@ function DashboardContent({
         <Link href="/" className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="https://i.ibb.co/ZwcJcN1/logo.webp"
+            src="https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png"
             alt="Logo"
             className="h-16 w-auto object-contain brightness-0 invert"
           />
@@ -228,7 +228,7 @@ function DashboardContent({
         "bg-white border-b border-gray-200 shadow-sm"
       )}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="https://i.ibb.co/ZwcJcN1/logo.webp" alt="Logo" className="h-7 w-auto object-contain shrink-0" />
+        <img src="https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png" alt="Logo" className="h-7 w-auto object-contain shrink-0" />
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <CurrencySelector showDefaultCurrencyOption onDark={false} />
           <button

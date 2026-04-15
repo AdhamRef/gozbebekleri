@@ -48,7 +48,8 @@ interface CartItem {
   };
 }
 
-const LOGO_URL = "https://i.ibb.co/ZwcJcN1/logo.webp";
+const LOGO_URL = "https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png";
+const LOGO_MOBILE_URL = "https://i.ibb.co/Q7KLSBpH/gozbebekleri.png";
 
 const Navbar = () => {
   const t = useTranslations("Navbar");
@@ -203,7 +204,10 @@ const Navbar = () => {
 
             {/* Logo — always visible */}
             <Link href="/" className="flex-shrink-0 flex items-center gap-2">
-              <Image src={LOGO_URL} alt="Logo" width={48} height={48} className="h-9 lg:h-12 w-auto object-contain" />
+              {/* Mobile: narrow square logo */}
+              <Image src={LOGO_MOBILE_URL} alt="Logo" width={48} height={48} className="lg:hidden h-9 w-auto object-contain" />
+              {/* Desktop: wide logo — width must match aspect ratio to prevent blur */}
+              <Image src={LOGO_URL} alt="Logo" width={240} height={48} className="hidden lg:block h-12 w-auto object-contain" />
             </Link>
 
             {/* Desktop Nav Links */}

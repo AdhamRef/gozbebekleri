@@ -43,7 +43,7 @@ export async function generateMetadata({
     title: { default: seo.title, template: seo.titleTemplate },
     description: seo.description,
     keywords: seo.keywords,
-    icons: { icon: "https://i.ibb.co/ZwcJcN1/logo.webp" },
+    icons: { icon: "https://i.ibb.co/Q7KLSBpH/gozbebekleri.png" },
     alternates,
     openGraph: {
       title: seo.title,

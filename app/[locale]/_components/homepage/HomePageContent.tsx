@@ -39,7 +39,7 @@ const cacheSet = <T,>(key: string, data: T): void => {
 interface CategoryItem { id: string; name: string; image?: string | null; icon?: string | null; order?: number; }
 interface PostItem { id: string; title: string; description: string | null; image: string | null; published: boolean; createdAt: string; }
 
-const LOGO_URL = "https://i.ibb.co/ZwcJcN1/logo.webp";
+const LOGO_URL = "https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png";
 
 function HomeLoadingScreen() {
   return (

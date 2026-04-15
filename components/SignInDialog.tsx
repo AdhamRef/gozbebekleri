@@ -276,7 +276,7 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl }: SignInDia
           <div className="flex justify-center mb-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="https://i.ibb.co/ZwcJcN1/logo.webp"
+              src="https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png"
               alt="Logo"
               className="h-12 w-auto object-contain brightness-0 invert"
             />

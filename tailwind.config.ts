@@ -83,8 +83,8 @@ export default {
   			'accordion-up': 'accordion-up 0.2s ease-out'
   		},
   		backgroundImage: {
-			'logo': "url('https://i.ibb.co/ZwcJcN1/logo.webp')",
-			'logo_white': "url('https://i.ibb.co/ZwcJcN1/logo.webp')",
+			'logo': "url('https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png')",
+			'logo_white': "url('https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png')",
   			'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
   			'gradient-conic':
   				'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',

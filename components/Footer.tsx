@@ -10,7 +10,7 @@ import { useSearchParams } from 'next/navigation';
 import SignInDialog from '@/components/SignInDialog';
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from '@/lib/currency-link';
 
-const LOGO_URL = 'https://i.ibb.co/ZwcJcN1/logo.webp';
+const LOGO_URL = 'https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png';
 
 const Footer = () => {
   const t = useTranslations('Footer');
