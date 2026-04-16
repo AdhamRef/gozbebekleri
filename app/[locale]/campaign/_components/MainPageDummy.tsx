@@ -12,7 +12,6 @@ import {
   Send,
   Loader2,
   MoreHorizontal,
-  Play,
   Bell,
   Info,
   Book,
@@ -58,6 +57,7 @@ interface Campaign {
   descriptionFr?: string;
   description?: string;
   images: string[];
+  videoUrl?: string | null;
   targetAmount: number;
   amountRaised?: number;
   currentAmount?: number;
@@ -108,6 +108,63 @@ interface Comment {
 
 const FALLBACK = "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg";
 
+/** Convert any video share URL into an embeddable iframe src */
+function resolveEmbedUrl(raw: string): string {
+  try {
+    const url = new URL(raw);
+    // YouTube: youtube.com/watch?v=ID  or  youtu.be/ID  or  /shorts/ID
+    if (url.hostname.includes("youtube.com") || url.hostname.includes("youtu.be")) {
+      let vid = url.searchParams.get("v");
+      if (!vid && url.hostname === "youtu.be") vid = url.pathname.slice(1).split("?")[0];
+      if (!vid) { const m = url.pathname.match(/\/(?:shorts|embed)\/([^/?]+)/); if (m) vid = m[1]; }
+      if (vid) return `https://www.youtube.com/embed/${vid}?rel=0`;
+    }
+    // Facebook: use plugin embed with the resolved (non-share) URL
+    if (url.hostname.includes("facebook.com")) {
+      return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(raw)}&show_text=false&width=720&allowfullscreen=true`;
+    }
+  } catch { /* fall through */ }
+  return raw;
+}
+
+/** Returns true for Facebook short-share URLs that need server-side resolution */
+function isFbShareUrl(raw: string): boolean {
+  try {
+    const url = new URL(raw);
+    return url.hostname.includes("facebook.com") && url.pathname.startsWith("/share/");
+  } catch { return false; }
+}
+
+/** Renders a 16:9 video iframe, resolving Facebook share URLs server-side first */
+function VideoEmbed({ rawUrl, title, className }: { rawUrl: string; title?: string; className?: string }) {
+  const [src, setSrc] = React.useState<string>(() =>
+    isFbShareUrl(rawUrl) ? "" : resolveEmbedUrl(rawUrl)
+  );
+
+  React.useEffect(() => {
+    if (!isFbShareUrl(rawUrl)) { setSrc(resolveEmbedUrl(rawUrl)); return; }
+    fetch(`/api/resolve-url?url=${encodeURIComponent(rawUrl)}`)
+      .then(r => r.json())
+      .then(({ resolved }: { resolved: string }) => setSrc(resolveEmbedUrl(resolved)))
+      .catch(() => setSrc(resolveEmbedUrl(rawUrl)));
+  }, [rawUrl]);
+
+  if (!src) return null;
+
+  return (
+    <div className={className} style={{ position: "relative", paddingBottom: "56.25%" }}>
+      <iframe
+        src={src}
+        title={title || "video"}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
+      />
+    </div>
+  );
+}
+
+
 const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale?: string }) => {
   const t = useTranslations("Campaign");
   const localeFromHook = useLocale() as "ar" | "en" | "fr";
@@ -157,6 +214,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
     };
     fetchCampaignData();
   }, [id, locale]);
+
 
   useEffect(() => {
     if (!campaign) return;
@@ -243,9 +301,9 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
             <div className="lg:col-span-8 flex flex-col gap-0 sm:gap-5">
 
               {/* ── Image block ── */}
-              <div className="sm:rounded-2xl overflow-hidden sm:shadow-sm sm:border sm:border-gray-100 bg-gray-950">
+              <div className="sm:rounded-2xl overflow-hidden sm:border-gray-100">
                 {/* Main image — full-width, no letterbox */}
-                <div className="relative w-full aspect-[16/9] sm:aspect-[16/8] overflow-hidden bg-gray-950">
+                <div className="relative w-full aspect-[16/9] sm:aspect-[16/8] overflow-hidden">
                   {/* Blurred background fill for portrait images */}
                   <Image
                     src={currentImg}
@@ -279,7 +337,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                   <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent pointer-events-none" />
 
                   {/* Category + title overlay */}
-                  <div className="absolute bottom-0 inset-x-0 p-4 sm:p-6">
+                  <div className="absolute bottom-0 inset-x-0 p-4 sm:p-6 z-10">
                     <Link
                       href={`/category/${campaign.category.id}`}
                       className="inline-flex items-center gap-1.5 mb-2 bg-[#FA5D17] hover:bg-[#e04a08] text-white text-[10px] sm:text-xs font-bold px-2.5 py-1.5 rounded-full uppercase tracking-wide transition-colors"
@@ -292,47 +350,66 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                     </h1>
                   </div>
 
-                  {/* Image nav arrows (multi-image) */}
-                  {campaign.images.length > 1 && (
-                    <>
-                      <button
-                        onClick={() => setSelectedImage(i => Math.max(0, i - 1))}
-                        disabled={selectedImage === 0}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-all disabled:opacity-30"
-                      >
-                        <ChevronLeft className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => setSelectedImage(i => Math.min(campaign.images.length - 1, i + 1))}
-                        disabled={selectedImage === campaign.images.length - 1}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-all disabled:opacity-30"
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </button>
-                    </>
-                  )}
+                  {/* RTL-aware nav arrows */}
+                  {campaign.images.length > 1 && (() => {
+                    const isRTL = locale === "ar";
+                    const atStart = selectedImage === 0;
+                    const atEnd = selectedImage === campaign.images.length - 1;
+                    const leftDisabled  = isRTL ? atEnd   : atStart;
+                    const rightDisabled = isRTL ? atStart : atEnd;
+                    const onLeft  = () => setSelectedImage(i => isRTL ? Math.min(campaign.images.length - 1, i + 1) : Math.max(0, i - 1));
+                    const onRight = () => setSelectedImage(i => isRTL ? Math.max(0, i - 1) : Math.min(campaign.images.length - 1, i + 1));
+                    return (
+                      <>
+                        <button
+                          onClick={onLeft}
+                          disabled={leftDisabled}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/30 hover:bg-black/55 backdrop-blur-sm text-white border border-white/20 flex items-center justify-center transition-all disabled:opacity-20 disabled:cursor-not-allowed"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={onRight}
+                          disabled={rightDisabled}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/30 hover:bg-black/55 backdrop-blur-sm text-white border border-white/20 flex items-center justify-center transition-all disabled:opacity-20 disabled:cursor-not-allowed"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </>
+                    );
+                  })()}
                 </div>
 
-                {/* Thumbnails */}
+                {/* Thumbnail strip — below the image, glass style */}
                 {campaign.images.length > 1 && (
-                  <div className="flex gap-2 p-3 sm:p-4 bg-gray-900/95 overflow-x-auto scrollbar-hide">
+                  <div className="flex gap-2.5 px-3 py-3 overflow-x-auto scrollbar-hide">
                     {campaign.images.map((img, i) => (
                       <button
                         key={i}
                         onClick={() => setSelectedImage(i)}
-                        className={`flex-shrink-0 rounded-lg overflow-hidden transition-all ring-2 ${
-                          selectedImage === i ? "ring-[#FA5D17] scale-105" : "ring-transparent opacity-60 hover:opacity-100"
+                        className={`relative flex-shrink-0 rounded-xl overflow-hidden transition-all duration-200 ${
+                          selectedImage === i
+                            ? "ring-2 ring-[#FA5D17] scale-105 opacity-100 shadow-md shadow-black/40"
+                            : "ring-1 ring-white/15 opacity-45 hover:opacity-75 hover:ring-white/35"
                         }`}
                       >
-                        <Image src={img} alt="" width={64} height={64} className="w-14 h-14 sm:w-16 sm:h-16 object-cover" />
+                        <Image
+                          src={img}
+                          alt=""
+                          width={64}
+                          height={56}
+                          className="w-14 h-12 sm:w-16 sm:h-14 object-cover"
+                        />
                       </button>
                     ))}
                   </div>
                 )}
               </div>
 
+
+
               {/* ── Tabs card ── */}
-              <div className="bg-white sm:rounded-2xl sm:border sm:border-gray-100 sm:shadow-sm overflow-hidden">
+              <div className="bg-white sm:rounded-2xl overflow-hidden">
                 {/* Tab bar */}
                 <div className="grid grid-cols-4 border-b border-gray-100">
                   {tabs.map(({ id: tabId, labelKey, icon: Icon, badge }) => {
@@ -396,26 +473,22 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                               <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line mb-3">
                                 {getLocalizedProperty(update, "description")}
                               </p>
-                              {(update.image || update.videoUrl) && (
-                                <div className="flex gap-2 flex-wrap">
-                                  {update.image && (
-                                    <button onClick={() => { setModalContent({ type: "image", src: update.image!, alt: getLocalizedProperty(update, "title") }); setIsModalOpen(true); }}
-                                      className="group relative rounded-xl overflow-hidden ring-1 ring-gray-200 hover:ring-[#025EB8] transition-all">
-                                      <Image src={update.image} alt="" width={96} height={96} className="w-24 h-24 object-cover group-hover:scale-105 transition-transform duration-300" />
-                                    </button>
-                                  )}
-                                  {update.videoUrl && (
-                                    <button onClick={() => { setModalContent({ type: "video", src: `${update.videoUrl}?autoplay=1` }); setIsModalOpen(true); }}
-                                      className="group relative rounded-xl overflow-hidden ring-1 ring-gray-200 hover:ring-[#025EB8] transition-all">
-                                      <Image src={`https://img.youtube.com/vi/${new URL(update.videoUrl).pathname.split("/")[2]}/hqdefault.jpg`} alt="" width={96} height={96} className="w-24 h-24 object-cover group-hover:scale-105 transition-transform duration-300" />
-                                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
-                                        <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center">
-                                          <Play className="w-4 h-4 text-gray-900 ms-0.5" />
-                                        </div>
-                                      </div>
-                                    </button>
-                                  )}
-                                </div>
+                              {/* Inline video embed */}
+                              {update.videoUrl && (
+                                <VideoEmbed
+                                  rawUrl={update.videoUrl}
+                                  title={getLocalizedProperty(update, "title") || "video"}
+                                  className="rounded-xl overflow-hidden bg-black mb-3"
+                                />
+                              )}
+                              {/* Image thumbnail */}
+                              {update.image && (
+                                <button
+                                  onClick={() => { setModalContent({ type: "image", src: update.image!, alt: getLocalizedProperty(update, "title") }); setIsModalOpen(true); }}
+                                  className="group relative rounded-xl overflow-hidden ring-1 ring-gray-200 hover:ring-[#025EB8] transition-all"
+                                >
+                                  <Image src={update.image} alt="" width={96} height={96} className="w-24 h-24 object-cover group-hover:scale-105 transition-transform duration-300" />
+                                </button>
                               )}
                             </div>
                           </motion.div>
@@ -583,6 +656,15 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                   </AnimatePresence>
                 </div>
               </div>
+
+                            {/* ── Campaign video ── */}
+              {campaign.videoUrl && (
+                <VideoEmbed
+                  rawUrl={campaign.videoUrl}
+                  title={String(campaign.title ?? "")}
+                  className="sm:rounded-2xl overflow-hidden sm:shadow-sm sm:border sm:border-gray-100 bg-black"
+                />
+              )}
             </div>
 
             {/* ── Right sidebar ── */}

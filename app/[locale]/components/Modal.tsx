@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { X } from 'lucide-react';
 
 interface ModalProps {
   isOpen: boolean;
@@ -13,58 +14,61 @@ interface ModalProps {
 const Modal: React.FC<ModalProps> = ({ isOpen, onClose, content }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // Close modal on outside click
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
-        onClose();
-      }
+    const handleClickOutside = (e: MouseEvent) => {
+      if (modalRef.current && !modalRef.current.contains(e.target as Node)) onClose();
     };
-
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKey);
     }
-
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKey);
     };
   }, [isOpen, onClose]);
 
   if (!isOpen || !content) return null;
 
+  const isFacebook = content.src.includes('facebook.com');
+
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm z-50">
+    <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-50 p-4">
       <div
         ref={modalRef}
-        className="bg-stone-900 rounded-lg overflow-hidden shadow-lg max-w-2xl w-full transition-transform transform"
-        style={{ cursor: 'move' }} // Indicate that the modal can be dragged
+        className="relative bg-black rounded-2xl overflow-hidden shadow-2xl w-full max-w-3xl"
       >
+        {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-2 right-2 text-red-600 bg-white rounded-full w-6 h-6 flex items-center justify-center hover:text-gray-800 transition-colors"
+          className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center transition-colors backdrop-blur-sm"
         >
-          &times;
+          <X className="w-4 h-4" />
         </button>
-        <div className="flex justify-center items-center">
-          {content.type === 'image' ? (
-            <img
-              src={content.src}
-              alt={content.alt}
-              className="max-h-[80vh] max-w-full object-contain"
-            />
-          ) : (
+
+        {content.type === 'image' ? (
+          <img
+            src={content.src}
+            alt={content.alt}
+            className="w-full max-h-[85vh] object-contain"
+          />
+        ) : (
+          <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
             <iframe
-              width="100%"
-              height="415"
+              className="absolute inset-0 w-full h-full"
               src={content.src}
-              title="YouTube video player"
+              title="Video player"
               frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allow={
+                isFacebook
+                  ? 'autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share'
+                  : 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
+              }
               allowFullScreen
-              className=""
             />
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

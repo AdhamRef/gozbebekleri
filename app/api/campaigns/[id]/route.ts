@@ -504,35 +504,28 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: 'Campaign has donations. Use force=true to remove donation items and delete the campaign.' }, { status: 400 });
     }
 
-    // Safe delete: if force is true, remove donation items (and orphaned donations) before deleting campaign
-    await prisma.$transaction(async (tx) => {
-      if (donationCount > 0 && force) {
-        // Delete donation items for this campaign
-        await tx.donationItem.deleteMany({ where: { campaignId: id } });
+    // Safe delete: run each cleanup step outside a single transaction to avoid
+    // the 5 s interactive-transaction timeout on large datasets.
+    if (donationCount > 0 && force) {
+      await prisma.donationItem.deleteMany({ where: { campaignId: id } });
 
-        // Delete donations that have no items left
-        const orphanDonations = await tx.donation.findMany({
-          where: { items: { none: {} } },
-          select: { id: true }
+      // Remove donations that now have no items at all
+      const orphanDonations = await prisma.donation.findMany({
+        where: { items: { none: {} }, categoryItems: { none: {} } },
+        select: { id: true },
+      });
+      if (orphanDonations.length > 0) {
+        await prisma.donation.deleteMany({
+          where: { id: { in: orphanDonations.map((d) => d.id) } },
         });
-        if (orphanDonations.length > 0) {
-          await tx.donation.deleteMany({ where: { id: { in: orphanDonations.map(d => d.id) } } });
-        }
       }
+    }
 
-      // Delete updates (translations will cascade)
-      await tx.update.deleteMany({ where: { campaignId: id } });
-
-      // Delete campaign translations
-      await tx.campaignTranslation.deleteMany({ where: { campaignId: id } });
-
-      // Delete comments and cart items
-      await tx.comment.deleteMany({ where: { campaignId: id } });
-      await tx.cartItem.deleteMany({ where: { campaignId: id } });
-
-      // Finally delete campaign
-      await tx.campaign.delete({ where: { id } });
-    });
+    await prisma.update.deleteMany({ where: { campaignId: id } });
+    await prisma.campaignTranslation.deleteMany({ where: { campaignId: id } });
+    await prisma.comment.deleteMany({ where: { campaignId: id } });
+    await prisma.cartItem.deleteMany({ where: { campaignId: id } });
+    await prisma.campaign.delete({ where: { id } });
 
     const actor = session!.user;
     await writeAuditLog({

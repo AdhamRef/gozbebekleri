@@ -1,4 +1,5 @@
 'use client';
+import ReactCountryFlag from 'react-country-flag';
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -345,31 +346,31 @@ const getTranslationStatus = () => {
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
               <TabsList className="flex flex-wrap gap-1 mb-6">
                 <TabsTrigger value="ar" className="gap-2">
-                  🇸🇦 العربية
+                  <ReactCountryFlag countryCode="SA" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> العربية
                   <span className="text-xs text-red-600">*</span>
                 </TabsTrigger>
                 <TabsTrigger value="en" className="gap-2">
-                  🇬🇧 English
+                  <ReactCountryFlag countryCode="GB" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> English
                   {translationStatus.hasEn && <CheckCircle2 className="w-3 h-3 text-green-600" />}
                 </TabsTrigger>
                 <TabsTrigger value="fr" className="gap-2">
-                  🇫🇷 Français
+                  <ReactCountryFlag countryCode="FR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Français
                   {translationStatus.hasFr && <CheckCircle2 className="w-3 h-3 text-[#025EB8]" />}
                 </TabsTrigger>
                 <TabsTrigger value="tr" className="gap-2">
-                  🇹🇷 Türkçe
+                  <ReactCountryFlag countryCode="TR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Türkçe
                   {translationStatus.hasTr && <CheckCircle2 className="w-3 h-3 text-green-600" />}
                 </TabsTrigger>
                 <TabsTrigger value="id" className="gap-2">
-                  🇮🇩 Bahasa
+                  <ReactCountryFlag countryCode="ID" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Bahasa
                   {translationStatus.hasId && <CheckCircle2 className="w-3 h-3 text-green-600" />}
                 </TabsTrigger>
                 <TabsTrigger value="pt" className="gap-2">
-                  🇵🇹 Português
+                  <ReactCountryFlag countryCode="PT" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Português
                   {translationStatus.hasPt && <CheckCircle2 className="w-3 h-3 text-green-600" />}
                 </TabsTrigger>
                 <TabsTrigger value="es" className="gap-2">
-                  🇪🇸 Español
+                  <ReactCountryFlag countryCode="ES" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Español
                   {translationStatus.hasEs && <CheckCircle2 className="w-3 h-3 text-green-600" />}
                 </TabsTrigger>
               </TabsList>

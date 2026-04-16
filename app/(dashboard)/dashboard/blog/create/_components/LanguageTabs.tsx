@@ -1,4 +1,5 @@
 "use client";
+import ReactCountryFlag from "react-country-flag";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle2 } from "lucide-react";
@@ -56,13 +57,13 @@ export default function LanguageTabs({ post, categories, campaignOptions = [], m
   const hasEs = hasLocale("es");
 
   const localeTabs: { value: string; label: string; required?: boolean; has?: boolean }[] = [
-    { value: "ar", label: "🇸🇦 العربية", required: true },
-    { value: "en", label: "🇬🇧 English", has: hasEn },
-    { value: "fr", label: "🇫🇷 Français", has: hasFr },
-    { value: "tr", label: "🇹🇷 Türkçe", has: hasTr },
-    { value: "id", label: "🇮🇩 Bahasa", has: hasId },
-    { value: "pt", label: "🇵🇹 Português", has: hasPt },
-    { value: "es", label: "🇪🇸 Español", has: hasEs },
+    { value: "ar", label: "<ReactCountryFlag countryCode="SA" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> العربية", required: true },
+    { value: "en", label: "<ReactCountryFlag countryCode="GB" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> English", has: hasEn },
+    { value: "fr", label: "<ReactCountryFlag countryCode="FR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Français", has: hasFr },
+    { value: "tr", label: "<ReactCountryFlag countryCode="TR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Türkçe", has: hasTr },
+    { value: "id", label: "<ReactCountryFlag countryCode="ID" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Bahasa", has: hasId },
+    { value: "pt", label: "<ReactCountryFlag countryCode="PT" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Português", has: hasPt },
+    { value: "es", label: "<ReactCountryFlag countryCode="ES" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Español", has: hasEs },
   ];
 
   return (

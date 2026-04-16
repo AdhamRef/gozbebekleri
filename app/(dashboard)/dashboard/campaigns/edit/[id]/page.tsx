@@ -1,4 +1,5 @@
 'use client';
+import ReactCountryFlag from 'react-country-flag';
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
@@ -101,6 +102,14 @@ const formSchema = z
   description_en: z.string().optional(),
   title_fr: z.string().optional(),
   description_fr: z.string().optional(),
+  title_tr: z.string().optional(),
+  description_tr: z.string().optional(),
+  title_id: z.string().optional(),
+  description_id: z.string().optional(),
+  title_pt: z.string().optional(),
+  description_pt: z.string().optional(),
+  title_es: z.string().optional(),
+  description_es: z.string().optional(),
 })
   .superRefine((data, ctx) => {
     if (data.goalType === 'FIXED' && (!data.targetAmount || data.targetAmount < 1)) {
@@ -130,6 +139,14 @@ const updateSchema = z.object({
   description_en: z.string().optional(),
   title_fr: z.string().optional(),
   description_fr: z.string().optional(),
+  title_tr: z.string().optional(),
+  description_tr: z.string().optional(),
+  title_id: z.string().optional(),
+  description_id: z.string().optional(),
+  title_pt: z.string().optional(),
+  description_pt: z.string().optional(),
+  title_es: z.string().optional(),
+  description_es: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -177,8 +194,8 @@ export default function EditCampaignPage() {
   const [updateLoading, setUpdateLoading] = useState(false);
   const [uploadingUpdateImage, setUploadingUpdateImage] = useState(false);
   const [updateImage, setUpdateImage] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<'ar' | 'en' | 'fr'>('ar');
-  const [updateActiveTab, setUpdateActiveTab] = useState<'ar' | 'en' | 'fr'>('ar');
+  const [activeTab, setActiveTab] = useState<'ar' | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es'>('ar');
+  const [updateActiveTab, setUpdateActiveTab] = useState<'ar' | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es'>('ar');
   const [suggestedSeed, setSuggestedSeed] = useState<
     SuggestedDonationsConfig | undefined
   >(undefined);
@@ -206,6 +223,14 @@ export default function EditCampaignPage() {
       description_en: '',
       title_fr: '',
       description_fr: '',
+      title_tr: '',
+      description_tr: '',
+      title_id: '',
+      description_id: '',
+      title_pt: '',
+      description_pt: '',
+      title_es: '',
+      description_es: '',
     },
   });
 
@@ -219,6 +244,14 @@ export default function EditCampaignPage() {
       description_en: '',
       title_fr: '',
       description_fr: '',
+      title_tr: '',
+      description_tr: '',
+      title_id: '',
+      description_id: '',
+      title_pt: '',
+      description_pt: '',
+      title_es: '',
+      description_es: '',
     }
   });
 
@@ -245,9 +278,8 @@ export default function EditCampaignPage() {
         const allTranslationsRes = await axios.get(`/api/campaigns/${params.id}/translations`);
         const allTranslations = allTranslationsRes.data;
 
-        // Find English and French translations
-        const enTranslation = allTranslations.find((t: any) => t.locale === 'en');
-        const frTranslation = allTranslations.find((t: any) => t.locale === 'fr');
+        const getTr = (locale: string) => allTranslations.find((t: any) => t.locale === locale);
+        const en = getTr('en'), fr = getTr('fr'), tr = getTr('tr'), id = getTr('id'), pt = getTr('pt'), es = getTr('es');
 
         form.reset({
           title: campaign.title,
@@ -261,12 +293,18 @@ export default function EditCampaignPage() {
           isActive: campaign.isActive,
           images: campaign.images,
           videoUrl: campaign.videoUrl || '',
-          
-          // Set translation fields
-          title_en: enTranslation?.title || '',
-          description_en: enTranslation?.description || '',
-          title_fr: frTranslation?.title || '',
-          description_fr: frTranslation?.description || '',
+          title_en: en?.title || '',
+          description_en: en?.description || '',
+          title_fr: fr?.title || '',
+          description_fr: fr?.description || '',
+          title_tr: tr?.title || '',
+          description_tr: tr?.description || '',
+          title_id: id?.title || '',
+          description_id: id?.description || '',
+          title_pt: pt?.title || '',
+          description_pt: pt?.description || '',
+          title_es: es?.title || '',
+          description_es: es?.description || '',
         });
       } catch (error) {
         console.error('Error fetching campaign:', error);
@@ -315,14 +353,12 @@ export default function EditCampaignPage() {
         images: values.images,
         videoUrl: values.videoUrl,
         translations: {
-          en: {
-            title: values.title_en,
-            description: values.description_en,
-          },
-          fr: {
-            title: values.title_fr,
-            description: values.description_fr,
-          },
+          en: { title: values.title_en, description: values.description_en },
+          fr: { title: values.title_fr, description: values.description_fr },
+          tr: { title: values.title_tr, description: values.description_tr },
+          id: { title: values.title_id, description: values.description_id },
+          pt: { title: values.title_pt, description: values.description_pt },
+          es: { title: values.title_es, description: values.description_es },
         },
         suggestedDonations:
           values.fundraisingMode === 'AMOUNT'
@@ -444,14 +480,12 @@ export default function EditCampaignPage() {
         image: updateImage,
         videoUrl: data.videoUrl,
         translations: {
-          en: {
-            title: data.title_en,
-            description: data.description_en,
-          },
-          fr: {
-            title: data.title_fr,
-            description: data.description_fr,
-          },
+          en: { title: data.title_en, description: data.description_en },
+          fr: { title: data.title_fr, description: data.description_fr },
+          tr: { title: data.title_tr, description: data.description_tr },
+          id: { title: data.title_id, description: data.description_id },
+          pt: { title: data.title_pt, description: data.description_pt },
+          es: { title: data.title_es, description: data.description_es },
         },
       };
 
@@ -484,14 +518,12 @@ export default function EditCampaignPage() {
         image: updateImage || selectedUpdate?.image,
         videoUrl: data.videoUrl,
         translations: {
-          en: {
-            title: data.title_en,
-            description: data.description_en,
-          },
-          fr: {
-            title: data.title_fr,
-            description: data.description_fr,
-          },
+          en: { title: data.title_en, description: data.description_en },
+          fr: { title: data.title_fr, description: data.description_fr },
+          tr: { title: data.title_tr, description: data.description_tr },
+          id: { title: data.title_id, description: data.description_id },
+          pt: { title: data.title_pt, description: data.description_pt },
+          es: { title: data.title_es, description: data.description_es },
         },
       };
 
@@ -530,18 +562,24 @@ export default function EditCampaignPage() {
   const openEditDialog = (update: Update) => {
     setSelectedUpdate(update);
     
-    // Find translations
-    const enTranslation = update.translations?.find(t => t.locale === 'en');
-    const frTranslation = update.translations?.find(t => t.locale === 'fr');
-    
+    const getUT = (locale: string) => update.translations?.find(t => t.locale === locale);
+
     updateForm.reset({
       title: update.title,
       description: update.description,
       videoUrl: update.videoUrl || '',
-      title_en: enTranslation?.title || '',
-      description_en: enTranslation?.description || '',
-      title_fr: frTranslation?.title || '',
-      description_fr: frTranslation?.description || '',
+      title_en: getUT('en')?.title || '',
+      description_en: getUT('en')?.description || '',
+      title_fr: getUT('fr')?.title || '',
+      description_fr: getUT('fr')?.description || '',
+      title_tr: getUT('tr')?.title || '',
+      description_tr: getUT('tr')?.description || '',
+      title_id: getUT('id')?.title || '',
+      description_id: getUT('id')?.description || '',
+      title_pt: getUT('pt')?.title || '',
+      description_pt: getUT('pt')?.description || '',
+      title_es: getUT('es')?.title || '',
+      description_es: getUT('es')?.description || '',
     });
     
     setUpdateImage(update.image || '');
@@ -552,9 +590,12 @@ export default function EditCampaignPage() {
   const getTranslationStatus = () => {
     const hasEn = !!form.getValues('title_en') && !!form.getValues('description_en');
     const hasFr = !!form.getValues('title_fr') && !!form.getValues('description_fr');
-    const completed = [hasEn, hasFr].filter(Boolean).length;
-    
-    return { completed, total: 2, hasEn, hasFr };
+    const hasTr = !!form.getValues('title_tr') && !!form.getValues('description_tr');
+    const hasId = !!form.getValues('title_id') && !!form.getValues('description_id');
+    const hasPt = !!form.getValues('title_pt') && !!form.getValues('description_pt');
+    const hasEs = !!form.getValues('title_es') && !!form.getValues('description_es');
+    const completed = [hasEn, hasFr, hasTr, hasId, hasPt, hasEs].filter(Boolean).length;
+    return { completed, total: 6, hasEn, hasFr, hasTr, hasId, hasPt, hasEs };
   };
 
   if (loading) {
@@ -580,12 +621,12 @@ export default function EditCampaignPage() {
             <span className="text-sm text-gray-600">
               الترجمات: {translationStatus.completed}/{translationStatus.total}
             </span>
-            {translationStatus.hasEn && (
-              <CheckCircle2 className="w-4 h-4 text-green-600" title="English available" />
-            )}
-            {translationStatus.hasFr && (
-              <CheckCircle2 className="w-4 h-4 text-[#025EB8]" title="French available" />
-            )}
+            {translationStatus.hasEn && <CheckCircle2 className="w-4 h-4 text-green-600" title="English available" />}
+            {translationStatus.hasFr && <CheckCircle2 className="w-4 h-4 text-[#025EB8]" title="French available" />}
+            {translationStatus.hasTr && <CheckCircle2 className="w-4 h-4 text-red-500" title="Turkish available" />}
+            {translationStatus.hasId && <CheckCircle2 className="w-4 h-4 text-orange-500" title="Indonesian available" />}
+            {translationStatus.hasPt && <CheckCircle2 className="w-4 h-4 text-green-700" title="Portuguese available" />}
+            {translationStatus.hasEs && <CheckCircle2 className="w-4 h-4 text-yellow-600" title="Spanish available" />}
           </div>
         </div>
         <Button
@@ -608,16 +649,14 @@ export default function EditCampaignPage() {
             </div>
             
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-              <TabsList className="grid w-full grid-cols-3 mb-6" dir="rtl">
-                <TabsTrigger value="ar" className="gap-2">
-                  🇸🇦 العربية
-                </TabsTrigger>
-                <TabsTrigger value="en" className="gap-2">
-                  🇬🇧 English
-                </TabsTrigger>
-                <TabsTrigger value="fr" className="gap-2">
-                  🇫🇷 Français
-                </TabsTrigger>
+              <TabsList className="flex flex-wrap gap-1 mb-6" dir="rtl">
+                <TabsTrigger value="ar" className="gap-2"><ReactCountryFlag countryCode="SA" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> العربية</TabsTrigger>
+                <TabsTrigger value="en" className="gap-2"><ReactCountryFlag countryCode="GB" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> English</TabsTrigger>
+                <TabsTrigger value="fr" className="gap-2"><ReactCountryFlag countryCode="FR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Français</TabsTrigger>
+                <TabsTrigger value="tr" className="gap-2"><ReactCountryFlag countryCode="TR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Türkçe</TabsTrigger>
+                <TabsTrigger value="id" className="gap-2"><ReactCountryFlag countryCode="ID" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Bahasa</TabsTrigger>
+                <TabsTrigger value="pt" className="gap-2"><ReactCountryFlag countryCode="PT" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Português</TabsTrigger>
+                <TabsTrigger value="es" className="gap-2"><ReactCountryFlag countryCode="ES" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Español</TabsTrigger>
               </TabsList>
 
               {/* Arabic Tab */}
@@ -728,44 +767,57 @@ export default function EditCampaignPage() {
 
               {/* French Tab */}
               <TabsContent value="fr" className="space-y-6">
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription className='mt-[5px]'>
-                    Les traductions françaises sont facultatives. Si elles ne sont pas fournies, le contenu arabe sera affiché.
-                  </AlertDescription>
-                </Alert>
+                <Alert><AlertCircle className="h-4 w-4" /><AlertDescription className='mt-[5px]'>Les traductions françaises sont facultatives. Si elles ne sont pas fournies, le contenu arabe sera affiché.</AlertDescription></Alert>
+                <FormField control={form.control} name="title_fr" render={({ field }) => (
+                  <FormItem dir='rtl'><FormLabel>Titre de la campagne (Français)</FormLabel><FormControl><Input {...field} placeholder="Entrez le titre de la campagne en français" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="description_fr" render={({ field }) => (
+                  <FormItem dir='rtl'><FormLabel>Description de la campagne (Français)</FormLabel><FormControl><Textarea placeholder="Rédigez une description détaillée de la campagne en français..." className="min-h-[200px] resize-y" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+              </TabsContent>
 
-                <FormField
-                  control={form.control}
-                  name="title_fr"
-                  render={({ field }) => (
-                    <FormItem dir='rtl'>
-                      <FormLabel>Titre de la campagne (Français)</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Entrez le titre de la campagne en français" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              {/* Turkish Tab */}
+              <TabsContent value="tr" className="space-y-6">
+                <Alert><AlertCircle className="h-4 w-4" /><AlertDescription className='mt-[5px]'>Türkçe çeviriler isteğe bağlıdır. Sağlanmazsa Arapça içerik görüntülenecektir.</AlertDescription></Alert>
+                <FormField control={form.control} name="title_tr" render={({ field }) => (
+                  <FormItem dir='rtl'><FormLabel>Kampanya Başlığı (Türkçe)</FormLabel><FormControl><Input {...field} placeholder="Türkçe kampanya başlığı" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="description_tr" render={({ field }) => (
+                  <FormItem dir='rtl'><FormLabel>Kampanya Açıklaması (Türkçe)</FormLabel><FormControl><Textarea placeholder="Türkçe açıklama..." className="min-h-[200px] resize-y" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+              </TabsContent>
 
-                <FormField
-                  control={form.control}
-                  name="description_fr"
-                  render={({ field }) => (
-                    <FormItem dir='rtl'>
-                      <FormLabel>Description de la campagne (Français)</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Rédigez une description détaillée de la campagne en français..."
-                          className="min-h-[200px] resize-y"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              {/* Indonesian Tab */}
+              <TabsContent value="id" className="space-y-6">
+                <Alert><AlertCircle className="h-4 w-4" /><AlertDescription className='mt-[5px]'>Terjemahan Bahasa Indonesia bersifat opsional. Jika tidak disediakan, konten Arab akan ditampilkan.</AlertDescription></Alert>
+                <FormField control={form.control} name="title_id" render={({ field }) => (
+                  <FormItem dir='rtl'><FormLabel>Judul Kampanye (Indonesia)</FormLabel><FormControl><Input {...field} placeholder="Judul kampanye dalam Bahasa Indonesia" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="description_id" render={({ field }) => (
+                  <FormItem dir='rtl'><FormLabel>Deskripsi Kampanye (Indonesia)</FormLabel><FormControl><Textarea placeholder="Deskripsi dalam Bahasa Indonesia..." className="min-h-[200px] resize-y" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+              </TabsContent>
+
+              {/* Portuguese Tab */}
+              <TabsContent value="pt" className="space-y-6">
+                <Alert><AlertCircle className="h-4 w-4" /><AlertDescription className='mt-[5px]'>As traduções em português são opcionais. Se não fornecidas, o conteúdo em árabe será exibido.</AlertDescription></Alert>
+                <FormField control={form.control} name="title_pt" render={({ field }) => (
+                  <FormItem dir='rtl'><FormLabel>Título da Campanha (Português)</FormLabel><FormControl><Input {...field} placeholder="Título da campanha em português" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="description_pt" render={({ field }) => (
+                  <FormItem dir='rtl'><FormLabel>Descrição da Campanha (Português)</FormLabel><FormControl><Textarea placeholder="Descrição detalhada em português..." className="min-h-[200px] resize-y" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+              </TabsContent>
+
+              {/* Spanish Tab */}
+              <TabsContent value="es" className="space-y-6">
+                <Alert><AlertCircle className="h-4 w-4" /><AlertDescription className='mt-[5px]'>Las traducciones al español son opcionales. Si no se proporcionan, se mostrará el contenido en árabe.</AlertDescription></Alert>
+                <FormField control={form.control} name="title_es" render={({ field }) => (
+                  <FormItem dir='rtl'><FormLabel>Título de la Campaña (Español)</FormLabel><FormControl><Input {...field} placeholder="Título de la campaña en español" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="description_es" render={({ field }) => (
+                  <FormItem dir='rtl'><FormLabel>Descripción de la Campaña (Español)</FormLabel><FormControl><Textarea placeholder="Descripción detallada en español..." className="min-h-[200px] resize-y" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
               </TabsContent>
             </Tabs>
           </Card>
@@ -1056,108 +1108,73 @@ export default function EditCampaignPage() {
                   <Form {...updateForm}>
                     <form onSubmit={updateForm.handleSubmit(handleAddUpdate)} className="space-y-4">
                       <Tabs value={updateActiveTab} onValueChange={(v) => setUpdateActiveTab(v as any)}>
-                        <TabsList className="grid w-full grid-cols-3">
-                          <TabsTrigger value="ar">🇸🇦 العربية</TabsTrigger>
-                          <TabsTrigger value="en">🇬🇧 English</TabsTrigger>
-                          <TabsTrigger value="fr">🇫🇷 Français</TabsTrigger>
+                        <TabsList className="flex flex-wrap gap-1">
+                          <TabsTrigger value="ar"><ReactCountryFlag countryCode="SA" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> العربية</TabsTrigger>
+                          <TabsTrigger value="en"><ReactCountryFlag countryCode="GB" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> English</TabsTrigger>
+                          <TabsTrigger value="fr"><ReactCountryFlag countryCode="FR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Français</TabsTrigger>
+                          <TabsTrigger value="tr"><ReactCountryFlag countryCode="TR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Türkçe</TabsTrigger>
+                          <TabsTrigger value="id"><ReactCountryFlag countryCode="ID" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Bahasa</TabsTrigger>
+                          <TabsTrigger value="pt"><ReactCountryFlag countryCode="PT" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Português</TabsTrigger>
+                          <TabsTrigger value="es"><ReactCountryFlag countryCode="ES" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Español</TabsTrigger>
                         </TabsList>
-
                         <TabsContent value="ar" className="space-y-4">
-                          <FormField
-                            control={updateForm.control}
-                            name="title"
-                            render={({ field }) => (
-                              <FormItem dir='rtl'>
-                                <FormLabel>عنوان التحديث *</FormLabel>
-                                <FormControl>
-                                  <Input {...field} placeholder="أدخل عنوان التحديث" />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={updateForm.control}
-                            name="description"
-                            render={({ field }) => (
-                              <FormItem dir='rtl'>
-                                <FormLabel>وصف التحديث *</FormLabel>
-                                <FormControl>
-                                  <Textarea 
-                                    {...field} 
-                                    placeholder="اكتب وصف التحديث..."
-                                    className="min-h-[100px]"
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+                          <FormField control={updateForm.control} name="title" render={({ field }) => (
+                            <FormItem dir='rtl'><FormLabel>عنوان التحديث *</FormLabel><FormControl><Input {...field} placeholder="أدخل عنوان التحديث" /></FormControl><FormMessage /></FormItem>
+                          )} />
+                          <FormField control={updateForm.control} name="description" render={({ field }) => (
+                            <FormItem dir='rtl'><FormLabel>وصف التحديث *</FormLabel><FormControl><Textarea {...field} placeholder="اكتب وصف التحديث..." className="min-h-[100px]" /></FormControl><FormMessage /></FormItem>
+                          )} />
                         </TabsContent>
-
                         <TabsContent value="en" className="space-y-4">
-                          <FormField
-                            control={updateForm.control}
-                            name="title_en"
-                            render={({ field }) => (
-                              <FormItem dir='rtl'>
-                                <FormLabel>Update Title (English)</FormLabel>
-                                <FormControl>
-                                  <Input {...field} placeholder="Enter update title in English" />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={updateForm.control}
-                            name="description_en"
-                            render={({ field }) => (
-                              <FormItem dir='rtl'>
-                                <FormLabel>Update Description (English)</FormLabel>
-                                <FormControl>
-                                  <Textarea 
-                                    {...field} 
-                                    placeholder="Write update description in English..."
-                                    className="min-h-[100px]"
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
+                          <FormField control={updateForm.control} name="title_en" render={({ field }) => (
+                            <FormItem dir='rtl'><FormLabel>Update Title (English)</FormLabel><FormControl><Input {...field} placeholder="Enter update title in English" /></FormControl></FormItem>
+                          )} />
+                          <FormField control={updateForm.control} name="description_en" render={({ field }) => (
+                            <FormItem dir='rtl'><FormLabel>Update Description (English)</FormLabel><FormControl><Textarea {...field} placeholder="Write update description in English..." className="min-h-[100px]" /></FormControl></FormItem>
+                          )} />
                         </TabsContent>
-
                         <TabsContent value="fr" className="space-y-4">
-                          <FormField
-                            control={updateForm.control}
-                            name="title_fr"
-                            render={({ field }) => (
-                              <FormItem dir='rtl'>
-                                <FormLabel>Titre de la mise à jour (Français)</FormLabel>
-                                <FormControl>
-                                  <Input {...field} placeholder="Entrez le titre de la mise à jour en français" />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={updateForm.control}
-                            name="description_fr"
-                            render={({ field }) => (
-                              <FormItem dir='rtl'>
-                                <FormLabel>Description de la mise à jour (Français)</FormLabel>
-                                <FormControl>
-                                  <Textarea 
-                                    {...field} 
-                                    placeholder="Rédigez la description de la mise à jour en français..."
-                                    className="min-h-[100px]"
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
+                          <FormField control={updateForm.control} name="title_fr" render={({ field }) => (
+                            <FormItem dir='rtl'><FormLabel>Titre de la mise à jour (Français)</FormLabel><FormControl><Input {...field} placeholder="Entrez le titre en français" /></FormControl></FormItem>
+                          )} />
+                          <FormField control={updateForm.control} name="description_fr" render={({ field }) => (
+                            <FormItem dir='rtl'><FormLabel>Description (Français)</FormLabel><FormControl><Textarea {...field} placeholder="Description en français..." className="min-h-[100px]" /></FormControl></FormItem>
+                          )} />
+                        </TabsContent>
+                        <TabsContent value="tr" className="space-y-4">
+                          <FormField control={updateForm.control} name="title_tr" render={({ field }) => (
+                            <FormItem dir='rtl'><FormLabel>Güncelleme Başlığı (Türkçe)</FormLabel><FormControl><Input {...field} placeholder="Türkçe başlık" /></FormControl></FormItem>
+                          )} />
+                          <FormField control={updateForm.control} name="description_tr" render={({ field }) => (
+                            <FormItem dir='rtl'><FormLabel>Açıklama (Türkçe)</FormLabel><FormControl><Textarea {...field} placeholder="Türkçe açıklama..." className="min-h-[100px]" /></FormControl></FormItem>
+                          )} />
+                        </TabsContent>
+                        <TabsContent value="id" className="space-y-4">
+                          <FormField control={updateForm.control} name="title_id" render={({ field }) => (
+                            <FormItem dir='rtl'><FormLabel>Judul Pembaruan (Indonesia)</FormLabel><FormControl><Input {...field} placeholder="Judul dalam Bahasa Indonesia" /></FormControl></FormItem>
+                          )} />
+                          <FormField control={updateForm.control} name="description_id" render={({ field }) => (
+                            <FormItem dir='rtl'><FormLabel>Deskripsi (Indonesia)</FormLabel><FormControl><Textarea {...field} placeholder="Deskripsi dalam Bahasa Indonesia..." className="min-h-[100px]" /></FormControl></FormItem>
+                          )} />
+                        </TabsContent>
+                        <TabsContent value="pt" className="space-y-4">
+                          <FormField control={updateForm.control} name="title_pt" render={({ field }) => (
+                            <FormItem dir='rtl'><FormLabel>Título da Atualização (Português)</FormLabel><FormControl><Input {...field} placeholder="Título em português" /></FormControl></FormItem>
+                          )} />
+                          <FormField control={updateForm.control} name="description_pt" render={({ field }) => (
+                            <FormItem dir='rtl'><FormLabel>Descrição (Português)</FormLabel><FormControl><Textarea {...field} placeholder="Descrição em português..." className="min-h-[100px]" /></FormControl></FormItem>
+                          )} />
+                        </TabsContent>
+                        <TabsContent value="es" className="space-y-4">
+                          <FormField control={updateForm.control} name="title_es" render={({ field }) => (
+                            <FormItem dir='rtl'><FormLabel>Título de la Actualización (Español)</FormLabel><FormControl><Input {...field} placeholder="Título en español" /></FormControl></FormItem>
+                          )} />
+                          <FormField control={updateForm.control} name="description_es" render={({ field }) => (
+                            <FormItem dir='rtl'><FormLabel>Descripción (Español)</FormLabel><FormControl><Textarea {...field} placeholder="Descripción en español..." className="min-h-[100px]" /></FormControl></FormItem>
+                          )} />
                         </TabsContent>
                       </Tabs>
-                      
+
                       {/* Image Upload Section */}
                       <div className="space-y-4">
                         <label className="block text-sm font-medium text-gray-700">
@@ -1257,26 +1274,26 @@ export default function EditCampaignPage() {
             {/* Updates List */}
             <div className="space-y-4">
               {updates.map((update) => {
-                const enTrans = update.translations?.find(t => t.locale === 'en');
-                const frTrans = update.translations?.find(t => t.locale === 'fr');
-                
+                const hasTrans = (lc: string) => !!update.translations?.find(t => t.locale === lc)?.title;
+                const badges = [
+                  { lc: 'en', label: 'EN', cls: 'bg-[#025EB8]/10 text-[#025EB8]' },
+                  { lc: 'fr', label: 'FR', cls: 'bg-purple-100 text-purple-700' },
+                  { lc: 'tr', label: 'TR', cls: 'bg-red-100 text-red-700' },
+                  { lc: 'id', label: 'ID', cls: 'bg-orange-100 text-orange-700' },
+                  { lc: 'pt', label: 'PT', cls: 'bg-green-100 text-green-700' },
+                  { lc: 'es', label: 'ES', cls: 'bg-yellow-100 text-yellow-700' },
+                ];
+
                 return (
                   <Card key={update.id} className="p-4">
                     <div className="flex justify-between items-start">
                       <div className="space-y-2 flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-semibold text-lg">{update.title}</h3>
-                          <div className="flex gap-1">
-                            {enTrans && (
-                              <span className="text-xs bg-[#025EB8]/10 text-[#025EB8] px-2 py-0.5 rounded" title="English available">
-                                EN
-                              </span>
-                            )}
-                            {frTrans && (
-                              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded" title="French available">
-                                FR
-                              </span>
-                            )}
+                          <div className="flex gap-1 flex-wrap">
+                            {badges.map(b => hasTrans(b.lc) && (
+                              <span key={b.lc} className={`text-xs px-2 py-0.5 rounded ${b.cls}`}>{b.label}</span>
+                            ))}
                           </div>
                         </div>
                         <p className="text-gray-600">{update.description}</p>
@@ -1360,105 +1377,70 @@ export default function EditCampaignPage() {
             <Form {...updateForm}>
               <form onSubmit={updateForm.handleSubmit((data) => handleEditUpdate(selectedUpdate.id, data))} className="space-y-4">
                 <Tabs value={updateActiveTab} onValueChange={(v) => setUpdateActiveTab(v as any)}>
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="ar">🇸🇦 العربية</TabsTrigger>
-                    <TabsTrigger value="en">🇬🇧 English</TabsTrigger>
-                    <TabsTrigger value="fr">🇫🇷 Français</TabsTrigger>
+                  <TabsList className="flex flex-wrap gap-1">
+                    <TabsTrigger value="ar"><ReactCountryFlag countryCode="SA" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> العربية</TabsTrigger>
+                    <TabsTrigger value="en"><ReactCountryFlag countryCode="GB" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> English</TabsTrigger>
+                    <TabsTrigger value="fr"><ReactCountryFlag countryCode="FR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Français</TabsTrigger>
+                    <TabsTrigger value="tr"><ReactCountryFlag countryCode="TR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Türkçe</TabsTrigger>
+                    <TabsTrigger value="id"><ReactCountryFlag countryCode="ID" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Bahasa</TabsTrigger>
+                    <TabsTrigger value="pt"><ReactCountryFlag countryCode="PT" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Português</TabsTrigger>
+                    <TabsTrigger value="es"><ReactCountryFlag countryCode="ES" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Español</TabsTrigger>
                   </TabsList>
-
                   <TabsContent value="ar" className="space-y-4">
-                    <FormField
-                      control={updateForm.control}
-                      name="title"
-                      render={({ field }) => (
-                        <FormItem dir='rtl'>
-                          <FormLabel>عنوان التحديث *</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="أدخل عنوان التحديث" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={updateForm.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem dir='rtl'>
-                          <FormLabel>وصف التحديث *</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              {...field} 
-                              placeholder="اكتب وصف التحديث..."
-                              className="min-h-[100px]"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <FormField control={updateForm.control} name="title" render={({ field }) => (
+                      <FormItem dir='rtl'><FormLabel>عنوان التحديث *</FormLabel><FormControl><Input {...field} placeholder="أدخل عنوان التحديث" /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={updateForm.control} name="description" render={({ field }) => (
+                      <FormItem dir='rtl'><FormLabel>وصف التحديث *</FormLabel><FormControl><Textarea {...field} placeholder="اكتب وصف التحديث..." className="min-h-[100px]" /></FormControl><FormMessage /></FormItem>
+                    )} />
                   </TabsContent>
-
                   <TabsContent value="en" className="space-y-4">
-                    <FormField
-                      control={updateForm.control}
-                      name="title_en"
-                      render={({ field }) => (
-                        <FormItem dir='rtl'>
-                          <FormLabel>Update Title (English)</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="Enter update title in English" />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={updateForm.control}
-                      name="description_en"
-                      render={({ field }) => (
-                        <FormItem dir='rtl'>
-                          <FormLabel>Update Description (English)</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              {...field} 
-                              placeholder="Write update description in English..."
-                              className="min-h-[100px]"
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
+                    <FormField control={updateForm.control} name="title_en" render={({ field }) => (
+                      <FormItem dir='rtl'><FormLabel>Update Title (English)</FormLabel><FormControl><Input {...field} placeholder="Enter update title in English" /></FormControl></FormItem>
+                    )} />
+                    <FormField control={updateForm.control} name="description_en" render={({ field }) => (
+                      <FormItem dir='rtl'><FormLabel>Update Description (English)</FormLabel><FormControl><Textarea {...field} placeholder="Write update description in English..." className="min-h-[100px]" /></FormControl></FormItem>
+                    )} />
                   </TabsContent>
-
                   <TabsContent value="fr" className="space-y-4">
-                    <FormField
-                      control={updateForm.control}
-                      name="title_fr"
-                      render={({ field }) => (
-                        <FormItem dir='rtl'>
-                          <FormLabel>Titre de la mise à jour (Français)</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="Entrez le titre de la mise à jour en français" />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={updateForm.control}
-                      name="description_fr"
-                      render={({ field }) => (
-                        <FormItem dir='rtl'>
-                          <FormLabel>Description de la mise à jour (Français)</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              {...field} 
-                              placeholder="Rédigez la description de la mise à jour en français..."
-                              className="min-h-[100px]"
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
+                    <FormField control={updateForm.control} name="title_fr" render={({ field }) => (
+                      <FormItem dir='rtl'><FormLabel>Titre de la mise à jour (Français)</FormLabel><FormControl><Input {...field} placeholder="Entrez le titre en français" /></FormControl></FormItem>
+                    )} />
+                    <FormField control={updateForm.control} name="description_fr" render={({ field }) => (
+                      <FormItem dir='rtl'><FormLabel>Description (Français)</FormLabel><FormControl><Textarea {...field} placeholder="Description en français..." className="min-h-[100px]" /></FormControl></FormItem>
+                    )} />
+                  </TabsContent>
+                  <TabsContent value="tr" className="space-y-4">
+                    <FormField control={updateForm.control} name="title_tr" render={({ field }) => (
+                      <FormItem dir='rtl'><FormLabel>Güncelleme Başlığı (Türkçe)</FormLabel><FormControl><Input {...field} placeholder="Türkçe başlık" /></FormControl></FormItem>
+                    )} />
+                    <FormField control={updateForm.control} name="description_tr" render={({ field }) => (
+                      <FormItem dir='rtl'><FormLabel>Açıklama (Türkçe)</FormLabel><FormControl><Textarea {...field} placeholder="Türkçe açıklama..." className="min-h-[100px]" /></FormControl></FormItem>
+                    )} />
+                  </TabsContent>
+                  <TabsContent value="id" className="space-y-4">
+                    <FormField control={updateForm.control} name="title_id" render={({ field }) => (
+                      <FormItem dir='rtl'><FormLabel>Judul Pembaruan (Indonesia)</FormLabel><FormControl><Input {...field} placeholder="Judul dalam Bahasa Indonesia" /></FormControl></FormItem>
+                    )} />
+                    <FormField control={updateForm.control} name="description_id" render={({ field }) => (
+                      <FormItem dir='rtl'><FormLabel>Deskripsi (Indonesia)</FormLabel><FormControl><Textarea {...field} placeholder="Deskripsi dalam Bahasa Indonesia..." className="min-h-[100px]" /></FormControl></FormItem>
+                    )} />
+                  </TabsContent>
+                  <TabsContent value="pt" className="space-y-4">
+                    <FormField control={updateForm.control} name="title_pt" render={({ field }) => (
+                      <FormItem dir='rtl'><FormLabel>Título da Atualização (Português)</FormLabel><FormControl><Input {...field} placeholder="Título em português" /></FormControl></FormItem>
+                    )} />
+                    <FormField control={updateForm.control} name="description_pt" render={({ field }) => (
+                      <FormItem dir='rtl'><FormLabel>Descrição (Português)</FormLabel><FormControl><Textarea {...field} placeholder="Descrição em português..." className="min-h-[100px]" /></FormControl></FormItem>
+                    )} />
+                  </TabsContent>
+                  <TabsContent value="es" className="space-y-4">
+                    <FormField control={updateForm.control} name="title_es" render={({ field }) => (
+                      <FormItem dir='rtl'><FormLabel>Título de la Actualización (Español)</FormLabel><FormControl><Input {...field} placeholder="Título en español" /></FormControl></FormItem>
+                    )} />
+                    <FormField control={updateForm.control} name="description_es" render={({ field }) => (
+                      <FormItem dir='rtl'><FormLabel>Descripción (Español)</FormLabel><FormControl><Textarea {...field} placeholder="Descripción en español..." className="min-h-[100px]" /></FormControl></FormItem>
+                    )} />
                   </TabsContent>
                 </Tabs>
 
