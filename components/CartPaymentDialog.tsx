@@ -60,24 +60,22 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
   const locale = useLocale() as "ar" | "en" | "fr";
   const isRTL = locale === "ar";
   const dir = isRTL ? "rtl" : "ltr";
-  const navRow = `inline-flex items-center justify-center gap-2${isRTL ? " flex-row-reverse" : ""}`;
-  const backLabel = (
-    <span dir={dir} className={navRow}>
-      <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />
-      {t("back")}
-    </span>
+  const btnRow = "inline-flex items-center justify-center gap-2";
+  // RTL: Back → on right, Next ← on left. LTR: Back ← on left, Next → on right.
+  const backLabel = isRTL ? (
+    <span className={btnRow}><ChevronRight className="h-4 w-4 shrink-0" aria-hidden />{t("back")}</span>
+  ) : (
+    <span className={btnRow}><ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />{t("back")}</span>
   );
-  const nextLabel = (
-    <span className={navRow}>
-      {t("next")}
-      <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
-    </span>
+  const nextLabel = isRTL ? (
+    <span className={btnRow}>{t("next")}<ChevronLeft className="h-4 w-4 shrink-0" aria-hidden /></span>
+  ) : (
+    <span className={btnRow}>{t("next")}<ChevronRight className="h-4 w-4 shrink-0" aria-hidden /></span>
   );
-  const confirmDonationLabel = (
-    <span className={navRow}>
-      {t("confirmDonation")}
-      <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
-    </span>
+  const confirmDonationLabel = isRTL ? (
+    <span className={btnRow}>{t("confirmDonation")}<ChevronLeft className="h-4 w-4 shrink-0" aria-hidden /></span>
+  ) : (
+    <span className={btnRow}>{t("confirmDonation")}<ChevronRight className="h-4 w-4 shrink-0" aria-hidden /></span>
   );
 
   const STEPS = [
@@ -101,7 +99,6 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
   const [teamSupport, setTeamSupport]     = useState(0);
   const [coverFees,   setCoverFees]       = useState(false);
   const paymentMethod = "CARD";
-  const [use3D, setUse3D]                 = useState(true);
   // PayFor manual card inputs (use3D === true)
   const [cardDetails, setCardDetails]     = useState<PayForCardState>({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" });
   const [cardFocus, setCardFocus]         = useState("");
@@ -111,6 +108,8 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
   const onStripeReadyChange = useCallback((ready: boolean) => setStripeReady(ready), []);
   // Set when PayFor fails and we get a fallback clientSecret from the server
   const [fallbackClientSecret, setFallbackClientSecret] = useState<string | null>(null);
+  // Auto-select PayFor when TL currency (cart is always ONE_TIME). Fallback secret forces Stripe.
+  const use3D = getCurrency() === "TRY" && !fallbackClientSecret;
   const [fallbackDonationId, setFallbackDonationId] = useState<string | null>(null);
   // Guard against duplicate fallback execution
   const hasFallenBackRef = useRef(false);
@@ -152,7 +151,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
     if (!isOpen || !tracking || cartItems.length === 0 || checkoutTrackedRef.current) return;
     checkoutTrackedRef.current = true;
     const ids = cartItems.map((i) => i.campaign?.id).filter(Boolean) as string[];
-    tracking.trackInitiateCheckout({ value: amount, currency: "USD", numItems: cartItems.length, contentIds: ids.length ? ids : undefined });
+    tracking.trackInitiateCheckout({ value: amount, currency: getCurrency(), numItems: cartItems.length, contentIds: ids.length ? ids : undefined });
   }, [isOpen, tracking, cartItems, amount]);
 
   useEffect(() => {
@@ -163,7 +162,6 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
       hasFallenBackRef.current = false;
       setFallbackClientSecret(null);
       setFallbackDonationId(null);
-      setUse3D(true);
     }
   }, [isOpen]);
 
@@ -338,9 +336,9 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
             const fbRes = await axios.post("/api/stripe/fallback", { donationId, locale });
             if (!fbRes.data.clientSecret) { toast.error(t("donationFailed")); return; }
             // Store clientSecret + donationId, switch to Stripe Elements form
+            // use3D becomes false automatically via derived value once fallbackClientSecret is set
             setFallbackClientSecret(fbRes.data.clientSecret);
             setFallbackDonationId(fbRes.data.donationId ?? donationId);
-            setUse3D(false);
             setRedirecting(false);
             setPayforSwitching(false);
             setLoading(false);
@@ -420,7 +418,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
             ))}
           </div>
         </div>
-        <div dir={dir} className={`flex justify-between gap-4 ${isRTL ? " flex-row-reverse" : ""}`}>
+        <div dir={dir} className="flex justify-between gap-4">
           <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">{backLabel}</Button>
           <Button onClick={handleNext} className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2">{nextLabel}</Button>
         </div>
@@ -460,7 +458,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
             <p className="text-sm text-gray-500 mt-0.5">{t("feesWillBeAdded", { amount: `${fees.toFixed(2)} ${getCurrency()}` })}</p>
           </div>
         </button>
-        <div dir={dir} className={`flex justify-between gap-4 ${isRTL ? " flex-row-reverse" : ""}`}>
+        <div dir={dir} className="flex justify-between gap-4">
           <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">{backLabel}</Button>
           <Button onClick={handleNext} className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2">{nextLabel}</Button>
         </div>
@@ -538,18 +536,6 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
           </div>
         )}
 
-        {/* 3D Secure toggle */}
-        {paymentMethod === "CARD" && (
-          <button type="button" onClick={() => setUse3D(!use3D)}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded border text-xs transition-all duration-200 ${use3D ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]" : "border-gray-200 text-gray-500 hover:border-gray-400"}`}>
-            <div className={`w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center rounded border transition-all duration-200 ${use3D ? "bg-[#025EB8] border-[#025EB8]" : "border-gray-300 bg-white"}`}>
-              {use3D && <Check className="w-2 h-2 text-white" />}
-            </div>
-            <span className="font-medium">{t("secure3DLabel")}</span>
-            <span className="text-gray-400 ms-auto">{use3D ? t("secure3DEnabled") : t("secure3DDisabled")}</span>
-          </button>
-        )}
-
         {/* Stripe Elements — only mounted when use3D is false. Never mixed with PayFor. */}
         {paymentMethod === "CARD" && !use3D && (
           <Elements stripe={getStripePromise()}>
@@ -578,7 +564,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
           </div>
         </div>
 
-        <div className={`flex justify-between gap-4 ${locale === "ar" ? "flex-row-reverse" : ""}`}>
+        <div className="flex justify-between gap-4">
           <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">{backLabel}</Button>
           <Button onClick={handleSubmit}
             disabled={

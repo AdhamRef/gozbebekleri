@@ -1,5 +1,6 @@
 'use client';
 
+import ReactCountryFlag from 'react-country-flag';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
@@ -118,13 +119,13 @@ export default function NewSlidePage() {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <Tabs defaultValue="ar" className="w-full">
             <TabsList className="flex flex-wrap gap-1 mb-4" dir="rtl">
-              <TabsTrigger value="ar">🇸🇦 العربية</TabsTrigger>
-              <TabsTrigger value="en">🇬🇧 English</TabsTrigger>
-              <TabsTrigger value="fr">🇫🇷 Français</TabsTrigger>
-              <TabsTrigger value="tr">🇹🇷 Türkçe</TabsTrigger>
-              <TabsTrigger value="id">🇮🇩 Bahasa</TabsTrigger>
-              <TabsTrigger value="pt">🇵🇹 Português</TabsTrigger>
-              <TabsTrigger value="es">🇪🇸 Español</TabsTrigger>
+              <TabsTrigger value="ar"><ReactCountryFlag countryCode="SA" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> العربية</TabsTrigger>
+              <TabsTrigger value="en"><ReactCountryFlag countryCode="GB" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> English</TabsTrigger>
+              <TabsTrigger value="fr"><ReactCountryFlag countryCode="FR" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Français</TabsTrigger>
+              <TabsTrigger value="tr"><ReactCountryFlag countryCode="TR" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Türkçe</TabsTrigger>
+              <TabsTrigger value="id"><ReactCountryFlag countryCode="ID" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Bahasa</TabsTrigger>
+              <TabsTrigger value="pt"><ReactCountryFlag countryCode="PT" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Português</TabsTrigger>
+              <TabsTrigger value="es"><ReactCountryFlag countryCode="ES" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Español</TabsTrigger>
             </TabsList>
             <TabsContent value="ar" className="space-y-4 mt-0">
               <Card className="p-6 space-y-4">

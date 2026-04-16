@@ -117,24 +117,22 @@ const DonationDialog = ({
   const locale = useLocale() as "ar" | "en" | "fr";
   const isRTL = locale === "ar";
   const dir = isRTL ? "rtl" : "ltr";
-  const navRow = `inline-flex items-center justify-center gap-2${isRTL ? " flex-row-reverse" : ""}`;
-  const backLabel = (
-    <span className={navRow}>
-      <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />
-      {t("back")}
-    </span>
+  const btnRow = "inline-flex items-center justify-center gap-2";
+  // RTL: Back → on right, Next ← on left. LTR: Back ← on left, Next → on right.
+  const backLabel = isRTL ? (
+    <span className={btnRow}><ChevronRight className="h-4 w-4 shrink-0" aria-hidden />{t("back")}</span>
+  ) : (
+    <span className={btnRow}><ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />{t("back")}</span>
   );
-  const nextLabel = (
-    <span className={navRow}>
-      {t("next")}
-      <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
-    </span>
+  const nextLabel = isRTL ? (
+    <span className={btnRow}>{t("next")}<ChevronLeft className="h-4 w-4 shrink-0" aria-hidden /></span>
+  ) : (
+    <span className={btnRow}>{t("next")}<ChevronRight className="h-4 w-4 shrink-0" aria-hidden /></span>
   );
-  const confirmDonationLabel = (
-    <span className={navRow}>
-      {t("confirmDonation")}
-      <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
-    </span>
+  const confirmDonationLabel = isRTL ? (
+    <span className={btnRow}>{t("confirmDonation")}<ChevronLeft className="h-4 w-4 shrink-0" aria-hidden /></span>
+  ) : (
+    <span className={btnRow}>{t("confirmDonation")}<ChevronRight className="h-4 w-4 shrink-0" aria-hidden /></span>
   );
   const getReferralCode = useReferralCode();
 
@@ -181,7 +179,6 @@ const DonationDialog = ({
   const [coverFees, setCoverFees] = useState(false);
   const [billingDay, setBillingDay] = useState<number>(1);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
-  const [use3D, setUse3D] = useState(true);
   // PayFor manual card inputs (use3D === true)
   const [cardDetails, setCardDetails] = useState<PayForCardState>({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" });
   const [cardFocus, setCardFocus] = useState("");
@@ -190,8 +187,10 @@ const DonationDialog = ({
   const stripeFormRef = useRef<StripePaymentHandle | null>(null);
   // Stable callback — prevents useEffect loop inside StripePaymentStep
   const onStripeReadyChange = useCallback((ready: boolean) => setStripeReady(ready), []);
-  // Set when PayFor fails and we get a fallback clientSecret from the server
+  // Auto-select PayFor when ONE_TIME + TL, Stripe otherwise. Fallback secret forces Stripe.
   const [fallbackClientSecret, setFallbackClientSecret] = useState<string | null>(null);
+  // use3D is derived: PayFor when one-time TL donation (no manual override)
+  const use3D = donationType === "ONE_TIME" && getCurrency() === "TRY" && !fallbackClientSecret;
   const [fallbackDonationId, setFallbackDonationId] = useState<string | null>(null);
   // Guard against duplicate fallback execution
   const hasFallenBackRef = useRef(false);
@@ -246,19 +245,15 @@ const DonationDialog = ({
   // Reset state when dialog opens + fire view_donation_page
   useEffect(() => {
     if (isOpen) {
-      setUse3D(true);
       setFallbackClientSecret(null);
       setFallbackDonationId(null);
       hasFallenBackRef.current = false;
       // Track opening the donation flow
-      const amountUSD = initialDonationAmount
-        ? convertToUSD(initialDonationAmount, getCurrency())
-        : undefined;
       tracking?.trackViewContent({
         contentIds:  campaignId ? [campaignId] : categoryId ? [categoryId] : undefined,
         contentName: campaignTitle || categoryName || undefined,
-        value:       amountUSD,
-        currency:    "USD",
+        value:       initialDonationAmount || undefined,
+        currency:    getCurrency(),
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -351,16 +346,14 @@ const DonationDialog = ({
       setCurrentStep(nextStep);
 
       // ── Funnel events on step transitions ──────────────────────────────────
-      const amountUSD = shareMode && sharePriceUSD != null
-        ? shareCount * sharePriceUSD
-        : convertToUSD(donationAmount, getCurrency());
+      const currency = getCurrency();
       const nextTitle = steps[nextStep]?.title;
 
       // Reached confirmation step → InitiateCheckout
       if (nextTitle === t("confirmation")) {
         tracking?.trackInitiateCheckout({
-          value:       amountUSD,
-          currency:    "USD",
+          value:       donationAmount,
+          currency,
           numItems:    1,
           contentIds:  campaignId ? [campaignId] : categoryId ? [categoryId] : undefined,
           donationType: donationType ?? undefined,
@@ -370,8 +363,8 @@ const DonationDialog = ({
       // Reached payment step → AddPaymentInfo
       if (nextTitle === t("paymentInfo")) {
         tracking?.trackAddPaymentInfo({
-          value:         amountUSD,
-          currency:      "USD",
+          value:         donationAmount,
+          currency,
           causeId:       campaignId || categoryId || undefined,
           causeName:     campaignTitle || categoryName || undefined,
           paymentMethod: paymentMethod ?? "CARD",
@@ -382,8 +375,8 @@ const DonationDialog = ({
       if (steps[currentStep]?.title === t("donationAmount") || steps[currentStep]?.title === t("monthlyDonationAmount")) {
         tracking?.trackCustomizeProduct({
           donationType: donationType ?? undefined,
-          amount:       amountUSD,
-          currency:     "USD",
+          amount:       donationAmount,
+          currency,
           causeId:      campaignId || categoryId || undefined,
           causeName:    campaignTitle || categoryName || undefined,
         });
@@ -623,11 +616,11 @@ const DonationDialog = ({
                 type="button"
                 variant="outline"
                 onClick={handleBackFromDonationValueStep}
-                className={`flex-1 min-w-[6rem] inline-flex items-center justify-center gap-2 ${isRTL ? " flex-row-reverse" : ""}`}
+                className="flex-1 min-w-[6rem] inline-flex items-center justify-center gap-2"
               >
                 {backLabel}
               </Button>
-              {!isCategoryMode && campaignId && (
+              {!isCategoryMode && campaignId && donationType !== "MONTHLY" && (
                 <Button
                   variant="outline"
                   onClick={async () => {
@@ -645,8 +638,8 @@ const DonationDialog = ({
                       });
                       addItem(response.data || []);
                       tracking?.trackAddToCart({
-                        value: amountUSD,
-                        currency: "USD",
+                        value: donationAmount,
+                        currency: getCurrency(),
                         contentIds: [campaignId],
                         contentName: campaignTitle,
                         quantity: 1,
@@ -721,8 +714,8 @@ const DonationDialog = ({
               </div>
             </div>
 
-            <div className={`flex justify-between gap-4 ${isRTL ? " flex-row-reverse" : ""}`}>
-              <Button variant="outline" onClick={handleBack} className={`flex-1 inline-flex items-center justify-center gap-2 ${isRTL ? " flex-row-reverse" : ""}`}>
+            <div className="flex justify-between gap-4">
+              <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">
                 {backLabel}
               </Button>
               <Button
@@ -787,8 +780,8 @@ const DonationDialog = ({
               </div>
             </button>
 
-            <div className={`flex justify-between gap-4 ${isRTL ? " flex-row-reverse" : ""}`}>
-              <Button variant="outline" onClick={handleBack} className={`flex-1 inline-flex items-center justify-center gap-2 ${isRTL ? " flex-row-reverse" : ""}`}>
+            <div className="flex justify-between gap-4">
+              <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">
                 {backLabel}
               </Button>
               <Button
@@ -853,7 +846,7 @@ const DonationDialog = ({
             </div>
 
             {/* Buttons Section */}
-            <div className={`flex justify-between gap-4 ${isRTL ? " flex-row-reverse" : ""}`}>
+            <div className="flex justify-between gap-4">
               <Button
                 variant="outline"
                 onClick={handleBack}
@@ -912,11 +905,11 @@ const DonationDialog = ({
               ))}
             </div>
 
-            <div className={`flex justify-between gap-4 ${isRTL ? " flex-row-reverse" : ""}`}>
+            <div className="flex justify-between gap-4">
               <Button
                 variant="outline"
                 onClick={handleBack}
-                className={`flex-1 inline-flex items-center justify-center gap-2 ${isRTL ? " flex-row-reverse" : ""}`}
+                className="flex-1 inline-flex items-center justify-center gap-2"
               >
                 {backLabel}
               </Button>
@@ -964,23 +957,6 @@ const DonationDialog = ({
               />
             )}
 
-            {/* 3D Secure toggle — only for one-time card payments */}
-            {donationType === "ONE_TIME" && paymentMethod === "CARD" && (
-              <button
-                type="button"
-                onClick={() => setUse3D(!use3D)}
-                className={`w-full flex items-center gap-2 px-3 py-2 rounded border text-xs transition-all duration-200 ${
-                  use3D ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]" : "border-gray-200 text-gray-500 hover:border-gray-400"
-                }`}
-              >
-                <div className={`w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center rounded border transition-all duration-200 ${use3D ? "bg-[#025EB8] border-[#025EB8]" : "border-gray-300 bg-white"}`}>
-                  {use3D && <Check className="w-2 h-2 text-white" />}
-                </div>
-                <span className="font-medium">{t("secure3DLabel")}</span>
-                <span className="text-gray-400 ms-auto">{use3D ? t("secure3DEnabled") : t("secure3DDisabled")}</span>
-              </button>
-            )}
-
             <div className="space-y-2 overflow-visible pt-2 border-t border-border" dir={locale === "ar" ? "rtl" : "ltr"}>
               <label className={`block text-sm font-medium text-gray-700 ${locale === "ar" ? "text-right" : "text-left"}`}>{t("contactPhone")}</label>
               <div className="overflow-visible phone-input-wrapper">
@@ -995,8 +971,8 @@ const DonationDialog = ({
               </div>
             </div>
 
-            <div dir={dir} className={`flex justify-between gap-4 ${isRTL ? " flex-row-reverse" : ""}`}>
-              <Button variant="outline" onClick={handleBack} className={`flex-1 inline-flex items-center justify-center gap-2 ${isRTL ? " flex-row-reverse" : ""}`}>
+            <div dir={dir} className="flex justify-between gap-4">
+              <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">
                 {backLabel}
               </Button>
               <Button
@@ -1060,8 +1036,8 @@ const DonationDialog = ({
 
       // payment_submit event
       tracking?.trackPaymentSubmit({
-        value:        amountUSD,
-        currency:     "USD",
+        value:        totalAmount,
+        currency:     getCurrency(),
         causeId:      campaignId || categoryId || undefined,
         causeName:    campaignTitle || categoryName || undefined,
         donationType: donationType ?? undefined,
@@ -1216,10 +1192,9 @@ const DonationDialog = ({
               try {
                 const fbRes = await axios.post("/api/stripe/fallback", { donationId, locale });
                 if (!fbRes.data.clientSecret) { toast.error(t("donationFailed")); return; }
-                // Store clientSecret + donationId, switch to Stripe Elements form
+                // Store clientSecret + donationId; use3D becomes false automatically via derived value
                 setFallbackClientSecret(fbRes.data.clientSecret);
                 setFallbackDonationId(fbRes.data.donationId ?? donationId);
-                setUse3D(false);
                 setRedirecting(false);
                 setPayforSwitching(false);
                 setLoading(false);
@@ -1273,13 +1248,9 @@ const DonationDialog = ({
     } catch (error) {
       console.error("Payment failed:", error);
       toast.error(t("donationFailed"));
-      const amountUSD =
-        shareMode && sharePriceUSD != null
-          ? shareCount * sharePriceUSD
-          : convertToUSD(donationAmount, getCurrency());
       tracking?.trackPaymentFailed({
-        value:   amountUSD,
-        currency: "USD",
+        value:   donationAmount,
+        currency: getCurrency(),
         causeId: campaignId || categoryId || undefined,
         reason:  error instanceof Error ? error.message : "unknown",
         gateway: use3D ? "payfor" : "stripe",
