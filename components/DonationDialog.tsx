@@ -568,7 +568,11 @@ const DonationDialog = ({
                             : ""
                         }
                       >
-                        {c}
+                        {c*sharePriceUSD > 0 ? (
+                          <span dir="ltr">{formatNumber(convertToCurrency(c * sharePriceUSD).convertedValue ?? c * sharePriceUSD)} {getCurrency()}</span>
+                        ) : (
+                          t("free")
+                        )}
                       </Button>
                     ))}
                   </div>
