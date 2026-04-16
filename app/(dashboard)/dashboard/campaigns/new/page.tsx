@@ -706,7 +706,7 @@ const getTranslationStatus = () => {
                     <FormControl>
                       <Input
                         {...field}
-                        placeholder="أدخل رابط الفيديو (YouTube أو Vimeo)"
+                        placeholder="أدخل رابط الفيديو (YouTube أو Facebook)"
                       />
                     </FormControl>
                     <FormDescription>

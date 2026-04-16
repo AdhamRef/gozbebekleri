@@ -957,7 +957,7 @@ export default function EditCampaignPage() {
                     <FormControl>
                       <Input
                         {...field}
-                        placeholder="أدخل رابط الفيديو (YouTube أو Vimeo)"
+                        placeholder="أدخل رابط الفيديو (YouTube أو Facebook)"
                       />
                     </FormControl>
                     <FormMessage />
