@@ -1,5 +1,4 @@
 'use client';
-import ReactCountryFlag from 'react-country-flag';
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
@@ -650,13 +649,13 @@ export default function EditCampaignPage() {
             
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
               <TabsList className="flex flex-wrap gap-1 mb-6" dir="rtl">
-                <TabsTrigger value="ar" className="gap-2"><ReactCountryFlag countryCode="SA" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> العربية</TabsTrigger>
-                <TabsTrigger value="en" className="gap-2"><ReactCountryFlag countryCode="GB" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> English</TabsTrigger>
-                <TabsTrigger value="fr" className="gap-2"><ReactCountryFlag countryCode="FR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Français</TabsTrigger>
-                <TabsTrigger value="tr" className="gap-2"><ReactCountryFlag countryCode="TR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Türkçe</TabsTrigger>
-                <TabsTrigger value="id" className="gap-2"><ReactCountryFlag countryCode="ID" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Bahasa</TabsTrigger>
-                <TabsTrigger value="pt" className="gap-2"><ReactCountryFlag countryCode="PT" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Português</TabsTrigger>
-                <TabsTrigger value="es" className="gap-2"><ReactCountryFlag countryCode="ES" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Español</TabsTrigger>
+                <TabsTrigger value="ar" className="gap-2">🇸🇦 العربية</TabsTrigger>
+                <TabsTrigger value="en" className="gap-2">🇬🇧 English</TabsTrigger>
+                <TabsTrigger value="fr" className="gap-2">🇫🇷 Français</TabsTrigger>
+                <TabsTrigger value="tr" className="gap-2">🇹🇷 Türkçe</TabsTrigger>
+                <TabsTrigger value="id" className="gap-2">🇮🇩 Bahasa</TabsTrigger>
+                <TabsTrigger value="pt" className="gap-2">🇵🇹 Português</TabsTrigger>
+                <TabsTrigger value="es" className="gap-2">🇪🇸 Español</TabsTrigger>
               </TabsList>
 
               {/* Arabic Tab */}
@@ -1109,13 +1108,13 @@ export default function EditCampaignPage() {
                     <form onSubmit={updateForm.handleSubmit(handleAddUpdate)} className="space-y-4">
                       <Tabs value={updateActiveTab} onValueChange={(v) => setUpdateActiveTab(v as any)}>
                         <TabsList className="flex flex-wrap gap-1">
-                          <TabsTrigger value="ar"><ReactCountryFlag countryCode="SA" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> العربية</TabsTrigger>
-                          <TabsTrigger value="en"><ReactCountryFlag countryCode="GB" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> English</TabsTrigger>
-                          <TabsTrigger value="fr"><ReactCountryFlag countryCode="FR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Français</TabsTrigger>
-                          <TabsTrigger value="tr"><ReactCountryFlag countryCode="TR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Türkçe</TabsTrigger>
-                          <TabsTrigger value="id"><ReactCountryFlag countryCode="ID" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Bahasa</TabsTrigger>
-                          <TabsTrigger value="pt"><ReactCountryFlag countryCode="PT" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Português</TabsTrigger>
-                          <TabsTrigger value="es"><ReactCountryFlag countryCode="ES" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Español</TabsTrigger>
+                          <TabsTrigger value="ar">🇸🇦 العربية</TabsTrigger>
+                          <TabsTrigger value="en">🇬🇧 English</TabsTrigger>
+                          <TabsTrigger value="fr">🇫🇷 Français</TabsTrigger>
+                          <TabsTrigger value="tr">🇹🇷 Türkçe</TabsTrigger>
+                          <TabsTrigger value="id">🇮🇩 Bahasa</TabsTrigger>
+                          <TabsTrigger value="pt">🇵🇹 Português</TabsTrigger>
+                          <TabsTrigger value="es">🇪🇸 Español</TabsTrigger>
                         </TabsList>
                         <TabsContent value="ar" className="space-y-4">
                           <FormField control={updateForm.control} name="title" render={({ field }) => (
@@ -1378,13 +1377,13 @@ export default function EditCampaignPage() {
               <form onSubmit={updateForm.handleSubmit((data) => handleEditUpdate(selectedUpdate.id, data))} className="space-y-4">
                 <Tabs value={updateActiveTab} onValueChange={(v) => setUpdateActiveTab(v as any)}>
                   <TabsList className="flex flex-wrap gap-1">
-                    <TabsTrigger value="ar"><ReactCountryFlag countryCode="SA" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> العربية</TabsTrigger>
-                    <TabsTrigger value="en"><ReactCountryFlag countryCode="GB" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> English</TabsTrigger>
-                    <TabsTrigger value="fr"><ReactCountryFlag countryCode="FR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Français</TabsTrigger>
-                    <TabsTrigger value="tr"><ReactCountryFlag countryCode="TR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Türkçe</TabsTrigger>
-                    <TabsTrigger value="id"><ReactCountryFlag countryCode="ID" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Bahasa</TabsTrigger>
-                    <TabsTrigger value="pt"><ReactCountryFlag countryCode="PT" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Português</TabsTrigger>
-                    <TabsTrigger value="es"><ReactCountryFlag countryCode="ES" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Español</TabsTrigger>
+                    <TabsTrigger value="ar">🇸🇦 العربية</TabsTrigger>
+                    <TabsTrigger value="en">🇬🇧 English</TabsTrigger>
+                    <TabsTrigger value="fr">🇫🇷 Français</TabsTrigger>
+                    <TabsTrigger value="tr">🇹🇷 Türkçe</TabsTrigger>
+                    <TabsTrigger value="id">🇮🇩 Bahasa</TabsTrigger>
+                    <TabsTrigger value="pt">🇵🇹 Português</TabsTrigger>
+                    <TabsTrigger value="es">🇪🇸 Español</TabsTrigger>
                   </TabsList>
                   <TabsContent value="ar" className="space-y-4">
                     <FormField control={updateForm.control} name="title" render={({ field }) => (

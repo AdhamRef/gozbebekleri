@@ -57,7 +57,7 @@ export default function LanguageTabs({ post, categories, campaignOptions = [], m
   const hasEs = hasLocale("es");
 
   const localeTabs: { value: string; label: string; required?: boolean; has?: boolean }[] = [
-    { value: "ar", label: "<ReactCountryFlag countryCode="SA" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> العربية", required: true },
+    { value: "ar", label: "<ReactCountryFlag countryCode="AR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> العربية", required: true },
     { value: "en", label: "<ReactCountryFlag countryCode="GB" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> English", has: hasEn },
     { value: "fr", label: "<ReactCountryFlag countryCode="FR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Français", has: hasFr },
     { value: "tr", label: "<ReactCountryFlag countryCode="TR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Türkçe", has: hasTr },
