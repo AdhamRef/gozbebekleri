@@ -1,6 +1,6 @@
 "use client";
-import ReactCountryFlag from "react-country-flag";
 
+import ReactCountryFlag from "react-country-flag";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -47,30 +47,54 @@ interface LanguageTabsProps {
 
 export default function LanguageTabs({ post, categories, campaignOptions = [], mode = "edit" }: LanguageTabsProps) {
   const isCreate = mode === "create" || post.id === "new";
+
   const hasLocale = (code: string) =>
     post.translations?.some((t) => t.locale === code && (t.title || t.description || t.content));
-  const hasEn = hasLocale("en");
-  const hasFr = hasLocale("fr");
-  const hasTr = hasLocale("tr");
-  const hasId = hasLocale("id");
-  const hasPt = hasLocale("pt");
-  const hasEs = hasLocale("es");
 
-  const localeTabs: { value: string; label: string; required?: boolean; has?: boolean }[] = [
-    { value: "ar", label: "<ReactCountryFlag countryCode="AR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> العربية", required: true },
-    { value: "en", label: "<ReactCountryFlag countryCode="GB" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> English", has: hasEn },
-    { value: "fr", label: "<ReactCountryFlag countryCode="FR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Français", has: hasFr },
-    { value: "tr", label: "<ReactCountryFlag countryCode="TR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Türkçe", has: hasTr },
-    { value: "id", label: "<ReactCountryFlag countryCode="ID" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Bahasa", has: hasId },
-    { value: "pt", label: "<ReactCountryFlag countryCode="PT" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Português", has: hasPt },
-    { value: "es", label: "<ReactCountryFlag countryCode="ES" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Español", has: hasEs },
+  // The fix: label is now a React element, not a string inside quotes.
+  const localeTabs = [
+    { 
+      value: "ar", 
+      label: <><ReactCountryFlag countryCode="SA" svg style={{ width: '1.2em', height: '1.2em' }} /> العربية</>, 
+      required: true 
+    },
+    { 
+      value: "en", 
+      label: <><ReactCountryFlag countryCode="GB" svg style={{ width: '1.2em', height: '1.2em' }} /> English</>, 
+      has: hasLocale("en") 
+    },
+    { 
+      value: "fr", 
+      label: <><ReactCountryFlag countryCode="FR" svg style={{ width: '1.2em', height: '1.2em' }} /> Français</>, 
+      has: hasLocale("fr") 
+    },
+    { 
+      value: "tr", 
+      label: <><ReactCountryFlag countryCode="TR" svg style={{ width: '1.2em', height: '1.2em' }} /> Türkçe</>, 
+      has: hasLocale("tr") 
+    },
+    { 
+      value: "id", 
+      label: <><ReactCountryFlag countryCode="ID" svg style={{ width: '1.2em', height: '1.2em' }} /> Bahasa</>, 
+      has: hasLocale("id") 
+    },
+    { 
+      value: "pt", 
+      label: <><ReactCountryFlag countryCode="PT" svg style={{ width: '1.2em', height: '1.2em' }} /> Português</>, 
+      has: hasLocale("pt") 
+    },
+    { 
+      value: "es", 
+      label: <><ReactCountryFlag countryCode="ES" svg style={{ width: '1.2em', height: '1.2em' }} /> Español</>, 
+      has: hasLocale("es") 
+    },
   ];
 
   return (
     <Tabs defaultValue="ar" className="w-full">
       <TabsList className="flex flex-wrap gap-1 mb-6" dir="rtl">
         {localeTabs.map(({ value, label, required, has }) => (
-          <TabsTrigger key={value} value={value} className="gap-2">
+          <TabsTrigger key={value} value={value} className="gap-2 px-4">
             {label}
             {required && <span className="text-xs text-red-600">*</span>}
             {has && <CheckCircle2 className="w-3 h-3 text-green-600" />}
