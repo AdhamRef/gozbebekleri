@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       ...(!isAdmin && { donorId: session.user.id }),
       ...(search && isAdmin && { donor: { name: { contains: search } } }),
       ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
-      ...(statusFilter && ["PAID", "FAILED", "PENDING"].includes(statusFilter) && { status: statusFilter }),
+      ...(statusFilter && ["PAID", "FAILED"].includes(statusFilter) && { status: statusFilter }),
     };
     if (categoryId && isAdmin) {
       where.OR = [
@@ -267,7 +267,7 @@ export async function POST(request: NextRequest) {
             currency,
             fees: coverFees ? fees : 0,
             totalAmount: finalTotalAmount,
-            status: "PENDING",
+            status: "PAID",
             locale: validLocale ?? undefined,
             donorId: session.user.id,
             referralId: referralId ?? undefined,
@@ -358,7 +358,7 @@ export async function POST(request: NextRequest) {
           currency,
           fees: coverFees ? fees : 0,
           totalAmount: finalTotalAmount,
-          status: "PENDING",
+          status: "PAID",
           locale: validLocale ?? undefined,
           donorId: session.user.id,
           referralId: referralId ?? undefined,

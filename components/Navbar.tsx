@@ -303,7 +303,7 @@ const Navbar = () => {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 8 }}
                       transition={{ duration: 0.15 }}
-                      className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50"
+                      className={`absolute mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 ${isRTL ? "left-0" : "right-0"}`}
                     >
                       <div className="px-4 py-3 border-b border-gray-100">
                         <p className="text-sm font-semibold text-gray-800 truncate">{session.user.name}</p>

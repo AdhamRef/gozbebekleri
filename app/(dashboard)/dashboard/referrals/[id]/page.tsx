@@ -96,9 +96,7 @@ interface ReferralStats {
   totalDonations: number;
   paidCount?: number;
   failedCount?: number;
-  pendingCount?: number;
   failedTotalAmount?: number;
-  pendingTotalAmount?: number;
   totalAmount: number;
   allTimeRevenue?: number;
   /** All PAID for this referral (USD) — ignores category/campaign filters */
@@ -207,7 +205,7 @@ export default function ReferralAnalyticsPage() {
   const [dateTo, setDateTo] = useState("");
   const [donationsSortBy, setDonationsSortBy] = useState<"date" | "amount">("date");
   const [donationsSortOrder, setDonationsSortOrder] = useState<"asc" | "desc">("desc");
-  const [donationsStatusFilter, setDonationsStatusFilter] = useState<"all" | "PAID" | "FAILED" | "PENDING">("all");
+  const [donationsStatusFilter, setDonationsStatusFilter] = useState<"all" | "PAID" | "FAILED">("all");
   const [donations, setDonations] = useState<DonationRow[]>([]);
   const [donationsPage, setDonationsPage] = useState(1);
   const [donationsTotal, setDonationsTotal] = useState(0);
@@ -456,14 +454,6 @@ export default function ReferralAnalyticsPage() {
                 <StatsMetricCard compact title="الرسوم" value={stats.feesTotal ?? 0} icon={Percent} accent="orange" format="money" subtitle="من التبرعات الناجحة" />
                 <StatsMetricCard compact title="تبرعات ناجحة" value={stats.paidCount ?? 0} icon={Receipt} accent="teal" subtitle={`إجمالي: ${formatMoney(stats.totalAmount ?? 0, undefined, undefined, true)}`} />
                 <StatsMetricCard compact title="تبرعات فاشلة" value={stats.failedCount ?? 0} icon={Receipt} accent="orange" subtitle={stats.failedTotalAmount ? formatMoney(stats.failedTotalAmount, undefined, undefined, true) : "—"} />
-                <StatsMetricCard
-                  compact
-                  title="تبرعات معلقة"
-                  value={stats.pendingCount ?? 0}
-                  icon={Receipt}
-                  accent="amber"
-                  subtitle={stats.pendingTotalAmount ? formatMoney(stats.pendingTotalAmount, undefined, undefined, true) : undefined}
-                />
               </>
             )}
             {statCardSet === "overview" && (
@@ -602,7 +592,6 @@ export default function ReferralAnalyticsPage() {
                     <SelectItem value="all" className="text-xs">كل الحالات</SelectItem>
                     <SelectItem value="PAID" className="text-xs">ناجح</SelectItem>
                     <SelectItem value="FAILED" className="text-xs">فاشل</SelectItem>
-                    <SelectItem value="PENDING" className="text-xs">معلق</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

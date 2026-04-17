@@ -630,9 +630,8 @@ async function main() {
     const rate     = usdRates[currency] ?? 1;
     const amountUSD = parseFloat((amount * rate).toFixed(2));
 
-    // Most donations are PAID; a few PENDING / FAILED for realism
-    const status: 'PAID' | 'PENDING' | 'FAILED' =
-      i < 58 ? 'PAID' : i === 58 ? 'PENDING' : i === 59 ? 'FAILED' : 'PENDING';
+    const status: 'PAID' | 'FAILED' =
+      i < 59 ? 'PAID' : 'FAILED';
 
     const referral     = i % 5 === 0 ? referrals[i % referrals.length] : null;
     const donationDate = randomDate(monthsAgo(12), daysAgo(1));

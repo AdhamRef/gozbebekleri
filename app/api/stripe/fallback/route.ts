@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     const categoryNames = donation.categoryItems.map((i) => i.category.name).join(", ");
     const description = campaignNames || categoryNames || "Donation";
 
-    // Clone into a fresh PENDING donation if the original failed
+    // Clone the failed donation as a new record for retry
     let targetDonationId = donationId;
 
     if (donation.status === "FAILED") {
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
           currency: donation.currency,
           fees: donation.fees,
           totalAmount: donation.totalAmount,
-          status: "PENDING",
+          status: "PAID",
           locale: donation.locale ?? locale,
           donorId: donation.donorId,
           paymentMethod: "CARD",
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
       });
       targetDonationId = newDonation.id;
     } else {
-      // PENDING: switch provider to STRIPE
+      // switch provider to STRIPE
       await prisma.donation.update({
         where: { id: donationId },
         data: { provider: "STRIPE" },

@@ -52,14 +52,14 @@ export async function POST(req: NextRequest) {
       });
 
       // ── Stripe fallback ──────────────────────────────────────────────────────
-      // Clone the failed donation as a new PENDING record, then redirect the
+      // Clone the failed donation as a new record, then redirect the
       // user directly to Stripe Checkout — no page visit, no form, no clicks.
       try {
         const campaignNames = donation.items.map((i) => i.campaign.title).join(", ");
         const categoryNames = donation.categoryItems.map((i) => i.category.name).join(", ");
         const productName = campaignNames || categoryNames || "Donation";
 
-        // Clone donation (new ID, PENDING, provider=STRIPE)
+        // Clone donation (new ID, provider=STRIPE)
         const newDonation = await prisma.donation.create({
           data: {
             amount: donation.amount,
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
             currency: donation.currency,
             fees: donation.fees,
             totalAmount: donation.totalAmount,
-            status: "PENDING",
+            status: "PAID",
             locale: donation.locale ?? locale,
             donorId: donation.donorId,
             paymentMethod: "CARD",

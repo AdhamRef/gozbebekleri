@@ -152,9 +152,7 @@ interface DashboardStats {
   feesTotal?: number;
   paidCount?: number;
   failedCount?: number;
-  pendingCount?: number;
   failedTotalAmount?: number;
-  pendingTotalAmount?: number;
   recentDonations: Array<{
     id: string;
     amount: number;
@@ -270,7 +268,7 @@ export default function MonthlySubscriptionsDashboardPage() {
   const [dateTo, setDateTo] = useState("");
   const [donationsSortBy, setDonationsSortBy] = useState<"date" | "amount">("date");
   const [donationsSortOrder, setDonationsSortOrder] = useState<"asc" | "desc">("desc");
-  const [donationsStatusFilter, setDonationsStatusFilter] = useState<"all" | "PAID" | "FAILED" | "PENDING">("all");
+  const [donationsStatusFilter, setDonationsStatusFilter] = useState<"all" | "PAID" | "FAILED">("all");
 
   const [donations, setDonations] = useState<DonationRow[]>([]);
   const [donationsPage, setDonationsPage] = useState(1);
@@ -783,18 +781,6 @@ export default function MonthlySubscriptionsDashboardPage() {
                   accent="orange"
                   subtitle={stats?.failedTotalAmount ? formatMoney(stats.failedTotalAmount, undefined, undefined, true) : "—"}
                 />
-                <StatsMetricCard
-                  compact
-                  title="دفعات معلقة"
-                  value={stats?.pendingCount ?? 0}
-                  icon={Receipt}
-                  accent="amber"
-                  subtitle={
-                    stats?.pendingTotalAmount
-                      ? formatMoney(stats.pendingTotalAmount, undefined, undefined, true)
-                      : undefined
-                  }
-                />
               </>
             )}
             {statCardSet === "overview" && (
@@ -1109,7 +1095,6 @@ export default function MonthlySubscriptionsDashboardPage() {
         <SelectItem value="all" className="text-xs">كل الحالات</SelectItem>
         <SelectItem value="PAID" className="text-xs">ناجح</SelectItem>
         <SelectItem value="FAILED" className="text-xs">فاشل</SelectItem>
-        <SelectItem value="PENDING" className="text-xs">معلق</SelectItem>
       </SelectContent>
     </Select>
   </div>

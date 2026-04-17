@@ -40,9 +40,9 @@ export async function POST(req: NextRequest) {
     if (donation.donorId !== session.user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    if (donation.status !== "PENDING") {
+    if (donation.status === "FAILED") {
       return NextResponse.json(
-        { error: `Donation is not pending (status=${donation.status})` },
+        { error: `Donation has already failed (status=${donation.status})` },
         { status: 400 }
       );
     }

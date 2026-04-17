@@ -12,7 +12,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 /**
  * POST /api/stripe/intent
  *
- * Creates a donation record (PENDING) and a Stripe PaymentIntent (one-time)
+ * Creates a donation record (PAID) and a Stripe PaymentIntent (one-time)
  * or a Customer + Subscription (monthly), then returns the clientSecret so
  * the browser can confirm via Stripe Elements — no redirect needed.
  *
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
               currency,
               fees: coverFees ? fees : 0,
               totalAmount: finalTotal,
-              status: "PENDING",
+              status: "PAID",
               locale: validLocale ?? undefined,
               donorId: session.user.id,
               referralId: referralId ?? undefined,
@@ -292,7 +292,7 @@ export async function POST(req: NextRequest) {
             currency,
             fees: coverFees ? fees : 0,
             totalAmount: finalTotal,
-            status: "PENDING",
+            status: "PAID",
             locale: validLocale ?? undefined,
             donorId: session.user.id,
             referralId: referralId ?? undefined,

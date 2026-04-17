@@ -89,7 +89,7 @@ interface DonationForProfile {
   totalAmount: number;
   currency: string;
   type: string;
-  /** PAID / FAILED / PENDING for this charge (from API) */
+  /** PAID / FAILED for this charge (from API) */
   paymentStatus?: string | null;
   paymentMethod?: string | null;
   paidAt?: string | null;
@@ -542,7 +542,7 @@ const ProfilePage = () => {
 
   // Donations tab: full donation history (all types) + subscriptions (one row per subscription)
   const Donations = ({ user: u }: { user: UserProfile }) => {
-    const [paymentFilter, setPaymentFilter] = useState<"all" | "PAID" | "FAILED" | "PENDING">("all");
+    const [paymentFilter, setPaymentFilter] = useState<"all" | "PAID" | "FAILED">("all");
 
     const matchesPeriod = (donation: DonationForProfile) => {
       const date = new Date(donation.createdAt);
@@ -665,7 +665,6 @@ const ProfilePage = () => {
       const s = donationPaymentChargeStatus(d);
       if (s === "PAID") return t("donations.paymentSucceeded");
       if (s === "FAILED") return t("donations.paymentFailed");
-      if (s === "PENDING") return t("donations.paymentPending");
       return t("donations.paymentUnknown");
     };
 
@@ -759,7 +758,7 @@ const ProfilePage = () => {
                 </p>
                 <Select
                   value={paymentFilter}
-                  onValueChange={(v) => setPaymentFilter(v as "all" | "PAID" | "FAILED" | "PENDING")}
+                  onValueChange={(v) => setPaymentFilter(v as "all" | "PAID" | "FAILED")}
                 >
                   <SelectTrigger className="w-full sm:w-[200px]">
                     <SelectValue />
@@ -768,7 +767,6 @@ const ProfilePage = () => {
                     <SelectItem value="all">{t("donations.filterPaymentAll")}</SelectItem>
                     <SelectItem value="PAID">{t("donations.filterPaymentPaid")}</SelectItem>
                     <SelectItem value="FAILED">{t("donations.filterPaymentFailed")}</SelectItem>
-                    <SelectItem value="PENDING">{t("donations.filterPaymentPending")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
             currency: failed.currency,
             fees: failed.fees,
             totalAmount: failed.totalAmount,
-            status: "PENDING",
+            status: "PAID",
             locale: failed.locale ?? locale,
             donorId: failed.donorId,
             paymentMethod: "CARD",

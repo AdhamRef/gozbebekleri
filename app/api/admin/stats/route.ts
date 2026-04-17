@@ -119,7 +119,6 @@ export async function GET(request: NextRequest) {
     const oneTimeWhere = { ...paidWhere, subscriptionId: null };
     const fromSubscriptionWhere = { ...paidWhere, subscriptionId: { not: null } };
     const failedWhere = { ...donationWhere, status: 'FAILED' as const };
-    const pendingWhere = { ...donationWhere, status: 'PENDING' as const };
 
     const { monthStart, monthEnd } = getCurrentCalendarMonthUtcRange();
     const thisMonthDonationWhere = buildDonationWhere(monthStart, monthEnd, categoryId, campaignId);
@@ -142,7 +141,6 @@ export async function GET(request: NextRequest) {
       totalDonations,
       paidCount,
       failedCount,
-      pendingCount,
       totalAmountResult,
       oneTimeCount,
       fromSubscriptionCount,
@@ -155,7 +153,6 @@ export async function GET(request: NextRequest) {
       thisMonthTotalResult,
       allTimeRevenueResult,
       failedTotalResult,
-      pendingTotalResult,
       campaignDonationsSum,
       categoryDonationsSum,
       recentDonations,
@@ -166,7 +163,6 @@ export async function GET(request: NextRequest) {
       prisma.donation.count({ where: donationWhere }),
       prisma.donation.count({ where: paidWhere }),
       prisma.donation.count({ where: failedWhere }),
-      prisma.donation.count({ where: pendingWhere }),
       prisma.donation.aggregate({
         _sum: { amountUSD: true },
         where: paidWhere,
@@ -204,10 +200,6 @@ export async function GET(request: NextRequest) {
       prisma.donation.aggregate({
         _sum: { amountUSD: true },
         where: failedWhere,
-      }),
-      prisma.donation.aggregate({
-        _sum: { amountUSD: true },
-        where: pendingWhere,
       }),
       prisma.donationItem.aggregate({
         _sum: { amountUSD: true, amount: true },
@@ -328,7 +320,6 @@ export async function GET(request: NextRequest) {
     }));
 
     const failedTotalAmount = failedTotalResult._sum?.amountUSD ?? 0;
-    const pendingTotalAmount = pendingTotalResult._sum?.amountUSD ?? 0;
 
     /** All successful charges ever — ignores period / category / campaign query filters */
     const globalPaidWhere = { status: 'PAID' as const };
@@ -352,9 +343,7 @@ export async function GET(request: NextRequest) {
       paidRevenueAllTimeUnfiltered,
       paidCount,
       failedCount,
-      pendingCount,
       failedTotalAmount,
-      pendingTotalAmount,
       oneTimeCount,
       monthlyCount: fromSubscriptionCount,
       activeMonthlyCount: activeSubscriptionCount,

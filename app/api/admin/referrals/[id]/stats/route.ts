@@ -82,7 +82,6 @@ export async function GET(
 
     const paidDonationWhere: Prisma.DonationWhereInput = { ...donationWhere, status: "PAID" };
     const failedDonationWhere: Prisma.DonationWhereInput = { ...donationWhere, status: "FAILED" };
-    const pendingDonationWhere: Prisma.DonationWhereInput = { ...donationWhere, status: "PENDING" };
     const oneTimeWhere = { ...paidDonationWhere, subscriptionId: null };
     const fromSubscriptionWhere = { ...paidDonationWhere, subscriptionId: { not: null } };
 
@@ -116,7 +115,6 @@ export async function GET(
       totalDonations,
       paidDonationCount,
       failedDonationCount,
-      pendingDonationCount,
       oneTimeCount,
       fromSubscriptionCount,
       activeSubscriptionCount,
@@ -128,7 +126,6 @@ export async function GET(
       thisMonthTotalResult,
       allTimeRevenueResult,
       failedTotalResult,
-      pendingTotalResult,
       campaignDonationsSum,
       categoryDonationsSum,
       recentDonations,
@@ -136,7 +133,6 @@ export async function GET(
       prisma.donation.count({ where: donationWhere }),
       prisma.donation.count({ where: paidDonationWhere }),
       prisma.donation.count({ where: failedDonationWhere }),
-      prisma.donation.count({ where: pendingDonationWhere }),
       prisma.donation.count({ where: oneTimeWhere }),
       prisma.donation.count({ where: fromSubscriptionWhere }),
       prisma.subscription.count({ where: { ...subscriptionWhere, status: "ACTIVE" } }),
@@ -170,10 +166,6 @@ export async function GET(
       prisma.donation.aggregate({
         _sum: { amountUSD: true },
         where: failedDonationWhere,
-      }),
-      prisma.donation.aggregate({
-        _sum: { amountUSD: true },
-        where: pendingDonationWhere,
       }),
       prisma.donationItem.aggregate({
         _sum: { amountUSD: true, amount: true },
@@ -278,7 +270,6 @@ export async function GET(
     }));
 
     const failedTotalAmount = failedTotalResult._sum?.amountUSD ?? 0;
-    const pendingTotalAmount = pendingTotalResult._sum?.amountUSD ?? 0;
 
     /** All-time successful revenue for this referral — ignores category/campaign filters */
     const referralAllTimePaidWhere: Prisma.DonationWhereInput = { referralId, status: 'PAID' };
@@ -297,9 +288,7 @@ export async function GET(
       totalDonations,
       paidCount: paidDonationCount,
       failedCount: failedDonationCount,
-      pendingCount: pendingDonationCount,
       failedTotalAmount,
-      pendingTotalAmount,
       totalUsers: 0,
       totalAmount,
       allTimeRevenue,

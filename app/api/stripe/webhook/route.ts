@@ -129,19 +129,19 @@ export async function POST(req: NextRequest) {
           (dbSubscription.coverFees ? fees : 0);
 
         await prisma.$transaction(async (tx) => {
-          // Check if there is an existing PENDING first donation for this invoice.
+          // Check if there is an existing PAID first donation for this invoice.
           // This is the donation created by POST /api/donations before payment.
-          // We mark it PAID instead of creating a duplicate.
+          // We update it with provider details instead of creating a duplicate.
           const existingPending = await tx.donation.findFirst({
             where: {
               subscriptionId: dbSubscription.id,
               providerOrderId: invoice.id,
-              status: "PENDING",
+              status: "PAID",
             },
           });
 
           if (existingPending) {
-            // First invoice: update the existing PENDING donation to PAID
+            // First invoice: update the existing donation with provider details
             await tx.donation.update({
               where: { id: existingPending.id },
               data: {

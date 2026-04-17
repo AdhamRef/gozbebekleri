@@ -82,7 +82,7 @@ export async function GET(
       return {
         ...d,
         type,
-        /** Donation charge status (PAID / FAILED / PENDING) — unchanged for revenue totals */
+        /** Donation charge status (PAID / FAILED) — unchanged for revenue totals */
         paymentStatus: d.status,
         status: type === 'MONTHLY' ? (sub?.status ?? null) : d.status,
         billingDay: type === 'MONTHLY' ? (sub?.billingDay ?? null) : null,

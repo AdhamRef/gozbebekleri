@@ -118,9 +118,7 @@ interface DashboardStats {
   paidRevenueAllTimeUnfiltered?: number;
   paidCount?: number;
   failedCount?: number;
-  pendingCount?: number;
   failedTotalAmount?: number;
-  pendingTotalAmount?: number;
   oneTimeCount: number;
   monthlyCount: number;
   activeMonthlyCount: number;
@@ -299,7 +297,7 @@ export default function DashboardPage() {
   const [donationsSortBy, setDonationsSortBy] = useState<"date" | "amount">("date");
   const [donationsSortOrder, setDonationsSortOrder] = useState<"asc" | "desc">("desc");
   const [showFailed, setShowFailed] = useState(false);
-  const [donationsStatusFilter, setDonationsStatusFilter] = useState<"all" | "PAID" | "FAILED" | "PENDING">("all");
+  const [donationsStatusFilter, setDonationsStatusFilter] = useState<"all" | "PAID" | "FAILED">("all");
 
   const [donations, setDonations] = useState<DonationRow[]>([]);
   const [donationsPage, setDonationsPage] = useState(1);
@@ -583,12 +581,6 @@ export default function DashboardPage() {
       count: stats?.failedCount ?? 0,
       color: "#ef4444",
     },
-    {
-      name: "معلقة",
-      value: stats?.pendingTotalAmount ?? 0,
-      count: stats?.pendingCount ?? 0,
-      color: "#f59e0b",
-    },
   ].filter((d) => d.value > 0 || d.count > 0);
 
   return (
@@ -723,18 +715,6 @@ export default function DashboardPage() {
                   icon={Receipt}
                   accent="orange"
                   subtitle={stats?.failedTotalAmount ? formatMoney(stats.failedTotalAmount, undefined, undefined, true) : "—"}
-                />
-                <StatsMetricCard
-                  compact
-                  title="تبرعات معلقة"
-                  value={stats?.pendingCount ?? 0}
-                  icon={Receipt}
-                  accent="amber"
-                  subtitle={
-                    stats?.pendingTotalAmount
-                      ? formatMoney(stats.pendingTotalAmount, undefined, undefined, true)
-                      : undefined
-                  }
                 />
               </>
             )}
@@ -1052,7 +1032,6 @@ export default function DashboardPage() {
         <SelectItem value="all" className="text-xs">كل الحالات</SelectItem>
         <SelectItem value="PAID" className="text-xs">ناجح</SelectItem>
         <SelectItem value="FAILED" className="text-xs">فاشل</SelectItem>
-        <SelectItem value="PENDING" className="text-xs">معلق</SelectItem>
       </SelectContent>
     </Select>
   </div>

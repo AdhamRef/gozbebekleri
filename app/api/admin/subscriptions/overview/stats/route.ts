@@ -180,7 +180,6 @@ export async function GET(request: NextRequest) {
     const donationChargeBase = buildDonationChargeBase(startDate, endDate, categoryId, campaignId, referralId);
     const donationPaidWhere = { ...donationChargeBase, status: "PAID" as const };
     const donationFailedWhere = { ...donationChargeBase, status: "FAILED" as const };
-    const donationPendingWhere = { ...donationChargeBase, status: "PENDING" as const };
     const donationAllTimeBase = buildDonationChargeAllTimeBase(categoryId, campaignId, referralId);
     const donationPaidAllTime = { ...donationAllTimeBase, status: "PAID" as const };
 
@@ -201,12 +200,10 @@ export async function GET(request: NextRequest) {
       totalDonations,
       paidDonationCount,
       failedDonationCount,
-      pendingDonationCount,
       totalAmountResult,
       thisMonthTotalResult,
       allTimeRevenueResult,
       failedTotalResult,
-      pendingTotalResult,
       campaignDonationsSum,
       categoryDonationsSum,
       recentDonations,
@@ -225,7 +222,6 @@ export async function GET(request: NextRequest) {
       prisma.donation.count({ where: donationChargeBase }),
       prisma.donation.count({ where: donationPaidWhere }),
       prisma.donation.count({ where: donationFailedWhere }),
-      prisma.donation.count({ where: donationPendingWhere }),
       prisma.donation.aggregate({
         _sum: { amountUSD: true },
         where: donationPaidWhere,
@@ -241,10 +237,6 @@ export async function GET(request: NextRequest) {
       prisma.donation.aggregate({
         _sum: { amountUSD: true },
         where: donationFailedWhere,
-      }),
-      prisma.donation.aggregate({
-        _sum: { amountUSD: true },
-        where: donationPendingWhere,
       }),
       prisma.donationItem.aggregate({
         _sum: { amountUSD: true, amount: true },
@@ -367,7 +359,6 @@ export async function GET(request: NextRequest) {
     }));
 
     const failedTotalAmount = failedTotalResult._sum?.amountUSD ?? 0;
-    const pendingTotalAmount = pendingTotalResult._sum?.amountUSD ?? 0;
 
     /** All successful subscription charges ever — ignores category/campaign/referral filters */
     const globalSubPaidWhere = { subscriptionId: { not: null }, status: "PAID" as const };
@@ -386,9 +377,7 @@ export async function GET(request: NextRequest) {
       totalDonations,
       paidCount: paidDonationCount,
       failedCount: failedDonationCount,
-      pendingCount: pendingDonationCount,
       failedTotalAmount,
-      pendingTotalAmount,
       totalAmount,
       allTimeRevenue,
       paidRevenueAllTimeUnfiltered,

@@ -339,7 +339,7 @@ model Donation {
   fees       Float    @default(0)
   totalAmount Float
 
-  status     DonationStatus @default(PENDING)
+  status     DonationStatus @default(PAID)
   locale     String?
 
   // Payment provider tracking (PayFor Sanal POS)
@@ -475,7 +475,6 @@ enum SubscriptionStatus {
 }
 
 enum DonationStatus {
-  PENDING
   PAID
   FAILED
 }

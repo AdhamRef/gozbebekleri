@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
             teamSupport: sub.teamSupport ?? 0,
             coverFees: sub.coverFees,
             fees,
-            status: "PENDING",
+            status: "PAID",
             donorId: sub.donorId,
             referralId: sub.referralId ?? undefined,
             subscriptionId: sub.id,
