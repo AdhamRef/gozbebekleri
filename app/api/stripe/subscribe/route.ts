@@ -4,16 +4,15 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-03-25.dahlia",
-});
-
-// POST /api/stripe/subscribe
-// Creates a Stripe Subscription for the given donation and returns the clientSecret
-// of the subscription's first invoice PaymentIntent.
-// The client then calls stripe.confirmCardPayment(clientSecret, { payment_method: { card: rawData } })
-// which also saves the card for future monthly billing.
 export async function POST(req: NextRequest) {
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) {
+    console.error("[Stripe Subscribe] STRIPE_SECRET_KEY is not set");
+    return NextResponse.json({ error: "Payment not configured" }, { status: 500 });
+  }
+
+  const stripe = new Stripe(stripeKey, { apiVersion: "2026-03-25.dahlia" });
+
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
