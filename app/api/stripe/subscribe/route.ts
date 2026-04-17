@@ -5,15 +5,16 @@ import { prisma } from "@/lib/prisma";
 import Stripe from "stripe";
 
 export async function POST(req: NextRequest) {
-  const stripeKey = process.env.STRIPE_SECRET_KEY;
-  if (!stripeKey) {
-    console.error("[Stripe Subscribe] STRIPE_SECRET_KEY is not set");
-    return NextResponse.json({ error: "Payment not configured" }, { status: 500 });
-  }
-
-  const stripe = new Stripe(stripeKey, { apiVersion: "2026-03-25.dahlia" });
-
   try {
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeKey) {
+      console.error("[Stripe Subscribe] STRIPE_SECRET_KEY is not set");
+      return NextResponse.json({ error: "Payment not configured" }, { status: 500 });
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const stripe = new Stripe(stripeKey, { apiVersion: "2024-06-20" as any });
+
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -56,30 +57,29 @@ export async function POST(req: NextRequest) {
     const categoryNames = donation.categoryItems.map((i) => i.category.name).join(", ");
     const productName = campaignNames || categoryNames || "Monthly Donation";
 
+    console.log("[Stripe Subscribe] creating customer, currency:", currency, "amount:", amountInSmallestUnit);
+
     // Create a Stripe Customer for this subscription
     const customer = await stripe.customers.create({
       email: session.user.email ?? undefined,
       metadata: { userId: session.user.id },
     });
-    const customerId = customer.id;
 
+    console.log("[Stripe Subscribe] creating product:", productName);
     const product = await stripe.products.create({ name: productName });
-    const priceData = {
-      currency,
-      product: product.id,
-      unit_amount: amountInSmallestUnit,
-      recurring: { interval: "month" as const },
-    };
 
-    // Create subscription with incomplete payment — client confirms with card data.
-    // Stripe renews automatically one month from the first successful charge.
-    // save_default_payment_method stores the card for all future recurring charges.
+    console.log("[Stripe Subscribe] creating price");
+    const price = await stripe.prices.create({
+      currency,
+      unit_amount: amountInSmallestUnit,
+      recurring: { interval: "month" },
+      product: product.id,
+    });
+
+    console.log("[Stripe Subscribe] creating subscription, price:", price.id);
     const subscription = await stripe.subscriptions.create({
-      customer: customerId,
-      items: [
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { price_data: priceData as any },
-      ],
+      customer: customer.id,
+      items: [{ price: price.id }],
       payment_behavior: "default_incomplete",
       payment_settings: { save_default_payment_method: "on_subscription" },
       expand: ["latest_invoice.payment_intent"],
@@ -104,17 +104,16 @@ export async function POST(req: NextRequest) {
     const clientSecret = invoice?.payment_intent?.client_secret;
 
     if (!clientSecret) {
+      console.error("[Stripe Subscribe] no clientSecret in invoice:", invoice?.id);
       return NextResponse.json({ error: "Could not get payment intent" }, { status: 500 });
     }
 
-    // Store the first invoice ID as providerOrderId.
-    // The webhook (invoice.payment_succeeded) uses this for idempotency — it will find
-    // this PENDING donation by invoice ID and mark it PAID instead of creating a duplicate.
     await prisma.donation.update({
       where: { id: donationId },
       data: { provider: "STRIPE", providerOrderId: invoice.id || subscription.id, locale },
     });
 
+    console.log("[Stripe Subscribe] success, subscription:", subscription.id);
     return NextResponse.json({ clientSecret });
   } catch (error) {
     console.error("[Stripe Subscribe] error:", error);
