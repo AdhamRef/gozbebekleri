@@ -4,6 +4,7 @@ import { Heart, TrendingUp, Users, Award, CheckCircle, ArrowLeft, Sparkles, Chev
 import { getCurrency } from "@/hooks/useCampaignValue";
 import { usePathname, useRouter } from "@/i18n/routing";
 import { useTranslations, useLocale } from "next-intl";
+import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import DonationDialog from "@/components/DonationDialog";
@@ -21,6 +22,7 @@ const QUICK_DONATE_RESUME_KEY = "quickDonateResume";
 
 const QuickDonate = () => {
   const t = useTranslations("QuickDonate");
+  const tDonation = useTranslations("DonationDialog");
   const locale = useLocale() as "ar" | "en" | "fr";
   const { data: session } = useSession();
   const pathname = usePathname();
@@ -36,13 +38,25 @@ const QuickDonate = () => {
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const [currencyLabel, setCurrencyLabel] = useState<string>("USD");
+  const [stripeMinAmount, setStripeMinAmount] = useState(1);
   const [resumeAmount, setResumeAmount] = useState<number | undefined>(undefined);
   const [resumeCategoryId, setResumeCategoryId] = useState<string>("");
   const [resumeCategoryName, setResumeCategoryName] = useState<string>("");
   const [resumeCategoryImage, setResumeCategoryImage] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    setCurrencyLabel(getCurrency());
+    const cur = getCurrency();
+    setCurrencyLabel(cur);
+    if (cur !== "USD") {
+      try {
+        const cached = localStorage.getItem("cachedExchangeRates");
+        if (cached) {
+          const { rates } = JSON.parse(cached) as { rates: Record<string, number> };
+          const rate = rates?.[cur];
+          if (rate) setStripeMinAmount(Math.ceil(rate));
+        }
+      } catch { /* use default 1 */ }
+    }
   }, []);
 
   // After sign-in redirect: restore selection, open donation dialog, clean URL
@@ -261,10 +275,26 @@ const QuickDonate = () => {
                 </div>
               </div>
 
+              {/* Stripe minimum hint */}
+              <AnimatePresence>
+                {stripeMinAmount > 1 && displayAmount > 0 && displayAmount < stripeMinAmount && (
+                  <motion.p
+                    key="stripe-min"
+                    className="text-xs text-center text-amber-600 font-medium"
+                    initial={{ opacity: 0, y: -6, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: "auto" }}
+                    exit={{ opacity: 0, y: -6, height: 0 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                  >
+                    {tDonation("stripeMinDonation", { amount: stripeMinAmount, currency: currencyLabel })}
+                  </motion.p>
+                )}
+              </AnimatePresence>
+
               {/* CTA */}
               <button
                 onClick={handleDonateClick}
-                disabled={!selectedCategoryId || displayAmount <= 0 || categoriesLoading}
+                disabled={!selectedCategoryId || displayAmount <= 0 || categoriesLoading || (stripeMinAmount > 1 && displayAmount > 0 && displayAmount < stripeMinAmount)}
                 className="w-full bg-[#FA5D17] hover:bg-[#e04d0f] text-white py-3 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 shadow-md disabled:opacity-50 disabled:pointer-events-none"
               >
                 {t("donateNow")}
