@@ -64,9 +64,10 @@ export async function POST(req: NextRequest) {
     });
     const customerId = customer.id;
 
+    const product = await stripe.products.create({ name: productName });
     const priceData = {
       currency,
-      product_data: { name: productName },
+      product: product.id,
       unit_amount: amountInSmallestUnit,
       recurring: { interval: "month" as const },
     };
