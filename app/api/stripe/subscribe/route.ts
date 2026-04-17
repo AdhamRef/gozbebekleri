@@ -71,31 +71,8 @@ export async function POST(req: NextRequest) {
       recurring: { interval: "month" as const },
     };
 
-    // Compute billing_cycle_anchor = next billing day (next calendar month).
-    // e.g. today = Apr 5, billingDay = 19 → anchor = May 19 00:00 UTC
-    // This tells Stripe: charge immediately (first invoice = today),
-    // then charge again on May 19, June 19, July 19, etc.
-    const bd = donation.subscription?.billingDay;
-    const nowForAnchor = new Date();
-    const anchorDate = new Date(Date.UTC(
-      nowForAnchor.getUTCFullYear(),
-      nowForAnchor.getUTCMonth() + 1,
-      1,
-    ));
-    if (bd != null && bd >= 1 && bd <= 31) {
-      const lastDay = new Date(Date.UTC(
-        anchorDate.getUTCFullYear(),
-        anchorDate.getUTCMonth() + 1,
-        0,
-      )).getUTCDate();
-      anchorDate.setUTCDate(Math.min(bd, lastDay));
-    }
-    anchorDate.setUTCHours(0, 0, 0, 0);
-    const billingCycleAnchor = Math.floor(anchorDate.getTime() / 1000);
-
     // Create subscription with incomplete payment — client confirms with card data.
-    // billing_cycle_anchor ensures future charges happen on the chosen billing day.
-    // proration_behavior: "none" so Stripe charges the full amount immediately (not prorated).
+    // Stripe renews automatically one month from the first successful charge.
     // save_default_payment_method stores the card for all future recurring charges.
     const subscription = await stripe.subscriptions.create({
       customer: customerId,
@@ -103,8 +80,6 @@ export async function POST(req: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { price_data: priceData as any },
       ],
-      billing_cycle_anchor: billingCycleAnchor,
-      proration_behavior: "none",
       payment_behavior: "default_incomplete",
       payment_settings: { save_default_payment_method: "on_subscription" },
       expand: ["latest_invoice.payment_intent"],
