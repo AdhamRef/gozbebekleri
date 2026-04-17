@@ -445,7 +445,8 @@
     "standardStripeRedirect": "Anda akan diarahkan ke halaman pembayaran aman untuk menyelesaikan donasi.",
     "paymentSwitching": "Beralih ke gerbang pembayaran cadangan…",
     "paymentSwitchingDesc": "Terjadi kesalahan pada gerbang pembayaran. Anda akan dialihkan secara otomatis untuk menyelesaikan pembayaran melalui gerbang alternatif.",
-    "sslSecurePayment": "Enkripsi SSL 256-bit · Pembayaran aman"
+    "sslSecurePayment": "Enkripsi SSL 256-bit · Pembayaran aman",
+    "stripeMinDonation": "Donasi minimum: {amount} {currency}"
   },
   "DonationSuccess": {
     "thankYou": "Terima kasih banyak",

@@ -379,11 +379,13 @@ export async function PUT(
         });
 
         const upsertPromises = translationUpdates.flatMap(({ locale, data }) => {
-          const translationData: Record<string, string> = {};
+          const translationData: Record<string, string | null> = {};
           if (data.title !== undefined) translationData.title = data.title;
           if (data.description !== undefined)
             translationData.description = data.description;
           if (Object.keys(translationData).length === 0) return [];
+          // Skip if no meaningful content (avoid creating empty records)
+          if (!translationData.title && !translationData.description) return [];
           return [
             tx.campaignTranslation.upsert({
               where: {
@@ -394,7 +396,7 @@ export async function PUT(
               },
               update: translationData,
               create: {
-                campaignId: id,
+                campaign: { connect: { id } },
                 locale,
                 ...translationData,
               },

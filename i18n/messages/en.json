@@ -445,7 +445,8 @@
     "standardStripeRedirect": "You will be redirected to the secure payment page to complete your donation.",
     "paymentSwitching": "Switching to backup payment gateway…",
     "paymentSwitchingDesc": "An error occurred with the payment gateway. You will be automatically redirected to complete your payment via an alternative gateway.",
-    "sslSecurePayment": "256-bit SSL encrypted · Secure payment"
+    "sslSecurePayment": "256-bit SSL encrypted · Secure payment",
+    "stripeMinDonation": "Minimum donation: {amount} {currency}"
   },
   "DonationSuccess": {
     "thankYou": "Thank you very much",

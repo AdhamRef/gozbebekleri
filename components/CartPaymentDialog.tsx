@@ -137,6 +137,21 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
   // ── derived ────────────────────────────────────────────────────────────
   const fees        = (amount + teamSupport) * 0.03;
   const totalAmount = amount + teamSupport + (coverFees ? fees : 0);
+
+  // Minimum Stripe charge = 1 USD converted to the selected currency, rounded up.
+  const stripeMinAmount = (() => {
+    const cur = getCurrency();
+    if (cur === "USD") return 1;
+    try {
+      const cached = typeof window !== "undefined" ? localStorage.getItem("cachedExchangeRates") : null;
+      if (!cached) return 1;
+      const { rates } = JSON.parse(cached) as { rates: Record<string, number> };
+      const rate = rates?.[cur];
+      return rate ? Math.ceil(rate+1) : 1;
+    } catch {
+      return 1;
+    }
+  })();
   const isPhoneValid = () => phoneValue.trim().replace(/\s/g, "").length >= 10;
   const isCardValid  = () =>
     cardDetails.cardNumber.length >= 13 &&
@@ -553,6 +568,22 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
           />
         )}
 
+        {/* Minimum Stripe amount warning */}
+        <AnimatePresence>
+          {!use3D && totalAmount < stripeMinAmount && (
+            <motion.p
+              key="stripe-min"
+              className="text-[13px] text-amber-600 font-medium"
+              initial={{ opacity: 0, y: -6, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              exit={{ opacity: 0, y: -6, height: 0 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+            >
+              {t("stripeMinDonation", { amount: stripeMinAmount, currency: getCurrency() })}
+            </motion.p>
+          )}
+        </AnimatePresence>
+
         {/* Phone */}
         <div className="space-y-2 overflow-visible pt-2 border-t border-border" dir={locale === "ar" ? "rtl" : "ltr"}>
           <label className={`block text-sm font-medium text-gray-700 ${locale === "ar" ? "text-right" : "text-left"}`}>{t("contactPhone")}</label>
@@ -571,6 +602,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
               loading ||
               !isPhoneValid() ||
               (paymentMethod === "CARD" && !use3D && !stripeReady) ||
+              (paymentMethod === "CARD" && !use3D && totalAmount < stripeMinAmount) ||
               (paymentMethod === "CARD" && use3D && !isCardValid())
             }
             className="flex-1 bg-[#FA5D17] hover:bg-[#e04d0f] text-white inline-flex items-center justify-center gap-2">

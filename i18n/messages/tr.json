@@ -445,7 +445,8 @@
     "standardStripeRedirect": "Bağışınızı tamamlamak için güvenli ödeme sayfasına yönlendirileceksiniz.",
     "paymentSwitching": "Yedek ödeme ağ geçidine geçiliyor…",
     "paymentSwitchingDesc": "Ödeme ağ geçidinde bir hata oluştu. Ödemenizi alternatif bir ağ geçidi üzerinden tamamlamak için otomatik olarak yönlendirileceksiniz.",
-    "sslSecurePayment": "256 bit SSL şifreli · Güvenli ödeme"
+    "sslSecurePayment": "256 bit SSL şifreli · Güvenli ödeme",
+    "stripeMinDonation": "Minimum bağış: {amount} {currency}"
   },
   "DonationSuccess": {
     "thankYou": "Çok teşekkür ederiz",

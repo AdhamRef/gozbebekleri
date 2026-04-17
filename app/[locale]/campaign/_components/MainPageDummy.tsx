@@ -35,6 +35,7 @@ import DonationSidebar from "../_components/DonationSidebar";
 import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
 import CategoryIcon from "@/components/CategoryIcon";
+import WysiwygEditor from "@/app/[locale]/blog/_components/wysiwyg/wysiwyg-editor";
 
 // Types
 interface Category {
@@ -445,9 +446,28 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                     {/* Description */}
                     {activeTab === "description" && (
                       <motion.div key="desc" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-                        <p className="text-gray-700 text-sm sm:text-base leading-relaxed sm:leading-loose whitespace-pre-line">
-                          {getLocalizedProperty(campaign, "description")}
-                        </p>
+                        {(() => {
+                          const desc = getLocalizedProperty(campaign, "description") as string;
+                          if (!desc) return null;
+                          const trimmed = desc.trim();
+                          if (trimmed.startsWith("{")) {
+                            try {
+                              const parsed = JSON.parse(trimmed);
+                              if (parsed?.type === "doc") {
+                                return (
+                                  <div className="prose max-w-none [&_.ProseMirror]:min-h-0 [&_.ProseMirror]:p-0 [&_.ProseMirror]:focus:outline-none">
+                                    <WysiwygEditor defaultValue={parsed} isEditable={false} className="border-0 shadow-none p-0 min-h-0" />
+                                  </div>
+                                );
+                              }
+                            } catch {}
+                          }
+                          return (
+                            <p className="text-gray-700 text-sm sm:text-base leading-relaxed sm:leading-loose whitespace-pre-line">
+                              {desc}
+                            </p>
+                          );
+                        })()}
                       </motion.div>
                     )}
 

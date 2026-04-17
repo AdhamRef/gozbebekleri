@@ -12,6 +12,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import WysiwygEditor from '@/app/[locale]/blog/_components/wysiwyg/wysiwyg-editor';
 import {
   Form,
   FormControl,
@@ -83,9 +84,6 @@ const formSchema = z
   title: z.string()
     .min(1, 'العنوان مطلوب')
     .max(100, 'العنوان طويل جداً'),
-  description: z.string()
-    .min(1, 'الوصف مطلوب')
-    .max(10000, 'الوصف طويل جداً'),
   targetAmount: z.number().min(0).max(1000000),
   goalType: z.enum(['FIXED', 'OPEN']),
   fundraisingMode: z.enum(['AMOUNT', 'SHARES']),
@@ -99,17 +97,11 @@ const formSchema = z
   videoUrl: z.string().optional(),
   currentAmount: z.number(),
   title_en: z.string().optional(),
-  description_en: z.string().optional(),
   title_fr: z.string().optional(),
-  description_fr: z.string().optional(),
   title_tr: z.string().optional(),
-  description_tr: z.string().optional(),
   title_id: z.string().optional(),
-  description_id: z.string().optional(),
   title_pt: z.string().optional(),
-  description_pt: z.string().optional(),
   title_es: z.string().optional(),
-  description_es: z.string().optional(),
 })
   .superRefine((data, ctx) => {
     if (data.goalType === 'FIXED' && (!data.targetAmount || data.targetAmount < 1)) {
@@ -205,11 +197,43 @@ export default function EditCampaignPage() {
   const suggestedDonationsRef = useRef<SuggestedDonationsSectionRef>(null);
   const suggestedShareCountsRef = useRef<SuggestedShareCountsSectionRef>(null);
 
+  const [descriptionAr, setDescriptionAr] = useState<string | null>(null);
+  const [descriptionEn, setDescriptionEn] = useState<string | null>(null);
+  const [descriptionFr, setDescriptionFr] = useState<string | null>(null);
+  const [descriptionTr, setDescriptionTr] = useState<string | null>(null);
+  const [descriptionId, setDescriptionId] = useState<string | null>(null);
+  const [descriptionPt, setDescriptionPt] = useState<string | null>(null);
+  const [descriptionEs, setDescriptionEs] = useState<string | null>(null);
+
+  const editorClassName = "w-full border border-stone-200 rounded-md bg-white [&_.ProseMirror]:min-h-[150px] [&_.ProseMirror]:p-4 [&_.ProseMirror]:focus:outline-none";
+
+  const parseEditorContent = (json: string | null) => {
+    if (!json) return { type: "doc", content: [{ type: "paragraph" }] };
+    const trimmed = json.trim();
+    if (trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed.type === 'doc') return parsed;
+      } catch {}
+    }
+    return { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: json }] }] };
+  };
+
+  const isDescEmpty = (json: string | null) => {
+    if (!json) return true;
+    try {
+      const doc = JSON.parse(json);
+      if (!doc.content || doc.content.length === 0) return true;
+      return doc.content.every((n: { type: string; content?: unknown[] }) =>
+        n.type === 'paragraph' && (!n.content || n.content.length === 0)
+      );
+    } catch { return true; }
+  };
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: '',
-      description: '',
       targetAmount: 0,
       goalType: 'FIXED',
       fundraisingMode: 'AMOUNT',
@@ -220,17 +244,11 @@ export default function EditCampaignPage() {
       images: [],
       videoUrl: '',
       title_en: '',
-      description_en: '',
       title_fr: '',
-      description_fr: '',
       title_tr: '',
-      description_tr: '',
       title_id: '',
-      description_id: '',
       title_pt: '',
-      description_pt: '',
       title_es: '',
-      description_es: '',
     },
   });
 
@@ -283,7 +301,6 @@ export default function EditCampaignPage() {
 
         form.reset({
           title: campaign.title,
-          description: campaign.description,
           targetAmount: campaign.targetAmount,
           goalType: campaign.goalType ?? 'FIXED',
           fundraisingMode: campaign.fundraisingMode ?? 'AMOUNT',
@@ -294,18 +311,20 @@ export default function EditCampaignPage() {
           images: campaign.images,
           videoUrl: campaign.videoUrl || '',
           title_en: en?.title || '',
-          description_en: en?.description || '',
           title_fr: fr?.title || '',
-          description_fr: fr?.description || '',
           title_tr: tr?.title || '',
-          description_tr: tr?.description || '',
           title_id: id?.title || '',
-          description_id: id?.description || '',
           title_pt: pt?.title || '',
-          description_pt: pt?.description || '',
           title_es: es?.title || '',
-          description_es: es?.description || '',
         });
+
+        setDescriptionAr(campaign.description || null);
+        setDescriptionEn(en?.description || null);
+        setDescriptionFr(fr?.description || null);
+        setDescriptionTr(tr?.description || null);
+        setDescriptionId(id?.description || null);
+        setDescriptionPt(pt?.description || null);
+        setDescriptionEs(es?.description || null);
       } catch (error) {
         console.error('Error fetching campaign:', error);
         toast.error('فشل في تحميل بيانات الحملة');
@@ -336,13 +355,17 @@ export default function EditCampaignPage() {
 
   const onSubmit = async (values: FormValues) => {
     if (!params?.id) return;
-    
+    if (isDescEmpty(descriptionAr)) {
+      toast.error('الوصف العربي مطلوب');
+      setActiveTab('ar');
+      return;
+    }
     setSaving(true);
     try {
       // ✅ Prepare request with translations
       const requestData = {
         title: values.title,
-        description: values.description,
+        description: descriptionAr || '',
         goalType: values.goalType,
         fundraisingMode: values.fundraisingMode,
         targetAmount: values.goalType === 'OPEN' ? 0 : values.targetAmount,
@@ -353,12 +376,12 @@ export default function EditCampaignPage() {
         images: values.images,
         videoUrl: values.videoUrl,
         translations: {
-          en: { title: values.title_en, description: values.description_en },
-          fr: { title: values.title_fr, description: values.description_fr },
-          tr: { title: values.title_tr, description: values.description_tr },
-          id: { title: values.title_id, description: values.description_id },
-          pt: { title: values.title_pt, description: values.description_pt },
-          es: { title: values.title_es, description: values.description_es },
+          ...(values.title_en || !isDescEmpty(descriptionEn) ? { en: { title: values.title_en, description: descriptionEn } } : {}),
+          ...(values.title_fr || !isDescEmpty(descriptionFr) ? { fr: { title: values.title_fr, description: descriptionFr } } : {}),
+          ...(values.title_tr || !isDescEmpty(descriptionTr) ? { tr: { title: values.title_tr, description: descriptionTr } } : {}),
+          ...(values.title_id || !isDescEmpty(descriptionId) ? { id: { title: values.title_id, description: descriptionId } } : {}),
+          ...(values.title_pt || !isDescEmpty(descriptionPt) ? { pt: { title: values.title_pt, description: descriptionPt } } : {}),
+          ...(values.title_es || !isDescEmpty(descriptionEs) ? { es: { title: values.title_es, description: descriptionEs } } : {}),
         },
         suggestedDonations:
           values.fundraisingMode === 'AMOUNT'
@@ -588,12 +611,12 @@ export default function EditCampaignPage() {
 
   // ✅ Check translation completeness
   const getTranslationStatus = () => {
-    const hasEn = !!form.getValues('title_en') && !!form.getValues('description_en');
-    const hasFr = !!form.getValues('title_fr') && !!form.getValues('description_fr');
-    const hasTr = !!form.getValues('title_tr') && !!form.getValues('description_tr');
-    const hasId = !!form.getValues('title_id') && !!form.getValues('description_id');
-    const hasPt = !!form.getValues('title_pt') && !!form.getValues('description_pt');
-    const hasEs = !!form.getValues('title_es') && !!form.getValues('description_es');
+    const hasEn = !!form.getValues('title_en') && !isDescEmpty(descriptionEn);
+    const hasFr = !!form.getValues('title_fr') && !isDescEmpty(descriptionFr);
+    const hasTr = !!form.getValues('title_tr') && !isDescEmpty(descriptionTr);
+    const hasId = !!form.getValues('title_id') && !isDescEmpty(descriptionId);
+    const hasPt = !!form.getValues('title_pt') && !isDescEmpty(descriptionPt);
+    const hasEs = !!form.getValues('title_es') && !isDescEmpty(descriptionEs);
     const completed = [hasEn, hasFr, hasTr, hasId, hasPt, hasEs].filter(Boolean).length;
     return { completed, total: 6, hasEn, hasFr, hasTr, hasId, hasPt, hasEs };
   };
@@ -704,23 +727,14 @@ export default function EditCampaignPage() {
                   
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem dir='rtl'>
-                      <FormLabel>وصف الحملة *</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="اكتب وصفاً تفصيلياً للحملة..."
-                          className="min-h-[200px] resize-y"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <FormItem dir='rtl'>
+                  <FormLabel>وصف الحملة *</FormLabel>
+                  <WysiwygEditor
+                    defaultValue={parseEditorContent(descriptionAr)}
+                    onDebouncedUpdate={(editor) => setDescriptionAr(JSON.stringify(editor?.getJSON()))}
+                    className={editorClassName}
+                  />
+                </FormItem>
               </TabsContent>
 
               {/* English Tab */}
@@ -746,23 +760,14 @@ export default function EditCampaignPage() {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="description_en"
-                  render={({ field }) => (
-                    <FormItem dir='rtl'>
-                      <FormLabel>Campaign Description (English)</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Write detailed campaign description in English..."
-                          className="min-h-[200px] resize-y"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <FormItem dir='rtl'>
+                  <FormLabel>Campaign Description (English)</FormLabel>
+                  <WysiwygEditor
+                    defaultValue={parseEditorContent(descriptionEn)}
+                    onDebouncedUpdate={(editor) => setDescriptionEn(JSON.stringify(editor?.getJSON()))}
+                    className={editorClassName}
+                  />
+                </FormItem>
               </TabsContent>
 
               {/* French Tab */}
@@ -771,9 +776,10 @@ export default function EditCampaignPage() {
                 <FormField control={form.control} name="title_fr" render={({ field }) => (
                   <FormItem dir='rtl'><FormLabel>Titre de la campagne (Français)</FormLabel><FormControl><Input {...field} placeholder="Entrez le titre de la campagne en français" /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField control={form.control} name="description_fr" render={({ field }) => (
-                  <FormItem dir='rtl'><FormLabel>Description de la campagne (Français)</FormLabel><FormControl><Textarea placeholder="Rédigez une description détaillée de la campagne en français..." className="min-h-[200px] resize-y" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormItem dir='rtl'>
+                  <FormLabel>Description de la campagne (Français)</FormLabel>
+                  <WysiwygEditor defaultValue={parseEditorContent(descriptionFr)} onDebouncedUpdate={(editor) => setDescriptionFr(JSON.stringify(editor?.getJSON()))} className={editorClassName} />
+                </FormItem>
               </TabsContent>
 
               {/* Turkish Tab */}
@@ -782,9 +788,10 @@ export default function EditCampaignPage() {
                 <FormField control={form.control} name="title_tr" render={({ field }) => (
                   <FormItem dir='rtl'><FormLabel>Kampanya Başlığı (Türkçe)</FormLabel><FormControl><Input {...field} placeholder="Türkçe kampanya başlığı" /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField control={form.control} name="description_tr" render={({ field }) => (
-                  <FormItem dir='rtl'><FormLabel>Kampanya Açıklaması (Türkçe)</FormLabel><FormControl><Textarea placeholder="Türkçe açıklama..." className="min-h-[200px] resize-y" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormItem dir='rtl'>
+                  <FormLabel>Kampanya Açıklaması (Türkçe)</FormLabel>
+                  <WysiwygEditor defaultValue={parseEditorContent(descriptionTr)} onDebouncedUpdate={(editor) => setDescriptionTr(JSON.stringify(editor?.getJSON()))} className={editorClassName} />
+                </FormItem>
               </TabsContent>
 
               {/* Indonesian Tab */}
@@ -793,9 +800,10 @@ export default function EditCampaignPage() {
                 <FormField control={form.control} name="title_id" render={({ field }) => (
                   <FormItem dir='rtl'><FormLabel>Judul Kampanye (Indonesia)</FormLabel><FormControl><Input {...field} placeholder="Judul kampanye dalam Bahasa Indonesia" /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField control={form.control} name="description_id" render={({ field }) => (
-                  <FormItem dir='rtl'><FormLabel>Deskripsi Kampanye (Indonesia)</FormLabel><FormControl><Textarea placeholder="Deskripsi dalam Bahasa Indonesia..." className="min-h-[200px] resize-y" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormItem dir='rtl'>
+                  <FormLabel>Deskripsi Kampanye (Indonesia)</FormLabel>
+                  <WysiwygEditor defaultValue={parseEditorContent(descriptionId)} onDebouncedUpdate={(editor) => setDescriptionId(JSON.stringify(editor?.getJSON()))} className={editorClassName} />
+                </FormItem>
               </TabsContent>
 
               {/* Portuguese Tab */}
@@ -804,9 +812,10 @@ export default function EditCampaignPage() {
                 <FormField control={form.control} name="title_pt" render={({ field }) => (
                   <FormItem dir='rtl'><FormLabel>Título da Campanha (Português)</FormLabel><FormControl><Input {...field} placeholder="Título da campanha em português" /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField control={form.control} name="description_pt" render={({ field }) => (
-                  <FormItem dir='rtl'><FormLabel>Descrição da Campanha (Português)</FormLabel><FormControl><Textarea placeholder="Descrição detalhada em português..." className="min-h-[200px] resize-y" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormItem dir='rtl'>
+                  <FormLabel>Descrição da Campanha (Português)</FormLabel>
+                  <WysiwygEditor defaultValue={parseEditorContent(descriptionPt)} onDebouncedUpdate={(editor) => setDescriptionPt(JSON.stringify(editor?.getJSON()))} className={editorClassName} />
+                </FormItem>
               </TabsContent>
 
               {/* Spanish Tab */}
@@ -815,9 +824,10 @@ export default function EditCampaignPage() {
                 <FormField control={form.control} name="title_es" render={({ field }) => (
                   <FormItem dir='rtl'><FormLabel>Título de la Campaña (Español)</FormLabel><FormControl><Input {...field} placeholder="Título de la campaña en español" /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField control={form.control} name="description_es" render={({ field }) => (
-                  <FormItem dir='rtl'><FormLabel>Descripción de la Campaña (Español)</FormLabel><FormControl><Textarea placeholder="Descripción detallada en español..." className="min-h-[200px] resize-y" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormItem dir='rtl'>
+                  <FormLabel>Descripción de la Campaña (Español)</FormLabel>
+                  <WysiwygEditor defaultValue={parseEditorContent(descriptionEs)} onDebouncedUpdate={(editor) => setDescriptionEs(JSON.stringify(editor?.getJSON()))} className={editorClassName} />
+                </FormItem>
               </TabsContent>
             </Tabs>
           </Card>

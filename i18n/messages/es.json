@@ -445,7 +445,8 @@
     "standardStripeRedirect": "Serás redirigido a la página de pago segura para completar tu donación.",
     "paymentSwitching": "Cambiando a la pasarela de pago alternativa…",
     "paymentSwitchingDesc": "Se produjo un error con la pasarela de pago. Serás redirigido automáticamente para completar el pago por otra vía.",
-    "sslSecurePayment": "Cifrado SSL de 256 bits · Pago seguro"
+    "sslSecurePayment": "Cifrado SSL de 256 bits · Pago seguro",
+    "stripeMinDonation": "Donación mínima: {amount} {currency}"
   },
   "DonationSuccess": {
     "thankYou": "Muchas gracias",

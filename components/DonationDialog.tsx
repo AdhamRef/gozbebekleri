@@ -303,6 +303,21 @@ const DonationDialog = ({
     return resolveSuggestedAmountsForCurrency(cfg, getCurrency());
   }, [campaignId, isCategoryMode, suggestedDonations, isOpen]);
 
+  // Minimum Stripe charge = 1 USD converted to the selected currency, rounded up.
+  const stripeMinAmount = (() => {
+    const cur = getCurrency();
+    if (cur === "USD") return 1;
+    try {
+      const cached = typeof window !== "undefined" ? localStorage.getItem("cachedExchangeRates") : null;
+      if (!cached) return 1;
+      const { rates } = JSON.parse(cached) as { rates: Record<string, number> };
+      const rate = rates?.[cur];
+      return rate ? Math.ceil(rate+1) : 1;
+    } catch {
+      return 1;
+    }
+  })();
+
   const progress =
     openGoal ||
     !targetAmount ||
@@ -575,6 +590,20 @@ const DonationDialog = ({
                 </>
               ) : (
                 <>
+                  <AnimatePresence>
+                    {!use3D && stripeMinAmount > 1 && donationAmount > 0 && donationAmount < stripeMinAmount && (
+                      <motion.p
+                        key="stripe-min"
+                        className="text-[13px] text-amber-600 font-medium"
+                        initial={{ opacity: 0, y: -6, height: 0 }}
+                        animate={{ opacity: 1, y: 0, height: "auto" }}
+                        exit={{ opacity: 0, y: -6, height: 0 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                      >
+                        {t("stripeMinDonation", { amount: stripeMinAmount, currency: getCurrency() })}
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
                   <Input
                     type="number"
                     inputMode="numeric"
@@ -660,7 +689,7 @@ const DonationDialog = ({
               )}
               <Button
                 onClick={handleNext}
-                disabled={!donationAmount}
+                disabled={!donationAmount || (!use3D && donationAmount < stripeMinAmount)}
                 className="flex-1 min-w-[6rem] bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2"
               >
                 {nextLabel}

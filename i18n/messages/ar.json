@@ -445,7 +445,8 @@
     "standardStripeRedirect": "سيتم تحويلك إلى صفحة الدفع الآمنة لإتمام تبرعك.",
     "paymentSwitching": "جارٍ التحويل إلى بوابة دفع بديلة…",
     "paymentSwitchingDesc": "حدث خطأ في بوابة الدفع، سيتم توجيهك تلقائياً لإتمام الدفع عبر بوابة بديلة",
-    "sslSecurePayment": "مشفَّر بـ SSL 256-بت · دفع آمن"
+    "sslSecurePayment": "مشفَّر بـ SSL 256-بت · دفع آمن",
+    "stripeMinDonation": "الحد الأدنى للتبرع: {amount} {currency}"
   },
   "DonationSuccess": {
     "thankYou": "شكراً جزيلاً",
