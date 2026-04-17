@@ -57,32 +57,12 @@ export async function POST(req: NextRequest) {
     const categoryNames = donation.categoryItems.map((i) => i.category.name).join(", ");
     const productName = campaignNames || categoryNames || "Monthly Donation";
 
-    // Get or create Stripe Customer (no payment method yet — card attached on confirmation)
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { email: true, stripeCustomerId: true } as never,
+    // Create a Stripe Customer for this subscription
+    const customer = await stripe.customers.create({
+      email: session.user.email ?? undefined,
+      metadata: { userId: session.user.id },
     });
-
-    let customerId: string;
-    const stripeCustomerId = (user as { stripeCustomerId?: string | null })?.stripeCustomerId;
-
-    if (stripeCustomerId) {
-      customerId = stripeCustomerId;
-    } else {
-      const customer = await stripe.customers.create({
-        email: session.user.email ?? undefined,
-        metadata: { userId: session.user.id },
-      });
-      customerId = customer.id;
-      try {
-        await prisma.user.update({
-          where: { id: session.user.id },
-          data: { stripeCustomerId: customerId } as never,
-        });
-      } catch {
-        // Column may not exist yet; non-fatal
-      }
-    }
+    const customerId = customer.id;
 
     const priceData = {
       currency,
