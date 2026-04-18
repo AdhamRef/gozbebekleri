@@ -725,6 +725,10 @@
     "saveButton": "حفظ ومتابعة",
     "skip": "تخطي في الوقت الحالي",
     "fillAllFields": "يرجى ملء جميع الحقول",
-    "saveFailed": "حدث خطأ. يرجى المحاولة مرة أخرى"
+    "saveFailed": "حدث خطأ. يرجى المحاولة مرة أخرى",
+    "phoneLabel": "رقم الهاتف",
+    "dobDayPlaceholder": "يوم",
+    "dobMonthPlaceholder": "شهر",
+    "dobYearPlaceholder": "سنة"
   }
 }

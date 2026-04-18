@@ -725,6 +725,10 @@
     "saveButton": "Kaydet ve Devam Et",
     "skip": "Şimdilik atla",
     "fillAllFields": "Lütfen tüm alanları doldurun",
-    "saveFailed": "Bir şeyler yanlış gitti. Lütfen tekrar deneyin"
+    "saveFailed": "Bir şeyler yanlış gitti. Lütfen tekrar deneyin",
+    "phoneLabel": "Telefon Numarası",
+    "dobDayPlaceholder": "Gün",
+    "dobMonthPlaceholder": "Ay",
+    "dobYearPlaceholder": "Yıl"
   }
 }

@@ -725,6 +725,10 @@
     "saveButton": "Simpan & Lanjutkan",
     "skip": "Lewati untuk sekarang",
     "fillAllFields": "Harap isi semua kolom",
-    "saveFailed": "Terjadi kesalahan. Silakan coba lagi"
+    "saveFailed": "Terjadi kesalahan. Silakan coba lagi",
+    "phoneLabel": "Nomor Telepon",
+    "dobDayPlaceholder": "Hari",
+    "dobMonthPlaceholder": "Bulan",
+    "dobYearPlaceholder": "Tahun"
   }
 }

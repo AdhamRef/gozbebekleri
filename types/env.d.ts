@@ -9,4 +9,9 @@ declare namespace NodeJS {
     FACEBOOK_CLIENT_SECRET: string;
     NODE_ENV: 'development' | 'production' | 'test';
   }
-} 
+}
+
+declare module '*.css' {
+  const content: Record<string, string>;
+  export default content;
+}

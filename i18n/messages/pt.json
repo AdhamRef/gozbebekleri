@@ -725,6 +725,10 @@
     "saveButton": "Salvar e continuar",
     "skip": "Pular por agora",
     "fillAllFields": "Por favor, preencha todos os campos",
-    "saveFailed": "Algo deu errado. Por favor, tente novamente"
+    "saveFailed": "Algo deu errado. Por favor, tente novamente",
+    "phoneLabel": "Número de telefone",
+    "dobDayPlaceholder": "Dia",
+    "dobMonthPlaceholder": "Mês",
+    "dobYearPlaceholder": "Ano"
   }
 }

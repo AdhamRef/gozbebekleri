@@ -725,6 +725,10 @@
     "saveButton": "Enregistrer et continuer",
     "skip": "Ignorer pour l'instant",
     "fillAllFields": "Veuillez remplir tous les champs",
-    "saveFailed": "Une erreur s'est produite. Veuillez réessayer"
+    "saveFailed": "Une erreur s'est produite. Veuillez réessayer",
+    "phoneLabel": "Numéro de téléphone",
+    "dobDayPlaceholder": "Jour",
+    "dobMonthPlaceholder": "Mois",
+    "dobYearPlaceholder": "Année"
   }
 }

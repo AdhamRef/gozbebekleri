@@ -725,6 +725,10 @@
     "saveButton": "Guardar y continuar",
     "skip": "Omitir por ahora",
     "fillAllFields": "Por favor, completa todos los campos",
-    "saveFailed": "Algo salió mal. Por favor, inténtalo de nuevo"
+    "saveFailed": "Algo salió mal. Por favor, inténtalo de nuevo",
+    "phoneLabel": "Número de teléfono",
+    "dobDayPlaceholder": "Día",
+    "dobMonthPlaceholder": "Mes",
+    "dobYearPlaceholder": "Año"
   }
 }
