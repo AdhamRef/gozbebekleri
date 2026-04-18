@@ -105,7 +105,8 @@ async function sendMetaCAPI(
 
   const custom_data: Record<string, unknown> = {};
   // ── Core value / currency ─────────────────────────────────────────────────
-  if (d.amount != null)  custom_data.value    = d.amount_usd ?? d.amount;
+  // Send actual transaction currency/amount — not always USD
+  if (d.amount != null)  custom_data.value    = d.amount;
   if (d.currency)        custom_data.currency = d.currency;
   // ── Content IDs / Contents ────────────────────────────────────────────────
   if (event.items?.length) {

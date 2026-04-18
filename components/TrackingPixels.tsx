@@ -34,6 +34,7 @@ export interface TrackingItem {
 
 interface TrackPurchaseOptions {
   value: number;
+  valueUSD?: number;
   currency?: string;
   orderId?: string;
   numItems?: number;
@@ -42,6 +43,8 @@ interface TrackPurchaseOptions {
   causeName?: string;
   causeId?: string;
   gateway?: string;
+  subscriptionId?: string;
+  description?: string;
 }
 
 interface TrackAddToCartOptions {
@@ -633,7 +636,7 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
   }, [sendCanonical]);
 
   const trackDonate = useCallback((options: TrackPurchaseOptions) => {
-    const { value, currency = "USD", orderId, numItems = 1, items, donationType, causeName, causeId, gateway } = options;
+    const { value, valueUSD, currency = "USD", orderId, numItems = 1, items, donationType, causeName, causeId, gateway, subscriptionId, description } = options;
     const canonItems: CanonicalItem[] = items?.length
       ? items.map((i) => ({ ...i }))
       : [{ item_id: causeId ?? orderId ?? "donation", item_name: causeName ?? "Donation", price: value, quantity: numItems, item_category: "donation" }];
@@ -641,18 +644,21 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
     sendCanonical({
       event:    "donation_complete",
       event_id: generateEventId("pur"),
+      // subscription_id is a user_data field in Meta — merge it for this event only
+      user: subscriptionId ? { subscription_id: subscriptionId } : undefined,
       donation: {
-        amount:                value,
-        amount_usd:            value,
+        amount:                 value,
+        amount_usd:             valueUSD ?? value,
         currency,
-        cause_id:              causeId,
-        cause_name:            causeName,
-        content_name:          causeName,
-        content_category:      donationType ? donationType.toLowerCase() : "donation",
-        status:                "completed",
+        cause_id:               causeId,
+        cause_name:             causeName,
+        content_name:           causeName,
+        content_category:       donationType ? donationType.toLowerCase() : "donation",
+        description,
+        status:                 "completed",
         payment_info_available: 1,
-        donation_type:         donationType,
-        recurring:             donationType === "MONTHLY",
+        donation_type:          donationType,
+        recurring:              donationType === "MONTHLY",
       },
       payment: {
         transaction_id: orderId,
