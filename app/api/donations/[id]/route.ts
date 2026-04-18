@@ -38,9 +38,16 @@ export async function GET(
       include: {
         donor: {
           select: {
+            id: true,
             name: true,
             email: true,
             image: true,
+            phone: true,
+            gender: true,
+            birthdate: true,
+            countryCode: true,
+            city: true,
+            region: true,
           },
         },
         subscription: {

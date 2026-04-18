@@ -63,19 +63,19 @@ const DonationSuccessPage = () => {
     if (!donation || !id || purchaseTracked.current || !tracking || userProfile === undefined) return;
     purchaseTracked.current = true;
 
-    // Push full user data for all PII parameters
+    // Push full user data for all PII parameters — prefer userProfile, fall back to donation.donor
     const nameParts = (userProfile?.name ?? donation.donor?.name ?? "").trim().split(/\s+/);
     tracking.setUserData({
-      external_id:   session?.user?.id ?? undefined,
+      external_id:   session?.user?.id ?? donation.donor?.id ?? undefined,
       email:         userProfile?.email ?? donation.donor?.email ?? undefined,
-      phone:         userProfile?.phone ?? undefined,
+      phone:         userProfile?.phone ?? donation.donor?.phone ?? undefined,
       first_name:    nameParts[0] || undefined,
       last_name:     nameParts.slice(1).join(" ") || undefined,
-      gender:        userProfile?.gender ?? undefined,
-      date_of_birth: userProfile?.birthdate ?? undefined,
-      country_code:  userProfile?.countryCode ?? undefined,
-      city:          userProfile?.city ?? undefined,
-      state:         userProfile?.region ?? undefined,
+      gender:        userProfile?.gender ?? donation.donor?.gender ?? undefined,
+      date_of_birth: userProfile?.birthdate ?? donation.donor?.birthdate ?? undefined,
+      country_code:  userProfile?.countryCode ?? donation.donor?.countryCode ?? undefined,
+      city:          userProfile?.city ?? donation.donor?.city ?? undefined,
+      state:         userProfile?.region ?? donation.donor?.region ?? undefined,
     });
 
     // Use actual charged amount + currency (not always USD)
