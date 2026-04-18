@@ -194,6 +194,9 @@ const DonationDialog = ({
   const [fallbackDonationId, setFallbackDonationId] = useState<string | null>(null);
   // Guard against duplicate fallback execution
   const hasFallenBackRef = useRef(false);
+  // Guards to prevent funnel events firing more than once per dialog session
+  const checkoutTrackedRef = useRef(false);
+  const paymentInfoTrackedRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const [payforSwitching, setPayforSwitching] = useState(false);
@@ -248,12 +251,33 @@ const DonationDialog = ({
       .catch(() => setCurrentUser(null));
   }, [isOpen, session?.user?.id]);
 
+  // Push user PII into tracking ref as soon as profile loads — so it's present for AddPaymentInfo
+  useEffect(() => {
+    if (!currentUser || !session?.user?.id) return;
+    const nameParts = (currentUser.name ?? "").trim().split(/\s+/);
+    tracking?.setUserData({
+      external_id:   session.user.id,
+      email:         (session.user as { email?: string })?.email ?? undefined,
+      phone:         currentUser.phone ?? undefined,
+      first_name:    nameParts[0] || undefined,
+      last_name:     nameParts.slice(1).join(" ") || undefined,
+      country_code:  currentUser.countryCode ?? undefined,
+      city:          currentUser.city ?? undefined,
+      state:         currentUser.region ?? undefined,
+      gender:        currentUser.gender ?? undefined,
+      date_of_birth: currentUser.birthdate ?? undefined,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, session?.user?.id]);
+
   // Reset state when dialog opens + fire view_donation_page
   useEffect(() => {
     if (isOpen) {
       setFallbackClientSecret(null);
       setFallbackDonationId(null);
       hasFallenBackRef.current = false;
+      checkoutTrackedRef.current = false;
+      paymentInfoTrackedRef.current = false;
       // Track opening the donation flow
       tracking?.trackViewContent({
         contentIds:  campaignId ? [campaignId] : categoryId ? [categoryId] : undefined,
@@ -370,8 +394,9 @@ const DonationDialog = ({
       const currency = getCurrency();
       const nextTitle = steps[nextStep]?.title;
 
-      // Reached confirmation step → InitiateCheckout
-      if (nextTitle === t("confirmation")) {
+      // Reached confirmation step → InitiateCheckout (once per session)
+      if (nextTitle === t("confirmation") && !checkoutTrackedRef.current) {
+        checkoutTrackedRef.current = true;
         tracking?.trackInitiateCheckout({
           value:       donationAmount,
           currency,
@@ -381,8 +406,9 @@ const DonationDialog = ({
         });
       }
 
-      // Reached payment step → AddPaymentInfo
-      if (nextTitle === t("paymentInfo")) {
+      // Reached payment step → AddPaymentInfo (once per session)
+      if (nextTitle === t("paymentInfo") && !paymentInfoTrackedRef.current) {
+        paymentInfoTrackedRef.current = true;
         tracking?.trackAddPaymentInfo({
           value:         donationAmount,
           currency,

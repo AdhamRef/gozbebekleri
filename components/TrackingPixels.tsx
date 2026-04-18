@@ -410,7 +410,7 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
         const p = event.payment  ?? {};
         const fbData: Record<string, unknown> = {};
         // Core value
-        if (d.amount_usd ?? d.amount) fbData.value    = d.amount_usd ?? d.amount;
+        if (d.amount ?? d.amount_usd) fbData.value    = d.amount ?? d.amount_usd;
         if (d.currency)               fbData.currency = d.currency;
         // Content IDs / Contents
         if (event.items?.length) {
@@ -419,7 +419,7 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
           fbData.num_items   = event.items.reduce((s: number, i) => s + (i.quantity ?? 1), 0);
         } else if (d.cause_id) {
           fbData.content_ids = [d.cause_id];
-          fbData.contents    = [{ id: d.cause_id, quantity: 1, item_price: d.amount_usd ?? d.amount ?? 0 }];
+          fbData.contents    = [{ id: d.cause_id, quantity: 1, item_price: d.amount ?? d.amount_usd ?? 0 }];
           fbData.num_items   = 1;
         }
         // Content metadata
@@ -440,7 +440,7 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
       if (c?.tiktokPixelId && window.ttq && tiktokEventName) {
         const d = event.donation ?? {};
         window.ttq.track(tiktokEventName, {
-          value:        d.amount_usd ?? d.amount,
+          value:        d.amount ?? d.amount_usd,
           currency:     d.currency,
           content_id:   event.items?.[0]?.item_id ?? d.cause_id,
           content_name: d.cause_name,
@@ -455,7 +455,7 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
         const d  = event.donation ?? {};
         const p  = event.payment  ?? {};
         const ga4: Record<string, unknown> = {};
-        if (d.amount_usd ?? d.amount) ga4.value    = d.amount_usd ?? d.amount;
+        if (d.amount ?? d.amount_usd) ga4.value    = d.amount ?? d.amount_usd;
         if (d.currency)               ga4.currency  = d.currency;
         if (p.transaction_id)         ga4.transaction_id = p.transaction_id;
         if (event.items?.length) {
@@ -475,7 +475,7 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
       if (c?.xPixelId && window.twq) {
         const d = event.donation ?? {};
         window.twq("event", c.xPixelId, {
-          tw_sale_amount:    d.amount_usd ?? d.amount,
+          tw_sale_amount:    d.amount ?? d.amount_usd,
           tw_order_quantity: event.items?.reduce((s, i) => s + (i.quantity ?? 1), 0) ?? 1,
         });
       }
