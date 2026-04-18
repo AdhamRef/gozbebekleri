@@ -76,25 +76,38 @@ async function sendMetaCAPI(
   const d = event.donation ?? {};
   const p = event.payment ?? {};
 
+  // ── Normalise gender → Meta format ("m" / "f") ───────────────────────────
+  const normalisedGender =
+    u.gender === "male" ? "m" : u.gender === "female" ? "f" : undefined;
+  // ── Normalise DOB → YYYYMMDD (strip dashes from YYYY-MM-DD) ─────────────
+  const normalisedDob = u.date_of_birth
+    ? String(u.date_of_birth).replace(/-/g, "")
+    : undefined;
+
   const user_data: Record<string, unknown> = {};
-  if (u.email)        user_data.em           = [sha256(u.email)];
-  if (u.phone)        user_data.ph           = [sha256(u.phone)];
-  if (u.first_name)   user_data.fn           = [sha256(u.first_name)];
-  if (u.last_name)    user_data.ln           = [sha256(u.last_name)];
-  if (u.city)         user_data.ct           = [sha256(u.city)];
-  if (u.state)        user_data.st           = [sha256(u.state)];
-  if (u.zip)          user_data.zp           = [sha256(u.zip)];
-  if (u.country_code) user_data.country      = [sha256(u.country_code)];
-  if (u.external_id)  user_data.external_id  = [sha256(u.external_id)];
-  // These are identifiers — not hashed
-  if (u.fbp)          user_data.fbp          = u.fbp;
-  if (u.fbc)          user_data.fbc          = u.fbc;
-  if (u.user_agent)   user_data.client_user_agent = u.user_agent;
-  if (clientIp)       user_data.client_ip_address = clientIp;
+  if (u.email)          user_data.em              = [sha256(u.email)];
+  if (u.phone)          user_data.ph              = [sha256(u.phone)];
+  if (u.first_name)     user_data.fn              = [sha256(u.first_name)];
+  if (u.last_name)      user_data.ln              = [sha256(u.last_name)];
+  if (u.city)           user_data.ct              = [sha256(u.city)];
+  if (u.state)          user_data.st              = [sha256(u.state)];
+  if (u.zip)            user_data.zp              = [sha256(u.zip)];
+  if (u.country_code)   user_data.country         = [sha256(u.country_code)];
+  if (u.external_id)    user_data.external_id     = [sha256(u.external_id)];
+  if (normalisedGender) user_data.ge              = [sha256(normalisedGender)];
+  if (normalisedDob)    user_data.db              = [sha256(normalisedDob)];
+  // Identifiers — not hashed
+  if (u.fbp)            user_data.fbp             = u.fbp;
+  if (u.fbc)            user_data.fbc             = u.fbc;
+  if (u.user_agent)     user_data.client_user_agent = u.user_agent;
+  if (clientIp)         user_data.client_ip_address = clientIp;
+  if (u.subscription_id) user_data.subscription_id = u.subscription_id;
 
   const custom_data: Record<string, unknown> = {};
+  // ── Core value / currency ─────────────────────────────────────────────────
   if (d.amount != null)  custom_data.value    = d.amount_usd ?? d.amount;
   if (d.currency)        custom_data.currency = d.currency;
+  // ── Content IDs / Contents ────────────────────────────────────────────────
   if (event.items?.length) {
     custom_data.content_ids = event.items.map((i) => i.item_id);
     custom_data.contents    = event.items.map((i) => ({ id: i.item_id, quantity: i.quantity ?? 1, item_price: i.price ?? 0 }));
@@ -102,9 +115,19 @@ async function sendMetaCAPI(
   } else if (d.cause_id) {
     custom_data.content_ids = [d.cause_id];
     custom_data.contents    = [{ id: d.cause_id, quantity: 1, item_price: d.amount_usd ?? d.amount ?? 0 }];
+    custom_data.num_items   = 1;
   }
-  if (d.donation_type)           custom_data.content_type   = "product";
-  if (p.transaction_id)          custom_data.order_id       = p.transaction_id;
+  // ── Content metadata ──────────────────────────────────────────────────────
+  custom_data.content_type = "product";
+  if (d.content_name ?? d.cause_name)        custom_data.content_name     = d.content_name ?? d.cause_name;
+  if (d.content_category ?? d.donation_type) custom_data.content_category = d.content_category ?? d.donation_type?.toLowerCase();
+  if (d.delivery_category)                    custom_data.delivery_category = d.delivery_category;
+  if (d.description)                          custom_data.description       = d.description;
+  if (d.status)                               custom_data.status            = d.status;
+  if (d.payment_info_available != null)       custom_data.payment_info_available = d.payment_info_available;
+  if (d.predicted_ltv != null)                custom_data.predicted_ltv    = d.predicted_ltv;
+  // ── Order / transaction ───────────────────────────────────────────────────
+  if (p.transaction_id)  custom_data.order_id = p.transaction_id;
 
   const payload = {
     data: [

@@ -340,7 +340,13 @@
     "accountCreated": "Akun berhasil dibuat!",
     "checkSpam": "Periksa folder spam jika tidak menemukannya",
     "fillAllFields": "Harap isi semua bidang yang wajib",
-    "serverError": "Terjadi kesalahan. Silakan coba lagi"
+    "serverError": "Terjadi kesalahan. Silakan coba lagi",
+    "dateOfBirthLabel": "Tanggal Lahir",
+    "dateOfBirthPlaceholder": "Tanggal lahir",
+    "genderLabel": "Jenis Kelamin",
+    "genderMale": "Laki-laki",
+    "genderFemale": "Perempuan",
+    "genderPreferNotToSay": "Tidak ingin menyebutkan"
   },
   "SharePopup": {
     "shareCampaign": "Bagikan Kampanye dengan Orang Lain",
@@ -541,7 +547,8 @@
       "birthdate": "Tanggal Lahir",
       "verified": "Terverifikasi",
       "personalInfo": "Informasi Pribadi",
-      "security": "Keamanan & Preferensi"
+      "security": "Keamanan & Preferensi",
+      "gender": "Jenis Kelamin"
     },
     "editDialog": {
       "notSpecified": "Tidak ditentukan",
@@ -711,5 +718,13 @@
     "PARTNERSHIP": "Kemitraan",
     "VOLUNTEERING": "Kerelawanan",
     "GENERAL": "Pertanyaan umum"
+  },
+  "CompleteProfile": {
+    "title": "Lengkapi Profil Anda",
+    "subtitle": "Harap berikan beberapa detail tambahan untuk menyelesaikan pengaturan akun Anda",
+    "saveButton": "Simpan & Lanjutkan",
+    "skip": "Lewati untuk sekarang",
+    "fillAllFields": "Harap isi semua kolom",
+    "saveFailed": "Terjadi kesalahan. Silakan coba lagi"
   }
 }

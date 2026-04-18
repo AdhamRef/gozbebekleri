@@ -340,7 +340,13 @@
     "accountCreated": "تم إنشاء الحساب بنجاح!",
     "checkSpam": "تحقق من مجلد البريد غير المرغوب إذا لم تجد الرسالة",
     "fillAllFields": "يرجى ملء جميع الحقول المطلوبة",
-    "serverError": "حدث خطأ. يرجى المحاولة مرة أخرى"
+    "serverError": "حدث خطأ. يرجى المحاولة مرة أخرى",
+    "dateOfBirthLabel": "تاريخ الميلاد",
+    "dateOfBirthPlaceholder": "تاريخ الميلاد",
+    "genderLabel": "الجنس",
+    "genderMale": "ذكر",
+    "genderFemale": "أنثى",
+    "genderPreferNotToSay": "لا أفضّل الإفصاح"
   },
   "SharePopup": {
     "shareCampaign": "شارك الحملة مع الآخرين",
@@ -541,7 +547,8 @@
       "birthdate": "تاريخ الميلاد",
       "verified": "موثق",
       "personalInfo": "المعلومات الشخصية",
-      "security": "الأمان والتفضيلات"
+      "security": "الأمان والتفضيلات",
+      "gender": "الجنس"
     },
     "editDialog": {
       "notSpecified": "غير محدد",
@@ -711,5 +718,13 @@
     "PARTNERSHIP": "شراكة",
     "VOLUNTEERING": "تطوع",
     "GENERAL": "استفسار عام"
+  },
+  "CompleteProfile": {
+    "title": "أكمل ملفك الشخصي",
+    "subtitle": "يرجى تقديم بعض التفاصيل الإضافية لإكمال إعداد حسابك",
+    "saveButton": "حفظ ومتابعة",
+    "skip": "تخطي في الوقت الحالي",
+    "fillAllFields": "يرجى ملء جميع الحقول",
+    "saveFailed": "حدث خطأ. يرجى المحاولة مرة أخرى"
   }
 }

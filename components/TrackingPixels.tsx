@@ -404,17 +404,31 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
       const metaEventName = META_EVENT_MAP[event.event];
       if (c?.facebookPixelId && window.fbq && metaEventName) {
         const d = event.donation ?? {};
+        const p = event.payment  ?? {};
         const fbData: Record<string, unknown> = {};
-        if (d.amount_usd ?? d.amount)   fbData.value        = d.amount_usd ?? d.amount;
-        if (d.currency)                  fbData.currency     = d.currency;
+        // Core value
+        if (d.amount_usd ?? d.amount) fbData.value    = d.amount_usd ?? d.amount;
+        if (d.currency)               fbData.currency = d.currency;
+        // Content IDs / Contents
         if (event.items?.length) {
           fbData.content_ids = event.items.map((i) => i.item_id);
           fbData.contents    = event.items.map((i) => ({ id: i.item_id, quantity: i.quantity ?? 1, item_price: i.price ?? 0 }));
+          fbData.num_items   = event.items.reduce((s: number, i) => s + (i.quantity ?? 1), 0);
         } else if (d.cause_id) {
           fbData.content_ids = [d.cause_id];
           fbData.contents    = [{ id: d.cause_id, quantity: 1, item_price: d.amount_usd ?? d.amount ?? 0 }];
+          fbData.num_items   = 1;
         }
+        // Content metadata
         fbData.content_type = "product";
+        if (d.content_name ?? d.cause_name)        fbData.content_name          = d.content_name ?? d.cause_name;
+        if (d.content_category ?? d.donation_type) fbData.content_category      = d.content_category ?? d.donation_type?.toLowerCase();
+        if (d.delivery_category)                    fbData.delivery_category     = d.delivery_category;
+        if (d.description)                          fbData.description           = d.description;
+        if (d.status)                               fbData.status                = d.status;
+        if (d.payment_info_available != null)       fbData.payment_info_available = d.payment_info_available;
+        if (d.predicted_ltv != null)                fbData.predicted_ltv         = d.predicted_ltv;
+        if (p.transaction_id)                       fbData.order_id              = p.transaction_id;
         window.fbq("track", metaEventName, fbData, { eventID: event.event_id });
       }
 
@@ -628,13 +642,17 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
       event:    "donation_complete",
       event_id: generateEventId("pur"),
       donation: {
-        amount:        value,
-        amount_usd:    value,
+        amount:                value,
+        amount_usd:            value,
         currency,
-        cause_id:      causeId,
-        cause_name:    causeName,
-        donation_type: donationType,
-        recurring:     donationType === "MONTHLY",
+        cause_id:              causeId,
+        cause_name:            causeName,
+        content_name:          causeName,
+        content_category:      donationType ? donationType.toLowerCase() : "donation",
+        status:                "completed",
+        payment_info_available: 1,
+        donation_type:         donationType,
+        recurring:             donationType === "MONTHLY",
       },
       payment: {
         transaction_id: orderId,

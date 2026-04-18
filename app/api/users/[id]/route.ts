@@ -135,6 +135,7 @@ export async function PUT(
       city,
       phone,
       birthdate,
+      gender,
       role,
       preferredLang,
       dashboardPermissions: rawDashboardPermissions,
@@ -257,6 +258,7 @@ export async function PUT(
         ...(city !== undefined && { city: city === "" ? null : city }),
         ...(phone !== undefined && { phone }),
         ...(birthdate !== undefined && { birthdate }),
+        ...(gender !== undefined && { gender: gender === "" ? null : gender }),
         ...(role !== undefined && { role }),
         ...(preferredLang !== undefined && {
           preferredLang: preferredLang === '' ? null : preferredLang,

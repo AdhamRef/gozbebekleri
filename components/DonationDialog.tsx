@@ -209,6 +209,9 @@ const DonationDialog = ({
     countryName?: string | null;
     city?: string | null;
     region?: string | null;
+    name?: string | null;
+    gender?: string | null;
+    birthdate?: string | null;
   } | null>(null);
   const { data: session } = useSession();
   const { convertToCurrency, exchangeRates } = useCurrency();
@@ -235,6 +238,9 @@ const DonationDialog = ({
             countryName: user.countryName ?? null,
             city: user.city ?? null,
             region: user.region ?? null,
+            name: user.name ?? null,
+            gender: user.gender ?? null,
+            birthdate: user.birthdate ?? null,
           });
           if (user.phone) setPhoneValue(user.phone);
         }
@@ -1054,13 +1060,18 @@ const DonationDialog = ({
           : convertToUSD(donationAmount, getCurrency());
 
       // Push user data for enhanced matching
+      const nameParts = (currentUser?.name ?? "").trim().split(/\s+/);
       tracking?.setUserData({
-        external_id: session?.user?.id ?? undefined,
-        email:       (session?.user as { email?: string })?.email ?? undefined,
-        phone:       phoneValue.trim() || undefined,
-        country_code: currentUser?.countryCode ?? undefined,
-        city:         currentUser?.city ?? undefined,
-        state:        currentUser?.region ?? undefined,
+        external_id:   session?.user?.id ?? undefined,
+        email:         (session?.user as { email?: string })?.email ?? undefined,
+        phone:         phoneValue.trim() || undefined,
+        first_name:    nameParts[0] ?? undefined,
+        last_name:     nameParts.slice(1).join(" ") || undefined,
+        country_code:  currentUser?.countryCode ?? undefined,
+        city:          currentUser?.city ?? undefined,
+        state:         currentUser?.region ?? undefined,
+        gender:        currentUser?.gender ?? undefined,
+        date_of_birth: currentUser?.birthdate ?? undefined,
       });
 
       // payment_submit event

@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   RefreshCw,
   Inbox,
+  Calendar,
 } from "lucide-react";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { PhoneInput } from "react-international-phone";
@@ -87,6 +88,8 @@ interface FormState {
   firstName: string;
   lastName: string;
   phone: string;
+  dateOfBirth: string;
+  gender: string;
   email: string;
   password: string;
 }
@@ -104,7 +107,7 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl }: SignInDia
 
   // ── Form state ────────────────────────────────────────────────────────────
   const [form, setForm] = useState<FormState>({
-    firstName: "", lastName: "", phone: "", email: "", password: "",
+    firstName: "", lastName: "", phone: "", dateOfBirth: "", gender: "", email: "", password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,7 +124,7 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl }: SignInDia
     if (!isOpen) {
       setScreen("options");
       setAuthMode("signin");
-      setForm({ firstName: "", lastName: "", phone: "", email: "", password: "" });
+      setForm({ firstName: "", lastName: "", phone: "", dateOfBirth: "", gender: "", email: "", password: "" });
       setError(null);
       setResendSuccess(false);
       setShowPassword(false);
@@ -143,7 +146,9 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl }: SignInDia
 
   // ── Google sign-in ────────────────────────────────────────────────────────
   const handleGoogleSignIn = () => {
-    signIn("google", { callbackUrl: callbackUrl ?? pathname });
+    const finalCallbackUrl = callbackUrl ?? pathname;
+    const completeProfileUrl = `/${locale}/auth/complete-profile?callbackUrl=${encodeURIComponent(finalCallbackUrl)}`;
+    signIn("google", { callbackUrl: completeProfileUrl });
   };
 
   // ── Email sign-in ─────────────────────────────────────────────────────────
@@ -411,6 +416,37 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl }: SignInDia
                     className="w-full overflow-visible"
                     inputClassName="w-full min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#025EB8] focus:ring-2 focus:ring-[#025EB8]/10 transition-all"
                   />
+                </div>
+              )}
+
+              {authMode === "signup" && (
+                <AuthField
+                  isRTL={isRTL}
+                  icon={Calendar}
+                  type="date"
+                  value={form.dateOfBirth}
+                  onChange={(v) => setForm((f) => ({ ...f, dateOfBirth: v }))}
+                  placeholder={t("dateOfBirthPlaceholder")}
+                  autoComplete="bday"
+                />
+              )}
+
+              {authMode === "signup" && (
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(["male", "female", "preferNotToSay"] as const).map((g) => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, gender: g }))}
+                      className={`py-2 text-xs font-medium rounded-xl border transition-all ${
+                        form.gender === g
+                          ? "bg-[#025EB8] text-white border-[#025EB8]"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-[#025EB8]/40"
+                      }`}
+                    >
+                      {t(`gender${g.charAt(0).toUpperCase() + g.slice(1)}` as "genderMale" | "genderFemale" | "genderPreferNotToSay")}
+                    </button>
+                  ))}
                 </div>
               )}
 

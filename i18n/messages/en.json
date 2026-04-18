@@ -340,7 +340,13 @@
     "accountCreated": "Account created successfully!",
     "checkSpam": "Check your spam folder if you don't see it",
     "fillAllFields": "Please fill in all required fields",
-    "serverError": "Something went wrong. Please try again"
+    "serverError": "Something went wrong. Please try again",
+    "dateOfBirthLabel": "Date of Birth",
+    "dateOfBirthPlaceholder": "Date of birth",
+    "genderLabel": "Gender",
+    "genderMale": "Male",
+    "genderFemale": "Female",
+    "genderPreferNotToSay": "Prefer not to say"
   },
   "SharePopup": {
     "shareCampaign": "Share Campaign with Others",
@@ -541,7 +547,8 @@
       "birthdate": "Date of Birth",
       "verified": "Verified",
       "personalInfo": "Personal Information",
-      "security": "Security & Preferences"
+      "security": "Security & Preferences",
+      "gender": "Gender"
     },
     "editDialog": {
       "notSpecified": "Not specified",
@@ -711,5 +718,13 @@
     "PARTNERSHIP": "Partnership",
     "VOLUNTEERING": "Volunteering",
     "GENERAL": "General Inquiry"
+  },
+  "CompleteProfile": {
+    "title": "Complete Your Profile",
+    "subtitle": "Please provide a few more details to finish setting up your account",
+    "saveButton": "Save & Continue",
+    "skip": "Skip for now",
+    "fillAllFields": "Please fill in all fields",
+    "saveFailed": "Something went wrong. Please try again"
   }
 }

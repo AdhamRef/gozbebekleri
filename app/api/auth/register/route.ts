@@ -6,7 +6,7 @@ import { sendVerificationEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
-    const { firstName, lastName, phone, email, password, locale, callbackUrl } = await req.json();
+    const { firstName, lastName, phone, dateOfBirth, gender, email, password, locale, callbackUrl } = await req.json();
 
     // ── Validate ──────────────────────────────────────────────────────────
     if (!firstName?.trim() || !lastName?.trim() || !email?.trim() || !password) {
@@ -33,6 +33,8 @@ export async function POST(req: NextRequest) {
         email: email.toLowerCase().trim(),
         password: hashed,
         phone: phone?.trim() || null,
+        birthdate: dateOfBirth?.trim() || null,
+        gender: gender?.trim() || null,
         role: "DONOR",
         emailVerified: null,
       },

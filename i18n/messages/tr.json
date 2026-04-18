@@ -340,7 +340,13 @@
     "accountCreated": "Hesap başarıyla oluşturuldu!",
     "checkSpam": "Görmüyorsanız spam klasörünüzü kontrol edin",
     "fillAllFields": "Lütfen tüm zorunlu alanları doldurun",
-    "serverError": "Bir hata oluştu. Lütfen tekrar deneyin"
+    "serverError": "Bir hata oluştu. Lütfen tekrar deneyin",
+    "dateOfBirthLabel": "Doğum Tarihi",
+    "dateOfBirthPlaceholder": "Doğum tarihi",
+    "genderLabel": "Cinsiyet",
+    "genderMale": "Erkek",
+    "genderFemale": "Kadın",
+    "genderPreferNotToSay": "Belirtmek istemiyorum"
   },
   "SharePopup": {
     "shareCampaign": "Kampanyayı Başkalarıyla Paylaş",
@@ -541,7 +547,8 @@
       "birthdate": "Doğum Tarihi",
       "verified": "Doğrulanmış",
       "personalInfo": "Kişisel Bilgiler",
-      "security": "Güvenlik ve Tercihler"
+      "security": "Güvenlik ve Tercihler",
+      "gender": "Cinsiyet"
     },
     "editDialog": {
       "notSpecified": "Belirtilmemiş",
@@ -711,5 +718,13 @@
     "PARTNERSHIP": "Ortaklık",
     "VOLUNTEERING": "Gönüllülük",
     "GENERAL": "Genel talep"
+  },
+  "CompleteProfile": {
+    "title": "Profilinizi Tamamlayın",
+    "subtitle": "Hesabınızı tamamlamak için birkaç ek bilgi girin",
+    "saveButton": "Kaydet ve Devam Et",
+    "skip": "Şimdilik atla",
+    "fillAllFields": "Lütfen tüm alanları doldurun",
+    "saveFailed": "Bir şeyler yanlış gitti. Lütfen tekrar deneyin"
   }
 }

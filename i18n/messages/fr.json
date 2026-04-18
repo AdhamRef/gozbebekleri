@@ -340,7 +340,13 @@
     "accountCreated": "Compte créé avec succès !",
     "checkSpam": "Vérifiez vos spams si vous ne le voyez pas",
     "fillAllFields": "Veuillez remplir tous les champs obligatoires",
-    "serverError": "Une erreur s'est produite. Veuillez réessayer"
+    "serverError": "Une erreur s'est produite. Veuillez réessayer",
+    "dateOfBirthLabel": "Date de naissance",
+    "dateOfBirthPlaceholder": "Date de naissance",
+    "genderLabel": "Genre",
+    "genderMale": "Homme",
+    "genderFemale": "Femme",
+    "genderPreferNotToSay": "Préfère ne pas dire"
   },
   "SharePopup": {
     "shareCampaign": "Partager la campagne avec d'autres",
@@ -541,7 +547,8 @@
       "birthdate": "Date de naissance",
       "verified": "Vérifié",
       "personalInfo": "Informations personnelles",
-      "security": "Sécurité et préférences"
+      "security": "Sécurité et préférences",
+      "gender": "Genre"
     },
     "editDialog": {
       "notSpecified": "Non spécifié",
@@ -711,5 +718,13 @@
     "PARTNERSHIP": "Partenariat",
     "VOLUNTEERING": "Bénévolat",
     "GENERAL": "Demande générale"
+  },
+  "CompleteProfile": {
+    "title": "Complétez votre profil",
+    "subtitle": "Veuillez fournir quelques détails supplémentaires pour terminer la configuration de votre compte",
+    "saveButton": "Enregistrer et continuer",
+    "skip": "Ignorer pour l'instant",
+    "fillAllFields": "Veuillez remplir tous les champs",
+    "saveFailed": "Une erreur s'est produite. Veuillez réessayer"
   }
 }

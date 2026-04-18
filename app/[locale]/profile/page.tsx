@@ -126,6 +126,7 @@ interface UserProfile {
   city?: string | null;
   phone?: string | null;
   birthdate?: string | null;
+  gender?: string | null;
   donations?: DonationForProfile[];
   [key: string]: unknown;
 }
@@ -482,6 +483,12 @@ const ProfilePage = () => {
             onSave={(value: string) => handleUpdateField("birthdate", value)}
             type="date"
             icon={Calendar}
+          />
+          <EditDialog
+            title={t("account.gender")}
+            value={u.gender ?? ""}
+            onSave={(value: string) => handleUpdateField("gender", value)}
+            icon={User}
           />
         </Card>
       </div>

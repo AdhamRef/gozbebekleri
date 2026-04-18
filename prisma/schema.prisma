@@ -76,6 +76,7 @@ model User {
   city          String?
   phone         String?
   birthdate     String?
+  gender        String?
   role          Role     @default(DONOR)
   preferredLang String? // locale from first donation (ar, en, fr) for emails/SMS
 

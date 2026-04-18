@@ -49,19 +49,22 @@ export interface CanonicalSession {
 }
 
 export interface CanonicalUser {
-  external_id?: string;  // user DB id (will be hashed before server send)
-  email?: string;        // will be hashed
-  phone?: string;        // will be hashed
-  first_name?: string;   // will be hashed
-  last_name?: string;    // will be hashed
-  city?: string;         // will be hashed
-  state?: string;        // will be hashed
-  zip?: string;          // will be hashed
-  country_code?: string; // will be hashed
-  fbp?: string;          // send as-is
-  fbc?: string;          // send as-is
-  user_agent?: string;   // send as-is
-  ip?: string;           // send as-is
+  external_id?: string;    // user DB id (will be hashed before server send)
+  email?: string;          // will be hashed
+  phone?: string;          // will be hashed
+  first_name?: string;     // will be hashed
+  last_name?: string;      // will be hashed
+  city?: string;           // will be hashed
+  state?: string;          // will be hashed
+  zip?: string;            // will be hashed
+  country_code?: string;   // will be hashed
+  gender?: string;         // "male" | "female" | "preferNotToSay" — normalised to "m"/"f" before hashing
+  date_of_birth?: string;  // YYYY-MM-DD — normalised to YYYYMMDD before hashing
+  subscription_id?: string; // send as-is (not hashed)
+  fbp?: string;            // send as-is
+  fbc?: string;            // send as-is
+  user_agent?: string;     // send as-is
+  ip?: string;             // send as-is
 }
 
 export interface CanonicalDonation {
@@ -69,8 +72,15 @@ export interface CanonicalDonation {
   amount?: number;
   amount_usd?: number;
   currency?: string;
-  cause_id?: string;      // campaign or category ID
+  cause_id?: string;            // campaign or category ID
   cause_name?: string;
+  content_category?: string;    // e.g. "donation", "zakat", "sadaqah"
+  content_name?: string;        // human-readable campaign/cause name for ads
+  delivery_category?: string;   // Meta: "in_store" | "home_delivery" | "curbside"
+  description?: string;
+  status?: string;              // e.g. "completed", "pending"
+  payment_info_available?: 0 | 1; // 1 if card info was provided
+  predicted_ltv?: number;
   donor_type?: "new" | "returning";
   recurring?: boolean;
 }
@@ -119,7 +129,7 @@ export const META_EVENT_MAP: Partial<Record<CanonicalEventName, string>> = {
   add_to_cart:        "AddToCart",
   begin_checkout:     "InitiateCheckout",
   add_payment_info:   "AddPaymentInfo",
-  donation_complete:  "Donate",
+  donation_complete:  "Purchase",
   sign_up:            "CompleteRegistration",
 };
 
@@ -143,7 +153,7 @@ export const GA4_EVENT_MAP: Partial<Record<CanonicalEventName, string>> = {
   begin_checkout:     "begin_checkout",
   add_payment_info:   "add_payment_info",
   payment_failed:     "exception",
-  donation_complete:  "donate",
+  donation_complete:  "Donate",
   sign_up:            "sign_up",
   scroll_depth:       "scroll",
   user_engagement:    "user_engagement",
