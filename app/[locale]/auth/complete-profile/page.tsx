@@ -74,6 +74,8 @@ export default function CompleteProfilePage() {
       .then((r) => r.json())
       .then((data) => {
         const u = data.user;
+        // Skip entirely if user has already seen this page once
+        if (u?.profileCompletionSeen) { router.replace(callbackUrl); return; }
         const missingPhone     = !u?.phone;
         const missingBirthdate = !u?.birthdate;
         const missingGender    = !u?.gender;
@@ -100,7 +102,7 @@ export default function CompleteProfilePage() {
     const birthdate = needBirthdate
       ? `${dobYear}-${String(+dobMonth).padStart(2, "0")}-${String(+dobDay).padStart(2, "0")}`
       : undefined;
-    const body: Record<string, unknown> = {};
+    const body: Record<string, unknown> = { profileCompletionSeen: true };
     if (needPhone)     body.phone     = phone.trim();
     if (needBirthdate) body.birthdate = birthdate;
     if (needGender)    body.gender    = gender;
@@ -297,7 +299,14 @@ export default function CompleteProfilePage() {
             <p className="text-center">
               <button
                 type="button"
-                onClick={() => router.replace(callbackUrl)}
+                onClick={async () => {
+                  await fetch(`/api/users/${session!.user.id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ profileCompletionSeen: true }),
+                  });
+                  router.replace(callbackUrl);
+                }}
                 className="text-[11px] text-gray-400 hover:text-gray-500 transition-colors underline underline-offset-2"
               >
                 {t("skip")}

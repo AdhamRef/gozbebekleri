@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    if (donation && donation.status !== "PAID") {
+    if (donation && donation.paidAt === null) {
       // Mark the PayFor attempt as FAILED — preserves full audit trail
       await prisma.donation.update({
         where: { id: donationId },

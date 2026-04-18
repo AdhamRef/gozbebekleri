@@ -41,8 +41,8 @@ export async function POST(req: NextRequest) {
       });
       if (!donation) return { ok: false as const, reason: "not_found" as const };
 
-      // Idempotency: if already paid, just redirect to success
-      if (donation.status === "PAID") return { ok: true as const };
+      // Idempotency: if already confirmed by a prior callback, just redirect to success
+      if (donation.paidAt !== null) return { ok: true as const };
 
       // Basic linkage check
       if (donation.providerOrderId && orderId && donation.providerOrderId !== orderId) {

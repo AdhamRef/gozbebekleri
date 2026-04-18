@@ -1255,7 +1255,7 @@ const DonationDialog = ({
                 if (!res.ok) return;
                 const data = await res.json();
 
-                if (data.status === "PAID") {
+                if (data.status === "PAID" && data.paidAt) {
                   clearInterval(payforPollRef.current!);
                   payforPollRef.current = null;
                   if (payforPopupRef.current && !payforPopupRef.current.closed) {

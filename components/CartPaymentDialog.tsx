@@ -373,7 +373,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
             if (!check.ok) return;
             const data = await check.json();
 
-            if (data.status === "PAID") {
+            if (data.status === "PAID" && data.paidAt) {
               clearInterval(payforPollRef.current!); payforPollRef.current = null;
               if (payforPopupRef.current && !payforPopupRef.current.closed) payforPopupRef.current.close();
               clearItems(); confetti.onOpen();
