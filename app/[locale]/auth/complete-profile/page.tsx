@@ -1,18 +1,16 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import {
-  Loader2, Phone, Calendar, Users, ArrowRight, CheckCircle2,
-} from "lucide-react";
+import { useRouter } from "@/i18n/routing";
+import { Loader2, Phone, Calendar, Users, ArrowRight } from "lucide-react";
 import Image from "next/image";
 import { PhoneInput } from "react-international-phone";
 import "react-international-phone/style.css";
 import { useIpCountry } from "@/hooks/useIpCountry";
 
-// ── Localised month names ─────────────────────────────────────────────────────
 const MONTH_LABELS: Record<string, string[]> = {
   ar: ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"],
   en: ["January","February","March","April","May","June","July","August","September","October","November","December"],
@@ -28,18 +26,16 @@ function daysInMonth(month: number, year: number) {
   return new Date(year, month, 0).getDate();
 }
 
-const LOGO_URL = "https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png";
-
-// ── Chevron icon ──────────────────────────────────────────────────────────────
 function ChevronDown() {
   return (
-    <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+    <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
     </svg>
   );
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+const LOGO_URL = "https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png";
+
 export default function CompleteProfilePage() {
   const { data: session, status } = useSession();
   const router       = useRouter();
@@ -52,19 +48,18 @@ export default function CompleteProfilePage() {
 
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
-  // ── Form state ────────────────────────────────────────────────────────────
   const [phone,    setPhone]    = useState("");
   const [dobDay,   setDobDay]   = useState<number | "">("");
   const [dobMonth, setDobMonth] = useState<number | "">("");
   const [dobYear,  setDobYear]  = useState<number | "">("");
   const [gender,   setGender]   = useState("");
-
-  // ── UI state ──────────────────────────────────────────────────────────────
+  const [needPhone,    setNeedPhone]    = useState(false);
+  const [needBirthdate, setNeedBirthdate] = useState(false);
+  const [needGender,   setNeedGender]   = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState<string | null>(null);
 
-  // ── Date helpers ──────────────────────────────────────────────────────────
   const currentYear = new Date().getFullYear();
   const years  = useMemo(() => Array.from({ length: currentYear - 1919 }, (_, i) => currentYear - i), [currentYear]);
   const maxDay = useMemo(() => daysInMonth(dobMonth === "" ? 0 : +dobMonth, dobYear === "" ? 0 : +dobYear), [dobMonth, dobYear]);
@@ -72,15 +67,20 @@ export default function CompleteProfilePage() {
   const months = MONTH_LABELS[locale] ?? MONTH_LABELS.en;
   useEffect(() => { if (dobDay !== "" && +dobDay > maxDay) setDobDay(maxDay); }, [maxDay, dobDay]);
 
-  // ── Load existing profile ─────────────────────────────────────────────────
   useEffect(() => {
-    if (status === "unauthenticated") { router.replace(`/${locale}/auth/signin`); return; }
+    if (status === "unauthenticated") { router.replace("/auth/signin"); return; }
     if (status !== "authenticated") return;
     fetch(`/api/users/${session.user.id}`)
       .then((r) => r.json())
       .then((data) => {
         const u = data.user;
-        if (u?.birthdate && u?.gender && u?.phone) { router.replace(callbackUrl); return; }
+        const missingPhone     = !u?.phone;
+        const missingBirthdate = !u?.birthdate;
+        const missingGender    = !u?.gender;
+        if (!missingPhone && !missingBirthdate && !missingGender) { router.replace(callbackUrl); return; }
+        setNeedPhone(missingPhone);
+        setNeedBirthdate(missingBirthdate);
+        setNeedGender(missingGender);
         if (u?.phone)     setPhone(u.phone);
         if (u?.gender)    setGender(u.gender);
         if (u?.birthdate) {
@@ -92,18 +92,23 @@ export default function CompleteProfilePage() {
       .catch(() => setPageLoading(false));
   }, [status, session, callbackUrl, locale, router]);
 
-  // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
-    if (!phone.trim() || !dobDay || !dobMonth || !dobYear || !gender) {
-      setError(t("fillAllFields")); return;
-    }
+    if (needPhone && !phone.trim()) { setError(t("fillAllFields")); return; }
+    if (needBirthdate && (!dobDay || !dobMonth || !dobYear)) { setError(t("fillAllFields")); return; }
+    if (needGender && !gender) { setError(t("fillAllFields")); return; }
     setSaving(true); setError(null);
-    const birthdate = `${dobYear}-${String(+dobMonth).padStart(2,"0")}-${String(+dobDay).padStart(2,"0")}`;
+    const birthdate = needBirthdate
+      ? `${dobYear}-${String(+dobMonth).padStart(2, "0")}-${String(+dobDay).padStart(2, "0")}`
+      : undefined;
+    const body: Record<string, unknown> = {};
+    if (needPhone)     body.phone     = phone.trim();
+    if (needBirthdate) body.birthdate = birthdate;
+    if (needGender)    body.gender    = gender;
     try {
       const res = await fetch(`/api/users/${session!.user.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: phone.trim(), birthdate, gender }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error();
       router.replace(callbackUrl);
@@ -114,236 +119,186 @@ export default function CompleteProfilePage() {
     }
   };
 
-  // ── Loading ───────────────────────────────────────────────────────────────
   if (pageLoading || status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-orange-50/40">
-        <div className="flex flex-col items-center gap-3">
-          <Image src={LOGO_URL} alt="Logo" width={48} height={48} className="h-12 w-auto object-contain opacity-60" />
-          <Loader2 className="w-6 h-6 animate-spin text-[#025EB8]" />
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-[#025EB8]">
+        <Loader2 className="w-6 h-6 animate-spin text-white/60" />
       </div>
     );
   }
 
-  // ── Derived ───────────────────────────────────────────────────────────────
   const firstName = session?.user?.name?.split(" ")[0] ?? "";
   const userImage = session?.user?.image;
-
   const isAr = locale === "ar";
-  const greeting = isAr ? `أهلاً${firstName ? `، ${firstName}` : ""}!` : `Hi${firstName ? `, ${firstName}` : ""}!`;
+  const greeting = isAr
+    ? `أهلاً${firstName ? `، ${firstName}` : ""}!`
+    : `Hi${firstName ? `, ${firstName}` : ""}!`;
 
-  // Select base class
   const selCls = (filled: boolean) =>
-    `w-full border rounded-2xl py-3 px-3.5 text-sm outline-none appearance-none cursor-pointer transition-all bg-white
+    `w-full border rounded-xl py-2.5 px-3 text-sm outline-none appearance-none cursor-pointer transition-all bg-white
      focus:border-[#025EB8] focus:ring-2 focus:ring-[#025EB8]/10
-     ${filled ? "text-gray-800 border-[#025EB8]/40 bg-blue-50/30" : "text-gray-400 border-gray-200 hover:border-gray-300"}`;
-
-  // Completion score for the mini progress bar
-  const filled = [phone, dobDay, dobMonth, dobYear, gender].filter(Boolean).length;
-  const pct = Math.round((filled / 5) * 100);
+     ${filled
+       ? "text-gray-800 border-[#025EB8]/50"
+       : "text-gray-400 border-gray-200 hover:border-gray-300"}`;
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-orange-50/40 p-4 py-10"
-      dir={isRTL ? "rtl" : "ltr"}
-    >
-      {/* ── Decorative blobs ────────────────────────────────────────────────── */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-[#025EB8]/6 blur-3xl" />
-        <div className="absolute -bottom-24 -right-24 w-80 h-80 rounded-full bg-[#FA5D17]/6 blur-3xl" />
+    <div className="min-h-screen bg-[#025EB8] flex flex-col items-center justify-center p-4" dir={isRTL ? "rtl" : "ltr"}>
+
+      {/* Subtle radial glow behind card */}
+      <div className="pointer-events-none fixed inset-0">
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0150a0] to-[#013a75]" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] rounded-full bg-white/5 blur-3xl" />
       </div>
 
-      <div className="relative w-full max-w-md">
+      <div className="relative w-full max-w-sm">
 
-        {/* ── Logo above card ─────────────────────────────────────────────── */}
-        <div className="flex justify-center mb-6">
-          <Image src={LOGO_URL} alt="Logo" width={56} height={56} className="h-12 w-auto object-contain" />
-        </div>
-
-        {/* ── Card ────────────────────────────────────────────────────────── */}
-        <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/70 border border-gray-100/80 overflow-hidden">
-
-          {/* Rainbow accent top bar */}
-          <div className="h-1 bg-gradient-to-r from-[#025EB8] via-[#1e7fea] to-[#FA5D17]" />
-
-          {/* ── Card header ────────────────────────────────────────────────── */}
-          <div className="px-7 pt-7 pb-6 text-center">
-            {/* Avatar */}
-            <div className="relative inline-flex mb-4">
-              {userImage ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={userImage}
-                  alt={session?.user?.name ?? ""}
-                  className="w-[72px] h-[72px] rounded-full ring-4 ring-white shadow-md object-cover"
-                />
-              ) : (
-                <div className="w-[72px] h-[72px] rounded-full bg-[#025EB8]/10 ring-4 ring-white shadow-md flex items-center justify-center">
-                  <Users className="w-8 h-8 text-[#025EB8]" />
-                </div>
-              )}
-              {/* Google badge */}
-              <div className="absolute -bottom-1 -end-1 w-7 h-7 bg-white rounded-full flex items-center justify-center shadow ring-2 ring-white">
-                <Image src="/google.svg" alt="Google" width={16} height={16} />
+        {/* Logo + greeting above card */}
+        <div className="text-center mb-5">
+          <Image
+            src={LOGO_URL}
+            alt="Logo"
+            width={48}
+            height={48}
+            className="h-10 w-auto object-contain brightness-0 invert mx-auto mb-4"
+          />
+          {/* Avatar */}
+          <div className="relative inline-flex mb-3">
+            {userImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={userImage}
+                alt={session?.user?.name ?? ""}
+                className="w-14 h-14 rounded-full ring-2 ring-white/30 object-cover"
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-full bg-white/10 ring-2 ring-white/20 flex items-center justify-center">
+                <Users className="w-6 h-6 text-white/60" />
               </div>
-            </div>
-
-            <h1 className="text-xl font-extrabold text-gray-900 tracking-tight">{greeting}</h1>
-            <p className="text-sm text-gray-500 mt-1 leading-relaxed max-w-xs mx-auto">{t("subtitle")}</p>
-
-            {/* Live progress bar */}
-            <div className="mt-5 space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] font-semibold text-gray-400">
-                <span>{t("progress") ?? "Profile completion"}</span>
-                <span className={pct === 100 ? "text-green-500" : "text-[#025EB8]"}>{pct}%</span>
-              </div>
-              <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-[#025EB8] to-[#FA5D17]"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
+            )}
+            <div className="absolute -bottom-0.5 -end-0.5 w-5 h-5 bg-white rounded-full flex items-center justify-center shadow">
+              <Image src="/google.svg" alt="Google" width={12} height={12} />
             </div>
           </div>
+          <h1 className="text-lg font-bold text-white">{greeting}</h1>
+          <p className="text-xs text-white/60 mt-0.5">{t("subtitle")}</p>
+        </div>
 
-          {/* ── Divider ────────────────────────────────────────────────────── */}
-          <div className="mx-7 h-px bg-gray-100" />
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-2xl shadow-black/20 overflow-hidden">
 
-          {/* ── Form body ──────────────────────────────────────────────────── */}
-          <div className="px-7 py-6 space-y-6">
+          <div className="px-6 py-5 space-y-4">
 
             {/* Error */}
             {error && (
-              <div className="flex items-center gap-2.5 bg-red-50 border border-red-100 rounded-2xl px-4 py-3 text-sm text-red-600">
-                <span className="shrink-0 w-4 h-4 rounded-full bg-red-100 flex items-center justify-center text-red-500 font-bold text-xs">!</span>
+              <div className="bg-red-50 border border-red-100 rounded-xl px-3.5 py-2.5 text-xs text-red-600">
                 {error}
               </div>
             )}
 
-            {/* ── Phone ──────────────────────────────────────────────────── */}
-            <div className="space-y-2.5">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-[#025EB8]/10 flex items-center justify-center shrink-0">
+            {/* Phone */}
+            {needPhone && (
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
                   <Phone className="w-3 h-3 text-[#025EB8]" />
-                </div>
-                <label className="text-[13px] font-bold text-gray-700 uppercase tracking-wide">
                   {t("phoneLabel")}
                 </label>
-                {phone && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ms-auto" />}
-              </div>
-              <div className="overflow-visible phone-input-wrapper">
-                <PhoneInput
-                  defaultCountry={ipCountry}
-                  value={phone}
-                  onChange={setPhone}
-                  className="w-full overflow-visible"
-                  inputClassName="w-full min-w-0 rounded-2xl border border-gray-200 bg-white px-3.5 py-3 text-sm outline-none focus:border-[#025EB8] focus:ring-2 focus:ring-[#025EB8]/10 transition-all hover:border-gray-300"
-                />
-              </div>
-            </div>
-
-            {/* ── Date of Birth ───────────────────────────────────────────── */}
-            <div className="space-y-2.5">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-[#025EB8]/10 flex items-center justify-center shrink-0">
-                  <Calendar className="w-3 h-3 text-[#025EB8]" />
+                <div className="overflow-visible phone-input-wrapper">
+                  <PhoneInput
+                    defaultCountry={ipCountry}
+                    value={phone}
+                    onChange={setPhone}
+                    className="w-full overflow-visible"
+                    inputClassName="w-full min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#025EB8] focus:ring-2 focus:ring-[#025EB8]/10 transition-all"
+                  />
                 </div>
-                <label className="text-[13px] font-bold text-gray-700 uppercase tracking-wide">
+              </div>
+            )}
+
+            {/* Date of Birth */}
+            {needBirthdate && (
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                  <Calendar className="w-3 h-3 text-[#025EB8]" />
                   {tD("dateOfBirthLabel")}
                 </label>
-                {dobDay && dobMonth && dobYear && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ms-auto" />}
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                {/* Day */}
-                <div className="relative">
-                  <select value={dobDay} onChange={(e) => setDobDay(e.target.value === "" ? "" : +e.target.value)} className={selCls(dobDay !== "")}>
-                    <option value="">{t("dobDayPlaceholder")}</option>
-                    {days.map((d) => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 end-2.5 flex items-center"><ChevronDown /></div>
-                </div>
-                {/* Month */}
-                <div className="relative">
-                  <select value={dobMonth} onChange={(e) => setDobMonth(e.target.value === "" ? "" : +e.target.value)} className={selCls(dobMonth !== "")}>
-                    <option value="">{t("dobMonthPlaceholder")}</option>
-                    {months.map((name, i) => <option key={i + 1} value={i + 1}>{name}</option>)}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 end-2.5 flex items-center"><ChevronDown /></div>
-                </div>
-                {/* Year */}
-                <div className="relative">
-                  <select value={dobYear} onChange={(e) => setDobYear(e.target.value === "" ? "" : +e.target.value)} className={selCls(dobYear !== "")}>
-                    <option value="">{t("dobYearPlaceholder")}</option>
-                    {years.map((y) => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 end-2.5 flex items-center"><ChevronDown /></div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="relative">
+                    <select value={dobDay} onChange={(e) => setDobDay(e.target.value === "" ? "" : +e.target.value)} className={selCls(dobDay !== "")}>
+                      <option value="">{t("dobDayPlaceholder")}</option>
+                      {days.map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 end-2.5 flex items-center"><ChevronDown /></div>
+                  </div>
+                  <div className="relative">
+                    <select value={dobMonth} onChange={(e) => setDobMonth(e.target.value === "" ? "" : +e.target.value)} className={selCls(dobMonth !== "")}>
+                      <option value="">{t("dobMonthPlaceholder")}</option>
+                      {months.map((name, i) => <option key={i + 1} value={i + 1}>{name}</option>)}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 end-2.5 flex items-center"><ChevronDown /></div>
+                  </div>
+                  <div className="relative">
+                    <select value={dobYear} onChange={(e) => setDobYear(e.target.value === "" ? "" : +e.target.value)} className={selCls(dobYear !== "")}>
+                      <option value="">{t("dobYearPlaceholder")}</option>
+                      {years.map((y) => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 end-2.5 flex items-center"><ChevronDown /></div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* ── Gender ──────────────────────────────────────────────────── */}
-            <div className="space-y-2.5">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-[#025EB8]/10 flex items-center justify-center shrink-0">
+            {/* Gender */}
+            {needGender && (
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
                   <Users className="w-3 h-3 text-[#025EB8]" />
-                </div>
-                <label className="text-[13px] font-bold text-gray-700 uppercase tracking-wide">
                   {tD("genderLabel")}
                 </label>
-                {gender && <CheckCircle2 className="w-3.5 h-3.5 text-green-500 ms-auto" />}
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { key: "male",           symbol: "♂", label: tD("genderMale") },
+                    { key: "female",         symbol: "♀", label: tD("genderFemale") },
+                    { key: "preferNotToSay", symbol: "—", label: tD("genderPreferNotToSay") },
+                  ] as const).map(({ key, symbol, label }) => {
+                    const active = gender === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setGender(key)}
+                        className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl border transition-all text-center ${
+                          active
+                            ? "border-[#025EB8] bg-[#025EB8] text-white shadow-sm"
+                            : "border-gray-200 bg-white text-gray-500 hover:border-[#025EB8]/40 hover:text-[#025EB8]"
+                        }`}
+                      >
+                        <span className={`text-base leading-none ${active ? "text-white" : "text-gray-400"}`}>{symbol}</span>
+                        <span className="text-[10px] font-semibold leading-tight">{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+            )}
 
-              <div className="grid grid-cols-3 gap-2">
-                {([
-                  { key: "male",           emoji: "♂",  label: tD("genderMale") },
-                  { key: "female",         emoji: "♀",  label: tD("genderFemale") },
-                  { key: "preferNotToSay", emoji: "—",  label: tD("genderPreferNotToSay") },
-                ] as const).map(({ key, emoji, label }) => {
-                  const active = gender === key;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setGender(key)}
-                      className={`flex flex-col items-center justify-center gap-1.5 py-3.5 rounded-2xl border-2 text-center transition-all duration-150 ${
-                        active
-                          ? "border-[#025EB8] bg-[#025EB8] text-white shadow-md shadow-[#025EB8]/20 scale-[1.02]"
-                          : "border-gray-200 bg-white text-gray-500 hover:border-[#025EB8]/40 hover:bg-blue-50/40 hover:text-[#025EB8]"
-                      }`}
-                    >
-                      <span className={`text-xl leading-none ${active ? "text-white" : "text-gray-400"}`}>{emoji}</span>
-                      <span className="text-[11px] font-bold leading-tight">{label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* ── Save button ─────────────────────────────────────────────── */}
+            {/* Save */}
             <button
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="w-full flex items-center justify-center gap-2.5 bg-gradient-to-r from-[#025EB8] to-[#0478E8] hover:from-[#014fa0] hover:to-[#0265c4] disabled:opacity-60 text-white text-sm font-bold py-3.5 rounded-2xl transition-all active:scale-[0.98] shadow-lg shadow-[#025EB8]/25"
+              className="w-full flex items-center justify-center gap-2 bg-[#025EB8] hover:bg-[#014fa0] disabled:opacity-60 text-white text-sm font-bold py-3 rounded-xl transition-colors active:scale-[0.98] shadow-sm"
             >
-              {saving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  {t("saveButton")}
-                  <ArrowRight className={`w-4 h-4 ${isRTL ? "rotate-180" : ""}`} />
-                </>
-              )}
+              {saving
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <><span>{t("saveButton")}</span><ArrowRight className={`w-4 h-4 ${isRTL ? "rotate-180" : ""}`} /></>}
             </button>
 
-            {/* ── Skip ────────────────────────────────────────────────────── */}
+            {/* Skip */}
             <p className="text-center">
               <button
                 type="button"
                 onClick={() => router.replace(callbackUrl)}
-                className="text-xs text-gray-400 hover:text-gray-500 transition-colors underline underline-offset-2"
+                className="text-[11px] text-gray-400 hover:text-gray-500 transition-colors underline underline-offset-2"
               >
                 {t("skip")}
               </button>
@@ -351,15 +306,6 @@ export default function CompleteProfilePage() {
 
           </div>
         </div>
-
-        {/* ── Footer note ─────────────────────────────────────────────────── */}
-        <p className="text-center text-[11px] text-gray-400 mt-5 leading-relaxed">
-          {isAr
-            ? "معلوماتك محمية ولن تُشارك مع أي طرف ثالث."
-            : locale === "tr"
-            ? "Bilgileriniz korunmaktadır ve üçüncü taraflarla paylaşılmaz."
-            : "Your information is protected and will never be shared."}
-        </p>
 
       </div>
     </div>
