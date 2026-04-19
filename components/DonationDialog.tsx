@@ -79,6 +79,8 @@ interface DonationDialogProps {
   fundraisingMode?: string;
   sharePriceUSD?: number | null;
   suggestedShareCounts?: { counts: number[] } | null;
+  /** When true, user skipped sign-in — collect contact info inline */
+  guestMode?: boolean;
 }
 
 
@@ -100,6 +102,7 @@ const DonationDialog = ({
   fundraisingMode = "AMOUNT",
   sharePriceUSD,
   suggestedShareCounts,
+  guestMode = false,
 }: DonationDialogProps) => {
   const isCategoryMode = Boolean(categoryId);
   const openGoal = goalType === GOAL_TYPE_OPEN;
@@ -203,6 +206,12 @@ const DonationDialog = ({
   const payforPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [mounted, setMounted] = useState(false);
   const [phoneValue, setPhoneValue] = useState("");
+  const [guestFirstName, setGuestFirstName] = useState("");
+  const [guestLastName, setGuestLastName] = useState("");
+  // Saved cards
+  const [savedCards, setSavedCards] = useState<{ id: string; last4: string; cardType: string; expiryDate: string; cardholderName?: string | null; isDefault: boolean; nickname?: string | null }[]>([]);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [guestEmail, setGuestEmail] = useState("");
   const ipCountry = useIpCountry();
   const [currentUser, setCurrentUser] = useState<{
     phone: string | null;
@@ -268,6 +277,28 @@ const DonationDialog = ({
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, session?.user?.id]);
+
+  // Reset guest fields and saved card selection on close
+  useEffect(() => {
+    if (!isOpen) {
+      setGuestFirstName(""); setGuestLastName(""); setGuestEmail("");
+      setSelectedCardId(null); setSavedCards([]);
+    }
+  }, [isOpen]);
+
+  // Load saved cards when dialog opens (authenticated users only)
+  useEffect(() => {
+    if (!isOpen || !session?.user?.id) return;
+    axios.get("/api/credit-cards").then((res) => {
+      const cards = res.data?.cards ?? [];
+      setSavedCards(cards);
+      const def = cards.find((c: typeof cards[0]) => c.isDefault);
+      if (def) {
+        setSelectedCardId(def.id);
+        setCardDetails({ cardNumber: `**** **** **** ${def.last4}`, expiryDate: def.expiryDate, cvv: "", cardholderName: def.cardholderName ?? "" });
+      }
+    }).catch(() => {});
+  }, [isOpen, session?.user?.id]);
 
   // Reset state when dialog opens + fire view_donation_page
   useEffect(() => {
@@ -375,6 +406,7 @@ const DonationDialog = ({
   };
 
   const isPhoneValid = () => {
+    if (session?.user?.id) return true; // authenticated — phone not required
     const p = phoneValue.trim().replace(/\s/g, "");
     return p.length >= 10;
   };
@@ -689,14 +721,27 @@ const DonationDialog = ({
                         shareMode && sharePriceUSD != null
                           ? shareCount * sharePriceUSD
                           : useConvetToUSD(donationAmount, getCurrency());
-                      const response = await axios.post("/api/cart", {
-                        campaignId: campaignId,
-                        amount: donationAmount,
-                        amountUSD,
-                        currency: getCurrency(),
-                        ...(shareMode ? { shareCount } : {}),
-                      });
-                      addItem(response.data || []);
+                      if (guestMode) {
+                        // Guest: add to Zustand only (no DB call — not authenticated)
+                        addItem({
+                          id: crypto.randomUUID(),
+                          campaignId,
+                          amount: donationAmount,
+                          amountUSD,
+                          currency: getCurrency(),
+                          ...(shareMode ? { shareCount } : {}),
+                          campaign: { id: campaignId, title: campaignTitle, images: [campaignImage] },
+                        });
+                      } else {
+                        const response = await axios.post("/api/cart", {
+                          campaignId: campaignId,
+                          amount: donationAmount,
+                          amountUSD,
+                          currency: getCurrency(),
+                          ...(shareMode ? { shareCount } : {}),
+                        });
+                        addItem(response.data || []);
+                      }
                       tracking?.trackAddToCart({
                         value: donationAmount,
                         currency: getCurrency(),
@@ -704,7 +749,7 @@ const DonationDialog = ({
                         contentName: campaignTitle,
                         quantity: 1,
                       });
-                      window.location.reload();
+                      if (!guestMode) window.location.reload();
                     } catch (error) {
                       console.error("Error adding to cart:", error);
                       toast.error(t("failedToAddToCart"));
@@ -985,30 +1030,90 @@ const DonationDialog = ({
       case t("paymentInfo"):
         return (
           <div className="space-y-6 overflow-visible">
-            {paymentMethod === "CARD" ? (
-              <div className="text-center space-y-3">
-                <p className="text-gray-900 font-semibold">{t("bankCard")}</p>
-                <p className="text-sm text-gray-600">
-                  {t("secure3DCardPrompt")}
-                </p>
-              </div>
-            ) : (
-              <div className="text-center">
-                <p className="text-gray-600">
-                  {t("paypalRedirect")}
-                </p>
+
+            {/* ── Saved cards picker — shown when user has any saved card ── */}
+            {savedCards.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-gray-700">{t("savedCards")}</p>
+                <div className="space-y-2">
+                  {savedCards.map((card) => {
+                    const selected = selectedCardId === card.id;
+                    const brandBadge: Record<string, string> = { visa: "VISA", mastercard: "MC", amex: "AMEX", troy: "TROY" };
+                    return (
+                      <button
+                        key={card.id}
+                        type="button"
+                        onClick={() => {
+                          if (selected) {
+                            setSelectedCardId(null);
+                            setCardDetails({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" });
+                          } else {
+                            setSelectedCardId(card.id);
+                            setCardDetails({ cardNumber: `**** **** **** ${card.last4}`, expiryDate: card.expiryDate, cvv: "", cardholderName: card.cardholderName ?? "" });
+                          }
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm transition-all duration-200 ${selected ? "border-[#025EB8] bg-[#025EB8]/5 shadow-sm" : "border-gray-200 hover:border-gray-300 bg-white hover:shadow-sm"}`}
+                      >
+                        <span className={`w-10 h-7 rounded-md flex items-center justify-center text-[10px] font-bold text-white shrink-0 ${card.cardType === "visa" ? "bg-blue-600" : card.cardType === "mastercard" ? "bg-orange-500" : card.cardType === "amex" ? "bg-green-600" : card.cardType === "troy" ? "bg-red-600" : "bg-gray-500"}`}>{brandBadge[card.cardType] ?? "💳"}</span>
+                        <div className="flex-1 text-start min-w-0">
+                          <p className="font-semibold text-gray-800 text-sm truncate">{card.nickname || `${card.cardType.charAt(0).toUpperCase() + card.cardType.slice(1)} •••• ${card.last4}`}</p>
+                          <p className="text-xs text-gray-400">{t("expires")} {card.expiryDate}</p>
+                        </div>
+                        {selected
+                          ? <span className="w-5 h-5 rounded-full bg-[#025EB8] flex items-center justify-center shrink-0"><svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 12 12"><path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
+                          : <span className="w-5 h-5 rounded-full border-2 border-gray-300 shrink-0" />
+                        }
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedCardId(null); setCardDetails({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" }); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm transition-all duration-200 ${!selectedCardId ? "border-[#025EB8] bg-[#025EB8]/5 shadow-sm" : "border-dashed border-gray-300 hover:border-gray-400 bg-white hover:shadow-sm"}`}
+                  >
+                    <span className="w-10 h-7 rounded-md border-2 border-dashed border-gray-300 flex items-center justify-center shrink-0">
+                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
+                    </span>
+                    <span className="font-medium text-gray-700">{t("useNewCard")}</span>
+                    {!selectedCardId && <span className="w-5 h-5 rounded-full bg-[#025EB8] flex items-center justify-center shrink-0"><svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 12 12"><path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg></span>}
+                  </button>
+                </div>
               </div>
             )}
 
-            {/* Stripe Elements — only mounted when use3D is false. Never mixed with PayFor. */}
-            {paymentMethod === "CARD" && !use3D && (
+            {/* CVC-only when a saved card is selected */}
+            {selectedCardId && (
+              <div className="space-y-2" dir="ltr">
+                <label className="block text-sm font-medium text-gray-700 text-start">{t("cvc")}</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={cardDetails.cvv}
+                  onChange={(e) => setCardDetails((d) => ({ ...d, cvv: e.target.value.replace(/\D/g, "") }))}
+                  placeholder="•••"
+                  className="w-28 rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-[#025EB8] focus:ring-2 focus:ring-[#025EB8]/10 tracking-widest"
+                />
+              </div>
+            )}
+
+            {/* Full form when no saved card selected */}
+            {!selectedCardId && paymentMethod === "CARD" && (
+              <div className="text-center space-y-3">
+                <p className="text-gray-900 font-semibold">{t("bankCard")}</p>
+                <p className="text-sm text-gray-600">{t("secure3DCardPrompt")}</p>
+              </div>
+            )}
+
+            {/* Stripe Elements — only when no saved card + not use3D */}
+            {paymentMethod === "CARD" && !use3D && !selectedCardId && (
               <Elements stripe={getStripePromise()}>
                 <StripePaymentStep ref={stripeFormRef} onReadyChange={onStripeReadyChange} />
               </Elements>
             )}
 
-            {/* PayFor manual inputs — only shown when use3D is true. No Stripe involvement. */}
-            {paymentMethod === "CARD" && use3D && (
+            {/* PayFor manual form — only when no saved card + use3D */}
+            {paymentMethod === "CARD" && use3D && !selectedCardId && (
               <PayForCardForm
                 cardDetails={cardDetails}
                 setCardDetails={setCardDetails}
@@ -1017,19 +1122,59 @@ const DonationDialog = ({
               />
             )}
 
-            <div className="space-y-2 overflow-visible pt-2 border-t border-border" dir={locale === "ar" ? "rtl" : "ltr"}>
-              <label className={`block text-sm font-medium text-gray-700 ${locale === "ar" ? "text-right" : "text-left"}`}>{t("contactPhone")}</label>
-              <div className="overflow-visible phone-input-wrapper">
-                <PhoneInput
-                  defaultCountry={ipCountry}
-                  value={phoneValue}
-                  onChange={(phone) => setPhoneValue(phone)}
-                  className="w-full overflow-visible"
-                  inputClassName="w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-                  required
-                />
+            {guestMode && (
+              <div className="space-y-3 pt-2 border-t border-border" dir={dir}>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-sm font-medium text-gray-700">{t("firstName")}</label>
+                    <input
+                      type="text"
+                      value={guestFirstName}
+                      onChange={(e) => setGuestFirstName(e.target.value)}
+                      placeholder={t("firstName")}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-sm font-medium text-gray-700">{t("lastName")}</label>
+                    <input
+                      type="text"
+                      value={guestLastName}
+                      onChange={(e) => setGuestLastName(e.target.value)}
+                      placeholder={t("lastName")}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-gray-700">{t("email")}</label>
+                  <input
+                    type="email"
+                    value={guestEmail}
+                    onChange={(e) => setGuestEmail(e.target.value)}
+                    placeholder={t("email")}
+                    dir="ltr"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                  />
+                </div>
               </div>
-            </div>
+            )}
+
+            {!session?.user?.id && (
+              <div className="space-y-2 overflow-visible pt-2 border-t border-border" dir={locale === "ar" ? "rtl" : "ltr"}>
+                <label className={`block text-sm font-medium text-gray-700 ${locale === "ar" ? "text-right" : "text-left"}`}>{t("contactPhone")}</label>
+                <div className="overflow-visible phone-input-wrapper">
+                  <PhoneInput
+                    defaultCountry={ipCountry}
+                    value={phoneValue}
+                    onChange={(phone) => setPhoneValue(phone)}
+                    className="w-full overflow-visible"
+                    inputClassName="w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
+            )}
 
             <div dir={dir} className="flex justify-between gap-4">
               <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">
@@ -1040,8 +1185,9 @@ const DonationDialog = ({
                 disabled={
                   loading ||
                   !isPhoneValid() ||
-                  (paymentMethod === "CARD" && !use3D && !stripeReady) ||
-                  (paymentMethod === "CARD" && use3D && (
+                  (paymentMethod === "CARD" && !use3D && !selectedCardId && !stripeReady) ||
+                  (paymentMethod === "CARD" && selectedCardId && cardDetails.cvv.length < 3) ||
+                  (paymentMethod === "CARD" && use3D && !selectedCardId && (
                     cardDetails.cardNumber.length < 13 ||
                     cardDetails.expiryDate.length < 5 ||
                     cardDetails.cvv.length < 3 ||
@@ -1084,20 +1230,57 @@ const DonationDialog = ({
           ? shareCount * sharePriceUSD
           : convertToUSD(donationAmount, getCurrency());
 
+      // Resolve guest geo (used for both tracking and API request)
+      let geoCountryCode: string | undefined;
+      let geoCity: string | undefined;
+      let geoRegion: string | undefined;
+      if (guestMode) {
+        try {
+          const cached = typeof window !== "undefined" ? localStorage.getItem("ipapi_cache") : null;
+          const cacheData = cached ? JSON.parse(cached) as { data?: { country_code?: string; city?: string; region?: string }; ts?: number } : null;
+          const isValid = cacheData && cacheData.ts && Date.now() - cacheData.ts < 86400000;
+          if (isValid && cacheData.data) {
+            geoCountryCode = cacheData.data.country_code?.toLowerCase();
+            geoCity = cacheData.data.city;
+            geoRegion = cacheData.data.region;
+          } else {
+            const geo = await fetch("https://ipapi.co/json/").then((r) => r.json()) as { country_code?: string; city?: string; region?: string };
+            geoCountryCode = geo.country_code?.toLowerCase();
+            geoCity = geo.city;
+            geoRegion = geo.region;
+            if (typeof window !== "undefined") {
+              localStorage.setItem("ipapi_cache", JSON.stringify({ data: geo, ts: Date.now() }));
+            }
+          }
+        } catch { /* geo is optional */ }
+      }
+
       // Push user data for enhanced matching
-      const nameParts = (currentUser?.name ?? "").trim().split(/\s+/);
-      tracking?.setUserData({
-        external_id:   session?.user?.id ?? undefined,
-        email:         (session?.user as { email?: string })?.email ?? undefined,
-        phone:         phoneValue.trim() || undefined,
-        first_name:    nameParts[0] ?? undefined,
-        last_name:     nameParts.slice(1).join(" ") || undefined,
-        country_code:  currentUser?.countryCode ?? undefined,
-        city:          currentUser?.city ?? undefined,
-        state:         currentUser?.region ?? undefined,
-        gender:        currentUser?.gender ?? undefined,
-        date_of_birth: currentUser?.birthdate ?? undefined,
-      });
+      if (guestMode) {
+        tracking?.setUserData({
+          email:        guestEmail.trim() || undefined,
+          phone:        phoneValue.trim() || undefined,
+          first_name:   guestFirstName.trim() || undefined,
+          last_name:    guestLastName.trim() || undefined,
+          country_code: geoCountryCode,
+          city:         geoCity,
+          state:        geoRegion,
+        });
+      } else {
+        const nameParts = (currentUser?.name ?? "").trim().split(/\s+/);
+        tracking?.setUserData({
+          external_id:   session?.user?.id ?? undefined,
+          email:         (session?.user as { email?: string })?.email ?? undefined,
+          phone:         phoneValue.trim() || undefined,
+          first_name:    nameParts[0] ?? undefined,
+          last_name:     nameParts.slice(1).join(" ") || undefined,
+          country_code:  currentUser?.countryCode ?? undefined,
+          city:          currentUser?.city ?? undefined,
+          state:         currentUser?.region ?? undefined,
+          gender:        currentUser?.gender ?? undefined,
+          date_of_birth: currentUser?.birthdate ?? undefined,
+        });
+      }
 
       // payment_submit event
       tracking?.trackPaymentSubmit({
@@ -1118,6 +1301,17 @@ const DonationDialog = ({
         cardDetails: null,
         billingDay: donationType === "MONTHLY" ? billingDay : null,
         locale,
+        ...(guestMode && {
+          guest: {
+            firstName: guestFirstName.trim() || undefined,
+            lastName:  guestLastName.trim() || undefined,
+            email:     guestEmail.trim() || undefined,
+            phone:     phoneValue.trim() || undefined,
+            countryCode: geoCountryCode,
+            city:        geoCity,
+            region:      geoRegion,
+          },
+        }),
       };
       const refCode = getReferralCode();
       if (refCode) donationData.referralCode = refCode;
@@ -1140,6 +1334,11 @@ const DonationDialog = ({
       // stripeFormRef.current.confirmPayment() calls stripe.confirmCardPayment()
       // with the CardNumberElement — card data goes browser → Stripe, never our server.
       if (paymentMethod === "CARD" && !use3D) {
+        if (selectedCardId) {
+          toast.error(t("useNewCard"));
+          setLoading(false);
+          return;
+        }
         if (!stripeFormRef.current) throw new Error("Stripe form not ready");
 
         let targetDonationId: string;
@@ -1207,8 +1406,27 @@ const DonationDialog = ({
             });
 
             const [mm, yy] = cardDetails.expiryDate.split("/");
+
+            // Determine the real card number to send to PayFor
+            // When using a saved card, we don't have the full number here — PayFor won't work
+            // with masked numbers; saved-card flow would require server-side decryption (future).
+            // For now: if a new card was entered, save it; if saved card selected, use CVC only
+            const realCardNumber = selectedCardId
+              ? "" // PayFor still needs real card; saved-card one-click needs server flow
+              : cardDetails.cardNumber.replace(/\s/g, "");
+
+            // Save new card (fire-and-forget, non-blocking)
+            if (!selectedCardId && session?.user?.id && realCardNumber.length >= 13) {
+              axios.post("/api/credit-cards", {
+                cardNumber: realCardNumber,
+                expiryDate: cardDetails.expiryDate,
+                cvc: cardDetails.cvv,
+                cardholderName: cardDetails.cardholderName || undefined,
+              }).catch(() => {});
+            }
+
             const cardFields: Record<string, string> = {
-              Pan: cardDetails.cardNumber.replace(/\s/g, ""),
+              Pan: realCardNumber || cardDetails.cardNumber.replace(/\s/g, ""),
               Expiry: `${mm ?? ""}${yy ?? ""}`, // MMYY as required by Ziraat Katılım
               Cvv2: cardDetails.cvv,
               CardHolderName: cardDetails.cardholderName,

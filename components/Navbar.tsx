@@ -24,6 +24,7 @@ import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import { useSession, signOut } from "next-auth/react";
 import CartSheet from "../components/CartSheet";
+import { useCart } from "@/hooks/useCart";
 import CurrencySelector from "./CurrencySelector";
 import LanguageSwitcher from "./LanguageSelector";
 import SignInDialog from "@/components/SignInDialog";
@@ -69,6 +70,8 @@ const Navbar = () => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isCartPaymentDialogOpen, setIsCartPaymentDialogOpen] = useState(false);
   const [signInCallbackUrl, setSignInCallbackUrl] = useState<string | undefined>(undefined);
+  const [cartGuestMode, setCartGuestMode] = useState(false);
+  const { items: zustandItems, removeItem: zustandRemoveItem, clearItems: clearZustandItems } = useCart();
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -111,6 +114,10 @@ const Navbar = () => {
   }, []);
 
   const handleRemoveItem = async (id: string) => {
+    if (!session?.user) {
+      zustandRemoveItem(id);
+      return;
+    }
     try {
       await axios.delete(`/api/cart/${id}`);
       setCartItems((prev) => prev.filter((item) => item.id !== id));
@@ -138,6 +145,10 @@ const Navbar = () => {
 
   const openCart = () => {
     if (session?.user) {
+      setCartGuestMode(false);
+      setIsCartOpen(true);
+    } else if (zustandItems.length > 0) {
+      setCartGuestMode(true);
       setIsCartOpen(true);
     } else {
       setSignInCallbackUrl(
@@ -273,9 +284,9 @@ const Navbar = () => {
               aria-label="Cart"
             >
               <ShoppingCart className="w-5 h-5" />
-              {cartItems.length > 0 && (
+              {(session?.user ? cartItems.length : zustandItems.length) > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 bg-[#FA5D17] text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                  {cartItems.length}
+                  {session?.user ? cartItems.length : zustandItems.length}
                 </span>
               )}
             </button>
@@ -492,7 +503,7 @@ const Navbar = () => {
       <CartSheet
         open={isCartOpen}
         onOpenChange={setIsCartOpen}
-        cartItems={cartItems}
+        cartItems={session?.user ? cartItems : zustandItems}
         handleRemoveItem={handleRemoveItem}
         onOpenDonationDialog={onOpenDonationDialog}
       />
@@ -501,10 +512,12 @@ const Navbar = () => {
       <CartPaymentDialog
         isOpen={isCartPaymentDialogOpen}
         onClose={() => setIsCartPaymentDialogOpen(false)}
-        cartItems={cartItems}
+        cartItems={session?.user ? cartItems : zustandItems}
+        guestMode={cartGuestMode}
         onSuccess={() => {
           setIsCartPaymentDialogOpen(false);
           setCartItems([]);
+          if (cartGuestMode) clearZustandItems();
         }}
       />
 

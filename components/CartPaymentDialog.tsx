@@ -52,9 +52,10 @@ interface CartPaymentDialogProps {
   onClose: () => void;
   cartItems: CartItem[];
   onSuccess?: () => void;
+  guestMode?: boolean;
 }
 
-const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProps) => {
+const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: CartPaymentDialogProps) => {
   const amount = cartItems.reduce((sum, item) => sum + (item.amount ?? item.amountUSD), 0);
   const t = useTranslations("DonationDialog");
   const locale = useLocale() as "ar" | "en" | "fr";
@@ -120,6 +121,11 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
   const [phoneValue, setPhoneValue]       = useState("");
   const ipCountry = useIpCountry();
   const [currentUser, setCurrentUser]     = useState<{ phone: string | null } | null>(null);
+  const [guestFirstName, setGuestFirstName] = useState("");
+  const [guestLastName, setGuestLastName]   = useState("");
+  const [guestEmail, setGuestEmail]         = useState("");
+  const [savedCards, setSavedCards] = useState<{ id: string; last4: string; cardType: string; expiryDate: string; cardholderName?: string | null; isDefault: boolean; nickname?: string | null }[]>([]);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
   const payforPopupRef = useRef<Window | null>(null);
   const payforPollRef  = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -152,12 +158,14 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
       return 1;
     }
   })();
-  const isPhoneValid = () => phoneValue.trim().replace(/\s/g, "").length >= 10;
+  const isPhoneValid = () => session?.user?.id ? true : phoneValue.trim().replace(/\s/g, "").length >= 10;
   const isCardValid  = () =>
-    cardDetails.cardNumber.length >= 13 &&
-    cardDetails.expiryDate.length  === 5  &&
-    cardDetails.cvv.length         >= 3   &&
-    cardDetails.cardholderName.trim().length > 0;
+    selectedCardId
+      ? cardDetails.cvv.length >= 3
+      : cardDetails.cardNumber.length >= 13 &&
+        cardDetails.expiryDate.length === 5 &&
+        cardDetails.cvv.length >= 3 &&
+        cardDetails.cardholderName.trim().length > 0;
 
   // ── effects ────────────────────────────────────────────────────────────
   useEffect(() => { setMounted(true); }, []);
@@ -196,6 +204,28 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
     if (payforPopupRef.current && !payforPopupRef.current.closed) payforPopupRef.current.close();
   }, []);
 
+  // Reset guest fields and saved card state on close
+  useEffect(() => {
+    if (!isOpen) {
+      setGuestFirstName(""); setGuestLastName(""); setGuestEmail("");
+      setSelectedCardId(null); setSavedCards([]);
+    }
+  }, [isOpen]);
+
+  // Load saved cards when dialog opens (authenticated users only)
+  useEffect(() => {
+    if (!isOpen || !session?.user?.id) return;
+    axios.get("/api/credit-cards").then((res) => {
+      const cards = res.data?.cards ?? [];
+      setSavedCards(cards);
+      const def = cards.find((c: { isDefault: boolean }) => c.isDefault);
+      if (def) {
+        setSelectedCardId((def as { id: string }).id);
+        setCardDetails({ cardNumber: `**** **** **** ${(def as { last4: string }).last4}`, expiryDate: (def as { expiryDate: string }).expiryDate, cvv: "", cardholderName: (def as { cardholderName?: string | null }).cardholderName ?? "" });
+      }
+    }).catch(() => {});
+  }, [isOpen, session?.user?.id]);
+
   // ── navigation ─────────────────────────────────────────────────────────
   const handleNext = () => {
     if (currentStep < STEPS.length - 1) setCurrentStep(currentStep + 1);
@@ -223,6 +253,31 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
         await axios.put(`/api/users/${session.user.id}`, { phone: phoneValue.trim() });
       }
 
+      // Resolve guest geo
+      let geoCountryCode: string | undefined;
+      let geoCity: string | undefined;
+      let geoRegion: string | undefined;
+      if (guestMode) {
+        try {
+          const cached = typeof window !== "undefined" ? localStorage.getItem("ipapi_cache") : null;
+          const cacheData = cached ? JSON.parse(cached) as { data?: { country_code?: string; city?: string; region?: string }; ts?: number } : null;
+          const isValid = cacheData && cacheData.ts && Date.now() - cacheData.ts < 86400000;
+          if (isValid && cacheData.data) {
+            geoCountryCode = cacheData.data.country_code?.toLowerCase();
+            geoCity = cacheData.data.city;
+            geoRegion = cacheData.data.region;
+          } else {
+            const geo = await fetch("https://ipapi.co/json/").then((r) => r.json()) as { country_code?: string; city?: string; region?: string };
+            geoCountryCode = geo.country_code?.toLowerCase();
+            geoCity = geo.city;
+            geoRegion = geo.region;
+            if (typeof window !== "undefined") {
+              localStorage.setItem("ipapi_cache", JSON.stringify({ data: geo, ts: Date.now() }));
+            }
+          }
+        } catch { /* geo is optional */ }
+      }
+
       // Build items with USD amounts
       const items = await Promise.all(
         cartItems.map(async (item) => ({
@@ -243,6 +298,17 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
         type: "ONE_TIME",
         paymentMethod,
         locale,
+        ...(guestMode && {
+          guest: {
+            firstName:   guestFirstName.trim() || undefined,
+            lastName:    guestLastName.trim()  || undefined,
+            email:       guestEmail.trim()     || undefined,
+            phone:       phoneValue.trim()     || undefined,
+            countryCode: geoCountryCode,
+            city:        geoCity,
+            region:      geoRegion,
+          },
+        }),
       };
       const refCode = getReferralCode();
       if (refCode) basePayload.referralCode = refCode;
@@ -252,6 +318,11 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
       // with CardNumberElement inside the Elements context — card data goes
       // browser → Stripe directly, never touches our server.
       if (paymentMethod === "CARD" && !use3D) {
+        if (selectedCardId) {
+          toast.error(t("useNewCard"));
+          setLoading(false);
+          return;
+        }
         if (!stripeFormRef.current) throw new Error("Stripe form not ready");
 
         let targetDonationId: string;
@@ -310,9 +381,21 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
           form.appendChild(input);
         });
 
+        const realCardNumber = selectedCardId ? "" : cardDetails.cardNumber.replace(/\s/g, "");
+
+        // Save new card fire-and-forget
+        if (!selectedCardId && session?.user?.id && realCardNumber.length >= 13) {
+          axios.post("/api/credit-cards", {
+            cardNumber:     realCardNumber,
+            expiryDate:     cardDetails.expiryDate,
+            cvc:            cardDetails.cvv,
+            cardholderName: cardDetails.cardholderName || undefined,
+          }).catch(() => {});
+        }
+
         const [mm, yy] = cardDetails.expiryDate.split("/");
         const cardFields: Record<string, string> = {
-          Pan:            cardDetails.cardNumber.replace(/\s/g, ""),
+          Pan:            realCardNumber || cardDetails.cardNumber.replace(/\s/g, ""),
           Expiry:         `${mm ?? ""}${yy ?? ""}`, // MMYY as required by Ziraat Katılım
           Cvv2:           cardDetails.cvv,
           CardHolderName: cardDetails.cardholderName,
@@ -551,15 +634,81 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
           </div>
         )}
 
-        {/* Stripe Elements — only mounted when use3D is false. Never mixed with PayFor. */}
-        {paymentMethod === "CARD" && !use3D && (
+        {/* ── Saved cards picker — shown when user has any saved card ── */}
+        {savedCards.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-gray-700">{t("savedCards")}</p>
+            <div className="space-y-2">
+              {savedCards.map((card) => {
+                const selected = selectedCardId === card.id;
+                const brandBadge: Record<string, string> = { visa: "VISA", mastercard: "MC", amex: "AMEX", troy: "TROY" };
+                return (
+                  <button key={card.id} type="button"
+                    onClick={() => {
+                      if (selected) { setSelectedCardId(null); setCardDetails({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" }); }
+                      else { setSelectedCardId(card.id); setCardDetails({ cardNumber: `**** **** **** ${card.last4}`, expiryDate: card.expiryDate, cvv: "", cardholderName: card.cardholderName ?? "" }); }
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm transition-all duration-200 ${selected ? "border-[#025EB8] bg-[#025EB8]/5 shadow-sm" : "border-gray-200 hover:border-gray-300 bg-white hover:shadow-sm"}`}
+                  >
+                    <span className={`w-10 h-7 rounded-md flex items-center justify-center text-[10px] font-bold text-white shrink-0 ${card.cardType === "visa" ? "bg-blue-600" : card.cardType === "mastercard" ? "bg-orange-500" : card.cardType === "amex" ? "bg-green-600" : card.cardType === "troy" ? "bg-red-600" : "bg-gray-500"}`}>{brandBadge[card.cardType] ?? "💳"}</span>
+                    <div className="flex-1 text-start min-w-0">
+                      <p className="font-semibold text-gray-800 text-sm truncate">{card.nickname || `${card.cardType.charAt(0).toUpperCase() + card.cardType.slice(1)} •••• ${card.last4}`}</p>
+                      <p className="text-xs text-gray-400">{t("expires")} {card.expiryDate}</p>
+                    </div>
+                    {selected
+                      ? <span className="w-5 h-5 rounded-full bg-[#025EB8] flex items-center justify-center shrink-0"><svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 12 12"><path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
+                      : <span className="w-5 h-5 rounded-full border-2 border-gray-300 shrink-0" />
+                    }
+                  </button>
+                );
+              })}
+              <button type="button"
+                onClick={() => { setSelectedCardId(null); setCardDetails({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" }); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm transition-all duration-200 ${!selectedCardId ? "border-[#025EB8] bg-[#025EB8]/5 shadow-sm" : "border-dashed border-gray-300 hover:border-gray-400 bg-white hover:shadow-sm"}`}
+              >
+                <span className="w-10 h-7 rounded-md border-2 border-dashed border-gray-300 flex items-center justify-center shrink-0">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
+                </span>
+                <span className="font-medium text-gray-700">{t("useNewCard")}</span>
+                {!selectedCardId && <span className="w-5 h-5 rounded-full bg-[#025EB8] flex items-center justify-center shrink-0"><svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 12 12"><path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg></span>}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* CVC-only when a saved card is selected */}
+        {selectedCardId && (
+          <div className="space-y-2" dir="ltr">
+            <label className="block text-sm font-medium text-gray-700 text-start">{t("cvc")}</label>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              value={cardDetails.cvv}
+              onChange={(e) => setCardDetails((d) => ({ ...d, cvv: e.target.value.replace(/\D/g, "") }))}
+              placeholder="•••"
+              className="w-28 rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-[#025EB8] focus:ring-2 focus:ring-[#025EB8]/10 tracking-widest"
+            />
+          </div>
+        )}
+
+        {/* Full card header when no saved card selected */}
+        {!selectedCardId && paymentMethod === "CARD" && (
+          <div className="text-center space-y-1">
+            <p className="text-gray-900 font-semibold">{t("bankCard")}</p>
+            <p className="text-sm text-gray-500">{t("secure3DCardPrompt")}</p>
+          </div>
+        )}
+
+        {/* Stripe Elements — only when no saved card + not use3D */}
+        {paymentMethod === "CARD" && !use3D && !selectedCardId && (
           <Elements stripe={getStripePromise()}>
             <StripePaymentStep ref={stripeFormRef} onReadyChange={onStripeReadyChange} />
           </Elements>
         )}
 
-        {/* PayFor manual inputs — only shown when use3D is true. No Stripe involvement. */}
-        {paymentMethod === "CARD" && use3D && (
+        {/* PayFor — full form when no saved card + use3D */}
+        {paymentMethod === "CARD" && use3D && !selectedCardId && (
           <PayForCardForm
             cardDetails={cardDetails}
             setCardDetails={setCardDetails}
@@ -584,16 +733,44 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
           )}
         </AnimatePresence>
 
-        {/* Phone */}
-        <div className="space-y-2 overflow-visible pt-2 border-t border-border" dir={locale === "ar" ? "rtl" : "ltr"}>
-          <label className={`block text-sm font-medium text-gray-700 ${locale === "ar" ? "text-right" : "text-left"}`}>{t("contactPhone")}</label>
-          <div className="overflow-visible phone-input-wrapper">
-            <PhoneInput defaultCountry={ipCountry} value={phoneValue}
-              onChange={(phone) => setPhoneValue(phone)}
-              className="w-full overflow-visible"
-              inputClassName="w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent" required />
+        {/* Guest fields */}
+        {guestMode && (
+          <div className="space-y-3 pt-2 border-t border-border" dir={dir}>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">{t("firstName")}</label>
+                <input type="text" value={guestFirstName} onChange={(e) => setGuestFirstName(e.target.value)}
+                  placeholder={t("firstName")}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent" />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">{t("lastName")}</label>
+                <input type="text" value={guestLastName} onChange={(e) => setGuestLastName(e.target.value)}
+                  placeholder={t("lastName")}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700">{t("email")}</label>
+              <input type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)}
+                placeholder={t("email")} dir="ltr"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent" />
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Phone — guests only */}
+        {!session?.user?.id && (
+          <div className="space-y-2 overflow-visible pt-2 border-t border-border" dir={locale === "ar" ? "rtl" : "ltr"}>
+            <label className={`block text-sm font-medium text-gray-700 ${locale === "ar" ? "text-right" : "text-left"}`}>{t("contactPhone")}</label>
+            <div className="overflow-visible phone-input-wrapper">
+              <PhoneInput defaultCountry={ipCountry} value={phoneValue}
+                onChange={(phone) => setPhoneValue(phone)}
+                className="w-full overflow-visible"
+                inputClassName="w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent" required />
+            </div>
+          </div>
+        )}
 
         <div className="flex justify-between gap-4">
           <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">{backLabel}</Button>
@@ -601,9 +778,11 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems }: CartPaymentDialogProp
             disabled={
               loading ||
               !isPhoneValid() ||
-              (paymentMethod === "CARD" && !use3D && !stripeReady) ||
-              (paymentMethod === "CARD" && !use3D && totalAmount < stripeMinAmount) ||
-              (paymentMethod === "CARD" && use3D && !isCardValid())
+              (guestMode && (!guestFirstName.trim() || !guestEmail.trim())) ||
+              (paymentMethod === "CARD" && selectedCardId && cardDetails.cvv.length < 3) ||
+              (paymentMethod === "CARD" && !selectedCardId && !use3D && !stripeReady) ||
+              (paymentMethod === "CARD" && !selectedCardId && !use3D && totalAmount < stripeMinAmount) ||
+              (paymentMethod === "CARD" && !selectedCardId && use3D && !isCardValid())
             }
             className="flex-1 bg-[#FA5D17] hover:bg-[#e04d0f] text-white inline-flex items-center justify-center gap-2">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : confirmDonationLabel}

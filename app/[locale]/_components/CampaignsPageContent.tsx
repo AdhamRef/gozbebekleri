@@ -8,7 +8,6 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import CampaignCard from "@/app/[locale]/_components/CampaignCard";
 import { useDebounce } from "use-debounce";
 import { useSession } from "next-auth/react";
-import SignInDialog from "@/components/SignInDialog";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import CategoryIcon from "@/components/CategoryIcon";
@@ -47,7 +46,6 @@ const HERO_IMAGE = "https://i.ibb.co/Xm58ssT/481207566-944951421141366-115843478
 const CampaignsPage = () => {
   const t = useTranslations("CampaignsPage");
   const { data: session } = useSession();
-  const [isSignInOpen, setIsSignInOpen] = useState(false);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,11 +99,10 @@ const CampaignsPage = () => {
       setLoading(false);
     }
   };
-
+``
   useEffect(() => {
     setCursor(null);
     setHasMore(true);
-    if (!session) setIsSignInOpen(true);
     setCampaigns([]);
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -159,8 +156,6 @@ const CampaignsPage = () => {
 
   return (
     <main className="min-h-screen bg-gray-50" dir={isRTL ? "rtl" : "ltr"}>
-      <SignInDialog isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} />
-
       {/* ── Hero Header ── */}
       <section className="relative">
         {/* Background layers — clipped independently so the search bar can overflow the section */}

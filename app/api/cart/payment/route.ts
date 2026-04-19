@@ -6,7 +6,6 @@ import { resolveReferralId } from "@/lib/referral-server";
 import { userHasDashboardPermission } from "@/lib/dashboard/permissions";
 import { writeAuditLog, auditStreamForRole } from "@/lib/audit-log";
 
-// GET /api/donations - Get all donations (admin) or user's donations
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -83,13 +82,9 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/donations - Create a new donation
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     const body = await request.json();
     const {
@@ -103,6 +98,7 @@ export async function POST(request: NextRequest) {
       cardDetails = null,
       referralCode,
       locale: donationLocale,
+      guest,
     } = body;
 
     // Validate required fields
@@ -111,6 +107,55 @@ export async function POST(request: NextRequest) {
         { error: "Items, currency, and payment method are required" },
         { status: 400 }
       );
+    }
+
+    // Resolve donor
+    let donorId: string;
+    let donorName: string | null = null;
+
+    if (session?.user?.id) {
+      donorId = session.user.id;
+      donorName = session.user.name ?? null;
+    } else if (guest) {
+      const email = guest.email?.trim() || null;
+      if (email) {
+        const existing = await prisma.user.findFirst({ where: { email } });
+        if (existing) {
+          donorId = existing.id;
+          donorName = existing.name;
+        } else {
+          const name = [guest.firstName, guest.lastName].filter(Boolean).join(" ") || null;
+          const newUser = await prisma.user.create({
+            data: {
+              email,
+              name,
+              role: "DONOR",
+              phone: guest.phone || undefined,
+              countryCode: guest.countryCode || undefined,
+              city: guest.city || undefined,
+              region: guest.region || undefined,
+            },
+          });
+          donorId = newUser.id;
+          donorName = newUser.name;
+        }
+      } else {
+        const name = [guest.firstName, guest.lastName].filter(Boolean).join(" ") || null;
+        const newUser = await prisma.user.create({
+          data: {
+            name,
+            role: "DONOR",
+            phone: guest.phone || undefined,
+            countryCode: guest.countryCode || undefined,
+            city: guest.city || undefined,
+            region: guest.region || undefined,
+          },
+        });
+        donorId = newUser.id;
+        donorName = newUser.name;
+      }
+    } else {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Card payments are handled via PayFor 3D Secure redirect flow (we do not store PAN/CVV).
@@ -168,7 +213,7 @@ export async function POST(request: NextRequest) {
             coverFees,
             paymentMethod,
             cardDetails: paymentMethod === "CARD" ? cardDetails : null,
-            donorId: session.user.id,
+            donorId: donorId,
             referralId: referralId ?? undefined,
             nextBillingDate: nextBilling,
             lastBillingDate: new Date(),
@@ -203,7 +248,7 @@ export async function POST(request: NextRequest) {
             totalAmount: finalTotalAmount,
             status: "PAID",
             locale: validLocale ?? undefined,
-            donorId: session.user.id,
+            donorId: donorId,
             referralId: referralId ?? undefined,
             subscriptionId: sub.id,
             paymentMethod,
@@ -234,12 +279,12 @@ export async function POST(request: NextRequest) {
 
         if (validLocale) {
           const donor = await tx.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: donorId },
             select: { preferredLang: true },
           });
           if (donor && donor.preferredLang == null) {
             await tx.user.update({
-              where: { id: session.user.id },
+              where: { id: donorId },
               data: { preferredLang: validLocale },
             });
           }
@@ -249,13 +294,13 @@ export async function POST(request: NextRequest) {
       }, { timeout: 15000 });
 
       const d = result.donation;
-      const actorRole = session.user.role ?? "DONOR";
+      const actorRole = session?.user?.role ?? "DONOR";
       await writeAuditLog({
-        actorId: session.user.id,
-        actorName: session.user.name,
+        actorId: donorId,
+        actorName: donorName,
         actorRole,
         action: "DONATION_MONTHLY_CHECKOUT_START",
-        messageAr: `${session.user.name ?? "متبرع"} بدأ عملية دفع اشتراكًا شهريًا عبر السلة (≈ ${totalAmountUSD.toFixed(0)} USD لكل دورة)`,
+        messageAr: `${donorName ?? "متبرع"} بدأ عملية دفع اشتراكًا شهريًا عبر السلة (≈ ${totalAmountUSD.toFixed(0)} USD لكل دورة)`,
         entityType: "Donation",
         entityId: d.id,
         metadata: { amountUSD: totalAmountUSD, via: "cart_payment", status: "PENDING", provider: "PAYFOR" },
@@ -281,7 +326,7 @@ export async function POST(request: NextRequest) {
           totalAmount: finalTotalAmount,
           status: "PAID",
           locale: validLocale ?? undefined,
-          donorId: session.user.id,
+          donorId: donorId,
           referralId: referralId ?? undefined,
           paymentMethod,
           cardDetails: null,
@@ -311,12 +356,12 @@ export async function POST(request: NextRequest) {
 
       if (validLocale) {
         const donor = await tx.user.findUnique({
-          where: { id: session.user.id },
+          where: { id: donorId },
           select: { preferredLang: true },
         });
         if (donor && donor.preferredLang == null) {
           await tx.user.update({
-            where: { id: session.user.id },
+            where: { id: donorId },
             data: { preferredLang: validLocale },
           });
         }
@@ -325,13 +370,13 @@ export async function POST(request: NextRequest) {
       return d;
     }, { timeout: 15000 });
 
-    const actorRole = session.user.role ?? "DONOR";
+    const actorRole = session?.user?.role ?? "DONOR";
     await writeAuditLog({
-      actorId: session.user.id,
-      actorName: session.user.name,
+      actorId: donorId,
+      actorName: donorName,
       actorRole,
       action: "DONATION_ONE_TIME_CHECKOUT_START",
-      messageAr: `${session.user.name ?? "متبرع"} بدأ عملية دفع تبرعًا لمرة واحدة عبر السلة (≈ ${totalAmountUSD.toFixed(0)} USD)`,
+      messageAr: `${donorName ?? "متبرع"} بدأ عملية دفع تبرعًا لمرة واحدة عبر السلة (≈ ${totalAmountUSD.toFixed(0)} USD)`,
       entityType: "Donation",
       entityId: donation.id,
       metadata: { amountUSD: totalAmountUSD, via: "cart_payment", status: "PENDING", provider: "PAYFOR" },

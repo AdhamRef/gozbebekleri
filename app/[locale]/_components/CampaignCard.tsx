@@ -75,6 +75,7 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
   const [donationOpen, setDonationOpen] = useState(false);
   const [donationContext, setDonationContext] = useState<DonationDialogCampaignContext | null>(null);
   const [signInOpen, setSignInOpen] = useState(false);
+  const [isGuestDonation, setIsGuestDonation] = useState(false);
 
   const snapshotDonationContext = (): DonationDialogCampaignContext => ({
     goalType: campaign.goalType,
@@ -110,11 +111,14 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
       setDonationContext(snapshotDonationContext());
       setDonationOpen(true);
     } else {
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem(RESUME_KEY, JSON.stringify({ campaignId: campaign.id }));
-      }
       setSignInOpen(true);
     }
+  };
+
+  const handleGuestDonate = () => {
+    setDonationContext(snapshotDonationContext());
+    setIsGuestDonation(true);
+    setDonationOpen(true);
   };
 
   const rawImgSrc = campaign.images[0] || FALLBACK_IMG;
@@ -255,7 +259,9 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
         onClose={() => {
           setDonationOpen(false);
           setDonationContext(null);
+          setIsGuestDonation(false);
         }}
+        guestMode={isGuestDonation}
         campaignId={campaign.id}
         campaignTitle={campaign.title}
         campaignImage={rawImgSrc}
@@ -271,6 +277,7 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
       <SignInDialog
         isOpen={signInOpen}
         onClose={() => setSignInOpen(false)}
+        onSkip={handleGuestDonate}
         callbackUrl={
           typeof window !== "undefined"
             ? appendCurrencyQuery(

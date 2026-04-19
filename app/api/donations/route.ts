@@ -101,9 +101,6 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     const body = await request.json();
     const {
@@ -119,6 +116,7 @@ export async function POST(request: NextRequest) {
       referralCode,
       referralId: bodyReferralId,
       locale: donationLocale,
+      guest,
     } = body;
 
     const hasCampaignItems = items?.length > 0;
@@ -130,6 +128,55 @@ export async function POST(request: NextRequest) {
         { error: "Items or categoryItems, currency, and payment method are required" },
         { status: 400 }
       );
+    }
+
+    // Resolve donorId — authenticated user or guest upsert
+    let donorId: string;
+    let donorName: string | null = null;
+    if (session?.user?.id) {
+      donorId = session.user.id;
+      donorName = session.user.name ?? null;
+    } else if (guest) {
+      const guestEmail: string | undefined = guest.email?.trim() || undefined;
+      const guestName = [guest.firstName, guest.lastName].filter(Boolean).join(" ") || "Guest";
+      if (guestEmail) {
+        // Upsert: if real account exists keep it, otherwise create guest record
+        const existing = await prisma.user.findUnique({ where: { email: guestEmail }, select: { id: true, name: true } });
+        if (existing) {
+          donorId = existing.id;
+          donorName = existing.name;
+        } else {
+          const created = await prisma.user.create({
+            data: {
+              email: guestEmail,
+              name: guestName,
+              phone: guest.phone?.trim() || undefined,
+              countryCode: guest.countryCode || undefined,
+              city: guest.city || undefined,
+              region: guest.region || undefined,
+            },
+            select: { id: true },
+          });
+          donorId = created.id;
+          donorName = guestName;
+        }
+      } else {
+        // No email — fully anonymous guest
+        const anon = await prisma.user.create({
+          data: {
+            name: guestName || "Guest",
+            phone: guest.phone?.trim() || undefined,
+            countryCode: guest.countryCode || undefined,
+            city: guest.city || undefined,
+            region: guest.region || undefined,
+          },
+          select: { id: true },
+        });
+        donorId = anon.id;
+        donorName = guestName || "Guest";
+      }
+    } else {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Card payments are handled via PayFor 3D Secure redirect flow (we do not store PAN/CVV).
@@ -222,7 +269,7 @@ export async function POST(request: NextRequest) {
             coverFees,
             paymentMethod,
             cardDetails: paymentMethod === "CARD" ? cardDetails : null,
-            donorId: session.user.id,
+            donorId,
             referralId: referralId ?? undefined,
             nextBillingDate: nextBilling,
             lastBillingDate: new Date(),
@@ -269,7 +316,7 @@ export async function POST(request: NextRequest) {
             totalAmount: finalTotalAmount,
             status: "PAID",
             locale: validLocale ?? undefined,
-            donorId: session.user.id,
+            donorId,
             referralId: referralId ?? undefined,
             subscriptionId: sub.id,
             paymentMethod,
@@ -312,12 +359,12 @@ export async function POST(request: NextRequest) {
 
         if (validLocale) {
           const donor = await tx.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: donorId },
             select: { preferredLang: true },
           });
           if (donor && donor.preferredLang == null) {
             await tx.user.update({
-              where: { id: session.user.id },
+              where: { id: donorId },
               data: { preferredLang: validLocale },
             });
           }
@@ -327,13 +374,13 @@ export async function POST(request: NextRequest) {
       }, { timeout: 15000 });
 
       const d = subscription.donation;
-      const actorRole = session.user.role ?? "DONOR";
+      const actorRole = session?.user?.role ?? "DONOR";
       await writeAuditLog({
-        actorId: session.user.id,
-        actorName: session.user.name,
+        actorId: donorId,
+        actorName: donorName,
         actorRole,
         action: "DONATION_MONTHLY_CHECKOUT_START",
-        messageAr: `${session.user.name ?? "متبرع"} بدأ عملية دفع اشتراك شهري (≈ ${totalAmountUSD.toFixed(0)} USD لكل دورة)`,
+        messageAr: `${donorName ?? "متبرع"} بدأ عملية دفع اشتراك شهري (≈ ${totalAmountUSD.toFixed(0)} USD لكل دورة)`,
         entityType: "Donation",
         entityId: d.id,
         metadata: { amountUSD: totalAmountUSD, status: "PENDING", provider: "PAYFOR" },
@@ -360,7 +407,7 @@ export async function POST(request: NextRequest) {
           totalAmount: finalTotalAmount,
           status: "PAID",
           locale: validLocale ?? undefined,
-          donorId: session.user.id,
+          donorId,
           referralId: referralId ?? undefined,
           paymentMethod,
           cardDetails: null,
@@ -402,12 +449,12 @@ export async function POST(request: NextRequest) {
 
       if (validLocale) {
         const donor = await tx.user.findUnique({
-          where: { id: session.user.id },
+          where: { id: donorId },
           select: { preferredLang: true },
         });
         if (donor && donor.preferredLang == null) {
           await tx.user.update({
-            where: { id: session.user.id },
+            where: { id: donorId },
             data: { preferredLang: validLocale },
           });
         }
@@ -416,13 +463,13 @@ export async function POST(request: NextRequest) {
       return d;
     }, { timeout: 15000 });
 
-    const actorRole = session.user.role ?? "DONOR";
+    const actorRole = session?.user?.role ?? "DONOR";
     await writeAuditLog({
-      actorId: session.user.id,
-      actorName: session.user.name,
+      actorId: donorId,
+      actorName: donorName,
       actorRole,
       action: "DONATION_ONE_TIME_CHECKOUT_START",
-      messageAr: `${session.user.name ?? "متبرع"} بدأ عملية دفع تبرع لمرة واحدة (≈ ${totalAmountUSD.toFixed(0)} USD)`,
+      messageAr: `${donorName ?? "متبرع"} بدأ عملية دفع تبرع لمرة واحدة (≈ ${totalAmountUSD.toFixed(0)} USD)`,
       entityType: "Donation",
       entityId: donation.id,
       metadata: { amountUSD: totalAmountUSD, status: "PENDING", provider: "PAYFOR" },

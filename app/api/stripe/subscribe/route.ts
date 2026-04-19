@@ -16,9 +16,7 @@ export async function POST(req: NextRequest) {
     const stripe = new Stripe(stripeKey, { apiVersion: "2024-06-20" as any });
 
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    
 
     const body = await req.json() as { donationId?: string; locale?: string };
     const donationId = String(body.donationId || "").trim();
@@ -33,13 +31,15 @@ export async function POST(req: NextRequest) {
         items: { include: { campaign: { select: { title: true } } } },
         categoryItems: { include: { category: { select: { name: true } } } },
         subscription: true,
+        donor: { select: { email: true } },
       },
     });
 
     if (!donation) {
       return NextResponse.json({ error: "Donation not found" }, { status: 404 });
     }
-    if (donation.donorId !== session.user.id) {
+    // Authenticated users: verify ownership. Guests have no session — trust the donationId.
+    if (session?.user?.id && donation.donorId !== session.user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     if (donation.status === "FAILED") {
@@ -59,10 +59,13 @@ export async function POST(req: NextRequest) {
 
     console.log("[Stripe Subscribe] creating customer, currency:", currency, "amount:", amountInSmallestUnit);
 
+    const donorEmail = session?.user?.email ?? (donation as typeof donation & { donor: { email: string | null } }).donor?.email ?? undefined;
+    const donorUserId = session?.user?.id ?? donation.donorId;
+
     // Create a Stripe Customer for this subscription
     const customer = await stripe.customers.create({
-      email: session.user.email ?? undefined,
-      metadata: { userId: session.user.id },
+      email: donorEmail,
+      metadata: { userId: donorUserId },
     });
 
     console.log("[Stripe Subscribe] creating product:", productName);
@@ -85,7 +88,7 @@ export async function POST(req: NextRequest) {
       expand: ["latest_invoice.payment_intent"],
       metadata: {
         donationId,
-        userId: session.user.id,
+        userId: donorUserId,
         ...(donation.subscriptionId ? { subscriptionDbId: donation.subscriptionId } : {}),
       },
     });

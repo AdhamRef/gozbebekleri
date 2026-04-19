@@ -32,6 +32,7 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isDonationOpen, setIsDonationOpen] = useState(false);
   const [isSignInOpen, setIsSignInOpen] = useState(false);
+  const [isGuestDonation, setIsGuestDonation] = useState(false);
 
   // After sign-in redirect: open donation dialog once and clean URL (only one instance handles it)
   useEffect(() => {
@@ -91,10 +92,16 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
 
   const handleDonate = () => {
     if (session) {
+      setIsGuestDonation(false);
       setIsDonationOpen(true);
     } else {
       setIsSignInOpen(true);
     }
+  };
+
+  const handleGuestDonate = () => {
+    setIsGuestDonation(true);
+    setIsDonationOpen(true);
   };
   
   const handleShare = () => {
@@ -119,7 +126,7 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
 
         <DonationDialog
           isOpen={isDonationOpen}
-          onClose={() => setIsDonationOpen(false)}
+          onClose={() => { setIsDonationOpen(false); setIsGuestDonation(false); }}
           campaignTitle={getLocalizedProperty(campaign, "title")}
           campaignImage={campaign.images[0]}
           targetAmount={campaign.targetAmount}
@@ -130,11 +137,13 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
           fundraisingMode={campaign.fundraisingMode}
           sharePriceUSD={campaign.sharePriceUSD}
           suggestedShareCounts={campaign.suggestedShareCounts}
+          guestMode={isGuestDonation}
         />
 
         <SignInDialog
           isOpen={isSignInOpen}
           onClose={() => setIsSignInOpen(false)}
+          onSkip={handleGuestDonate}
           callbackUrl={donationCallbackUrl}
         />
 
@@ -232,7 +241,7 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
 
       <DonationDialog
         isOpen={isDonationOpen}
-        onClose={() => setIsDonationOpen(false)}
+        onClose={() => { setIsDonationOpen(false); setIsGuestDonation(false); }}
         campaignTitle={getLocalizedProperty(campaign, "title")}
         campaignImage={campaign.images[0]}
         targetAmount={campaign.targetAmount}
@@ -243,11 +252,13 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
         fundraisingMode={campaign.fundraisingMode}
         sharePriceUSD={campaign.sharePriceUSD}
         suggestedShareCounts={campaign.suggestedShareCounts}
+        guestMode={isGuestDonation}
       />
 
       <SignInDialog
         isOpen={isSignInOpen}
         onClose={() => setIsSignInOpen(false)}
+        onSkip={handleGuestDonate}
         callbackUrl={donationCallbackUrl}
       />
 

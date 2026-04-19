@@ -79,6 +79,7 @@ interface SignInDialogProps {
   isOpen: boolean;
   onClose: () => void;
   callbackUrl?: string;
+  onSkip?: () => void;
 }
 
 type Screen = "options" | "auth" | "otp";
@@ -94,7 +95,7 @@ interface FormState {
   password: string;
 }
 
-export default function SignInDialog({ isOpen, onClose, callbackUrl }: SignInDialogProps) {
+export default function SignInDialog({ isOpen, onClose, callbackUrl, onSkip }: SignInDialogProps) {
   const t = useTranslations("SignInDialog");
   const pathname = usePathname();
   const locale = useLocale();
@@ -354,6 +355,17 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl }: SignInDia
                 {" "}{t("and")}{" "}
                 <Link href="/privacy" className="text-[#025EB8] hover:underline font-medium">{t("privacyPolicy")}</Link>
               </p>
+
+              {/* Skip — only shown in donation flow */}
+              {onSkip && (
+                <button
+                  type="button"
+                  onClick={() => { onClose(); onSkip(); }}
+                  className="w-full text-center text-[12px] text-gray-400 hover:text-gray-600 transition-colors py-1"
+                >
+                  {t("skipAndDonate")}
+                </button>
+              )}
             </>
           )}
 
