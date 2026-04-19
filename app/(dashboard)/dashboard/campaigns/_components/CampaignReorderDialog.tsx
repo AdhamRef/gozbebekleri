@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { toast } from 'react-hot-toast';
-import { ArrowUpDown, Crown, GripVertical, Loader2 } from 'lucide-react';
+import { Check, ChevronsUpDown, Crown, GripVertical, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,19 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import axios from 'axios';
 
 interface Campaign {
@@ -62,6 +74,7 @@ const DraggableCampaign = ({ campaign, index, moveCampaign }: DraggableCampaignP
 
 export const CampaignReorderDialog = ({ onReorder }: { onReorder: () => void }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [comboOpen, setComboOpen] = useState(false);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedCampaigns, setSelectedCampaigns] = useState<Campaign[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -88,8 +101,8 @@ export const CampaignReorderDialog = ({ onReorder }: { onReorder: () => void }) 
     const campaign = campaigns.find(c => c.id === campaignId);
     if (!campaign) return;
 
-    if (selectedCampaigns.length >= 5) {
-      toast.error('يمكنك اختيار 5 حملات كحد أقصى');
+    if (selectedCampaigns.length >= 12) {
+      toast.error('يمكنك اختيار 12 حملة كحد أقصى');
       return;
     }
 
@@ -150,27 +163,51 @@ export const CampaignReorderDialog = ({ onReorder }: { onReorder: () => void }) 
         </DialogHeader>
         <div className="py-4">
           <p className="text-sm text-gray-500 mb-4">
-            اختر الحملات التي تريد عرضها في القائمة المميزة. يفضل اختيار 5 حملات كحد أقصى.
+            اختر الحملات التي تريد عرضها بالترتيب. الحملة الأولى ستظهر كحملة مميزة بحجم أكبر. الحد الأقصى 12 حملة.
             <br />
             <span className="text-xs mt-1 block">
-              ({selectedCampaigns.length}/5 حملات مختارة)
+              ({selectedCampaigns.length}/12 حملات مختارة)
             </span>
           </p>
           
-          <Select onValueChange={handleSelectCampaign}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="اختر حملة لإضافتها" />
-            </SelectTrigger>
-            <SelectContent>
-              {campaigns
-                .filter(campaign => !selectedCampaigns.some(sc => sc.id === campaign.id))
-                .map((campaign) => (
-                  <SelectItem key={campaign.id} value={campaign.id}>
-                    {campaign.title}
-                  </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={comboOpen} onOpenChange={setComboOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={comboOpen}
+                className="w-full justify-between font-normal text-muted-foreground"
+              >
+                اختر حملة لإضافتها
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0" align="start" style={{ width: "var(--radix-popover-trigger-width)" }}>
+              <Command>
+                <CommandInput placeholder="ابحث عن حملة..." />
+                <CommandList>
+                  <CommandEmpty>لا توجد نتائج</CommandEmpty>
+                  <CommandGroup>
+                    {campaigns
+                      .filter(c => !selectedCampaigns.some(sc => sc.id === c.id))
+                      .map((campaign) => (
+                        <CommandItem
+                          key={campaign.id}
+                          value={campaign.title}
+                          onSelect={() => {
+                            handleSelectCampaign(campaign.id);
+                            setComboOpen(false);
+                          }}
+                        >
+                          <Check className="mr-2 h-4 w-4 opacity-0" />
+                          {campaign.title}
+                        </CommandItem>
+                      ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
 
           <DndProvider backend={HTML5Backend}>
             <div className="mt-4 space-y-2">

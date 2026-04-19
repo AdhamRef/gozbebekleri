@@ -304,7 +304,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
               {/* ── Image block ── */}
               <div className="sm:rounded-2xl overflow-hidden sm:border-gray-100">
                 {/* Main image — full-width, no letterbox */}
-                <div className="relative w-full aspect-[16/9] sm:aspect-[16/8] overflow-hidden">
+                <div className="relative w-full aspect-[4/3] overflow-hidden">
                   {/* Blurred background fill for portrait images */}
                   <Image
                     src={currentImg}

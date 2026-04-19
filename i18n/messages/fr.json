@@ -28,7 +28,22 @@
     "activities": "Activités",
     "searchPlaceholder": "Rechercher...",
     "donate": "FAIRE UN DON",
-    "signIn": "Connexion"
+    "signIn": "Connexion",
+    "bankAccounts": "Nos Comptes Bancaires"
+  },
+  "BankTransfer": {
+    "badge": "Don par Virement Bancaire",
+    "title": "Nos Comptes Bancaires",
+    "subtitle": "Vous pouvez envoyer votre don par virement bancaire à l'un des comptes ci-dessous.",
+    "notice": "Veuillez inclure votre nom complet dans la description du virement.",
+    "branch": "Agence :",
+    "accountHolder": "Titulaire du Compte",
+    "accountNo": "N° de Compte :",
+    "extNo": "N° d'Extension :",
+    "copyIban": "Copier l'IBAN",
+    "copy": "Copier",
+    "copied": "Copié !",
+    "footer": "Pour toute question, contactez-nous à"
   },
   "HomePage": {
     "donationCategories": "Catégories de don",

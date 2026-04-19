@@ -25,7 +25,22 @@
     "activities": "Actividades",
     "searchPlaceholder": "Buscar...",
     "donate": "DONAR AHORA",
-    "signIn": "Iniciar sesión"
+    "signIn": "Iniciar sesión",
+    "bankAccounts": "Nuestras Cuentas Bancarias"
+  },
+  "BankTransfer": {
+    "badge": "Donación por Transferencia Bancaria",
+    "title": "Nuestras Cuentas Bancarias",
+    "subtitle": "Puede enviar su donación por transferencia bancaria a cualquiera de las cuentas a continuación.",
+    "notice": "Por favor, incluya su nombre completo en la descripción de la transferencia.",
+    "branch": "Sucursal:",
+    "accountHolder": "Titular de la Cuenta",
+    "accountNo": "Nº de Cuenta:",
+    "extNo": "Nº de Extensión:",
+    "copyIban": "Copiar IBAN",
+    "copy": "Copiar",
+    "copied": "¡Copiado!",
+    "footer": "Para consultas, contáctenos en"
   },
   "BlogCard": {
     "readMore": "Leer más"

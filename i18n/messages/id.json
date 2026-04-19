@@ -25,7 +25,22 @@
     "activities": "Kegiatan",
     "searchPlaceholder": "Cari...",
     "donate": "DONASI SEKARANG",
-    "signIn": "Masuk"
+    "signIn": "Masuk",
+    "bankAccounts": "Rekening Bank Kami"
+  },
+  "BankTransfer": {
+    "badge": "Donasi via Transfer Bank",
+    "title": "Rekening Bank Kami",
+    "subtitle": "Anda dapat mengirim donasi melalui transfer bank ke salah satu rekening di bawah ini.",
+    "notice": "Harap cantumkan nama lengkap Anda di keterangan transfer.",
+    "branch": "Cabang:",
+    "accountHolder": "Pemilik Rekening",
+    "accountNo": "No. Rekening:",
+    "extNo": "No. Ekstensi:",
+    "copyIban": "Salin IBAN",
+    "copy": "Salin",
+    "copied": "Tersalin!",
+    "footer": "Untuk pertanyaan, hubungi kami di"
   },
   "BlogCard": {
     "readMore": "Baca selengkapnya"

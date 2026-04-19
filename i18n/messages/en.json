@@ -1,4 +1,18 @@
 {
+  "BankTransfer": {
+    "badge": "Bank Transfer Donation",
+    "title": "Our Bank Accounts",
+    "subtitle": "You can send your donation via wire transfer to any of the accounts below.",
+    "notice": "Please include your full name in the transfer description.",
+    "branch": "Branch:",
+    "accountHolder": "Account Holder",
+    "accountNo": "Account No:",
+    "extNo": "Ext No:",
+    "copyIban": "Copy IBAN",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "footer": "For inquiries, contact us at"
+  },
   "BlogCard": {
     "readMore": "Read More"
   },
@@ -28,7 +42,8 @@
     "activities": "Activities",
     "searchPlaceholder": "Search...",
     "donate": "DONATE NOW",
-    "signIn": "Sign In"
+    "signIn": "Sign In",
+    "bankAccounts": "Our Bank Accounts"
   },
   "HomePage": {
     "donationCategories": "Donation Categories",

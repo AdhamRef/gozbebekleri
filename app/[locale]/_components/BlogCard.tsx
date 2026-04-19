@@ -17,7 +17,7 @@ const BlogCard: React.FC<BlogCardProps> = ({ title, image, link = "#", descripti
   return (
     <Link href={link} className="group flex flex-col bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 h-full">
       {/* Image */}
-      <div className="relative overflow-hidden h-48 flex-shrink-0">
+      <div className="relative overflow-hidden aspect-[4/3] flex-shrink-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={image}

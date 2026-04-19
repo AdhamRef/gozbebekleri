@@ -253,7 +253,7 @@ const MainPage = ({ id, locale: localeProp }: { id: string; locale?: string }) =
 /* ── Skeleton card ── */
 const CardSkeleton = () => (
   <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-    <div className="h-52 bg-gray-100 animate-pulse" />
+    <div className="aspect-[4/3] bg-gray-100 animate-pulse" />
     <div className="p-4 space-y-3">
       <div className="flex items-center gap-2">
         <div className="h-5 w-5 rounded-full bg-gray-100 animate-pulse" />

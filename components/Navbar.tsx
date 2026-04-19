@@ -153,7 +153,7 @@ const Navbar = () => {
     { href: "/about-us", label: t("about") },
     { href: "/campaigns", label: t("projects") },
     { href: "/blog", label: t("news") },
-    // { href: "/campaigns", label: t("activities") },
+    { href: "/bank-transfer", label: t("bankAccounts") },
     { href: "/contact-us", label: t("contact") },
   ];
 
@@ -330,7 +330,7 @@ const Navbar = () => {
                  
                       <button
                         type="button"
-                        onClick={() => { setIsUserMenuOpen(false); signOut(); }}
+                        onClick={() => { setIsUserMenuOpen(false); signOut({ callbackUrl: "/" }); }}
                         className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
                       >
                         <LogOut className="w-4 h-4" />
@@ -434,7 +434,7 @@ const Navbar = () => {
                       </Link>
                       <button
                         type="button"
-                        onClick={() => { setIsMobileMenuOpen(false); signOut(); }}
+                        onClick={() => { setIsMobileMenuOpen(false); signOut({ callbackUrl: "/" }); }}
                         className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
                       >
                         <LogOut className="w-4 h-4" />

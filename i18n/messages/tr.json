@@ -25,7 +25,22 @@
     "activities": "Etkinlikler",
     "searchPlaceholder": "Ara...",
     "donate": "BAĞIŞ YAP",
-    "signIn": "Giriş Yap"
+    "signIn": "Giriş Yap",
+    "bankAccounts": "Banka Hesaplarımız"
+  },
+  "BankTransfer": {
+    "badge": "Banka Havalesi ile Bağış",
+    "title": "Hesap Bilgilerimiz",
+    "subtitle": "Aşağıdaki hesaplardan herhangi birine havale veya EFT yaparak bağışınızı iletebilirsiniz.",
+    "notice": "Lütfen havale açıklamasına adınızı ve soyadınızı yazmayı unutmayınız.",
+    "branch": "Şube:",
+    "accountHolder": "Hesap Adı",
+    "accountNo": "Hesap No:",
+    "extNo": "Ek No:",
+    "copyIban": "IBAN Kopyala",
+    "copy": "Kopyala",
+    "copied": "Kopyalandı!",
+    "footer": "Sorularınız için"
   },
   "BlogCard": {
     "readMore": "Devamını oku"

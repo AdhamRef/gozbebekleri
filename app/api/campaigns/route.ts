@@ -59,7 +59,8 @@ export async function GET(request: NextRequest) {
         orderBy = { currentAmount: 'desc' };
         break;
       case 'priority':
-        orderBy = { priority: 'asc' };
+        // Fetch newest first; in-memory sort puts prioritized campaigns first (nulls last)
+        orderBy = { createdAt: 'desc' };
         break;
     }
 
@@ -107,7 +108,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Handle progress sorting in memory if needed
+    // Handle in-memory sorting
     let sortedCampaigns = [...filteredCampaigns];
     if (sortBy === 'progress') {
       sortedCampaigns.sort((a, b) => {
@@ -116,6 +117,17 @@ export async function GET(request: NextRequest) {
         const progressA = computeCampaignProgressPercent(a.currentAmount, a.targetAmount, ga) / 100;
         const progressB = computeCampaignProgressPercent(b.currentAmount, b.targetAmount, gb) / 100;
         return progressB - progressA;
+      });
+    } else if (sortBy === 'priority') {
+      // Prioritized campaigns (priority not null) come first, sorted ascending by priority value.
+      // Campaigns without a priority are sorted by createdAt desc after the prioritized ones.
+      sortedCampaigns.sort((a, b) => {
+        const ap = a.priority ?? null;
+        const bp = b.priority ?? null;
+        if (ap !== null && bp !== null) return ap - bp;
+        if (ap !== null) return -1;
+        if (bp !== null) return 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
     }
 

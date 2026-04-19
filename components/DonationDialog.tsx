@@ -199,7 +199,6 @@ const DonationDialog = ({
   const paymentInfoTrackedRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
-  const [payforSwitching, setPayforSwitching] = useState(false);
   const payforPopupRef = useRef<Window | null>(null);
   const payforPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -1242,34 +1241,6 @@ const DonationDialog = ({
             isRedirecting = true;
             setRedirecting(true);
 
-            const fallbackToStripe = async () => {
-              // Guard: only run once even if poll fires multiple times simultaneously
-              if (hasFallenBackRef.current) return;
-              hasFallenBackRef.current = true;
-
-              if (payforPollRef.current) {
-                clearInterval(payforPollRef.current);
-                payforPollRef.current = null;
-              }
-              if (payforPopupRef.current && !payforPopupRef.current.closed) {
-                payforPopupRef.current.close();
-              }
-              setPayforSwitching(true);
-              try {
-                const fbRes = await axios.post("/api/stripe/fallback", { donationId, locale });
-                if (!fbRes.data.clientSecret) { toast.error(t("donationFailed")); return; }
-                // Store clientSecret + donationId; use3D becomes false automatically via derived value
-                setFallbackClientSecret(fbRes.data.clientSecret);
-                setFallbackDonationId(fbRes.data.donationId ?? donationId);
-                setRedirecting(false);
-                setPayforSwitching(false);
-                setLoading(false);
-                isRedirecting = false;
-              } catch {
-                hasFallenBackRef.current = false; // allow retry on network error
-                toast.error(t("donationFailed"));
-              }
-            };
 
             let polls = 0;
             const FALLBACK_AFTER_POLLS = 25;
@@ -1293,7 +1264,9 @@ const DonationDialog = ({
                   return;
                 }
                 if (data.status === "FAILED" || payforPopupRef.current?.closed || polls >= FALLBACK_AFTER_POLLS) {
-                  await fallbackToStripe();
+                  clearInterval(payforPollRef.current!);
+                  payforPollRef.current = null;
+                  router.push("/bank-transfer");
                 }
               } catch {
                 // Ignore transient errors
@@ -1375,8 +1348,8 @@ const DonationDialog = ({
                   {redirecting ? (
                     <div className="flex flex-col items-center justify-center py-10 gap-5 text-center">
                       <div className="relative">
-                        <div className={`w-20 h-20 rounded-full flex items-center justify-center transition-colors ${payforSwitching ? "bg-[#635bff]/10" : "bg-[#025EB8]/8"}`}>
-                          <CardIcon className={`h-9 w-9 transition-colors ${payforSwitching ? "text-[#635bff]" : "text-[#025EB8]"}`} />
+                        <div className={`w-20 h-20 rounded-full flex items-center justify-center transition-colors ${false ? "bg-[#635bff]/10" : "bg-[#025EB8]/8"}`}>
+                          <CardIcon className={`h-9 w-9 transition-colors ${false ? "text-[#635bff]" : "text-[#025EB8]"}`} />
                         </div>
                         <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-white border-2 border-[#025EB8]/20 rounded-full flex items-center justify-center">
                           <ExternalLink className="h-3 w-3 text-[#025EB8]" />
@@ -1384,17 +1357,17 @@ const DonationDialog = ({
                       </div>
                       <div>
                         <p className="text-base font-semibold text-gray-900">
-                          {payforSwitching ? t("paymentSwitching") : t("successRedirecting")}
+                          {false ? t("paymentSwitching") : t("successRedirecting")}
                         </p>
                         <p className="text-sm text-gray-400 mt-1 max-w-xs mx-auto">
-                          {payforSwitching
+                          {false
                             ? t("paymentSwitchingDesc")
                             : t("successRedirectingDesc")}
                         </p>
                       </div>
-                      <div className={`flex items-center gap-2 text-xs px-4 py-2 rounded-full transition-colors ${payforSwitching ? "text-[#635bff] bg-[#635bff]/8" : "text-[#025EB8] bg-[#025EB8]/6"}`}>
+                      <div className={`flex items-center gap-2 text-xs px-4 py-2 rounded-full transition-colors ${false ? "text-[#635bff] bg-[#635bff]/8" : "text-[#025EB8] bg-[#025EB8]/6"}`}>
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        <span>{payforSwitching ? t("paymentSwitching") : t("successRedirectingDesc")}</span>
+                        <span>{false ? t("paymentSwitching") : t("successRedirectingDesc")}</span>
                       </div>
                     </div>
                   ) : (

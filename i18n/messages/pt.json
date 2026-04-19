@@ -25,7 +25,22 @@
     "activities": "Atividades",
     "searchPlaceholder": "Pesquisar...",
     "donate": "DOAR AGORA",
-    "signIn": "Entrar"
+    "signIn": "Entrar",
+    "bankAccounts": "Nossas Contas Bancárias"
+  },
+  "BankTransfer": {
+    "badge": "Doação por Transferência Bancária",
+    "title": "Nossas Contas Bancárias",
+    "subtitle": "Você pode enviar sua doação por transferência bancária para qualquer uma das contas abaixo.",
+    "notice": "Por favor, inclua seu nome completo na descrição da transferência.",
+    "branch": "Agência:",
+    "accountHolder": "Titular da Conta",
+    "accountNo": "Nº da Conta:",
+    "extNo": "Nº de Extensão:",
+    "copyIban": "Copiar IBAN",
+    "copy": "Copiar",
+    "copied": "Copiado!",
+    "footer": "Para dúvidas, entre em contato conosco em"
   },
   "BlogCard": {
     "readMore": "Ler mais"

@@ -5,6 +5,8 @@ export const ALLOWED_URL_CURRENCIES = new Set([
   "USD",
   "EUR",
   "GBP",
+  "CAD",
+  "AUD",
   "TRY",
   "SAR",
   "AED",
@@ -12,6 +14,8 @@ export const ALLOWED_URL_CURRENCIES = new Set([
   "EGP",
   "QAR",
   "BHD",
+  "JOD",
+  "MAD",
   "DEFAULT",
 ]);
 
@@ -21,13 +25,17 @@ export const URL_CURRENCY_CODES_ORDERED = [
   "USD",
   "EUR",
   "GBP",
+  "CAD",
+  "AUD",
   "TRY",
   "SAR",
   "AED",
   "KWD",
-  "EGP",
   "QAR",
   "BHD",
+  "JOD",
+  "MAD",
+  "EGP",
 ] as const;
 
 const COOKIE_DEFAULT = "DEFAULT";

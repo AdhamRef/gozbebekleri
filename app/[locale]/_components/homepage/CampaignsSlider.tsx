@@ -1,27 +1,14 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import axios from "axios";
 import CampaignCard from "@/app/[locale]/_components/CampaignCard";
 import type { CampaignCardData } from "@/app/[locale]/_components/CampaignCard";
 
-const DRAG_THRESHOLD = 6; // px movement before treating as a drag
-
-const CampaignsSlider = ({
-  isGrid = false,
-  isGridMobile = false,
-  limit = 16,
-}) => {
+const CampaignsSlider = ({ limit = 16, listView = false }: { limit?: number; listView?: boolean }) => {
   const t = useTranslations("CampaignsSlider");
   const locale = useLocale();
-  const sliderRef = useRef<HTMLDivElement>(null);
-  const isDraggingRef = useRef(false);
-  const hasDraggedRef = useRef(false);
-  const startXRef = useRef(0);
-  const scrollLeftRef = useRef(0);
-
   const [campaigns, setCampaigns] = useState<CampaignCardData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,13 +19,10 @@ const CampaignsSlider = ({
         setLoading(true);
         setError(null);
         const response = await axios.get("/api/campaigns", {
-          params: { limit, sortBy: "newest", locale },
+          params: { limit, sortBy: "priority", locale },
         });
-        if (response.data?.items) {
-          setCampaigns(response.data.items);
-        }
-      } catch (err) {
-        console.error("Error fetching campaigns:", err);
+        if (response.data?.items) setCampaigns(response.data.items);
+      } catch {
         setError("Failed to load campaigns");
       } finally {
         setLoading(false);
@@ -47,181 +31,75 @@ const CampaignsSlider = ({
     fetchCampaigns();
   }, [limit, locale]);
 
-  const scroll = (direction: "left" | "right") => {
-    if (sliderRef.current) {
-      sliderRef.current.scrollBy({
-        left: direction === "left" ? -300 : 300,
-        behavior: "smooth",
-      });
-    }
-  };
+  if (loading) return <LoadingSkeleton />;
+  if (error) return <div className="flex items-center justify-center py-20"><p className="text-gray-600">{error}</p></div>;
+  if (campaigns.length === 0) return <div className="flex items-center justify-center py-20"><p className="text-gray-600">{t("noCampaigns") || "No campaigns available"}</p></div>;
 
-  const isSliderOnMobile = isGrid && !isGridMobile;
-  const isAlwaysSlider = !isGrid;
-  const allowDrag = isAlwaysSlider || isSliderOnMobile;
+  const featured = campaigns[0];
+  const top4     = campaigns.slice(1, 5);
+  const rest     = campaigns.slice(5);
 
-  // Only block the link click if the user actually dragged (not a plain click)
-  const handleLinkClick = (e: React.MouseEvent) => {
-    if (hasDraggedRef.current) e.preventDefault();
-  };
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!sliderRef.current || !allowDrag) return;
-    isDraggingRef.current = true;
-    hasDraggedRef.current = false;
-    startXRef.current = e.pageX - sliderRef.current.offsetLeft;
-    scrollLeftRef.current = sliderRef.current.scrollLeft;
-    sliderRef.current.style.cursor = "grabbing";
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDraggingRef.current || !sliderRef.current) return;
-    const x = e.pageX - sliderRef.current.offsetLeft;
-    const delta = x - startXRef.current;
-    if (Math.abs(delta) > DRAG_THRESHOLD) {
-      hasDraggedRef.current = true;
-      e.preventDefault();
-      sliderRef.current.scrollLeft = scrollLeftRef.current - delta * 1.5;
-    }
-  };
-
-  const stopDrag = () => {
-    isDraggingRef.current = false;
-    // Keep hasDraggedRef true until the click event fires, then reset
-    if (hasDraggedRef.current) {
-      setTimeout(() => { hasDraggedRef.current = false; }, 0);
-    }
-    if (sliderRef.current) sliderRef.current.style.cursor = "grab";
-  };
-
-  useEffect(() => {
-    const slider = sliderRef.current;
-    if (slider && allowDrag) slider.style.cursor = "grab";
-    return () => { if (slider) slider.style.cursor = "default"; };
-  }, [isGrid, isGridMobile, allowDrag]);
-
-  if (loading) {
-    const skeletonClass = isGrid
-      ? isGridMobile
-        ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4"
-        : "flex gap-3 overflow-x-hidden pb-4 pt-1 sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"
-      : "flex gap-3 overflow-x-hidden pb-4 pt-1";
-    const skeletonCardClass = isGrid && !isGridMobile ? "w-[70vw] flex-shrink-0 sm:w-auto sm:flex-shrink" : isGrid ? "" : "w-[70vw] flex-shrink-0 sm:w-[300px]";
-    return (
-      <div className="w-full mx-auto">
-        <div className="max-w-7xl mx-auto">
-          <div className={skeletonClass}>
-            {Array.from({ length: isGrid ? 6 : 4 }).map((_, i) => (
-              <div key={i} className={`bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm flex flex-col ${skeletonCardClass}`}>
-                <div className="h-64 lg:h-72 bg-gray-200 animate-pulse" />
-                <div className="h-10 bg-gray-100 animate-pulse" />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center py-20 w-full">
-        <p className="text-gray-600">{error}</p>
-      </div>
-    );
-  }
-
-  if (campaigns.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-20 w-full">
-        <p className="text-gray-600">{t("noCampaigns") || "No campaigns available"}</p>
-      </div>
-    );
-  }
-
-  const cardClassName = isGrid
-    ? isGridMobile
-      ? ""
-      : "w-[70vw] flex-shrink-0 sm:w-auto sm:flex-shrink"
-    : "w-[70vw] flex-shrink-0 sm:w-[300px]";
-
-  const containerClassName = isGrid
-    ? isGridMobile
-      ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4"
-      : "flex gap-3 overflow-x-auto scroll-smooth pb-4 pt-1 sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"
-    : "flex gap-3 overflow-x-auto scroll-smooth pb-4 pt-1 lg:scrollbar-hide";
+  const others = [...top4, ...rest];
 
   return (
-    <div className="w-full mx-auto">
-      <div className="max-w-7xl mx-auto">
-        <div className="relative group/slider">
-          {/* Desktop nav arrows (slider-only mode) */}
-          {!isGrid && (
-            <>
-              <button
-                onClick={() => scroll("left")}
-                className="hidden lg:flex absolute left-[-20px] top-1/2 -translate-y-1/2 z-20 bg-white shadow-lg rounded-full p-3 hover:bg-gray-50 transition-all opacity-0 group-hover/slider:opacity-100 items-center justify-center"
-                aria-label="Previous"
-              >
-                <ChevronLeft className="w-5 h-5 text-gray-700" />
-              </button>
-              <button
-                onClick={() => scroll("right")}
-                className="hidden lg:flex absolute right-[-20px] top-1/2 -translate-y-1/2 z-20 bg-white shadow-lg rounded-full p-3 hover:bg-gray-50 transition-all opacity-0 group-hover/slider:opacity-100 items-center justify-center"
-                aria-label="Next"
-              >
-                <ChevronRight className="w-5 h-5 text-gray-700" />
-              </button>
-            </>
-          )}
+    <div className="w-full space-y-4">
 
-          {/* Touch devices: native overflow-x scroll (no JS interference).
-              Desktop: mouse-drag scrolling with click protection. */}
-          <div
-            ref={sliderRef}
-            className={containerClassName}
-            style={allowDrag ? { userSelect: "none" } : {}}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={stopDrag}
-            onMouseLeave={stopDrag}
-          >
-            {campaigns.map((campaign) => (
-              <CampaignCard
-                key={campaign.id}
-                campaign={campaign}
-                className={cardClassName}
-                onClick={handleLinkClick}
-              />
-            ))}
-          </div>
+      {/* ── Mobile: full horizontal snap-scroll (all campaigns) ── */}
+      <div className="lg:hidden flex overflow-x-auto gap-3 pb-3 px-4 snap-x snap-mandatory scrollbar-hide">
+        <div className="flex-shrink-0 w-[72vw] max-w-[280px] snap-start">
+          <CampaignCard campaign={featured} />
         </div>
+        {others.map((c) => (
+          <div key={c.id} className="flex-shrink-0 w-[72vw] max-w-[280px] snap-start">
+            <CampaignCard campaign={c} listView={listView} />
+          </div>
+        ))}
       </div>
 
-      <style jsx>{`
-        .lg\\:scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        @media (max-width: 1023px) {
-          div[class*="overflow-x-auto"] {
-            scrollbar-width: thin;
-            scrollbar-color: #025EB8 #e5e7eb;
-          }
-          div[class*="overflow-x-auto"]::-webkit-scrollbar {
-            height: 4px;
-          }
-          div[class*="overflow-x-auto"]::-webkit-scrollbar-track {
-            background: #e5e7eb;
-            border-radius: 9999px;
-          }
-          div[class*="overflow-x-auto"]::-webkit-scrollbar-thumb {
-            background: #025EB8;
-            border-radius: 9999px;
-          }
-        }
-      `}</style>
+      {/* ── Desktop: featured + 2×2 grid ── */}
+      <div className="hidden lg:flex flex-row gap-4">
+        <div className="w-[50%] flex flex-col">
+          <CampaignCard campaign={featured} isFeatured className="flex-1 h-full" />
+        </div>
+        {top4.length > 0 && (
+          <div className="w-[50%] grid grid-cols-2 gap-3">
+            {top4.map((c) => (
+              <CampaignCard key={c.id} campaign={c} compact />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Desktop: rest in 4-col grid ── */}
+      {rest.length > 0 && (
+        <div className="hidden lg:grid grid-cols-4 gap-3 pt-2">
+          {rest.map((c) => (
+            <CampaignCard key={c.id} campaign={c} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
+
+function LoadingSkeleton() {
+  return (
+    <div className="w-full space-y-4">
+      <div className="flex flex-col lg:flex-row gap-4">
+        <div className="w-full lg:w-[50%] aspect-[4/3] bg-gray-200 rounded-2xl animate-pulse" />
+        <div className="w-full lg:w-[50%] grid grid-cols-2 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="aspect-[4/3] bg-gray-200 rounded-2xl animate-pulse" />
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="aspect-[4/3] bg-gray-200 rounded-2xl animate-pulse" />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default CampaignsSlider;

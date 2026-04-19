@@ -123,7 +123,7 @@ const HomePage: React.FC<HomePageContentProps> = ({ firstHeroImage }) => {
               {t("viewAll") || "Tümünü Gör"} <MoreHorizontal className="w-4 h-4" />
             </Link>
           </div>
-          <CampaignsSlider isGrid={true} isGridMobile={false} limit={16} />
+          <CampaignsSlider limit={12}/>
         </div>
       </section>
 
