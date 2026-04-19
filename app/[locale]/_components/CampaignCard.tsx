@@ -15,7 +15,7 @@ import SignInDialog from "@/components/SignInDialog";
 
 const DonationDialog = dynamic(() => import("@/components/DonationDialog"), { ssr: false });
 import CategoryIcon from "@/components/CategoryIcon";
-import { Heart } from "lucide-react";
+import { Heart, Zap } from "lucide-react";
 import type { SuggestedDonationsConfig } from "@/lib/campaign/suggested-donations";
 
 const RESUME_KEY = "campaignDonateResume";
@@ -155,8 +155,8 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
         className={`${listView && !isFeatured ? "hidden sm:flex" : "flex"} group/card relative bg-white rounded-2xl overflow-hidden border shadow-sm hover:shadow-xl transition-all duration-300 flex-col ${isFeatured ? "border-[#FA5D17]/40 hover:shadow-[#FA5D17]/15 ring-1 ring-[#FA5D17]/20" : "border-gray-100 hover:shadow-[#025EB8]/12"} ${className ?? ""}`}
       >
         {/* Full image with everything overlaid */}
-        <Link href={`/campaign/${campaign.id}`} prefetch={true} onClick={onClick} className="block relative flex-1">
-          <div className="relative w-full aspect-[4/3] overflow-hidden">
+        <Link href={`/campaign/${campaign.id}`} prefetch={true} onClick={onClick} className={`relative flex-1 ${isFeatured ? "block" : "block"}`}>
+          <div className={`relative w-full overflow-hidden ${isFeatured ? "h-full min-h-[280px]" : "aspect-[4/3]"}`}>
             <Image
               src={isFeatured ? buildImgSrc(rawImgSrc, 1280, 960) : imgSrc}
               alt={campaign.title}
@@ -174,7 +174,8 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
             {isFeatured && (
               <div className="absolute top-3 end-3">
                 <span className="inline-flex items-center gap-1.5 bg-[#FA5D17] text-white text-[11px] font-black px-3 py-1.5 rounded-full shadow-lg shadow-[#FA5D17]/40">
-                  ★ حملة مميزة
+                  <Zap className="w-3 h-3 fill-white" />
+                  {t("featuredBadge")}
                 </span>
               </div>
             )}

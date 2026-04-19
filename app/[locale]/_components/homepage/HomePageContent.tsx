@@ -43,13 +43,25 @@ const LOGO_URL = "https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png";
 
 function HomeLoadingScreen() {
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white">
-      <div className="flex flex-col items-center gap-6">
-        <Image src={LOGO_URL} alt="" width={64} height={64} className="h-16 w-auto object-contain animate-pulse" />
-        <div className="w-48 h-1 bg-gray-100 rounded-full overflow-hidden">
-          <div className="h-full bg-[#025EB8] rounded-full animate-[shimmer_1.2s_ease-in-out_infinite] w-2/5" />
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white overflow-hidden">
+      {/* Soft radial glow behind logo */}
+      <div className="absolute w-72 h-72 rounded-full bg-[#025EB8]/6 blur-3xl" />
+      <div className="absolute w-40 h-40 rounded-full bg-[#FA5D17]/8 blur-2xl translate-y-8" />
+
+      <div className="relative flex flex-col items-center gap-8">
+        {/* Logo */}
+        <Image src={LOGO_URL} alt="" width={128} height={128} quality={100} className="h-16 w-auto object-contain" />
+
+        {/* Animated dots */}
+        <div className="flex items-center gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="w-1.5 h-1.5 rounded-full bg-[#025EB8] animate-bounce"
+              style={{ animationDelay: `${i * 0.18}s`, animationDuration: "0.9s" }}
+            />
+          ))}
         </div>
-        {/* <p className="text-xs text-gray-400 tracking-widest uppercase">Loading...</p> */}
       </div>
     </div>
   );

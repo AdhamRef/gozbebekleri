@@ -263,7 +263,8 @@
     "goal": "Goal",
     "home": "Home",
     "heroDescription": "Support meaningful causes and make a lasting difference in people's lives.",
-    "resultsFound": "campaigns found"
+    "resultsFound": "campaigns found",
+    "featuredBadge": "Urgent Campaign"
   },
   "Campaign": {
     "story": "Story",

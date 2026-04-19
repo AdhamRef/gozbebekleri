@@ -263,7 +263,8 @@
     "goal": "الهدف",
     "home": "الرئيسية",
     "heroDescription": "ادعم قضايا هادفة وأحدث فارقاً حقيقياً في حياة الناس.",
-    "resultsFound": "حملة موجودة"
+    "resultsFound": "حملة موجودة",
+    "featuredBadge": "حملة عاجلة"
   },
   "Campaign": {
     "story": "القصة",
