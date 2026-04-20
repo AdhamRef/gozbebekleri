@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import axios from "axios";
 import { Search, HandHeart, ArrowRight, SlidersHorizontal, X, ChevronRight } from "lucide-react";
@@ -43,20 +43,33 @@ interface FilterState {
 
 const HERO_IMAGE = "https://i.ibb.co/Xm58ssT/481207566-944951421141366-1158434782285969951-n-1.png";
 
-const CampaignsPage = () => {
+interface CampaignsPageContentProps {
+  initialCampaigns?: Campaign[];
+  initialCategories?: Category[];
+  initialCursor?: string | null;
+  initialHasMore?: boolean;
+}
+
+const CampaignsPage = ({
+  initialCampaigns = [],
+  initialCategories = [],
+  initialCursor = null,
+  initialHasMore = false,
+}: CampaignsPageContentProps = {}) => {
   const t = useTranslations("CampaignsPage");
   const { data: session } = useSession();
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [campaigns, setCampaigns] = useState<Campaign[]>(initialCampaigns);
+  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  const [loading, setLoading] = useState(initialCampaigns.length === 0);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch] = useDebounce(searchQuery, 300);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [filters, setFilters] = useState<FilterState>({ sortBy: "newest", minAmount: 0, maxAmount: 100000000 });
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [cursor, setCursor] = useState<string | null>(initialCursor);
+  const didHydrateRef = useRef(false);
   const ITEMS_PER_PAGE = 12;
   const locale = useLocale() as string;
   const isRTL = locale === "ar";
@@ -101,6 +114,18 @@ const CampaignsPage = () => {
   };
 ``
   useEffect(() => {
+    // Skip first run: initial data was provided by the server render.
+    if (!didHydrateRef.current) {
+      didHydrateRef.current = true;
+      // If the server returned nothing (empty DB / error), still do a client fetch so the page isn't empty.
+      if (initialCampaigns.length === 0) {
+        setCursor(null);
+        setHasMore(true);
+        setCampaigns([]);
+        fetchData();
+      }
+      return;
+    }
     setCursor(null);
     setHasMore(true);
     setCampaigns([]);

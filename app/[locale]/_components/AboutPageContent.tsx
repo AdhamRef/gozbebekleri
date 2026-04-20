@@ -273,7 +273,7 @@ const AboutUs = () => {
               <div className="relative rounded-xl overflow-hidden shadow-lg sticky top-4 h-[320px] sm:h-[380px]">
                 <Image
                   src="https://i.ibb.co/rKTrMkzj/gozbebekkleri-hakkimizda.jpg"
-                  alt="رئيسة الجمعية"
+                  alt="رئيس الجمعية"
                   fill
                   sizes="(max-width: 1024px) 100vw, 33vw"
                   className="object-cover"

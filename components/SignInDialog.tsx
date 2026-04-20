@@ -263,6 +263,17 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl, onSkip }: S
           <X className="w-3.5 h-3.5 text-white" />
         </DialogClose>
 
+        {/* Skip — mirrors X on the opposite side, only on options screen */}
+        {screen === "options" && onSkip && (
+          <button
+            type="button"
+            onClick={() => { onClose(); onSkip(); }}
+            className="absolute top-3.5 start-3.5 z-50 h-7 px-3 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-[11px] font-semibold text-white transition-colors"
+          >
+            {t("skipAndDonate")}
+          </button>
+        )}
+
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="bg-[#025EB8] px-6 pt-7 pb-6 text-center relative">
           {screen !== "options" && (
@@ -355,17 +366,6 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl, onSkip }: S
                 {" "}{t("and")}{" "}
                 <Link href="/privacy" className="text-[#025EB8] hover:underline font-medium">{t("privacyPolicy")}</Link>
               </p>
-
-              {/* Skip — only shown in donation flow */}
-              {onSkip && (
-                <button
-                  type="button"
-                  onClick={() => { onClose(); onSkip(); }}
-                  className="w-full text-center text-[12px] text-gray-400 hover:text-gray-600 transition-colors py-1"
-                >
-                  {t("skipAndDonate")}
-                </button>
-              )}
             </>
           )}
 

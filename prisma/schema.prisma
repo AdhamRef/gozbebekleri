@@ -266,8 +266,10 @@ model Campaign {
   currentAmount Float   @default(0)
   images        String[]
   videoUrl      String?
-  isActive      Boolean @default(true)
-  priority      Int?
+  isActive         Boolean @default(true)
+  priority         Int?
+  /// Priority within the campaign's category — controls ordering when listing the category's campaigns
+  categoryPriority Int?
 
   /// { "amounts": number[], "byCurrency"?: Record<string, number[]> } — quick-pick donation amounts; omit/null uses app defaults
   suggestedDonations Json?

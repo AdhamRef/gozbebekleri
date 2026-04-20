@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { Link } from "@/i18n/routing";
 import { Search, BookOpen, Calendar, ArrowRight, Loader2 } from "lucide-react";
 import { useDebounce } from "use-debounce";
 import { useLocale, useTranslations } from "next-intl";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, type Locale } from "date-fns";
 import { ar, enUS, tr } from "date-fns/locale";
 
 interface Post {
@@ -20,18 +20,29 @@ interface Post {
 
 const dateLocaleMap: Record<string, Locale> = { ar, en: enUS, tr };
 
-const BlogPage = () => {
+interface BlogPageContentProps {
+  initialPosts?: Post[];
+  initialCursor?: string | null;
+  initialHasMore?: boolean;
+}
+
+const BlogPage = ({
+  initialPosts = [],
+  initialCursor = null,
+  initialHasMore = false,
+}: BlogPageContentProps = {}) => {
   const t = useTranslations("Blog");
   const locale = useLocale();
   const dateLocale = dateLocaleMap[locale] ?? enUS;
 
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [posts, setPosts] = useState<Post[]>(initialPosts);
+  const [loading, setLoading] = useState(initialPosts.length === 0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [cursor, setCursor] = useState<string | null>(initialCursor);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch] = useDebounce(searchQuery, 400);
+  const didHydrateRef = useRef(false);
   const ITEMS_PER_PAGE = 9;
 
   const fetchPosts = async (cursorParam?: string | null) => {
@@ -54,6 +65,17 @@ const BlogPage = () => {
   };
 
   useEffect(() => {
+    // Skip first run: initial data was provided by the server render.
+    if (!didHydrateRef.current) {
+      didHydrateRef.current = true;
+      if (initialPosts.length === 0) {
+        setLoading(true);
+        setCursor(null);
+        setPosts([]);
+        fetchPosts();
+      }
+      return;
+    }
     setLoading(true);
     setCursor(null);
     setPosts([]);

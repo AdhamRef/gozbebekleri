@@ -118,7 +118,8 @@ const Footer = () => {
     { label: isTr ? 'Haberler' : isAr ? 'الأخبار' : 'News', href: '/blog' },
     { label: isTr ? 'Faaliyetler' : isAr ? 'الأنشطة' : 'Activities', href: '/campaigns' },
     { label: isTr ? 'İletişim' : isAr ? 'اتصل بنا' : 'Contact', href: '/contact-us' },
-    { label: isTr ? 'Gizlilik Politikası' : isAr ? 'سياسة الخصوصية' : 'Privacy Policy', href: '/' },
+    { label: isTr ? 'Gizlilik Politikası' : isAr ? 'سياسة الخصوصية' : 'Privacy Policy', href: '/privacy' },
+    { label: isTr ? 'Kullanım Şartları' : isAr ? 'شروط الاستخدام' : 'Terms of Use', href: '/terms' },
   ];
 
   const socialLinks = [

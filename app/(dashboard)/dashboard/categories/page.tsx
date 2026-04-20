@@ -5,7 +5,7 @@ import { useLocale } from 'next-intl';
 import {useRouter} from 'next/navigation';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
-import { Plus, Pencil, Trash2, Loader2, ArrowUpDown, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, ArrowUpDown, Search, Crown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { ReorderDialog } from './_components/ReorderDialog';
+import { CategoryCampaignPriorityDialog } from './_components/CategoryCampaignPriorityDialog';
 
 interface Category {
   id: string;
@@ -60,6 +61,7 @@ export default function CategoriesPage() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [itemsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const [priorityDialog, setPriorityDialog] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     fetchCategories();
@@ -317,6 +319,15 @@ export default function CategoriesPage() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={() => setPriorityDialog({ id: category.id, name: category.name })}
+                      className="text-amber-600 hover:bg-amber-50"
+                      title="أولويات الحملات داخل القسم"
+                    >
+                      <Crown className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => router.push(`/dashboard/categories/edit/${category.id}`)}
                       className="text-primary hover:bg-primary/10"
                     >
@@ -384,8 +395,17 @@ export default function CategoriesPage() {
         )}
       </div>
 
-      <AlertDialog 
-        open={!!categoryToDelete} 
+      {priorityDialog && (
+        <CategoryCampaignPriorityDialog
+          open={!!priorityDialog}
+          onOpenChange={(open) => { if (!open) setPriorityDialog(null); }}
+          categoryId={priorityDialog.id}
+          categoryName={priorityDialog.name}
+        />
+      )}
+
+      <AlertDialog
+        open={!!categoryToDelete}
         onOpenChange={() => setCategoryToDelete(null)}
       >
         <AlertDialogContent>
