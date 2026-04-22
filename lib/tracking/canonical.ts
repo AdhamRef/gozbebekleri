@@ -129,7 +129,7 @@ export const META_EVENT_MAP: Partial<Record<CanonicalEventName, string>> = {
   add_to_cart:        "AddToCart",
   begin_checkout:     "InitiateCheckout",
   add_payment_info:   "AddPaymentInfo",
-  donation_complete:  "Purchase",
+  donation_complete:  "Donate",
   sign_up:            "CompleteRegistration",
 };
 
