@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from "../../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
+import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 
 export async function GET(
   req: NextRequest,
@@ -22,7 +23,7 @@ export async function GET(
         description: true,
         image: true,
         createdAt: true,
-        translations: { where: { locale }, take: 1, select: { locale: true, name: true, title: true, description: true, image: true } },
+        translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true, title: true, description: true, image: true } },
         posts: {
           select: {
             id: true,
@@ -33,7 +34,7 @@ export async function GET(
             published: true,
             createdAt: true,
             updatedAt: true,
-            translations: { where: { locale }, take: 1, select: { title: true, description: true, content: true, image: true } }
+            translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true, description: true, content: true, image: true } }
           },
           orderBy: { createdAt: 'desc' }
         }
@@ -42,22 +43,26 @@ export async function GET(
 
     if (!category) return NextResponse.json({ error: 'Category not found' }, { status: 404 });
 
+    const tCat = pickTranslation(category.translations, locale);
     const transformed = {
       id: category.id,
-      name: category.translations[0]?.name || category.name,
-      title: category.translations[0]?.title || category.title,
-      description: category.translations[0]?.description || category.description,
-      image: category.translations[0]?.image || category.image,
-      posts: category.posts.map(p => ({
-        id: p.id,
-        title: p.translations[0]?.title || p.title,
-        description: p.translations[0]?.description || p.description,
-        content: p.translations[0]?.content || p.content,
-        image: p.translations[0]?.image || p.image,
-        published: p.published,
-        createdAt: p.createdAt,
-        updatedAt: p.updatedAt,
-      })),
+      name: tCat?.name || category.name,
+      title: tCat?.title || category.title,
+      description: tCat?.description || category.description,
+      image: tCat?.image || category.image,
+      posts: category.posts.map(p => {
+        const tP = pickTranslation(p.translations, locale);
+        return {
+          id: p.id,
+          title: tP?.title || p.title,
+          description: tP?.description || p.description,
+          content: tP?.content || p.content,
+          image: tP?.image || p.image,
+          published: p.published,
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt,
+        };
+      }),
       createdAt: category.createdAt,
     };
 

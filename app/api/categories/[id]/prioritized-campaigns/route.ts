@@ -84,7 +84,7 @@ export async function POST(
     await writeAuditLog({
       ...actor,
       action: "CAMPAIGN_CATEGORY_REORDER",
-      messageAr: `${actor.actorName ?? "مسؤول"} أعاد ترتيب أولويات الحملات داخل قسم (${campaigns.length} حملة)`,
+      messageAr: `${actor.actorName ?? "مسؤول"} أعاد ترتيب أولويات المشاريع داخل حملة (${campaigns.length} مشروع)`,
       entityType: "Category",
       entityId: id,
       metadata: { count: campaigns.length, categoryId: id },

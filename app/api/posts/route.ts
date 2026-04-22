@@ -5,6 +5,7 @@ import { authOptions } from "../auth/[...nextauth]/options";
 import { orderCampaignsByIds, sanitizeCampaignIds } from "@/lib/blog/campaign-ids";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog } from "@/lib/audit-log";
+import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -36,10 +37,10 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
-            translations: { where: { locale }, take: 1, select: { name: true } }
+            translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true } }
           }
         },
-        translations: { where: { locale }, take: 1, select: { locale: true, title: true, description: true, content: true, image: true } },
+        translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true, description: true, content: true, image: true } },
         campaignIds: true,
       }
     });
@@ -47,8 +48,9 @@ export async function GET(request: NextRequest) {
     let filtered = posts;
     if (search) {
       filtered = posts.filter(p => {
-        const title = p.translations[0]?.title || p.title || '';
-        const desc = p.translations[0]?.description || p.description || '';
+        const t = pickTranslation(p.translations, locale);
+        const title = t?.title || p.title || '';
+        const desc = t?.description || p.description || '';
         return title.toLowerCase().includes(search) || desc.toLowerCase().includes(search);
       });
     }
@@ -69,27 +71,32 @@ export async function GET(request: NextRequest) {
               currentAmount: true,
               targetAmount: true,
               images: true,
-              translations: { where: { locale }, take: 1, select: { title: true } },
+              translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true } },
             },
           });
 
     const transformed = items.map((p) => {
       const ids = p.campaignIds ?? [];
-      const campaigns = orderCampaignsByIds(ids, campaignRows).map((c) => ({
-        id: c.id,
-        title: c.translations[0]?.title || c.title,
-        currentAmount: c.currentAmount,
-        targetAmount: c.targetAmount,
-        images: c.images,
-      }));
+      const campaigns = orderCampaignsByIds(ids, campaignRows).map((c) => {
+        const tC = pickTranslation(c.translations, locale);
+        return {
+          id: c.id,
+          title: tC?.title || c.title,
+          currentAmount: c.currentAmount,
+          targetAmount: c.targetAmount,
+          images: c.images,
+        };
+      });
+      const tP = pickTranslation(p.translations, locale);
+      const tCat = pickTranslation(p.category?.translations, locale);
       return {
         id: p.id,
-        title: p.translations[0]?.title || p.title,
-        description: p.translations[0]?.description || p.description,
-        content: p.translations[0]?.content || p.content,
-        image: p.translations[0]?.image || p.image,
+        title: tP?.title || p.title,
+        description: tP?.description || p.description,
+        content: tP?.content || p.content,
+        image: tP?.image || p.image,
         published: p.published,
-        category: p.category ? { id: p.category.id, name: p.category.translations[0]?.name || p.category.name } : null,
+        category: p.category ? { id: p.category.id, name: tCat?.name || p.category.name } : null,
         campaigns,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,

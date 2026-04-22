@@ -265,7 +265,7 @@ export default function DonationsPage() {
               <TableHead className="text-right">النوع</TableHead>
               <TableHead className="text-right">طريقة الدفع</TableHead>
               <TableHead className="text-right">التاريخ</TableHead>
-              <TableHead className="text-right">الحملات</TableHead>
+              <TableHead className="text-right">المشاريع</TableHead>
               <TableHead className="text-center">الإجراءات</TableHead>
             </TableRow>
           </TableHeader>

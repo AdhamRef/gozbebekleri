@@ -7,6 +7,8 @@ import {
   parseSuggestedShareCounts,
   showCampaignProgress,
 } from "@/lib/campaign/campaign-modes";
+import { parseSuggestedDonations } from "@/lib/campaign/suggested-donations";
+import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 
 export async function GET(
   request: NextRequest,
@@ -37,7 +39,7 @@ export async function GET(
         id: true,
         name: true,
         icon: true,
-        translations: { where: { locale }, take: 1, select: { name: true } }
+        translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true } }
       }
     });
 
@@ -108,14 +110,15 @@ export async function GET(
         fundraisingMode: true,
         sharePriceUSD: true,
         suggestedShareCounts: true,
-        translations: { where: { locale }, take: 1, select: { title: true, description: true, locale: true } },
+        suggestedDonations: true,
+        translations: { where: translationLocaleWhere(locale), take: 2, select: { title: true, description: true, locale: true } },
         _count: { select: { donations: true } },
         category: {
           select: {
             id: true,
             name: true,
             icon: true,
-            translations: { where: { locale }, take: 1, select: { name: true } }
+            translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true } }
           }
         }
       }
@@ -142,10 +145,12 @@ export async function GET(
     const transformed = pageItems.map((c) => {
       const goalType = normalizeGoalType(c.goalType);
       const fundraisingMode = normalizeFundraisingMode(c.fundraisingMode);
+      const tC = pickTranslation(c.translations, locale);
+      const tCat = pickTranslation(c.category?.translations, locale);
       return {
         id: c.id,
-        title: c.translations[0]?.title || c.title,
-        description: c.translations[0]?.description || c.description,
+        title: tC?.title || c.title,
+        description: tC?.description || c.description,
         images: c.images,
         videoUrl: c.videoUrl,
         targetAmount: c.targetAmount,
@@ -163,12 +168,13 @@ export async function GET(
         fundraisingMode,
         sharePriceUSD: c.sharePriceUSD ?? null,
         suggestedShareCounts: parseSuggestedShareCounts(c.suggestedShareCounts),
+        suggestedDonations: parseSuggestedDonations(c.suggestedDonations),
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
         category: c.category
           ? {
               id: c.category.id,
-              name: c.category.translations[0]?.name || c.category.name,
+              name: tCat?.name || c.category.name,
               icon: c.category.icon,
             }
           : null,
@@ -178,7 +184,7 @@ export async function GET(
     // Localized category response
     const localizedCategory = {
       id: category.id,
-      name: category.translations[0]?.name || category.name,
+      name: pickTranslation(category.translations, locale)?.name || category.name,
       icon: category.icon
     };
 

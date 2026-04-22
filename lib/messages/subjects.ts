@@ -67,7 +67,7 @@ export function subjectLabel(subject: MessageSubject, locale?: string): string {
     return "Donation Issue";
   }
   if (subject === "CAMPAIGN_SUPPORT") {
-    if (isAr) return "دعم حملة";
+    if (isAr) return "دعم مشروع";
     if (isFr) return "Support campagne";
     if (isEs) return "Soporte de campana";
     if (isId) return "Dukungan kampanye";

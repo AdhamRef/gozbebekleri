@@ -148,10 +148,10 @@ export default function CampaignsPage() {
     try {
       await axios.put(`/api/campaigns/${id}`, { isActive: nextActive });
       setCampaigns(prev => prev.map(c => c.id === id ? { ...c, isActive: nextActive } : c));
-      toast.success(nextActive ? 'تم تفعيل الحملة' : 'تم تعطيل الحملة');
+      toast.success(nextActive ? 'تم تفعيل المشروع' : 'تم تعطيل المشروع');
     } catch (err: any) {
-      const msg = axios.isAxiosError(err) ? err.response?.data?.error || err.message : 'تعذّر تحديث حالة الحملة';
-      toast.error(typeof msg === 'string' ? msg : 'تعذّر تحديث حالة الحملة');
+      const msg = axios.isAxiosError(err) ? err.response?.data?.error || err.message : 'تعذّر تحديث حالة المشروع';
+      toast.error(typeof msg === 'string' ? msg : 'تعذّر تحديث حالة المشروع');
     } finally {
       setActionLoading(null);
     }
@@ -160,8 +160,8 @@ export default function CampaignsPage() {
   const handleDeactivate = (campaign: Campaign) => {
     setConfirmDialog({
       open: true,
-      title: 'تعطيل الحملة',
-      description: `سيتم إخفاء حملة "${campaign.title}" من الموقع ونقلها إلى الأرشيف. يمكنك إعادة تفعيلها في أي وقت.`,
+      title: 'تعطيل المشروع',
+      description: `سيتم إخفاء مشروع "${campaign.title}" من الموقع ونقلها إلى الأرشيف. يمكنك إعادة تفعيلها في أي وقت.`,
       actionLabel: 'تعطيل',
       actionClassName: 'bg-amber-600 hover:bg-amber-700 text-white',
       onConfirm: () => setActive(campaign.id, false),
@@ -171,8 +171,8 @@ export default function CampaignsPage() {
   const handleReactivate = (campaign: Campaign) => {
     setConfirmDialog({
       open: true,
-      title: 'إعادة تفعيل الحملة',
-      description: `سيتم نشر حملة "${campaign.title}" على الموقع مجدداً.`,
+      title: 'إعادة تفعيل المشروع',
+      description: `سيتم نشر مشروع "${campaign.title}" على الموقع مجدداً.`,
       actionLabel: 'تفعيل',
       actionClassName: 'bg-emerald-600 hover:bg-emerald-700 text-white',
       onConfirm: () => setActive(campaign.id, true),
@@ -228,17 +228,17 @@ export default function CampaignsPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground">الحملات</h1>
-          <p className="text-sm text-muted-foreground">إدارة حملات التبرع</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">المشاريع</h1>
+          <p className="text-sm text-muted-foreground">إدارة مشاريع التبرع</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => window.location.href = '/dashboard/campaigns/new'} className="bg-[#025EB8] hover:bg-[#014fa0] gap-2">
             <Plus className="w-4 h-4" />
-            إنشاء حملة جديدة
+            إنشاء مشروع جديدة
           </Button>
           <Button variant="outline" className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => setArchiveOpen(true)}>
             <Archive className="w-4 h-4" />
-            أرشيف الحملات
+            أرشيف المشاريع
             {archivedCampaigns.length > 0 && (
               <span className="bg-amber-100 text-amber-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
                 {archivedCampaigns.length}
@@ -254,19 +254,19 @@ export default function CampaignsPage() {
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 flex-wrap">
           <div className="relative flex-1 min-w-0">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <Input placeholder="البحث في الحملات..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-4 pr-10" />
+            <Input placeholder="البحث في المشاريع..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-4 pr-10" />
           </div>
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="جميع الأقسام" /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="جميع الحملات" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">جميع الأقسام</SelectItem>
+              <SelectItem value="all">جميع الحملات</SelectItem>
               {categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={progressFilter} onValueChange={(v: any) => setProgressFilter(v)}>
             <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="التقدم" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">جميع الحملات</SelectItem>
+              <SelectItem value="all">جميع المشاريع</SelectItem>
               <SelectItem value="completed">مكتملة</SelectItem>
               <SelectItem value="ongoing">جارية</SelectItem>
             </SelectContent>
@@ -287,10 +287,10 @@ export default function CampaignsPage() {
               <TableRow>
                 <TableHead className="text-right">
                   <Button variant="ghost" onClick={() => handleSort('title')} className="hover:bg-transparent p-0 font-bold">
-                    عنوان الحملة <ArrowUpDown className="mr-2 h-4 w-4" />
+                    عنوان المشروع <ArrowUpDown className="mr-2 h-4 w-4" />
                   </Button>
                 </TableHead>
-                <TableHead className="text-right">القسم</TableHead>
+                <TableHead className="text-right">الحملة</TableHead>
                 <TableHead className="text-right">
                   <Button variant="ghost" onClick={() => handleSort('targetAmount')} className="hover:bg-transparent p-0 font-bold">
                     المبلغ المستهدف ($) <ArrowUpDown className="mr-2 h-4 w-4" />
@@ -309,7 +309,7 @@ export default function CampaignsPage() {
             <TableBody>
               {paginatedCampaigns.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">لا توجد حملات نشطة</TableCell>
+                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">لا توجد مشاريع نشطة</TableCell>
                 </TableRow>
               ) : paginatedCampaigns.map(campaign => (
                 <TableRow key={campaign.id}>
@@ -386,7 +386,7 @@ export default function CampaignsPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-amber-700">
               <Archive className="w-5 h-5" />
-              أرشيف الحملات المعطّلة ({archivedCampaigns.length})
+              أرشيف المشاريع المعطّلة ({archivedCampaigns.length})
             </DialogTitle>
           </DialogHeader>
 
@@ -399,8 +399,8 @@ export default function CampaignsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-right">عنوان الحملة</TableHead>
-                  <TableHead className="text-right">القسم</TableHead>
+                  <TableHead className="text-right">عنوان المشروع</TableHead>
+                  <TableHead className="text-right">الحملة</TableHead>
                   <TableHead className="text-right">التاريخ</TableHead>
                   <TableHead className="text-center w-32">إجراء</TableHead>
                 </TableRow>
@@ -409,7 +409,7 @@ export default function CampaignsPage() {
                 {filteredArchive.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
-                      لا توجد حملات في الأرشيف
+                      لا توجد مشاريع في الأرشيف
                     </TableCell>
                   </TableRow>
                 ) : filteredArchive.map(campaign => (

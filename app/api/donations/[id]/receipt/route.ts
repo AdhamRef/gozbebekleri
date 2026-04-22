@@ -82,7 +82,7 @@ const RECEIPT_LABELS = {
     active: 'نشط',
     paused: 'متوقف مؤقتاً',
     cancelled: 'ملغي',
-    campaign: 'الحملة',
+    campaign: 'المشروع',
     category: 'الفئة',
     amount: 'المبلغ',
     subtotal: 'المجموع الفرعي',

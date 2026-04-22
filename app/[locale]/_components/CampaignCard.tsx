@@ -159,13 +159,13 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
         className={`${listView && !isFeatured ? "hidden sm:flex" : "flex"} group/card relative bg-white rounded-2xl overflow-hidden border shadow-sm hover:shadow-xl transition-all duration-300 flex-col ${isFeatured ? "border-[#FA5D17]/40 hover:shadow-[#FA5D17]/15 ring-1 ring-[#FA5D17]/20" : "border-gray-100 hover:shadow-[#025EB8]/12"} ${className ?? ""}`}
       >
         {/* Full image with everything overlaid */}
-        <Link href={`/campaign/${campaign.id}`} prefetch={true} onClick={onClick} className={`relative flex-1 ${isFeatured ? "block" : "block"}`}>
-          <div className={`relative w-full overflow-hidden ${isFeatured ? "h-full min-h-[280px]" : "aspect-[4/3]"}`}>
+        <Link href={`/campaign/${campaign.id}`} prefetch={true} onClick={onClick} className="relative flex-1 block">
+          <div className={`relative w-full overflow-hidden ${isFeatured ? "h-full" : "aspect-[4/3]"}`}>
             <Image
               src={isFeatured ? buildImgSrc(rawImgSrc, 1280, 960) : imgSrc}
               alt={campaign.title}
               fill
-              sizes={isFeatured ? "(max-width: 640px) 90vw, 100vw" : "(max-width: 640px) 70vw, (max-width: 1024px) 300px, 380px"}
+              sizes={isFeatured ? "(max-width: 640px) 90vw, 50vw" : "(max-width: 640px) 70vw, (max-width: 1024px) 300px, 25vw"}
               className="object-cover group-hover/card:scale-105 transition-transform duration-700 ease-out"
               draggable={false}
               priority={isFeatured}

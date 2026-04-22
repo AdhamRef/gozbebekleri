@@ -69,9 +69,9 @@ interface ReferralRow {
 
 const PAGE_OPTIONS: { id: PageKind; label: string; hint?: string }[] = [
   { id: "home", label: "الصفحة الرئيسية" },
-  { id: "campaigns", label: "قائمة الحملات", hint: "بحث اختياري" },
-  { id: "campaign", label: "صفحة حملة محددة" },
-  { id: "category", label: "صفحة قسم (تصنيف حملات)" },
+  { id: "campaigns", label: "قائمة المشاريع", hint: "بحث اختياري" },
+  { id: "campaign", label: "صفحة مشروع محددة" },
+  { id: "category", label: "صفحة حملة (تصنيف مشاريع)" },
   { id: "blog", label: "المدونة — قائمة المقالات" },
   { id: "blog_post", label: "مقال مدونة محدد" },
   { id: "blog_post_category", label: "تصنيف مقالات المدونة" },
@@ -410,7 +410,7 @@ export default function LinkGeneratorPage() {
             منشئ روابط الموقع
           </CardTitle>
           <CardDescription className="leading-relaxed">
-            اختر الصفحة ثم أكمل الحقول الظاهرة تلقائيًا. استخدم البحث داخل القوائم للوصول السريع إلى الحملات والأقسام والمقالات.
+            اختر الصفحة ثم أكمل الحقول الظاهرة تلقائيًا. استخدم البحث داخل القوائم للوصول السريع إلى المشاريع والحملات والمقالات.
             يُحدَّث الرابط في الأسفل مباشرة.
           </CardDescription>
         </CardHeader>
@@ -445,8 +445,8 @@ export default function LinkGeneratorPage() {
                 {needsResourcePick(pageKind as PageKind) && (
                   <div className="space-y-2">
                     <span className="text-sm text-muted-foreground">
-                      {pageKind === "campaign" && "اختر الحملة"}
-                      {pageKind === "category" && "اختر القسم"}
+                      {pageKind === "campaign" && "اختر المشروع"}
+                      {pageKind === "category" && "اختر الحملة"}
                       {pageKind === "blog_post" && "اختر المقال"}
                       {pageKind === "blog_post_category" && "اختر تصنيف المدونة"}
                     </span>
@@ -462,7 +462,7 @@ export default function LinkGeneratorPage() {
 
                 {pageKind === "campaigns" && (
                   <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">بحث في قائمة الحملات (اختياري)</Label>
+                    <Label className="text-sm text-muted-foreground">بحث في قائمة المشاريع (اختياري)</Label>
                     <Input
                       value={campaignSearch}
                       onChange={(e) => setCampaignSearch(e.target.value)}

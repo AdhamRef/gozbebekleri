@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/options";
-import { validateSuggestedDonationsBody } from "@/lib/campaign/suggested-donations";
+import { parseSuggestedDonations, validateSuggestedDonationsBody } from "@/lib/campaign/suggested-donations";
 import {
   computeCampaignProgressPercent,
   normalizeFundraisingMode,
@@ -17,6 +17,7 @@ import {
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog } from "@/lib/audit-log";
 import { parseIncludeInactive } from "@/lib/campaign/include-inactive-query";
+import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 
 export async function GET(request: NextRequest) {
   try {
@@ -79,14 +80,14 @@ export async function GET(request: NextRequest) {
             name: true,
             icon: true,
             translations: {
-              where: { locale },
-              take: 1,
+              where: translationLocaleWhere(locale),
+              take: 2,
             },
           },
         },
         translations: {
-          where: { locale },
-          take: 1,
+          where: translationLocaleWhere(locale),
+          take: 2,
         },
         _count: {
           select: { donations: true }
@@ -98,9 +99,10 @@ export async function GET(request: NextRequest) {
     let filteredCampaigns = campaigns;
     if (search) {
       filteredCampaigns = campaigns.filter(campaign => {
-        const title = campaign.translations[0]?.title || campaign.title;
-        const description = campaign.translations[0]?.description || campaign.description;
-        
+        const t = pickTranslation(campaign.translations, locale);
+        const title = t?.title || campaign.title;
+        const description = t?.description || campaign.description;
+
         return (
           title?.toLowerCase().includes(search) ||
           description?.toLowerCase().includes(search)
@@ -138,10 +140,12 @@ export async function GET(request: NextRequest) {
     const transformedCampaigns = items.map((campaign) => {
       const goalType = normalizeGoalType(campaign.goalType);
       const fundraisingMode = normalizeFundraisingMode(campaign.fundraisingMode);
+      const tC = pickTranslation(campaign.translations, locale);
+      const tCat = pickTranslation(campaign.category?.translations, locale);
       return {
         id: campaign.id,
-        title: campaign.translations[0]?.title || campaign.title,
-        description: campaign.translations[0]?.description || campaign.description,
+        title: tC?.title || campaign.title,
+        description: tC?.description || campaign.description,
         images: campaign.images,
         videoUrl: campaign.videoUrl,
         targetAmount: campaign.targetAmount,
@@ -151,7 +155,7 @@ export async function GET(request: NextRequest) {
         category: campaign.category
           ? {
               id: campaign.category.id,
-              name: campaign.category.translations[0]?.name || campaign.category.name,
+              name: tCat?.name || campaign.category.name,
               icon: campaign.category.icon,
             }
           : null,
@@ -166,6 +170,7 @@ export async function GET(request: NextRequest) {
         fundraisingMode,
         sharePriceUSD: campaign.sharePriceUSD ?? null,
         suggestedShareCounts: parseSuggestedShareCounts(campaign.suggestedShareCounts),
+        suggestedDonations: parseSuggestedDonations(campaign.suggestedDonations),
         createdAt: campaign.createdAt,
         updatedAt: campaign.updatedAt,
       };
@@ -380,7 +385,7 @@ export async function POST(request: NextRequest) {
       actorName: actor.name,
       actorRole: actor.role ?? "ADMIN",
       action: "CAMPAIGN_CREATE",
-      messageAr: `${actor.name ?? "مسؤول"} أنشأ حملة جديدة: ${fullCampaign?.title ?? data.title}`,
+      messageAr: `${actor.name ?? "مسؤول"} أنشأ مشروع جديدة: ${fullCampaign?.title ?? data.title}`,
       messageEn: `${actor.name ?? "Admin"} created campaign ${fullCampaign?.title ?? data.title}`,
       entityType: "Campaign",
       entityId: campaign.id,

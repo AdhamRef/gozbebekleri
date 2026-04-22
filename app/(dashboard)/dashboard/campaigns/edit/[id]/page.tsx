@@ -89,7 +89,7 @@ const formSchema = z
   fundraisingMode: z.enum(['AMOUNT', 'SHARES']),
   sharePriceUSD: z.number().min(0).max(1000000).optional(),
   categoryId: z.string()
-    .min(1, 'القسم مطلوب'),
+    .min(1, 'الحملة مطلوب'),
   isActive: z.boolean(),
   images: z.array(z.string())
     .min(1, 'صورة واحدة على الأقل مطلوبة')
@@ -114,7 +114,7 @@ const formSchema = z
     if (data.fundraisingMode === 'SHARES' && (!data.sharePriceUSD || data.sharePriceUSD <= 0)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'سعر السهم بالدولار مطلوب لحملات السهوم',
+        message: 'سعر السهم بالدولار مطلوب لمشاريع السهوم',
         path: ['sharePriceUSD'],
       });
     }
@@ -327,7 +327,7 @@ export default function EditCampaignPage() {
         setDescriptionEs(es?.description || null);
       } catch (error) {
         console.error('Error fetching campaign:', error);
-        toast.error('فشل في تحميل بيانات الحملة');
+        toast.error('فشل في تحميل بيانات المشروع');
         router.push('/dashboard/campaigns');
       } finally {
         setLoading(false);
@@ -346,7 +346,7 @@ export default function EditCampaignPage() {
         setUpdates(response.data);
       } catch (error) {
         console.error('Error fetching updates:', error);
-        toast.error('فشل في تحميل التحديثات');
+        toast.error('فشل في تحميل الإنجازات');
       }
     };
 
@@ -394,11 +394,11 @@ export default function EditCampaignPage() {
       };
 
       await axios.put(`/api/campaigns/${params.id}`, requestData);
-      toast.success('تم تحديث الحملة بنجاح');
+      toast.success('تم تحديث المشروع بنجاح');
       //router.push('/dashboard/campaigns');
     } catch (error) {
       console.error('Error updating campaign:', error);
-      toast.error('فشل في تحديث الحملة');
+      toast.error('فشل في تحديث المشروع');
     } finally {
       setSaving(false);
     }
@@ -635,8 +635,8 @@ export default function EditCampaignPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">تعديل الحملة</h1>
-          <p className="text-gray-600">قم بتحديث معلومات الحملة</p>
+          <h1 className="text-2xl font-bold text-gray-800">تعديل المشروع</h1>
+          <p className="text-gray-600">قم بتحديث معلومات المشروع</p>
           
           {/* ✅ Translation Status Badge */}
           <div className="flex items-center gap-2 mt-2">
@@ -690,11 +690,11 @@ export default function EditCampaignPage() {
                     name="categoryId"
                     render={({ field }) => (
                       <FormItem dir='rtl'>
-                        <FormLabel>القسم *</FormLabel>
+                        <FormLabel>الحملة *</FormLabel>
                         <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="اختر القسم" />
+                              <SelectValue placeholder="اختر الحملة" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -715,9 +715,9 @@ export default function EditCampaignPage() {
                     name="title"
                     render={({ field }) => (
                       <FormItem dir='rtl'>
-                        <FormLabel>عنوان الحملة *</FormLabel>
+                        <FormLabel>عنوان المشروع *</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="أدخل عنوان الحملة" />
+                          <Input {...field} placeholder="أدخل عنوان المشروع" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -728,7 +728,7 @@ export default function EditCampaignPage() {
                 </div>
 
                 <FormItem dir='rtl'>
-                  <FormLabel>وصف الحملة *</FormLabel>
+                  <FormLabel>وصف المشروع *</FormLabel>
                   <WysiwygEditor
                     defaultValue={parseEditorContent(descriptionAr)}
                     onDebouncedUpdate={(editor) => setDescriptionAr(JSON.stringify(editor?.getJSON()))}
@@ -834,7 +834,7 @@ export default function EditCampaignPage() {
 
           {/* Campaign Settings */}
           <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">إعدادات الحملة</h2>
+            <h2 className="text-lg font-semibold mb-4">إعدادات المشروع</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
@@ -1007,7 +1007,7 @@ export default function EditCampaignPage() {
               name="images"
               render={({ field }) => (
                 <FormItem dir='rtl'>
-                  <FormLabel>صور الحملة</FormLabel>
+                  <FormLabel>صور المشروع</FormLabel>
                   <FormControl>
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -1057,7 +1057,7 @@ export default function EditCampaignPage() {
                         )}
                       </div>
                       <FormDescription>
-                        يمكنك رفع حتى 5 صور للحملة. الصورة الأولى ستكون الصورة الرئيسية.
+                        يمكنك رفع حتى 5 صور للمشروع. الصورة الأولى ستكون الصورة الرئيسية.
                       </FormDescription>
                     </div>
                   </FormControl>
@@ -1075,9 +1075,9 @@ export default function EditCampaignPage() {
               render={({ field }) => (
                 <FormItem className="flex items-center justify-between">
                   <div>
-                    <FormLabel>حالة الحملة</FormLabel>
+                    <FormLabel>حالة المشروع</FormLabel>
                     <FormDescription>
-                      تحديد ما إذا كانت الحملة نشطة أم لا
+                      تحديد ما إذا كانت المشروع نشطة أم لا
                     </FormDescription>
                   </div>
                   <FormControl>
@@ -1095,7 +1095,7 @@ export default function EditCampaignPage() {
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className='mt-[5px]'>
-                تحذير: الحملة غير نشطة حالياً. لن يتمكن المستخدمون من رؤيتها أو التبرع لها.
+                تحذير: المشروع غير نشطة حالياً. لن يتمكن المستخدمون من رؤيتها أو التبرع لها.
               </AlertDescription>
             </Alert>
           )}
@@ -1103,7 +1103,7 @@ export default function EditCampaignPage() {
           {/* ✅ Campaign Updates Section with Translations */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-gray-800">تحديثات الحملة</h2>
+              <h2 className="text-xl font-semibold text-gray-800">إنجازات المشروع</h2>
               <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="gap-2">
@@ -1350,7 +1350,7 @@ export default function EditCampaignPage() {
               
               {updates.length === 0 && (
                 <Card className="p-8 text-center text-gray-500">
-                  <p>لا توجد تحديثات بعد. قم بإضافة تحديث لإبقاء المتبرعين على اطلاع.</p>
+                  <p>لا توجد إنجازات بعد. قم بإضافة تحديث لإبقاء المتبرعين على اطلاع.</p>
                 </Card>
               )}
             </div>

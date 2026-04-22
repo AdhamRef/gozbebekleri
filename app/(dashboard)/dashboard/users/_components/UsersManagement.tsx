@@ -196,7 +196,7 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
   const handleUserAuthoritySave = async () => {
     if (!selectedUser) return;
     if (selectedUser.role === "STAFF" && editPermissions.length === 0) {
-      toast.error("اختر قسمًا واحدًا على الأقل من لوحة التحكم لعضو الطاقم");
+      toast.error("اختر حملةًا واحدًا على الأقل من لوحة التحكم لعضو الطاقم");
       return;
     }
     try {
@@ -455,7 +455,7 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">الشارات</th>
                       )}
                       {scope === "team" && (
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">أقسام لوحة التحكم</th>
+                      <th className="text-right py-3 px-4 font-semibold text-slate-700">حملات لوحة التحكم</th>
                       )}
                       {scope === "donors" && (
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">عدد التبرعات</th>
@@ -560,7 +560,7 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                           {scope === "team" && (
                           <td className="py-3 px-4">
                             {u.role === "ADMIN" ? (
-                              <span className="text-xs text-[#FA5D17] bg-[#FA5D17]/8 px-2 py-1 rounded-md">كل الأقسام</span>
+                              <span className="text-xs text-[#FA5D17] bg-[#FA5D17]/8 px-2 py-1 rounded-md">كل الحملات</span>
                             ) : (
                               <div className="flex flex-wrap gap-1 max-w-[220px]">
                                 {(u.dashboardPermissions ?? []).map((key) => {
@@ -694,15 +694,15 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                   <SelectContent>
                     <SelectItem value="DONOR">متبرع</SelectItem>
                     <SelectItem value="STAFF">طاقم (لوحة تحكم محدودة)</SelectItem>
-                    <SelectItem value="ADMIN">مدير (كل الأقسام)</SelectItem>
+                    <SelectItem value="ADMIN">مدير (كل الحملات)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               {selectedUser.role === "STAFF" && (
                 <div className="space-y-2 rounded-lg border border-border p-3 bg-muted/40">
-                  <p className="text-sm font-medium">أقسام لوحة التحكم</p>
+                  <p className="text-sm font-medium">حملات لوحة التحكم</p>
                   <p className="text-xs text-muted-foreground">
-                    فعّل كل قسم يحق لهذا المستخدم الدخول إليه. بدون تفعيل لا يظهر في القائمة الجانبية.
+                    فعّل كل حملة يحق لهذا المستخدم الدخول إليه. بدون تفعيل لا يظهر في القائمة الجانبية.
                   </p>
                   <div className="grid gap-2 max-h-56 overflow-y-auto pe-1">
                     {DASHBOARD_PERMISSION_ROWS.map((row) => (
@@ -726,7 +726,7 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
               )}
               {selectedUser.role === "ADMIN" && (
                 <p className="text-xs text-muted-foreground">
-                  المدير يملك صلاحية جميع أقسام لوحة التحكم تلقائيًا.
+                  المدير يملك صلاحية جميع حملات لوحة التحكم تلقائيًا.
                 </p>
               )}
               <div className="flex justify-end gap-2 pt-2">
@@ -860,9 +860,9 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                       <span className="text-muted-foreground">الدور: </span>
                       <span className="font-medium">
                         {viewUser.role === "ADMIN"
-                          ? "مدير — وصول كامل لجميع أقسام لوحة التحكم"
+                          ? "مدير — وصول كامل لجميع حملات لوحة التحكم"
                           : viewUser.role === "STAFF"
-                            ? "عضو طاقم — وصول جزئي حسب الأقسام أدناه"
+                            ? "عضو طاقم — وصول جزئي حسب الحملات أدناه"
                             : "متبرع — حساب عام بدون لوحة تحكم إدارية"}
                       </span>
                     </p>
@@ -870,7 +870,7 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                       <div className="flex flex-wrap gap-2 pt-1">
                         {(viewUser.dashboardPermissions ?? []).length === 0 ? (
                           <span className="text-xs text-muted-foreground">
-                            لا توجد أقسام مفعّلة
+                            لا توجد حملات مفعّلة
                           </span>
                         ) : (
                           (viewUser.dashboardPermissions ?? []).map((key) => {

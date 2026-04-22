@@ -9,6 +9,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
+import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 
 type ParamsPromise = { params: Promise<{ id: string }> };
 
@@ -31,14 +32,15 @@ export async function GET(request: NextRequest, { params }: ParamsPromise) {
         videoUrl: true,
         createdAt: true,
         
-        // Only fetch translation for current locale
+        // Fetch requested locale + English (fallback chain)
         translations: {
-          where: { locale },
+          where: translationLocaleWhere(locale),
           select: {
+            locale: true,
             title: true,
             description: true,
           },
-          take: 1, // Only 1 translation per update
+          take: 2,
         },
       },
       orderBy: {
@@ -47,15 +49,18 @@ export async function GET(request: NextRequest, { params }: ParamsPromise) {
       take: 50, // Limit to prevent huge payloads
     });
 
-    // ✅ Transform: Use translation if available, fallback to Arabic
-    const transformedUpdates = updates.map((update) => ({
-      id: update.id,
-      title: update.translations[0]?.title || update.title,
-      description: update.translations[0]?.description || update.description,
-      image: update.image,
-      videoUrl: update.videoUrl,
-      createdAt: update.createdAt.toISOString(),
-    }));
+    // Transform: requested locale → English → Arabic (base)
+    const transformedUpdates = updates.map((update) => {
+      const t = pickTranslation(update.translations, locale);
+      return {
+        id: update.id,
+        title: t?.title || update.title,
+        description: t?.description || update.description,
+        image: update.image,
+        videoUrl: update.videoUrl,
+        createdAt: update.createdAt.toISOString(),
+      };
+    });
 
     return NextResponse.json(transformedUpdates, {
       headers: {
@@ -175,7 +180,7 @@ export async function POST(request: NextRequest, { params }: ParamsPromise) {
     await writeAuditLog({
       ...actor,
       action: "CAMPAIGN_UPDATE_POST_CREATE",
-      messageAr: `${actor.actorName ?? "مسؤول"} أضاف تحديثًا للحملة «${campaign.title}»: ${fullUpdate?.title ?? data.title}`,
+      messageAr: `${actor.actorName ?? "مسؤول"} أضاف تحديثًا للمشروع «${campaign.title}»: ${fullUpdate?.title ?? data.title}`,
       entityType: "Update",
       entityId: update.id,
       metadata: { campaignId: id },

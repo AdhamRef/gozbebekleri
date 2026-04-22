@@ -12,6 +12,7 @@ import {
 } from "@/lib/campaign/campaign-modes";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog } from "@/lib/audit-log";
+import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -42,11 +43,11 @@ export async function GET(
           select: {
             id: true,
             name: true,
-            translations: { where: { locale }, take: 1, select: { name: true } }
+            translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true } }
           }
         },
         campaignIds: true,
-        translations: { where: { locale }, take: 1, select: { title: true, description: true, content: true, image: true, locale: true } }
+        translations: { where: translationLocaleWhere(locale), take: 2, select: { title: true, description: true, content: true, image: true, locale: true } }
       }
     });
 
@@ -70,15 +71,16 @@ export async function GET(
               fundraisingMode: true,
               sharePriceUSD: true,
               suggestedShareCounts: true,
-              translations: { where: { locale }, take: 1, select: { title: true, description: true } },
+              translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true, description: true } },
             },
           });
     const orderedCampaigns = orderCampaignsByIds(campaignIdList, campaignRows).map((c) => {
       const goalType = normalizeGoalType(c.goalType);
+      const tC = pickTranslation(c.translations, locale);
       return {
         id: c.id,
-        title: c.translations[0]?.title || c.title,
-        description: c.translations[0]?.description || c.description,
+        title: tC?.title || c.title,
+        description: tC?.description || c.description,
         targetAmount: c.targetAmount,
         currentAmount: c.currentAmount,
         images: c.images,
@@ -110,7 +112,7 @@ export async function GET(
         published: true,
         createdAt: true,
         updatedAt: true,
-        translations: { where: { locale }, take: 1, select: { title: true, description: true, content: true, image: true } }
+        translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true, description: true, content: true, image: true } }
       }
     });
 
@@ -129,19 +131,22 @@ export async function GET(
           published: true,
           createdAt: true,
           updatedAt: true,
-          translations: { where: { locale }, take: 1, select: { title: true, description: true, content: true, image: true } }
+          translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true, description: true, content: true, image: true } }
         }
       });
     }
 
+    const tPost = pickTranslation(post.translations, locale);
+    const tPostCat = pickTranslation(post.category?.translations, locale);
+
     const filteredPost = {
       id: post.id,
-      title: post.translations[0]?.title || post.title,
-      description: post.translations[0]?.description || post.description,
-      content: post.translations[0]?.content || post.content,
-      image: post.translations[0]?.image || post.image,
+      title: tPost?.title || post.title,
+      description: tPost?.description || post.description,
+      content: tPost?.content || post.content,
+      image: tPost?.image || post.image,
       published: post.published,
-      category: post.category ? { id: post.category.id, name: post.category.translations[0]?.name || post.category.name } : null,
+      category: post.category ? { id: post.category.id, name: tPostCat?.name || post.category.name } : null,
       campaigns: orderedCampaigns,
       /** @deprecated use campaigns[0] */
       campaign: orderedCampaigns[0] ?? null,
@@ -149,16 +154,19 @@ export async function GET(
       updatedAt: post.updatedAt,
     };
 
-    const filteredSimilar = similar.map(sp => ({
-      id: sp.id,
-      title: sp.translations[0]?.title || sp.title,
-      description: sp.translations[0]?.description || sp.description,
-      content: sp.translations[0]?.content || sp.content,
-      image: sp.translations[0]?.image || sp.image,
-      published: sp.published,
-      createdAt: sp.createdAt,
-      updatedAt: sp.updatedAt,
-    }));
+    const filteredSimilar = similar.map(sp => {
+      const tSp = pickTranslation(sp.translations, locale);
+      return {
+        id: sp.id,
+        title: tSp?.title || sp.title,
+        description: tSp?.description || sp.description,
+        content: tSp?.content || sp.content,
+        image: tSp?.image || sp.image,
+        published: sp.published,
+        createdAt: sp.createdAt,
+        updatedAt: sp.updatedAt,
+      };
+    });
 
     return NextResponse.json({ post: filteredPost, similarPosts: filteredSimilar });
   } catch (error) {

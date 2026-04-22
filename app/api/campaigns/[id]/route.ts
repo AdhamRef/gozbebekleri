@@ -22,6 +22,7 @@ import {
 } from "@/lib/campaign/campaign-modes";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog } from "@/lib/audit-log";
+import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 
 // ✅ Prisma Singleton - Reuse connection across requests
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
@@ -61,16 +62,17 @@ export async function GET(
         sharePriceUSD: true,
         suggestedShareCounts: true,
 
-        // Get ONLY current locale translation (not all 3)
+        // Requested locale + English fallback (base Arabic is on the model itself)
         translations: {
-          where: { locale }, // Filters at DB level
+          where: translationLocaleWhere(locale),
           select: {
+            locale: true,
             title: true,
             description: true,
           },
-          take: 1, // Only 1 translation needed
+          take: 2,
         },
-        
+
         // Category with translation
         category: {
           select: {
@@ -78,13 +80,13 @@ export async function GET(
             name: true,
             icon: true,
             translations: {
-              where: { locale },
-              select: { name: true },
-              take: 1,
+              where: translationLocaleWhere(locale),
+              select: { locale: true, name: true },
+              take: 2,
             },
           },
         },
-        
+
         // Updates with translations (limit to 20)
         updates: {
           select: {
@@ -95,12 +97,13 @@ export async function GET(
             videoUrl: true,
             createdAt: true,
             translations: {
-              where: { locale },
+              where: translationLocaleWhere(locale),
               select: {
+                locale: true,
                 title: true,
                 description: true,
               },
-              take: 1,
+              take: 2,
             },
           },
           orderBy: { createdAt: "desc" },
@@ -179,13 +182,16 @@ export async function GET(
     const fundraisingMode = normalizeFundraisingMode(campaign.fundraisingMode);
     const showProgress = showCampaignProgress(goalType);
 
+    const tCampaign = pickTranslation(campaign.translations, locale);
+    const tCategory = pickTranslation(campaign.category?.translations, locale);
+
     // ✅ STEP 3: Transform data to match frontend expectations
     const transformedCampaign = {
       id: campaign.id,
-      
-      // Use translation if available, fallback to Arabic
-      title: campaign.translations[0]?.title || campaign.title,
-      description: campaign.translations[0]?.description || campaign.description,
+
+      // Requested locale → English → Arabic (base) fallback
+      title: tCampaign?.title || campaign.title,
+      description: tCampaign?.description || campaign.description,
       
       images: campaign.images,
       videoUrl: campaign.videoUrl,
@@ -208,19 +214,22 @@ export async function GET(
       // Category with translation
       category: campaign.category ? {
         id: campaign.category.id,
-        name: campaign.category.translations[0]?.name || campaign.category.name,
+        name: tCategory?.name || campaign.category.name,
         icon: campaign.category.icon,
       } : null,
-      
+
       // Updates with translations
-      updates: campaign.updates.map((update) => ({
-        id: update.id,
-        title: update.translations[0]?.title || update.title,
-        description: update.translations[0]?.description || update.description,
-        image: update.image,
-        videoUrl: update.videoUrl,
-        createdAt: update.createdAt.toISOString(),
-      })),
+      updates: campaign.updates.map((update) => {
+        const tU = pickTranslation(update.translations, locale);
+        return {
+          id: update.id,
+          title: tU?.title || update.title,
+          description: tU?.description || update.description,
+          image: update.image,
+          videoUrl: update.videoUrl,
+          createdAt: update.createdAt.toISOString(),
+        };
+      }),
       
       // Donation statistics
       donationStats: {
@@ -445,13 +454,13 @@ export async function PUT(
     });
 
     const actor = session!.user;
-    const t = fullCampaign?.title ?? body.title ?? "حملة";
+    const t = fullCampaign?.title ?? body.title ?? "مشروع";
     await writeAuditLog({
       actorId: actor.id,
       actorName: actor.name,
       actorRole: actor.role ?? "ADMIN",
       action: "CAMPAIGN_UPDATE",
-      messageAr: `${actor.name ?? "مسؤول"} عدّل الحملة: ${t}`,
+      messageAr: `${actor.name ?? "مسؤول"} عدّل المشروع: ${t}`,
       messageEn: `${actor.name ?? "Admin"} updated campaign ${t}`,
       entityType: "Campaign",
       entityId: id,
@@ -535,12 +544,12 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       actorName: actor.name,
       actorRole: actor.role ?? "ADMIN",
       action: "CAMPAIGN_DELETE",
-      messageAr: `${actor.name ?? "مسؤول"} حذف الحملة: ${camp.title}`,
+      messageAr: `${actor.name ?? "مسؤول"} حذف المشروع: ${camp.title}`,
       entityType: "Campaign",
       entityId: id,
     });
 
-    return NextResponse.json({ message: 'تم مسح الحملة' }, { status: 200 });
+    return NextResponse.json({ message: 'تم مسح المشروع' }, { status: 200 });
   } catch (error) {
     console.error('Error deleting campaign:', error);
     return NextResponse.json({ error: 'Failed to delete campaign' }, { status: 500 });

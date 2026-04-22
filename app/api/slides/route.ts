@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from "../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
+import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,20 +24,23 @@ export async function GET(request: NextRequest) {
         buttonText: true,
         buttonLink: true,
         order: true,
-        translations: { where: { locale }, take: 1, select: { title: true, description: true, buttonText: true } },
+        translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true, description: true, buttonText: true } },
       },
     });
 
-    const items = slides.map(s => ({
-      id: s.id,
-      title: s.translations[0]?.title ?? s.title,
-      description: s.translations[0]?.description ?? s.description ?? '',
-      image: s.image,
-      showButton: s.showButton,
-      buttonText: s.translations[0]?.buttonText ?? s.buttonText ?? '',
-      buttonLink: s.buttonLink ?? '#quick_donate',
-      order: s.order,
-    }));
+    const items = slides.map(s => {
+      const t = pickTranslation(s.translations, locale);
+      return {
+        id: s.id,
+        title: t?.title ?? s.title,
+        description: t?.description ?? s.description ?? '',
+        image: s.image,
+        showButton: s.showButton,
+        buttonText: t?.buttonText ?? s.buttonText ?? '',
+        buttonLink: s.buttonLink ?? '#quick_donate',
+        order: s.order,
+      };
+    });
 
     return NextResponse.json({ items });
   } catch (error) {

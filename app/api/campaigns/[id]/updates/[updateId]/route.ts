@@ -10,6 +10,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../../../../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
+import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 
 type ParamsPromise = { params: Promise<{ id: string; updateId: string }> };
 
@@ -30,14 +31,15 @@ export async function GET(request: NextRequest, { params }: ParamsPromise) {
         createdAt: true,
         campaignId: true,
         
-        // Fetch translation for current locale
+        // Fetch requested locale + English (fallback chain)
         translations: {
-          where: { locale },
+          where: translationLocaleWhere(locale),
           select: {
+            locale: true,
             title: true,
             description: true,
           },
-          take: 1,
+          take: 2,
         },
       },
     });
@@ -49,11 +51,13 @@ export async function GET(request: NextRequest, { params }: ParamsPromise) {
       );
     }
 
-    // Transform: Use translation if available, fallback to Arabic
+    const t = pickTranslation(update.translations, locale);
+
+    // Transform: requested locale → English → Arabic (base)
     const transformedUpdate = {
       id: update.id,
-      title: update.translations[0]?.title || update.title,
-      description: update.translations[0]?.description || update.description,
+      title: t?.title || update.title,
+      description: t?.description || update.description,
       image: update.image,
       videoUrl: update.videoUrl,
       campaignId: update.campaignId,
@@ -180,7 +184,7 @@ export async function PATCH(request: NextRequest, { params }: ParamsPromise) {
     await writeAuditLog({
       ...actor,
       action: "CAMPAIGN_UPDATE_EDIT",
-      messageAr: `${actor.actorName ?? "مسؤول"} عدّل تحديث الحملة: ${fullUpdate?.title ?? existingUpdate.title}`,
+      messageAr: `${actor.actorName ?? "مسؤول"} عدّل تحديث المشروع: ${fullUpdate?.title ?? existingUpdate.title}`,
       entityType: "Update",
       entityId: updateId,
       metadata: { campaignId: fullUpdate?.campaignId },
@@ -228,7 +232,7 @@ export async function DELETE(request: NextRequest, { params }: ParamsPromise) {
     await writeAuditLog({
       ...actor,
       action: "CAMPAIGN_UPDATE_DELETE",
-      messageAr: `${actor.actorName ?? "مسؤول"} حذف تحديثًا من الحملة: ${existingUpdate.title}`,
+      messageAr: `${actor.actorName ?? "مسؤول"} حذف تحديثًا من المشروع: ${existingUpdate.title}`,
       entityType: "Update",
       entityId: updateId,
       metadata: { campaignId: existingUpdate.campaignId },

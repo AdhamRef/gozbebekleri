@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from "../../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
+import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 
 // GET: return a single category (localized) with optional counts
 export async function GET(
@@ -28,7 +29,7 @@ export async function GET(
         order: true,
         translations: allTranslations
           ? { select: { locale: true, name: true, description: true } }
-          : { where: { locale }, take: 1, select: { locale: true, name: true, description: true } },
+          : { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true, description: true } },
         ...(includeCounts ? { _count: { select: { campaigns: true } } } : {})
       }
     });
@@ -44,10 +45,11 @@ export async function GET(
       });
     }
 
+    const t = pickTranslation(category.translations, locale);
     const localized = {
       id: category.id,
-      name: category.translations[0]?.name || category.name,
-      description: category.translations[0]?.description || category.description,
+      name: t?.name || category.name,
+      description: t?.description || category.description,
       image: category.image,
       icon: category.icon,
       order: category.order,
@@ -130,7 +132,7 @@ export async function PUT(
     await writeAuditLog({
       ...actor,
       action: "CATEGORY_UPDATE",
-      messageAr: `${actor.actorName ?? "مسؤول"} عدّل القسم: ${full?.name ?? name}`,
+      messageAr: `${actor.actorName ?? "مسؤول"} عدّل الحملة: ${full?.name ?? name}`,
       entityType: "Category",
       entityId: id,
     });
@@ -174,7 +176,7 @@ export async function DELETE(
     await writeAuditLog({
       ...actor,
       action: "CATEGORY_DELETE",
-      messageAr: `${actor.actorName ?? "مسؤول"} حذف القسم: ${cat?.name ?? id}`,
+      messageAr: `${actor.actorName ?? "مسؤول"} حذف الحملة: ${cat?.name ?? id}`,
       entityType: "Category",
       entityId: id,
     });

@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from "../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog } from "@/lib/audit-log";
+import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 
 // GET: supports locale-aware translations, search, cursor pagination, optional counts, and sorting
 export async function GET(request: NextRequest) {
@@ -34,8 +35,8 @@ export async function GET(request: NextRequest) {
         icon: true,
         order: true,
         translations: {
-          where: { locale },
-          take: 1,
+          where: translationLocaleWhere(locale),
+          take: 2,
           select: { locale: true, name: true, description: true }
         },
         ...(includeCounts ? { _count: { select: { campaigns: true } } } : {})
@@ -46,8 +47,9 @@ export async function GET(request: NextRequest) {
     let filtered = categories;
     if (search) {
       filtered = categories.filter(cat => {
-        const name = cat.translations[0]?.name || cat.name || '';
-        const description = cat.translations[0]?.description || cat.description || '';
+        const t = pickTranslation(cat.translations, locale);
+        const name = t?.name || cat.name || '';
+        const description = t?.description || cat.description || '';
         return (
           name.toLowerCase().includes(search) ||
           description.toLowerCase().includes(search)
@@ -59,15 +61,18 @@ export async function GET(request: NextRequest) {
     const items = hasMore ? filtered.slice(0, -1) : filtered;
     const nextCursor = hasMore ? items[items.length - 1]?.id : null;
 
-    const transformed = items.map(cat => ({
-      id: cat.id,
-      name: cat.translations[0]?.name || cat.name,
-      description: cat.translations[0]?.description || cat.description,
-      image: cat.image,
-      icon: cat.icon,
-      order: cat.order,
-      campaignCount: cat._count?.campaigns ?? undefined,
-    }));
+    const transformed = items.map(cat => {
+      const t = pickTranslation(cat.translations, locale);
+      return {
+        id: cat.id,
+        name: t?.name || cat.name,
+        description: t?.description || cat.description,
+        image: cat.image,
+        icon: cat.icon,
+        order: cat.order,
+        campaignCount: cat._count?.campaigns ?? undefined,
+      };
+    });
 
     return NextResponse.json({
       items: transformed,
@@ -157,7 +162,7 @@ export async function POST(request: NextRequest) {
       actorName: actor.name,
       actorRole: actor.role ?? "ADMIN",
       action: "CATEGORY_CREATE",
-      messageAr: `${actor.name ?? "مسؤول"} أنشأ قسمًا جديدًا: ${full?.name ?? name}`,
+      messageAr: `${actor.name ?? "مسؤول"} أنشأ حملةًا جديدًا: ${full?.name ?? name}`,
       entityType: "Category",
       entityId: category.id,
     });

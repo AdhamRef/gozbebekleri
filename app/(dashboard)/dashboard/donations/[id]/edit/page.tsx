@@ -24,8 +24,8 @@ export default function EditCampaignPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">تعديل الحملة</h1>
-          <p className="text-gray-600">قم بتحديث معلومات الحملة</p>
+          <h1 className="text-2xl font-bold text-gray-800">تعديل المشروع</h1>
+          <p className="text-gray-600">قم بتحديث معلومات المشروع</p>
         </div>
       </div>
 
@@ -38,10 +38,10 @@ export default function EditCampaignPage() {
             name="description"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>وصف الحملة</FormLabel>
+                <FormLabel>وصف المشروع</FormLabel>
                 <FormControl>
                   <Textarea
-                    placeholder="اكتب وصفاً تفصيلياً للحملة..."
+                    placeholder="اكتب وصفاً تفصيلياً للمشروع..."
                     className="min-h-[200px] resize-y"
                     {...field}
                   />

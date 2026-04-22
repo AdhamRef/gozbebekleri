@@ -6,7 +6,7 @@ import ar from "../../../i18n/messages/ar.json";
 
 export const metadata: Metadata = {
   title: "لوحة التحكم | قرة العيون",
-  description: "إدارة الحملات والتبرعات والمستخدمين",
+  description: "إدارة المشاريع والتبرعات والمستخدمين",
   icons: { icon: "https://i.ibb.co/Q7KLSBpH/gozbebekleri.png" },
   robots: { index: false, follow: false },
 };

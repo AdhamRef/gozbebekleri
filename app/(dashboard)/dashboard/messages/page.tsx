@@ -181,7 +181,7 @@ export default function MessagesPage() {
                 </Select>
               </div>
               <div className="space-y-2 text-right">
-                <label className="text-[11px] font-medium text-slate-500">القسم / النوع</label>
+                <label className="text-[11px] font-medium text-slate-500">الحملة / النوع</label>
                 <Select value={subjectFilter} onValueChange={setSubjectFilter}>
                   <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50">
                     <SelectValue placeholder="الكل" />
@@ -236,7 +236,7 @@ export default function MessagesPage() {
                     <tr className="border-b border-slate-200 bg-slate-50/80">
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">الرسالة</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">المرسل</th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">القسم</th>
+                      <th className="text-right py-3 px-4 font-semibold text-slate-700">الحملة</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">اللغة</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">التاريخ</th>
                       <th className="text-left py-3 px-4 font-semibold text-slate-700">الإجراء</th>

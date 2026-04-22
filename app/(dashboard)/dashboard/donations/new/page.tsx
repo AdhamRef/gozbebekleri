@@ -41,7 +41,7 @@ const formSchema = z.object({
     .min(1, 'المبلغ المستهدف ($) مطلوب')
     .max(1000000, 'المبلغ المستهدف ($) كبير جداً'),
   categoryId: z.string()
-    .min(1, 'القسم مطلوب'),
+    .min(1, 'الحملة مطلوب'),
   isActive: z.boolean(),
   images: z.array(z.string())
     .min(1, 'صورة واحدة على الأقل مطلوبة')
@@ -83,7 +83,7 @@ export default function NewCampaignPage() {
         setCategories(response.data);
       } catch (error) {
         console.error('Error fetching categories:', error);
-        toast.error('فشل في تحميل الأقسام');
+        toast.error('فشل في تحميل الحملات');
       } finally {
         setLoading(false);
       }
@@ -96,11 +96,11 @@ export default function NewCampaignPage() {
     setSaving(true);
     try {
       await axios.post('/api/campaigns', values);
-      toast.success('تم إنشاء الحملة بنجاح');
+      toast.success('تم إنشاء المشروع بنجاح');
       router.push('/dashboard/campaigns');
     } catch (error) {
       console.error('Error creating campaign:', error);
-      toast.error('فشل في إنشاء الحملة');
+      toast.error('فشل في إنشاء المشروع');
     } finally {
       setSaving(false);
     }
@@ -174,8 +174,8 @@ export default function NewCampaignPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">إنشاء حملة جديدة</h1>
-          <p className="text-gray-600">قم بإدخال معلومات الحملة</p>
+          <h1 className="text-2xl font-bold text-gray-800">إنشاء مشروع جديدة</h1>
+          <p className="text-gray-600">قم بإدخال معلومات المشروع</p>
         </div>
         <Button
           variant="outline"
@@ -199,9 +199,9 @@ export default function NewCampaignPage() {
                 name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>عنوان الحملة</FormLabel>
+                    <FormLabel>عنوان المشروع</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="أدخل عنوان الحملة" />
+                      <Input {...field} placeholder="أدخل عنوان المشروع" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -214,14 +214,14 @@ export default function NewCampaignPage() {
                 name="categoryId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>القسم</FormLabel>
+                    <FormLabel>الحملة</FormLabel>
                     <Select
                       value={field.value}
                       onValueChange={field.onChange}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="اختر القسم" />
+                          <SelectValue placeholder="اختر الحملة" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -284,17 +284,17 @@ export default function NewCampaignPage() {
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>وصف الحملة</FormLabel>
+                  <FormLabel>وصف المشروع</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="اكتب وصفاً تفصيلياً للحملة..."
+                      placeholder="اكتب وصفاً تفصيلياً للمشروع..."
                       className="min-h-[300px] resize-y"
                       {...field}
                     />
                   </FormControl>
                   <FormMessage />
                   <FormDescription>
-                    يمكنك كتابة وصف تفصيلي للحملة. يدعم النص العربي والإنجليزي.
+                    يمكنك كتابة وصف تفصيلي للمشروع. يدعم النص العربي والإنجليزي.
                   </FormDescription>
                 </FormItem>
               )}
@@ -308,7 +308,7 @@ export default function NewCampaignPage() {
               name="images"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>صور الحملة</FormLabel>
+                  <FormLabel>صور المشروع</FormLabel>
                   <FormControl>
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -358,7 +358,7 @@ export default function NewCampaignPage() {
                         )}
                       </div>
                       <FormDescription>
-                        يمكنك رفع حتى 5 صور للحملة. الصورة الأولى ستكون الصورة الرئيسية.
+                        يمكنك رفع حتى 5 صور للمشروع. الصورة الأولى ستكون الصورة الرئيسية.
                       </FormDescription>
                     </div>
                   </FormControl>
@@ -376,9 +376,9 @@ export default function NewCampaignPage() {
               render={({ field }) => (
                 <FormItem className="flex items-center justify-between">
                   <div>
-                    <FormLabel>حالة الحملة</FormLabel>
+                    <FormLabel>حالة المشروع</FormLabel>
                     <FormDescription>
-                      تحديد ما إذا كانت الحملة نشطة أم لا
+                      تحديد ما إذا كانت المشروع نشطة أم لا
                     </FormDescription>
                   </div>
                   <FormControl>
@@ -407,7 +407,7 @@ export default function NewCampaignPage() {
               disabled={saving}
             >
               {saving && <Loader2 className="w-4 h-4 ml-2 animate-spin" />}
-              إنشاء الحملة
+              إنشاء المشروع
             </Button>
           </div>
         </form>

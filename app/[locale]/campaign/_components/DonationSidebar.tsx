@@ -161,13 +161,15 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
                       {t("from")} {formatMoney(campaign.targetAmount)}
                     </span>
                   ) : campaign.fundraisingMode === "SHARES" ? (
-                    <span className="text-xs text-violet-700 bg-violet-50 px-2 py-1 rounded-md">
-                      {t("sharesCampaignBadge")}
-                    </span>
+                    // <span className="text-xs text-violet-700 bg-violet-50 px-2 py-1 rounded-md">
+                    //   {t("sharesCampaignBadge")}
+                    // </span>
+                    <></>
                   ) : (
-                    <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md">
-                      {t("openGoalBadge")}
-                    </span>
+                    // <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md">
+                    //   {t("openGoalBadge")}
+                    // </span>
+                    <></>
                   )}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-600">
@@ -282,13 +284,15 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
                         {campaign.fundraisingMode === "SHARES" &&
                         campaign.sharePriceUSD != null &&
                         campaign.sharePriceUSD > 0 ? (
-                          <p className="text-white bg-violet-600 px-2 py-1 rounded-md text-sm font-medium">
-                            {t("sharesCampaignBadge")}
-                          </p>
+                          // <p className="text-white bg-violet-600 px-2 py-1 rounded-md text-sm font-medium">
+                          //   {t("sharesCampaignBadge")}
+                          // </p>
+                          <></>
                         ) : (
-                          <p className="text-white bg-emerald-600 px-2 py-1 rounded-md text-sm font-medium">
-                            {t("openGoalBadge")}
-                          </p>
+                          // <p className="text-white bg-emerald-600 px-2 py-1 rounded-md text-sm font-medium">
+                          //   {t("openGoalBadge")}
+                          // </p>
+                          <></>
                         )}
                       </>
                     )}

@@ -386,7 +386,7 @@ export default function ReferralAnalyticsPage() {
   const oneTimeTotal = stats.oneTimeTotalAmount ?? 0;
   const monthlyTotal = stats.monthlyTotalAmount ?? 0;
   const revenueSplitData = [
-    { name: "حملات", value: stats.campaignDonationsTotal ?? 0, count: stats.campaignDonationsCount ?? 0, color: "#2563eb" },
+    { name: "مشاريع", value: stats.campaignDonationsTotal ?? 0, count: stats.campaignDonationsCount ?? 0, color: "#2563eb" },
     { name: "فئات", value: stats.categoryDonationsTotal ?? 0, count: stats.categoryDonationsCount ?? 0, color: "#64748b" },
   ].filter((d) => d.value > 0 || d.count > 0);
   const typeSplitData = [
@@ -446,7 +446,7 @@ export default function ReferralAnalyticsPage() {
                   icon={DollarSign}
                   accent="emerald"
                   format="money"
-                  subtitle="كل تبرعات الرابط الناجحة — دون تصفية الفئة أو الحملة"
+                  subtitle="كل تبرعات الرابط الناجحة — دون تصفية الفئة أو المشروع"
                 />
                 <StatsMetricCard compact title={thisMonthRevenueTitle} value={stats.thisMonthRevenue ?? 0} icon={Calendar} accent="emerald" format="money" subtitle="ناجح — الشهر الحالي (UTC)" />
                 <StatsMetricCard compact title="إيرادات شهرية متكررة" value={stats.monthlyRecurringRevenue ?? 0} icon={Repeat} accent="emerald" format="money" subtitle="اشتراكات نشطة" />
@@ -547,16 +547,16 @@ export default function ReferralAnalyticsPage() {
                 </Select>
               </div>
               <div className="space-y-1 text-right">
-                <label className="text-[11px] font-medium text-slate-500">الحملة</label>
+                <label className="text-[11px] font-medium text-slate-500">المشروع</label>
                 <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
                   <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
-                    <SelectValue placeholder="اختر الحملة" />
+                    <SelectValue placeholder="اختر المشروع" />
                   </SelectTrigger>
                   <SelectContent>
                     <div className="p-2 border-b border-slate-100">
                       <Input placeholder="بحث..." value={searchCampaign} onChange={(e) => setSearchCampaign(e.target.value)} className="w-full h-8 text-xs" />
                     </div>
-                    <SelectItem value="all" className="text-xs">جميع الحملات</SelectItem>
+                    <SelectItem value="all" className="text-xs">جميع المشاريع</SelectItem>
                     {campaigns
                       .filter(
                         (c) =>
@@ -710,7 +710,7 @@ export default function ReferralAnalyticsPage() {
                 <TabsContent value="split" className="mt-0" dir="rtl">
                   <Tabs defaultValue="one-time-monthly" className="w-full" dir="rtl">
                     <TabsList className="bg-slate-100 p-1 rounded-lg mb-4 inline-flex flex-row-reverse">
-                      <TabsTrigger value="campaign-category" className="data-[state=active]:bg-card data-[state=active]:shadow-sm text-sm">حملات vs فئات</TabsTrigger>
+                      <TabsTrigger value="campaign-category" className="data-[state=active]:bg-card data-[state=active]:shadow-sm text-sm">مشاريع vs فئات</TabsTrigger>
                       <TabsTrigger value="one-time-monthly" className="data-[state=active]:bg-card data-[state=active]:shadow-sm text-sm">مرة واحدة vs شهرية</TabsTrigger>
                     </TabsList>
                     <TabsContent value="campaign-category" className="mt-0">
@@ -807,7 +807,7 @@ export default function ReferralAnalyticsPage() {
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">دعم الفريق</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">مشاركة الرسوم</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">النوع</th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">الحملة / الفئة</th>
+                      <th className="text-right py-3 px-4 font-semibold text-slate-700">المشروع / الفئة</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">التاريخ</th>
                     </tr>
                   </thead>

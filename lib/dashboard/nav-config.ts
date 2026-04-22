@@ -27,8 +27,8 @@ export const DASHBOARD_NAV_GROUPS: {
   {
     group: "إدارة المحتوى",
     items: [
-      { key: "campaigns", title: "الحملات", href: "/dashboard/campaigns" },
-      { key: "categories", title: "الأقسام", href: "/dashboard/categories" },
+      { key: "campaigns", title: "المشاريع", href: "/dashboard/campaigns" },
+      { key: "categories", title: "الحملات", href: "/dashboard/categories" },
       { key: "blog", title: "المدونة", href: "/dashboard/blog" },
     ],
   },

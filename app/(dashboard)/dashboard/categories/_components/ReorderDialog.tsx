@@ -94,12 +94,12 @@ export const ReorderDialog = ({ categories, onReorder }: {
         categories: updatedCategories,
       });
 
-      toast.success('تم إعادة ترتيب الأقسام بنجاح');
+      toast.success('تم إعادة ترتيب الحملات بنجاح');
       onReorder();
       setIsOpen(false);
     } catch (error) {
       console.error('Error reordering categories:', error);
-      toast.error('فشل في إعادة ترتيب الأقسام');
+      toast.error('فشل في إعادة ترتيب الحملات');
     } finally {
       setIsSubmitting(false);
     }
@@ -115,11 +115,11 @@ export const ReorderDialog = ({ categories, onReorder }: {
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>إعادة ترتيب الأقسام</DialogTitle>
+          <DialogTitle>إعادة ترتيب الحملات</DialogTitle>
         </DialogHeader>
         <div className="py-4">
           <p className="text-sm text-gray-500 mb-4">
-            اسحب وأفلت الأقسام لإعادة ترتيبها
+            اسحب وأفلت الحملات لإعادة ترتيبها
           </p>
           <DndProvider backend={HTML5Backend}>
             <div className="max-h-[400px] overflow-y-auto">

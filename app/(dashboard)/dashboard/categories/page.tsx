@@ -92,7 +92,7 @@ export default function CategoriesPage() {
       setCategories(normalized);
     } catch (error) {
       console.error('Error fetching categories:', error);
-      toast.error('فشل في تحميل الأقسام');
+      toast.error('فشل في تحميل الحملات');
     } finally {
       setLoading(false);
     }
@@ -110,26 +110,26 @@ export default function CategoriesPage() {
   const handleDelete = async (category: Category) => {
     const count = (category as any).campaignCount ?? (category.campaigns?.length ?? 0);
     if (count > 0) {
-      toast.error('لا يمكن حذف قسم يحتوي على حملات');
+      toast.error('لا يمكن حذف حملة تحتوي على مشاريع');
       return;
     }
     setCategoryToDelete(category);
   };
 
   const handleBulkDelete = async () => {
-    if (!window.confirm(`هل أنت متأكد من حذف ${selectedCategories.length} قسم؟`)) return;
+    if (!window.confirm(`هل أنت متأكد من حذف ${selectedCategories.length} حملة؟`)) return;
     
     setDeleteLoading(true);
     try {
       await Promise.all(
         selectedCategories.map(id => axios.delete(`/api/categories/${id}`))
       );
-      toast.success('تم حذف الأقسام المحددة بنجاح');
+      toast.success('تم حذف الحملات المحددة بنجاح');
       fetchCategories();
       setSelectedCategories([]);
     } catch (error) {
       console.error('Error deleting categories:', error);
-      toast.error('فشل في حذف الأقسام');
+      toast.error('فشل في حذف الحملات');
     } finally {
       setDeleteLoading(false);
     }
@@ -141,11 +141,11 @@ export default function CategoriesPage() {
     setDeleteLoading(true);
     try {
       await axios.delete(`/api/categories/${categoryToDelete.id}`);
-      toast.success('تم حذف القسم بنجاح');
+      toast.success('تم حذف الحملة بنجاح');
       fetchCategories();
     } catch (error) {
       console.error('Error deleting category:', error);
-      toast.error('فشل في حذف القسم');
+      toast.error('فشل في حذف الحملة');
     } finally {
       setDeleteLoading(false);
       setCategoryToDelete(null);
@@ -209,8 +209,8 @@ export default function CategoriesPage() {
     <div className="space-y-4 sm:space-y-6 p-0 sm:p-2">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground">الأقسام</h1>
-          <p className="text-sm text-muted-foreground">إدارة أقسام الحملات</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">الحملات</h1>
+          <p className="text-sm text-muted-foreground">إدارة الحملات ومشاريعها</p>
         </div>
         <div className="flex flex-wrap gap-2 sm:gap-3">
           {selectedCategories.length > 0 && (
@@ -230,7 +230,7 @@ export default function CategoriesPage() {
             className="bg-[#025EB8] hover:bg-[#014fa0] gap-2"
           >
             <Plus className="w-4 h-4" />
-            قسم جديد
+            حملة جديدة
           </Button>
         </div>
       </div>
@@ -240,7 +240,7 @@ export default function CategoriesPage() {
         <div className="relative flex-1 min-w-0">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <Input
-            placeholder="ابحث عن قسم..."
+            placeholder="ابحث عن حملة..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-4 pr-10"
@@ -251,12 +251,12 @@ export default function CategoriesPage() {
           onValueChange={(value: 'all' | 'with' | 'without') => setCampaignsFilter(value)}
         >
           <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="الحملات" />
+            <SelectValue placeholder="المشاريع" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">جميع الأقسام</SelectItem>
-            <SelectItem value="with">أقسام بها حملات</SelectItem>
-            <SelectItem value="without">أقسام بدون حملات</SelectItem>
+            <SelectItem value="all">جميع الحملات</SelectItem>
+            <SelectItem value="with">حملات بها مشاريع</SelectItem>
+            <SelectItem value="without">حملات بدون مشاريع</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -278,12 +278,12 @@ export default function CategoriesPage() {
                 onClick={() => handleSort('name')}
               >
                 <div className="flex items-center gap-2">
-                  اسم القسم
+                  اسم الحملة
                   <ArrowUpDown className="w-4 h-4" />
                 </div>
               </TableHead>
               <TableHead className="text-start">الوصف</TableHead>
-              <TableHead className="text-start">عدد الحملات</TableHead>
+              <TableHead className="text-start">عدد المشاريع</TableHead>
               <TableHead className="text-start">الصورة</TableHead>
               <TableHead className="text-center">الإجراءات</TableHead>
             </TableRow>
@@ -321,7 +321,7 @@ export default function CategoriesPage() {
                       size="icon"
                       onClick={() => setPriorityDialog({ id: category.id, name: category.name })}
                       className="text-amber-600 hover:bg-amber-50"
-                      title="أولويات الحملات داخل القسم"
+                      title="أولويات المشاريع داخل الحملة"
                     >
                       <Crown className="w-4 h-4" />
                     </Button>
@@ -350,13 +350,13 @@ export default function CategoriesPage() {
             {paginatedCategories.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8">
-                  <p className="text-gray-500">لا توجد أقسام</p>
+                  <p className="text-gray-500">لا توجد حملات</p>
                   <Button
                     variant="link"
                     onClick={() => router.push('/dashboard/categories/new')}
                     className="mt-2"
                   >
-                    إضافة قسم جديد
+                    إضافة حملة جديدة
                   </Button>
                 </TableCell>
               </TableRow>
@@ -410,9 +410,9 @@ export default function CategoriesPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>هل أنت متأكد من حذف هذا القسم؟</AlertDialogTitle>
+            <AlertDialogTitle>هل أنت متأكد من حذف هذه الحملة؟</AlertDialogTitle>
             <AlertDialogDescription>
-              سيتم حذف القسم نهائياً ولا يمكن التراجع عن هذا الإجراء.
+              سيتم حذف الحملة نهائياً ولا يمكن التراجع عن هذا الإجراء.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

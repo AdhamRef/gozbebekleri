@@ -81,7 +81,7 @@ export async function POST(request: NextRequest, { params }: ParamsPromise) {
     await writeAuditLog({
       ...actor,
       action: "CAMPAIGN_COMMENT_CREATE",
-      messageAr: `${actor.actorName ?? "مستخدم"} علّق على الحملة «${camp?.title ?? id}»`,
+      messageAr: `${actor.actorName ?? "مستخدم"} علّق على المشروع «${camp?.title ?? id}»`,
       entityType: "Comment",
       entityId: comment.id,
       metadata: { campaignId: id },
@@ -144,8 +144,8 @@ export async function DELETE(request: NextRequest, { params }: ParamsPromise) {
       ...actor,
       action: "CAMPAIGN_COMMENT_DELETE",
       messageAr: canModerate
-        ? `${actor.actorName ?? "مسؤول"} حذف تعليقًا على حملة (إشراف)`
-        : `${actor.actorName ?? "مستخدم"} حذف تعليقه على حملة`,
+        ? `${actor.actorName ?? "مسؤول"} حذف تعليقًا على مشروع (إشراف)`
+        : `${actor.actorName ?? "مستخدم"} حذف تعليقه على مشروع`,
       entityType: "Comment",
       entityId: commentId,
       metadata: { campaignId: comment.campaignId },
@@ -219,7 +219,7 @@ export async function PATCH(request: NextRequest, { params }: ParamsPromise) {
     await writeAuditLog({
       ...actor,
       action: "CAMPAIGN_COMMENT_UPDATE",
-      messageAr: `${actor.actorName ?? "مستخدم"} عدّل تعليقه على حملة`,
+      messageAr: `${actor.actorName ?? "مستخدم"} عدّل تعليقه على مشروع`,
       entityType: "Comment",
       entityId: commentId,
       metadata: { campaignId: comment.campaignId },

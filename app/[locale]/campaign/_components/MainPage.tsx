@@ -789,7 +789,7 @@ const MainPage = ({ id, locale }: {id:string; locale?: string}) => {
 
           {/* Sidebar */}
           <div className="max-sm:hidden col-span-4">
-            <div className="sticky top-28">
+            <div className="sticky top-32">
               <DonationSidebar campaign={campaign} />
             </div>
           </div>

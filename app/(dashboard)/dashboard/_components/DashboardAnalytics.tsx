@@ -453,7 +453,7 @@ export default function DashboardPage() {
   const monthlyTotal = stats?.monthlyTotalAmount ?? 0;
   const revenueSplitData = [
     {
-      name: "حملات",
+      name: "مشاريع",
       value: stats?.campaignDonationsTotal ?? 0,
       count: stats?.campaignDonationsCount ?? 0,
       color: "#2563eb",
@@ -583,7 +583,7 @@ export default function DashboardPage() {
             {statCardSet === "overview" && (
               <>
                 <StatsCard
-                  title="الحملات"
+                  title="المشاريع"
                   value={stats?.totalCampaigns ?? 0}
                   icon={Heart}
                   accent="teal"
@@ -644,7 +644,7 @@ export default function DashboardPage() {
         </section>
         )}
 
-        {/* تصفية النتائج — تؤثر على الرسم وجدول التبرعات (فترة، فئة، حملة، مستخدم، نوع الرسم) */}
+        {/* تصفية النتائج — تؤثر على الرسم وجدول التبرعات (فترة، فئة، مشروع، مستخدم، نوع الرسم) */}
         <Card className="border-border shadow-sm">
           <CardHeader className="py-4">
             <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2 justify-end">
@@ -736,11 +736,11 @@ export default function DashboardPage() {
   {/* Campaign */}
   <div className="space-y-1 text-right">
     <label className="text-[11px] font-medium text-slate-500">
-      الحملة
+      المشروع
     </label>
     <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
       <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
-        <SelectValue placeholder="اختر الحملة" />
+        <SelectValue placeholder="اختر المشروع" />
       </SelectTrigger>
       <SelectContent>
         <div className="p-2 border-b border-slate-100">
@@ -751,7 +751,7 @@ export default function DashboardPage() {
             className="w-full h-8 text-xs"
           />
         </div>
-        <SelectItem value="all" className="text-xs">جميع الحملات</SelectItem>
+        <SelectItem value="all" className="text-xs">جميع المشاريع</SelectItem>
         {campaigns
           .filter(
             (c) =>
@@ -1249,7 +1249,7 @@ export default function DashboardPage() {
                         value="campaign-category"
                         className="data-[state=active]:bg-card data-[state=active]:shadow-sm text-sm"
                       >
-                        حملات vs فئات
+                        مشاريع vs فئات
                       </TabsTrigger>
                       <TabsTrigger
                         value="one-time-monthly"
@@ -1411,7 +1411,7 @@ export default function DashboardPage() {
                         النوع
                       </th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">
-                        الحملة / الفئة
+                        المشروع / الفئة
                       </th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">
                         التاريخ

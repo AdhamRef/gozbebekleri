@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog } from "@/lib/audit-log";
+import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,9 +16,9 @@ export async function GET(request: NextRequest) {
       orderBy: { order: "asc" },
       include: {
         translations: {
-          where: { locale },
-          take: 1,
-          select: { name: true },
+          where: translationLocaleWhere(locale),
+          take: 2,
+          select: { locale: true, name: true },
         },
       },
     });
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
       criteria: b.criteria,
       order: b.order,
       createdAt: b.createdAt,
-      translatedName: b.translations[0]?.name ?? b.name,
+      translatedName: pickTranslation(b.translations, locale)?.name ?? b.name,
     }));
     return NextResponse.json({ badges: items });
   } catch (error) {

@@ -116,7 +116,7 @@ export const CategoryCampaignPriorityDialog = ({
         );
       } catch (err) {
         console.error(err);
-        toast.error('فشل في تحميل الحملات');
+        toast.error('فشل في تحميل المشاريع');
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -129,11 +129,11 @@ export const CategoryCampaignPriorityDialog = ({
     if (!campaign) return;
 
     if (selectedCampaigns.length >= 12) {
-      toast.error('يمكنك اختيار 12 حملة كحد أقصى');
+      toast.error('يمكنك اختيار 12 مشروع كحد أقصى');
       return;
     }
     if (selectedCampaigns.some((c) => c.id === campaignId)) {
-      toast.error('هذه الحملة مضافة بالفعل');
+      toast.error('هذا المشروع مضاف بالفعل');
       return;
     }
     setSelectedCampaigns((prev) => [...prev, campaign]);
@@ -158,12 +158,12 @@ export const CategoryCampaignPriorityDialog = ({
       await axios.post(`/api/categories/${categoryId}/prioritized-campaigns`, {
         campaigns: payload,
       });
-      toast.success('تم إعادة ترتيب الحملات بنجاح');
+      toast.success('تم إعادة ترتيب المشاريع بنجاح');
       onSaved?.();
       onOpenChange(false);
     } catch (error) {
       console.error(error);
-      toast.error('فشل في إعادة ترتيب الحملات');
+      toast.error('فشل في إعادة ترتيب المشاريع');
     } finally {
       setIsSubmitting(false);
     }
@@ -175,16 +175,16 @@ export const CategoryCampaignPriorityDialog = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Crown className="w-5 h-5 text-[#025EB8]" />
-            أولويات الحملات — {categoryName}
+            أولويات المشاريع — {categoryName}
           </DialogTitle>
         </DialogHeader>
 
         <div className="py-4">
           <p className="text-sm text-gray-500 mb-4">
-            اختر الحملات التي تريد عرضها بالترتيب داخل هذا القسم. الحد الأقصى 12 حملة.
+            اختر المشاريع التي تريد عرضها بالترتيب داخل هذه الحملة. الحد الأقصى 12 مشروعًا.
             <br />
             <span className="text-xs mt-1 block">
-              ({selectedCampaigns.length}/12 حملات مختارة)
+              ({selectedCampaigns.length}/12 مشاريع مختارة)
             </span>
           </p>
 
@@ -197,7 +197,7 @@ export const CategoryCampaignPriorityDialog = ({
                 className="w-full justify-between font-normal text-muted-foreground"
                 disabled={isLoading}
               >
-                {isLoading ? 'جارٍ التحميل…' : 'اختر حملة لإضافتها'}
+                {isLoading ? 'جارٍ التحميل…' : 'اختر مشروع لإضافتها'}
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
@@ -207,7 +207,7 @@ export const CategoryCampaignPriorityDialog = ({
               style={{ width: 'var(--radix-popover-trigger-width)' }}
             >
               <Command>
-                <CommandInput placeholder="ابحث عن حملة..." />
+                <CommandInput placeholder="ابحث عن مشروع..." />
                 <CommandList>
                   <CommandEmpty>لا توجد نتائج</CommandEmpty>
                   <CommandGroup>
@@ -236,7 +236,7 @@ export const CategoryCampaignPriorityDialog = ({
             <div className="mt-4 space-y-2">
               {selectedCampaigns.length === 0 ? (
                 <p className="text-sm text-gray-500 text-center py-4">
-                  لم يتم اختيار أي حملات بعد
+                  لم يتم اختيار أي مشاريع بعد
                 </p>
               ) : (
                 <div className="max-h-[400px] overflow-y-auto">

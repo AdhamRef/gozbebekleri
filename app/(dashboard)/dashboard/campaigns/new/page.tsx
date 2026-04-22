@@ -67,7 +67,7 @@ const formSchema = z
   fundraisingMode: z.enum(['AMOUNT', 'SHARES']),
   sharePriceUSD: z.number().min(0).max(1000000).optional(),
   categoryId: z.string()
-    .min(1, 'القسم مطلوب'),
+    .min(1, 'الحملة مطلوب'),
   isActive: z.boolean(),
   images: z.array(z.string())
     .min(1, 'صورة واحدة على الأقل مطلوبة')
@@ -92,7 +92,7 @@ const formSchema = z
     if (data.fundraisingMode === 'SHARES' && (!data.sharePriceUSD || data.sharePriceUSD <= 0)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'أدخل سعر السهم الواحد بالدولار الأمريكي لحملات السهوم',
+        message: 'أدخل سعر السهم الواحد بالدولار الأمريكي لمشاريع السهوم',
         path: ['sharePriceUSD'],
       });
     }
@@ -186,7 +186,7 @@ export default function NewCampaignPage() {
         setCategories(response.data.items);
       } catch (error) {
         console.error('Error fetching categories:', error);
-        toast.error('فشل في تحميل الأقسام');
+        toast.error('فشل في تحميل الحملات');
       } finally {
         setLoading(false);
       }
@@ -237,11 +237,11 @@ export default function NewCampaignPage() {
       };
 
       await axios.post('/api/campaigns', requestData);
-      toast.success('تم إنشاء الحملة بنجاح');
+      toast.success('تم إنشاء المشروع بنجاح');
       router.push('/dashboard/campaigns');
     } catch (error) {
       console.error('Error creating campaign:', error);
-      toast.error('فشل في إنشاء الحملة');
+      toast.error('فشل في إنشاء المشروع');
     } finally {
       setSaving(false);
     }
@@ -327,8 +327,8 @@ const getTranslationStatus = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">إنشاء حملة جديدة</h1>
-          <p className="text-gray-600">قم بإدخال معلومات الحملة</p>
+          <h1 className="text-2xl font-bold text-gray-800">إنشاء مشروع جديدة</h1>
+          <p className="text-gray-600">قم بإدخال معلومات المشروع</p>
           
           {/* ✅ Translation Status Badge */}
           <div className="flex items-center gap-2 mt-2">
@@ -408,11 +408,11 @@ const getTranslationStatus = () => {
                     name="categoryId"
                     render={({ field }) => (
                       <FormItem dir='rtl'>
-                        <FormLabel>القسم *</FormLabel>
+                        <FormLabel>الحملة *</FormLabel>
                         <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="اختر القسم" />
+                              <SelectValue placeholder="اختر الحملة" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -433,9 +433,9 @@ const getTranslationStatus = () => {
                     name="title"
                     render={({ field }) => (
                       <FormItem dir='rtl'>
-                        <FormLabel>عنوان الحملة *</FormLabel>
+                        <FormLabel>عنوان المشروع *</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="أدخل عنوان الحملة" />
+                          <Input {...field} placeholder="أدخل عنوان المشروع" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -445,14 +445,14 @@ const getTranslationStatus = () => {
                 </div>
 
                 <FormItem dir='rtl'>
-                  <FormLabel>وصف الحملة *</FormLabel>
+                  <FormLabel>وصف المشروع *</FormLabel>
                   <WysiwygEditor
                     defaultValue={parseEditorContent(descriptionAr)}
                     onDebouncedUpdate={(editor) => setDescriptionAr(JSON.stringify(editor?.getJSON()))}
                     className={editorClassName}
                   />
                   <FormDescription>
-                    قدم وصفاً شاملاً للحملة وأهدافها
+                    قدم وصفاً شاملاً للمشروع وأهدافها
                   </FormDescription>
                 </FormItem>
               </TabsContent>
@@ -596,7 +596,7 @@ const getTranslationStatus = () => {
 
           {/* Campaign Settings */}
           <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">إعدادات الحملة</h2>
+            <h2 className="text-lg font-semibold mb-4">إعدادات المشروع</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
@@ -664,7 +664,7 @@ const getTranslationStatus = () => {
                       />
                     </FormControl>
                     <FormDescription>
-                      المبلغ الإجمالي المطلوب للحملة بالدولار
+                      المبلغ الإجمالي المطلوب للمشروع بالدولار
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -711,7 +711,7 @@ const getTranslationStatus = () => {
                       />
                     </FormControl>
                     <FormDescription>
-                      رابط فيديو توضيحي للحملة
+                      رابط فيديو توضيحي للمشروع
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -737,7 +737,7 @@ const getTranslationStatus = () => {
               name="images"
               render={({ field }) => (
                 <FormItem dir='rtl'>
-                  <FormLabel>صور الحملة *</FormLabel>
+                  <FormLabel>صور المشروع *</FormLabel>
                   <FormControl>
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -792,7 +792,7 @@ const getTranslationStatus = () => {
                         )}
                       </div>
                       <FormDescription>
-                        يمكنك رفع حتى 5 صور للحملة. الصورة الأولى ستكون الصورة الرئيسية المعروضة.
+                        يمكنك رفع حتى 5 صور للمشروع. الصورة الأولى ستكون الصورة الرئيسية المعروضة.
                       </FormDescription>
                     </div>
                   </FormControl>
@@ -810,9 +810,9 @@ const getTranslationStatus = () => {
               render={({ field }) => (
                 <FormItem className="flex items-center justify-between">
                   <div>
-                    <FormLabel>حالة الحملة</FormLabel>
+                    <FormLabel>حالة المشروع</FormLabel>
                     <FormDescription>
-                      تحديد ما إذا كانت الحملة نشطة ومرئية للمستخدمين فور الإنشاء
+                      تحديد ما إذا كانت المشروع نشطة ومرئية للمستخدمين فور الإنشاء
                     </FormDescription>
                   </div>
                   <FormControl>
@@ -870,7 +870,7 @@ const getTranslationStatus = () => {
               disabled={saving}
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              إنشاء الحملة
+              إنشاء المشروع
             </Button>
           </div>
         </form>

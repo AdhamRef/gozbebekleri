@@ -90,7 +90,7 @@ export const CampaignReorderDialog = ({ onReorder }: { onReorder: () => void }) 
         setSelectedCampaigns(mainResponse.data); // Set prioritized campaigns as selected
       } catch (error) {
         console.error('Error fetching campaigns:', error);
-        // toast.error('فشل في تحميل الحملات');
+        // toast.error('فشل في تحميل المشاريع');
       }
     };
 
@@ -102,12 +102,12 @@ export const CampaignReorderDialog = ({ onReorder }: { onReorder: () => void }) 
     if (!campaign) return;
 
     if (selectedCampaigns.length >= 12) {
-      toast.error('يمكنك اختيار 12 حملة كحد أقصى');
+      toast.error('يمكنك اختيار 12 مشروع كحد أقصى');
       return;
     }
 
     if (selectedCampaigns.some(c => c.id === campaignId)) {
-      toast.error('هذه الحملة مضافة بالفعل');
+      toast.error('هذا المشروع مضاف بالفعل');
       return;
     }
 
@@ -138,12 +138,12 @@ export const CampaignReorderDialog = ({ onReorder }: { onReorder: () => void }) 
         campaigns: updatedCampaigns,
       });
 
-      toast.success('تم إعادة ترتيب الحملات بنجاح');
+      toast.success('تم إعادة ترتيب المشاريع بنجاح');
       onReorder();
       setIsOpen(false);
     } catch (error) {
       console.error('Error reordering campaigns:', error);
-      // toast.error('فشل في إعادة ترتيب الحملات');
+      // toast.error('فشل في إعادة ترتيب المشاريع');
     } finally {
       setIsSubmitting(false);
     }
@@ -154,19 +154,19 @@ export const CampaignReorderDialog = ({ onReorder }: { onReorder: () => void }) 
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-2">
           <Crown className="w-4 h-4" />
-          أولويات الحملات
+          أولويات المشاريع
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>إعادة ترتيب الحملات</DialogTitle>
+          <DialogTitle>إعادة ترتيب المشاريع</DialogTitle>
         </DialogHeader>
         <div className="py-4">
           <p className="text-sm text-gray-500 mb-4">
-            اختر الحملات التي تريد عرضها بالترتيب. الحملة الأولى ستظهر كحملة مميزة بحجم أكبر. الحد الأقصى 12 حملة.
+            اختر المشاريع التي تريد عرضها بالترتيب. المشروع الأولى ستظهر كمشروع مميزة بحجم أكبر. الحد الأقصى 12 مشروع.
             <br />
             <span className="text-xs mt-1 block">
-              ({selectedCampaigns.length}/12 حملات مختارة)
+              ({selectedCampaigns.length}/12 مشاريع مختارة)
             </span>
           </p>
           
@@ -178,13 +178,13 @@ export const CampaignReorderDialog = ({ onReorder }: { onReorder: () => void }) 
                 aria-expanded={comboOpen}
                 className="w-full justify-between font-normal text-muted-foreground"
               >
-                اختر حملة لإضافتها
+                اختر مشروع لإضافتها
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-full p-0" align="start" style={{ width: "var(--radix-popover-trigger-width)" }}>
               <Command>
-                <CommandInput placeholder="ابحث عن حملة..." />
+                <CommandInput placeholder="ابحث عن مشروع..." />
                 <CommandList>
                   <CommandEmpty>لا توجد نتائج</CommandEmpty>
                   <CommandGroup>
@@ -213,7 +213,7 @@ export const CampaignReorderDialog = ({ onReorder }: { onReorder: () => void }) 
             <div className="mt-4 space-y-2">
               {selectedCampaigns.length === 0 ? (
                 <p className="text-sm text-gray-500 text-center py-4">
-                  لم يتم اختيار أي حملات بعد
+                  لم يتم اختيار أي مشاريع بعد
                 </p>
               ) : (
                 <div className="max-h-[400px] overflow-y-auto">

@@ -608,7 +608,7 @@ async function main() {
     prisma.referral.create({ data: { code: 'tiktok',      name: 'TikTok Campaign',        cookieExpiryDays: 30 } }),
     prisma.referral.create({ data: { code: 'instagram',   name: 'Instagram Ads',           cookieExpiryDays: 30 } }),
     prisma.referral.create({ data: { code: 'facebook',    name: 'Facebook Ads',            cookieExpiryDays: 14 } }),
-    prisma.referral.create({ data: { code: 'ramadan2024', name: 'حملة رمضان 2024',         cookieExpiryDays: 60 } }),
+    prisma.referral.create({ data: { code: 'ramadan2024', name: 'مشروع رمضان 2024',         cookieExpiryDays: 60 } }),
     prisma.referral.create({ data: { code: 'youtube',     name: 'YouTube Channel',         cookieExpiryDays: 30 } }),
   ]);
   console.log(`✓ Created ${referrals.length} referral codes`);
@@ -917,7 +917,7 @@ async function main() {
     },
     {
       title: 'عمر.. الطفل الذي استعاد ابتسامته',
-      description: 'قصة الطفل عمر (7 سنوات) الذي وُلد بعيب خلقي في القلب وكيف غيّر تبرعكم حياته',
+      description: 'وصف الطفل عمر (7 سنوات) الذي وُلد بعيب خلقي في القلب وكيف غيّر تبرعكم حياته',
       content: '<p>وُلد عمر في قرية نائية باليمن يعاني من عيب خلقي خطير في القلب. أخبر الأطباء والديه أن الطفل لن يعيش طويلاً بدون تدخل جراحي مكلف.</p><p>لم تكن عائلته تعلم أن تبرعاً بسيطاً من محسنين كرام سيغير مصيره إلى الأبد. بفضل تبرعات المحسنين عبر مؤسسة العافية، خضع عمر لعملية جراحية ناجحة في مستشفى متخصص في تركيا.</p><p>واليوم يركض ويلعب كأقرانه، وتعلو ابتسامة الأمل وجهه الصغير. قالت والدته: "ظننت أنني سأفقده، لكن الله أرسل لنا أناساً طيبين أعادوا لنا الفرحة."</p>',
       published: true,
       categoryIndex: 1,
@@ -967,9 +967,9 @@ async function main() {
       },
     },
     {
-      title: 'نتائج حملة رمضان 2024',
-      description: 'إحصائيات ونتائج مفصّلة لحملة سلال رمضان الغذائية لعام 2024',
-      content: '<h2>نتائج حملة رمضان 2024</h2><p>بحمد الله وبفضل سخاء المتبرعين، استطعنا هذا العام تجاوز هدفنا وتوزيع أكثر من 4,800 سلة غذائية على الأسر المحتاجة في 6 دول.</p><h3>الأرقام والإحصائيات</h3><ul><li>4,832 سلة موزّعة</li><li>6 دول مستفيدة: اليمن، سوريا، غزة، الصومال، نيجيريا، أفغانستان</li><li>أكثر من 24,000 فرد استفاد مباشرة</li><li>1.2 مليون دولار إجمالي التبرعات</li></ul><p>شكر خاص لكل من شارك وساهم في إيصال فرحة رمضان إلى بيوت المحتاجين.</p>',
+      title: 'نتائج مشروع رمضان 2024',
+      description: 'إحصائيات ونتائج مفصّلة لمشروع سلال رمضان الغذائية لعام 2024',
+      content: '<h2>نتائج مشروع رمضان 2024</h2><p>بحمد الله وبفضل سخاء المتبرعين، استطعنا هذا العام تجاوز هدفنا وتوزيع أكثر من 4,800 سلة غذائية على الأسر المحتاجة في 6 دول.</p><h3>الأرقام والإحصائيات</h3><ul><li>4,832 سلة موزّعة</li><li>6 دول مستفيدة: اليمن، سوريا، غزة، الصومال، نيجيريا، أفغانستان</li><li>أكثر من 24,000 فرد استفاد مباشرة</li><li>1.2 مليون دولار إجمالي التبرعات</li></ul><p>شكر خاص لكل من شارك وساهم في إيصال فرحة رمضان إلى بيوت المحتاجين.</p>',
       published: true,
       categoryIndex: 0,
       en: {
@@ -1029,7 +1029,7 @@ async function main() {
 
   const messagesRaw: MessageRaw[] = [
     { subject: 'GENERAL',           body: 'أريد الاستفسار عن طرق التبرع المتاحة وكيفية متابعة تبرعاتي', guestName: 'محمد العتيبي',   guestEmail: 'mohammed.otaibi@example.com', locale: 'ar' },
-    { subject: 'CAMPAIGN_SUPPORT',  body: 'هل يمكن التبرع لحملة بعينها وتخصيص المبلغ بالكامل لها فقط؟', guestName: 'سارة الأحمد',    guestEmail: 'sara.ahmad@example.com',      locale: 'ar' },
+    { subject: 'CAMPAIGN_SUPPORT',  body: 'هل يمكن التبرع لمشروع بعينها وتخصيص المبلغ بالكامل لها فقط؟', guestName: 'سارة الأحمد',    guestEmail: 'sara.ahmad@example.com',      locale: 'ar' },
     { subject: 'PARTNERSHIP',       body: 'We are a humanitarian foundation and would like to explore partnership opportunities with your organization.', guestName: 'Robert Hughes', guestEmail: 'r.hughes@ngo.org', locale: 'en' },
     { subject: 'DONATION_ISSUE',    body: 'تم خصم المبلغ من حسابي البنكي منذ 3 أيام ولم أتلقَّ رسالة تأكيد أو إيصال حتى الآن', guestName: 'خالد منصور', guestEmail: 'khalid.m@example.com', locale: 'ar' },
     { subject: 'VOLUNTEERING',      body: 'Je souhaite me porter volontaire pour vos activités humanitaires en Afrique. Comment puis-je rejoindre votre équipe sur le terrain ?', guestName: 'Ibrahim Coulibaly', guestEmail: 'ibrahim.c@example.com', locale: 'fr' },
@@ -1058,8 +1058,8 @@ async function main() {
   // AUDIT LOGS
   // ─────────────────────────────────────────────
   const auditLogsRaw = [
-    { actorName: 'مدير النظام',  actorRole: 'ADMIN', action: 'CREATE_CAMPAIGN',   messageAr: 'تم إنشاء حملة: كفالة 100 يتيم في اليمن',          messageEn: 'Created campaign: Sponsor 100 Orphans in Yemen',        entityType: 'Campaign',     stream: 'TEAM' },
-    { actorName: 'Sara Al-Rashid', actorRole: 'STAFF', action: 'UPDATE_CAMPAIGN', messageAr: 'تم تحديث حملة: مدرسة الأمل لأطفال سوريا',           messageEn: 'Updated campaign: Hope School for Syrian Children',     entityType: 'Campaign',     stream: 'TEAM' },
+    { actorName: 'مدير النظام',  actorRole: 'ADMIN', action: 'CREATE_CAMPAIGN',   messageAr: 'تم إنشاء مشروع: كفالة 100 يتيم في اليمن',          messageEn: 'Created campaign: Sponsor 100 Orphans in Yemen',        entityType: 'Campaign',     stream: 'TEAM' },
+    { actorName: 'Sara Al-Rashid', actorRole: 'STAFF', action: 'UPDATE_CAMPAIGN', messageAr: 'تم تحديث مشروع: مدرسة الأمل لأطفال سوريا',           messageEn: 'Updated campaign: Hope School for Syrian Children',     entityType: 'Campaign',     stream: 'TEAM' },
     { actorName: 'مدير النظام',  actorRole: 'ADMIN', action: 'CREATE_CATEGORY',   messageAr: 'تم إنشاء فئة: رعاية الأيتام',                       messageEn: 'Created category: Orphan Care',                         entityType: 'Category',     stream: 'TEAM' },
     { actorName: 'Khalid Mansour', actorRole: 'STAFF', action: 'VIEW_DONATIONS',  messageAr: 'استعرض قائمة التبرعات',                              messageEn: 'Viewed donations list',                                 entityType: null,           stream: 'TEAM' },
     { actorName: 'Ahmed Al-Sayed', actorRole: 'DONOR', action: 'DONATION_PAID',   messageAr: 'تم إتمام التبرع بمبلغ 100 دولار',                   messageEn: 'Donation of $100 completed',                           entityType: 'Donation',     stream: 'DONOR' },
@@ -1077,7 +1077,7 @@ async function main() {
     { actorName: 'مدير النظام',  actorRole: 'ADMIN', action: 'PUBLISH_POST',      messageAr: 'تم نشر مقال: فضل صدقة الجارية في الإسلام',         messageEn: 'Published article: Virtue of Sadaqah Jariyah in Islam', entityType: 'Post',        stream: 'TEAM' },
     { actorName: 'Khalid Mansour', actorRole: 'STAFF', action: 'EXPORT_REPORT',   messageAr: 'تم تصدير تقرير التبرعات الشهري',                    messageEn: 'Exported monthly donations report',                    entityType: null,           stream: 'TEAM' },
     { actorName: 'Hassan Nasser', actorRole: 'DONOR', action: 'DONATION_PAID',     messageAr: 'تم إتمام التبرع بمبلغ 500 دولار',                   messageEn: 'Donation of $500 completed',                           entityType: 'Donation',     stream: 'DONOR' },
-    { actorName: 'مدير النظام',  actorRole: 'ADMIN', action: 'CREATE_CAMPAIGN',   messageAr: 'تم إنشاء حملة: سلة غذاء رمضان',                    messageEn: 'Created campaign: Ramadan Food Basket',                entityType: 'Campaign',     stream: 'TEAM' },
+    { actorName: 'مدير النظام',  actorRole: 'ADMIN', action: 'CREATE_CAMPAIGN',   messageAr: 'تم إنشاء مشروع: سلة غذاء رمضان',                    messageEn: 'Created campaign: Ramadan Food Basket',                entityType: 'Campaign',     stream: 'TEAM' },
   ];
 
   for (const log of auditLogsRaw) {

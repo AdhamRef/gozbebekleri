@@ -357,7 +357,7 @@ export async function DELETE(
     await writeAuditLog({
       ...actor,
       action: "DONATION_DELETE",
-      messageAr: `${actor.actorName ?? "مسؤول"} حذف تبرعًا من السجلات (مع تعديل مبالغ الحملات/الأقسام إن وُجدت)`,
+      messageAr: `${actor.actorName ?? "مسؤول"} حذف تبرعًا من السجلات (مع تعديل مبالغ المشاريع/الحملات إن وُجدت)`,
       entityType: "Donation",
       entityId: id,
     });

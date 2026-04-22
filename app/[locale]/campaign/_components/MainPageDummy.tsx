@@ -689,7 +689,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
 
             {/* ── Right sidebar ── */}
             <div className="lg:col-span-4 max-sm:hidden">
-              <div className="sticky top-24">
+              <div className="sticky top-32">
                 <DonationSidebar campaign={campaign} />
               </div>
             </div>

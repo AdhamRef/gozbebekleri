@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from "../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
+import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 
 // GET: list post categories with locale-aware translations, search, and paging
 export async function GET(request: NextRequest) {
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
         description: true,
         image: true,
         createdAt: true,
-        translations: { where: { locale }, take: 1, select: { locale: true, name: true, title: true, description: true, image: true } },
+        translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true, title: true, description: true, image: true } },
         ...(includeCounts ? { _count: { select: { posts: true } } } : {}),
       }
     });
@@ -34,9 +35,10 @@ export async function GET(request: NextRequest) {
     let filtered = categories;
     if (search) {
       filtered = categories.filter(cat => {
-        const name = cat.translations[0]?.name || cat.name || '';
-        const title = cat.translations[0]?.title || cat.title || '';
-        const desc = cat.translations[0]?.description || cat.description || '';
+        const t = pickTranslation(cat.translations, locale);
+        const name = t?.name || cat.name || '';
+        const title = t?.title || cat.title || '';
+        const desc = t?.description || cat.description || '';
         return (
           name.toLowerCase().includes(search) ||
           title.toLowerCase().includes(search) ||
@@ -49,15 +51,18 @@ export async function GET(request: NextRequest) {
     const items = hasMore ? filtered.slice(0, -1) : filtered;
     const nextCursor = hasMore ? items[items.length - 1]?.id : null;
 
-    const transformed = items.map(cat => ({
-      id: cat.id,
-      name: cat.translations[0]?.name || cat.name,
-      title: cat.translations[0]?.title || cat.title,
-      description: cat.translations[0]?.description || cat.description,
-      image: cat.translations[0]?.image || cat.image,
-      postCount: cat._count?.posts ?? undefined,
-      createdAt: cat.createdAt,
-    }));
+    const transformed = items.map(cat => {
+      const t = pickTranslation(cat.translations, locale);
+      return {
+        id: cat.id,
+        name: t?.name || cat.name,
+        title: t?.title || cat.title,
+        description: t?.description || cat.description,
+        image: t?.image || cat.image,
+        postCount: cat._count?.posts ?? undefined,
+        createdAt: cat.createdAt,
+      };
+    });
 
     return NextResponse.json({ items: transformed, nextCursor, hasMore, filters: { locale, limit, search } });
   } catch (error) {

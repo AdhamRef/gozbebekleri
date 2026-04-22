@@ -4,6 +4,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from "../../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
+import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
+import { parseSuggestedDonations } from "@/lib/campaign/suggested-donations";
 
 // GET: localized categories with optional campaigns (limited per-category), cursor pagination
 export async function GET(request: NextRequest) {
@@ -28,7 +30,7 @@ export async function GET(request: NextRequest) {
         image: true,
         icon: true,
         order: true,
-        translations: { where: { locale }, take: 1, select: { locale: true, name: true, description: true } },
+        translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true, description: true } },
         ...(includeCounts ? { _count: { select: { campaigns: true } } } : {})
       }
     });
@@ -55,7 +57,8 @@ export async function GET(request: NextRequest) {
             isActive: true,
             priority: true,
             createdAt: true,
-            translations: { where: { locale }, take: 1, select: { title: true, description: true } },
+            suggestedDonations: true,
+            translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true, description: true } },
             _count: { select: { donations: true } }
           }
         }).then(list => ({ id: cat.id, list }))
@@ -68,28 +71,35 @@ export async function GET(request: NextRequest) {
       }, {} as Record<string, any[]>);
     }
 
-    const transformed = page.map(cat => ({
-      id: cat.id,
-      name: cat.translations[0]?.name || cat.name,
-      description: cat.translations[0]?.description || cat.description,
-      image: cat.image,
-      icon: cat.icon,
-      order: cat.order,
-      campaignCount: cat._count?.campaigns ?? undefined,
-      campaigns: includeCampaigns ? (campaignsByCategory[cat.id] || []).map(c => ({
-        id: c.id,
-        title: c.translations[0]?.title || c.title,
-        description: c.translations[0]?.description || c.description,
-        images: c.images,
-        targetAmount: c.targetAmount,
-        currentAmount: c.currentAmount,
-        isActive: c.isActive,
-        priority: c.priority,
-        donationCount: c._count?.donations ?? 0,
-        progress: (c.currentAmount / Math.max(c.targetAmount, 1)) * 100,
-        createdAt: c.createdAt
-      })) : undefined
-    }));
+    const transformed = page.map(cat => {
+      const tCat = pickTranslation(cat.translations, locale);
+      return {
+        id: cat.id,
+        name: tCat?.name || cat.name,
+        description: tCat?.description || cat.description,
+        image: cat.image,
+        icon: cat.icon,
+        order: cat.order,
+        campaignCount: cat._count?.campaigns ?? undefined,
+        campaigns: includeCampaigns ? (campaignsByCategory[cat.id] || []).map(c => {
+          const tC = pickTranslation(c.translations, locale);
+          return {
+            id: c.id,
+            title: tC?.title || c.title,
+            description: tC?.description || c.description,
+            images: c.images,
+            targetAmount: c.targetAmount,
+            currentAmount: c.currentAmount,
+            isActive: c.isActive,
+            priority: c.priority,
+            donationCount: c._count?.donations ?? 0,
+            progress: (c.currentAmount / Math.max(c.targetAmount, 1)) * 100,
+            suggestedDonations: parseSuggestedDonations(c.suggestedDonations),
+            createdAt: c.createdAt
+          };
+        }) : undefined
+      };
+    });
 
     return NextResponse.json({ items: transformed, nextCursor, hasMore });
 
@@ -145,7 +155,7 @@ export async function POST(request: NextRequest) {
     await writeAuditLog({
       ...actor,
       action: "CATEGORY_CREATE",
-      messageAr: `${actor.actorName ?? "مسؤول"} أنشأ قسمًا (من الواجهة التفصيلية): ${full?.name ?? name}`,
+      messageAr: `${actor.actorName ?? "مسؤول"} أنشأ حملةًا (من الواجهة التفصيلية): ${full?.name ?? name}`,
       entityType: "Category",
       entityId: category.id,
     });

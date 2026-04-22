@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     await writeAuditLog({
       ...actor,
       action: "CATEGORY_REORDER",
-      messageAr: `${actor.actorName ?? "مسؤول"} أعاد ترتيب الأقسام (${categories.length} قسم)`,
+      messageAr: `${actor.actorName ?? "مسؤول"} أعاد ترتيب الحملات (${categories.length} حملة)`,
       entityType: "Category",
       metadata: { count: categories.length },
     });

@@ -1,5 +1,6 @@
 'use client';
 
+import ReactCountryFlag from 'react-country-flag';
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import axios from 'axios';
@@ -25,7 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CategoryIcon, { CATEGORY_ICON_NAMES } from '@/components/CategoryIcon';
 
 const formSchema = z.object({
-  name: z.string().min(1, 'اسم القسم مطلوب').max(50, 'اسم القسم طويل جداً'),
+  name: z.string().min(1, 'اسم الحملة مطلوب').max(50, 'اسم الحملة طويل جداً'),
   description: z.string().max(500, 'الوصف طويل جداً').optional(),
   image: z.string().optional(),
   icon: z.string().optional(),
@@ -110,7 +111,7 @@ export default function EditCategoryPage() {
         });
       } catch (error) {
         console.error('Error fetching category:', error);
-        toast.error('فشل في تحميل بيانات القسم');
+        toast.error('فشل في تحميل بيانات الحملة');
         router.push('/dashboard/categories');
       } finally {
         setLoading(false);
@@ -138,11 +139,11 @@ export default function EditCategoryPage() {
           es: { name: values.name_es ?? '', description: values.description_es ?? '' },
         },
       });
-      toast.success('تم تحديث القسم بنجاح');
+      toast.success('تم تحديث الحملة بنجاح');
       router.push('/dashboard/categories');
     } catch (error) {
       console.error('Error updating category:', error);
-      toast.error('فشل في تحديث القسم');
+      toast.error('فشل في تحديث الحملة');
     } finally {
       setSaving(false);
     }
@@ -197,8 +198,8 @@ export default function EditCategoryPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">تعديل القسم</h1>
-          <p className="text-gray-600">قم بتحديث معلومات القسم</p>
+          <h1 className="text-2xl font-bold text-gray-800">تعديل الحملة</h1>
+          <p className="text-gray-600">قم بتحديث معلومات الحملة</p>
         </div>
         <Button
           variant="outline"
@@ -214,22 +215,36 @@ export default function EditCategoryPage() {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <Tabs defaultValue="ar" className="w-full">
             <TabsList className="flex flex-wrap gap-1 mb-4" dir="rtl">
-              <TabsTrigger value="ar">العربية</TabsTrigger>
-              <TabsTrigger value="en">English</TabsTrigger>
-              <TabsTrigger value="fr">Français</TabsTrigger>
-              <TabsTrigger value="tr">Türkçe</TabsTrigger>
-              <TabsTrigger value="id">Bahasa</TabsTrigger>
-              <TabsTrigger value="pt">Português</TabsTrigger>
-              <TabsTrigger value="es">Español</TabsTrigger>
+              <TabsTrigger value="ar" className="gap-2">
+                <ReactCountryFlag countryCode="SA" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> العربية
+              </TabsTrigger>
+              <TabsTrigger value="en" className="gap-2">
+                <ReactCountryFlag countryCode="GB" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> English
+              </TabsTrigger>
+              <TabsTrigger value="fr" className="gap-2">
+                <ReactCountryFlag countryCode="FR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Français
+              </TabsTrigger>
+              <TabsTrigger value="tr" className="gap-2">
+                <ReactCountryFlag countryCode="TR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Türkçe
+              </TabsTrigger>
+              <TabsTrigger value="id" className="gap-2">
+                <ReactCountryFlag countryCode="ID" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Bahasa
+              </TabsTrigger>
+              <TabsTrigger value="pt" className="gap-2">
+                <ReactCountryFlag countryCode="PT" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Português
+              </TabsTrigger>
+              <TabsTrigger value="es" className="gap-2">
+                <ReactCountryFlag countryCode="ES" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Español
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="ar" className="mt-0">
               <Card className="p-6">
                 <div className="grid gap-6">
                   <FormField control={form.control} name="name" render={({ field }) => (
-                    <FormItem><FormLabel>اسم القسم</FormLabel><FormControl><Input {...field} placeholder="أدخل اسم القسم" /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>اسم الحملة</FormLabel><FormControl><Input {...field} placeholder="أدخل اسم الحملة" /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="description" render={({ field }) => (
-                    <FormItem><FormLabel>وصف القسم</FormLabel><FormControl><Textarea placeholder="اكتب وصفاً للقسم..." className="resize-y" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>وصف الحملة</FormLabel><FormControl><Textarea placeholder="اكتب وصفاً للحملة..." className="resize-y" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
               </Card>
@@ -317,7 +332,7 @@ export default function EditCategoryPage() {
                 name="image"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>صورة القسم</FormLabel>
+                    <FormLabel>صورة الحملة</FormLabel>
                     <FormControl>
                       <div className="space-y-4">
                         {field.value ? (
@@ -365,7 +380,7 @@ export default function EditCategoryPage() {
                       </div>
                     </FormControl>
                     <FormDescription>
-                      يمكنك رفع صورة واحدة للقسم
+                      يمكنك رفع صورة واحدة للحملة
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -378,7 +393,7 @@ export default function EditCategoryPage() {
                 name="icon"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>أيقونة القسم</FormLabel>
+                    <FormLabel>أيقونة الحملة</FormLabel>
                     <FormControl>
                       <div className="space-y-3">
                         {/* Preview */}
@@ -411,7 +426,7 @@ export default function EditCategoryPage() {
                         </div>
                       </div>
                     </FormControl>
-                    <FormDescription>اختر أيقونة للقسم</FormDescription>
+                    <FormDescription>اختر أيقونة للحملة</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
