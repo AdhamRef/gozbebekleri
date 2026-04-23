@@ -110,7 +110,6 @@ export async function POST(request: NextRequest) {
       teamSupport = 0,
       coverFees = false,
       type = "ONE_TIME",
-      billingDay = null,
       paymentMethod,
       cardDetails = null,
       referralCode,
@@ -244,24 +243,18 @@ export async function POST(request: NextRequest) {
         : null;
 
     if (type === "MONTHLY") {
-      // Monthly: create Subscription + first Donation (transaction) linked to it
+      // Monthly: create Subscription + first Donation (transaction) linked to it.
+      // The Stripe invoice.payment_succeeded webhook drives nextBillingDate thereafter;
+      // seed it with one month from now so cron filters don't pick the sub up before
+      // Stripe has confirmed the first charge.
       const subscription = await prisma.$transaction(async (tx) => {
-        // Compute nextBillingDate = billing day in NEXT calendar month.
-        // e.g. today = Apr 5, billingDay = 19 → nextBillingDate = May 19
         const now = new Date();
-        const nextBilling = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-        const bd = typeof billingDay === "number" && billingDay >= 1 && billingDay <= 31 ? billingDay : null;
-        if (bd !== null) {
-          // Clamp to last day of target month (e.g. Feb 30 → Feb 28)
-          const lastDay = new Date(Date.UTC(nextBilling.getUTCFullYear(), nextBilling.getUTCMonth() + 1, 0)).getUTCDate();
-          nextBilling.setUTCDate(Math.min(bd, lastDay));
-        }
+        const nextBilling = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, now.getUTCDate()));
         nextBilling.setUTCHours(0, 0, 0, 0);
 
         const sub = await tx.subscription.create({
           data: {
             status: "ACTIVE",
-            billingDay: billingDay ?? undefined,
             amount: totalAmount,
             amountUSD: totalAmountUSD,
             currency,

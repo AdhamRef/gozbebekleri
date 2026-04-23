@@ -169,7 +169,6 @@ const DonationDialog = ({
         title: t("monthlyDonationAmount"),
         subtitle: t("monthlyDonationAmountDesc"),
       },
-      { title: t("billingDay"), subtitle: t("billingDayDesc") },
       { title: t("teamSupport"), subtitle: t("teamSupportDesc") },
       { title: t("paymentFees"), subtitle: t("paymentFeesDesc") },
       { title: t("confirmation"), subtitle: t("confirmationDesc") },
@@ -182,7 +181,6 @@ const DonationDialog = ({
   const [donationAmount, setDonationAmount] = useState<number>(0);
   const [teamSupport, setTeamSupport] = useState<number>(0);
   const [coverFees, setCoverFees] = useState(false);
-  const [billingDay, setBillingDay] = useState<number>(1);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CARD");
   // PayFor manual card inputs (use3D === true)
   const [cardDetails, setCardDetails] = useState<PayForCardState>({ cardNumber: "", expiryDate: "", cvv: "", cardholderName: "" });
@@ -1009,52 +1007,6 @@ const DonationDialog = ({
           </div>
         );
 
-      case t("billingDay"):
-        return (
-          <div className="space-y-6">
-            <div className="text-center space-y-2">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {t("chooseBillingDay")}
-              </h3>
-              <p className="text-gray-600 text-sm">
-                {t("billingDayInfo")}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-7 gap-2">
-              {Array.from({ length: 28 }, (_, i) => i + 1).map((day) => (
-                <Button
-                  key={day}
-                  variant="outline"
-                  onClick={() => setBillingDay(day)}
-                  className={`${
-                    billingDay === day
-                      ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]"
-                      : ""
-                  }`}
-                >
-                  {day}
-                </Button>
-              ))}
-            </div>
-
-            <div className="flex justify-between gap-4">
-              <Button
-                variant="outline"
-                onClick={handleBack}
-                className="flex-1 inline-flex items-center justify-center gap-2"
-              >
-                {backLabel}
-              </Button>
-              <Button
-                onClick={handleNext}
-                className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2"
-              >
-                {nextLabel}
-              </Button>
-            </div>
-          </div>
-        );
       case t("paymentInfo"):
         return (
           <div className="space-y-6 overflow-visible">
@@ -1327,7 +1279,6 @@ const DonationDialog = ({
         type: donationType,
         paymentMethod,
         cardDetails: null,
-        billingDay: donationType === "MONTHLY" ? billingDay : null,
         locale,
         ...(guestMode && {
           guest: {

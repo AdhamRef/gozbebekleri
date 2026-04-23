@@ -697,12 +697,11 @@ async function main() {
     const campaign = campaigns[i % campaigns.length];
     const amount   = subAmounts[i];
     const subDate  = randomDate(monthsAgo(12), monthsAgo(1));
-    const billingDay = (i % 28) + 1;
+    const nextDay = (i % 28) + 1;
 
     const sub = await prisma.subscription.create({
       data: {
         status: subStatuses[i],
-        billingDay,
         amount,
         amountUSD: amount,
         currency: 'USD',
@@ -710,7 +709,7 @@ async function main() {
         coverFees: false,
         paymentMethod: 'CARD',
         donorId: donor.id,
-        nextBillingDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, billingDay),
+        nextBillingDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, nextDay),
         lastBillingDate: subDate,
         createdAt: subDate,
       },

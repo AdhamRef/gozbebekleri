@@ -52,7 +52,6 @@ const RECEIPT_LABELS = {
     fees: 'Transaction Fees',
     total: 'Total',
     nextBilling: 'Next billing date',
-    billingDay: 'Billing day',
     thankYou: 'Thank you for your generous donation.',
     thankYouFrom: 'With gratitude,\nQurrat Al-Ayun Relief and Solidarity Association',
     thankYouMessage: 'Your kindness brings hope and relief to those in need. Together we are making a lasting difference in the lives of children and families. This receipt confirms your support we are deeply grateful.',
@@ -90,7 +89,6 @@ const RECEIPT_LABELS = {
     fees: 'الرسوم',
     total: 'الإجمالي',
     nextBilling: 'تاريخ الخصم القادم',
-    billingDay: 'يوم الخصم',
     thankYou: 'شكراً لتبرعكم السخي.',
     thankYouFrom: 'بامتنان،\nجمعية قرة العيون للإغاثة والتضامن',
     thankYouMessage: 'لطفكم يبعث الأمل والإغاثة لمن هم في حاجة. معاً نصنع فرقاً دائمياً في حياة الأطفال والأسر. هذا الإيصال يؤكد دعمكم نحن ممتنون جداً.',
@@ -128,7 +126,6 @@ const RECEIPT_LABELS = {
     fees: 'Frais',
     total: 'Total',
     nextBilling: 'Prochaine date de prélèvement',
-    billingDay: 'Jour de prélèvement',
     thankYou: 'Merci pour votre généreux don.',
     thankYouFrom: 'Avec gratitude,\nQurrat Al-Ayun – Association de secours et de solidarité',
     thankYouMessage: 'Votre générosité apporte espoir et réconfort à ceux qui en ont besoin. Ensemble nous faisons une différence durable dans la vie des enfants et des familles. Ce reçu confirme votre soutien—nous vous en sommes profondément reconnaissants.',
@@ -196,7 +193,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         subscription: {
           select: {
             status: true,
-            billingDay: true,
             nextBillingDate: true,
             lastBillingDate: true,
           },
@@ -247,7 +243,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       type: donationRow.subscriptionId ? ('MONTHLY' as const) : ('ONE_TIME' as const),
       status: sub?.status ?? null,
       nextBillingDate: sub?.nextBillingDate ?? null,
-      billingDay: sub?.billingDay ?? null,
     };
 
     const L = getLabels(locale);
@@ -466,10 +461,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       doc.setFontSize(10);
       if (donation.nextBillingDate) {
         addText(`${L.nextBilling}: ${format(new Date(donation.nextBillingDate), 'PPP', { locale: dateLocale })}`, margin, y);
-        y += 7;
-      }
-      if (donation.billingDay != null) {
-        addText(`${L.billingDay}: ${donation.billingDay}`, margin, y);
         y += 7;
       }
       y += 6;

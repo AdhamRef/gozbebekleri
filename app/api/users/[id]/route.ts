@@ -46,7 +46,6 @@ export async function GET(
               select: {
                 id: true,
                 status: true,
-                billingDay: true,
                 nextBillingDate: true,
               },
             },
@@ -85,7 +84,6 @@ export async function GET(
         /** Donation charge status (PAID / FAILED) — unchanged for revenue totals */
         paymentStatus: d.status,
         status: type === 'MONTHLY' ? (sub?.status ?? null) : d.status,
-        billingDay: type === 'MONTHLY' ? (sub?.billingDay ?? null) : null,
         nextBillingDate: type === 'MONTHLY' ? (sub?.nextBillingDate ?? null) : null,
       };
     };

@@ -93,7 +93,6 @@ export async function POST(request: NextRequest) {
       teamSupport = 0,
       coverFees = false,
       type = "ONE_TIME",
-      billingDay = null,
       paymentMethod,
       cardDetails = null,
       referralCode,
@@ -205,7 +204,6 @@ export async function POST(request: NextRequest) {
         const sub = await tx.subscription.create({
           data: {
             status: "ACTIVE",
-            billingDay: billingDay ?? undefined,
             amount: totalAmount,
             amountUSD: totalAmountUSD,
             currency,

@@ -110,7 +110,6 @@ interface SubscriptionRow {
   createdAt: string;
   nextBillingDate: string | null;
   lastBillingDate: string | null;
-  billingDay: number | null;
   donor: { id: string; name: string | null; email: string | null };
   campaigns: { id: string; title: string }[];
   categories: { id: string; name: string }[];
@@ -1938,7 +1937,6 @@ export default function MonthlySubscriptionsDashboardPage() {
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">الحالة</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">المشروع / الفئة</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">الإحالة</th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">يوم الفوترة</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">آخر دفعة</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">الدفعة القادمة</th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">بدء الاشتراك</th>
@@ -1947,19 +1945,19 @@ export default function MonthlySubscriptionsDashboardPage() {
                   <tbody>
                     {subsLoading && subsRows.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-14 text-center">
+                        <td colSpan={8} className="py-14 text-center">
                           <Loader2 className="w-8 h-8 animate-spin mx-auto text-[#025EB8]" />
                         </td>
                       </tr>
                     ) : !subsFetchedOnce ? (
                       <tr>
-                        <td colSpan={9} className="py-14 text-center text-slate-500">
+                        <td colSpan={8} className="py-14 text-center text-slate-500">
                           جاري التحميل...
                         </td>
                       </tr>
                     ) : subsRows.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-14 text-center text-slate-500">
+                        <td colSpan={8} className="py-14 text-center text-slate-500">
                           لا توجد اشتراكات تطابق التصفية
                         </td>
                       </tr>
@@ -2040,9 +2038,6 @@ export default function MonthlySubscriptionsDashboardPage() {
                             ) : (
                               <span className="text-slate-400">—</span>
                             )}
-                          </td>
-                          <td className="py-3 px-4 text-slate-600 align-top tabular-nums">
-                            {s.billingDay != null ? s.billingDay : "—"}
                           </td>
                           <td className="py-3 px-4 text-slate-600 align-top whitespace-nowrap">
                             {s.lastBillingDate

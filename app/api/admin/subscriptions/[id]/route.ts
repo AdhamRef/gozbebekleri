@@ -9,19 +9,14 @@ import {
   auditActorFromDashboardSession,
 } from "@/lib/audit-log";
 
-function nextBillingFromDay(billingDay: number): Date {
+/** Returns the next billing date: one month from today, clamped to the target month's last day. */
+function nextBillingInOneMonth(): Date {
   const d = new Date();
-  let year = d.getFullYear();
-  let month = d.getMonth();
-  const day = Math.min(billingDay, 28);
-  if (d.getDate() >= day) {
-    month += 1;
-    if (month > 11) {
-      month = 0;
-      year += 1;
-    }
-  }
-  return new Date(year, month, day);
+  const next = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+  const lastDay = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
+  next.setUTCDate(Math.min(d.getUTCDate(), lastDay));
+  next.setUTCHours(0, 0, 0, 0);
+  return next;
 }
 
 /** PATCH /api/admin/subscriptions/[id] — set status (ACTIVE | PAUSED | CANCELLED); dashboard monthly permission */
@@ -51,7 +46,7 @@ export async function PATCH(
 
     const sub = await prisma.subscription.findUnique({
       where: { id },
-      select: { id: true, status: true, billingDay: true },
+      select: { id: true, status: true },
     });
 
     if (!sub) {
@@ -61,16 +56,12 @@ export async function PATCH(
     const nextStatus = status as SubscriptionStatus;
     const data: {
       status: SubscriptionStatus;
-      billingDay?: number;
       nextBillingDate?: Date;
     } = { status: nextStatus };
 
     if (nextStatus === "ACTIVE" && sub.status !== "ACTIVE") {
-      const day = Math.min(28, Math.max(1, sub.billingDay ?? 1));
-      if (sub.billingDay == null) {
-        data.billingDay = day;
-      }
-      data.nextBillingDate = nextBillingFromDay(day);
+      // Stripe owns the real cadence; seed nextBillingDate so list filters work.
+      data.nextBillingDate = nextBillingInOneMonth();
     }
 
     await prisma.subscription.update({
@@ -101,7 +92,6 @@ export async function PATCH(
         createdAt: true,
         nextBillingDate: true,
         lastBillingDate: true,
-        billingDay: true,
         donor: { select: { id: true, name: true, email: true } },
         items: { select: { campaign: { select: { id: true, title: true } } } },
         categoryItems: { select: { category: { select: { id: true, name: true } } } },
@@ -121,7 +111,6 @@ export async function PATCH(
       createdAt: row.createdAt,
       nextBillingDate: row.nextBillingDate,
       lastBillingDate: row.lastBillingDate,
-      billingDay: row.billingDay,
       donor: row.donor,
       campaigns: row.items.map((i) => ({ id: i.campaign.id, title: i.campaign.title })),
       categories: row.categoryItems.map((c) => ({

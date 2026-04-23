@@ -95,7 +95,6 @@ interface DonationForProfile {
   paidAt?: string | null;
   status: string | null;
   subscriptionId?: string | null;
-  billingDay?: number | null;
   nextBillingDate?: string | null;
   createdAt: string;
   /** Earliest charge date for this subscription (client-only, subscriptions table) */
@@ -256,7 +255,6 @@ const ProfilePage = () => {
       const newStatus = selectedDonation.status === "ACTIVE" ? "PAUSED" : "ACTIVE";
       const response = await axios.put(`/api/donations/${selectedDonation.id}`, {
         status: newStatus,
-        billingDay: selectedDonation.billingDay ?? 1,
       });
       const updated = response.data as DonationForProfile;
       setUser((prev) => {
@@ -284,26 +282,6 @@ const ProfilePage = () => {
       setIsPauseDialogOpen(false);
       setSelectedDonation(null);
       setSubscriptionSettingsDonation((prev) => (prev?.id === selectedDonation.id ? null : prev));
-    }
-  };
-
-  const handleBillingDayChange = async (donationId: string, billingDay: number) => {
-    try {
-      const response = await axios.put(`/api/donations/${donationId}`, { billingDay });
-      const updated = response.data as DonationForProfile;
-      setUser((prev) => {
-        if (!prev || !prev.donations) return prev;
-        return {
-          ...prev,
-          donations: prev.donations.map((d) =>
-            d.id === donationId ? { ...d, ...updated } : d
-          ),
-        };
-      });
-      setSubscriptionSettingsDonation((prev) => (prev?.id === donationId ? { ...prev, ...updated } : prev));
-      toast.success(t("toast.updateSuccess"));
-    } catch (error) {
-      toast.error(t("toast.subscriptionUpdateError"));
     }
   };
 
@@ -935,9 +913,6 @@ const ProfilePage = () => {
                         {t("donations.status")}
                       </th>
                       <th className={cn("text-left font-semibold text-gray-700 py-4 px-6", isRtl && "text-right")}>
-                        {t("subscriptions.billingDay")}
-                      </th>
-                      <th className={cn("text-left font-semibold text-gray-700 py-4 px-6", isRtl && "text-right")}>
                         {t("donations.nextBillingDate")}
                       </th>
                       <th className={cn("text-left font-semibold text-gray-700 py-4 px-6 min-w-[8rem]", isRtl && "text-right")}>
@@ -973,9 +948,6 @@ const ProfilePage = () => {
                           >
                             {statusLabel(donation)}
                           </Badge>
-                        </td>
-                        <td className="py-4 px-6 text-gray-700 text-sm whitespace-nowrap">
-                          {donation.billingDay != null ? donation.billingDay : "—"}
                         </td>
                         <td className="py-4 px-6 text-gray-700 text-sm whitespace-nowrap">
                           {formatBillingDate(donation.nextBillingDate)}
@@ -1053,12 +1025,6 @@ const ProfilePage = () => {
                           {statusLabel(donation)}
                         </Badge>
                       </div>
-                      {donation.billingDay != null && (
-                        <p className="text-sm text-gray-600">
-                          <span className="font-medium">{t("subscriptions.billingDay")}: </span>
-                          {donation.billingDay}
-                        </p>
-                      )}
                       <p className="text-sm text-gray-600">
                         <span className="font-medium">{t("donations.nextBillingDate")}: </span>
                         {formatBillingDate(donation.nextBillingDate)}
@@ -1178,24 +1144,6 @@ const ProfilePage = () => {
                 </p>
               ))}
             </div>
-            {isActive && (
-              <div>
-                <Label className="text-sm font-medium">{t("subscriptions.billingDay")}</Label>
-                <Select
-                  value={sub.billingDay ? String(sub.billingDay) : undefined}
-                  onValueChange={(v) => handleBillingDayChange(sub.id, Number(v))}
-                >
-                  <SelectTrigger className="mt-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 28 }, (_, i) => i + 1).map((day) => (
-                      <SelectItem key={day} value={String(day)}>{day}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
             <div className="flex flex-wrap gap-2">
               {sub.status !== "CANCELLED" && (
                 <Button

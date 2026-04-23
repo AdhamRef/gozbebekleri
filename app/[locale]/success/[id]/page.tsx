@@ -9,7 +9,7 @@ import { useLocale } from 'next-intl';
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { HandHeartIcon, Receipt, Calendar, Heart, ArrowLeft, CalendarClock, Repeat, Info, Download, Loader2, FileText } from 'lucide-react';
+import { HandHeartIcon, Receipt, Calendar, Heart, ArrowLeft, Repeat, Info, Download, Loader2, FileText } from 'lucide-react';
 import { useConfettiStore } from '@/hooks/use-confetti-store';
 import { useTracking } from '@/components/TrackingPixels';
 import { useSession } from 'next-auth/react';
@@ -243,7 +243,7 @@ const DonationSuccessPage = () => {
         </motion.section>
 
         {/* Monthly donation highlight */}
-        {isMonthly && (donation.billingDay != null || donation.nextBillingDate) && (
+        {isMonthly && donation.nextBillingDate && (
           <motion.section
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -264,17 +264,6 @@ const DonationSuccessPage = () => {
                   </div>
                 </div>
                 <div className="grid sm:grid-cols-2 gap-4">
-                  {donation.billingDay != null && (
-                    <div className="flex items-center gap-3 rounded-lg bg-white/80 p-3">
-                      <CalendarClock className="w-5 h-5 text-emerald-600 shrink-0" />
-                      <div>
-                        <p className="text-xs text-slate-500">{t('billingDayLabel')}</p>
-                        <p className="font-semibold text-slate-900">
-                          {donation.billingDay}
-                        </p>
-                      </div>
-                    </div>
-                  )}
                   {nextBillingFormatted && (
                     <div className="flex items-center gap-3 rounded-lg bg-white/80 p-3">
                       <Calendar className="w-5 h-5 text-emerald-600 shrink-0" />

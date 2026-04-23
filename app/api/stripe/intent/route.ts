@@ -32,7 +32,6 @@ export async function POST(req: NextRequest) {
       teamSupport = 0,
       coverFees = false,
       type = "ONE_TIME",
-      billingDay = null,
       referralCode,
       referralId: bodyReferralId,
       locale: donationLocale,
@@ -116,7 +115,6 @@ export async function POST(req: NextRequest) {
           const sub = await tx.subscription.create({
             data: {
               status: "ACTIVE",
-              billingDay: billingDay ?? undefined,
               amount: totalAmount,
               amountUSD: totalAmountUSD,
               currency,

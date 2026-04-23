@@ -110,18 +110,21 @@ export async function POST(req: NextRequest) {
         // Compute paidAt from invoice timestamp
         const paidAt = new Date((invoice as any).created * 1000);
 
-        // Compute nextBillingDate using the subscription's chosen billingDay.
-        // e.g. paid on May 19, billingDay = 19 → nextBillingDate = June 19
-        const bd = dbSubscription.billingDay;
-        const nextBillingDate = new Date(Date.UTC(paidAt.getUTCFullYear(), paidAt.getUTCMonth() + 1, 1));
-        if (bd != null && bd >= 1 && bd <= 31) {
-          const lastDay = new Date(Date.UTC(
-            nextBillingDate.getUTCFullYear(),
-            nextBillingDate.getUTCMonth() + 1,
-            0,
-          )).getUTCDate();
-          nextBillingDate.setUTCDate(Math.min(bd, lastDay));
-        }
+        // nextBillingDate = one month after this invoice was paid. Stripe owns the
+        // actual billing cadence (donors can't pick a day); we just mirror it so
+        // the admin UI and cron filters have a usable value. Clamp to the target
+        // month's last day to handle edge cases like the 31st.
+        const nextBillingDate = new Date(Date.UTC(
+          paidAt.getUTCFullYear(),
+          paidAt.getUTCMonth() + 1,
+          1,
+        ));
+        const lastDay = new Date(Date.UTC(
+          nextBillingDate.getUTCFullYear(),
+          nextBillingDate.getUTCMonth() + 1,
+          0,
+        )).getUTCDate();
+        nextBillingDate.setUTCDate(Math.min(paidAt.getUTCDate(), lastDay));
         nextBillingDate.setUTCHours(0, 0, 0, 0);
 
         const fees = (dbSubscription.amount + dbSubscription.teamSupport) * 0.03;
@@ -212,7 +215,7 @@ export async function POST(req: NextRequest) {
             });
           }
 
-          // Update subscription billing dates respecting the chosen billingDay
+          // Update subscription billing dates (Stripe drives the actual cadence)
           await tx.subscription.update({
             where: { id: dbSubscription.id },
             data: {

@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-/** Returns the next billing date (next month, same day or last day of month) */
-function getNextBillingDate(from: Date, billingDay: number | null): Date {
+/** Returns the next billing date: one month after `from`, clamped to the target month's last day. */
+function getNextBillingDate(from: Date): Date {
   const next = new Date(from);
+  const targetDay = next.getUTCDate();
+  next.setUTCDate(1);
   next.setUTCMonth(next.getUTCMonth() + 1);
-  if (billingDay != null && billingDay >= 1 && billingDay <= 31) {
-    const lastDay = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
-    next.setUTCDate(Math.min(billingDay, lastDay));
-  }
+  const lastDay = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
+  next.setUTCDate(Math.min(targetDay, lastDay));
   next.setUTCHours(0, 0, 0, 0);
   return next;
 }
@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
           },
         });
 
-        const nextBilling = getNextBillingDate(transactionDate, sub.billingDay);
+        const nextBilling = getNextBillingDate(transactionDate);
 
         await tx.subscription.update({
           where: { id: sub.id },

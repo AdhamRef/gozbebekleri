@@ -117,7 +117,6 @@ export async function GET(
         subscription: {
           select: {
             status: true,
-            billingDay: true,
             nextBillingDate: true,
             lastBillingDate: true,
           },
@@ -175,7 +174,6 @@ export async function GET(
       type: donation.subscriptionId ? ('MONTHLY' as const) : ('ONE_TIME' as const),
       paymentStatus: donation.status,
       subscriptionStatus: sub?.status ?? null,
-      billingDay: sub?.billingDay ?? null,
       nextBillingDate: sub?.nextBillingDate ?? null,
       lastBillingDate: sub?.lastBillingDate ?? null,
     };
@@ -189,23 +187,9 @@ export async function GET(
   }
 }
 
-/** Compute next billing date from billing day (1–28). If day has passed this month, next month. */
-function nextBillingFromDay(billingDay: number): Date {
-  const d = new Date();
-  let year = d.getFullYear();
-  let month = d.getMonth();
-  const day = Math.min(billingDay, 28);
-  if (d.getDate() >= day) {
-    month += 1;
-    if (month > 11) {
-      month = 0;
-      year += 1;
-    }
-  }
-  return new Date(year, month, day);
-}
-
-// PUT /api/donations/[id] - Update subscription (when this donation is from a subscription); donor or admin can update status/billingDay
+// PUT /api/donations/[id] - Update the linked subscription's status. The billing
+// cadence is owned by Stripe (the donor can't pick a day), so only `status` is
+// writable here.
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -221,14 +205,14 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { status, billingDay } = body;
+    const { status } = body;
 
     const currentDonation = await prisma.donation.findUnique({
       where: { id },
       include: {
         items: true,
         subscription: {
-          select: { id: true, status: true, billingDay: true, nextBillingDate: true, lastBillingDate: true },
+          select: { id: true, status: true, nextBillingDate: true, lastBillingDate: true },
         },
       },
     });
@@ -258,7 +242,7 @@ export async function PUT(
       );
     }
 
-    const updates: { status?: SubscriptionStatus; billingDay?: number; nextBillingDate?: Date } = {};
+    const updates: { status?: SubscriptionStatus } = {};
     if (status !== undefined) {
       if (!['ACTIVE', 'PAUSED', 'CANCELLED'].includes(String(status))) {
         return NextResponse.json(
@@ -267,18 +251,6 @@ export async function PUT(
         );
       }
       updates.status = status as SubscriptionStatus;
-      if (status === 'ACTIVE' && sub.status !== 'ACTIVE') {
-        const day = billingDay != null ? Math.min(28, Math.max(1, Number(billingDay))) : (sub.billingDay ?? 1);
-        updates.nextBillingDate = nextBillingFromDay(day);
-        updates.billingDay = day;
-      }
-    }
-    if (billingDay !== undefined) {
-      const day = Math.min(28, Math.max(1, Number(billingDay)));
-      updates.billingDay = day;
-      if ((updates.status ?? sub.status) === 'ACTIVE') {
-        updates.nextBillingDate = nextBillingFromDay(day);
-      }
     }
 
     if (Object.keys(updates).length === 0) {
@@ -287,7 +259,7 @@ export async function PUT(
         omit: { cardDetails: true },
         include: {
           donor: { select: { name: true, email: true, image: true } },
-          subscription: { select: { status: true, billingDay: true, nextBillingDate: true, lastBillingDate: true } },
+          subscription: { select: { status: true, nextBillingDate: true, lastBillingDate: true } },
           items: { include: { campaign: { select: { title: true, images: true, translations: { select: { locale: true, title: true } } } } } },
           categoryItems: { include: { category: { select: { name: true, image: true, translations: { select: { locale: true, name: true } } } } } },
         },
@@ -298,7 +270,6 @@ export async function PUT(
         ...out,
         type: 'MONTHLY' as const,
         status: s?.status ?? null,
-        billingDay: s?.billingDay ?? null,
         nextBillingDate: s?.nextBillingDate ?? null,
         lastBillingDate: s?.lastBillingDate ?? null,
       });
@@ -338,7 +309,6 @@ export async function PUT(
       metadata: {
         donationId: id,
         ...(updates.status !== undefined && { status: updates.status }),
-        ...(updates.billingDay !== undefined && { billingDay: updates.billingDay }),
       },
       stream: subStream,
     });
@@ -348,7 +318,7 @@ export async function PUT(
       omit: { cardDetails: true },
       include: {
         donor: { select: { name: true, email: true, image: true } },
-        subscription: { select: { status: true, billingDay: true, nextBillingDate: true, lastBillingDate: true } },
+        subscription: { select: { status: true, nextBillingDate: true, lastBillingDate: true } },
         items: { include: { campaign: { select: { title: true, images: true, translations: { select: { locale: true, title: true } } } } } },
         categoryItems: { include: { category: { select: { name: true, image: true, translations: { select: { locale: true, name: true } } } } } },
       },
@@ -363,7 +333,6 @@ export async function PUT(
       ...updatedDonation,
       type: 'MONTHLY' as const,
       status: s?.status ?? null,
-      billingDay: s?.billingDay ?? null,
       nextBillingDate: s?.nextBillingDate ?? null,
       lastBillingDate: s?.lastBillingDate ?? null,
     });

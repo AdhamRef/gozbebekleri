@@ -403,7 +403,6 @@ model Donation {
 model Subscription {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
   status     SubscriptionStatus @default(ACTIVE)
-  billingDay Int?
 
   amount       Float
   amountUSD    Float?
