@@ -177,10 +177,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
     const session = await getServerSession(authOptions);
 
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const donationRow = await prisma.donation.findUnique({
       where: { id },
       omit: { cardDetails: true },
@@ -233,11 +229,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Donation not found' }, { status: 404 });
     }
 
-    const canViewReceipt =
-      userHasDashboardPermission(session.user, 'revenue') ||
-      session.user.id === donationRow.donorId;
-    if (!canViewReceipt) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Guest donations have no session — the unguessable donation id acts as
+    // the access token. For authenticated users, keep ownership/revenue-admin
+    // enforcement to prevent cross-account receipt access.
+    if (session) {
+      const canViewReceipt =
+        userHasDashboardPermission(session.user, 'revenue') ||
+        session.user.id === donationRow.donorId;
+      if (!canViewReceipt) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
     }
 
     const sub = donationRow.subscription;

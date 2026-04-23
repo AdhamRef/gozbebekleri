@@ -34,6 +34,7 @@ import {
   FUNDRAISING_SHARES,
   GOAL_TYPE_OPEN,
   parseSuggestedShareCounts,
+  resolveSharePriceOverride,
 } from "@/lib/campaign/campaign-modes";
 import useConvetToUSD from "@/hooks/useConvetToUSD";
 import { useReferralCode } from "@/hooks/useReferralCode";
@@ -78,7 +79,7 @@ interface DonationDialogProps {
   goalType?: string;
   fundraisingMode?: string;
   sharePriceUSD?: number | null;
-  suggestedShareCounts?: { counts: number[] } | null;
+  suggestedShareCounts?: { counts: number[]; priceByCurrency?: Record<string, number> } | null;
   /** When true, user skipped sign-in — collect contact info inline */
   guestMode?: boolean;
 }
@@ -112,10 +113,11 @@ const DonationDialog = ({
     fundraisingMode === FUNDRAISING_SHARES &&
     sharePriceUSD != null &&
     sharePriceUSD > 0;
-  const sharePickCounts = useMemo(
-    () => parseSuggestedShareCounts(suggestedShareCounts).counts,
+  const parsedShareCounts = useMemo(
+    () => parseSuggestedShareCounts(suggestedShareCounts),
     [suggestedShareCounts]
   );
+  const sharePickCounts = parsedShareCounts.counts;
   const t = useTranslations("DonationDialog");
   const locale = useLocale() as "ar" | "en" | "fr";
   const isRTL = locale === "ar";
@@ -335,15 +337,36 @@ const DonationDialog = ({
     }
   }, [isOpen, shareMode]);
 
+  /** Per-share display price in the donor's currently selected currency. */
+  const getSharePriceInCurrency = (): number => {
+    if (sharePriceUSD == null) return 0;
+    const override = resolveSharePriceOverride(parsedShareCounts, getCurrency());
+    if (override != null) return override;
+    const r = convertToCurrency(sharePriceUSD);
+    return r?.convertedValue != null && Number.isFinite(r.convertedValue)
+      ? (r.convertedValue as number)
+      : sharePriceUSD;
+  };
+
+  /** USD equivalent of one share, used for `amountUSD` sent to the server. */
+  const getSharePriceUSDEffective = (): number => {
+    if (sharePriceUSD == null) return 0;
+    const override = resolveSharePriceOverride(parsedShareCounts, getCurrency());
+    if (override == null) return sharePriceUSD;
+    // Override is the absolute price in the donor's currency — convert back to USD via cached rate.
+    const cur = getCurrency();
+    if (cur === "USD" || cur === "DEFAULT") return override;
+    const rate = exchangeRates?.[cur];
+    if (!rate || !Number.isFinite(rate) || rate <= 0) return sharePriceUSD;
+    return override / rate;
+  };
+
   useEffect(() => {
     if (!isOpen || !shareMode || sharePriceUSD == null || sharePriceUSD <= 0) return;
-    const r = convertToCurrency(sharePriceUSD);
-    const unit =
-      r?.convertedValue != null && Number.isFinite(r.convertedValue)
-        ? r.convertedValue
-        : sharePriceUSD;
+    const unit = getSharePriceInCurrency();
     setDonationAmount(Math.round(shareCount * unit * 100) / 100);
-  }, [isOpen, shareMode, shareCount, sharePriceUSD, exchangeRates, convertToCurrency]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, shareMode, shareCount, sharePriceUSD, exchangeRates, convertToCurrency, parsedShareCounts]);
 
   // Pre-fill amount and skip amount step when opening with initialDonationAmount (e.g. from QuickDonate)
   useEffect(() => {
@@ -598,10 +621,13 @@ const DonationDialog = ({
 
             <div className="space-y-4">
               {shareMode && sharePriceUSD != null ? (
+                (() => {
+                  const sharePriceInCurrency = getSharePriceInCurrency();
+                  return (
                 <>
                   <p className="text-sm text-center text-gray-600">
                     {t("sharePriceLabel")}{" "}
-                    <span dir="ltr">{formatNumber(convertToCurrency(sharePriceUSD).convertedValue ?? sharePriceUSD)} {getCurrency()}</span>
+                    <span dir="ltr">{formatNumber(sharePriceInCurrency)} {getCurrency()}</span>
                   </p>
                   <p className="text-xs text-center text-gray-500">{t("sharesPickHint")}</p>
                   <div className="flex items-center justify-center gap-3">
@@ -639,8 +665,8 @@ const DonationDialog = ({
                             : ""
                         }
                       >
-                        {c*sharePriceUSD > 0 ? (
-                          <span dir="ltr">{formatNumber(convertToCurrency(c * sharePriceUSD).convertedValue ?? c * sharePriceUSD)} {getCurrency()}</span>
+                        {c * sharePriceInCurrency > 0 ? (
+                          <span dir="ltr">{formatNumber(c * sharePriceInCurrency)} {getCurrency()}</span>
                         ) : (
                           t("free")
                         )}
@@ -651,6 +677,8 @@ const DonationDialog = ({
                     {t("donationTotal")}: <span dir="ltr">{formatNumber(donationAmount)} {getCurrency()}</span>
                   </p>
                 </>
+                  );
+                })()
               ) : (
                 <>
                   <AnimatePresence>
@@ -719,7 +747,7 @@ const DonationDialog = ({
                     try {
                       const amountUSD =
                         shareMode && sharePriceUSD != null
-                          ? shareCount * sharePriceUSD
+                          ? shareCount * getSharePriceUSDEffective()
                           : useConvetToUSD(donationAmount, getCurrency());
                       if (guestMode) {
                         // Guest: add to Zustand only (no DB call — not authenticated)
@@ -1227,7 +1255,7 @@ const DonationDialog = ({
       }
       const amountUSD =
         shareMode && sharePriceUSD != null
-          ? shareCount * sharePriceUSD
+          ? shareCount * getSharePriceUSDEffective()
           : convertToUSD(donationAmount, getCurrency());
 
       // Resolve guest geo (used for both tracking and API request)

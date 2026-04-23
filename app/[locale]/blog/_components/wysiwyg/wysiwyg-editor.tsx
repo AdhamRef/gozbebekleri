@@ -17,6 +17,7 @@ import { defaultEditorContent } from "./default-content";
 import { defaultExtensions } from "./extensions";
 import { ImageResizer } from "./extensions/image-resizer";
 import { defaultEditorProps } from "./props";
+import { EditorToolbar } from "./toolbar";
 
 export default function WysiwygEditor({
   isEditable = true,
@@ -28,49 +29,13 @@ export default function WysiwygEditor({
   extensions = [],
   editorProps = {},
 }: {
-  /**
-   * Additional classes to add to the editor container.
-   * Defaults to "relative min-h-[500px] w-full max-w-screen-lg border-stone-200 bg-white sm:mb-[calc(20vh)] sm:rounded-lg sm:border sm:shadow-lg".
-   */
-  isEditable?: any;
-
+  isEditable?: boolean;
   className?: string;
-  /**
-   * The default value to use for the editor.
-   * Defaults to defaultEditorContent.
-   */
   defaultValue?: JSONContent | string;
-  /**
-   * A list of extensions to use for the editor, in addition to the default Novel extensions.
-   * Defaults to [].
-   */
   extensions?: Extension[];
-  /**
-   * Props to pass to the underlying Tiptap editor, in addition to the default Novel editor props.
-   * Defaults to {}.
-   */
   editorProps?: EditorProps;
-  /**
-   * A callback function that is called whenever the editor is updated.
-   * Defaults to () => {}.
-   */
-  // eslint-disable-next-line no-unused-vars
   onUpdate?: (editor?: EditorClass) => void | Promise<void>;
-  /**
-   * A callback function that is called whenever the editor is updated, but only after the defined debounce duration.
-   * Defaults to () => {}.
-   */
-  // eslint-disable-next-line no-unused-vars
-  /**
-   * A callback function that is called whenever the editor is updated, but only after the defined debounce duration.
-   * Defaults to () => {}.
-   */
-  // eslint-disable-next-line no-unused-vars
   onDebouncedUpdate?: (editor?: EditorClass) => void | Promise<void>;
-  /**
-   * The duration (in milliseconds) to debounce the onDebouncedUpdate callback.
-   * Defaults to 750.
-   */
   debounceDuration?: number;
 }) {
   const debouncedUpdates = useDebouncedCallback(async ({ editor }) => {
@@ -90,24 +55,48 @@ export default function WysiwygEditor({
     },
   });
 
-  // hydrate the editor with the defaultValue.
+  // Track what we last applied to the editor so we don't stomp on the user's
+  // cursor every render. The parent re-creates the `defaultValue` object on
+  // every keystroke (parseEditorContent(state)), so a naïve `setContent` would
+  // reset selection to the end after every edit.
+  const hydratedKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!editor) return;
 
-    if (defaultValue) {
-      editor.commands.setContent(defaultValue);
+    // Serialize incoming value for a stable equality check against what we last
+    // applied, and against the editor's current content.
+    const incomingKey =
+      typeof defaultValue === "string"
+        ? defaultValue
+        : JSON.stringify(defaultValue);
+
+    if (hydratedKeyRef.current === incomingKey) return;
+
+    // If the editor already holds the same content (e.g. because the parent is
+    // re-feeding us the JSON it just received from onUpdate), skip to avoid
+    // resetting the selection.
+    const currentKey = JSON.stringify(editor.getJSON());
+    if (currentKey === incomingKey) {
+      hydratedKeyRef.current = incomingKey;
+      return;
+    }
+
+    // Preserve the current selection across a genuine external content swap
+    // when possible — but never force cursor movement just because the parent
+    // re-rendered.
+    const wasFocused = editor.isFocused;
+    editor.commands.setContent(defaultValue, false);
+    hydratedKeyRef.current = incomingKey;
+    if (wasFocused) {
+      // Keep focus but don't snap the cursor anywhere specific.
+      editor.commands.focus(undefined, { scrollIntoView: false });
     }
   }, [editor, defaultValue]);
 
-  const prev = useRef("");
-
   return (
-    <div
-      onClick={() => {
-        editor?.chain().focus().run();
-      }}
-      className={isEditable ? className : ""}
-    >
+    <div className={isEditable ? className : ""}>
+      {isEditable && editor && <EditorToolbar editor={editor} />}
       {editor && <EditorBubbleMenu editor={editor} />}
       {editor?.isActive("image") && <ImageResizer editor={editor} />}
       <EditorContent editor={editor} />

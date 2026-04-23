@@ -31,7 +31,11 @@ export function computeCampaignProgressPercent(
   return Math.min(100, (Number(currentAmount) / t) * 100);
 }
 
-export type SuggestedShareCountsConfig = { counts: number[] };
+export type SuggestedShareCountsConfig = {
+  counts: number[];
+  /** Per-currency overrides for the share price, stored as the absolute price in that currency (not USD). */
+  priceByCurrency?: Record<string, number>;
+};
 
 export const DEFAULT_SUGGESTED_SHARE_COUNTS = [1, 5, 10, 25, 50];
 
@@ -45,18 +49,53 @@ function normalizeCountsArray(raw: unknown): number[] {
   return [...new Set(out)].sort((a, b) => a - b);
 }
 
+function normalizeCurrencyCode(code: string): string {
+  return String(code || "").trim().toUpperCase();
+}
+
+function normalizePriceByCurrency(raw: unknown): Record<string, number> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const code = normalizeCurrencyCode(k);
+    if (!code) continue;
+    const n = typeof v === "number" ? v : Number(v);
+    if (Number.isFinite(n) && n > 0) out[code] = n;
+  }
+  return out;
+}
+
 export function parseSuggestedShareCounts(raw: unknown): SuggestedShareCountsConfig {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    return { counts: [...DEFAULT_SUGGESTED_SHARE_COUNTS] };
+    return { counts: [...DEFAULT_SUGGESTED_SHARE_COUNTS], priceByCurrency: {} };
   }
   const o = raw as Record<string, unknown>;
   const counts = normalizeCountsArray(o.counts);
+  const priceByCurrency = normalizePriceByCurrency(o.priceByCurrency);
   return {
     counts: counts.length ? counts : [...DEFAULT_SUGGESTED_SHARE_COUNTS],
+    priceByCurrency,
   };
 }
 
+/**
+ * Resolve the display price of one share for the given currency.
+ * When an override exists, returns { price, isOverride: true } — callers should
+ * display this value as-is and convert to USD for the server via the exchange rate.
+ * Otherwise returns null, meaning the caller should convert sharePriceUSD normally.
+ */
+export function resolveSharePriceOverride(
+  config: SuggestedShareCountsConfig | null | undefined,
+  currencyCode: string
+): number | null {
+  if (!config?.priceByCurrency) return null;
+  const c = normalizeCurrencyCode(currencyCode);
+  const v = c ? config.priceByCurrency[c] : undefined;
+  return Number.isFinite(v) && (v as number) > 0 ? (v as number) : null;
+}
+
 const MAX_COUNTS = 12;
+const MAX_PRICE_OVERRIDES = 20;
 
 export function validateSuggestedShareCountsBody(
   body: unknown
@@ -71,6 +110,10 @@ export function validateSuggestedShareCountsBody(
   if (counts.length > MAX_COUNTS) {
     throw new Error(`At most ${MAX_COUNTS} suggested share counts`);
   }
+  const priceByCurrency = normalizePriceByCurrency(o.priceByCurrency);
+  if (Object.keys(priceByCurrency).length > MAX_PRICE_OVERRIDES) {
+    throw new Error(`At most ${MAX_PRICE_OVERRIDES} share price overrides`);
+  }
   if (!counts.length) counts = [...DEFAULT_SUGGESTED_SHARE_COUNTS];
-  return { counts };
+  return { counts, priceByCurrency };
 }

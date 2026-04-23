@@ -13,6 +13,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { Markdown } from "tiptap-markdown";
 import CustomKeymap from "./custom-keymap";
 import DragAndDrop from "./drag-and-drop";
+import FontSize from "./font-size";
 import SlashCommand from "./slash-command";
 import UpdatedImage from "./updated-image";
 
@@ -114,6 +115,7 @@ export const defaultExtensions = [
   SlashCommand,
   TiptapUnderline,
   TextStyle,
+  FontSize,
   Color,
   Highlight.configure({
     multicolor: true,

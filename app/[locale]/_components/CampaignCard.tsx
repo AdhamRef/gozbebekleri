@@ -43,7 +43,7 @@ export interface CampaignCardData {
   fundraisingMode?: string;
   goalType?: string;
   sharePriceUSD?: number | null;
-  suggestedShareCounts?: { counts: number[] } | null;
+  suggestedShareCounts?: { counts: number[]; priceByCurrency?: Record<string, number> } | null;
   suggestedDonations?: SuggestedDonationsConfig | null;
   category?: { id?: string; name?: string; icon?: string };
 }
@@ -52,7 +52,7 @@ type DonationDialogCampaignContext = {
   goalType?: string;
   fundraisingMode?: string;
   sharePriceUSD?: number | null;
-  suggestedShareCounts?: { counts: number[] } | null;
+  suggestedShareCounts?: { counts: number[]; priceByCurrency?: Record<string, number> } | null;
   suggestedDonations?: SuggestedDonationsConfig | null;
 };
 

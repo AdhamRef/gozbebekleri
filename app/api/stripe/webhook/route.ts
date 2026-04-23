@@ -42,7 +42,9 @@ export async function POST(req: NextRequest) {
               where: { id: donationId },
               include: { items: true, categoryItems: true },
             });
-            if (!donation || donation.status === "PAID") return;
+            // Idempotency: the row is created with status=PAID by /api/stripe/intent
+            // before Stripe confirms payment, so we key off paidAt (only set here).
+            if (!donation || donation.paidAt != null) return;
 
             // Mark donation as paid
             await tx.donation.update({
@@ -283,7 +285,9 @@ export async function POST(req: NextRequest) {
             where: { id: donationId },
             include: { items: true, categoryItems: true },
           });
-          if (!donation || donation.status === "PAID") return;
+          // Idempotency: the row is created with status=PAID by /api/stripe/intent
+          // before Stripe confirms payment, so we key off paidAt (only set here).
+          if (!donation || donation.paidAt != null) return;
 
           await tx.donation.update({
             where: { id: donationId },

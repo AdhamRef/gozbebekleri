@@ -68,7 +68,7 @@ interface Campaign {
   goalType?: string;
   fundraisingMode?: string;
   sharePriceUSD?: number | null;
-  suggestedShareCounts?: { counts: number[] };
+  suggestedShareCounts?: { counts: number[]; priceByCurrency?: Record<string, number> };
   category: Category;
   donationStats: {
     first: DonationStat | null;
