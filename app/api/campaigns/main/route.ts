@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
         category: {
           select: {
             id: true,
+            slug: true,
             name: true,
             icon: true,
           },

@@ -62,6 +62,7 @@ const formSchema = z
   title: z.string()
     .min(1, 'العنوان مطلوب')
     .max(100, 'العنوان طويل جداً'),
+  slug: z.string().max(80, 'الـ slug طويل جداً').optional().or(z.literal('')),
   targetAmount: z.number().min(0).max(1000000),
   goalType: z.enum(['FIXED', 'OPEN']),
   fundraisingMode: z.enum(['AMOUNT', 'SHARES']),
@@ -74,7 +75,7 @@ const formSchema = z
     .max(5, 'الحد الأقصى 5 صور'),
   videoUrl: z.string().optional(),
   
-  title_en: z.string().optional(),
+  title_en: z.string().min(1, 'English title is required'),
   title_fr: z.string().optional(),
   title_tr: z.string().optional(),
   title_id: z.string().optional(),
@@ -153,6 +154,7 @@ export default function NewCampaignPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: '',
+      slug: '',
       targetAmount: 0,
       goalType: 'FIXED',
       fundraisingMode: 'AMOUNT',
@@ -201,11 +203,17 @@ export default function NewCampaignPage() {
       setActiveTab('ar');
       return;
     }
+    if (isDescEmpty(descriptionEn)) {
+      toast.error('English description is required');
+      setActiveTab('en');
+      return;
+    }
     setSaving(true);
     try {
       // ✅ Prepare request with translations
       const requestData = {
         title: values.title,
+        slug: values.slug || undefined,
         description: descriptionAr || '',
         goalType: values.goalType,
         fundraisingMode: values.fundraisingMode,
@@ -217,9 +225,9 @@ export default function NewCampaignPage() {
         images: values.images,
         videoUrl: values.videoUrl,
 
-        // Only include translations if they have content
+        // English is always sent (required); other locales only when title + description provided.
         translations: {
-          ...(values.title_en && !isDescEmpty(descriptionEn) ? { en: { title: values.title_en, description: descriptionEn } } : {}),
+          en: { title: values.title_en, description: descriptionEn },
           ...(values.title_fr && !isDescEmpty(descriptionFr) ? { fr: { title: values.title_fr, description: descriptionFr } } : {}),
           ...(values.title_tr && !isDescEmpty(descriptionTr) ? { tr: { title: values.title_tr, description: descriptionTr } } : {}),
           ...(values.title_id && !isDescEmpty(descriptionId) ? { id: { title: values.title_id, description: descriptionId } } : {}),
@@ -364,7 +372,25 @@ const getTranslationStatus = () => {
               <Languages className="w-5 h-5 text-gray-700" />
               <h2 className="text-lg font-semibold">المعلومات الأساسية</h2>
             </div>
-            
+
+            {/* Slug — outside the language tabs (one URL per campaign, derived from English) */}
+            <FormField
+              control={form.control}
+              name="slug"
+              render={({ field }) => (
+                <FormItem dir='rtl' className="mb-6">
+                  <FormLabel>الرابط (slug) — اختياري</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="مثال: gaza-emergency-relief" dir="ltr" />
+                  </FormControl>
+                  <FormDescription>
+                    يُستخدم في رابط المشروع. إذا تُرك فارغاً سيُنشأ تلقائياً من العنوان الإنجليزي.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
               <TabsList className="flex flex-wrap gap-1 mb-6">
                 <TabsTrigger value="ar" className="gap-2">
@@ -373,6 +399,7 @@ const getTranslationStatus = () => {
                 </TabsTrigger>
                 <TabsTrigger value="en" className="gap-2">
                   <ReactCountryFlag countryCode="GB" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> English
+                  <span className="text-xs text-red-600">*</span>
                   {translationStatus.hasEn && <CheckCircle2 className="w-3 h-3 text-green-600" />}
                 </TabsTrigger>
                 <TabsTrigger value="fr" className="gap-2">
@@ -457,12 +484,12 @@ const getTranslationStatus = () => {
                 </FormItem>
               </TabsContent>
 
-              {/* English Tab */}
+              {/* English Tab — required */}
               <TabsContent value="en" className="space-y-6">
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription className='mt-[5px]'>
-                    English translations are optional. If not provided, Arabic content will be displayed to English users.
+                    English is required. The slug is auto-generated from the English title.
                   </AlertDescription>
                 </Alert>
 
@@ -471,39 +498,29 @@ const getTranslationStatus = () => {
                   name="title_en"
                   render={({ field }) => (
                     <FormItem dir='rtl'>
-                      <FormLabel>Campaign Title (English)</FormLabel>
+                      <FormLabel>Campaign Title (English) *</FormLabel>
                       <FormControl>
                         <Input {...field} placeholder="Enter campaign title in English" />
                       </FormControl>
                       <FormDescription>
-                        Provide an English translation of the campaign title
+                        Required — also drives the slug when no manual override is set.
                       </FormDescription>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
 
                 <FormItem dir='rtl'>
-                  <FormLabel>Campaign Description (English)</FormLabel>
+                  <FormLabel>Campaign Description (English) *</FormLabel>
                   <WysiwygEditor
                     defaultValue={parseEditorContent(descriptionEn)}
                     onDebouncedUpdate={(editor) => setDescriptionEn(JSON.stringify(editor?.getJSON()))}
                     className={editorClassName}
                   />
                   <FormDescription>
-                    Provide a comprehensive English description of the campaign and its goals
+                    Required — comprehensive English description of the campaign and its goals.
                   </FormDescription>
                 </FormItem>
-
-                {/* Helper for partial translations */}
-                {(form.watch('title_en') || form.watch('description_en')) && 
-                 (!form.watch('title_en') || !form.watch('description_en')) && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription className='mt-[5px]'>
-                      Both title and description must be provided for English translation to be saved.
-                    </AlertDescription>
-                  </Alert>
-                )}
               </TabsContent>
 
               {/* French Tab */}
@@ -793,6 +810,10 @@ const getTranslationStatus = () => {
                       </div>
                       <FormDescription>
                         يمكنك رفع حتى 5 صور للمشروع. الصورة الأولى ستكون الصورة الرئيسية المعروضة.
+                        <br />
+                        <span className="text-amber-700">
+                          الحجم المُوصى به: <strong>1200×900 px</strong> (نسبة 4:3)، صيغة JPG أو PNG، حجم الملف لا يزيد عن 2MB.
+                        </span>
                       </FormDescription>
                     </div>
                   </FormControl>

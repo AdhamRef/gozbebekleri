@@ -341,7 +341,7 @@ export default function CampaignsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>إجراءات</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => router.push(`/${locale}/campaign/${campaign.id}`)}>
+                          <DropdownMenuItem onClick={() => router.push(`/${locale}/campaign/${(campaign as any).slug || campaign.id}`)}>
                             <Eye className="w-4 h-4 ml-2" /> عرض
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => router.push(`/dashboard/campaigns/edit/${campaign.id}`)}>

@@ -11,11 +11,12 @@ import { ar, enUS, tr } from "date-fns/locale";
 
 interface Post {
   id: string;
+  slug?: string | null;
   title: string;
   description: string;
   image?: string | null;
   createdAt: string | Date;
-  category?: { id?: string; name?: string } | null;
+  category?: { id?: string; slug?: string | null; name?: string } | null;
 }
 
 const dateLocaleMap: Record<string, Locale> = { ar, en: enUS, tr };
@@ -145,7 +146,7 @@ const BlogPage = ({
             {posts.map((post) => (
               <Link
                 key={post.id}
-                href={`/blog/${post.id}`}
+                href={`/blog/${post.slug || post.id}`}
                 className="group block bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100"
               >
                 {/* Image */}

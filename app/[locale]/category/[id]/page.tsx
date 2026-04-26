@@ -5,6 +5,7 @@ import MainPage from "./_components/MainPage";
 
 interface Category {
   id: string;
+  slug?: string | null;
   name: string;
   description: string;
   image: string;
@@ -45,7 +46,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           alt: category.name,
         },
       ],
-      url: `https://gozbebekleri.com/${locale}/categories/${id}`,
+      url: `https://gozbebekleri.com/${locale}/categories/${category.slug || id}`,
       type: "website",
     },
     twitter: {
@@ -55,7 +56,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images: [category.image || "/default-category.jpg"],
     },
     alternates: {
-      canonical: `https://gozbebekleri.com/${locale}/categories/${id}`,
+      canonical: `https://gozbebekleri.com/${locale}/categories/${category.slug || id}`,
     },
   };
 }

@@ -203,6 +203,9 @@ model Category {
   name          String   @unique
   description   String?
 
+  /// URL slug for human-friendly category links (unique across categories)
+  slug          String?  @unique
+
   image         String?
   icon          String?
   order         Int?
@@ -261,6 +264,9 @@ model Campaign {
   // Arabic (default)
   title         String
   description   String
+
+  /// URL slug for human-friendly campaign links (unique across campaigns)
+  slug          String?  @unique
 
   targetAmount  Float
   currentAmount Float   @default(0)
@@ -563,6 +569,9 @@ model PostCategory {
   description String?
   image     String?
 
+  /// URL slug for blog category links (unique across post categories)
+  slug      String?  @unique
+
   posts       Post[]
   translations PostCategoryTranslation[]
 
@@ -592,6 +601,9 @@ model Post {
   description String?
   content   String?
   image     String?
+
+  /// URL slug for blog post links (unique across posts)
+  slug      String?  @unique
 
   published Boolean @default(false)
 

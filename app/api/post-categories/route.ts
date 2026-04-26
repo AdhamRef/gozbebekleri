@@ -5,6 +5,7 @@ import { authOptions } from "../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
+import { generateUniqueSlug, normalizeUserSlug } from "@/lib/slug";
 
 // GET: list post categories with locale-aware translations, search, and paging
 export async function GET(request: NextRequest) {
@@ -22,6 +23,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
+        slug: true,
         name: true,
         title: true,
         description: true,
@@ -55,6 +57,7 @@ export async function GET(request: NextRequest) {
       const t = pickTranslation(cat.translations, locale);
       return {
         id: cat.id,
+        slug: cat.slug ?? null,
         name: t?.name || cat.name,
         title: t?.title || cat.title,
         description: t?.description || cat.description,
@@ -83,6 +86,17 @@ export async function POST(request: NextRequest) {
 
     if (!name) return NextResponse.json({ error: 'Category name is required' }, { status: 400 });
 
+    // English is required.
+    const enTrans = translations?.en;
+    const enName: string | undefined =
+      typeof enTrans?.name === "string" ? enTrans.name.trim() : undefined;
+    if (!enName) {
+      return NextResponse.json(
+        { error: "English category name is required" },
+        { status: 400 }
+      );
+    }
+
     const translationData: { locale: string; name: string; title?: string; description?: string; image?: string }[] = [];
     if (translations && typeof translations === 'object') {
       for (const [locale, t] of Object.entries(translations)) {
@@ -95,8 +109,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Auto-generate slug from English name (always); admin can override.
+    const requestedSlug = normalizeUserSlug(data.slug);
+    const slug = await generateUniqueSlug(
+      prisma.postCategory as any,
+      requestedSlug ?? enName,
+      { fallbackPrefix: "blog-category" }
+    );
+
     const category = await prisma.$transaction(async (tx) => {
-      const created = await tx.postCategory.create({ data: { name, title: title || '', description: description || '', image: image || '' } });
+      const created = await tx.postCategory.create({ data: { name, slug, title: title || '', description: description || '', image: image || '' } });
 
       if (translationData.length > 0) {
         await tx.postCategoryTranslation.createMany({ data: translationData.map(t => ({ categoryId: created.id, locale: t.locale, name: t.name, title: t.title, description: t.description, image: t.image })) });
@@ -105,7 +127,7 @@ export async function POST(request: NextRequest) {
       return created;
     });
 
-    const full = await prisma.postCategory.findUnique({ where: { id: category.id }, select: { id: true, name: true, title: true, description: true, image: true, translations: { select: { locale: true, name: true, title: true, description: true, image: true } } } });
+    const full = await prisma.postCategory.findUnique({ where: { id: category.id }, select: { id: true, slug: true, name: true, title: true, description: true, image: true, translations: { select: { locale: true, name: true, title: true, description: true, image: true } } } });
 
     const actor = auditActorFromDashboardSession(session!);
     await writeAuditLog({

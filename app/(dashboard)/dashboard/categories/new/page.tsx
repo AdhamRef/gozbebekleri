@@ -27,10 +27,11 @@ import CategoryIcon, { CATEGORY_ICON_NAMES } from '@/components/CategoryIcon';
 
 const formSchema = z.object({
   name: z.string().min(1, 'اسم الحملة مطلوب').max(50, 'اسم الحملة طويل جداً'),
+  slug: z.string().max(80, 'الـ slug طويل جداً').optional().or(z.literal('')),
   description: z.string().max(500, 'الوصف طويل جداً').optional(),
   image: z.string().optional(),
   icon: z.string().optional(),
-  name_en: z.string().max(50).optional(),
+  name_en: z.string().min(1, 'English name is required').max(50, 'English name is too long'),
   description_en: z.string().max(500).optional(),
   name_fr: z.string().max(50).optional(),
   description_fr: z.string().max(500).optional(),
@@ -55,6 +56,7 @@ export default function NewCategoryPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
+      slug: '',
       description: '',
       image: '',
       icon: '',
@@ -78,6 +80,7 @@ export default function NewCategoryPage() {
     try {
       await axios.post('/api/categories', {
         name: values.name,
+        slug: values.slug || undefined,
         description: values.description,
         image: values.image,
         icon: values.icon,
@@ -156,6 +159,18 @@ export default function NewCategoryPage() {
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          {/* Slug — outside the language tabs (one URL per category, derived from English) */}
+          <Card className="p-6">
+            <FormField control={form.control} name="slug" render={({ field }) => (
+              <FormItem>
+                <FormLabel>الرابط (slug) — اختياري</FormLabel>
+                <FormControl><Input {...field} placeholder="مثال: emergency-relief" dir="ltr" /></FormControl>
+                <FormDescription>يُستخدم في رابط الحملة. إذا تُرك فارغاً سيُنشأ تلقائياً من الاسم الإنجليزي.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </Card>
+
           <Tabs defaultValue="ar" className="w-full">
             <TabsList className="flex flex-wrap gap-1 mb-4" dir="rtl">
               <TabsTrigger value="ar" className="gap-2">
@@ -163,6 +178,7 @@ export default function NewCategoryPage() {
               </TabsTrigger>
               <TabsTrigger value="en" className="gap-2">
                 <ReactCountryFlag countryCode="GB" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> English
+                <span className="text-xs text-red-600">*</span>
               </TabsTrigger>
               <TabsTrigger value="fr" className="gap-2">
                 <ReactCountryFlag countryCode="FR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Français
@@ -196,7 +212,7 @@ export default function NewCategoryPage() {
               <Card className="p-6">
                 <div className="grid gap-6">
                   <FormField control={form.control} name="name_en" render={({ field }) => (
-                    <FormItem><FormLabel>Category name (English)</FormLabel><FormControl><Input {...field} placeholder="Category name" /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Category name (English) *</FormLabel><FormControl><Input {...field} placeholder="Category name" /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="description_en" render={({ field }) => (
                     <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Description..." className="resize-y" {...field} /></FormControl><FormMessage /></FormItem>
@@ -322,7 +338,11 @@ export default function NewCategoryPage() {
                       </div>
                     </FormControl>
                     <FormDescription>
-                      يمكنك رفع صورة واحدة للحملة
+                      يمكنك رفع صورة واحدة للحملة.
+                      <br />
+                      <span className="text-amber-700">
+                        الحجم المُوصى به: <strong>1200×800 px</strong> (نسبة 3:2)، صيغة JPG أو PNG، حجم الملف لا يزيد عن 2MB.
+                      </span>
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

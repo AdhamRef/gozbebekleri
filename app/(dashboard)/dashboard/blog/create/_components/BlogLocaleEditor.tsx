@@ -38,11 +38,19 @@ import {
 import WysiwygEditor from "@/app/[locale]/blog/_components/wysiwyg/wysiwyg-editor";
 import { defaultEditorContent } from "@/app/[locale]/blog/_components/wysiwyg/default-content";
 
-const schema = z.object({
-  title: z.string().optional(),
-  description: z.string().optional(),
-  image: z.string().optional(),
-});
+// Per-locale schema. English is required (title + description); other locales stay optional.
+const schemaFor = (locale: string) =>
+  locale === "en"
+    ? z.object({
+        title: z.string().min(1, "English title is required"),
+        description: z.string().min(1, "English description is required"),
+        image: z.string().optional(),
+      })
+    : z.object({
+        title: z.string().optional(),
+        description: z.string().optional(),
+        image: z.string().optional(),
+      });
 
 const config = {
   save: "حفظ",
@@ -84,6 +92,7 @@ export default function BlogLocaleEditor({ post, locale }: BlogLocaleEditorProps
     trans?.content ?? null
   );
 
+  const schema = schemaFor(locale);
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -120,7 +129,25 @@ export default function BlogLocaleEditor({ post, locale }: BlogLocaleEditorProps
     form.setValue("image", "");
   };
 
+  const isContentEmpty = (json: string | null) => {
+    if (!json) return true;
+    try {
+      const doc = JSON.parse(json);
+      if (!doc?.content?.length) return true;
+      return doc.content.every(
+        (n: { type: string; content?: unknown[] }) =>
+          n.type === "paragraph" && (!n.content || n.content.length === 0)
+      );
+    } catch {
+      return true;
+    }
+  };
+
   const onSubmit = async (data: z.infer<typeof schema>) => {
+    if (locale === "en" && isContentEmpty(content)) {
+      toast.error("English content is required");
+      return;
+    }
     setShowLoadingAlert(true);
     setIsSaving(true);
     try {
@@ -160,7 +187,7 @@ export default function BlogLocaleEditor({ post, locale }: BlogLocaleEditorProps
                 name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{config.titleLabel}</FormLabel>
+                    <FormLabel>{config.titleLabel}{locale === "en" ? " *" : ""}</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="Title" />
                     </FormControl>
@@ -173,7 +200,7 @@ export default function BlogLocaleEditor({ post, locale }: BlogLocaleEditorProps
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{config.descriptionLabel}</FormLabel>
+                    <FormLabel>{config.descriptionLabel}{locale === "en" ? " *" : ""}</FormLabel>
                     <FormControl>
                       <Textarea {...field} placeholder="Description" rows={4} />
                     </FormControl>
@@ -237,6 +264,11 @@ export default function BlogLocaleEditor({ post, locale }: BlogLocaleEditorProps
                         )}
                       </div>
                     </FormControl>
+                    <FormDescription>
+                      <span className="text-amber-700">
+                        Recommended size: <strong>1200×675 px</strong> (16:9 ratio), JPG or PNG, max 2MB.
+                      </span>
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

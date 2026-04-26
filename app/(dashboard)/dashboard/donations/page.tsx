@@ -316,7 +316,7 @@ export default function DonationsPage() {
                 <TableCell>
                   <div className="flex flex-col gap-1">
                     {donation.items.map((item) => (
-                      <Link href={`/campaign/${item.campaign.id}`} key={item.campaign.id} className="text-sm text-[#025EB8] flex gap-2">
+                      <Link href={`/campaign/${(item.campaign as any).slug || item.campaign.id}`} key={item.campaign.id} className="text-sm text-[#025EB8] flex gap-2">
                         <Link2 className='w-5 h-5 text-[#025EB8]' />
                         {item.campaign.title}
                       </Link>

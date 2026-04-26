@@ -64,13 +64,17 @@ import {
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 
-// Validation schema (Arabic fields only - simple inputs like BlogLocaleEditor)
+// Validation schema. English title/description are required (covers create flow);
+// for edit, English is managed via BlogLocaleEditor and these fields stay empty.
 const postEditFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
+  slug: z.string().max(80, "الـ slug طويل جداً").optional().or(z.literal("")),
   description: z.string().optional(),
   image: z.string().optional(),
   categoryId: z.string().optional(),
   campaignIds: z.tuple([z.string().optional(), z.string().optional(), z.string().optional()]),
+  title_en: z.string().optional(),
+  description_en: z.string().optional(),
 });
 
 // Configuration
@@ -125,6 +129,8 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
 
   // Arabic content only (en/fr edited in BlogLocaleEditor)
   const [contentAR, setContentAR] = useState(post?.contentAR || null);
+  // English content captured in the create flow (required) — edited via BlogLocaleEditor afterwards
+  const [contentEN, setContentEN] = useState(post?.contentEN || null);
 
 
   // Uppy instance for cover photo upload
@@ -184,10 +190,13 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
   };
   const defaultValues = {
     title: post?.titleAR || post?.title || "",
+    slug: post?.slug || "",
     description: post?.descriptionAR || post?.description || "",
     image: post?.imageAR || post?.image || "",
     categoryId: post?.category_id || post?.categoryId || "",
     campaignIds: padCampaignIds(),
+    title_en: post?.titleEN || "",
+    description_en: post?.descriptionEN || "",
   };
 
   const form = useForm({
@@ -196,12 +205,22 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
     mode: "onChange",
   });
 
-  // Submit handler: Arabic fields only (en/fr edited in BlogLocaleEditor)
+  // Submit handler: Arabic fields only (en/fr edited in BlogLocaleEditor on edit pages)
   const onSubmit = async (data) => {
     setShowLoadingAlert(true);
     setIsSaving(true);
 
     try {
+      // English is required when creating a post (the API enforces this too).
+      const titleEnTrim = (data.title_en || "").trim();
+      const descEnTrim = (data.description_en || "").trim();
+      if (isCreate && (!titleEnTrim || !descEnTrim)) {
+        toast.error("English title and description are required");
+        setIsSaving(false);
+        setShowLoadingAlert(false);
+        return;
+      }
+
       const rawIds = (data.campaignIds || [])
         .filter((id) => id && id !== NO_CAMPAIGN_VALUE);
       const seen = new Set();
@@ -214,26 +233,40 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
       }
       const payload = {
         title: data.title,
+        slug: data.slug ?? "",
         description: data.description || "",
         content: contentAR || "",
         image: data.image || "",
         categoryId: data.categoryId || null,
         campaignIds,
       };
+      // On create, send English translation alongside Arabic (API requires it).
+      if (isCreate) {
+        payload.translations = {
+          en: {
+            title: titleEnTrim,
+            description: descEnTrim,
+            content: contentEN || "",
+          },
+        };
+      }
+      // On create, an empty slug means "auto-generate from English title" — drop it so the API picks.
+      if (isCreate && !payload.slug) delete payload.slug;
 
       let response;
       if (isCreate) {
         response = await axios.post("/api/posts", payload);
         toast.success(protectedEditorConfig.successMessage);
+        const key = response.data.slug || response.data.id;
         if (redirectAfterCreate) {
-          router.push(`${redirectAfterCreate}/${response.data.id}`);
+          router.push(`${redirectAfterCreate}/${key}`);
         } else {
-          router.push(`/blog/${response.data.id}`);
+          router.push(`/blog/${key}`);
         }
       } else {
         response = await axios.patch(`/api/posts/${post.id}`, payload);
         toast.success(protectedEditorConfig.successMessage);
-        router.push(`/blog/${response.data.id}`);
+        router.push(`/blog/${response.data.slug || response.data.id}`);
       }
     } catch (error) {
       console.error(isCreate ? "Post create error:" : "Post update error:", error);
@@ -326,6 +359,62 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="slug"
+                render={({ field }) => (
+                  <FormItem dir="rtl">
+                    <FormLabel>الرابط (slug) — اختياري</FormLabel>
+                    <FormControl>
+                      <Input dir="ltr" placeholder={protectedEditorConfig.placeholderSlug} {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      يُستخدم في رابط المقال (لكل اللغات). إذا تُرك فارغاً سيُنشأ تلقائياً من العنوان الإنجليزي.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {isCreate && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="title_en"
+                    render={({ field }) => (
+                      <FormItem dir="ltr">
+                        <FormLabel>Title (English) *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter post title in English" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          Required — also used to generate the slug when no override is provided.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="description_en"
+                    render={({ field }) => (
+                      <FormItem dir="ltr">
+                        <FormLabel>Description (English) *</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Short English description"
+                            className="min-h-[120px] resize-y"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
 
               <FormField
                 control={form.control}
@@ -491,6 +580,11 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
                         )}
                       </div>
                     </FormControl>
+                    <FormDescription>
+                      <span className="text-amber-700">
+                        الحجم المُوصى به: <strong>1200×675 px</strong> (نسبة 16:9)، صيغة JPG أو PNG، حجم الملف لا يزيد عن 2MB.
+                      </span>
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -538,6 +632,30 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
               />
             </CardContent>
           </Card>
+
+          {isCreate && (
+            <Card>
+              <CardHeader dir="ltr">
+                <CardTitle>Content (English)</CardTitle>
+                <CardDescription>Required — English version of the post body.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <WysiwygEditor
+                  defaultValue={(() => {
+                    if (!contentEN) return defaultEditorContent;
+                    try {
+                      return typeof contentEN === "string" ? JSON.parse(contentEN) : contentEN;
+                    } catch {
+                      return defaultEditorContent;
+                    }
+                  })()}
+                  onDebouncedUpdate={(editor) => {
+                    setContentEN(JSON.stringify(editor?.getJSON()));
+                  }}
+                />
+              </CardContent>
+            </Card>
+          )}
 
           {/* Form submission buttons */}
           <div className="inline-flex items-center justify-start gap-x-3">

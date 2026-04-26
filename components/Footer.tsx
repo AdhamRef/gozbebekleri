@@ -23,7 +23,7 @@ const Footer = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
   const [isSignInOpen, setIsSignInOpen] = useState(false);
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: string; slug?: string | null; name: string }[]>([]);
   const pendingMessageKey = 'footer_pending_contact_message';
   const signInCallbackUrl =
     typeof window !== 'undefined'
@@ -168,7 +168,7 @@ const Footer = () => {
               {categories.map((cat) => (
                 <li key={cat.id}>
                   <Link
-                    href={`/category/${cat.id}`}
+                    href={`/category/${cat.slug || cat.id}`}
                     className="group flex items-center gap-1.5 text-sm text-white/65 hover:text-white transition-colors"
                   >
                     <ChevronRight className="w-3.5 h-3.5 text-[#FA5D17] flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />

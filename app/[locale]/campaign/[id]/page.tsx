@@ -8,6 +8,7 @@ interface Props {
 }
 
 interface Campaign {
+  slug?: string | null;
   title: string;
   description: string;
   images: string[];
@@ -39,7 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const image = campaign.images[0] || `${SITE_URL}/og-image.jpg`;
-  const path = `/campaign/${id}`;
+  const path = `/campaign/${campaign.slug || id}`;
   const alternates = buildHreflang(path, locale);
 
   // Emotionally charged, urgency-driven title

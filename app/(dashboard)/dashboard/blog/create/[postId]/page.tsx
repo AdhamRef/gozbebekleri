@@ -43,6 +43,7 @@ export default async function PostEditorPage({
 
   const editorPost = {
     id: post.id,
+    slug: (post as { slug?: string | null }).slug ?? null,
     title: post.title ?? null,
     description: post.description ?? null,
     content: post.content ?? null,

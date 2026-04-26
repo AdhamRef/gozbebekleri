@@ -1,12 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { orderCampaignsByIds } from "@/lib/blog/campaign-ids";
+import { whereByIdOrSlug } from "@/lib/slug";
 
 export default async function getPost(postId: string) {
   try {
-    const post = await prisma.post.findUnique({
-      where: {
-        id: postId,
-      },
+    const post = await prisma.post.findFirst({
+      where: whereByIdOrSlug(postId),
       include: {
         category: true,
         translations: true,

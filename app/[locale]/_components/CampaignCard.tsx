@@ -33,6 +33,7 @@ function buildImgSrc(src: string, width = 640, height = 480): string {
 
 export interface CampaignCardData {
   id: string;
+  slug?: string | null;
   images: string[];
   title: string;
   description: string;
@@ -45,7 +46,7 @@ export interface CampaignCardData {
   sharePriceUSD?: number | null;
   suggestedShareCounts?: { counts: number[]; priceByCurrency?: Record<string, number> } | null;
   suggestedDonations?: SuggestedDonationsConfig | null;
-  category?: { id?: string; name?: string; icon?: string };
+  category?: { id?: string; slug?: string | null; name?: string; icon?: string };
 }
 
 type DonationDialogCampaignContext = {
@@ -129,14 +130,14 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
       {/* ── Mobile horizontal list row (listView only, hidden on sm+) ── */}
       {listView && !isFeatured && (
         <div className="sm:hidden flex flex-row bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-          <Link href={`/campaign/${campaign.id}`} onClick={onClick} className="relative flex-shrink-0 w-28 aspect-square">
+          <Link href={`/campaign/${campaign.slug || campaign.id}`} onClick={onClick} className="relative flex-shrink-0 w-28 aspect-square">
             <Image src={buildImgSrc(rawImgSrc, 320, 320)} alt={campaign.title} fill sizes="112px" className="object-cover" draggable={false} />
           </Link>
           <div className="flex flex-col justify-between flex-1 min-w-0 px-3 py-2.5">
             {campaign.category?.name && (
               <p className="text-[10px] text-gray-400 font-medium truncate mb-0.5">{campaign.category.name}</p>
             )}
-            <Link href={`/campaign/${campaign.id}`} onClick={onClick}>
+            <Link href={`/campaign/${campaign.slug || campaign.id}`} onClick={onClick}>
               <h3 className="text-[13px] font-bold text-gray-900 line-clamp-2 leading-snug">{campaign.title}</h3>
             </Link>
             <div className="mt-1.5">
@@ -159,7 +160,7 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
         className={`${listView && !isFeatured ? "hidden sm:flex" : "flex"} group/card relative bg-white rounded-2xl overflow-hidden border shadow-sm hover:shadow-xl transition-all duration-300 flex-col ${isFeatured ? "border-[#FA5D17]/40 hover:shadow-[#FA5D17]/15 ring-1 ring-[#FA5D17]/20" : "border-gray-100 hover:shadow-[#025EB8]/12"} ${className ?? ""}`}
       >
         {/* Full image with everything overlaid */}
-        <Link href={`/campaign/${campaign.id}`} prefetch={true} onClick={onClick} className="relative flex-1 block">
+        <Link href={`/campaign/${campaign.slug || campaign.id}`} prefetch={true} onClick={onClick} className="relative flex-1 block">
           <div className={`relative w-full overflow-hidden ${isFeatured ? "h-full" : "aspect-[4/3]"}`}>
             <Image
               src={isFeatured ? buildImgSrc(rawImgSrc, 1280, 960) : imgSrc}
@@ -245,7 +246,7 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
             {t("donateNow") || "تبرع الآن"}
           </button>
           <Link
-            href={`/campaign/${campaign.id}`}
+            href={`/campaign/${campaign.slug || campaign.id}`}
             onClick={onClick}
             className={`flex-1 flex items-center justify-center text-gray-500 hover:text-[#025EB8] font-semibold transition-colors border-e border-gray-100 ${isFeatured ? "text-sm py-3.5" : compact ? "text-[11px] py-2" : "text-xs py-2.5"}`}
           >

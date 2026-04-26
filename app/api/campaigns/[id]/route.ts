@@ -23,6 +23,11 @@ import {
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog } from "@/lib/audit-log";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
+import {
+  generateUniqueSlug,
+  normalizeUserSlug,
+  whereByIdOrSlug,
+} from "@/lib/slug";
 
 // ✅ Prisma Singleton - Reuse connection across requests
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
@@ -42,11 +47,13 @@ export async function GET(
       "ar";
 
     // ✅ STEP 1: Fetch campaign with ONLY current locale translations
-    const campaign = await prisma.campaign.findUnique({
-      where: { id },
+    // Accept either ObjectId or slug in the URL param.
+    const campaign = await prisma.campaign.findFirst({
+      where: whereByIdOrSlug(id),
       select: {
         // Basic fields
         id: true,
+        slug: true,
         title: true,        // Arabic default
         description: true,  // Arabic default
         images: true,
@@ -122,16 +129,18 @@ export async function GET(
 
     // ✅ STEP 2: Get donation stats with PARALLEL queries
     // Instead of loading 100+ donations, we get only what we need
-    const [donationCount, firstDonation, lastDonation, largestDonation] = 
+    // Use the resolved Prisma id (since the URL param may have been a slug)
+    const realId = campaign.id;
+    const [donationCount, firstDonation, lastDonation, largestDonation] =
       await Promise.all([
         // Total count of donations for this campaign
         prisma.donationItem.count({
-          where: { campaignId: id },
+          where: { campaignId: realId },
         }),
-        
+
         // First donation (oldest)
         prisma.donationItem.findFirst({
-          where: { campaignId: id },
+          where: { campaignId: realId },
           orderBy: { createdAt: "asc" },
           select: {
             amount: true,
@@ -147,7 +156,7 @@ export async function GET(
         
         // Last donation (newest)
         prisma.donationItem.findFirst({
-          where: { campaignId: id },
+          where: { campaignId: realId },
           orderBy: { createdAt: "desc" },
           select: {
             amount: true,
@@ -163,7 +172,7 @@ export async function GET(
         
         // Largest donation (highest amount)
         prisma.donationItem.findFirst({
-          where: { campaignId: id },
+          where: { campaignId: realId },
           orderBy: { amount: "desc" },
           select: {
             amount: true,
@@ -188,6 +197,7 @@ export async function GET(
     // ✅ STEP 3: Transform data to match frontend expectations
     const transformedCampaign = {
       id: campaign.id,
+      slug: campaign.slug ?? null,
 
       // Requested locale → English → Arabic (base) fallback
       title: tCampaign?.title || campaign.title,
@@ -282,13 +292,13 @@ export async function PUT(
     const denied = requireAdminOrDashboardPermission(session, "campaigns");
     if (denied) return denied;
 
-    const { id } = await params;
+    const { id: idOrSlug } = await params;
     const body = await request.json();
 
-    // ✅ STEP 1: Validate campaign exists
-    const existingCampaign = await prisma.campaign.findUnique({
-      where: { id },
-      select: { id: true, fundraisingMode: true, goalType: true },
+    // ✅ STEP 1: Validate campaign exists (param may be id or slug)
+    const existingCampaign = await prisma.campaign.findFirst({
+      where: whereByIdOrSlug(idOrSlug),
+      select: { id: true, fundraisingMode: true, goalType: true, title: true },
     });
 
     if (!existingCampaign) {
@@ -297,6 +307,7 @@ export async function PUT(
         { status: 404 }
       );
     }
+    const id = existingCampaign.id;
 
     // ✅ STEP 2: Prepare update data
     // Separate main fields from translation fields
@@ -365,6 +376,34 @@ export async function PUT(
       }
     }
 
+    // Slug: explicit value (admin override) or auto-regenerate from English title.
+    // When the admin clears the slug, we fall back to the new English title (if
+    // they're updating translations now), then the saved English translation,
+    // then the campaign's base (Arabic) title as a last resort.
+    if (body.slug !== undefined) {
+      const cleaned = normalizeUserSlug(body.slug);
+      let base = cleaned ?? "";
+      if (!base) {
+        const newEnTitle =
+          typeof body?.translations?.en?.title === "string"
+            ? body.translations.en.title.trim()
+            : "";
+        if (newEnTitle) {
+          base = newEnTitle;
+        } else {
+          const existingEn = await prisma.campaignTranslation.findFirst({
+            where: { campaignId: id, locale: "en" },
+            select: { title: true },
+          });
+          base = existingEn?.title?.trim() || existingCampaign.title;
+        }
+      }
+      updateData.slug = await generateUniqueSlug(prisma.campaign as any, base, {
+        fallbackPrefix: "campaign",
+        currentId: id,
+      });
+    }
+
     // ✅ STEP 3: Handle translations if provided
     // Expected format: { translations: { en: { title, description }, fr: {...} } }
     if (body.translations && typeof body.translations === 'object') {
@@ -427,6 +466,7 @@ export async function PUT(
       where: { id },
       select: {
         id: true,
+        slug: true,
         title: true,
         description: true,
         targetAmount: true,
@@ -497,16 +537,17 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const denied = requireAdminOrDashboardPermission(session, 'campaigns');
     if (denied) return denied;
 
-    const { id } = await params;
+    const { id: idOrSlug } = await params;
 
-    // Ensure campaign exists
-    const camp = await prisma.campaign.findUnique({
-      where: { id },
+    // Ensure campaign exists (param may be id or slug)
+    const camp = await prisma.campaign.findFirst({
+      where: whereByIdOrSlug(idOrSlug),
       select: { id: true, title: true },
     });
     if (!camp) {
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
+    const id = camp.id;
 
     // Check for donations
     const donationCount = await prisma.donationItem.count({ where: { campaignId: id } });

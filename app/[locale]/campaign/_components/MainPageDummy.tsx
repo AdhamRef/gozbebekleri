@@ -40,6 +40,7 @@ import WysiwygEditor from "@/app/[locale]/blog/_components/wysiwyg/wysiwyg-edito
 // Types
 interface Category {
   id?: string;
+  slug?: string | null;
   nameAr?: string;
   nameEn?: string;
   nameFr?: string;
@@ -49,6 +50,7 @@ interface Category {
 
 interface Campaign {
   id: string;
+  slug?: string | null;
   titleAr?: string;
   titleEn?: string;
   titleFr?: string;
@@ -340,7 +342,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                   {/* Category + title overlay */}
                   <div className="absolute bottom-0 inset-x-0 p-4 sm:p-6 z-10">
                     <Link
-                      href={`/category/${campaign.category.id}`}
+                      href={`/category/${campaign.category.slug || campaign.category.id}`}
                       className="inline-flex items-center gap-1.5 mb-2 bg-[#FA5D17] hover:bg-[#e04a08] text-white text-[10px] sm:text-xs font-bold px-2.5 py-1.5 rounded-full uppercase tracking-wide transition-colors"
                     >
                       <CategoryIcon name={campaign.category.icon} className="w-3 h-3 sm:w-3.5 sm:h-3.5" />

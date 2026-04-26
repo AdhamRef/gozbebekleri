@@ -36,8 +36,8 @@ const cacheSet = <T,>(key: string, data: T): void => {
   try { sessionStorage.setItem(key, JSON.stringify({ data, expires: Date.now() + CACHE_TTL_MS })); } catch { /* ignore */ }
 };
 
-interface CategoryItem { id: string; name: string; image?: string | null; icon?: string | null; order?: number; }
-interface PostItem { id: string; title: string; description: string | null; image: string | null; published: boolean; createdAt: string; }
+interface CategoryItem { id: string; slug?: string | null; name: string; image?: string | null; icon?: string | null; order?: number; }
+interface PostItem { id: string; slug?: string | null; title: string; description: string | null; image: string | null; published: boolean; createdAt: string; }
 
 const LOGO_URL = "https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png";
 
@@ -201,7 +201,7 @@ const HomePage: React.FC<HomePageContentProps> = ({ firstHeroImage }) => {
               {categories.slice(0, 6).map((cat) => (
                 <Link
                   key={cat.id}
-                  href={`/category/${cat.id}`}
+                  href={`/category/${cat.slug || cat.id}`}
                   className="group flex flex-col items-center gap-2 p-3 sm:p-4 rounded-xl border border-gray-100 bg-white hover:bg-[#025EB8] hover:border-[#025EB8] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:shadow-[#025EB8]/20"
                 >
                   <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-[#025EB8]/8 flex items-center justify-center group-hover:bg-white/15 transition-colors">
@@ -243,7 +243,7 @@ const HomePage: React.FC<HomePageContentProps> = ({ firstHeroImage }) => {
                   key={post.id}
                   title={post.title}
                   image={post.image || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"}
-                  link={`/blog/${post.id}`}
+                  link={`/blog/${post.slug || post.id}`}
                 />
               ))}
             </div>

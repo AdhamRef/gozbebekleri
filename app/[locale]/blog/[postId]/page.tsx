@@ -44,7 +44,8 @@ export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
     const imageUrl = post?.image || "/default-post-image.jpg";
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://gozbebekleri.com";
-    const canonicalUrl = `${siteUrl}/${locale}/blog/${postId}`;
+    const canonicalSlug = post?.slug || postId;
+    const canonicalUrl = `${siteUrl}/${locale}/blog/${canonicalSlug}`;
 
     const msgs = await import(`../../../../i18n/messages/${locale}.json`).catch(() => null);
     const metaSuffix = msgs?.default?.Blog?.metaTitleSuffix ?? " - قرة العيون";
@@ -147,7 +148,7 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
                 </CardContent>
 
                 <CardFooter>
-                  <ShareButton label={t('sharePost')} copiedMessage={t('linkCopied')} url={`https://gozbebekleri.com/${locale}/blog/${params.postId}`} />
+                  <ShareButton label={t('sharePost')} copiedMessage={t('linkCopied')} url={`https://gozbebekleri.com/${locale}/blog/${post?.slug || params.postId}`} />
                 </CardFooter>
               </Card>
             </div>
@@ -157,6 +158,7 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
                 const raw = post.campaigns ?? (post.campaign ? [post.campaign] : []);
                 const list = raw as {
                   id: string;
+                  slug?: string | null;
                   title: string;
                   currentAmount: number;
                   targetAmount: number;
@@ -187,7 +189,7 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
                         return (
                           <Link
                             key={camp.id}
-                            href={`/${locale}/campaign/${camp.id}`}
+                            href={`/${locale}/campaign/${camp.slug || camp.id}`}
                             className="group block rounded-xl overflow-hidden border border-gray-200/80 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-[#025EB8]/30"
                           >
                             <div className="relative aspect-[4/2.5] overflow-hidden bg-gray-100">
@@ -255,8 +257,8 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
                 </CardHeader>
 
                 <CardContent className="p-4 pt-0 flex flex-col gap-4">
-                  {(similarPosts as { id: string; title?: string; image?: string }[]).map((sp) => (
-                    <Link key={sp.id} href={`/${locale}/blog/${sp.id}`} className="group relative rounded-xl overflow-hidden border bg-background shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+                  {(similarPosts as { id: string; slug?: string | null; title?: string; image?: string }[]).map((sp) => (
+                    <Link key={sp.id} href={`/${locale}/blog/${sp.slug || sp.id}`} className="group relative rounded-xl overflow-hidden border bg-background shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
                       <div className="relative aspect-[4/2.5] overflow-hidden">
                         <Image src={sp.image || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"} alt={sp.title || ''} fill sizes="600px" className="object-cover transition-transform duration-500 group-hover:scale-110" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />

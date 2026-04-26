@@ -26,12 +26,13 @@ import { useLocale } from "next-intl";
 
 export interface BlogRow {
   id: string;
+  slug?: string | null;
   title: string | null;
   description: string | null;
   content: string | null;
   image: string | null;
   published: boolean;
-  category: { id: string; name: string } | null;
+  category: { id: string; slug?: string | null; name: string } | null;
   categoryId?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -61,7 +62,7 @@ function BlogRowActions({
           <DropdownMenuItem asChild>
             <Link
               className="flex w-full justify-end items-center text-black"
-              href={`/${locale}/blog/${id}`}
+              href={`/${locale}/blog/${row.slug || id}`}
             >
               عرض
               <Eye className="h-4 w-4 ml-2" />
@@ -71,7 +72,7 @@ function BlogRowActions({
             <DropdownMenuItem asChild>
               <Link
                 className="flex w-full justify-end items-center text-black"
-                href={`/${locale}/blog/category/${row.category.id}`}
+                href={`/${locale}/blog/category/${row.category.slug || row.category.id}`}
               >
                 عرض التصنيف
                 <Blocks className="h-4 w-4 ml-2" />

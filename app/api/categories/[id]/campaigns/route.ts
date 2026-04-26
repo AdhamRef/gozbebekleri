@@ -9,14 +9,15 @@ import {
 } from "@/lib/campaign/campaign-modes";
 import { parseSuggestedDonations } from "@/lib/campaign/suggested-donations";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
+import { whereByIdOrSlug } from "@/lib/slug";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    if (!id || id === 'undefined') {
+    const { id: idOrSlug } = await params;
+    if (!idOrSlug || idOrSlug === 'undefined') {
       return NextResponse.json({ error: 'Category ID required' }, { status: 400 });
     }
     const searchParams = request.nextUrl.searchParams;
@@ -33,10 +34,11 @@ export async function GET(
     const hasPriority = searchParams.get('hasPriority') === 'true';
 
     // Check that category exists and fetch localized name if available
-    const category = await prisma.category.findUnique({
-      where: { id },
+    const category = await prisma.category.findFirst({
+      where: whereByIdOrSlug(idOrSlug),
       select: {
         id: true,
+        slug: true,
         name: true,
         icon: true,
         translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true } }
@@ -46,6 +48,7 @@ export async function GET(
     if (!category) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 });
     }
+    const id = category.id;
 
     // Build where clause
     const where: any = {
@@ -96,6 +99,7 @@ export async function GET(
       orderBy,
       select: {
         id: true,
+        slug: true,
         title: true,
         description: true,
         images: true,
@@ -116,6 +120,7 @@ export async function GET(
         category: {
           select: {
             id: true,
+            slug: true,
             name: true,
             icon: true,
             translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true } }
@@ -149,6 +154,7 @@ export async function GET(
       const tCat = pickTranslation(c.category?.translations, locale);
       return {
         id: c.id,
+        slug: c.slug ?? null,
         title: tC?.title || c.title,
         description: tC?.description || c.description,
         images: c.images,
@@ -174,6 +180,7 @@ export async function GET(
         category: c.category
           ? {
               id: c.category.id,
+              slug: c.category.slug ?? null,
               name: tCat?.name || c.category.name,
               icon: c.category.icon,
             }
@@ -184,6 +191,7 @@ export async function GET(
     // Localized category response
     const localizedCategory = {
       id: category.id,
+      slug: category.slug ?? null,
       name: pickTranslation(category.translations, locale)?.name || category.name,
       icon: category.icon
     };

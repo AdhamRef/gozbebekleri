@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "TSC_COMPILE_ON_ERROR=true prisma generate && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "backfill:slugs": "tsx prisma/backfill-slugs.ts"
   },
   "prisma": {
     "seed": "node prisma/seed.ts"

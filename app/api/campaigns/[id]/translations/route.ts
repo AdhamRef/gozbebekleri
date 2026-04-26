@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/[...nextauth]/options";
+import { whereByIdOrSlug } from "@/lib/slug";
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -13,12 +14,19 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = await params;
+    const { id: idOrSlug } = await params;
+
+    // Resolve param (slug or id) to the real campaign id
+    const camp = await prisma.campaign.findFirst({
+      where: whereByIdOrSlug(idOrSlug),
+      select: { id: true },
+    });
+    if (!camp) return NextResponse.json([]);
 
     // ✅ Fetch all translations for the campaign
     const translations = await prisma.campaignTranslation.findMany({
       where: {
-        campaignId: id,
+        campaignId: camp.id,
       },
       select: {
         locale: true,

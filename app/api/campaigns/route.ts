@@ -18,6 +18,7 @@ import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog } from "@/lib/audit-log";
 import { parseIncludeInactive } from "@/lib/campaign/include-inactive-query";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
+import { generateUniqueSlug, normalizeUserSlug } from "@/lib/slug";
 
 export async function GET(request: NextRequest) {
   try {
@@ -77,6 +78,7 @@ export async function GET(request: NextRequest) {
         category: {
           select: {
             id: true,
+            slug: true,
             name: true,
             icon: true,
             translations: {
@@ -144,6 +146,7 @@ export async function GET(request: NextRequest) {
       const tCat = pickTranslation(campaign.category?.translations, locale);
       return {
         id: campaign.id,
+        slug: campaign.slug ?? null,
         title: tC?.title || campaign.title,
         description: tC?.description || campaign.description,
         images: campaign.images,
@@ -155,6 +158,7 @@ export async function GET(request: NextRequest) {
         category: campaign.category
           ? {
               id: campaign.category.id,
+              slug: campaign.category.slug ?? null,
               name: tCat?.name || campaign.category.name,
               icon: campaign.category.icon,
             }
@@ -281,8 +285,21 @@ export async function POST(request: NextRequest) {
     }
 
     // ✅ STEP 4: Prepare translation data
+    // English is required — title and description must both be provided.
+    const enTrans = data?.translations?.en;
+    const enTitle: string | undefined = typeof enTrans?.title === "string" ? enTrans.title.trim() : undefined;
+    const enDescription: string | undefined =
+      typeof enTrans?.description === "string" ? enTrans.description.trim() : undefined;
+
+    if (!enTitle || !enDescription) {
+      return NextResponse.json(
+        { error: "English title and description are required" },
+        { status: 400 }
+      );
+    }
+
     const translationData: { locale: string; title: string; description: string }[] = [];
-    
+
     if (data.translations && typeof data.translations === 'object') {
       for (const [locale, trans] of Object.entries(data.translations)) {
         if (locale !== 'ar' && trans && typeof trans === 'object') {
@@ -299,6 +316,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Resolve slug: explicit override or auto-generate from English title (always)
+    const requestedSlug = normalizeUserSlug(data.slug);
+    const slug = await generateUniqueSlug(
+      prisma.campaign as any,
+      requestedSlug ?? enTitle,
+      { fallbackPrefix: "campaign" }
+    );
+
     // ✅ STEP 5: Create campaign with translations in a transaction
     const campaign = await prisma.$transaction(async (tx) => {
       // Create main campaign (Arabic)
@@ -309,6 +334,7 @@ export async function POST(request: NextRequest) {
         data: {
           title: data.title,
           description: data.description,
+          slug,
           targetAmount,
           currentAmount: 0,
           categoryId: data.categoryId,
@@ -346,6 +372,7 @@ export async function POST(request: NextRequest) {
       where: { id: campaign.id },
       select: {
         id: true,
+        slug: true,
         title: true,
         description: true,
         targetAmount: true,
@@ -372,6 +399,7 @@ export async function POST(request: NextRequest) {
         category: {
           select: {
             id: true,
+            slug: true,
             name: true,
             icon: true,
           },

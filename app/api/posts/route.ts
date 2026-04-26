@@ -6,6 +6,7 @@ import { orderCampaignsByIds, sanitizeCampaignIds } from "@/lib/blog/campaign-id
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog } from "@/lib/audit-log";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
+import { generateUniqueSlug, normalizeUserSlug } from "@/lib/slug";
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
+        slug: true,
         title: true,
         description: true,
         content: true,
@@ -36,6 +38,7 @@ export async function GET(request: NextRequest) {
         category: {
           select: {
             id: true,
+            slug: true,
             name: true,
             translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true } }
           }
@@ -67,6 +70,7 @@ export async function GET(request: NextRequest) {
             where: { id: { in: allCampaignIds } },
             select: {
               id: true,
+              slug: true,
               title: true,
               currentAmount: true,
               targetAmount: true,
@@ -81,6 +85,7 @@ export async function GET(request: NextRequest) {
         const tC = pickTranslation(c.translations, locale);
         return {
           id: c.id,
+          slug: c.slug ?? null,
           title: tC?.title || c.title,
           currentAmount: c.currentAmount,
           targetAmount: c.targetAmount,
@@ -91,12 +96,19 @@ export async function GET(request: NextRequest) {
       const tCat = pickTranslation(p.category?.translations, locale);
       return {
         id: p.id,
+        slug: p.slug ?? null,
         title: tP?.title || p.title,
         description: tP?.description || p.description,
         content: tP?.content || p.content,
         image: tP?.image || p.image,
         published: p.published,
-        category: p.category ? { id: p.category.id, name: tCat?.name || p.category.name } : null,
+        category: p.category
+          ? {
+              id: p.category.id,
+              slug: p.category.slug ?? null,
+              name: tCat?.name || p.category.name,
+            }
+          : null,
         campaigns,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
@@ -123,6 +135,19 @@ export async function POST(request: NextRequest) {
       campaignIds !== undefined ? campaignIds : campaignId != null ? [campaignId] : []
     );
 
+    // English is required.
+    const enTrans = translations?.en;
+    const enTitle: string | undefined =
+      typeof enTrans?.title === "string" ? enTrans.title.trim() : undefined;
+    const enDescription: string | undefined =
+      typeof enTrans?.description === "string" ? enTrans.description.trim() : undefined;
+    if (!enTitle || !enDescription) {
+      return NextResponse.json(
+        { error: "English title and description are required" },
+        { status: 400 }
+      );
+    }
+
     const translationData: { locale: string; title?: string; description?: string; content?: string; image?: string }[] = [];
     if (translations && typeof translations === 'object') {
       for (const [locale, t] of Object.entries(translations)) {
@@ -133,6 +158,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Auto-generate slug from English title (always); admin can override.
+    const requestedSlug = normalizeUserSlug(data.slug);
+    const slug = await generateUniqueSlug(
+      prisma.post as any,
+      requestedSlug ?? enTitle,
+      { fallbackPrefix: "post" }
+    );
+
     const created = await prisma.$transaction(async (tx) => {
       const post = await tx.post.create({
         data: {
@@ -140,6 +173,7 @@ export async function POST(request: NextRequest) {
           description: description || "",
           content: content || "",
           image: image || "",
+          slug,
           published: !!published,
           categoryId: categoryId || null,
           campaignIds: resolvedCampaignIds,
@@ -157,6 +191,7 @@ export async function POST(request: NextRequest) {
       where: { id: created.id },
       select: {
         id: true,
+        slug: true,
         title: true,
         description: true,
         content: true,

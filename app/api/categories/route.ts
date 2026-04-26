@@ -5,6 +5,7 @@ import { authOptions } from "../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog } from "@/lib/audit-log";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
+import { generateUniqueSlug, normalizeUserSlug } from "@/lib/slug";
 
 // GET: supports locale-aware translations, search, cursor pagination, optional counts, and sorting
 export async function GET(request: NextRequest) {
@@ -29,6 +30,7 @@ export async function GET(request: NextRequest) {
       orderBy,
       select: {
         id: true,
+        slug: true,
         name: true,
         description: true,
         image: true,
@@ -65,6 +67,7 @@ export async function GET(request: NextRequest) {
       const t = pickTranslation(cat.translations, locale);
       return {
         id: cat.id,
+        slug: cat.slug ?? null,
         name: t?.name || cat.name,
         description: t?.description || cat.description,
         image: cat.image,
@@ -105,6 +108,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Category name is required' }, { status: 400 });
     }
 
+    // English is required.
+    const enTrans = translations?.en;
+    const enName: string | undefined =
+      typeof enTrans?.name === "string" ? enTrans.name.trim() : undefined;
+    if (!enName) {
+      return NextResponse.json(
+        { error: "English category name is required" },
+        { status: 400 }
+      );
+    }
+
     // Prepare translations payload (exclude default locale 'ar')
     const translationData: { locale: string; name: string; description?: string }[] = [];
     if (translations && typeof translations === 'object') {
@@ -118,10 +132,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Auto-generate slug from English name (always); admin can override.
+    const requestedSlug = normalizeUserSlug(data.slug);
+    const slug = await generateUniqueSlug(
+      prisma.category as any,
+      requestedSlug ?? enName,
+      { fallbackPrefix: "category" }
+    );
+
     const category = await prisma.$transaction(async (tx) => {
       const created = await tx.category.create({
         data: {
           name,
+          slug,
           description: description || '',
           image: image || '',
           icon: icon || '',
@@ -147,6 +170,7 @@ export async function POST(request: NextRequest) {
       where: { id: category.id },
       select: {
         id: true,
+        slug: true,
         name: true,
         description: true,
         image: true,

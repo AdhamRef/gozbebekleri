@@ -6,6 +6,7 @@ import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 import { parseSuggestedDonations } from "@/lib/campaign/suggested-donations";
+import { generateUniqueSlug, normalizeUserSlug } from "@/lib/slug";
 
 // GET: localized categories with optional campaigns (limited per-category), cursor pagination
 export async function GET(request: NextRequest) {
@@ -25,6 +26,7 @@ export async function GET(request: NextRequest) {
       orderBy: { order: 'asc' },
       select: {
         id: true,
+        slug: true,
         name: true,
         description: true,
         image: true,
@@ -49,6 +51,7 @@ export async function GET(request: NextRequest) {
           orderBy: { createdAt: 'desc' },
           select: {
             id: true,
+            slug: true,
             title: true,
             description: true,
             images: true,
@@ -75,6 +78,7 @@ export async function GET(request: NextRequest) {
       const tCat = pickTranslation(cat.translations, locale);
       return {
         id: cat.id,
+        slug: cat.slug ?? null,
         name: tCat?.name || cat.name,
         description: tCat?.description || cat.description,
         image: cat.image,
@@ -85,6 +89,7 @@ export async function GET(request: NextRequest) {
           const tC = pickTranslation(c.translations, locale);
           return {
             id: c.id,
+            slug: c.slug ?? null,
             title: tC?.title || c.title,
             description: tC?.description || c.description,
             images: c.images,
@@ -123,6 +128,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Category name is required' }, { status: 400 });
     }
 
+    const enTrans = translations?.en;
+    const enName: string | undefined =
+      typeof enTrans?.name === "string" ? enTrans.name.trim() : undefined;
+    if (!enName) {
+      return NextResponse.json(
+        { error: "English category name is required" },
+        { status: 400 }
+      );
+    }
+
     const translationData: { locale: string; name: string; description?: string }[] = [];
     if (translations && typeof translations === 'object') {
       for (const [locale, t] of Object.entries(translations)) {
@@ -133,9 +148,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const requestedSlug = normalizeUserSlug(data.slug);
+    const slug = await generateUniqueSlug(
+      prisma.category as any,
+      requestedSlug ?? enName,
+      { fallbackPrefix: "category" }
+    );
+
     const category = await prisma.$transaction(async (tx) => {
       const created = await tx.category.create({ data: {
         name,
+        slug,
         description: description || '',
         image: image || '',
         icon: icon || '',
@@ -149,7 +172,7 @@ export async function POST(request: NextRequest) {
       return created;
     });
 
-    const full = await prisma.category.findUnique({ where: { id: category.id }, select: { id: true, name: true, description: true, image: true, icon: true, order: true, translations: { select: { locale: true, name: true, description: true } } } });
+    const full = await prisma.category.findUnique({ where: { id: category.id }, select: { id: true, slug: true, name: true, description: true, image: true, icon: true, order: true, translations: { select: { locale: true, name: true, description: true } } } });
 
     const actor = auditActorFromDashboardSession(session!);
     await writeAuditLog({

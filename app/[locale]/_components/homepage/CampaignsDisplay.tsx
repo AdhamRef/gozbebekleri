@@ -150,7 +150,7 @@ const CampaignCard = ({ campaign, isMain = false, index = 0 }) => {
         <CardContent className="p-0 h-full relative">
           <DecorativeSVG isMain={isMain} />
           <Link
-            href={`/campaign/${campaign.id}`}
+            href={`/campaign/${campaign.slug || campaign.id}`}
             className="relative cursor-pointer flex flex-col h-full"
             role="button"
             tabIndex={0}

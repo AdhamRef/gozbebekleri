@@ -5,6 +5,11 @@ import { authOptions } from "../../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
+import {
+  generateUniqueSlug,
+  normalizeUserSlug,
+  whereByIdOrSlug,
+} from "@/lib/slug";
 
 // GET: return a single category (localized) with optional counts
 export async function GET(
@@ -18,10 +23,11 @@ export async function GET(
     const includeCounts = paramsUrl.get('counts') === 'true';
     const allTranslations = paramsUrl.get('allTranslations') === 'true';
 
-    const category = await prisma.category.findUnique({
-      where: { id },
+    const category = await prisma.category.findFirst({
+      where: whereByIdOrSlug(id),
       select: {
         id: true,
+        slug: true,
         name: true,
         description: true,
         image: true,
@@ -48,6 +54,7 @@ export async function GET(
     const t = pickTranslation(category.translations, locale);
     const localized = {
       id: category.id,
+      slug: category.slug ?? null,
       name: t?.name || category.name,
       description: t?.description || category.description,
       image: category.image,
@@ -69,7 +76,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
+    const { id: idOrSlug } = await params;
     const session = await getServerSession(authOptions);
     const denied = requireAdminOrDashboardPermission(session, 'categories');
     if (denied) return denied;
@@ -81,6 +88,42 @@ export async function PUT(
       return NextResponse.json({ error: 'Category name is required' }, { status: 400 });
     }
 
+    const existing = await prisma.category.findFirst({
+      where: whereByIdOrSlug(idOrSlug),
+      select: { id: true, name: true },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+    }
+    const id = existing.id;
+
+    // Slug: explicit value, or auto-regenerate from English name (with fallbacks).
+    let nextSlug: string | undefined;
+    if (body.slug !== undefined) {
+      const cleaned = normalizeUserSlug(body.slug);
+      let base = cleaned ?? "";
+      if (!base) {
+        const newEnName =
+          typeof body?.translations?.en?.name === "string"
+            ? body.translations.en.name.trim()
+            : "";
+        if (newEnName) {
+          base = newEnName;
+        } else {
+          const existingEn = await prisma.categoryTranslation.findFirst({
+            where: { categoryId: id, locale: "en" },
+            select: { name: true },
+          });
+          base = existingEn?.name?.trim() || name || existing.name;
+        }
+      }
+      nextSlug = await generateUniqueSlug(
+        prisma.category as any,
+        base,
+        { fallbackPrefix: "category", currentId: id }
+      );
+    }
+
     const updated = await prisma.$transaction(async (tx) => {
       const updatedCat = await tx.category.update({
         where: { id },
@@ -90,6 +133,7 @@ export async function PUT(
           image: image || '',
           icon: icon || '',
           order: order ?? 0,
+          ...(nextSlug !== undefined ? { slug: nextSlug } : {}),
         }
       });
 
@@ -119,6 +163,7 @@ export async function PUT(
       where: { id: updated.id },
       select: {
         id: true,
+        slug: true,
         name: true,
         description: true,
         image: true,
@@ -155,20 +200,24 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
+    const { id: idOrSlug } = await params;
     const session = await getServerSession(authOptions);
     const denied = requireAdminOrDashboardPermission(session, 'categories');
     if (denied) return denied;
+
+    const cat = await prisma.category.findFirst({
+      where: whereByIdOrSlug(idOrSlug),
+      select: { id: true, name: true },
+    });
+    if (!cat) {
+      return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+    }
+    const id = cat.id;
 
     const campaignCount = await prisma.campaign.count({ where: { categoryId: id } });
     if (campaignCount > 0) {
       return NextResponse.json({ error: 'Category has campaigns. Delete or move campaigns before deleting the category.' }, { status: 400 });
     }
-
-    const cat = await prisma.category.findUnique({
-      where: { id },
-      select: { name: true },
-    });
 
     await prisma.category.delete({ where: { id } });
 

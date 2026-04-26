@@ -20,6 +20,7 @@ export async function GET() {
       prisma.campaign.findMany({
         select: {
           id: true,
+          slug: true,
           title: true,
           translations: { select: { locale: true, title: true } },
         },
@@ -29,6 +30,7 @@ export async function GET() {
       prisma.category.findMany({
         select: {
           id: true,
+          slug: true,
           name: true,
           translations: { select: { locale: true, name: true } },
         },
@@ -37,6 +39,7 @@ export async function GET() {
       prisma.post.findMany({
         select: {
           id: true,
+          slug: true,
           title: true,
           published: true,
           translations: { select: { locale: true, title: true } },
@@ -47,6 +50,7 @@ export async function GET() {
       prisma.postCategory.findMany({
         select: {
           id: true,
+          slug: true,
           name: true,
           translations: { select: { locale: true, name: true } },
         },
@@ -62,6 +66,7 @@ export async function GET() {
       }
       return {
         id: c.id,
+        slug: c.slug ?? null,
         title: c.title,
         supportedLocales: [...supportedLocales],
       };
@@ -75,6 +80,7 @@ export async function GET() {
       }
       return {
         id: c.id,
+        slug: c.slug ?? null,
         name: c.name,
         supportedLocales: [...supportedLocales],
       };
@@ -88,6 +94,7 @@ export async function GET() {
       }
       return {
         id: p.id,
+        slug: p.slug ?? null,
         title: p.title || "—",
         published: p.published,
         supportedLocales: [...supportedLocales],
@@ -102,6 +109,7 @@ export async function GET() {
       }
       return {
         id: c.id,
+        slug: c.slug ?? null,
         name: c.name,
         supportedLocales: [...supportedLocales],
       };

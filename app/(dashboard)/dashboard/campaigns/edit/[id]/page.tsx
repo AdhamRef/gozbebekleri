@@ -84,6 +84,7 @@ const formSchema = z
   title: z.string()
     .min(1, 'العنوان مطلوب')
     .max(100, 'العنوان طويل جداً'),
+  slug: z.string().max(80, 'الـ slug طويل جداً').optional().or(z.literal('')),
   targetAmount: z.number().min(0).max(1000000),
   goalType: z.enum(['FIXED', 'OPEN']),
   fundraisingMode: z.enum(['AMOUNT', 'SHARES']),
@@ -96,7 +97,7 @@ const formSchema = z
     .max(5, 'الحد الأقصى 5 صور'),
   videoUrl: z.string().optional(),
   currentAmount: z.number(),
-  title_en: z.string().optional(),
+  title_en: z.string().min(1, 'English title is required'),
   title_fr: z.string().optional(),
   title_tr: z.string().optional(),
   title_id: z.string().optional(),
@@ -234,6 +235,7 @@ export default function EditCampaignPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: '',
+      slug: '',
       targetAmount: 0,
       goalType: 'FIXED',
       fundraisingMode: 'AMOUNT',
@@ -301,6 +303,7 @@ export default function EditCampaignPage() {
 
         form.reset({
           title: campaign.title,
+          slug: campaign.slug || '',
           targetAmount: campaign.targetAmount,
           goalType: campaign.goalType ?? 'FIXED',
           fundraisingMode: campaign.fundraisingMode ?? 'AMOUNT',
@@ -360,11 +363,17 @@ export default function EditCampaignPage() {
       setActiveTab('ar');
       return;
     }
+    if (isDescEmpty(descriptionEn)) {
+      toast.error('English description is required');
+      setActiveTab('en');
+      return;
+    }
     setSaving(true);
     try {
-      // ✅ Prepare request with translations
+      // ✅ Prepare request with translations (English always sent — required)
       const requestData = {
         title: values.title,
+        slug: values.slug ?? '',
         description: descriptionAr || '',
         goalType: values.goalType,
         fundraisingMode: values.fundraisingMode,
@@ -376,7 +385,7 @@ export default function EditCampaignPage() {
         images: values.images,
         videoUrl: values.videoUrl,
         translations: {
-          ...(values.title_en || !isDescEmpty(descriptionEn) ? { en: { title: values.title_en, description: descriptionEn } } : {}),
+          en: { title: values.title_en, description: descriptionEn },
           ...(values.title_fr || !isDescEmpty(descriptionFr) ? { fr: { title: values.title_fr, description: descriptionFr } } : {}),
           ...(values.title_tr || !isDescEmpty(descriptionTr) ? { tr: { title: values.title_tr, description: descriptionTr } } : {}),
           ...(values.title_id || !isDescEmpty(descriptionId) ? { id: { title: values.title_id, description: descriptionId } } : {}),
@@ -670,7 +679,25 @@ export default function EditCampaignPage() {
               <Languages className="w-5 h-5 text-gray-700" />
               <h2 className="text-lg font-semibold">المعلومات الأساسية</h2>
             </div>
-            
+
+            {/* Slug — outside language tabs (one URL per campaign, derived from English) */}
+            <FormField
+              control={form.control}
+              name="slug"
+              render={({ field }) => (
+                <FormItem dir='rtl' className="mb-6">
+                  <FormLabel>الرابط (slug) — اختياري</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="مثال: gaza-emergency-relief" dir="ltr" />
+                  </FormControl>
+                  <FormDescription>
+                    تغييره سيغيّر رابط هذه المشروع — احرص على إعادة توجيه الروابط القديمة. اتركه فارغاً لإعادة التوليد من العنوان الإنجليزي.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
               <TabsList className="flex flex-wrap gap-1 mb-6" dir="rtl">
                 <TabsTrigger value="ar" className="gap-2"><ReactCountryFlag countryCode="SA" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> العربية</TabsTrigger>
@@ -724,7 +751,6 @@ export default function EditCampaignPage() {
                     )}
                   />
 
-                  
                 </div>
 
                 <FormItem dir='rtl'>
@@ -737,12 +763,12 @@ export default function EditCampaignPage() {
                 </FormItem>
               </TabsContent>
 
-              {/* English Tab */}
+              {/* English Tab — required */}
               <TabsContent value="en" className="space-y-6">
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription className='mt-[5px]'>
-                    English translations are optional. If not provided, Arabic content will be displayed.
+                    English is required. The slug is auto-generated from the English title.
                   </AlertDescription>
                 </Alert>
 
@@ -751,7 +777,7 @@ export default function EditCampaignPage() {
                   name="title_en"
                   render={({ field }) => (
                     <FormItem dir='rtl'>
-                      <FormLabel>Campaign Title (English)</FormLabel>
+                      <FormLabel>Campaign Title (English) *</FormLabel>
                       <FormControl>
                         <Input {...field} placeholder="Enter campaign title in English" />
                       </FormControl>
@@ -761,7 +787,7 @@ export default function EditCampaignPage() {
                 />
 
                 <FormItem dir='rtl'>
-                  <FormLabel>Campaign Description (English)</FormLabel>
+                  <FormLabel>Campaign Description (English) *</FormLabel>
                   <WysiwygEditor
                     defaultValue={parseEditorContent(descriptionEn)}
                     onDebouncedUpdate={(editor) => setDescriptionEn(JSON.stringify(editor?.getJSON()))}
@@ -1058,6 +1084,10 @@ export default function EditCampaignPage() {
                       </div>
                       <FormDescription>
                         يمكنك رفع حتى 5 صور للمشروع. الصورة الأولى ستكون الصورة الرئيسية.
+                        <br />
+                        <span className="text-amber-700">
+                          الحجم المُوصى به: <strong>1200×900 px</strong> (نسبة 4:3)، صيغة JPG أو PNG، حجم الملف لا يزيد عن 2MB.
+                        </span>
                       </FormDescription>
                     </div>
                   </FormControl>

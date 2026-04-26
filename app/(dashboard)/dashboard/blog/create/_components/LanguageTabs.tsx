@@ -58,10 +58,11 @@ export default function LanguageTabs({ post, categories, campaignOptions = [], m
       label: <><ReactCountryFlag countryCode="SA" svg style={{ width: '1.2em', height: '1.2em' }} /> العربية</>, 
       required: true 
     },
-    { 
-      value: "en", 
-      label: <><ReactCountryFlag countryCode="GB" svg style={{ width: '1.2em', height: '1.2em' }} /> English</>, 
-      has: hasLocale("en") 
+    {
+      value: "en",
+      label: <><ReactCountryFlag countryCode="GB" svg style={{ width: '1.2em', height: '1.2em' }} /> English</>,
+      required: true,
+      has: hasLocale("en")
     },
     { 
       value: "fr", 

@@ -46,6 +46,7 @@ type PageKind =
 
 interface EntityRow {
   id: string;
+  slug?: string | null;
   title?: string;
   name?: string;
   published?: boolean;
@@ -342,8 +343,10 @@ export default function LinkGeneratorPage() {
 
   const path = useMemo(() => {
     if (!pageKind) return "";
-    return buildPath(pageKind, { resourceId, profileTab, donationId });
-  }, [pageKind, resourceId, profileTab, donationId]);
+    // Prefer slug for slugged entities so the URL is human-readable and indexable
+    const resourceKey = selectedResource?.slug || resourceId;
+    return buildPath(pageKind, { resourceId: resourceKey, profileTab, donationId });
+  }, [pageKind, resourceId, selectedResource, profileTab, donationId]);
 
   const fullUrl = useMemo(() => {
     if (!path || !locale || !pageKind) return "";

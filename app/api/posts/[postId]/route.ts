@@ -13,6 +13,11 @@ import {
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog } from "@/lib/audit-log";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
+import {
+  generateUniqueSlug,
+  normalizeUserSlug,
+  whereByIdOrSlug,
+} from "@/lib/slug";
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -23,15 +28,16 @@ export async function GET(
   { params }: { params: Promise<{ postId: string }> }
 ) {
   try {
-    const { postId } = await params;
+    const { postId: postIdOrSlug } = await params;
     const url = new URL(req.url);
     const qp = url.searchParams;
     const locale = req.headers.get('x-locale') || qp.get('locale') || qp.get('lang') || 'ar';
 
-    const post = await prisma.post.findUnique({
-      where: { id: postId },
+    const post = await prisma.post.findFirst({
+      where: whereByIdOrSlug(postIdOrSlug),
       select: {
         id: true,
+        slug: true,
         title: true,
         description: true,
         content: true,
@@ -42,6 +48,7 @@ export async function GET(
         category: {
           select: {
             id: true,
+            slug: true,
             name: true,
             translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true } }
           }
@@ -52,6 +59,7 @@ export async function GET(
     });
 
     if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
+    const postId = post.id;
 
     const campaignIdList = post.campaignIds ?? [];
     const campaignRows =
@@ -61,6 +69,7 @@ export async function GET(
             where: { id: { in: campaignIdList } },
             select: {
               id: true,
+              slug: true,
               title: true,
               description: true,
               targetAmount: true,
@@ -79,6 +88,7 @@ export async function GET(
       const tC = pickTranslation(c.translations, locale);
       return {
         id: c.id,
+        slug: c.slug ?? null,
         title: tC?.title || c.title,
         description: tC?.description || c.description,
         targetAmount: c.targetAmount,
@@ -105,6 +115,7 @@ export async function GET(
       take: 3,
       select: {
         id: true,
+        slug: true,
         title: true,
         description: true,
         content: true,
@@ -124,6 +135,7 @@ export async function GET(
         take: 3,
         select: {
           id: true,
+          slug: true,
           title: true,
           description: true,
           content: true,
@@ -141,12 +153,19 @@ export async function GET(
 
     const filteredPost = {
       id: post.id,
+      slug: post.slug ?? null,
       title: tPost?.title || post.title,
       description: tPost?.description || post.description,
       content: tPost?.content || post.content,
       image: tPost?.image || post.image,
       published: post.published,
-      category: post.category ? { id: post.category.id, name: tPostCat?.name || post.category.name } : null,
+      category: post.category
+        ? {
+            id: post.category.id,
+            slug: post.category.slug ?? null,
+            name: tPostCat?.name || post.category.name,
+          }
+        : null,
       campaigns: orderedCampaigns,
       /** @deprecated use campaigns[0] */
       campaign: orderedCampaigns[0] ?? null,
@@ -158,6 +177,7 @@ export async function GET(
       const tSp = pickTranslation(sp.translations, locale);
       return {
         id: sp.id,
+        slug: sp.slug ?? null,
         title: tSp?.title || sp.title,
         description: tSp?.description || sp.description,
         content: tSp?.content || sp.content,
@@ -185,8 +205,17 @@ export async function PATCH(
     const denied = requireAdminOrDashboardPermission(session, "blog");
     if (denied) return denied;
 
-    const { postId } = await params;
+    const { postId: postIdOrSlug } = await params;
     const body = await req.json();
+
+    const existingPost = await prisma.post.findFirst({
+      where: whereByIdOrSlug(postIdOrSlug),
+      select: { id: true, title: true },
+    });
+    if (!existingPost) {
+      return NextResponse.json({ error: 'Post not found' }, { status: 404 });
+    }
+    const postId = existingPost.id;
 
     const updateData: any = {};
     if (body.title !== undefined) updateData.title = body.title;
@@ -201,6 +230,31 @@ export async function PATCH(
       updateData.campaignIds = sanitizeCampaignIds(
         body.campaignId === "" || body.campaignId == null ? [] : [body.campaignId]
       );
+    }
+
+    // Slug: explicit value (admin override) or auto-regenerate from English title
+    if (body.slug !== undefined) {
+      const cleaned = normalizeUserSlug(body.slug);
+      let base = cleaned ?? "";
+      if (!base) {
+        const newEnTitle =
+          typeof body?.translations?.en?.title === "string"
+            ? body.translations.en.title.trim()
+            : "";
+        if (newEnTitle) {
+          base = newEnTitle;
+        } else {
+          const existingEn = await prisma.postTranslation.findFirst({
+            where: { postId, locale: "en" },
+            select: { title: true },
+          });
+          base = existingEn?.title?.trim() || existingPost.title || "";
+        }
+      }
+      updateData.slug = await generateUniqueSlug(prisma.post as any, base, {
+        fallbackPrefix: "post",
+        currentId: postId,
+      });
     }
 
     const translationUpdates: { locale: string; data: any }[] = [];
@@ -237,6 +291,7 @@ export async function PATCH(
       where: { id: updated.id },
       select: {
         id: true,
+        slug: true,
         title: true,
         description: true,
         content: true,
@@ -273,13 +328,14 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ p
     const denied = requireAdminOrDashboardPermission(session, "blog");
     if (denied) return denied;
 
-    const { postId } = await params;
+    const { postId: postIdOrSlug } = await params;
 
-    const exists = await prisma.post.findUnique({
-      where: { id: postId },
+    const exists = await prisma.post.findFirst({
+      where: whereByIdOrSlug(postIdOrSlug),
       select: { id: true, title: true },
     });
     if (!exists) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
+    const postId = exists.id;
 
     await prisma.$transaction(async (tx) => {
       await tx.postTranslation.deleteMany({ where: { postId } });

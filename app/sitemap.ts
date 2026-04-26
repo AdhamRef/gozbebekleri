@@ -39,12 +39,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const campaigns = await prisma.campaign.findMany({
       where: { isActive: true },
-      select: { id: true, updatedAt: true },
+      select: { id: true, slug: true, updatedAt: true },
       orderBy: { updatedAt: "desc" },
     });
 
     for (const campaign of campaigns) {
-      const path = `/campaign/${campaign.id}`;
+      const path = `/campaign/${campaign.slug || campaign.id}`;
       for (const locale of LOCALES) {
         entries.push({
           url: `${SITE_URL}/${locale}${path}`,
@@ -63,12 +63,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const posts = await prisma.post.findMany({
       where: { published: true },
-      select: { id: true, updatedAt: true },
+      select: { id: true, slug: true, updatedAt: true },
       orderBy: { updatedAt: "desc" },
     });
 
     for (const post of posts) {
-      const path = `/blog/${post.id}`;
+      const path = `/blog/${post.slug || post.id}`;
       for (const locale of LOCALES) {
         entries.push({
           url: `${SITE_URL}/${locale}${path}`,

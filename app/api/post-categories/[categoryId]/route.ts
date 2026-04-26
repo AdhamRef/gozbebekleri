@@ -5,19 +5,25 @@ import { authOptions } from "../../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
+import {
+  generateUniqueSlug,
+  normalizeUserSlug,
+  whereByIdOrSlug,
+} from "@/lib/slug";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ categoryId: string }> }
 ) {
   try {
-    const { categoryId } = await params;
+    const { categoryId: catIdOrSlug } = await params;
     const locale = req.headers.get('x-locale') || new URL(req.url).searchParams.get('locale') || 'ar';
 
-    const category = await prisma.postCategory.findUnique({
-      where: { id: categoryId },
+    const category = await prisma.postCategory.findFirst({
+      where: whereByIdOrSlug(catIdOrSlug),
       select: {
         id: true,
+        slug: true,
         name: true,
         title: true,
         description: true,
@@ -27,6 +33,7 @@ export async function GET(
         posts: {
           select: {
             id: true,
+            slug: true,
             title: true,
             description: true,
             content: true,
@@ -46,6 +53,7 @@ export async function GET(
     const tCat = pickTranslation(category.translations, locale);
     const transformed = {
       id: category.id,
+      slug: category.slug ?? null,
       name: tCat?.name || category.name,
       title: tCat?.title || category.title,
       description: tCat?.description || category.description,
@@ -54,6 +62,7 @@ export async function GET(
         const tP = pickTranslation(p.translations, locale);
         return {
           id: p.id,
+          slug: p.slug ?? null,
           title: tP?.title || p.title,
           description: tP?.description || p.description,
           content: tP?.content || p.content,
@@ -78,17 +87,51 @@ export async function PATCH(
   { params }: { params: Promise<{ categoryId: string }> }
 ) {
   try {
-    const { categoryId } = await params;
+    const { categoryId: catIdOrSlug } = await params;
     const session = await getServerSession(authOptions);
     const denied = requireAdminOrDashboardPermission(session, 'blog');
     if (denied) return denied;
     const body = await req.json();
+
+    const existingCat = await prisma.postCategory.findFirst({
+      where: whereByIdOrSlug(catIdOrSlug),
+      select: { id: true, name: true },
+    });
+    if (!existingCat) {
+      return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+    }
+    const categoryId = existingCat.id;
 
     const updateData: any = {};
     if (body.name !== undefined) updateData.name = body.name;
     if (body.title !== undefined) updateData.title = body.title;
     if (body.description !== undefined) updateData.description = body.description;
     if (body.image !== undefined) updateData.image = body.image;
+
+    if (body.slug !== undefined) {
+      const cleaned = normalizeUserSlug(body.slug);
+      let base = cleaned ?? "";
+      if (!base) {
+        const newEnName =
+          typeof body?.translations?.en?.name === "string"
+            ? body.translations.en.name.trim()
+            : "";
+        if (newEnName) {
+          base = newEnName;
+        } else {
+          const existingEn = await prisma.postCategoryTranslation.findFirst({
+            where: { categoryId, locale: "en" },
+            select: { name: true },
+          });
+          base = existingEn?.name?.trim() || body.name || existingCat.name;
+        }
+      }
+      updateData.slug = await generateUniqueSlug(
+        prisma.postCategory as any,
+        base,
+        { fallbackPrefix: "blog-category", currentId: categoryId }
+      );
+    }
 
     const translationUpdates: { locale: string; data: any }[] = [];
     if (body.translations && typeof body.translations === 'object') {
@@ -118,7 +161,7 @@ export async function PATCH(
       return cat;
     });
 
-    const full = await prisma.postCategory.findUnique({ where: { id: updated.id }, select: { id: true, name: true, title: true, description: true, image: true, translations: { select: { locale: true, name: true, title: true, description: true, image: true } } } });
+    const full = await prisma.postCategory.findUnique({ where: { id: updated.id }, select: { id: true, slug: true, name: true, title: true, description: true, image: true, translations: { select: { locale: true, name: true, title: true, description: true, image: true } } } });
 
     const actor = auditActorFromDashboardSession(session!);
     await writeAuditLog({
@@ -141,16 +184,20 @@ export async function DELETE(
   { params }: { params: Promise<{ categoryId: string }> }
 ) {
   try {
-    const { categoryId } = await params;
+    const { categoryId: catIdOrSlug } = await params;
     const session = await getServerSession(authOptions);
     const denied = requireAdminOrDashboardPermission(session, 'blog');
     if (denied) return denied;
     const force = req.nextUrl.searchParams.get('force') === 'true';
 
-    const catMeta = await prisma.postCategory.findUnique({
-      where: { id: categoryId },
-      select: { name: true },
+    const catMeta = await prisma.postCategory.findFirst({
+      where: whereByIdOrSlug(catIdOrSlug),
+      select: { id: true, name: true },
     });
+    if (!catMeta) {
+      return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+    }
+    const categoryId = catMeta.id;
 
     const postCount = await prisma.post.count({ where: { categoryId } });
     if (postCount > 0 && !force) return NextResponse.json({ error: 'Category has posts. Use force=true to delete.' }, { status: 400 });

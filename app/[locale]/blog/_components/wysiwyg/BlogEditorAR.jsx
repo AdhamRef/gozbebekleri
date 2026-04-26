@@ -260,7 +260,7 @@ const BlogEditor = ({ post, userId, categories }) => {
 
       // Success handling
       toast.success(protectedEditorConfig.successMessage);
-      router.push(`/blog/${response.data.id}`);
+      router.push(`/blog/${response.data.slug || response.data.id}`);
     } catch (error) {
       // Error handling
       console.error("Post update error:", error);

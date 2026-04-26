@@ -7,7 +7,7 @@ interface PostCardProps {
 
 export const PostCard: React.FC<PostCardProps> = ({ post }) => {
   return (
-    <Link href={`/blog/${post.id}`} className="bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl">
+    <Link href={`/blog/${(post as any).slug || post.id}`} className="bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl">
       {post.image && (
         <div className="relative h-48 w-full">
           <Image

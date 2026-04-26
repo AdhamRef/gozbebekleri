@@ -208,7 +208,7 @@ const MainPage: React.FC<BlogPostProps> = ({ id }: { id: string }) => {
                     {similarPosts.map((similarPost) => (
                       <Link
                         key={similarPost.id}
-                        href={`/blog/${similarPost.id}`}
+                        href={`/blog/${(similarPost as any).slug || similarPost.id}`}
                         className="block"
                       >
                         <div className="group relative overflow-hidden rounded-lg">
