@@ -334,6 +334,10 @@ const BlogEditor = ({ post, userId, categories }) => {
               <CardTitle>{protectedEditorConfig.coverImageTitle}</CardTitle>
               <CardDescription>
                 {protectedEditorConfig.coverImageDescription}
+                <br />
+                <span className="text-amber-700">
+                  الحجم المُوصى به: <strong>1200×675 px</strong> (نسبة 16:9)، صيغة JPG أو PNG، حجم الملف لا يزيد عن 2MB.
+                </span>
               </CardDescription>
             </CardHeader>
             <Separator className="mb-8" />
