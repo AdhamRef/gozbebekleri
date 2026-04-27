@@ -36,15 +36,17 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  Loader2, 
-  ArrowLeft, 
-  X, 
-  Upload, 
-  Languages, 
+import {
+  Loader2,
+  ArrowLeft,
+  X,
+  Upload,
+  Languages,
   AlertCircle,
   CheckCircle2,
-  Globe 
+  Globe,
+  Star,
+  GripVertical
 } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import {
@@ -114,6 +116,8 @@ export default function NewCampaignPage() {
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [activeTab, setActiveTab] = useState<'ar' | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es'>('ar');
+  const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
+  const [dragOverImageIndex, setDragOverImageIndex] = useState<number | null>(null);
   const suggestedDonationsRef = useRef<SuggestedDonationsSectionRef>(null);
   const suggestedShareCountsRef = useRef<SuggestedShareCountsSectionRef>(null);
 
@@ -294,18 +298,30 @@ export default function NewCampaignPage() {
     try {
       const currentImages = form.getValues('images');
       const imageUrl = currentImages[index];
-      
+
       const publicId = imageUrl.split('/').slice(-1)[0].split('.')[0];
       if (publicId) {
         await axios.delete(`/api/upload?publicId=${publicId}`);
       }
-      
+
       const newImages = currentImages.filter((_, i) => i !== index);
       form.setValue('images', newImages);
       toast.success('تم حذف الصورة بنجاح');
     } catch (error) {
       console.error('Error removing image:', error);
       toast.error('فشل في حذف الصورة');
+    }
+  };
+
+  const reorderImages = (from: number, to: number) => {
+    if (from === to) return;
+    const list = [...form.getValues('images')];
+    if (from < 0 || from >= list.length || to < 0 || to >= list.length) return;
+    const [moved] = list.splice(from, 1);
+    list.splice(to, 0, moved);
+    form.setValue('images', list, { shouldValidate: true, shouldDirty: true });
+    if (to === 0 && from !== 0) {
+      toast.success('تم تعيين الصورة الرئيسية');
     }
   };
 
@@ -758,27 +774,85 @@ const getTranslationStatus = () => {
                   <FormControl>
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                        {field.value.map((url, index) => (
-                          <div key={index} className="relative group">
-                            <img
-                              src={url}
-                              alt={`صورة ${index + 1}`}
-                              className="w-full h-32 object-cover rounded-lg"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeImage(index)}
-                              className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        {field.value.map((url, index) => {
+                          const isMain = index === 0;
+                          const isDragging = draggedImageIndex === index;
+                          const isDropTarget = dragOverImageIndex === index && draggedImageIndex !== index;
+                          return (
+                            <div
+                              key={url}
+                              draggable
+                              onDragStart={(e) => {
+                                setDraggedImageIndex(index);
+                                e.dataTransfer.effectAllowed = 'move';
+                              }}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = 'move';
+                                if (dragOverImageIndex !== index) setDragOverImageIndex(index);
+                              }}
+                              onDragLeave={() => {
+                                if (dragOverImageIndex === index) setDragOverImageIndex(null);
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                if (draggedImageIndex !== null && draggedImageIndex !== index) {
+                                  reorderImages(draggedImageIndex, index);
+                                }
+                                setDraggedImageIndex(null);
+                                setDragOverImageIndex(null);
+                              }}
+                              onDragEnd={() => {
+                                setDraggedImageIndex(null);
+                                setDragOverImageIndex(null);
+                              }}
+                              className={`relative group rounded-lg cursor-move transition-all ${
+                                isMain
+                                  ? 'ring-4 ring-[#025EB8] ring-offset-2 shadow-lg'
+                                  : 'ring-1 ring-gray-200 hover:ring-[#025EB8]/40'
+                              } ${isDragging ? 'opacity-40 scale-95' : ''} ${
+                                isDropTarget ? 'ring-4 ring-[#FA5D17] ring-offset-2' : ''
+                              }`}
                             >
-                              <X className="w-4 h-4" />
-                            </button>
-                            {index === 0 && (
-                              <div className="absolute bottom-2 left-2 px-2 py-1 bg-[#025EB8] text-white text-xs rounded">
-                                صورة رئيسية
+                              <img
+                                src={url}
+                                alt={`صورة ${index + 1}`}
+                                draggable={false}
+                                className="w-full h-32 object-cover rounded-lg pointer-events-none select-none"
+                              />
+                              {isMain && (
+                                <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-[#025EB8] to-[#025EB8]/0 rounded-t-lg p-2 flex items-center gap-1.5">
+                                  <Star className="w-4 h-4 text-white fill-white" />
+                                  <span className="text-white text-xs font-bold drop-shadow">الصورة الرئيسية</span>
+                                </div>
+                              )}
+                              <div className="absolute top-2 left-2 p-1 bg-black/50 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                                <GripVertical className="w-4 h-4" />
                               </div>
-                            )}
-                          </div>
-                        ))}
+                              <button
+                                type="button"
+                                onClick={() => removeImage(index)}
+                                className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                              {!isMain && (
+                                <button
+                                  type="button"
+                                  onClick={() => reorderImages(index, 0)}
+                                  title="تعيين كصورة رئيسية"
+                                  className="absolute bottom-2 left-2 px-2 py-1 bg-white text-[#025EB8] text-xs font-semibold rounded shadow opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 hover:bg-[#025EB8] hover:text-white"
+                                >
+                                  <Star className="w-3 h-3" />
+                                  جعلها الرئيسية
+                                </button>
+                              )}
+                              <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/60 text-white text-[10px] rounded font-mono">
+                                {index + 1}
+                              </div>
+                            </div>
+                          );
+                        })}
                         {field.value.length < 5 && (
                           <div className="relative">
                             <input
@@ -809,7 +883,9 @@ const getTranslationStatus = () => {
                         )}
                       </div>
                       <FormDescription>
-                        يمكنك رفع حتى 5 صور للمشروع. الصورة الأولى ستكون الصورة الرئيسية المعروضة.
+                        يمكنك رفع حتى 5 صور للمشروع. <strong>الصورة الأولى</strong> ستكون الصورة الرئيسية المعروضة.
+                        <br />
+                        اسحب الصور لإعادة ترتيبها، أو اضغط زر <strong>«جعلها الرئيسية»</strong> لتغيير الصورة الرئيسية.
                         <br />
                         <span className="text-amber-700">
                           الحجم المُوصى به: <strong>1200×900 px</strong> (نسبة 4:3)، صيغة JPG أو PNG، حجم الملف لا يزيد عن 2MB.
