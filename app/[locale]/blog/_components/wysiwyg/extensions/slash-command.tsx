@@ -1,12 +1,15 @@
 import { Editor, Extension, Range } from "@tiptap/core";
 import { ReactRenderer } from "@tiptap/react";
 import Suggestion from "@tiptap/suggestion";
+import axios from "axios";
+import { toast } from "react-hot-toast";
 import {
   CheckSquare,
   Code,
   Heading1,
   Heading2,
   Heading3,
+  Image as ImageIcon,
   List,
   ListOrdered,
   Text,
@@ -185,27 +188,40 @@ const getSuggestionItems = ({ query }: { query: string }) => {
       command: ({ editor, range }: CommandProps) =>
         editor.chain().focus().deleteRange(range).toggleCodeBlock().run(),
     },
-    // {
-    //   title: "Image",
-    //   description: "Upload an image from your computer.",
-    //   searchTerms: ["photo", "picture", "media"],
-    //   icon: <ImageIcon size={18} />,
-    //   command: ({ editor, range }: CommandProps) => {
-    //     editor.chain().focus().deleteRange(range).run();
-    //     // upload image
-    //     const input = document.createElement("input");
-    //     input.type = "file";
-    //     input.accept = "image/*";
-    //     input.onchange = async () => {
-    //       if (input.files?.length) {
-    //         const file = input.files[0];
-    //         const pos = editor.view.state.selection.from;
-    //         startImageUpload(file, editor.view, pos);
-    //       }
-    //     };
-    //     input.click();
-    //   },
-    // },
+    {
+      title: "Image",
+      description: "Upload an image from your computer.",
+      searchTerms: ["photo", "picture", "media", "صورة"],
+      icon: <ImageIcon size={18} />,
+      command: ({ editor, range }: CommandProps) => {
+        editor.chain().focus().deleteRange(range).run();
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "image/*";
+        input.onchange = async () => {
+          const file = input.files?.[0];
+          if (!file) return;
+          if (!file.type.startsWith("image/")) {
+            toast.error("الملف ليس صورة");
+            return;
+          }
+          const uploadingToast = toast.loading("جاري رفع الصورة...");
+          try {
+            const formData = new FormData();
+            formData.append("file", file);
+            const response = await axios.post("/api/upload", formData);
+            const url: string | undefined = response.data?.url;
+            if (!url) throw new Error("Upload returned no URL");
+            editor.chain().focus().setImage({ src: url }).run();
+            toast.success("تم رفع الصورة", { id: uploadingToast });
+          } catch (err) {
+            console.error("Slash image upload error:", err);
+            toast.error("فشل رفع الصورة", { id: uploadingToast });
+          }
+        };
+        input.click();
+      },
+    },
   ].filter((item) => {
     if (typeof query === "string" && query.length > 0) {
       const search = query.toLowerCase();

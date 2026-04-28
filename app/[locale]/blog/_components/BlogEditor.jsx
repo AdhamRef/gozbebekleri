@@ -42,6 +42,7 @@ import {
 // Custom components and config
 import WysiwygEditor from "./wysiwyg/wysiwyg-editor";
 import { defaultEditorContent } from "./wysiwyg/default-content";
+import { useCreateTranslations } from "@/app/(dashboard)/dashboard/blog/create/_components/CreateTranslationsContext";
 import {
   Select,
   SelectContent,
@@ -64,8 +65,8 @@ import {
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 
-// Validation schema. English title/description are required (covers create flow);
-// for edit, English is managed via BlogLocaleEditor and these fields stay empty.
+// Validation schema. English content is captured in its own language tab (buffered via context on create,
+// edited via BlogLocaleEditor on edit), so it's not part of this form schema.
 const postEditFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
   slug: z.string().max(80, "الـ slug طويل جداً").optional().or(z.literal("")),
@@ -73,8 +74,6 @@ const postEditFormSchema = z.object({
   image: z.string().optional(),
   categoryId: z.string().optional(),
   campaignIds: z.tuple([z.string().optional(), z.string().optional(), z.string().optional()]),
-  title_en: z.string().optional(),
-  description_en: z.string().optional(),
 });
 
 // Configuration
@@ -120,6 +119,7 @@ const protectedPostConfig = {
 const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAfterCreate, isCreate: isCreateProp }) => {
   const router = useRouter();
   const isCreate = isCreateProp || !post?.id || post.id === "new";
+  const createTranslationsCtx = useCreateTranslations();
 
 
   // States
@@ -127,10 +127,8 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
   const [showLoadingAlert, setShowLoadingAlert] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
 
-  // Arabic content only (en/fr edited in BlogLocaleEditor)
+  // Arabic content only (en/fr/tr/id/pt/es buffered in CreateTranslationsContext on create, BlogLocaleEditor on edit)
   const [contentAR, setContentAR] = useState(post?.contentAR || null);
-  // English content captured in the create flow (required) — edited via BlogLocaleEditor afterwards
-  const [contentEN, setContentEN] = useState(post?.contentEN || null);
 
 
   // Uppy instance for cover photo upload
@@ -195,8 +193,6 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
     image: post?.imageAR || post?.image || "",
     categoryId: post?.category_id || post?.categoryId || "",
     campaignIds: padCampaignIds(),
-    title_en: post?.titleEN || "",
-    description_en: post?.descriptionEN || "",
   };
 
   const form = useForm({
@@ -205,20 +201,34 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
     mode: "onChange",
   });
 
-  // Submit handler: Arabic fields only (en/fr edited in BlogLocaleEditor on edit pages)
+  // Submit handler: Arabic + buffered translations (create) or Arabic-only (edit)
   const onSubmit = async (data) => {
     setShowLoadingAlert(true);
     setIsSaving(true);
 
     try {
-      // English is required when creating a post (the API enforces this too).
-      const titleEnTrim = (data.title_en || "").trim();
-      const descEnTrim = (data.description_en || "").trim();
-      if (isCreate && (!titleEnTrim || !descEnTrim)) {
-        toast.error("English title and description are required");
-        setIsSaving(false);
-        setShowLoadingAlert(false);
-        return;
+      // Build translations payload from the buffered context on create.
+      const buffered = isCreate && createTranslationsCtx ? createTranslationsCtx.translations : {};
+      const translationsPayload = {};
+      for (const [loc, t] of Object.entries(buffered)) {
+        if (!t) continue;
+        const title = (t.title || "").trim();
+        const description = (t.description || "").trim();
+        const content = t.content || "";
+        const image = (t.image || "").trim();
+        if (title || description || content || image) {
+          translationsPayload[loc] = { title, description, content, image };
+        }
+      }
+
+      if (isCreate) {
+        const en = translationsPayload.en;
+        if (!en || !en.title || !en.description) {
+          toast.error("English title and description are required");
+          setIsSaving(false);
+          setShowLoadingAlert(false);
+          return;
+        }
       }
 
       const rawIds = (data.campaignIds || [])
@@ -240,15 +250,8 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
         categoryId: data.categoryId || null,
         campaignIds,
       };
-      // On create, send English translation alongside Arabic (API requires it).
-      if (isCreate) {
-        payload.translations = {
-          en: {
-            title: titleEnTrim,
-            description: descEnTrim,
-            content: contentEN || "",
-          },
-        };
+      if (isCreate && Object.keys(translationsPayload).length > 0) {
+        payload.translations = translationsPayload;
       }
       // On create, an empty slug means "auto-generate from English title" — drop it so the API picks.
       if (isCreate && !payload.slug) delete payload.slug;
@@ -333,7 +336,15 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
   return (
     <>
       <Form {...form} dir="rtl">
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && e.target?.tagName === "INPUT") {
+              e.preventDefault();
+            }
+          }}
+          className="space-y-6"
+        >
           {/* Single card with simple inputs like BlogLocaleEditor */}
           <Card className="">
             <CardHeader dir="rtl">
@@ -376,45 +387,6 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
                   </FormItem>
                 )}
               />
-
-              {isCreate && (
-                <>
-                  <FormField
-                    control={form.control}
-                    name="title_en"
-                    render={({ field }) => (
-                      <FormItem dir="ltr">
-                        <FormLabel>Title (English) *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter post title in English" {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          Required — also used to generate the slug when no override is provided.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="description_en"
-                    render={({ field }) => (
-                      <FormItem dir="ltr">
-                        <FormLabel>Description (English) *</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Short English description"
-                            className="min-h-[120px] resize-y"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </>
-              )}
 
               <FormField
                 control={form.control}
@@ -632,30 +604,6 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
               />
             </CardContent>
           </Card>
-
-          {isCreate && (
-            <Card>
-              <CardHeader dir="ltr">
-                <CardTitle>Content (English)</CardTitle>
-                <CardDescription>Required — English version of the post body.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <WysiwygEditor
-                  defaultValue={(() => {
-                    if (!contentEN) return defaultEditorContent;
-                    try {
-                      return typeof contentEN === "string" ? JSON.parse(contentEN) : contentEN;
-                    } catch {
-                      return defaultEditorContent;
-                    }
-                  })()}
-                  onDebouncedUpdate={(editor) => {
-                    setContentEN(JSON.stringify(editor?.getJSON()));
-                  }}
-                />
-              </CardContent>
-            </Card>
-          )}
 
           {/* Form submission buttons */}
           <div className="inline-flex items-center justify-start gap-x-3">

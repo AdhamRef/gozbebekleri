@@ -3,9 +3,10 @@
 import ReactCountryFlag from "react-country-flag";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle2 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import BlogEditor from "@/app/[locale]/blog/_components/BlogEditor";
 import BlogLocaleEditor from "./BlogLocaleEditor";
+import BlogLocaleBufferEditor from "./BlogLocaleBufferEditor";
+import { CreateTranslationsProvider } from "./CreateTranslationsContext";
 
 interface LanguageTabsProps {
   post: {
@@ -91,7 +92,7 @@ export default function LanguageTabs({ post, categories, campaignOptions = [], m
     },
   ];
 
-  return (
+  const tabsTree = (
     <Tabs defaultValue="ar" className="w-full">
       <TabsList className="flex flex-wrap gap-1 mb-6" dir="rtl">
         {localeTabs.map(({ value, label, required, has }) => (
@@ -109,7 +110,7 @@ export default function LanguageTabs({ post, categories, campaignOptions = [], m
           categories={categories}
           campaignOptions={campaignOptions}
           userId={undefined}
-          redirectAfterCreate={isCreate ? "/dashboard/blog/create" : undefined}
+          redirectAfterCreate={"/blog"}
           isCreate={isCreate}
         />
       </TabsContent>
@@ -117,11 +118,7 @@ export default function LanguageTabs({ post, categories, campaignOptions = [], m
       {(["en", "fr", "tr", "id", "pt", "es"] as const).map((loc) => (
         <TabsContent key={loc} value={loc} className="mt-0">
           {isCreate ? (
-            <Card className="max-w-2xl mx-auto">
-              <CardContent className="p-6 text-center text-muted-foreground">
-                احفظ المقال بالعربية أولاً لتفعيل الترجمة.
-              </CardContent>
-            </Card>
+            <BlogLocaleBufferEditor locale={loc} />
           ) : (
             <BlogLocaleEditor post={post} locale={loc} />
           )}
@@ -129,4 +126,9 @@ export default function LanguageTabs({ post, categories, campaignOptions = [], m
       ))}
     </Tabs>
   );
+
+  if (isCreate) {
+    return <CreateTranslationsProvider>{tabsTree}</CreateTranslationsProvider>;
+  }
+  return tabsTree;
 }

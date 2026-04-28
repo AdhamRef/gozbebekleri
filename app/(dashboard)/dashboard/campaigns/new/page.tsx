@@ -37,6 +37,12 @@ import {
 } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Loader2,
   ArrowLeft,
   X,
@@ -76,13 +82,28 @@ const formSchema = z
     .min(1, 'صورة واحدة على الأقل مطلوبة')
     .max(5, 'الحد الأقصى 5 صور'),
   videoUrl: z.string().optional(),
-  
+  currentAmount: z.number().min(0).max(1000000).optional(),
+
   title_en: z.string().min(1, 'English title is required'),
   title_fr: z.string().optional(),
   title_tr: z.string().optional(),
   title_id: z.string().optional(),
   title_pt: z.string().optional(),
   title_es: z.string().optional(),
+  // per-locale image override — optional. main campaign images[] is the only required media (≥1).
+  image_en: z.string().optional(),
+  image_fr: z.string().optional(),
+  image_tr: z.string().optional(),
+  image_id: z.string().optional(),
+  image_pt: z.string().optional(),
+  image_es: z.string().optional(),
+  // per-locale video URL override — optional (main videoUrl is also optional).
+  videoUrl_en: z.string().optional(),
+  videoUrl_fr: z.string().optional(),
+  videoUrl_tr: z.string().optional(),
+  videoUrl_id: z.string().optional(),
+  videoUrl_pt: z.string().optional(),
+  videoUrl_es: z.string().optional(),
 })
   .superRefine((data, ctx) => {
     if (data.goalType === 'FIXED' && (!data.targetAmount || data.targetAmount < 1)) {
@@ -118,6 +139,10 @@ export default function NewCampaignPage() {
   const [activeTab, setActiveTab] = useState<'ar' | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es'>('ar');
   const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
   const [dragOverImageIndex, setDragOverImageIndex] = useState<number | null>(null);
+  const [currentAmountUnlocked, setCurrentAmountUnlocked] = useState(false);
+  const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
+  const [unlockConfirmText, setUnlockConfirmText] = useState('');
+  const CURRENT_AMOUNT_UNLOCK_PHRASE = 'أؤكد تعديل المبلغ';
   const suggestedDonationsRef = useRef<SuggestedDonationsSectionRef>(null);
   const suggestedShareCountsRef = useRef<SuggestedShareCountsSectionRef>(null);
 
@@ -167,12 +192,25 @@ export default function NewCampaignPage() {
       isActive: true,
       images: [],
       videoUrl: '',
+      currentAmount: 0,
       title_en: '',
       title_fr: '',
       title_tr: '',
       title_id: '',
       title_pt: '',
       title_es: '',
+      image_en: '',
+      image_fr: '',
+      image_tr: '',
+      image_id: '',
+      image_pt: '',
+      image_es: '',
+      videoUrl_en: '',
+      videoUrl_fr: '',
+      videoUrl_tr: '',
+      videoUrl_id: '',
+      videoUrl_pt: '',
+      videoUrl_es: '',
     },
   });
 
@@ -228,15 +266,69 @@ export default function NewCampaignPage() {
         isActive: values.isActive,
         images: values.images,
         videoUrl: values.videoUrl,
+        ...(currentAmountUnlocked && Number(values.currentAmount ?? 0) > 0
+          ? { currentAmount: Math.max(0, Number(values.currentAmount)) }
+          : {}),
 
         // English is always sent (required); other locales only when title + description provided.
+        // image/videoUrl per-locale are optional overrides — sent through whenever provided.
         translations: {
-          en: { title: values.title_en, description: descriptionEn },
-          ...(values.title_fr && !isDescEmpty(descriptionFr) ? { fr: { title: values.title_fr, description: descriptionFr } } : {}),
-          ...(values.title_tr && !isDescEmpty(descriptionTr) ? { tr: { title: values.title_tr, description: descriptionTr } } : {}),
-          ...(values.title_id && !isDescEmpty(descriptionId) ? { id: { title: values.title_id, description: descriptionId } } : {}),
-          ...(values.title_pt && !isDescEmpty(descriptionPt) ? { pt: { title: values.title_pt, description: descriptionPt } } : {}),
-          ...(values.title_es && !isDescEmpty(descriptionEs) ? { es: { title: values.title_es, description: descriptionEs } } : {}),
+          en: {
+            title: values.title_en,
+            description: descriptionEn,
+            image: values.image_en || null,
+            videoUrl: values.videoUrl_en || null,
+          },
+          ...(values.title_fr && !isDescEmpty(descriptionFr)
+            ? {
+                fr: {
+                  title: values.title_fr,
+                  description: descriptionFr,
+                  image: values.image_fr || null,
+                  videoUrl: values.videoUrl_fr || null,
+                },
+              }
+            : {}),
+          ...(values.title_tr && !isDescEmpty(descriptionTr)
+            ? {
+                tr: {
+                  title: values.title_tr,
+                  description: descriptionTr,
+                  image: values.image_tr || null,
+                  videoUrl: values.videoUrl_tr || null,
+                },
+              }
+            : {}),
+          ...(values.title_id && !isDescEmpty(descriptionId)
+            ? {
+                id: {
+                  title: values.title_id,
+                  description: descriptionId,
+                  image: values.image_id || null,
+                  videoUrl: values.videoUrl_id || null,
+                },
+              }
+            : {}),
+          ...(values.title_pt && !isDescEmpty(descriptionPt)
+            ? {
+                pt: {
+                  title: values.title_pt,
+                  description: descriptionPt,
+                  image: values.image_pt || null,
+                  videoUrl: values.videoUrl_pt || null,
+                },
+              }
+            : {}),
+          ...(values.title_es && !isDescEmpty(descriptionEs)
+            ? {
+                es: {
+                  title: values.title_es,
+                  description: descriptionEs,
+                  image: values.image_es || null,
+                  videoUrl: values.videoUrl_es || null,
+                },
+              }
+            : {}),
         },
         suggestedDonations:
           values.fundraisingMode === 'AMOUNT'
@@ -257,6 +349,145 @@ export default function NewCampaignPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Per-locale single-image upload (optional override — fallback is the main Arabic cover).
+  const [uploadingLocale, setUploadingLocale] = useState<
+    null | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es'
+  >(null);
+
+  type LocaleImageKey =
+    | 'image_en' | 'image_fr' | 'image_tr' | 'image_id' | 'image_pt' | 'image_es';
+  type LocaleVideoKey =
+    | 'videoUrl_en' | 'videoUrl_fr' | 'videoUrl_tr' | 'videoUrl_id' | 'videoUrl_pt' | 'videoUrl_es';
+
+  const handleLocaleImageUpload = async (
+    locale: 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es',
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (e.target) e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('الملف ليس صورة');
+      return;
+    }
+    setUploadingLocale(locale);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await axios.post('/api/upload', formData);
+      form.setValue(`image_${locale}` as LocaleImageKey, response.data?.url ?? '', {
+        shouldDirty: true,
+      });
+      toast.success('تم رفع الصورة');
+    } catch (err) {
+      console.error('Locale image upload error:', err);
+      toast.error('فشل رفع الصورة');
+    } finally {
+      setUploadingLocale(null);
+    }
+  };
+
+  const removeLocaleImage = (locale: 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es') => {
+    const key = `image_${locale}` as LocaleImageKey;
+    const current = form.getValues(key);
+    if (current) {
+      const publicId = current.split('/').slice(-1)[0]?.split('.')[0];
+      if (publicId) axios.delete(`/api/upload?publicId=${publicId}`).catch(() => {});
+    }
+    form.setValue(key, '', { shouldDirty: true });
+  };
+
+  const renderLocaleMedia = (
+    locale: 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es',
+    labels: { image: string; imageHint: string; video: string; videoHint: string; optionalNote: string },
+    direction: 'ltr' | 'rtl' = 'ltr',
+  ) => {
+    const imageKey = `image_${locale}` as LocaleImageKey;
+    const videoKey = `videoUrl_${locale}` as LocaleVideoKey;
+    const isUploading = uploadingLocale === locale;
+    return (
+      <div className="space-y-4 mt-2" dir={direction}>
+        <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+          <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <span>{labels.optionalNote}</span>
+        </div>
+
+        <FormField
+          control={form.control}
+          name={imageKey}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{labels.image}</FormLabel>
+              <FormControl>
+                <div>
+                  {field.value ? (
+                    <div className="relative group w-56">
+                      <img
+                        src={field.value}
+                        alt="locale cover"
+                        className="w-56 h-40 object-cover rounded-lg border border-gray-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeLocaleImage(locale)}
+                        className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleLocaleImageUpload(locale, e)}
+                        className="hidden"
+                        id={`new-locale-image-${locale}`}
+                        disabled={isUploading}
+                      />
+                      <label
+                        htmlFor={`new-locale-image-${locale}`}
+                        className={`flex flex-col items-center justify-center w-56 h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#025EB8] transition-colors ${
+                          isUploading ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                      >
+                        {isUploading ? (
+                          <Loader2 className="w-6 h-6 animate-spin text-[#025EB8]" />
+                        ) : (
+                          <>
+                            <Upload className="w-6 h-6 text-gray-400" />
+                            <span className="mt-2 text-xs text-gray-500">{labels.imageHint}</span>
+                          </>
+                        )}
+                      </label>
+                    </>
+                  )}
+                </div>
+              </FormControl>
+              <FormDescription className="text-xs">
+                {labels.imageHint} — 1200×675 (16:9), JPG/PNG, ≤ 2MB.
+              </FormDescription>
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name={videoKey}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{labels.video}</FormLabel>
+              <FormControl>
+                <Input {...field} dir="ltr" placeholder="https://www.youtube.com/watch?v=..." />
+              </FormControl>
+              <FormDescription className="text-xs">{labels.videoHint}</FormDescription>
+            </FormItem>
+          )}
+        />
+      </div>
+    );
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -537,6 +768,19 @@ const getTranslationStatus = () => {
                     Required — comprehensive English description of the campaign and its goals.
                   </FormDescription>
                 </FormItem>
+
+                {renderLocaleMedia(
+                  'en',
+                  {
+                    image: 'Cover image (English) — optional',
+                    imageHint: 'Upload English cover',
+                    video: 'Video URL (English) — optional',
+                    videoHint: 'Locale-specific video link.',
+                    optionalNote:
+                      'Image and video URL here are optional overrides — they fall back to the Arabic main cover/video when empty. Only the Arabic main image (≥ 1) is required.',
+                  },
+                  'ltr',
+                )}
               </TabsContent>
 
               {/* French Tab */}
@@ -577,7 +821,7 @@ const getTranslationStatus = () => {
                 </FormItem>
 
                 {/* Helper for partial translations */}
-                {(form.watch('title_fr') || form.watch('description_fr')) && 
+                {(form.watch('title_fr') || form.watch('description_fr')) &&
                  (!form.watch('title_fr') || !form.watch('description_fr')) && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
@@ -585,6 +829,19 @@ const getTranslationStatus = () => {
                       Le titre et la description doivent être fournis pour que la traduction française soit enregistrée.
                     </AlertDescription>
                   </Alert>
+                )}
+
+                {renderLocaleMedia(
+                  'fr',
+                  {
+                    image: 'Image de couverture (Français) — facultative',
+                    imageHint: 'Téléverser la couverture',
+                    video: 'URL vidéo (Français) — facultative',
+                    videoHint: 'Lien vidéo spécifique au français.',
+                    optionalNote:
+                      "Image et URL vidéo facultatives — elles remplacent uniquement la couverture/vidéo arabe lorsqu'elles sont fournies. Seule l'image principale arabe (≥ 1) est requise.",
+                  },
+                  'ltr',
                 )}
               </TabsContent>
 
@@ -596,6 +853,18 @@ const getTranslationStatus = () => {
                   <FormLabel>Kampanya Açıklaması</FormLabel>
                   <WysiwygEditor defaultValue={parseEditorContent(descriptionTr)} onDebouncedUpdate={(editor) => setDescriptionTr(JSON.stringify(editor?.getJSON()))} className={editorClassName} />
                 </FormItem>
+                {renderLocaleMedia(
+                  'tr',
+                  {
+                    image: 'Kapak görseli (Türkçe) — isteğe bağlı',
+                    imageHint: 'Kapak yükle',
+                    video: 'Video URL (Türkçe) — isteğe bağlı',
+                    videoHint: 'Türkçeye özel video bağlantısı.',
+                    optionalNote:
+                      'Görsel ve video URL isteğe bağlıdır — yalnızca verildiğinde Arapça ana görsel/videonun yerine geçer. Yalnızca Arapça ana görsel (≥ 1) zorunludur.',
+                  },
+                  'ltr',
+                )}
               </TabsContent>
               <TabsContent value="id" className="space-y-6">
                 <FormField control={form.control} name="title_id" render={({ field }) => (
@@ -605,6 +874,18 @@ const getTranslationStatus = () => {
                   <FormLabel>Deskripsi Kampanye</FormLabel>
                   <WysiwygEditor defaultValue={parseEditorContent(descriptionId)} onDebouncedUpdate={(editor) => setDescriptionId(JSON.stringify(editor?.getJSON()))} className={editorClassName} />
                 </FormItem>
+                {renderLocaleMedia(
+                  'id',
+                  {
+                    image: 'Gambar sampul (Indonesia) — opsional',
+                    imageHint: 'Unggah sampul',
+                    video: 'URL Video (Indonesia) — opsional',
+                    videoHint: 'Tautan video khusus untuk Bahasa Indonesia.',
+                    optionalNote:
+                      'Gambar dan URL video bersifat opsional — hanya menggantikan sampul/video Arab utama jika diisi. Hanya gambar utama Arab (≥ 1) yang wajib.',
+                  },
+                  'ltr',
+                )}
               </TabsContent>
               <TabsContent value="pt" className="space-y-6">
                 <FormField control={form.control} name="title_pt" render={({ field }) => (
@@ -614,6 +895,18 @@ const getTranslationStatus = () => {
                   <FormLabel>Descrição da Campanha</FormLabel>
                   <WysiwygEditor defaultValue={parseEditorContent(descriptionPt)} onDebouncedUpdate={(editor) => setDescriptionPt(JSON.stringify(editor?.getJSON()))} className={editorClassName} />
                 </FormItem>
+                {renderLocaleMedia(
+                  'pt',
+                  {
+                    image: 'Imagem de capa (Português) — opcional',
+                    imageHint: 'Enviar capa',
+                    video: 'URL do vídeo (Português) — opcional',
+                    videoHint: 'Link de vídeo específico para o português.',
+                    optionalNote:
+                      'A imagem e a URL do vídeo são opcionais — substituem a capa/vídeo árabe principal apenas quando fornecidos. Apenas a imagem principal em árabe (≥ 1) é obrigatória.',
+                  },
+                  'ltr',
+                )}
               </TabsContent>
               <TabsContent value="es" className="space-y-6">
                 <FormField control={form.control} name="title_es" render={({ field }) => (
@@ -623,6 +916,18 @@ const getTranslationStatus = () => {
                   <FormLabel>Descripción de la Campaña</FormLabel>
                   <WysiwygEditor defaultValue={parseEditorContent(descriptionEs)} onDebouncedUpdate={(editor) => setDescriptionEs(JSON.stringify(editor?.getJSON()))} className={editorClassName} />
                 </FormItem>
+                {renderLocaleMedia(
+                  'es',
+                  {
+                    image: 'Imagen de portada (Español) — opcional',
+                    imageHint: 'Subir portada',
+                    video: 'URL del video (Español) — opcional',
+                    videoHint: 'Enlace de video específico para el español.',
+                    optionalNote:
+                      'La imagen y la URL del video son opcionales — reemplazan la portada/video árabe principal solo cuando se proporcionan. Solo la imagen principal en árabe (≥ 1) es obligatoria.',
+                  },
+                  'ltr',
+                )}
               </TabsContent>
             </Tabs>
           </Card>
@@ -704,6 +1009,149 @@ const getTranslationStatus = () => {
                 )}
               />
               )}
+
+              <FormField
+                control={form.control}
+                name="currentAmount"
+                render={({ field }) => (
+                  <FormItem dir="rtl">
+                    <div className="flex items-center justify-between gap-2">
+                      <FormLabel>المبلغ الحالي عند الإنشاء (متقدم)</FormLabel>
+                      {!currentAmountUnlocked ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-3 text-xs border-amber-500 text-amber-700 hover:bg-amber-50"
+                          onClick={() => {
+                            setUnlockConfirmText('');
+                            setUnlockDialogOpen(true);
+                          }}
+                        >
+                          <AlertCircle className="w-3.5 h-3.5 ml-1" />
+                          فتح للتعديل
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-3 text-xs text-gray-500 hover:text-gray-700"
+                          onClick={() => {
+                            form.setValue('currentAmount', 0);
+                            setCurrentAmountUnlocked(false);
+                          }}
+                        >
+                          إلغاء التعديل
+                        </Button>
+                      )}
+                    </div>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        value={field.value ?? 0}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        placeholder="0"
+                        disabled={!currentAmountUnlocked}
+                        className={
+                          currentAmountUnlocked
+                            ? 'border-red-500 ring-1 ring-red-200 focus-visible:ring-red-300'
+                            : ''
+                        }
+                      />
+                    </FormControl>
+                    {currentAmountUnlocked ? (
+                      <Alert
+                        variant="destructive"
+                        className="mt-2 border-red-300 bg-red-50 text-red-800"
+                      >
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription className="text-xs leading-relaxed">
+                          تعيين <strong>المبلغ الحالي</strong> يدوياً عند الإنشاء مخصّص لحالات استثنائية
+                          (مثل ترحيل مشروع قائم بمبلغ متراكم سابق). القيمة ستظهر للمتبرعين فوراً
+                          ولن يكون لها سجل تبرعات مقابل، فاحرص أن يكون التعيين مقصوداً.
+                        </AlertDescription>
+                      </Alert>
+                    ) : (
+                      <FormDescription>
+                        افتراضياً يبدأ المشروع بمبلغ <strong>0</strong> ويُحدَّث تلقائياً مع التبرعات.
+                        تجاوز هذا يدوياً يتطلب تأكيداً صريحاً.
+                      </FormDescription>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Dialog
+                open={unlockDialogOpen}
+                onOpenChange={(open) => {
+                  setUnlockDialogOpen(open);
+                  if (!open) setUnlockConfirmText('');
+                }}
+              >
+                <DialogContent className="font-sans" dir="rtl">
+                  <DialogHeader>
+                    <DialogTitle className="text-red-700 flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5" />
+                      تأكيد تعيين مبلغ ابتدائي
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-3 text-sm leading-relaxed text-gray-700">
+                    <p>
+                      أنت على وشك تعيين <strong>المبلغ الحالي</strong> للمشروع يدوياً عند الإنشاء.
+                      الافتراضي أن يبدأ المشروع بـ 0 ويُحسب من سجل التبرعات.
+                    </p>
+                    <ul className="list-disc pr-5 space-y-1 text-xs text-gray-600">
+                      <li>القيمة الجديدة ستظهر للمتبرعين فوراً على صفحة المشروع.</li>
+                      <li>لن يقابلها سجل تبرعات في قاعدة البيانات.</li>
+                      <li>يُسجَّل هذا الإجراء في سجل التدقيق (audit log).</li>
+                    </ul>
+                    <div className="space-y-1.5 pt-2">
+                      <label className="text-sm font-medium text-gray-800">
+                        اكتب الجملة التالية للمتابعة:{' '}
+                        <span className="font-mono text-red-700">
+                          {CURRENT_AMOUNT_UNLOCK_PHRASE}
+                        </span>
+                      </label>
+                      <Input
+                        autoFocus
+                        value={unlockConfirmText}
+                        onChange={(e) => setUnlockConfirmText(e.target.value)}
+                        placeholder={CURRENT_AMOUNT_UNLOCK_PHRASE}
+                        className="font-mono"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setUnlockDialogOpen(false);
+                        setUnlockConfirmText('');
+                      }}
+                    >
+                      إلغاء
+                    </Button>
+                    <Button
+                      type="button"
+                      disabled={
+                        unlockConfirmText.trim() !== CURRENT_AMOUNT_UNLOCK_PHRASE
+                      }
+                      className="!bg-red-600 hover:!bg-red-700 !text-white disabled:!bg-red-300"
+                      onClick={() => {
+                        setCurrentAmountUnlocked(true);
+                        setUnlockDialogOpen(false);
+                        setUnlockConfirmText('');
+                      }}
+                    >
+                      تأكيد وفتح الحقل
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
 
               {form.watch('fundraisingMode') === 'SHARES' && (
                 <FormField

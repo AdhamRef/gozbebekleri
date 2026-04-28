@@ -319,7 +319,7 @@ const ContactPage = () => {
               },
               {
                 Icon: Instagram,
-                href: "https://www.instagram.com/gozbebekleri_foundation/",
+                href: "https://www.instagram.com/gbyd_foundation/",
                 label: "Instagram",
               },
               {

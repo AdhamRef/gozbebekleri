@@ -48,8 +48,16 @@ export async function GET(request: NextRequest) {
       ].filter(condition => Object.keys(condition).length > 0)
     };
 
-    // Build orderBy based on sortBy parameter
+    // Build orderBy based on sortBy parameter.
+    // Default ("newest") applies global priority first (asc, nulls last) then createdAt desc,
+    // so admin-set priority surfaces without the client opting in. Explicit user-picked
+    // sorts (amount-high/-low, progress) override priority entirely.
+    // Mongo's ascending sort places null FIRST, so a single `[priority asc, createdAt desc]`
+    // query would mostly return unprioritized rows in the page slice. Instead, when priority
+    // ordering is in effect on the first page (no cursor), we fan out into two queries —
+    // prioritized first, then non-prioritized recency — and merge.
     let orderBy: any = { createdAt: 'desc' };
+    const applyPriorityFallbackSort = sortBy === 'newest' || !sortBy || sortBy === 'priority';
     switch (sortBy) {
       case 'amount-high':
         orderBy = { currentAmount: 'desc' };
@@ -60,42 +68,73 @@ export async function GET(request: NextRequest) {
       case 'progress':
         orderBy = { currentAmount: 'desc' };
         break;
-      case 'priority':
-        // Fetch newest first; in-memory sort puts prioritized campaigns first (nulls last)
-        orderBy = { createdAt: 'desc' };
-        break;
     }
 
-    const campaigns = await prisma.campaign.findMany({
-      where,
-      take: limit + 1,
-      ...(cursor && {
-        skip: 1,
-        cursor: { id: cursor },
-      }),
-      orderBy,
-      include: {
-        category: {
-          select: {
-            id: true,
-            slug: true,
-            name: true,
-            icon: true,
-            translations: {
-              where: translationLocaleWhere(locale),
-              take: 2,
-            },
+    const includeShape = {
+      category: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          icon: true,
+          translations: {
+            where: translationLocaleWhere(locale),
+            take: 2,
           },
         },
-        translations: {
-          where: translationLocaleWhere(locale),
-          take: 2,
-        },
-        _count: {
-          select: { donations: true }
-        }
       },
-    });
+      translations: {
+        where: translationLocaleWhere(locale),
+        take: 2,
+      },
+      _count: {
+        select: { donations: true },
+      },
+    } satisfies Prisma.CampaignInclude;
+
+    const campaigns = await (async () => {
+      if (applyPriorityFallbackSort && !cursor) {
+        // First page with priority-aware default ordering: split into two queries.
+        // 1) prioritized rows (asc priority, createdAt desc tiebreak), capped at limit + 1.
+        // 2) non-prioritized rows (createdAt desc), filling the remainder.
+        const priRows = await prisma.campaign.findMany({
+          where: { ...where, NOT: { priority: null } },
+          orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
+          take: limit + 1,
+          include: includeShape,
+        });
+        const remaining = Math.max(0, limit + 1 - priRows.length);
+        const recentRows = remaining > 0
+          ? await prisma.campaign.findMany({
+              where: { ...where, priority: null },
+              orderBy: { createdAt: 'desc' },
+              take: remaining,
+              include: includeShape,
+            })
+          : [];
+        return [...priRows, ...recentRows];
+      }
+      if (applyPriorityFallbackSort && cursor) {
+        // Subsequent pages: paginate the non-prioritized list by createdAt desc.
+        // Page 1 already showed all prioritized rows that fit, so we exclude them here to
+        // avoid duplicates and gaps.
+        return prisma.campaign.findMany({
+          where: { ...where, priority: null },
+          take: limit + 1,
+          skip: 1,
+          cursor: { id: cursor },
+          orderBy: { createdAt: 'desc' },
+          include: includeShape,
+        });
+      }
+      return prisma.campaign.findMany({
+        where,
+        take: limit + 1,
+        ...(cursor && { skip: 1, cursor: { id: cursor } }),
+        orderBy,
+        include: includeShape,
+      });
+    })();
 
     // Filter by search term if provided (search in both base and translated fields)
     let filteredCampaigns = campaigns;
@@ -112,7 +151,9 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Handle in-memory sorting
+    // Handle in-memory sorting. With applyPriorityFallbackSort the fan-out above already
+    // returns rows in the desired (prioritized → newest) order, so we only re-sort here for
+    // the special cases that can't be expressed in the Prisma orderBy.
     let sortedCampaigns = [...filteredCampaigns];
     if (sortBy === 'progress') {
       sortedCampaigns.sort((a, b) => {
@@ -121,17 +162,6 @@ export async function GET(request: NextRequest) {
         const progressA = computeCampaignProgressPercent(a.currentAmount, a.targetAmount, ga) / 100;
         const progressB = computeCampaignProgressPercent(b.currentAmount, b.targetAmount, gb) / 100;
         return progressB - progressA;
-      });
-    } else if (sortBy === 'priority') {
-      // Prioritized campaigns (priority not null) come first, sorted ascending by priority value.
-      // Campaigns without a priority are sorted by createdAt desc after the prioritized ones.
-      sortedCampaigns.sort((a, b) => {
-        const ap = a.priority ?? null;
-        const bp = b.priority ?? null;
-        if (ap !== null && bp !== null) return ap - bp;
-        if (ap !== null) return -1;
-        if (bp !== null) return 1;
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
     }
 
@@ -149,8 +179,11 @@ export async function GET(request: NextRequest) {
         slug: campaign.slug ?? null,
         title: tC?.title || campaign.title,
         description: tC?.description || campaign.description,
-        images: campaign.images,
-        videoUrl: campaign.videoUrl,
+        images:
+          tC?.image && Array.isArray(campaign.images)
+            ? [tC.image, ...campaign.images.slice(1)]
+            : campaign.images,
+        videoUrl: tC?.videoUrl || campaign.videoUrl,
         targetAmount: campaign.targetAmount,
         currentAmount: campaign.currentAmount,
         isActive: campaign.isActive,
@@ -298,7 +331,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const translationData: { locale: string; title: string; description: string }[] = [];
+    const translationData: {
+      locale: string;
+      title: string;
+      description: string;
+      image: string | null;
+      videoUrl: string | null;
+    }[] = [];
 
     if (data.translations && typeof data.translations === 'object') {
       for (const [locale, trans] of Object.entries(data.translations)) {
@@ -310,6 +349,9 @@ export async function POST(request: NextRequest) {
               locale,
               title: t.title,
               description: t.description,
+              image: typeof t.image === "string" && t.image.trim() ? t.image.trim() : null,
+              videoUrl:
+                typeof t.videoUrl === "string" && t.videoUrl.trim() ? t.videoUrl.trim() : null,
             });
           }
         }
@@ -330,13 +372,20 @@ export async function POST(request: NextRequest) {
       const sharePriceUSD =
         fundraisingMode === FUNDRAISING_SHARES ? Number(data.sharePriceUSD) : null;
 
+      const seededCurrentAmount =
+        typeof data.currentAmount === "number" &&
+        Number.isFinite(data.currentAmount) &&
+        data.currentAmount >= 0
+          ? data.currentAmount
+          : 0;
+
       const newCampaign = await tx.campaign.create({
         data: {
           title: data.title,
           description: data.description,
           slug,
           targetAmount,
-          currentAmount: 0,
+          currentAmount: seededCurrentAmount,
           categoryId: data.categoryId,
           isActive: data.isActive ?? true,
           images: data.images,
@@ -360,6 +409,8 @@ export async function POST(request: NextRequest) {
             locale: t.locale,
             title: t.title,
             description: t.description,
+            image: t.image,
+            videoUrl: t.videoUrl,
           })),
         });
       }

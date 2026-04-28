@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   computeCampaignProgressPercent,
@@ -73,8 +74,15 @@ export async function GET(
       });
     }
 
-    // Build orderBy based on sortBy parameter
+    // Build orderBy based on sortBy parameter.
+    // Default ("newest") applies the per-category priority first (the dashboard reorder
+    // dialog sets `categoryPriority`), then the global priority as a tiebreaker, then
+    // newest. Explicit user sorts (amount-high/-low, progress) override priority entirely.
+    // Mongo's ascending sort places null FIRST, so a single multi-field orderBy would
+    // mostly return unprioritized rows in the page slice. We fan out into two queries on
+    // page 1 — prioritized first, then non-prioritized recency — and merge.
     let orderBy: any = { createdAt: 'desc' };
+    const applyPriorityFallbackSort = sortBy === 'newest' || !sortBy || sortBy === 'priority';
     switch (sortBy) {
       case 'amount-high':
         orderBy = { currentAmount: 'desc' };
@@ -86,50 +94,90 @@ export async function GET(
         // We'll sort by progress in-memory after fetching the page
         orderBy = { createdAt: 'desc' };
         break;
-      case 'priority':
-        orderBy = { priority: 'asc' };
-        break;
     }
 
-    // Query campaigns and include localized translation and campaign counts
-    const campaigns = await prisma.campaign.findMany({
-      where,
-      take: limit + 1, // fetch one extra to determine if there's more
-      ...(cursor && { skip: 1, cursor: { id: cursor } }),
-      orderBy,
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        description: true,
-        images: true,
-        videoUrl: true,
-        targetAmount: true,
-        currentAmount: true,
-        isActive: true,
-        priority: true,
-        createdAt: true,
-        updatedAt: true,
-        goalType: true,
-        fundraisingMode: true,
-        sharePriceUSD: true,
-        suggestedShareCounts: true,
-        suggestedDonations: true,
-        translations: { where: translationLocaleWhere(locale), take: 2, select: { title: true, description: true, locale: true } },
-        _count: { select: { donations: true } },
-        category: {
-          select: {
-            id: true,
-            slug: true,
-            name: true,
-            icon: true,
-            translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true } }
-          }
-        }
-      }
-    });
+    const selectShape = {
+      id: true,
+      slug: true,
+      title: true,
+      description: true,
+      images: true,
+      videoUrl: true,
+      targetAmount: true,
+      currentAmount: true,
+      isActive: true,
+      priority: true,
+      categoryPriority: true,
+      createdAt: true,
+      updatedAt: true,
+      goalType: true,
+      fundraisingMode: true,
+      sharePriceUSD: true,
+      suggestedShareCounts: true,
+      suggestedDonations: true,
+      translations: { where: translationLocaleWhere(locale), take: 2, select: { title: true, description: true, locale: true } },
+      _count: { select: { donations: true } },
+      category: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          icon: true,
+          translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true } },
+        },
+      },
+    } satisfies Prisma.CampaignSelect;
 
-    // Sort by progress in-memory if requested
+    const campaigns = await (async () => {
+      if (applyPriorityFallbackSort && !cursor) {
+        // First page: prioritized rows (categoryPriority asc, then global priority asc),
+        // then non-prioritized rows by createdAt desc to fill the page.
+        const priRows = await prisma.campaign.findMany({
+          where: {
+            ...where,
+            OR: [{ NOT: { categoryPriority: null } }, { NOT: { priority: null } }],
+          },
+          orderBy: [
+            { categoryPriority: 'asc' },
+            { priority: 'asc' },
+            { createdAt: 'desc' },
+          ],
+          take: limit + 1,
+          select: selectShape,
+        });
+        const remaining = Math.max(0, limit + 1 - priRows.length);
+        const recentRows = remaining > 0
+          ? await prisma.campaign.findMany({
+              where: { ...where, categoryPriority: null, priority: null },
+              orderBy: { createdAt: 'desc' },
+              take: remaining,
+              select: selectShape,
+            })
+          : [];
+        return [...priRows, ...recentRows];
+      }
+      if (applyPriorityFallbackSort && cursor) {
+        // Subsequent pages: paginate non-prioritized rows by createdAt desc.
+        return prisma.campaign.findMany({
+          where: { ...where, categoryPriority: null, priority: null },
+          take: limit + 1,
+          skip: 1,
+          cursor: { id: cursor },
+          orderBy: { createdAt: 'desc' },
+          select: selectShape,
+        });
+      }
+      return prisma.campaign.findMany({
+        where,
+        take: limit + 1,
+        ...(cursor && { skip: 1, cursor: { id: cursor } }),
+        orderBy,
+        select: selectShape,
+      });
+    })();
+
+    // Sort by progress in-memory if requested. Other sorts (newest/priority/amount) are
+    // already in the desired order from the queries above.
     let sorted = [...campaigns];
     if (sortBy === 'progress') {
       sorted.sort((a, b) => {

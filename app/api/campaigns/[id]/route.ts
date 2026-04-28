@@ -76,6 +76,8 @@ export async function GET(
             locale: true,
             title: true,
             description: true,
+            image: true,
+            videoUrl: true,
           },
           take: 2,
         },
@@ -202,9 +204,14 @@ export async function GET(
       // Requested locale → English → Arabic (base) fallback
       title: tCampaign?.title || campaign.title,
       description: tCampaign?.description || campaign.description,
-      
-      images: campaign.images,
-      videoUrl: campaign.videoUrl,
+
+      // When a translation supplies its own cover image, swap images[0] with it; rest of the
+      // gallery is shared across locales (single source of truth on the campaign model).
+      images:
+        tCampaign?.image && Array.isArray(campaign.images)
+          ? [tCampaign.image, ...campaign.images.slice(1)]
+          : campaign.images,
+      videoUrl: tCampaign?.videoUrl || campaign.videoUrl,
       currentAmount: campaign.currentAmount,
       targetAmount: campaign.targetAmount,
       amountRaised: campaign.currentAmount, // Alias for compatibility
@@ -431,9 +438,33 @@ export async function PUT(
           if (data.title !== undefined) translationData.title = data.title;
           if (data.description !== undefined)
             translationData.description = data.description;
+          if (data.image !== undefined) {
+            translationData.image =
+              typeof data.image === "string" && data.image.trim() ? data.image.trim() : null;
+          }
+          if (data.videoUrl !== undefined) {
+            translationData.videoUrl =
+              typeof data.videoUrl === "string" && data.videoUrl.trim()
+                ? data.videoUrl.trim()
+                : null;
+          }
           if (Object.keys(translationData).length === 0) return [];
-          // Skip if no meaningful content (avoid creating empty records)
-          if (!translationData.title && !translationData.description) return [];
+          // Skip only when nothing meaningful was supplied — image/video-only updates still pass.
+          if (
+            !translationData.title &&
+            !translationData.description &&
+            !translationData.image &&
+            !translationData.videoUrl
+          )
+            return [];
+          // upsert.create requires title + description (NOT NULL); fall back to empty strings so
+          // an image/video-only update still creates the row.
+          const createData = {
+            ...translationData,
+            title: typeof translationData.title === "string" ? translationData.title : "",
+            description:
+              typeof translationData.description === "string" ? translationData.description : "",
+          };
           return [
             tx.campaignTranslation.upsert({
               where: {
@@ -446,7 +477,7 @@ export async function PUT(
               create: {
                 campaign: { connect: { id } },
                 locale,
-                ...translationData,
+                ...createData,
               },
             }),
           ];

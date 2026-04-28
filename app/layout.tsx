@@ -157,7 +157,7 @@ const organizationSchema = {
   ],
   sameAs: [
     "https://www.facebook.com/gozbebeklerider/",
-    "https://www.instagram.com/gozbebekleri_foundation/",
+    "https://www.instagram.com/gbyd_foundation/",
     "https://www.youtube.com/channel/UCvvSx8jtGafK9BI2hQnBYSQ",
     "https://x.com/gozbebeklerider",
     "https://wa.me/902122885930",

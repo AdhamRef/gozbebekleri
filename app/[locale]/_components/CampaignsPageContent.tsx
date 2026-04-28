@@ -26,6 +26,9 @@ interface Campaign {
   categoryId?: string;
   category: { id?: string; name: string; icon?: string };
   createdAt: string;
+  // Admin-set ordering fields. Lower number = higher priority. null = unprioritized.
+  priority?: number | null;
+  categoryPriority?: number | null;
 }
 
 interface Category {
@@ -147,7 +150,22 @@ const CampaignsPage = ({
       case "amount-high": return b.targetAmount - a.targetAmount;
       case "amount-low": return a.targetAmount - b.targetAmount;
       case "progress": return (b.currentAmount / b.targetAmount) - (a.currentAmount / a.targetAmount);
-      default: return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      default: {
+        // Mirror the server's default ordering so admin-set priority isn't clobbered on
+        // hydration. When a single category is selected we honor `categoryPriority` first
+        // (the per-category reorder dialog writes this), then global `priority`, then newest.
+        const aCat = selectedCategory !== "all" ? a.categoryPriority ?? null : null;
+        const bCat = selectedCategory !== "all" ? b.categoryPriority ?? null : null;
+        if (aCat !== null && bCat !== null && aCat !== bCat) return aCat - bCat;
+        if (aCat !== null && bCat === null) return -1;
+        if (aCat === null && bCat !== null) return 1;
+        const ap = a.priority ?? null;
+        const bp = b.priority ?? null;
+        if (ap !== null && bp !== null && ap !== bp) return ap - bp;
+        if (ap !== null && bp === null) return -1;
+        if (ap === null && bp !== null) return 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
     }
   });
 

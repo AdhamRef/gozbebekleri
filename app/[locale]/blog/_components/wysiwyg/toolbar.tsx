@@ -2,6 +2,8 @@
 
 import { cn } from "@/lib/utils";
 import type { Editor } from "@tiptap/core";
+import axios from "axios";
+import { toast } from "react-hot-toast";
 import {
   Bold as BoldIcon,
   Code as CodeIcon,
@@ -9,10 +11,12 @@ import {
   Heading2,
   Heading3,
   Highlighter,
+  Image as ImageIcon,
   Italic as ItalicIcon,
   Link as LinkIcon,
   List,
   ListOrdered,
+  Loader2,
   Minus,
   Palette,
   Quote,
@@ -24,6 +28,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   type FC,
   type ReactNode,
@@ -140,6 +145,38 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({ editor }) => {
       .setLink({ href: url, target: "_blank", rel: "noopener noreferrer" })
       .run();
   }, [editor]);
+
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const handleImageFile = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      // reset so picking the same file twice still triggers change
+      if (e.target) e.target.value = "";
+      if (!file || !editor) return;
+      if (!file.type.startsWith("image/")) {
+        toast.error("الملف ليس صورة");
+        return;
+      }
+      setUploadingImage(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const response = await axios.post("/api/upload", formData);
+        const url: string | undefined = response.data?.url;
+        if (!url) throw new Error("Upload returned no URL");
+        editor.chain().focus().setImage({ src: url }).run();
+        toast.success("تم رفع الصورة");
+      } catch (err) {
+        console.error("Toolbar image upload error:", err);
+        toast.error("فشل رفع الصورة");
+      } finally {
+        setUploadingImage(false);
+      }
+    },
+    [editor],
+  );
 
   if (!editor) return null;
 
@@ -351,6 +388,26 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({ editor }) => {
         onClick={promptForLink}
       >
         <LinkIcon className="h-4 w-4" />
+      </ToolButton>
+
+      {/* Image */}
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleImageFile}
+      />
+      <ToolButton
+        title={uploadingImage ? "جاري الرفع..." : "إدراج صورة"}
+        disabled={uploadingImage}
+        onClick={() => imageInputRef.current?.click()}
+      >
+        {uploadingImage ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <ImageIcon className="h-4 w-4" />
+        )}
       </ToolButton>
 
       <Divider />

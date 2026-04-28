@@ -125,7 +125,7 @@ const Footer = () => {
   const socialLinks = [
     { Icon: Facebook, href: 'https://www.facebook.com/gozbebeklerider/', label: 'Facebook' },
     { Icon: Twitter, href: 'https://x.com/gozbebeklerider', label: 'Twitter' },
-    { Icon: Instagram, href: 'https://www.instagram.com/gozbebekleri_foundation/', label: 'Instagram' },
+    { Icon: Instagram, href: 'https://www.instagram.com/gbyd_foundation/', label: 'Instagram' },
     { Icon: Youtube, href: 'https://www.youtube.com/channel/UCvvSx8jtGafK9BI2hQnBYSQ', label: 'Youtube' },
   ] as const;
 

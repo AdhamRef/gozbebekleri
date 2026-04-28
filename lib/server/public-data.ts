@@ -17,26 +17,42 @@ const POSTS_PER_PAGE = 9;
  */
 export async function getInitialCampaignsForPage(locale: string) {
   try {
-    const rows = await prisma.campaign.findMany({
-      where: { isActive: true },
-      take: CAMPAIGNS_PER_PAGE + 1,
-      orderBy: { createdAt: "desc" },
-      include: {
-        category: {
-          select: {
-            id: true,
-            name: true,
-            icon: true,
-            translations: { where: { locale }, take: 1 },
-          },
+    // Match the default ordering used by /api/campaigns when sortBy is "newest":
+    // global priority first (asc), then most-recent first. Mongo's ascending sort places
+    // null FIRST, so we split into two queries — prioritized first, then non-prioritized
+    // recency — and merge.
+    const includeShape = {
+      category: {
+        select: {
+          id: true,
+          name: true,
+          icon: true,
+          translations: { where: { locale }, take: 1 },
         },
-        translations: { where: { locale }, take: 1 },
-        _count: { select: { donations: true } },
       },
+      translations: { where: { locale }, take: 1 },
+      _count: { select: { donations: true } },
+    } as const;
+
+    const priRows = await prisma.campaign.findMany({
+      where: { isActive: true, NOT: { priority: null } },
+      orderBy: [{ priority: "asc" }, { createdAt: "desc" }],
+      take: CAMPAIGNS_PER_PAGE + 1,
+      include: includeShape,
     });
+    const remaining = Math.max(0, CAMPAIGNS_PER_PAGE + 1 - priRows.length);
+    const recentRows = remaining > 0
+      ? await prisma.campaign.findMany({
+          where: { isActive: true, priority: null },
+          orderBy: { createdAt: "desc" },
+          take: remaining,
+          include: includeShape,
+        })
+      : [];
+    const rows = [...priRows, ...recentRows];
 
     const hasMore = rows.length > CAMPAIGNS_PER_PAGE;
-    const items = hasMore ? rows.slice(0, -1) : rows;
+    const items = hasMore ? rows.slice(0, CAMPAIGNS_PER_PAGE) : rows;
     const nextCursor = hasMore ? items[items.length - 1]?.id ?? null : null;
 
     const transformed = items.map((c) => {

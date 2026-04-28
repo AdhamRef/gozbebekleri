@@ -175,7 +175,15 @@ export default function BlogLocaleEditor({ post, locale }: BlogLocaleEditorProps
   return (
     <>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") {
+              e.preventDefault();
+            }
+          }}
+          className="space-y-6"
+        >
           <Card className="">
           <CardHeader dir="rtl">
               <CardTitle>{config.generalTitle}</CardTitle>

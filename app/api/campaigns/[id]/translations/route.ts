@@ -32,6 +32,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         locale: true,
         title: true,
         description: true,
+        image: true,
+        videoUrl: true,
       },
     });
 

@@ -37,7 +37,7 @@ export type SuggestedShareCountsConfig = {
   priceByCurrency?: Record<string, number>;
 };
 
-export const DEFAULT_SUGGESTED_SHARE_COUNTS = [1, 5, 10, 25, 50];
+export const DEFAULT_SUGGESTED_SHARE_COUNTS = [1, 2, 3, 4, 5, 10];
 
 function normalizeCountsArray(raw: unknown): number[] {
   if (!Array.isArray(raw)) return [];

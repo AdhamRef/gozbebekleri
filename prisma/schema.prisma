@@ -311,6 +311,11 @@ model CampaignTranslation {
   title       String
   description String
 
+  /// Optional locale-specific cover image. When set, replaces images[0] (cover) for this locale.
+  image       String?
+  /// Optional locale-specific video URL. When set, replaces the campaign-level videoUrl for this locale.
+  videoUrl    String?
+
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   @@unique([campaignId, locale])

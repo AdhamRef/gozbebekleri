@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import BlogEditor from "@/app/[locale]/blog/_components/BlogEditor";
+import LanguageTabs from "./_components/LanguageTabs";
 
 export const revalidate = 0;
 
@@ -56,13 +56,11 @@ export default async function CreateBlogPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-6">
-          <BlogEditor
+          <LanguageTabs
             post={emptyEditorPost}
             categories={categoryOptions}
             campaignOptions={campaignOptions}
-            userId={undefined}
-            redirectAfterCreate="/dashboard/blog/create"
-            isCreate={true}
+            mode="create"
           />
         </CardContent>
       </Card>
