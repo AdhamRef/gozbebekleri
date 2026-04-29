@@ -142,10 +142,10 @@ const QuickDonate = () => {
   };
 
   const stats = [
-    { icon: Users, value: "50,000+", labelKey: "stat1" as const },
-    { icon: Award, value: "250+", labelKey: "stat2" as const },
-    { icon: Heart, value: "13", labelKey: "stat3" as const },
-    { icon: TrendingUp, value: "95%", labelKey: "stat4" as const },
+    { icon: Users, value: "500,000+", labelKey: "stat1" as const },
+    { icon: Award, value: "350+", labelKey: "stat2" as const },
+    { icon: Heart, value: "14", labelKey: "stat3" as const },
+    { icon: TrendingUp, value: "100%", labelKey: "stat4" as const },
   ];
 
   const featureKeys = ["feature1", "feature2", "feature3", "feature4"] as const;

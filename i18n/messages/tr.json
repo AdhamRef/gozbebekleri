@@ -147,12 +147,29 @@
     "goalsSubtitle": "Daha İyi Bir Gelecek İçin",
     "presidentMessage": "Başkanın Mesajı",
     "presidentTitle": "Dernek Başkanından Mesaj",
-    "presidentName": "Sayın Fadıl",
+    "presidentName": "Sayın Fazilhak",
     "presidentPosition": "Dernek Genel Başkanı",
     "ctaTitle": "Değişimin Parçası Olun",
     "ctaDesc": "Dünya genelinde çocuklar için daha iyi bir gelecek inşa etme yolculuğumuzda bize katılın",
     "donateNow": "Bağış Yap",
-    "contactUs": "İletişim"
+    "contactUs": "İletişim",
+    "goalsList": [
+      "Çocuklara ve ailelerine en iyi yaşam, sağlık, psikolojik ve eğitim hizmetlerini sunmak",
+      "Kendini aşan ve karşılaştığı zorlukların üstesinden gelen bir nesil yetiştirmek",
+      "Becerileri keşfetmek, yaratıcılığı geliştirmek ve çocukların yeteneklerini inşa etmek",
+      "Çocukları her türlü istismardan korumak ve farkındalıklarını geliştirmek",
+      "Sağlam değerlere ve ahlaka sahip nesiller yetiştirmek",
+      "Modern bir eğitim, öğretim ve sağlık sistemi oluşturmak",
+      "Çocukları aydınlık bir geleceğe yükseltmek"
+    ],
+    "presidentMessageParagraphs": [
+      "Bugünün dünyasında, özellikle İslam coğrafyasında, siyasi krizler, ekonomik krizler ve doğal afetler gibi sorunlardan en çok etkilenenler şüphesiz çocuklarımızdır.",
+      "Bu durumların yalnızca seyircisi olarak kalmamak için, ulaşabildiğimiz tüm çocuklar, özellikle de yetimler için geleceği daha uygun hale getirmek üzere harekete geçtik.",
+      "Gözbebekleri Derneği olarak, 2011 yılından bu yana özellikle sağlık, eğitim ve beslenme alanlarında ailelerini de kapsayan çeşitli projelerle çocuklarımızı ve yetimleri desteklemek için çalışıyoruz.",
+      "Söz konusu çocuklarımız olduğunda rehberimiz büyük Peygamberimiz (sallallahu aleyhi ve sellem)'dir. Peygamberimizin bu hassasiyetini örnek almaya çalışıyor ve çocuklarımızın nerede olurlarsa olsunlar dertlerini hafifletmeye çalışıyoruz.",
+      "Dünyanın çeşitli ülkelerindeki eğitimli personelimiz ve gönüllülerimizle iş birliği içinde, çaresiz olmadıklarını hatırlatarak yüz binlerce çocuğun hayatını desteklemek ve dokunmak için çalışıyoruz.",
+      "Derneğimiz, \"Halka hizmet, Hakk'a hizmettir\" ilkesinden yola çıkarak, herhangi bir kâr amacı gütmeden, en samimi duygularla sizinle birlikte çalışmaya devam edecektir."
+    ]
   },
   "ContactUs": {
     "pageTitle": "İletişim",

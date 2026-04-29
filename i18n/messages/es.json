@@ -152,7 +152,24 @@
     "ctaTitle": "Sé parte del cambio",
     "ctaDesc": "Únete a nosotros en nuestro camino para construir un futuro mejor para los niños del mundo",
     "donateNow": "Donar ahora",
-    "contactUs": "Contacto"
+    "contactUs": "Contacto",
+    "goalsList": [
+      "Brindar los mejores servicios de vida, salud, psicológicos y educativos a los niños y sus familias",
+      "Preparar una generación que se supere a sí misma y supere los desafíos que enfrenta",
+      "Descubrir habilidades, desarrollar la creatividad y construir las capacidades de los niños",
+      "Proteger a los niños de todas las formas de explotación y desarrollar su conciencia",
+      "Criar generaciones con valores y ética sólidos",
+      "Crear un sistema moderno de educación, aprendizaje y salud",
+      "Elevar a los niños hacia un futuro brillante"
+    ],
+    "presidentMessageParagraphs": [
+      "En nuestro mundo actual, especialmente en la geografía islámica, quienes más sufren los problemas como las crisis políticas, las crisis económicas y los desastres naturales son, sin duda, nuestros niños.",
+      "Para no quedarnos como meros espectadores de estas situaciones, nos hemos movilizado para hacer que el futuro sea más adecuado para todos los niños que podemos alcanzar, especialmente los huérfanos.",
+      "En la Asociación Gozbebekleri, trabajamos desde 2011 para apoyar a nuestros niños y huérfanos a través de diversos proyectos que incluyen a sus familias, especialmente en los ámbitos de la salud, la educación y la nutrición.",
+      "Cuando se trata de nuestros niños, nuestro guía es nuestro gran Profeta (la paz sea con él). Intentamos tomar como ejemplo esa sensibilidad de nuestro Profeta y procuramos aliviar las preocupaciones de nuestros niños dondequiera que estén.",
+      "Trabajamos para apoyar y tocar la vida de cientos de miles de niños recordándoles que no están desamparados, en cooperación con nuestro personal capacitado y voluntarios en varios países del mundo.",
+      "Nuestra asociación seguirá trabajando con ustedes con los sentimientos más sinceros, lejos de cualquier motivo de lucro, basándose en el principio \"Servir al pueblo es servir a Dios\"."
+    ]
   },
   "ContactUs": {
     "pageTitle": "Contacto",

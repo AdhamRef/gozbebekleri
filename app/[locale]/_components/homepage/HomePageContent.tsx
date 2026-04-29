@@ -68,8 +68,8 @@ function HomeLoadingScreen() {
 }
 
 const STATS = [
-  { icon: Home, valueKey: "stat1Value", labelKey: "stat1Label", value: "40K+" },
-  { icon: Baby, valueKey: "stat2Value", labelKey: "stat2Label", value: "35K+" },
+  { icon: Home, valueKey: "stat1Value", labelKey: "stat1Label", value: "100K+" },
+  { icon: Baby, valueKey: "stat2Value", labelKey: "stat2Label", value: "500K+" },
   { icon: Globe, valueKey: "stat3Value", labelKey: "stat3Label", value: "20" },
   { icon: Map, valueKey: "stat4Value", labelKey: "stat4Label", value: "4" },
 ];

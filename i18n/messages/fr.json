@@ -152,7 +152,24 @@
     "ctaTitle": "Faites partie du changement",
     "ctaDesc": "Rejoignez-nous dans notre voyage pour construire un avenir meilleur pour les enfants du monde entier",
     "donateNow": "Faire un don maintenant",
-    "contactUs": "Contactez-nous"
+    "contactUs": "Contactez-nous",
+    "goalsList": [
+      "Fournir les meilleurs services de vie, de santé, psychologiques et éducatifs aux enfants et à leurs familles",
+      "Préparer une génération qui excelle au-delà d'elle-même et surmonte les défis auxquels elle est confrontée",
+      "Découvrir les compétences, développer la créativité et construire les capacités des enfants",
+      "Protéger les enfants de toutes les formes d'exploitation et développer leur sensibilisation",
+      "Élever des générations avec des valeurs et une éthique saines",
+      "Créer un système éducatif, d'apprentissage et de santé moderne",
+      "Élever les enfants vers un avenir radieux"
+    ],
+    "presidentMessageParagraphs": [
+      "Dans notre monde d'aujourd'hui, en particulier dans la géographie islamique, ceux qui souffrent le plus des problèmes tels que les crises politiques, les crises économiques et les catastrophes naturelles sont sans aucun doute nos enfants.",
+      "Afin de ne pas rester de simples spectateurs de ces situations, nous avons agi pour rendre l'avenir plus adapté à tous les enfants que nous pouvons atteindre, en particulier les orphelins.",
+      "À l'Association Gozbebekleri, nous travaillons depuis 2011 à soutenir nos enfants et orphelins grâce à divers projets qui incluent leurs familles, en particulier dans les domaines de la santé, de l'éducation et de la nutrition.",
+      "Quand il s'agit de nos enfants, notre leader est notre grand Prophète (paix soit sur lui). Nous essayons de prendre cette sensibilité de notre Prophète comme exemple, et nous essayons d'alléger les préoccupations de nos enfants où qu'ils soient.",
+      "Nous travaillons à soutenir et à toucher la vie de centaines de milliers d'enfants en leur rappelant qu'ils ne sont pas impuissants, en coopération avec notre personnel formé et nos bénévoles dans divers pays du monde.",
+      "Notre association continuera à travailler avec vous avec les sentiments les plus sincères, loin de tout motif de profit, sur la base du principe \"Servir le peuple, c'est servir Dieu\"."
+    ]
   },
   "ContactUs": {
     "pageTitle": "Contactez-nous",

@@ -152,7 +152,24 @@
     "ctaTitle": "Be Part of the Change",
     "ctaDesc": "Join us on our journey to build a better future for children around the world",
     "donateNow": "Donate Now",
-    "contactUs": "Contact Us"
+    "contactUs": "Contact Us",
+    "goalsList": [
+      "Providing the best living, health, psychological, and educational services for children and their families",
+      "Preparing a generation that excels beyond itself and overcomes the challenges it faces",
+      "Discovering skills, developing creativity, and building children's capabilities",
+      "Protecting children from all forms of exploitation and developing their awareness",
+      "Raising generations with sound values and ethics",
+      "Creating a modern educational, learning, and health system",
+      "Elevating children towards a bright future"
+    ],
+    "presidentMessageParagraphs": [
+      "In our world today, especially in the Islamic geography, those who suffer most from problems such as political crises, economic crises, and natural disasters are undoubtedly our children.",
+      "In order not to remain mere spectators of these situations, we have moved to make the future more suitable for all children we can reach, especially orphans.",
+      "At the Gozbebekleri Association, we have been working to support our children and orphans through various projects that include their families, especially in the fields of health, education, and nutrition since 2011.",
+      "When it comes to our children, our leader is our great Prophet (peace be upon him). We try to take this sensitivity of our Prophet as an example, and we try to alleviate the concerns of our children wherever they are.",
+      "We work to support and touch the lives of hundreds of thousands of children by reminding them that they are not helpless, in cooperation with our trained staff and volunteers in various countries around the world.",
+      "Our association will continue to work with you with the most sincere feelings, away from any profit motive, based on the principle \"Serving the people is serving God\"."
+    ]
   },
   "ContactUs": {
     "pageTitle": "Contact Us",

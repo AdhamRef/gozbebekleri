@@ -1,90 +1,14 @@
 'use client';
-import React from 'react';
 import Image from 'next/image';
-import { Target, Users, Heart, MessageSquare, CheckCircle, Eye, Sparkles } from 'lucide-react';
-import { useTranslations, useLocale } from 'next-intl';
+import { Target, Users, Heart, MessageSquare, CheckCircle, Eye } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
 
 const AboutUs = () => {
   const t = useTranslations('AboutUs');
-  const locale = useLocale() as 'ar' | 'en' | 'fr';
 
-  // Helper function to get locale-specific property
-  const getLocalizedProperty = (obj: any, key: string) => {
-    const localeKey = `${key}${locale.charAt(0).toUpperCase() + locale.slice(1)}`;
-    return obj[localeKey] || obj[key] || '';
-  };
-
-  const goals = [
-    {
-      textAr: "تقديم أفضل الخدمات المعيشية والصحية والنفسية والتعليمية للاطفال وذويهم",
-      textEn: "Providing the best living, health, psychological, and educational services for children and their families",
-      textFr: "Fournir les meilleurs services de vie, de santé, psychologiques et éducatifs aux enfants et à leurs familles"
-    },
-    {
-      textAr: "إعداد جيل يتفوق على ذاته ويتخطى الصعاب التي تواجهه",
-      textEn: "Preparing a generation that excels beyond itself and overcomes the challenges it faces",
-      textFr: "Préparer une génération qui excelle au-delà d'elle-même et surmonte les défis auxquels elle est confrontée"
-    },
-    {
-      textAr: "اكتشاف المهارات وتنمية الابداع وبناء قدرات الأطفال",
-      textEn: "Discovering skills, developing creativity, and building children's capabilities",
-      textFr: "Découvrir les compétences, développer la créativité et construire les capacités des enfants"
-    },
-    {
-      textAr: "حماية الأطفال من الإستغلال بكافة أشكاله وتنمية الوعي لديهم",
-      textEn: "Protecting children from all forms of exploitation and developing their awareness",
-      textFr: "Protéger les enfants de toutes les formes d'exploitation et développer leur sensibilisation"
-    },
-    {
-      textAr: "تنشئة أجيال تتمتع بقيم وأخلاق سليمة",
-      textEn: "Raising generations with sound values and ethics",
-      textFr: "Élever des générations avec des valeurs et une éthique saines"
-    },
-    {
-      textAr: "إنشاء منظومة تربوية وتعليمية وصحية حديثة",
-      textEn: "Creating a modern educational, learning, and health system",
-      textFr: "Créer un système éducatif, d'apprentissage et de santé moderne"
-    },
-    {
-      textAr: "نرتقي بالأطفال نحو مستقبل مشرق",
-      textEn: "Elevating children towards a bright future",
-      textFr: "Élever les enfants vers un avenir radieux"
-    }
-  ];
-
-  const presidentMessage = [
-    {
-      textAr: "في عالمنا اليوم، وخاصة في الجغرافيا الإسلامية، فإن الذين يعانون أكثر من غيرهم من المشاكل مثل الأزمات السياسية، والأزمات الاقتصادية، والكوارث الطبيعية، هم بلا شك أبناؤنا.",
-      textEn: "In our world today, especially in the Islamic geography, those who suffer most from problems such as political crises, economic crises, and natural disasters are undoubtedly our children.",
-      textFr: "Dans notre monde d'aujourd'hui, en particulier dans la géographie islamique, ceux qui souffrent le plus des problèmes tels que les crises politiques, les crises économiques et les catastrophes naturelles sont sans aucun doute nos enfants."
-    },
-    {
-      textAr: "ولكي لا نبقى مجرد متفرجين على هذه الأوضاع، فقد تحركنا من أجل جعل المستقبل أكثر ملاءمة لجميع الأطفال الذين نستطيع الوصول إليهم، وخاصة الأيتام.",
-      textEn: "In order not to remain mere spectators of these situations, we have moved to make the future more suitable for all children we can reach, especially orphans.",
-      textFr: "Afin de ne pas rester de simples spectateurs de ces situations, nous avons agi pour rendre l'avenir plus adapté à tous les enfants que nous pouvons atteindre, en particulier les orphelins."
-    },
-    {
-      textAr: "نحن في جمعية جوزبيبيكلي نعمل على دعم أطفالنا والأيتام من خلال مشاريع مختلفة تشمل عائلاتهم وخاصة في مجالات الصحة والتعليم والتغذية منذ عام 2011.",
-      textEn: "At the Gozbebekleri Association, we have been working to support our children and orphans through various projects that include their families, especially in the fields of health, education, and nutrition since 2011.",
-      textFr: "À l'Association Gozbebekleri, nous travaillons depuis 2011 à soutenir nos enfants et orphelins grâce à divers projets qui incluent leurs familles, en particulier dans les domaines de la santé, de l'éducation et de la nutrition."
-    },
-    {
-      textAr: "وعندما يتعلق الأمر بأبنائنا فإن قائدنا هو نبينا العظيم صلى الله عليه وسلم. نحاول أن نتخذ هذه الحساسية عند نبينا قدوة، ونحاول أن نخفف من هموم أبنائنا أينما كانوا.",
-      textEn: "When it comes to our children, our leader is our great Prophet (peace be upon him). We try to take this sensitivity of our Prophet as an example, and we try to alleviate the concerns of our children wherever they are.",
-      textFr: "Quand il s'agit de nos enfants, notre leader est notre grand Prophète (paix soit sur lui). Nous essayons de prendre cette sensibilité de notre Prophète comme exemple, et nous essayons d'alléger les préoccupations de nos enfants où qu'ils soient."
-    },
-    {
-      textAr: "نعمل على دعم وملامسة حياة مئات الآلاف من الأطفال من خلال تذكيرهم بأنهم ليسوا عاجزين، بالتعاون مع موظفينا المدربين ومتطوعينا في مختلف بلدان العالم.",
-      textEn: "We work to support and touch the lives of hundreds of thousands of children by reminding them that they are not helpless, in cooperation with our trained staff and volunteers in various countries around the world.",
-      textFr: "Nous travaillons à soutenir et à toucher la vie de centaines de milliers d'enfants en leur rappelant qu'ils ne sont pas impuissants, en coopération avec notre personnel formé et nos bénévoles dans divers pays du monde."
-    },
-    {
-      textAr: "وستواصل جمعيتنا العمل معكم بأصدق المشاعر، بعيداً عن أي هدف ربحي، انطلاقاً من مبدأ \"خدمة الشعب هي خدمة لله\".",
-      textEn: "Our association will continue to work with you with the most sincere feelings, away from any profit motive, based on the principle \"Serving the people is serving God\".",
-      textFr: "Notre association continuera à travailler avec vous avec les sentiments les plus sincères, loin de tout motif de profit, sur la base du principe \"Servir le peuple, c'est servir Dieu\"."
-    }
-  ];
+  const goals = t.raw('goalsList') as string[];
+  const presidentMessage = t.raw('presidentMessageParagraphs') as string[];
 
   return (
     <div className="bg-white">
@@ -244,7 +168,7 @@ const AboutUs = () => {
                       <CheckCircle className="w-4 h-4 text-[#025EB8] group-hover:text-white transition-colors" />
                     </div>
                     <p className="text-gray-700 leading-relaxed text-xs sm:text-sm flex-1">
-                      {getLocalizedProperty(goal, 'text')}
+                      {goal}
                     </p>
                   </div>
                 </div>
@@ -291,7 +215,7 @@ const AboutUs = () => {
                 <div className="text-gray-700 leading-relaxed space-y-3 text-sm sm:text-base">
                   {presidentMessage.map((paragraph, index) => (
                     <p key={index} className={index === presidentMessage.length - 1 ? "font-semibold text-[#025EB8] text-sm" : ""}>
-                      {getLocalizedProperty(paragraph, 'text')}
+                      {paragraph}
                     </p>
                   ))}
                 </div>
