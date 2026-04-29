@@ -5,7 +5,11 @@ import { authOptions } from "../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
-import { generateUniqueSlug, normalizeUserSlug } from "@/lib/slug";
+import {
+  generateUniqueSlug,
+  generateUniqueLocaleSlug,
+  normalizeUserSlug,
+} from "@/lib/slug";
 
 // GET: list post categories with locale-aware translations, search, and paging
 export async function GET(request: NextRequest) {
@@ -29,7 +33,7 @@ export async function GET(request: NextRequest) {
         description: true,
         image: true,
         createdAt: true,
-        translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true, title: true, description: true, image: true } },
+        translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true, title: true, description: true, image: true, slug: true } },
         ...(includeCounts ? { _count: { select: { posts: true } } } : {}),
       }
     });
@@ -57,7 +61,8 @@ export async function GET(request: NextRequest) {
       const t = pickTranslation(cat.translations, locale);
       return {
         id: cat.id,
-        slug: cat.slug ?? null,
+        slug: (t as { slug?: string | null } | undefined)?.slug || cat.slug || null,
+        baseSlug: cat.slug ?? null,
         name: t?.name || cat.name,
         title: t?.title || cat.title,
         description: t?.description || cat.description,
@@ -97,13 +102,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const translationData: { locale: string; name: string; title?: string; description?: string; image?: string }[] = [];
+    const translationData: {
+      locale: string;
+      name: string;
+      title?: string;
+      description?: string;
+      image?: string;
+      requestedSlug: string | null;
+    }[] = [];
     if (translations && typeof translations === 'object') {
       for (const [locale, t] of Object.entries(translations)) {
         if (locale !== 'ar' && t && typeof t === 'object') {
           const tt: any = t;
           if (tt.name) {
-            translationData.push({ locale, name: tt.name, title: tt.title || '', description: tt.description || '', image: tt.image || '' });
+            translationData.push({
+              locale,
+              name: tt.name,
+              title: tt.title || '',
+              description: tt.description || '',
+              image: tt.image || '',
+              requestedSlug: normalizeUserSlug(tt.slug),
+            });
           }
         }
       }
@@ -120,14 +139,43 @@ export async function POST(request: NextRequest) {
     const category = await prisma.$transaction(async (tx) => {
       const created = await tx.postCategory.create({ data: { name, slug, title: title || '', description: description || '', image: image || '' } });
 
-      if (translationData.length > 0) {
-        await tx.postCategoryTranslation.createMany({ data: translationData.map(t => ({ categoryId: created.id, locale: t.locale, name: t.name, title: t.title, description: t.description, image: t.image })) });
+      // Sequential creates so the per-locale slug uniqueness check observes prior writes.
+      for (const t of translationData) {
+        const localeSlug = await generateUniqueLocaleSlug(
+          tx.postCategoryTranslation as any,
+          t.requestedSlug ?? t.name,
+          { locale: t.locale, fallbackPrefix: "blog-category" }
+        );
+        await tx.postCategoryTranslation.create({
+          data: {
+            categoryId: created.id,
+            locale: t.locale,
+            name: t.name,
+            title: t.title,
+            description: t.description,
+            image: t.image,
+            slug: localeSlug,
+          },
+        });
       }
 
       return created;
     });
 
-    const full = await prisma.postCategory.findUnique({ where: { id: category.id }, select: { id: true, slug: true, name: true, title: true, description: true, image: true, translations: { select: { locale: true, name: true, title: true, description: true, image: true } } } });
+    const full = await prisma.postCategory.findUnique({
+      where: { id: category.id },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        title: true,
+        description: true,
+        image: true,
+        translations: {
+          select: { locale: true, name: true, title: true, description: true, image: true, slug: true },
+        },
+      },
+    });
 
     const actor = auditActorFromDashboardSession(session!);
     await writeAuditLog({

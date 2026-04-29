@@ -18,7 +18,11 @@ import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog } from "@/lib/audit-log";
 import { parseIncludeInactive } from "@/lib/campaign/include-inactive-query";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
-import { generateUniqueSlug, normalizeUserSlug } from "@/lib/slug";
+import {
+  generateUniqueSlug,
+  generateUniqueLocaleSlug,
+  normalizeUserSlug,
+} from "@/lib/slug";
 
 export async function GET(request: NextRequest) {
   try {
@@ -176,7 +180,10 @@ export async function GET(request: NextRequest) {
       const tCat = pickTranslation(campaign.category?.translations, locale);
       return {
         id: campaign.id,
-        slug: campaign.slug ?? null,
+        // Locale-aware slug: per-locale translation slug → base slug → null. The base
+        // slug is also exposed for callers that need it (sitemap, hreflang alternates).
+        slug: (tC as { slug?: string | null } | undefined)?.slug || campaign.slug || null,
+        baseSlug: campaign.slug ?? null,
         title: tC?.title || campaign.title,
         description: tC?.description || campaign.description,
         images:
@@ -191,7 +198,10 @@ export async function GET(request: NextRequest) {
         category: campaign.category
           ? {
               id: campaign.category.id,
-              slug: campaign.category.slug ?? null,
+              slug:
+                (tCat as { slug?: string | null } | undefined)?.slug ||
+                campaign.category.slug ||
+                null,
               name: tCat?.name || campaign.category.name,
               icon: campaign.category.icon,
             }
@@ -337,6 +347,10 @@ export async function POST(request: NextRequest) {
       description: string;
       image: string | null;
       videoUrl: string | null;
+      slug: string | null;
+      /** Raw user slug input — null if not provided. The actual unique slug is computed
+       *  inside the transaction so the uniqueness check sees in-flight inserts. */
+      requestedSlug: string | null;
     }[] = [];
 
     if (data.translations && typeof data.translations === 'object') {
@@ -345,6 +359,7 @@ export async function POST(request: NextRequest) {
           const t = trans as any;
           // Only add translation if BOTH title and description are provided
           if (t.title && t.description) {
+            const requestedSlug = normalizeUserSlug(t.slug);
             translationData.push({
               locale,
               title: t.title,
@@ -352,6 +367,9 @@ export async function POST(request: NextRequest) {
               image: typeof t.image === "string" && t.image.trim() ? t.image.trim() : null,
               videoUrl:
                 typeof t.videoUrl === "string" && t.videoUrl.trim() ? t.videoUrl.trim() : null,
+              // Computed inside the transaction.
+              slug: null,
+              requestedSlug,
             });
           }
         }
@@ -401,17 +419,25 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Create translations if provided
-      if (translationData.length > 0) {
-        await tx.campaignTranslation.createMany({
-          data: translationData.map((t) => ({
+      // Create translations if provided. We do this sequentially (rather than createMany)
+      // so the per-locale slug uniqueness check inside generateUniqueLocaleSlug observes
+      // earlier inserts in the same transaction.
+      for (const t of translationData) {
+        const localeSlug = await generateUniqueLocaleSlug(
+          tx.campaignTranslation as any,
+          t.requestedSlug ?? t.title,
+          { locale: t.locale, fallbackPrefix: "campaign" }
+        );
+        await tx.campaignTranslation.create({
+          data: {
             campaignId: newCampaign.id,
             locale: t.locale,
             title: t.title,
             description: t.description,
             image: t.image,
             videoUrl: t.videoUrl,
-          })),
+            slug: localeSlug,
+          },
         });
       }
 

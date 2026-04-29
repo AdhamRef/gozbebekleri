@@ -225,6 +225,11 @@ model CategoryTranslation {
   name        String
   description String?
 
+  /// Optional per-locale URL slug. When set, takes precedence over the base Category.slug
+  /// for this locale. Uniqueness within a locale is enforced at write time by
+  /// generateUniqueLocaleSlug — Prisma+MongoDB doesn't model partial unique indexes well.
+  slug        String?
+
   category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@unique([categoryId, locale])
@@ -315,6 +320,10 @@ model CampaignTranslation {
   image       String?
   /// Optional locale-specific video URL. When set, replaces the campaign-level videoUrl for this locale.
   videoUrl    String?
+
+  /// Optional per-locale URL slug. When set, takes precedence over the base Campaign.slug
+  /// for this locale. Uniqueness within a locale is enforced at write time.
+  slug        String?
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
@@ -593,6 +602,10 @@ model PostCategoryTranslation {
   description String?
   image       String?
 
+  /// Optional per-locale URL slug. When set, takes precedence over PostCategory.slug
+  /// for this locale. Uniqueness within a locale is enforced at write time.
+  slug        String?
+
   category PostCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@unique([categoryId, locale])
@@ -633,6 +646,10 @@ model PostTranslation {
   description String?
   content     String?
   image       String?
+
+  /// Optional per-locale URL slug. When set, takes precedence over Post.slug
+  /// for this locale. Uniqueness within a locale is enforced at write time.
+  slug        String?
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 

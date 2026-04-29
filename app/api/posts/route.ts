@@ -6,7 +6,11 @@ import { orderCampaignsByIds, sanitizeCampaignIds } from "@/lib/blog/campaign-id
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog } from "@/lib/audit-log";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
-import { generateUniqueSlug, normalizeUserSlug } from "@/lib/slug";
+import {
+  generateUniqueSlug,
+  generateUniqueLocaleSlug,
+  normalizeUserSlug,
+} from "@/lib/slug";
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -40,10 +44,10 @@ export async function GET(request: NextRequest) {
             id: true,
             slug: true,
             name: true,
-            translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true } }
+            translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true, slug: true } }
           }
         },
-        translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true, description: true, content: true, image: true } },
+        translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true, description: true, content: true, image: true, slug: true } },
         campaignIds: true,
       }
     });
@@ -96,7 +100,8 @@ export async function GET(request: NextRequest) {
       const tCat = pickTranslation(p.category?.translations, locale);
       return {
         id: p.id,
-        slug: p.slug ?? null,
+        slug: (tP as { slug?: string | null } | undefined)?.slug || p.slug || null,
+        baseSlug: p.slug ?? null,
         title: tP?.title || p.title,
         description: tP?.description || p.description,
         content: tP?.content || p.content,
@@ -105,7 +110,10 @@ export async function GET(request: NextRequest) {
         category: p.category
           ? {
               id: p.category.id,
-              slug: p.category.slug ?? null,
+              slug:
+                (tCat as { slug?: string | null } | undefined)?.slug ||
+                p.category.slug ||
+                null,
               name: tCat?.name || p.category.name,
             }
           : null,
@@ -148,12 +156,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const translationData: { locale: string; title?: string; description?: string; content?: string; image?: string }[] = [];
+    const translationData: {
+      locale: string;
+      title?: string;
+      description?: string;
+      content?: string;
+      image?: string;
+      requestedSlug: string | null;
+    }[] = [];
     if (translations && typeof translations === 'object') {
       for (const [locale, t] of Object.entries(translations)) {
         if (locale !== 'ar' && t && typeof t === 'object') {
           const tt: any = t;
-          translationData.push({ locale, title: tt.title, description: tt.description, content: tt.content, image: tt.image });
+          translationData.push({
+            locale,
+            title: tt.title,
+            description: tt.description,
+            content: tt.content,
+            image: tt.image,
+            requestedSlug: normalizeUserSlug(tt.slug),
+          });
         }
       }
     }
@@ -180,8 +202,24 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      if (translationData.length > 0) {
-        await tx.postTranslation.createMany({ data: translationData.map(t => ({ postId: post.id, locale: t.locale, title: t.title || '', description: t.description || '', content: t.content || '', image: t.image || '' })) });
+      // Sequential creates so the per-locale slug uniqueness check observes prior writes.
+      for (const t of translationData) {
+        const localeSlug = await generateUniqueLocaleSlug(
+          tx.postTranslation as any,
+          t.requestedSlug ?? t.title ?? "",
+          { locale: t.locale, fallbackPrefix: "post" }
+        );
+        await tx.postTranslation.create({
+          data: {
+            postId: post.id,
+            locale: t.locale,
+            title: t.title || '',
+            description: t.description || '',
+            content: t.content || '',
+            image: t.image || '',
+            slug: localeSlug,
+          },
+        });
       }
 
       return post;
@@ -199,7 +237,7 @@ export async function POST(request: NextRequest) {
         published: true,
         categoryId: true,
         campaignIds: true,
-        translations: { select: { locale: true, title: true, description: true, content: true, image: true } },
+        translations: { select: { locale: true, title: true, description: true, content: true, image: true, slug: true } },
       },
     });
 

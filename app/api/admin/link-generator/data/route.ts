@@ -10,6 +10,24 @@ function nonEmpty(s: string | null | undefined) {
   return typeof s === "string" && s.trim().length > 0;
 }
 
+/**
+ * Build a Record<locale, slug> for an entity. Locale entries are populated only when
+ * either a per-locale translation slug exists or the base slug exists; otherwise we
+ * leave the locale out so the link-generator UI knows to fall back to the entity ID.
+ */
+function buildSlugByLocale(
+  baseSlug: string | null,
+  translations: Array<{ locale: string; slug?: string | null }>,
+  supportedLocales: string[]
+): Record<string, string | null> {
+  const map: Record<string, string | null> = {};
+  for (const loc of supportedLocales) {
+    const t = translations.find((tr) => tr.locale === loc);
+    map[loc] = (t && nonEmpty(t.slug) ? (t.slug as string) : null) || baseSlug || null;
+  }
+  return map;
+}
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -22,7 +40,7 @@ export async function GET() {
           id: true,
           slug: true,
           title: true,
-          translations: { select: { locale: true, title: true } },
+          translations: { select: { locale: true, title: true, slug: true } },
         },
         orderBy: { updatedAt: "desc" },
         take: 8000,
@@ -32,7 +50,7 @@ export async function GET() {
           id: true,
           slug: true,
           name: true,
-          translations: { select: { locale: true, name: true } },
+          translations: { select: { locale: true, name: true, slug: true } },
         },
         orderBy: { name: "asc" },
       }),
@@ -42,7 +60,7 @@ export async function GET() {
           slug: true,
           title: true,
           published: true,
-          translations: { select: { locale: true, title: true } },
+          translations: { select: { locale: true, title: true, slug: true } },
         },
         orderBy: { updatedAt: "desc" },
         take: 3000,
@@ -52,7 +70,7 @@ export async function GET() {
           id: true,
           slug: true,
           name: true,
-          translations: { select: { locale: true, name: true } },
+          translations: { select: { locale: true, name: true, slug: true } },
         },
         orderBy: { name: "asc" },
       }),
@@ -64,11 +82,13 @@ export async function GET() {
       for (const t of c.translations) {
         if (nonEmpty(t.title)) supportedLocales.add(t.locale);
       }
+      const localesArr = [...supportedLocales];
       return {
         id: c.id,
         slug: c.slug ?? null,
         title: c.title,
-        supportedLocales: [...supportedLocales],
+        supportedLocales: localesArr,
+        slugByLocale: buildSlugByLocale(c.slug ?? null, c.translations, localesArr),
       };
     });
 
@@ -78,11 +98,13 @@ export async function GET() {
       for (const t of c.translations) {
         if (nonEmpty(t.name)) supportedLocales.add(t.locale);
       }
+      const localesArr = [...supportedLocales];
       return {
         id: c.id,
         slug: c.slug ?? null,
         name: c.name,
-        supportedLocales: [...supportedLocales],
+        supportedLocales: localesArr,
+        slugByLocale: buildSlugByLocale(c.slug ?? null, c.translations, localesArr),
       };
     });
 
@@ -92,12 +114,14 @@ export async function GET() {
       for (const t of p.translations) {
         if (nonEmpty(t.title)) supportedLocales.add(t.locale);
       }
+      const localesArr = [...supportedLocales];
       return {
         id: p.id,
         slug: p.slug ?? null,
         title: p.title || "—",
         published: p.published,
-        supportedLocales: [...supportedLocales],
+        supportedLocales: localesArr,
+        slugByLocale: buildSlugByLocale(p.slug ?? null, p.translations, localesArr),
       };
     });
 
@@ -107,11 +131,13 @@ export async function GET() {
       for (const t of c.translations) {
         if (nonEmpty(t.name)) supportedLocales.add(t.locale);
       }
+      const localesArr = [...supportedLocales];
       return {
         id: c.id,
         slug: c.slug ?? null,
         name: c.name,
-        supportedLocales: [...supportedLocales],
+        supportedLocales: localesArr,
+        slugByLocale: buildSlugByLocale(c.slug ?? null, c.translations, localesArr),
       };
     });
 

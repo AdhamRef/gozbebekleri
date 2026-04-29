@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/[...nextauth]/options";
-import { whereByIdOrSlug } from "@/lib/slug";
+import { whereByIdOrLocaleSlug } from "@/lib/slug";
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
@@ -16,14 +16,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id: idOrSlug } = await params;
 
-    // Resolve param (slug or id) to the real campaign id
-    const camp = await prisma.campaign.findFirst({
-      where: whereByIdOrSlug(idOrSlug),
-      select: { id: true },
-    });
+    // Resolve param (id, base slug, or per-locale translation slug) to the real campaign id.
+    // We don't know which locale the slug came from when this route is hit, so probe each
+    // supported locale until we find a match.
+    const url = new URL(request.url);
+    const hintLocale = url.searchParams.get("locale") || "ar";
+    const probeLocales = [hintLocale, "en", "ar", "fr", "tr", "id", "pt", "es"];
+    let camp: { id: string } | null = null;
+    for (const loc of probeLocales) {
+      camp = await prisma.campaign.findFirst({
+        where: whereByIdOrLocaleSlug(idOrSlug, loc),
+        select: { id: true },
+      });
+      if (camp) break;
+    }
     if (!camp) return NextResponse.json([]);
 
-    // ✅ Fetch all translations for the campaign
+    // ✅ Fetch all translations for the campaign (including per-locale slug for editing)
     const translations = await prisma.campaignTranslation.findMany({
       where: {
         campaignId: camp.id,
@@ -34,6 +43,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         description: true,
         image: true,
         videoUrl: true,
+        slug: true,
       },
     });
 

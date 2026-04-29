@@ -15,8 +15,10 @@ import { writeAuditLog } from "@/lib/audit-log";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 import {
   generateUniqueSlug,
+  generateUniqueLocaleSlug,
   normalizeUserSlug,
   whereByIdOrSlug,
+  whereByIdOrLocaleSlug,
 } from "@/lib/slug";
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
@@ -34,7 +36,7 @@ export async function GET(
     const locale = req.headers.get('x-locale') || qp.get('locale') || qp.get('lang') || 'ar';
 
     const post = await prisma.post.findFirst({
-      where: whereByIdOrSlug(postIdOrSlug),
+      where: whereByIdOrLocaleSlug(postIdOrSlug, locale),
       select: {
         id: true,
         slug: true,
@@ -50,12 +52,27 @@ export async function GET(
             id: true,
             slug: true,
             name: true,
-            translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true } }
-          }
+            translations: {
+              where: translationLocaleWhere(locale),
+              take: 2,
+              select: { locale: true, name: true, slug: true },
+            },
+          },
         },
         campaignIds: true,
-        translations: { where: translationLocaleWhere(locale), take: 2, select: { title: true, description: true, content: true, image: true, locale: true } }
-      }
+        translations: {
+          where: translationLocaleWhere(locale),
+          take: 2,
+          select: {
+            title: true,
+            description: true,
+            content: true,
+            image: true,
+            locale: true,
+            slug: true,
+          },
+        },
+      },
     });
 
     if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
@@ -123,7 +140,7 @@ export async function GET(
         published: true,
         createdAt: true,
         updatedAt: true,
-        translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true, description: true, content: true, image: true } }
+        translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true, description: true, content: true, image: true, slug: true } }
       }
     });
 
@@ -143,7 +160,7 @@ export async function GET(
           published: true,
           createdAt: true,
           updatedAt: true,
-          translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true, description: true, content: true, image: true } }
+          translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true, description: true, content: true, image: true, slug: true } }
         }
       });
     }
@@ -153,7 +170,9 @@ export async function GET(
 
     const filteredPost = {
       id: post.id,
-      slug: post.slug ?? null,
+      // Locale-aware slug: per-locale → base → null. baseSlug exposed for hreflang/sitemap.
+      slug: (tPost as { slug?: string | null } | undefined)?.slug || post.slug || null,
+      baseSlug: post.slug ?? null,
       title: tPost?.title || post.title,
       description: tPost?.description || post.description,
       content: tPost?.content || post.content,
@@ -162,7 +181,10 @@ export async function GET(
       category: post.category
         ? {
             id: post.category.id,
-            slug: post.category.slug ?? null,
+            slug:
+              (tPostCat as { slug?: string | null } | undefined)?.slug ||
+              post.category.slug ||
+              null,
             name: tPostCat?.name || post.category.name,
           }
         : null,
@@ -177,7 +199,8 @@ export async function GET(
       const tSp = pickTranslation(sp.translations, locale);
       return {
         id: sp.id,
-        slug: sp.slug ?? null,
+        slug: (tSp as { slug?: string | null } | undefined)?.slug || sp.slug || null,
+        baseSlug: sp.slug ?? null,
         title: tSp?.title || sp.title,
         description: tSp?.description || sp.description,
         content: tSp?.content || sp.content,
@@ -209,7 +232,7 @@ export async function PATCH(
     const body = await req.json();
 
     const existingPost = await prisma.post.findFirst({
-      where: whereByIdOrSlug(postIdOrSlug),
+      where: whereByIdOrLocaleSlug(postIdOrSlug, "ar"),
       select: { id: true, title: true },
     });
     if (!existingPost) {
@@ -275,6 +298,35 @@ export async function PATCH(
         if (data.description !== undefined) td.description = data.description;
         if (data.content !== undefined) td.content = data.content;
         if (data.image !== undefined) td.image = data.image;
+
+        // Per-locale slug. Explicit empty/null clears; non-empty is normalized + deduped.
+        // If caller doesn't pass `slug` and there isn't one yet, auto-generate from the
+        // translated title so admins get clean URLs without manual work.
+        const existingTrans = await tx.postTranslation.findUnique({
+          where: { postId_locale: { postId, locale } },
+          select: { id: true, slug: true },
+        });
+        if (Object.prototype.hasOwnProperty.call(data, "slug")) {
+          const userSlug = normalizeUserSlug((data as Record<string, unknown>).slug);
+          td.slug = userSlug
+            ? await generateUniqueLocaleSlug(tx.postTranslation as any, userSlug, {
+                locale,
+                fallbackPrefix: "post",
+                currentTranslationId: existingTrans?.id,
+              })
+            : null;
+        } else if (!existingTrans?.slug && data.title) {
+          td.slug = await generateUniqueLocaleSlug(
+            tx.postTranslation as any,
+            data.title,
+            {
+              locale,
+              fallbackPrefix: "post",
+              currentTranslationId: existingTrans?.id,
+            }
+          );
+        }
+
         if (Object.keys(td).length === 0) continue;
 
         await tx.postTranslation.upsert({
@@ -299,7 +351,7 @@ export async function PATCH(
         published: true,
         categoryId: true,
         campaignIds: true,
-        translations: { select: { locale: true, title: true, description: true, content: true, image: true } },
+        translations: { select: { locale: true, title: true, description: true, content: true, image: true, slug: true } },
       },
     });
 

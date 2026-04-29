@@ -25,6 +25,7 @@ export async function getInitialCampaignsForPage(locale: string) {
       category: {
         select: {
           id: true,
+          slug: true,
           name: true,
           icon: true,
           translations: { where: { locale }, take: 1 },
@@ -58,10 +59,21 @@ export async function getInitialCampaignsForPage(locale: string) {
     const transformed = items.map((c) => {
       const goalType = normalizeGoalType(c.goalType);
       const fundraisingMode = normalizeFundraisingMode(c.fundraisingMode);
+      const tC = (c.translations as Array<{
+        title?: string;
+        description?: string;
+        slug?: string | null;
+      }>)[0];
+      const tCat = (c.category?.translations as
+        | Array<{ name?: string; slug?: string | null }>
+        | undefined)?.[0];
       return {
         id: c.id,
-        title: c.translations[0]?.title || c.title,
-        description: c.translations[0]?.description || c.description,
+        // Locale-aware slug: per-locale translation slug → base slug → null.
+        slug: tC?.slug || (c as { slug?: string | null }).slug || null,
+        baseSlug: (c as { slug?: string | null }).slug ?? null,
+        title: tC?.title || c.title,
+        description: tC?.description || c.description,
         images: c.images,
         videoUrl: c.videoUrl,
         targetAmount: c.targetAmount,
@@ -72,7 +84,8 @@ export async function getInitialCampaignsForPage(locale: string) {
         category: c.category
           ? {
               id: c.category.id,
-              name: c.category.translations[0]?.name || c.category.name,
+              slug: tCat?.slug || (c.category as { slug?: string | null }).slug || null,
+              name: tCat?.name || c.category.name,
               icon: c.category.icon,
             }
           : null,
@@ -105,19 +118,29 @@ export async function getCategoriesForPage(locale: string) {
       orderBy: [{ order: "asc" }],
       select: {
         id: true,
+        slug: true,
         name: true,
         icon: true,
-        translations: { where: { locale }, take: 1 },
+        translations: {
+          where: { locale },
+          take: 1,
+          select: { locale: true, name: true, slug: true },
+        },
         _count: { select: { campaigns: { where: { isActive: true } } } },
       },
     });
 
-    return rows.map((c) => ({
-      id: c.id,
-      name: c.translations[0]?.name || c.name,
-      icon: c.icon,
-      campaignCount: c._count.campaigns,
-    }));
+    return rows.map((c) => {
+      const t = c.translations[0];
+      return {
+        id: c.id,
+        slug: t?.slug || c.slug || null,
+        baseSlug: c.slug ?? null,
+        name: t?.name || c.name,
+        icon: c.icon,
+        campaignCount: c._count.campaigns,
+      };
+    });
   } catch (err) {
     console.error("getCategoriesForPage failed:", err);
     return [];
@@ -135,6 +158,7 @@ export async function getInitialPostsForPage(locale: string) {
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
+        slug: true,
         title: true,
         description: true,
         image: true,
@@ -142,14 +166,19 @@ export async function getInitialPostsForPage(locale: string) {
         category: {
           select: {
             id: true,
+            slug: true,
             name: true,
-            translations: { where: { locale }, take: 1, select: { name: true } },
+            translations: {
+              where: { locale },
+              take: 1,
+              select: { name: true, slug: true },
+            },
           },
         },
         translations: {
           where: { locale },
           take: 1,
-          select: { title: true, description: true, image: true },
+          select: { title: true, description: true, image: true, slug: true },
         },
       },
     });
@@ -160,6 +189,8 @@ export async function getInitialPostsForPage(locale: string) {
 
     const transformed = items.map((p) => ({
       id: p.id,
+      slug: p.translations[0]?.slug || p.slug || null,
+      baseSlug: p.slug ?? null,
       title: p.translations[0]?.title || p.title || "",
       description: p.translations[0]?.description || p.description || "",
       image: p.translations[0]?.image || p.image || null,
@@ -167,6 +198,8 @@ export async function getInitialPostsForPage(locale: string) {
       category: p.category
         ? {
             id: p.category.id,
+            slug:
+              p.category.translations[0]?.slug || p.category.slug || null,
             name: p.category.translations[0]?.name || p.category.name,
           }
         : null,

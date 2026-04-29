@@ -78,6 +78,113 @@ export function whereByIdOrSlug(key: string): { id: string } | { slug: string } 
 }
 
 /**
+ * Build a Prisma `where` that matches an entity by ObjectId, base slug, or
+ * by a translation slug for the given locale. Returns a clause shaped:
+ *   - { id }                                                           if key is an ObjectId
+ *   - { OR: [{ slug }, { translations: { some: { locale, slug } } }] } otherwise
+ *
+ * `translationsRelationName` defaults to `translations` (matches every model
+ * in this schema). Pass a different name only if your relation differs.
+ */
+export function whereByIdOrLocaleSlug(
+  key: string,
+  locale: string,
+  translationsRelationName = "translations"
+): Record<string, unknown> {
+  if (isObjectId(key)) return { id: key };
+  return {
+    OR: [
+      { slug: key },
+      { [translationsRelationName]: { some: { locale, slug: key } } },
+    ],
+  };
+}
+
+/**
+ * Pick the URL slug to display for a localized entity.
+ * Prefers the locale-specific translation slug, then base slug, then null.
+ *
+ * `translations` is expected to be the array shape used across this codebase:
+ *   [{ locale: string, slug?: string | null, ... }]
+ */
+export function pickLocaleSlug(
+  baseSlug: string | null | undefined,
+  translations: Array<{ locale: string; slug?: string | null }> | null | undefined,
+  locale: string
+): string | null {
+  if (translations && translations.length) {
+    const exact = translations.find((t) => t.locale === locale && nonEmpty(t.slug));
+    if (exact && nonEmpty(exact.slug)) return exact.slug as string;
+    // English is the secondary fallback used elsewhere in the codebase
+    if (locale !== "en") {
+      const en = translations.find((t) => t.locale === "en" && nonEmpty(t.slug));
+      if (en && nonEmpty(en.slug)) return en.slug as string;
+    }
+  }
+  return nonEmpty(baseSlug) ? (baseSlug as string) : null;
+}
+
+function nonEmpty(s: unknown): boolean {
+  return typeof s === "string" && s.trim().length > 0;
+}
+
+/**
+ * Build a Record<locale, slug> from a base slug + translation rows. Locales
+ * without a per-locale slug fall back to the base slug. Useful for the
+ * dashboard link generator so it can pick the correct slug per selected locale.
+ */
+export function slugByLocaleMap(
+  baseSlug: string | null | undefined,
+  translations: Array<{ locale: string; slug?: string | null }> | null | undefined,
+  supportedLocales: string[]
+): Record<string, string | null> {
+  const map: Record<string, string | null> = {};
+  for (const loc of supportedLocales) {
+    map[loc] = pickLocaleSlug(baseSlug, translations, loc);
+  }
+  return map;
+}
+
+/**
+ * Generate a slug unique within a single locale's translation rows.
+ *
+ * Pass the *translation* delegate (e.g. prisma.campaignTranslation) and the
+ * field name on the translation that holds the parent FK (e.g. "campaignId")
+ * so we can exclude the current translation when re-saving.
+ */
+export async function generateUniqueLocaleSlug(
+  translationDelegate: Delegate,
+  base: string,
+  options: {
+    locale: string;
+    fallbackPrefix?: string;
+    /** Exclude this translation row when checking — used during updates. */
+    currentTranslationId?: string;
+  }
+): Promise<string> {
+  const { locale, fallbackPrefix = "item", currentTranslationId } = options;
+  let slug = slugify(base);
+  if (!slug) slug = `${fallbackPrefix}-${Date.now().toString(36)}`;
+
+  const candidate = slug;
+  let suffix = 1;
+  while (true) {
+    const value = suffix === 1 ? candidate : `${candidate}-${suffix}`;
+    const where: any = { locale, slug: value };
+    if (currentTranslationId) where.id = { not: currentTranslationId };
+    const existing = await translationDelegate.findFirst({
+      where,
+      select: { id: true },
+    });
+    if (!existing) return value;
+    suffix += 1;
+    if (suffix > 1000) {
+      return `${candidate}-${Date.now().toString(36)}`;
+    }
+  }
+}
+
+/**
  * Resolve user-provided slug input.
  *  - returns null if input is empty/blank → caller should auto-generate
  *  - returns slugified value otherwise (so admins can't accidentally save spaces/uppercase)

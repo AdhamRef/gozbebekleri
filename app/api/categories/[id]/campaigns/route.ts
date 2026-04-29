@@ -10,7 +10,7 @@ import {
 } from "@/lib/campaign/campaign-modes";
 import { parseSuggestedDonations } from "@/lib/campaign/suggested-donations";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
-import { whereByIdOrSlug } from "@/lib/slug";
+import { whereByIdOrLocaleSlug } from "@/lib/slug";
 
 export async function GET(
   request: NextRequest,
@@ -34,15 +34,16 @@ export async function GET(
     const isActive = searchParams.get('isActive') === 'true';
     const hasPriority = searchParams.get('hasPriority') === 'true';
 
-    // Check that category exists and fetch localized name if available
+    // Check that category exists and fetch localized name if available. Resolves the
+    // param against the category's base slug or any per-locale translation slug.
     const category = await prisma.category.findFirst({
-      where: whereByIdOrSlug(idOrSlug),
+      where: whereByIdOrLocaleSlug(idOrSlug, locale),
       select: {
         id: true,
         slug: true,
         name: true,
         icon: true,
-        translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true } }
+        translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true, slug: true } }
       }
     });
 
@@ -236,12 +237,17 @@ export async function GET(
       };
     });
 
-    // Localized category response
+    // Localized category response — surface the per-locale slug for canonical URLs
+    const tCatPicked = pickTranslation(category.translations, locale);
     const localizedCategory = {
       id: category.id,
-      slug: category.slug ?? null,
-      name: pickTranslation(category.translations, locale)?.name || category.name,
-      icon: category.icon
+      slug:
+        (tCatPicked as { slug?: string | null } | undefined)?.slug ||
+        category.slug ||
+        null,
+      baseSlug: category.slug ?? null,
+      name: tCatPicked?.name || category.name,
+      icon: category.icon,
     };
 
     return NextResponse.json({

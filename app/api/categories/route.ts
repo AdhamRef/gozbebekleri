@@ -5,7 +5,11 @@ import { authOptions } from "../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog } from "@/lib/audit-log";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
-import { generateUniqueSlug, normalizeUserSlug } from "@/lib/slug";
+import {
+  generateUniqueSlug,
+  generateUniqueLocaleSlug,
+  normalizeUserSlug,
+} from "@/lib/slug";
 
 // GET: supports locale-aware translations, search, cursor pagination, optional counts, and sorting
 export async function GET(request: NextRequest) {
@@ -39,7 +43,7 @@ export async function GET(request: NextRequest) {
         translations: {
           where: translationLocaleWhere(locale),
           take: 2,
-          select: { locale: true, name: true, description: true }
+          select: { locale: true, name: true, description: true, slug: true }
         },
         ...(includeCounts ? { _count: { select: { campaigns: true } } } : {})
       }
@@ -67,7 +71,9 @@ export async function GET(request: NextRequest) {
       const t = pickTranslation(cat.translations, locale);
       return {
         id: cat.id,
-        slug: cat.slug ?? null,
+        // Locale-aware slug surfaced for canonical URLs.
+        slug: (t as { slug?: string | null } | undefined)?.slug || cat.slug || null,
+        baseSlug: cat.slug ?? null,
         name: t?.name || cat.name,
         description: t?.description || cat.description,
         image: cat.image,
@@ -119,14 +125,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prepare translations payload (exclude default locale 'ar')
-    const translationData: { locale: string; name: string; description?: string }[] = [];
+    // Prepare translations payload (exclude default locale 'ar'). The actual slug per
+    // locale is computed inside the transaction for uniqueness.
+    const translationData: {
+      locale: string;
+      name: string;
+      description?: string;
+      requestedSlug: string | null;
+    }[] = [];
     if (translations && typeof translations === 'object') {
       for (const [locale, t] of Object.entries(translations)) {
         if (locale !== 'ar' && t && typeof t === 'object') {
           const tt: any = t;
           if (tt.name) {
-            translationData.push({ locale, name: tt.name, description: tt.description || '' });
+            translationData.push({
+              locale,
+              name: tt.name,
+              description: tt.description || '',
+              requestedSlug: normalizeUserSlug(tt.slug),
+            });
           }
         }
       }
@@ -152,14 +169,21 @@ export async function POST(request: NextRequest) {
         }
       });
 
-      if (translationData.length > 0) {
-        await tx.categoryTranslation.createMany({
-          data: translationData.map(t => ({
+      // Sequential creates so the per-locale slug uniqueness check observes prior writes.
+      for (const t of translationData) {
+        const localeSlug = await generateUniqueLocaleSlug(
+          tx.categoryTranslation as any,
+          t.requestedSlug ?? t.name,
+          { locale: t.locale, fallbackPrefix: "category" }
+        );
+        await tx.categoryTranslation.create({
+          data: {
             categoryId: created.id,
             locale: t.locale,
             name: t.name,
             description: t.description || '',
-          }))
+            slug: localeSlug,
+          },
         });
       }
 
@@ -176,7 +200,7 @@ export async function POST(request: NextRequest) {
         image: true,
         icon: true,
         order: true,
-        translations: { select: { locale: true, name: true, description: true } }
+        translations: { select: { locale: true, name: true, description: true, slug: true } }
       }
     });
 

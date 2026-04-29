@@ -7,8 +7,10 @@ import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 import {
   generateUniqueSlug,
+  generateUniqueLocaleSlug,
   normalizeUserSlug,
   whereByIdOrSlug,
+  whereByIdOrLocaleSlug,
 } from "@/lib/slug";
 
 export async function GET(
@@ -20,7 +22,7 @@ export async function GET(
     const locale = req.headers.get('x-locale') || new URL(req.url).searchParams.get('locale') || 'ar';
 
     const category = await prisma.postCategory.findFirst({
-      where: whereByIdOrSlug(catIdOrSlug),
+      where: whereByIdOrLocaleSlug(catIdOrSlug, locale),
       select: {
         id: true,
         slug: true,
@@ -29,7 +31,11 @@ export async function GET(
         description: true,
         image: true,
         createdAt: true,
-        translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true, title: true, description: true, image: true } },
+        translations: {
+          where: translationLocaleWhere(locale),
+          take: 2,
+          select: { locale: true, name: true, title: true, description: true, image: true, slug: true },
+        },
         posts: {
           select: {
             id: true,
@@ -41,11 +47,15 @@ export async function GET(
             published: true,
             createdAt: true,
             updatedAt: true,
-            translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true, description: true, content: true, image: true } }
+            translations: {
+              where: translationLocaleWhere(locale),
+              take: 2,
+              select: { locale: true, title: true, description: true, content: true, image: true, slug: true },
+            },
           },
-          orderBy: { createdAt: 'desc' }
-        }
-      }
+          orderBy: { createdAt: 'desc' },
+        },
+      },
     });
 
     if (!category) return NextResponse.json({ error: 'Category not found' }, { status: 404 });
@@ -53,7 +63,8 @@ export async function GET(
     const tCat = pickTranslation(category.translations, locale);
     const transformed = {
       id: category.id,
-      slug: category.slug ?? null,
+      slug: (tCat as { slug?: string | null } | undefined)?.slug || category.slug || null,
+      baseSlug: category.slug ?? null,
       name: tCat?.name || category.name,
       title: tCat?.title || category.title,
       description: tCat?.description || category.description,
@@ -62,7 +73,8 @@ export async function GET(
         const tP = pickTranslation(p.translations, locale);
         return {
           id: p.id,
-          slug: p.slug ?? null,
+          slug: (tP as { slug?: string | null } | undefined)?.slug || p.slug || null,
+          baseSlug: p.slug ?? null,
           title: tP?.title || p.title,
           description: tP?.description || p.description,
           content: tP?.content || p.content,
@@ -149,6 +161,38 @@ export async function PATCH(
         if (data.title !== undefined) td.title = data.title;
         if (data.description !== undefined) td.description = data.description;
         if (data.image !== undefined) td.image = data.image;
+
+        // Per-locale slug. Explicit empty/null clears; non-empty is normalized + deduped.
+        // If caller doesn't pass `slug` and there isn't one yet, auto-generate from name.
+        const existingTrans = await tx.postCategoryTranslation.findUnique({
+          where: { categoryId_locale: { categoryId, locale } },
+          select: { id: true, slug: true },
+        });
+        if (Object.prototype.hasOwnProperty.call(data, "slug")) {
+          const userSlug = normalizeUserSlug(data.slug);
+          td.slug = userSlug
+            ? await generateUniqueLocaleSlug(
+                tx.postCategoryTranslation as any,
+                userSlug,
+                {
+                  locale,
+                  fallbackPrefix: "blog-category",
+                  currentTranslationId: existingTrans?.id,
+                }
+              )
+            : null;
+        } else if (!existingTrans?.slug && data.name) {
+          td.slug = await generateUniqueLocaleSlug(
+            tx.postCategoryTranslation as any,
+            data.name,
+            {
+              locale,
+              fallbackPrefix: "blog-category",
+              currentTranslationId: existingTrans?.id,
+            }
+          );
+        }
+
         if (Object.keys(td).length === 0) continue;
 
         await tx.postCategoryTranslation.upsert({
@@ -161,7 +205,20 @@ export async function PATCH(
       return cat;
     });
 
-    const full = await prisma.postCategory.findUnique({ where: { id: updated.id }, select: { id: true, slug: true, name: true, title: true, description: true, image: true, translations: { select: { locale: true, name: true, title: true, description: true, image: true } } } });
+    const full = await prisma.postCategory.findUnique({
+      where: { id: updated.id },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        title: true,
+        description: true,
+        image: true,
+        translations: {
+          select: { locale: true, name: true, title: true, description: true, image: true, slug: true },
+        },
+      },
+    });
 
     const actor = auditActorFromDashboardSession(session!);
     await writeAuditLog({

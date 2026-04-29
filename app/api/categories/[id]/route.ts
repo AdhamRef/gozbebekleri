@@ -7,8 +7,10 @@ import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 import {
   generateUniqueSlug,
+  generateUniqueLocaleSlug,
   normalizeUserSlug,
   whereByIdOrSlug,
+  whereByIdOrLocaleSlug,
 } from "@/lib/slug";
 
 // GET: return a single category (localized) with optional counts
@@ -24,7 +26,7 @@ export async function GET(
     const allTranslations = paramsUrl.get('allTranslations') === 'true';
 
     const category = await prisma.category.findFirst({
-      where: whereByIdOrSlug(id),
+      where: whereByIdOrLocaleSlug(id, locale),
       select: {
         id: true,
         slug: true,
@@ -34,8 +36,12 @@ export async function GET(
         icon: true,
         order: true,
         translations: allTranslations
-          ? { select: { locale: true, name: true, description: true } }
-          : { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true, description: true } },
+          ? { select: { locale: true, name: true, description: true, slug: true } }
+          : {
+              where: translationLocaleWhere(locale),
+              take: 2,
+              select: { locale: true, name: true, description: true, slug: true },
+            },
         ...(includeCounts ? { _count: { select: { campaigns: true } } } : {})
       }
     });
@@ -54,7 +60,9 @@ export async function GET(
     const t = pickTranslation(category.translations, locale);
     const localized = {
       id: category.id,
-      slug: category.slug ?? null,
+      // Locale-aware slug: per-locale translation slug → base slug → null.
+      slug: (t as { slug?: string | null } | undefined)?.slug || category.slug || null,
+      baseSlug: category.slug ?? null,
       name: t?.name || category.name,
       description: t?.description || category.description,
       image: category.image,
@@ -137,28 +145,71 @@ export async function PUT(
         }
       });
 
-      // Upsert translations (skip default locale 'ar')
+      // Upsert translations (skip default locale 'ar'). Sequential because the per-locale
+      // slug uniqueness check must observe in-flight writes.
       if (translations && typeof translations === 'object') {
-        const ops: Promise<any>[] = [];
         for (const [locale, t] of Object.entries(translations)) {
           if (locale === 'ar') continue;
           if (!t || typeof t !== 'object') continue;
           const tt: any = t;
           if (!tt.name) continue; // skip incomplete translations
 
-          ops.push(tx.categoryTranslation.upsert({
+          // Optional per-locale slug. If caller passes one, normalize + dedupe; otherwise
+          // auto-generate from the translated name (so admins get clean URLs by default).
+          const requestedSlug = normalizeUserSlug(tt.slug);
+          const existingTrans = await tx.categoryTranslation.findUnique({
             where: { categoryId_locale: { categoryId: id, locale } as any },
-            update: { name: tt.name, description: tt.description || '' },
-            create: { categoryId: id, locale, name: tt.name, description: tt.description || '' }
-          }));
+            select: { id: true, slug: true },
+          });
+          let localeSlug: string | null = existingTrans?.slug ?? null;
+          if (Object.prototype.hasOwnProperty.call(tt, "slug")) {
+            // Explicit caller intent: empty/blank clears, otherwise dedupe.
+            localeSlug = requestedSlug
+              ? await generateUniqueLocaleSlug(
+                  tx.categoryTranslation as any,
+                  requestedSlug,
+                  {
+                    locale,
+                    fallbackPrefix: "category",
+                    currentTranslationId: existingTrans?.id,
+                  }
+                )
+              : null;
+          } else if (!existingTrans?.slug && tt.name) {
+            // No existing slug → auto-generate from the translated name on first save.
+            localeSlug = await generateUniqueLocaleSlug(
+              tx.categoryTranslation as any,
+              tt.name,
+              {
+                locale,
+                fallbackPrefix: "category",
+                currentTranslationId: existingTrans?.id,
+              }
+            );
+          }
+
+          await tx.categoryTranslation.upsert({
+            where: { categoryId_locale: { categoryId: id, locale } as any },
+            update: {
+              name: tt.name,
+              description: tt.description || '',
+              slug: localeSlug,
+            },
+            create: {
+              categoryId: id,
+              locale,
+              name: tt.name,
+              description: tt.description || '',
+              slug: localeSlug,
+            },
+          });
         }
-        await Promise.all(ops);
       }
 
       return updatedCat;
     });
 
-    // Return fresh record with translations
+    // Return fresh record with translations (including per-locale slug)
     const full = await prisma.category.findUnique({
       where: { id: updated.id },
       select: {
@@ -169,7 +220,9 @@ export async function PUT(
         image: true,
         icon: true,
         order: true,
-        translations: { select: { locale: true, name: true, description: true } }
+        translations: {
+          select: { locale: true, name: true, description: true, slug: true },
+        }
       }
     });
 

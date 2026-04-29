@@ -25,8 +25,9 @@ import { writeAuditLog } from "@/lib/audit-log";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 import {
   generateUniqueSlug,
+  generateUniqueLocaleSlug,
   normalizeUserSlug,
-  whereByIdOrSlug,
+  whereByIdOrLocaleSlug,
 } from "@/lib/slug";
 
 // ✅ Prisma Singleton - Reuse connection across requests
@@ -47,9 +48,9 @@ export async function GET(
       "ar";
 
     // ✅ STEP 1: Fetch campaign with ONLY current locale translations
-    // Accept either ObjectId or slug in the URL param.
+    // Accept either an ObjectId, the base slug, or a per-locale translation slug.
     const campaign = await prisma.campaign.findFirst({
-      where: whereByIdOrSlug(id),
+      where: whereByIdOrLocaleSlug(id, locale),
       select: {
         // Basic fields
         id: true,
@@ -78,6 +79,7 @@ export async function GET(
             description: true,
             image: true,
             videoUrl: true,
+            slug: true,
           },
           take: 2,
         },
@@ -199,7 +201,10 @@ export async function GET(
     // ✅ STEP 3: Transform data to match frontend expectations
     const transformedCampaign = {
       id: campaign.id,
-      slug: campaign.slug ?? null,
+      // Locale-aware slug: per-locale translation slug → base slug → null. Public callers
+      // use this for canonical URLs in the requested locale.
+      slug: tCampaign?.slug || campaign.slug || null,
+      baseSlug: campaign.slug ?? null,
 
       // Requested locale → English → Arabic (base) fallback
       title: tCampaign?.title || campaign.title,
@@ -302,9 +307,9 @@ export async function PUT(
     const { id: idOrSlug } = await params;
     const body = await request.json();
 
-    // ✅ STEP 1: Validate campaign exists (param may be id or slug)
+    // ✅ STEP 1: Validate campaign exists (param may be id, base slug, or locale slug)
     const existingCampaign = await prisma.campaign.findFirst({
-      where: whereByIdOrSlug(idOrSlug),
+      where: whereByIdOrLocaleSlug(idOrSlug, "ar"),
       select: { id: true, fundraisingMode: true, goalType: true, title: true },
     });
 
@@ -433,7 +438,9 @@ export async function PUT(
           data: updateData,
         });
 
-        const upsertPromises = translationUpdates.flatMap(({ locale, data }) => {
+        // Process upserts sequentially because the locale-slug uniqueness check inside
+        // generateUniqueLocaleSlug must see prior writes within this transaction.
+        for (const { locale, data } of translationUpdates) {
           const translationData: Record<string, string | null> = {};
           if (data.title !== undefined) translationData.title = data.title;
           if (data.description !== undefined)
@@ -448,43 +455,63 @@ export async function PUT(
                 ? data.videoUrl.trim()
                 : null;
           }
-          if (Object.keys(translationData).length === 0) return [];
-          // Skip only when nothing meaningful was supplied — image/video-only updates still pass.
+          // Optional per-locale slug: when caller passes an explicit slug we normalize +
+          // dedupe; when it's omitted we leave the existing one alone; when it's
+          // explicitly nulled we clear it.
+          let resolvedSlug: string | null | undefined;
+          if (Object.prototype.hasOwnProperty.call(data, "slug")) {
+            const userSlug = normalizeUserSlug((data as Record<string, unknown>).slug);
+            if (userSlug === null) {
+              resolvedSlug = null;
+            } else {
+              const existingTrans = await tx.campaignTranslation.findUnique({
+                where: { campaignId_locale: { campaignId: id, locale } },
+                select: { id: true },
+              });
+              resolvedSlug = await generateUniqueLocaleSlug(
+                tx.campaignTranslation as any,
+                userSlug,
+                {
+                  locale,
+                  fallbackPrefix: "campaign",
+                  currentTranslationId: existingTrans?.id,
+                }
+              );
+            }
+            translationData.slug = resolvedSlug;
+          }
+          if (Object.keys(translationData).length === 0) continue;
+          // Skip only when nothing meaningful was supplied.
           if (
             !translationData.title &&
             !translationData.description &&
             !translationData.image &&
-            !translationData.videoUrl
+            !translationData.videoUrl &&
+            !translationData.slug
           )
-            return [];
+            continue;
           // upsert.create requires title + description (NOT NULL); fall back to empty strings so
-          // an image/video-only update still creates the row.
+          // an image/video/slug-only update still creates the row.
           const createData = {
             ...translationData,
             title: typeof translationData.title === "string" ? translationData.title : "",
             description:
               typeof translationData.description === "string" ? translationData.description : "",
           };
-          return [
-            tx.campaignTranslation.upsert({
-              where: {
-                campaignId_locale: {
-                  campaignId: id,
-                  locale,
-                },
-              },
-              update: translationData,
-              create: {
-                campaign: { connect: { id } },
+          await tx.campaignTranslation.upsert({
+            where: {
+              campaignId_locale: {
+                campaignId: id,
                 locale,
-                ...createData,
               },
-            }),
-          ];
-        });
-
-        if (upsertPromises.length > 0) {
-          await Promise.all(upsertPromises);
+            },
+            update: translationData,
+            create: {
+              campaign: { connect: { id } },
+              locale,
+              ...createData,
+            },
+          });
         }
 
         return campaign;
@@ -570,9 +597,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     const { id: idOrSlug } = await params;
 
-    // Ensure campaign exists (param may be id or slug)
+    // Ensure campaign exists (param may be id, base slug, or per-locale slug)
     const camp = await prisma.campaign.findFirst({
-      where: whereByIdOrSlug(idOrSlug),
+      where: whereByIdOrLocaleSlug(idOrSlug, "ar"),
       select: { id: true, title: true },
     });
     if (!camp) {

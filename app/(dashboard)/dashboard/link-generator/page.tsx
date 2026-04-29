@@ -51,6 +51,12 @@ interface EntityRow {
   name?: string;
   published?: boolean;
   supportedLocales: string[];
+  /**
+   * Slug per locale. When the locale's translation has its own slug we use it; otherwise
+   * the base slug is mirrored in for that locale. Locales the entity doesn't support are
+   * absent — the URL builder falls back to `slug` and finally to `id`.
+   */
+  slugByLocale?: Record<string, string | null>;
 }
 
 interface Bundle {
@@ -343,10 +349,14 @@ export default function LinkGeneratorPage() {
 
   const path = useMemo(() => {
     if (!pageKind) return "";
-    // Prefer slug for slugged entities so the URL is human-readable and indexable
-    const resourceKey = selectedResource?.slug || resourceId;
+    // Pick the locale-specific slug when available, fall back to the base slug, then
+    // finally the entity ID. This is what makes per-locale slugs (Arabic ↔ Latin
+    // transliterations, French/Turkish/Indonesian/Portuguese/Spanish variants) end up
+    // in the generated URL for that locale.
+    const localeSlug = selectedResource?.slugByLocale?.[locale] ?? null;
+    const resourceKey = localeSlug || selectedResource?.slug || resourceId;
     return buildPath(pageKind, { resourceId: resourceKey, profileTab, donationId });
-  }, [pageKind, resourceId, selectedResource, profileTab, donationId]);
+  }, [pageKind, resourceId, selectedResource, profileTab, donationId, locale]);
 
   const fullUrl = useMemo(() => {
     if (!path || !locale || !pageKind) return "";
