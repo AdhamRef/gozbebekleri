@@ -79,6 +79,7 @@ export async function GET(request: NextRequest) {
         totalAmount: true,
         amount: true,
         status: true,
+        paidAt: true,
         items: { select: { amount: true, amountUSD: true } },
         categoryItems: { select: { amount: true, amountUSD: true } },
       },
@@ -110,7 +111,9 @@ export async function GET(request: NextRequest) {
       };
 
       const amount = Number(d.amountUSD ?? d.totalAmount ?? d.amount ?? 0);
-      const isPaid = d.status === 'PAID';
+      // status=PAID is set at creation, before the gateway confirms; only rows
+      // with paidAt set actually settled and were counted into campaign.currentAmount.
+      const isPaid = d.status === 'PAID' && d.paidAt != null;
       const isFailed = d.status === 'FAILED';
 
       if (isPaid) {

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { PAID_DONATION_FILTER } from "@/lib/dashboard/donation-usd-revenue";
 
 function getDateRange(period: string, startParam?: string | null, endParam?: string | null) {
   let endDate: Date;
@@ -58,10 +59,11 @@ export async function GET(
     const campaignId = searchParams.get("campaignId");
 
     const { startDate, endDate } = getDateRange(period, startParam, endParam);
+    // status=PAID alone includes abandoned checkouts that never settled; require paidAt too.
     const donationWhere: Prisma.DonationWhereInput = {
       referralId,
       createdAt: { gte: startDate, lte: endDate },
-      status: "PAID",
+      ...PAID_DONATION_FILTER,
     };
     if (campaignId && campaignId !== "all") {
       donationWhere.items = { some: { campaignId } };

@@ -6,6 +6,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import {
+  PAID_DONATION_FILTER,
   donationRowUsdApprox,
   donationUsdRevenueFallback,
   donationUsdSumFallback,
@@ -80,7 +81,8 @@ export async function GET(
       ];
     }
 
-    const paidDonationWhere: Prisma.DonationWhereInput = { ...donationWhere, status: "PAID" };
+    // status=PAID alone includes abandoned checkouts that never settled; require paidAt too.
+    const paidDonationWhere: Prisma.DonationWhereInput = { ...donationWhere, ...PAID_DONATION_FILTER };
     const failedDonationWhere: Prisma.DonationWhereInput = { ...donationWhere, status: "FAILED" };
     const oneTimeWhere = { ...paidDonationWhere, subscriptionId: null };
     const fromSubscriptionWhere = { ...paidDonationWhere, subscriptionId: { not: null } };
@@ -108,8 +110,8 @@ export async function GET(
         { categoryItems: { some: { categoryId } } },
       ];
     }
-    const thisMonthPaidWhere: Prisma.DonationWhereInput = { ...thisMonthDonationWhere, status: "PAID" };
-    const allTimePaidWhere: Prisma.DonationWhereInput = { ...allTimeDonationWhere, status: "PAID" };
+    const thisMonthPaidWhere: Prisma.DonationWhereInput = { ...thisMonthDonationWhere, ...PAID_DONATION_FILTER };
+    const allTimePaidWhere: Prisma.DonationWhereInput = { ...allTimeDonationWhere, ...PAID_DONATION_FILTER };
 
     const [
       totalDonations,
@@ -272,7 +274,7 @@ export async function GET(
     const failedTotalAmount = failedTotalResult._sum?.amountUSD ?? 0;
 
     /** All-time successful revenue for this referral — ignores category/campaign filters */
-    const referralAllTimePaidWhere: Prisma.DonationWhereInput = { referralId, status: 'PAID' };
+    const referralAllTimePaidWhere: Prisma.DonationWhereInput = { referralId, ...PAID_DONATION_FILTER };
     let paidRevenueAllTimeUnfiltered =
       (await prisma.donation.aggregate({ _sum: { amountUSD: true }, where: referralAllTimePaidWhere }))._sum
         ?.amountUSD ?? 0;

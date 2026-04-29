@@ -1,6 +1,17 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
+/**
+ * Donations are inserted with status='PAID' *before* the gateway confirms,
+ * so an abandoned checkout leaves a row with status=PAID and paidAt=null
+ * that never increments campaign.currentAmount. Dashboard "actually paid"
+ * = status PAID AND paidAt set, matching what real money moved.
+ */
+export const PAID_DONATION_FILTER: Prisma.DonationWhereInput = {
+  status: "PAID",
+  paidAt: { not: null },
+};
+
 /** Single-row USD value for stats when `amountUSD` was never backfilled. */
 export function donationRowUsdApprox(row: {
   amountUSD: number | null;

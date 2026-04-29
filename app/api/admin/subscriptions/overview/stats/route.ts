@@ -6,6 +6,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import {
+  PAID_DONATION_FILTER,
   donationRowUsdApprox,
   donationUsdSumFallback,
 } from "@/lib/dashboard/donation-usd-revenue";
@@ -106,7 +107,7 @@ function buildDonationItemWhereSub(
   const donation: Prisma.DonationWhereInput = {
     subscriptionId: { not: null },
     createdAt: { gte: startDate, lte: endDate },
-    status: "PAID",
+    ...PAID_DONATION_FILTER,
   };
   if (referralId) donation.referralId = referralId;
   if (campaignId && campaignId !== "all") {
@@ -135,7 +136,7 @@ function buildDonationCategoryItemWhereSub(
   const donation: Prisma.DonationWhereInput = {
     subscriptionId: { not: null },
     createdAt: { gte: startDate, lte: endDate },
-    status: "PAID",
+    ...PAID_DONATION_FILTER,
   };
   if (referralId) donation.referralId = referralId;
   if (categoryId && categoryId !== "all") {
@@ -178,10 +179,11 @@ export async function GET(request: NextRequest) {
     const { startDate, endDate } = getDateRange(period, startParam, endParam);
     const subBase = buildSubscriptionWhere(categoryId, campaignId, referralId);
     const donationChargeBase = buildDonationChargeBase(startDate, endDate, categoryId, campaignId, referralId);
-    const donationPaidWhere = { ...donationChargeBase, status: "PAID" as const };
+    // status=PAID alone includes abandoned checkouts that never settled; require paidAt too.
+    const donationPaidWhere = { ...donationChargeBase, ...PAID_DONATION_FILTER };
     const donationFailedWhere = { ...donationChargeBase, status: "FAILED" as const };
     const donationAllTimeBase = buildDonationChargeAllTimeBase(categoryId, campaignId, referralId);
-    const donationPaidAllTime = { ...donationAllTimeBase, status: "PAID" as const };
+    const donationPaidAllTime = { ...donationAllTimeBase, ...PAID_DONATION_FILTER };
 
     const { monthStart, monthEnd } = getCurrentCalendarMonthUtcRange();
     const thisMonthBase = buildDonationChargeBase(
@@ -191,7 +193,7 @@ export async function GET(request: NextRequest) {
       campaignId,
       referralId
     );
-    const thisMonthPaid = { ...thisMonthBase, status: "PAID" as const };
+    const thisMonthPaid = { ...thisMonthBase, ...PAID_DONATION_FILTER };
 
     const [
       totalCampaigns,
@@ -361,7 +363,7 @@ export async function GET(request: NextRequest) {
     const failedTotalAmount = failedTotalResult._sum?.amountUSD ?? 0;
 
     /** All successful subscription charges ever — ignores category/campaign/referral filters */
-    const globalSubPaidWhere = { subscriptionId: { not: null }, status: "PAID" as const };
+    const globalSubPaidWhere = { subscriptionId: { not: null }, ...PAID_DONATION_FILTER };
     let paidRevenueAllTimeUnfiltered =
       (await prisma.donation.aggregate({ _sum: { amountUSD: true }, where: globalSubPaidWhere }))._sum
         ?.amountUSD ?? 0;

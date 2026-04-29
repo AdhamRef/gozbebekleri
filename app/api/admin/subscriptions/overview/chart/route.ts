@@ -58,10 +58,12 @@ export async function GET(request: NextRequest) {
 
     const { startDate, endDate } = getDateRange(period, startParam, endParam);
 
+    // status=PAID alone includes abandoned checkouts that never settled; require paidAt too.
     const whereClause: {
       subscriptionId: { not: null };
       createdAt: { gte: Date; lte: Date };
       status: "PAID";
+      paidAt: { not: null };
       referralId?: string;
       donorId?: string;
       items?: { some: { campaignId: string } };
@@ -73,6 +75,7 @@ export async function GET(request: NextRequest) {
       subscriptionId: { not: null },
       createdAt: { gte: startDate, lte: endDate },
       status: "PAID",
+      paidAt: { not: null },
     };
 
     if (referralIdParam) {

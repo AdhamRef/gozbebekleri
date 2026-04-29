@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { requireAdminOrDashboardPermission } from '@/lib/dashboard/api-auth';
 import {
+  PAID_DONATION_FILTER,
   donationRowUsdApprox,
   donationUsdRevenueFallback,
   donationUsdSumFallback,
@@ -73,7 +74,7 @@ function buildDonationItemWhere(
   campaignId: string | null
 ) {
   const base: Record<string, unknown> = {
-    donation: { createdAt: { gte: startDate, lte: endDate }, status: 'PAID' as const },
+    donation: { createdAt: { gte: startDate, lte: endDate }, ...PAID_DONATION_FILTER },
   };
   if (campaignId && campaignId !== 'all') {
     base.campaignId = campaignId;
@@ -89,7 +90,7 @@ function buildDonationCategoryItemWhere(
   categoryId: string | null
 ) {
   const base: Record<string, unknown> = {
-    donation: { createdAt: { gte: startDate, lte: endDate }, status: 'PAID' as const },
+    donation: { createdAt: { gte: startDate, lte: endDate }, ...PAID_DONATION_FILTER },
   };
   if (categoryId && categoryId !== 'all') {
     base.categoryId = categoryId;
@@ -114,15 +115,16 @@ export async function GET(request: NextRequest) {
     const donationWhere = buildDonationWhere(startDate, endDate, categoryId, campaignId);
     const donationWhereAllTime = buildDonationWhereAllTime(categoryId, campaignId);
 
-    // Only PAID donations count toward revenue
-    const paidWhere = { ...donationWhere, status: 'PAID' as const };
+    // Only donations that actually settled (status=PAID + paidAt set) count toward revenue.
+    // status=PAID alone includes abandoned checkouts that never increment campaign.currentAmount.
+    const paidWhere = { ...donationWhere, ...PAID_DONATION_FILTER };
     const oneTimeWhere = { ...paidWhere, subscriptionId: null };
     const fromSubscriptionWhere = { ...paidWhere, subscriptionId: { not: null } };
     const failedWhere = { ...donationWhere, status: 'FAILED' as const };
 
     const { monthStart, monthEnd } = getCurrentCalendarMonthUtcRange();
     const thisMonthDonationWhere = buildDonationWhere(monthStart, monthEnd, categoryId, campaignId);
-    const thisMonthPaidWhere = { ...thisMonthDonationWhere, status: 'PAID' as const };
+    const thisMonthPaidWhere = { ...thisMonthDonationWhere, ...PAID_DONATION_FILTER };
 
     const subscriptionWhere: Record<string, unknown> = { status: 'ACTIVE' };
     if (campaignId && campaignId !== 'all') {
@@ -195,7 +197,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.donation.aggregate({
         _sum: { amountUSD: true },
-        where: { ...donationWhereAllTime, status: 'PAID' },
+        where: { ...donationWhereAllTime, ...PAID_DONATION_FILTER },
       }),
       prisma.donation.aggregate({
         _sum: { amountUSD: true },
@@ -264,7 +266,7 @@ export async function GET(request: NextRequest) {
     }
     let allTimeRevenue = allTimeRevenueResult._sum?.amountUSD ?? 0;
     if (allTimeRevenue === 0) {
-      const allTimePaidWhere = { ...donationWhereAllTime, status: 'PAID' as const };
+      const allTimePaidWhere = { ...donationWhereAllTime, ...PAID_DONATION_FILTER };
       const allTimePaidCount = await prisma.donation.count({ where: allTimePaidWhere });
       if (allTimePaidCount > 0) {
         allTimeRevenue = await donationUsdSumFallback(allTimePaidWhere);
@@ -322,7 +324,7 @@ export async function GET(request: NextRequest) {
     const failedTotalAmount = failedTotalResult._sum?.amountUSD ?? 0;
 
     /** All successful charges ever — ignores period / category / campaign query filters */
-    const globalPaidWhere = { status: 'PAID' as const };
+    const globalPaidWhere = { ...PAID_DONATION_FILTER };
     let paidRevenueAllTimeUnfiltered =
       (await prisma.donation.aggregate({ _sum: { amountUSD: true }, where: globalPaidWhere }))._sum?.amountUSD ?? 0;
     if (paidRevenueAllTimeUnfiltered === 0) {
