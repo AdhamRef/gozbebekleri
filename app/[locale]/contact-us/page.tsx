@@ -19,6 +19,7 @@ import {
   type MessageSubject,
   subjectLabel,
 } from "@/lib/messages/subjects";
+import { getSocialLinks } from "@/lib/social-links";
 
 const PHONE_RAW = "+902122885930";
 const PHONE_DISPLAY = "+90 212 288 59 30";
@@ -311,28 +312,15 @@ const ContactPage = () => {
             {t("followUs")}
           </p>
           <div className="flex items-center gap-3">
-            {[
-              {
-                Icon: Facebook,
-                href: "https://www.facebook.com/gozbebeklerider/",
-                label: "Facebook",
-              },
-              {
-                Icon: Instagram,
-                href: "https://www.instagram.com/gbyd_foundation/",
-                label: "Instagram",
-              },
-              {
-                Icon: Twitter,
-                href: "https://x.com/gozbebeklerider",
-                label: "Twitter",
-              },
-              {
-                Icon: Youtube,
-                href: "https://www.youtube.com/channel/UCvvSx8jtGafK9BI2hQnBYSQ",
-                label: "YouTube",
-              },
-            ].map(({ Icon, href, label }) => (
+            {(() => {
+              const social = getSocialLinks(locale);
+              return [
+                { Icon: Facebook, href: social.facebook, label: "Facebook" },
+                { Icon: Instagram, href: social.instagram, label: "Instagram" },
+                { Icon: Twitter, href: social.twitter, label: "Twitter" },
+                { Icon: Youtube, href: social.youtube, label: "YouTube" },
+              ];
+            })().map(({ Icon, href, label }) => (
               <a
                 key={label}
                 href={href}

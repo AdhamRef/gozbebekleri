@@ -1,63 +1,86 @@
 import React from "react";
-import axios from "axios";
 import { Metadata } from "next";
 import MainPage from "./_components/MainPage";
-
-interface Category {
-  id: string;
-  slug?: string | null;
-  name: string;
-  description: string;
-  image: string;
-  campaignCount?: number;
-}
+import { prisma } from "@/lib/prisma";
+import { whereByIdOrLocaleSlug } from "@/lib/slug";
+import { pickTranslation } from "@/lib/i18n/translation-fallback";
+import {
+  LOCALE_SEO,
+  OG_LOCALE_MAP,
+  SITE_URL,
+  buildLocalizedAlternates,
+} from "@/lib/seo";
+import type { Locale } from "@/lib/seo";
 
 interface Props {
   params: Promise<{ id: string; locale: string }>;
 }
 
-// Generate metadata for the category page
+async function fetchCategoryForSeo(idOrSlug: string, locale: string) {
+  return prisma.category.findFirst({
+    where: whereByIdOrLocaleSlug(idOrSlug, locale),
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      description: true,
+      image: true,
+      translations: {
+        select: { locale: true, name: true, description: true, slug: true },
+      },
+    },
+  });
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id, locale } = await params;
-  const fetchCategoryData = async (): Promise<Category> => {
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
-      const response = await axios.get(`${baseUrl}/api/categories/${id}?locale=${locale}&counts=true`);
-      return response.data;
-    } catch (error) {
-      console.error("Failed to fetch category data:", error);
-      throw new Error("Failed to fetch category data");
-    }
-  };
+  const category = await fetchCategoryForSeo(id, locale);
+  const seo = LOCALE_SEO[locale as Locale] ?? LOCALE_SEO.en;
 
-  const category = await fetchCategoryData();
+  if (!category) {
+    return {
+      title: seo.campaigns.title,
+      description: seo.campaigns.description,
+    };
+  }
+
+  const t = pickTranslation(category.translations, locale);
+  const name = t?.name || category.name;
+  const description =
+    (t?.description || category.description || seo.campaigns.description).slice(0, 200);
+  const image = category.image || `${SITE_URL}/og-image.jpg`;
+
+  const alternates = buildLocalizedAlternates({
+    basePath: "/category",
+    baseSlug: category.slug,
+    translations: category.translations,
+    fallback: category.id,
+    currentLocale: locale,
+  });
+
+  const title = `${name} | ${seo.siteName}`;
 
   return {
-    title: `${category.name} - قرة العيون`,
-    description: category.description,
+    title,
+    description,
+    keywords: seo.keywords,
+    alternates,
     openGraph: {
-      title: `${category.name} - قرة العيون`,
-      description: category.description,
-      images: [
-        {
-          url: category.image || "/default-category.jpg",
-          width: 1200,
-          height: 630,
-          alt: category.name,
-        },
-      ],
-      url: `https://gozbebekleri.com/${locale}/categories/${category.slug || id}`,
+      title,
+      description,
+      url: alternates.canonical,
+      siteName: seo.siteName,
+      locale: OG_LOCALE_MAP[locale as Locale] ?? "en_US",
       type: "website",
+      images: [{ url: image, width: 1200, height: 630, alt: name }],
     },
     twitter: {
       card: "summary_large_image",
-      title: `${category.name} - قرة العيون`,
-      description: category.description,
-      images: [category.image || "/default-category.jpg"],
+      title,
+      description,
+      images: [image],
     },
-    alternates: {
-      canonical: `https://gozbebekleri.com/${locale}/categories/${category.slug || id}`,
-    },
+    robots: { index: true, follow: true },
   };
 }
 

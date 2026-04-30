@@ -10,12 +10,47 @@ const STATIC_PATHS = [
   { path: "/blog", changeFreq: "weekly" as const, priority: 0.8 },
 ];
 
-function buildAlternates(path: string) {
+function buildStaticAlternates(path: string): Record<string, string> {
   const languages: Record<string, string> = {};
   for (const locale of LOCALES) {
     languages[locale] = `${SITE_URL}/${locale}${path}`;
   }
   languages["x-default"] = `${SITE_URL}/ar${path}`;
+  return languages;
+}
+
+/**
+ * Pick the slug for a specific locale from a translations array, falling back
+ * to the entity's base slug, then to its id. Mirrors `buildLocalizedAlternates`
+ * in lib/seo.ts so sitemap URLs and on-page hreflangs agree.
+ */
+function pickSlugFor(
+  locale: string,
+  baseSlug: string | null | undefined,
+  translations: { locale: string; slug: string | null }[],
+  fallback: string,
+): string {
+  const t = translations.find((tt) => tt.locale === locale && tt.slug);
+  return t?.slug || baseSlug || fallback;
+}
+
+/**
+ * Build the per-locale alternates map for a slug-routed entity. Each locale's
+ * URL uses its own translation slug when present.
+ */
+function buildLocaleAlternatesForEntity(
+  basePath: string,
+  baseSlug: string | null | undefined,
+  translations: { locale: string; slug: string | null }[],
+  fallback: string,
+): Record<string, string> {
+  const url = (loc: string): string =>
+    `${SITE_URL}/${loc}${basePath}/${encodeURIComponent(
+      pickSlugFor(loc, baseSlug, translations, fallback),
+    )}`;
+  const languages: Record<string, string> = {};
+  for (const locale of LOCALES) languages[locale] = url(locale);
+  languages["x-default"] = url("ar");
   return languages;
 }
 
@@ -30,28 +65,41 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: new Date(),
         changeFrequency: changeFreq,
         priority,
-        alternates: { languages: buildAlternates(path) },
+        alternates: { languages: buildStaticAlternates(path) },
       });
     }
   }
 
   // ── Dynamic campaign pages ───────────────────────────────────────────────
+  // Each locale entry uses that locale's translation slug when set, so Google
+  // sees a clean per-language URL graph instead of one slug repeated under
+  // every hreflang.
   try {
     const campaigns = await prisma.campaign.findMany({
       where: { isActive: true },
-      select: { id: true, slug: true, updatedAt: true },
+      select: {
+        id: true,
+        slug: true,
+        updatedAt: true,
+        translations: { select: { locale: true, slug: true } },
+      },
       orderBy: { updatedAt: "desc" },
     });
 
-    for (const campaign of campaigns) {
-      const path = `/campaign/${campaign.slug || campaign.id}`;
+    for (const c of campaigns) {
+      const languages = buildLocaleAlternatesForEntity(
+        "/campaign",
+        c.slug,
+        c.translations,
+        c.id,
+      );
       for (const locale of LOCALES) {
         entries.push({
-          url: `${SITE_URL}/${locale}${path}`,
-          lastModified: campaign.updatedAt,
+          url: languages[locale],
+          lastModified: c.updatedAt,
           changeFrequency: "weekly",
           priority: 0.85,
-          alternates: { languages: buildAlternates(path) },
+          alternates: { languages },
         });
       }
     }
@@ -59,28 +107,69 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // DB unavailable during build — skip dynamic entries
   }
 
-  // ── Dynamic blog posts ───────────────────────────────────────────────────
+  // ── Dynamic category pages ───────────────────────────────────────────────
   try {
-    const posts = await prisma.post.findMany({
-      where: { published: true },
-      select: { id: true, slug: true, updatedAt: true },
-      orderBy: { updatedAt: "desc" },
+    const categories = await prisma.category.findMany({
+      select: {
+        id: true,
+        slug: true,
+        translations: { select: { locale: true, slug: true } },
+      },
     });
 
-    for (const post of posts) {
-      const path = `/blog/${post.slug || post.id}`;
+    for (const cat of categories) {
+      const languages = buildLocaleAlternatesForEntity(
+        "/category",
+        cat.slug,
+        cat.translations,
+        cat.id,
+      );
       for (const locale of LOCALES) {
         entries.push({
-          url: `${SITE_URL}/${locale}${path}`,
-          lastModified: post.updatedAt,
-          changeFrequency: "monthly",
-          priority: 0.65,
-          alternates: { languages: buildAlternates(path) },
+          url: languages[locale],
+          lastModified: new Date(),
+          changeFrequency: "weekly",
+          priority: 0.7,
+          alternates: { languages },
         });
       }
     }
   } catch {
-    // DB unavailable during build — skip
+    // DB unavailable — skip
+  }
+
+  // ── Dynamic blog posts ───────────────────────────────────────────────────
+  try {
+    const posts = await prisma.post.findMany({
+      where: { published: true },
+      select: {
+        id: true,
+        slug: true,
+        updatedAt: true,
+        translations: { select: { locale: true, slug: true } },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    for (const p of posts) {
+      const languages = buildLocaleAlternatesForEntity(
+        "/blog",
+        p.slug,
+        p.translations,
+        p.id,
+      );
+      for (const locale of LOCALES) {
+        entries.push({
+          url: languages[locale],
+          lastModified: p.updatedAt,
+          changeFrequency: "monthly",
+          priority: 0.65,
+          alternates: { languages },
+        });
+      }
+    }
+  } catch {
+    // DB unavailable — skip
   }
 
   return entries;

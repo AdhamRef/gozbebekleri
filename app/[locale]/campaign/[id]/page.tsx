@@ -1,35 +1,49 @@
 import { Metadata } from "next";
 import MainPageDummy from "../_components/MainPageDummy";
-import { SITE_URL, LOCALE_SEO, OG_LOCALE_MAP, LOCALES, buildHreflang } from "@/lib/seo";
+import { prisma } from "@/lib/prisma";
+import { whereByIdOrLocaleSlug } from "@/lib/slug";
+import { pickTranslation } from "@/lib/i18n/translation-fallback";
+import {
+  LOCALE_SEO,
+  OG_LOCALE_MAP,
+  SITE_URL,
+  buildLocalizedAlternates,
+} from "@/lib/seo";
 import type { Locale } from "@/lib/seo";
 
 interface Props {
   params: Promise<{ id: string; locale: string }>;
 }
 
-interface Campaign {
-  slug?: string | null;
-  title: string;
-  description: string;
-  images: string[];
+async function fetchCampaignForSeo(idOrSlug: string, locale: string) {
+  return prisma.campaign.findFirst({
+    where: whereByIdOrLocaleSlug(idOrSlug, locale),
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      description: true,
+      images: true,
+      translations: {
+        select: { locale: true, title: true, description: true, slug: true },
+      },
+    },
+  });
 }
 
-async function fetchCampaign(id: string, locale: string): Promise<Campaign | null> {
-  try {
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || "https://gozbebekleri.com";
-    const res = await fetch(`${baseUrl}/api/campaigns/${id}?locale=${locale}`, {
-      next: { revalidate: 3600 },
-    });
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
-}
+const URGENCY_PREFIX: Record<string, string> = {
+  ar: "ساعد الآن — ",
+  en: "Urgent: ",
+  tr: "Acil: ",
+  fr: "Urgent : ",
+  es: "Urgente: ",
+  pt: "Urgente: ",
+  id: "Mendesak: ",
+};
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id, locale } = await params;
-  const campaign = await fetchCampaign(id, locale);
+  const campaign = await fetchCampaignForSeo(id, locale);
   const seo = LOCALE_SEO[locale as Locale] ?? LOCALE_SEO.en;
 
   if (!campaign) {
@@ -39,43 +53,43 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
 
+  const t = pickTranslation(campaign.translations, locale);
+  const title = t?.title || campaign.title;
+  const description = (t?.description || campaign.description).slice(0, 160);
   const image = campaign.images[0] || `${SITE_URL}/og-image.jpg`;
-  const path = `/campaign/${campaign.slug || id}`;
-  const alternates = buildHreflang(path, locale);
 
-  // Emotionally charged, urgency-driven title
-  const urgencyPrefixes: Record<string, string> = {
-    ar: "ساعد الآن — ",
-    en: "Urgent: ",
-    tr: "Acil: ",
-    fr: "Urgent : ",
-    es: "Urgente: ",
-    pt: "Urgente: ",
-    id: "Mendesak: ",
-  };
-  const prefix = urgencyPrefixes[locale] ?? "";
-  const title = `${prefix}${campaign.title} | ${seo.siteName}`;
+  const alternates = buildLocalizedAlternates({
+    basePath: "/campaign",
+    baseSlug: campaign.slug,
+    translations: campaign.translations,
+    fallback: campaign.id,
+    currentLocale: locale,
+  });
+
+  const prefix = URGENCY_PREFIX[locale] ?? "";
+  const fullTitle = `${prefix}${title} | ${seo.siteName}`;
 
   return {
-    title,
-    description: campaign.description.slice(0, 160),
+    title: fullTitle,
+    description,
     keywords: seo.keywords,
     alternates,
     openGraph: {
-      title,
-      description: campaign.description.slice(0, 200),
+      title: fullTitle,
+      description: (t?.description || campaign.description).slice(0, 200),
       url: alternates.canonical,
       siteName: seo.siteName,
       locale: OG_LOCALE_MAP[locale as Locale] ?? "en_US",
       type: "website",
-      images: [{ url: image, width: 1200, height: 630, alt: campaign.title }],
+      images: [{ url: image, width: 1200, height: 630, alt: title }],
     },
     twitter: {
       card: "summary_large_image",
-      title,
-      description: campaign.description.slice(0, 200),
+      title: fullTitle,
+      description: (t?.description || campaign.description).slice(0, 200),
       images: [image],
     },
+    robots: { index: true, follow: true },
   };
 }
 

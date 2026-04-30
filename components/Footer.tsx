@@ -9,6 +9,7 @@ import { Link } from '@/i18n/routing';
 import { useSearchParams } from 'next/navigation';
 import SignInDialog from '@/components/SignInDialog';
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from '@/lib/currency-link';
+import { getSocialLinks } from '@/lib/social-links';
 
 const LOGO_URL = 'https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png';
 
@@ -122,11 +123,12 @@ const Footer = () => {
     { label: isTr ? 'Kullanım Şartları' : isAr ? 'شروط الاستخدام' : 'Terms of Use', href: '/terms' },
   ];
 
+  const social = getSocialLinks(locale);
   const socialLinks = [
-    { Icon: Facebook, href: 'https://www.facebook.com/gozbebeklerider/', label: 'Facebook' },
-    { Icon: Twitter, href: 'https://x.com/gozbebeklerider', label: 'Twitter' },
-    { Icon: Instagram, href: 'https://www.instagram.com/gbyd_foundation/', label: 'Instagram' },
-    { Icon: Youtube, href: 'https://www.youtube.com/channel/UCvvSx8jtGafK9BI2hQnBYSQ', label: 'Youtube' },
+    { Icon: Facebook, href: social.facebook, label: 'Facebook' },
+    { Icon: Twitter, href: social.twitter, label: 'Twitter' },
+    { Icon: Instagram, href: social.instagram, label: 'Instagram' },
+    { Icon: Youtube, href: social.youtube, label: 'Youtube' },
   ] as const;
 
   return (

@@ -258,6 +258,47 @@ export function buildHreflang(path: string, currentLocale: string) {
   };
 }
 
+/**
+ * Build hreflang/canonical alternates for a slug-routed entity (campaign, post,
+ * category) where each locale may have its OWN translation slug.
+ *
+ * Each locale's URL uses its own per-locale slug when present, falling back to
+ * the entity's base slug, then to `fallback` (typically the entity id).
+ *
+ * Example: an AR campaign with slug "زكاة-القدس" and an EN translation slug
+ * "pay-your-zakat-at-al-quds" yields:
+ *   hreflang="ar" → /ar/campaign/زكاة-القدس
+ *   hreflang="en" → /en/campaign/pay-your-zakat-at-al-quds
+ *
+ * Without this, Google sees the same slug under every hreflang and may drop
+ * the per-locale variants from the index.
+ */
+export function buildLocalizedAlternates(args: {
+  /** URL prefix without trailing slash, e.g. "/campaign", "/blog", "/category" */
+  basePath: string;
+  /** Default-locale (Arabic) slug from the entity row */
+  baseSlug?: string | null;
+  /** Per-locale translation rows; only `locale` and optional `slug` are used */
+  translations?: Array<{ locale: string; slug?: string | null }> | null;
+  /** Used when neither a translation slug nor base slug is set (typically the entity id) */
+  fallback: string;
+  /** Locale of the page we're rendering — drives `canonical` */
+  currentLocale: string;
+}): { canonical: string; languages: Record<string, string> } {
+  const { basePath, baseSlug, translations, fallback, currentLocale } = args;
+  const slugFor = (loc: string): string => {
+    const t = translations?.find((tt) => tt.locale === loc && tt.slug);
+    return t?.slug || baseSlug || fallback;
+  };
+  const url = (loc: string): string =>
+    `${SITE_URL}/${loc}${basePath}/${encodeURIComponent(slugFor(loc))}`;
+
+  const languages: Record<string, string> = {};
+  for (const locale of LOCALES) languages[locale] = url(locale);
+  languages["x-default"] = url("ar");
+  return { canonical: url(currentLocale), languages };
+}
+
 /** Build full per-page metadata (layout/page generateMetadata helper) */
 export function buildPageMetadata(
   locale: string,

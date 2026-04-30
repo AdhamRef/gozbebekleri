@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/[...nextauth]/options";
 import { userHasDashboardPermission } from '@/lib/dashboard/permissions';
+import { isObjectId } from '@/lib/slug';
 import {
   writeAuditLog,
   auditActorFromSiteSession,
@@ -11,13 +12,36 @@ import {
 
 type ParamsPromise = { params: Promise<{ id: string }> };
 
+/**
+ * The campaign URL param can be an ObjectId, a base slug, or a per-locale
+ * translation slug. Comment.campaignId is an ObjectId, so resolve first or
+ * Prisma raises P2023 ("Malformed ObjectID").
+ */
+async function resolveCampaignId(idOrSlug: string): Promise<string | null> {
+  if (isObjectId(idOrSlug)) return idOrSlug;
+  const c = await prisma.campaign.findFirst({
+    where: {
+      OR: [
+        { slug: idOrSlug },
+        { translations: { some: { slug: idOrSlug } } },
+      ],
+    },
+    select: { id: true },
+  });
+  return c?.id ?? null;
+}
+
 // Get campaign comments
 export async function GET(request: NextRequest, { params }: ParamsPromise) {
   try {
     const { id } = await params;
+    const campaignId = await resolveCampaignId(id);
+    if (!campaignId) {
+      return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+    }
     const comments = await prisma.comment.findMany({
       where: {
-        campaignId: id,
+        campaignId,
       },
       include: {
         user: {
@@ -55,11 +79,16 @@ export async function POST(request: NextRequest, { params }: ParamsPromise) {
       );
     }
 
+    const campaignId = await resolveCampaignId(id);
+    if (!campaignId) {
+      return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+    }
+
     const data = await request.json();
     const comment = await prisma.comment.create({
       data: {
         text: data.text,
-        campaignId: id,
+        campaignId,
         userId: session.user.id,
       },
       include: {
@@ -74,17 +103,17 @@ export async function POST(request: NextRequest, { params }: ParamsPromise) {
     });
 
     const camp = await prisma.campaign.findUnique({
-      where: { id },
+      where: { id: campaignId },
       select: { title: true },
     });
     const actor = auditActorFromSiteSession(session);
     await writeAuditLog({
       ...actor,
       action: "CAMPAIGN_COMMENT_CREATE",
-      messageAr: `${actor.actorName ?? "مستخدم"} علّق على المشروع «${camp?.title ?? id}»`,
+      messageAr: `${actor.actorName ?? "مستخدم"} علّق على المشروع «${camp?.title ?? campaignId}»`,
       entityType: "Comment",
       entityId: comment.id,
-      metadata: { campaignId: id },
+      metadata: { campaignId },
       stream: auditStreamForRole(actor.actorRole),
     });
 

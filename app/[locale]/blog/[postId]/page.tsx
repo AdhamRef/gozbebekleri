@@ -4,6 +4,16 @@ import axios from "axios";
 import Image from "next/image";
 import { Metadata } from "next";
 import React from "react";
+import { prisma } from "@/lib/prisma";
+import { whereByIdOrLocaleSlug } from "@/lib/slug";
+import { pickTranslation } from "@/lib/i18n/translation-fallback";
+import {
+  LOCALE_SEO,
+  OG_LOCALE_MAP,
+  SITE_URL,
+  buildLocalizedAlternates,
+} from "@/lib/seo";
+import type { Locale } from "@/lib/seo";
 // server-side messages loader
 
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,55 +36,76 @@ interface BlogPostProps {
   params: Promise<{ locale: string; postId: string }>;
 }
 
-// Generate metadata for the blog post page (SEO with translated title)
+async function fetchPostForSeo(idOrSlug: string, locale: string) {
+  return prisma.post.findFirst({
+    where: whereByIdOrLocaleSlug(idOrSlug, locale),
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      description: true,
+      image: true,
+      updatedAt: true,
+      translations: {
+        select: { locale: true, title: true, description: true, image: true, slug: true },
+      },
+    },
+  });
+}
+
+// Generate metadata for the blog post page (SEO with translated title +
+// per-locale hreflang/canonical using each locale's own translation slug)
 export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
   try {
     const params = await args.params;
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.com";
     const locale = (params?.locale as string) || "ar";
     const postId = params?.postId;
+    const seo = LOCALE_SEO[locale as Locale] ?? LOCALE_SEO.en;
 
-    const response = await axios.get(`${baseUrl}/api/posts/${postId}`, { params: { locale } });
-    const post = response.data.post;
+    const post = await fetchPostForSeo(postId, locale);
+    if (!post) {
+      return { title: seo.blog.title, description: seo.blog.description };
+    }
 
-    // Prefer localized top-level fields, then translations array, then language-suffixed fallbacks
-    const tr = Array.isArray(post?.translations) ? post.translations.find((t: { locale: string }) => t.locale === locale) : null;
-    const titleText = post?.title || tr?.title || post?.titleAR || post?.titleEN || post?.titleFR || "Blog";
-    const descriptionText = post?.description || tr?.description || post?.descriptionAR || post?.descriptionEN || post?.descriptionFR || "";
-    const imageUrl = post?.image || "/default-post-image.jpg";
+    const t = pickTranslation(post.translations, locale);
+    const titleText = (t?.title || post.title || seo.blog.title).trim();
+    const descriptionText = ((t?.description || post.description) || seo.blog.description).slice(0, 160);
+    const imageUrl =
+      (t as { image?: string | null } | undefined)?.image ||
+      post.image ||
+      `${SITE_URL}/og-image.jpg`;
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://gozbebekleri.com";
-    const canonicalSlug = post?.slug || postId;
-    const canonicalUrl = `${siteUrl}/${locale}/blog/${canonicalSlug}`;
+    const alternates = buildLocalizedAlternates({
+      basePath: "/blog",
+      baseSlug: post.slug,
+      translations: post.translations,
+      fallback: post.id,
+      currentLocale: locale,
+    });
 
-    const msgs = await import(`../../../../i18n/messages/${locale}.json`).catch(() => null);
-    const metaSuffix = msgs?.default?.Blog?.metaTitleSuffix ?? " - قرة العيون";
-    const fullTitle = `${titleText}${metaSuffix}`;
+    const fullTitle = `${titleText} | ${seo.siteName}`;
 
     return {
       title: fullTitle,
-      description: descriptionText || undefined,
+      description: descriptionText,
+      keywords: seo.keywords,
+      alternates,
       openGraph: {
         title: fullTitle,
-        description: descriptionText || undefined,
-        images: imageUrl ? [{ url: imageUrl, width: 1200, height: 630, alt: titleText }] : undefined,
-        url: canonicalUrl,
+        description: descriptionText,
+        images: [{ url: imageUrl, width: 1200, height: 630, alt: titleText }],
+        url: alternates.canonical,
+        siteName: seo.siteName,
+        locale: OG_LOCALE_MAP[locale as Locale] ?? "en_US",
         type: "article",
-        locale: locale === "ar" ? "ar_SA" : locale === "fr" ? "fr_FR" : "en_US",
       },
       twitter: {
         card: "summary_large_image",
         title: fullTitle,
-        description: descriptionText || undefined,
-        images: imageUrl ? [imageUrl] : undefined,
+        description: descriptionText,
+        images: [imageUrl],
       },
-      alternates: {
-        canonical: canonicalUrl,
-      },
-      robots: {
-        index: true,
-        follow: true,
-      },
+      robots: { index: true, follow: true },
     };
   } catch (err) {
     console.error("Failed to generate metadata", err);

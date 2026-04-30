@@ -33,6 +33,7 @@ import dynamic from "next/dynamic";
 const CartPaymentDialog = dynamic(() => import("./CartPaymentDialog"), { ssr: false });
 import { AnimatePresence, motion } from "framer-motion";
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
+import { getSocialLinks } from "@/lib/social-links";
 
 interface CartItem {
   id: string;
@@ -56,6 +57,7 @@ const Navbar = () => {
   const t = useTranslations("Navbar");
   const locale = useLocale();
   const isRTL = locale === "ar";
+  const social = getSocialLinks(locale);
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const router = useRouter();
@@ -180,16 +182,16 @@ const Navbar = () => {
           <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-9">
             {/* Left: social icons + phone */}
             <div className="flex items-center gap-3">
-              <a href="https://www.instagram.com/gbyd_foundation/" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="hover:text-blue-200 transition-colors">
+              <a href={social.instagram} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="hover:text-blue-200 transition-colors">
                 <Instagram className="w-3.5 h-3.5" />
               </a>
-              <a href="https://www.youtube.com/channel/UCvvSx8jtGafK9BI2hQnBYSQ" target="_blank" rel="noopener noreferrer" aria-label="Youtube" className="hover:text-blue-200 transition-colors">
+              <a href={social.youtube} target="_blank" rel="noopener noreferrer" aria-label="Youtube" className="hover:text-blue-200 transition-colors">
                 <Youtube className="w-3.5 h-3.5" />
               </a>
-              <a href="https://www.facebook.com/gozbebeklerider/" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="hover:text-blue-200 transition-colors">
+              <a href={social.facebook} target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="hover:text-blue-200 transition-colors">
                 <Facebook className="w-3.5 h-3.5" />
               </a>
-              <a href="https://x.com/gozbebeklerider" target="_blank" rel="noopener noreferrer" aria-label="Twitter" className="hover:text-blue-200 transition-colors">
+              <a href={social.twitter} target="_blank" rel="noopener noreferrer" aria-label="Twitter" className="hover:text-blue-200 transition-colors">
                 <Twitter className="w-3.5 h-3.5" />
               </a>
               <span className="border-l border-white/30 pl-3 flex items-center gap-1.5">
@@ -477,16 +479,16 @@ const Navbar = () => {
 
                 {/* Social links */}
                 <div className="px-4 py-3 flex items-center justify-center gap-5">
-                  <a href="https://www.instagram.com/gbyd_foundation/" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-[#025EB8] hover:text-white transition-colors">
+                  <a href={social.instagram} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-[#025EB8] hover:text-white transition-colors">
                     <Instagram className="w-4 h-4" />
                   </a>
-                  <a href="https://www.youtube.com/channel/UCvvSx8jtGafK9BI2hQnBYSQ" target="_blank" rel="noopener noreferrer" aria-label="Youtube" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-[#025EB8] hover:text-white transition-colors">
+                  <a href={social.youtube} target="_blank" rel="noopener noreferrer" aria-label="Youtube" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-[#025EB8] hover:text-white transition-colors">
                     <Youtube className="w-4 h-4" />
                   </a>
-                  <a href="https://www.facebook.com/gozbebeklerider/" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-[#025EB8] hover:text-white transition-colors">
+                  <a href={social.facebook} target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-[#025EB8] hover:text-white transition-colors">
                     <Facebook className="w-4 h-4" />
                   </a>
-                  <a href="https://x.com/gozbebeklerider" target="_blank" rel="noopener noreferrer" aria-label="Twitter" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-[#025EB8] hover:text-white transition-colors">
+                  <a href={social.twitter} target="_blank" rel="noopener noreferrer" aria-label="Twitter" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-[#025EB8] hover:text-white transition-colors">
                     <Twitter className="w-4 h-4" />
                   </a>
                   <a href="https://wa.me/902122885930" aria-label="WhatsApp" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-[#025EB8] hover:text-white transition-colors">
