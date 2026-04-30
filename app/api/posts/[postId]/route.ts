@@ -97,7 +97,7 @@ export async function GET(
               fundraisingMode: true,
               sharePriceUSD: true,
               suggestedShareCounts: true,
-              translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true, description: true } },
+              translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true, description: true, slug: true } },
             },
           });
     const orderedCampaigns = orderCampaignsByIds(campaignIdList, campaignRows).map((c) => {
@@ -105,7 +105,9 @@ export async function GET(
       const tC = pickTranslation(c.translations, locale);
       return {
         id: c.id,
-        slug: c.slug ?? null,
+        // Locale-aware slug for the related-campaign card shown on single blog post pages.
+        slug: (tC as { slug?: string | null } | undefined)?.slug || c.slug || null,
+        baseSlug: c.slug ?? null,
         title: tC?.title || c.title,
         description: tC?.description || c.description,
         targetAmount: c.targetAmount,

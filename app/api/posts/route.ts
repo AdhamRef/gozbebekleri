@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
               currentAmount: true,
               targetAmount: true,
               images: true,
-              translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true } },
+              translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, title: true, slug: true } },
             },
           });
 
@@ -89,7 +89,9 @@ export async function GET(request: NextRequest) {
         const tC = pickTranslation(c.translations, locale);
         return {
           id: c.id,
-          slug: c.slug ?? null,
+          // Locale-aware slug for /campaign/[slug] links from blog cards.
+          slug: (tC as { slug?: string | null } | undefined)?.slug || c.slug || null,
+          baseSlug: c.slug ?? null,
           title: tC?.title || c.title,
           currentAmount: c.currentAmount,
           targetAmount: c.targetAmount,

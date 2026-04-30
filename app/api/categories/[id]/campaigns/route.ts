@@ -116,7 +116,7 @@ export async function GET(
       sharePriceUSD: true,
       suggestedShareCounts: true,
       suggestedDonations: true,
-      translations: { where: translationLocaleWhere(locale), take: 2, select: { title: true, description: true, locale: true } },
+      translations: { where: translationLocaleWhere(locale), take: 2, select: { title: true, description: true, locale: true, slug: true } },
       _count: { select: { donations: true } },
       category: {
         select: {
@@ -124,7 +124,7 @@ export async function GET(
           slug: true,
           name: true,
           icon: true,
-          translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true } },
+          translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true, slug: true } },
         },
       },
     } satisfies Prisma.CampaignSelect;
@@ -203,7 +203,10 @@ export async function GET(
       const tCat = pickTranslation(c.category?.translations, locale);
       return {
         id: c.id,
-        slug: c.slug ?? null,
+        // Locale-aware slug: per-locale translation slug → base slug → null.
+        // Drives /campaign/[slug] links from this list.
+        slug: (tC as { slug?: string | null } | undefined)?.slug || c.slug || null,
+        baseSlug: c.slug ?? null,
         title: tC?.title || c.title,
         description: tC?.description || c.description,
         images: c.images,
@@ -229,7 +232,10 @@ export async function GET(
         category: c.category
           ? {
               id: c.category.id,
-              slug: c.category.slug ?? null,
+              slug:
+                (tCat as { slug?: string | null } | undefined)?.slug ||
+                c.category.slug ||
+                null,
               name: tCat?.name || c.category.name,
               icon: c.category.icon,
             }

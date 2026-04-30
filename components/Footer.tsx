@@ -67,7 +67,13 @@ const Footer = () => {
       .then((data) => {
         const items = data?.items ?? data ?? [];
         if (Array.isArray(items)) {
-          setCategories(items.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })));
+          setCategories(
+            items.map((c: { id: string; name: string; slug?: string | null }) => ({
+              id: c.id,
+              slug: c.slug ?? null,
+              name: c.name,
+            }))
+          );
         }
       })
       .catch(() => {});
