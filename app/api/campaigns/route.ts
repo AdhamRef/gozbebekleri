@@ -376,11 +376,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Resolve slug: explicit override or auto-generate from English title (always)
+    // Base (Arabic) slug: explicit override or auto-generate from main Arabic title, then EN.
     const requestedSlug = normalizeUserSlug(data.slug);
+    const arTitle =
+      typeof data.title === "string" && data.title.trim() ? data.title.trim() : "";
     const slug = await generateUniqueSlug(
       prisma.campaign as any,
-      requestedSlug ?? enTitle,
+      requestedSlug ?? (arTitle || enTitle),
       { fallbackPrefix: "campaign" }
     );
 

@@ -1,42 +1,14 @@
 import Cookies from "js-cookie";
+import { SUPPORTED_CURRENCY_OPTIONS } from "@/lib/supported-currencies";
 
-/** Matches `CurrencySelector` codes (uppercase in URLs). */
-export const ALLOWED_URL_CURRENCIES = new Set([
-  "USD",
-  "EUR",
-  "GBP",
-  "CAD",
-  "AUD",
-  "TRY",
-  "SAR",
-  "AED",
-  "KWD",
-  "EGP",
-  "QAR",
-  "BHD",
-  "JOD",
-  "MAD",
-  "DEFAULT",
-]);
-
-/** Stable list for dashboards / link builders (order matches typical UX). */
+/** Stable list for dashboards / link builders (DEFAULT first, then same order as `CurrencySelector`). */
 export const URL_CURRENCY_CODES_ORDERED = [
   "DEFAULT",
-  "USD",
-  "EUR",
-  "GBP",
-  "CAD",
-  "AUD",
-  "TRY",
-  "SAR",
-  "AED",
-  "KWD",
-  "QAR",
-  "BHD",
-  "JOD",
-  "MAD",
-  "EGP",
+  ...SUPPORTED_CURRENCY_OPTIONS.map((o) => o.code),
 ] as const;
+
+/** Matches `CurrencySelector` codes (uppercase in URLs). */
+export const ALLOWED_URL_CURRENCIES = new Set<string>(URL_CURRENCY_CODES_ORDERED);
 
 const COOKIE_DEFAULT = "DEFAULT";
 

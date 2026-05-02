@@ -24,19 +24,7 @@ import {
   type SuggestedShareCountsConfig,
 } from "@/lib/campaign/campaign-modes";
 import { parseAmountsInput } from "@/lib/campaign/suggested-donations";
-
-const CURRENCY_CODES = [
-  "USD",
-  "EUR",
-  "GBP",
-  "TRY",
-  "SAR",
-  "AED",
-  "KWD",
-  "EGP",
-  "QAR",
-  "BHD",
-] as const;
+import { SUPPORTED_CURRENCY_OPTIONS } from "@/lib/supported-currencies";
 
 type PriceRow = { id: string; currency: string; priceStr: string };
 
@@ -177,9 +165,9 @@ export const SuggestedShareCountsSection = forwardRef<
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {CURRENCY_CODES.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
+                      {SUPPORTED_CURRENCY_OPTIONS.map((c) => (
+                        <SelectItem key={c.code} value={c.code}>
+                          {c.code} — {c.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

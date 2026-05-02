@@ -388,26 +388,33 @@ export async function PUT(
       }
     }
 
-    // Slug: explicit value (admin override) or auto-regenerate from English title.
-    // When the admin clears the slug, we fall back to the new English title (if
-    // they're updating translations now), then the saved English translation,
-    // then the campaign's base (Arabic) title as a last resort.
+    // Base (Arabic) slug: admin override or auto from main Arabic title first (no AR translation row),
+    // then new/saved English title if Arabic is unavailable.
     if (body.slug !== undefined) {
       const cleaned = normalizeUserSlug(body.slug);
       let base = cleaned ?? "";
       if (!base) {
-        const newEnTitle =
-          typeof body?.translations?.en?.title === "string"
-            ? body.translations.en.title.trim()
-            : "";
-        if (newEnTitle) {
-          base = newEnTitle;
+        const newArTitle =
+          typeof body.title === "string" ? body.title.trim() : "";
+        if (newArTitle) {
+          base = newArTitle;
         } else {
-          const existingEn = await prisma.campaignTranslation.findFirst({
-            where: { campaignId: id, locale: "en" },
-            select: { title: true },
-          });
-          base = existingEn?.title?.trim() || existingCampaign.title;
+          const newEnTitle =
+            typeof body?.translations?.en?.title === "string"
+              ? body.translations.en.title.trim()
+              : "";
+          if (newEnTitle) {
+            base = newEnTitle;
+          } else {
+            const existingEn = await prisma.campaignTranslation.findFirst({
+              where: { campaignId: id, locale: "en" },
+              select: { title: true },
+            });
+            base =
+              existingCampaign.title?.trim() ||
+              existingEn?.title?.trim() ||
+              "";
+          }
         }
       }
       updateData.slug = await generateUniqueSlug(prisma.campaign as any, base, {
@@ -441,6 +448,11 @@ export async function PUT(
         // Process upserts sequentially because the locale-slug uniqueness check inside
         // generateUniqueLocaleSlug must see prior writes within this transaction.
         for (const { locale, data } of translationUpdates) {
+          const existingTrans = await tx.campaignTranslation.findUnique({
+            where: { campaignId_locale: { campaignId: id, locale } },
+            select: { id: true, title: true, description: true, slug: true },
+          });
+
           const translationData: Record<string, string | null> = {};
           if (data.title !== undefined) translationData.title = data.title;
           if (data.description !== undefined)
@@ -455,31 +467,41 @@ export async function PUT(
                 ? data.videoUrl.trim()
                 : null;
           }
-          // Optional per-locale slug: when caller passes an explicit slug we normalize +
-          // dedupe; when it's omitted we leave the existing one alone; when it's
-          // explicitly nulled we clear it.
-          let resolvedSlug: string | null | undefined;
-          if (Object.prototype.hasOwnProperty.call(data, "slug")) {
+
+          const mergedTitle =
+            (typeof translationData.title === "string" && translationData.title.trim()
+              ? translationData.title
+              : existingTrans?.title
+            )?.trim() || existingCampaign.title;
+
+          // Every translation row must have a non-empty slug. Explicit slug → normalize +
+          // dedupe; omitted slug → keep existing when set; empty/null slug in body →
+          // auto-generate from merged title (never persist null).
+          const slugKeyPresent = Object.prototype.hasOwnProperty.call(data, "slug");
+          if (slugKeyPresent) {
             const userSlug = normalizeUserSlug((data as Record<string, unknown>).slug);
-            if (userSlug === null) {
-              resolvedSlug = null;
-            } else {
-              const existingTrans = await tx.campaignTranslation.findUnique({
-                where: { campaignId_locale: { campaignId: id, locale } },
-                select: { id: true },
-              });
-              resolvedSlug = await generateUniqueLocaleSlug(
-                tx.campaignTranslation as any,
-                userSlug,
-                {
-                  locale,
-                  fallbackPrefix: "campaign",
-                  currentTranslationId: existingTrans?.id,
-                }
-              );
-            }
-            translationData.slug = resolvedSlug;
+            const baseForSlug = userSlug ?? mergedTitle;
+            translationData.slug = await generateUniqueLocaleSlug(
+              tx.campaignTranslation as any,
+              baseForSlug,
+              {
+                locale,
+                fallbackPrefix: "campaign",
+                currentTranslationId: existingTrans?.id,
+              }
+            );
+          } else if (!existingTrans?.slug?.trim()) {
+            translationData.slug = await generateUniqueLocaleSlug(
+              tx.campaignTranslation as any,
+              mergedTitle,
+              {
+                locale,
+                fallbackPrefix: "campaign",
+                currentTranslationId: existingTrans?.id,
+              }
+            );
           }
+
           if (Object.keys(translationData).length === 0) continue;
           // Skip only when nothing meaningful was supplied.
           if (

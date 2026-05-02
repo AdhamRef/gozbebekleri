@@ -104,6 +104,10 @@ export function whereByIdOrLocaleSlug(
  * Pick the URL slug to display for a localized entity.
  * Prefers the locale-specific translation slug, then base slug, then null.
  *
+ * For `ar`, the canonical copy lives on the base model (e.g. Campaign.title / Campaign.slug);
+ * there is no separate Arabic translation row. The Arabic URL must use `baseSlug`, not
+ * another locale’s translation slug.
+ *
  * `translations` is expected to be the array shape used across this codebase:
  *   [{ locale: string, slug?: string | null, ... }]
  */
@@ -112,10 +116,17 @@ export function pickLocaleSlug(
   translations: Array<{ locale: string; slug?: string | null }> | null | undefined,
   locale: string
 ): string | null {
+  if (locale === "ar") {
+    if (nonEmpty(baseSlug)) return baseSlug as string;
+    const legacyAr = translations?.find((t) => t.locale === "ar" && nonEmpty(t.slug));
+    if (legacyAr && nonEmpty(legacyAr.slug)) return legacyAr.slug as string;
+    return null;
+  }
+
   if (translations && translations.length) {
     const exact = translations.find((t) => t.locale === locale && nonEmpty(t.slug));
     if (exact && nonEmpty(exact.slug)) return exact.slug as string;
-    // English is the secondary fallback used elsewhere in the codebase
+    // English fallback for non-AR locales only (never for `ar` — see above).
     if (locale !== "en") {
       const en = translations.find((t) => t.locale === "en" && nonEmpty(t.slug));
       if (en && nonEmpty(en.slug)) return en.slug as string;

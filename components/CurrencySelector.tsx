@@ -8,26 +8,14 @@ import {
   isValidCurrencyParam,
   normalizeCurrencyParamToCookie,
 } from "@/lib/currency-link";
+import { SUPPORTED_CURRENCY_OPTIONS } from "@/lib/supported-currencies";
 import { CURRENCY_COOKIE_UPDATED_EVENT } from "@/components/CurrencyFromUrlSync";
 
 export const DEFAULT_CURRENCY_CODE = "DEFAULT";
 
 const currencies = [
   { code: DEFAULT_CURRENCY_CODE, symbol: "•", name: "Default" },
-  { code: "USD", symbol: "$", name: "US Dollar" },
-  { code: "EUR", symbol: "€", name: "Euro" },
-  { code: "GBP", symbol: "£", name: "British Pound" },
-  { code: "CAD", symbol: "C$", name: "Canadian Dollar" },
-  { code: "AUD", symbol: "A$", name: "Australian Dollar" },
-  { code: "TRY", symbol: "₺", name: "Turkish Lira" },
-  { code: "SAR", symbol: "﷼", name: "Saudi Riyal" },
-  { code: "AED", symbol: "د.إ", name: "UAE Dirham" },
-  { code: "KWD", symbol: "د.ك", name: "Kuwaiti Dinar" },
-  { code: "QAR", symbol: "﷼", name: "Qatari Riyal" },
-  { code: "BHD", symbol: "ب.د", name: "Bahraini Dinar" },
-  { code: "JOD", symbol: "د.أ", name: "Jordanian Dinar" },
-  { code: "MAD", symbol: "د.م.", name: "Moroccan Dirham" },
-  { code: "EGP", symbol: "EGP", name: "Egyptian Pound" },
+  ...SUPPORTED_CURRENCY_OPTIONS,
 ];
 
 const BASE_CURRENCY = "USD";

@@ -24,19 +24,7 @@ import {
   parseAmountsInput,
   type SuggestedDonationsConfig,
 } from "@/lib/campaign/suggested-donations";
-
-const CURRENCY_CODES = [
-  "USD",
-  "EUR",
-  "GBP",
-  "TRY",
-  "SAR",
-  "AED",
-  "KWD",
-  "EGP",
-  "QAR",
-  "BHD",
-] as const;
+import { SUPPORTED_CURRENCY_OPTIONS } from "@/lib/supported-currencies";
 
 type Row = { id: string; currency: string; amountsStr: string };
 
@@ -161,9 +149,9 @@ export const SuggestedDonationsSection = forwardRef<
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {CURRENCY_CODES.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
+                      {SUPPORTED_CURRENCY_OPTIONS.map((c) => (
+                        <SelectItem key={c.code} value={c.code}>
+                          {c.code} — {c.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
