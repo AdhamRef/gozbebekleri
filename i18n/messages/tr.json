@@ -81,7 +81,11 @@
     "remaining": "kalan",
     "contributor": "katkıda bulunan",
     "openGoal": "Açık hedef",
-    "sharesMode": "Hisse — hisse başı {currency}{price}"
+    "sharesMode": "Hisse — hisse başı {currency}{price}",
+    "noCampaigns": "Şu anda listelenecek proje yok.",
+    "showMore": "Daha fazla proje göster",
+    "loadingMore": "Yükleniyor…",
+    "loadError": "Projeler yüklenemedi. Lütfen tekrar deneyin."
   },
   "QuickDonate": {
     "associationName": "Kurratül-Ayn Yardım ve Dayanışma Derneği",

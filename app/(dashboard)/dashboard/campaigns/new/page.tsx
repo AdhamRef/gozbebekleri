@@ -70,7 +70,6 @@ const formSchema = z
   title: z.string()
     .min(1, 'العنوان مطلوب')
     .max(100, 'العنوان طويل جداً'),
-  slug: z.string().max(80, 'الـ slug طويل جداً').optional().or(z.literal('')),
   targetAmount: z.number().min(0).max(1000000),
   goalType: z.enum(['FIXED', 'OPEN']),
   fundraisingMode: z.enum(['AMOUNT', 'SHARES']),
@@ -183,7 +182,6 @@ export default function NewCampaignPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: '',
-      slug: '',
       targetAmount: 0,
       goalType: 'FIXED',
       fundraisingMode: 'AMOUNT',
@@ -255,7 +253,6 @@ export default function NewCampaignPage() {
       // ✅ Prepare request with translations
       const requestData = {
         title: values.title,
-        slug: values.slug || undefined,
         description: descriptionAr || '',
         goalType: values.goalType,
         fundraisingMode: values.fundraisingMode,
@@ -620,24 +617,6 @@ const getTranslationStatus = () => {
               <h2 className="text-lg font-semibold">المعلومات الأساسية</h2>
             </div>
 
-            {/* Slug — outside the language tabs (one URL per campaign, derived from English) */}
-            <FormField
-              control={form.control}
-              name="slug"
-              render={({ field }) => (
-                <FormItem dir='rtl' className="mb-6">
-                  <FormLabel>الرابط (slug) — اختياري</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="مثال: gaza-emergency-relief" dir="ltr" />
-                  </FormControl>
-                  <FormDescription>
-                    يُستخدم في رابط المشروع. إذا تُرك فارغاً سيُنشأ تلقائياً من العنوان الإنجليزي.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
               <TabsList className="flex flex-wrap gap-1 mb-6">
                 <TabsTrigger value="ar" className="gap-2">
@@ -749,9 +728,6 @@ const getTranslationStatus = () => {
                       <FormControl>
                         <Input {...field} placeholder="Enter campaign title in English" />
                       </FormControl>
-                      <FormDescription>
-                        Required — also drives the slug when no manual override is set.
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

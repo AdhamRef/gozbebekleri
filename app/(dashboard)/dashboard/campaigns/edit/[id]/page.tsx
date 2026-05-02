@@ -86,7 +86,6 @@ const formSchema = z
   title: z.string()
     .min(1, 'العنوان مطلوب')
     .max(100, 'العنوان طويل جداً'),
-  slug: z.string().max(80, 'الـ slug طويل جداً').optional().or(z.literal('')),
   targetAmount: z.number().min(0).max(1000000),
   goalType: z.enum(['FIXED', 'OPEN']),
   fundraisingMode: z.enum(['AMOUNT', 'SHARES']),
@@ -258,7 +257,6 @@ export default function EditCampaignPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: '',
-      slug: '',
       targetAmount: 0,
       goalType: 'FIXED',
       fundraisingMode: 'AMOUNT',
@@ -338,7 +336,6 @@ export default function EditCampaignPage() {
 
         form.reset({
           title: campaign.title,
-          slug: campaign.slug || '',
           targetAmount: campaign.targetAmount,
           goalType: campaign.goalType ?? 'FIXED',
           fundraisingMode: campaign.fundraisingMode ?? 'AMOUNT',
@@ -425,7 +422,6 @@ export default function EditCampaignPage() {
         Number(values.currentAmount) !== Number(originalCurrentAmount);
       const requestData: Record<string, unknown> = {
         title: values.title,
-        slug: values.slug ?? '',
         description: descriptionAr || '',
         goalType: values.goalType,
         fundraisingMode: values.fundraisingMode,
@@ -939,24 +935,6 @@ export default function EditCampaignPage() {
               <Languages className="w-5 h-5 text-gray-700" />
               <h2 className="text-lg font-semibold">المعلومات الأساسية</h2>
             </div>
-
-            {/* Slug — outside language tabs (one URL per campaign, derived from English) */}
-            <FormField
-              control={form.control}
-              name="slug"
-              render={({ field }) => (
-                <FormItem dir='rtl' className="mb-6">
-                  <FormLabel>الرابط (slug) — اختياري</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="مثال: gaza-emergency-relief" dir="ltr" />
-                  </FormControl>
-                  <FormDescription>
-                    تغييره سيغيّر رابط هذه المشروع — احرص على إعادة توجيه الروابط القديمة. اتركه فارغاً لإعادة التوليد من العنوان الإنجليزي.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
               <TabsList className="flex flex-wrap gap-1 mb-6" dir="rtl">

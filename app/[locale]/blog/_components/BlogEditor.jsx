@@ -69,7 +69,6 @@ import { cn } from "@/lib/utils";
 // edited via BlogLocaleEditor on edit), so it's not part of this form schema.
 const postEditFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
-  slug: z.string().max(80, "الـ slug طويل جداً").optional().or(z.literal("")),
   description: z.string().optional(),
   image: z.string().optional(),
   categoryId: z.string().optional(),
@@ -82,8 +81,6 @@ const protectedEditorConfig = {
   generalDescription: "قدم التفاصيل الأساسية لمقالك",
   formTitle: "العنوان",
   placeHolderTitle: "أدخل عنوان المقال",
-  placeholderSlug: "أدخل رابط المقال",
-  generateSlug: "توليد الرابط",
   categoryTitle: "التصنيف",
   categoryDescription: "اختر تصنيفاً لمقالك",
   campaignTitle: "الحملات ذات الصلة",
@@ -188,7 +185,6 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
   };
   const defaultValues = {
     title: post?.titleAR || post?.title || "",
-    slug: post?.slug || "",
     description: post?.descriptionAR || post?.description || "",
     image: post?.imageAR || post?.image || "",
     categoryId: post?.category_id || post?.categoryId || "",
@@ -243,7 +239,6 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
       }
       const payload = {
         title: data.title,
-        slug: data.slug ?? "",
         description: data.description || "",
         content: contentAR || "",
         image: data.image || "",
@@ -253,8 +248,6 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
       if (isCreate && Object.keys(translationsPayload).length > 0) {
         payload.translations = translationsPayload;
       }
-      // On create, an empty slug means "auto-generate from English title" — drop it so the API picks.
-      if (isCreate && !payload.slug) delete payload.slug;
 
       let response;
       if (isCreate) {
@@ -366,23 +359,6 @@ const BlogEditor = ({ post, userId, categories, campaignOptions = [], redirectAf
                         {...field}
                       />
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="slug"
-                render={({ field }) => (
-                  <FormItem dir="rtl">
-                    <FormLabel>الرابط (slug) — اختياري</FormLabel>
-                    <FormControl>
-                      <Input dir="ltr" placeholder={protectedEditorConfig.placeholderSlug} {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      يُستخدم في رابط المقال (لكل اللغات). إذا تُرك فارغاً سيُنشأ تلقائياً من العنوان الإنجليزي.
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -27,7 +27,6 @@ import CategoryIcon, { CATEGORY_ICON_NAMES } from '@/components/CategoryIcon';
 
 const formSchema = z.object({
   name: z.string().min(1, 'اسم الحملة مطلوب').max(50, 'اسم الحملة طويل جداً'),
-  slug: z.string().max(80, 'الـ slug طويل جداً').optional().or(z.literal('')),
   description: z.string().max(500, 'الوصف طويل جداً').optional(),
   image: z.string().optional(),
   icon: z.string().optional(),
@@ -56,7 +55,6 @@ export default function NewCategoryPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
-      slug: '',
       description: '',
       image: '',
       icon: '',
@@ -80,7 +78,6 @@ export default function NewCategoryPage() {
     try {
       await axios.post('/api/categories', {
         name: values.name,
-        slug: values.slug || undefined,
         description: values.description,
         image: values.image,
         icon: values.icon,
@@ -159,18 +156,6 @@ export default function NewCategoryPage() {
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          {/* Slug — outside the language tabs (one URL per category, derived from English) */}
-          <Card className="p-6">
-            <FormField control={form.control} name="slug" render={({ field }) => (
-              <FormItem>
-                <FormLabel>الرابط (slug) — اختياري</FormLabel>
-                <FormControl><Input {...field} placeholder="مثال: emergency-relief" dir="ltr" /></FormControl>
-                <FormDescription>يُستخدم في رابط الحملة. إذا تُرك فارغاً سيُنشأ تلقائياً من الاسم الإنجليزي.</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )} />
-          </Card>
-
           <Tabs defaultValue="ar" className="w-full">
             <TabsList className="flex flex-wrap gap-1 mb-4" dir="rtl">
               <TabsTrigger value="ar" className="gap-2">

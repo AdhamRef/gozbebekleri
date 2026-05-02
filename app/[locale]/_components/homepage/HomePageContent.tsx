@@ -1,22 +1,40 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Image from "next/image";
+import dynamic from "next/dynamic";
 import { Globe, MoreHorizontal, Baby, Home, Map, ArrowRight } from "lucide-react";
 import CategoryIcon from "@/components/CategoryIcon";
 
-import CampaignsSlider from "./CampaignsSlider";
-import QuickDonate from "./QuickDonate";
 import HeroSlider from "./HeroSlider";
 import BlogCard from "../BlogCard";
 
 interface HomePageContentProps {
   firstHeroImage?: string | null;
 }
-import LiveDonationsTicker from "@/components/LiveDonationsTicker";
 import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
 import axios from "axios";
+
+const CampaignsSlider = dynamic(() => import("./CampaignsSlider"), {
+  loading: () => (
+    <div className="w-full space-y-4" aria-busy="true">
+      <div className="grid grid-cols-2 lg:grid-cols-4 auto-rows-fr gap-3">
+        <div className="col-span-2 row-span-2 aspect-[4/3] bg-gray-200 rounded-2xl animate-pulse" />
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="aspect-[4/3] bg-gray-200 rounded-2xl animate-pulse" />
+        ))}
+      </div>
+    </div>
+  ),
+  ssr: false,
+});
+
+const QuickDonate = dynamic(() => import("./QuickDonate"), { loading: () => <div className="min-h-[200px]" aria-hidden />, ssr: false });
+
+const LiveDonationsTicker = dynamic(() => import("@/components/LiveDonationsTicker"), {
+  loading: () => null,
+  ssr: false,
+});
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -39,34 +57,6 @@ const cacheSet = <T,>(key: string, data: T): void => {
 interface CategoryItem { id: string; slug?: string | null; name: string; image?: string | null; icon?: string | null; order?: number; }
 interface PostItem { id: string; slug?: string | null; title: string; description: string | null; image: string | null; published: boolean; createdAt: string; }
 
-const LOGO_URL = "https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png";
-
-function HomeLoadingScreen() {
-  return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white overflow-hidden">
-      {/* Soft radial glow behind logo */}
-      <div className="absolute w-72 h-72 rounded-full bg-[#025EB8]/6 blur-3xl" />
-      <div className="absolute w-40 h-40 rounded-full bg-[#FA5D17]/8 blur-2xl translate-y-8" />
-
-      <div className="relative flex flex-col items-center gap-8">
-        {/* Logo */}
-        <Image src={LOGO_URL} alt="" width={128} height={128} quality={100} className="h-16 w-auto object-contain" />
-
-        {/* Animated dots */}
-        <div className="flex items-center gap-1.5">
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              className="w-1.5 h-1.5 rounded-full bg-[#025EB8] animate-bounce"
-              style={{ animationDelay: `${i * 0.18}s`, animationDuration: "0.9s" }}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 const STATS = [
   { icon: Home, valueKey: "stat1Value", labelKey: "stat1Label", value: "100K+" },
   { icon: Baby, valueKey: "stat2Value", labelKey: "stat2Label", value: "500K+" },
@@ -79,7 +69,6 @@ const HomePage: React.FC<HomePageContentProps> = ({ firstHeroImage }) => {
   const locale = useLocale();
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [posts, setPosts] = useState<PostItem[]>([]);
-  const [initialLoading, setInitialLoading] = useState(true);
 
   useEffect(() => {
     const cacheKeyCategories = `home_categories_${locale}`;
@@ -91,10 +80,9 @@ const HomePage: React.FC<HomePageContentProps> = ({ firstHeroImage }) => {
       const cachedPosts = cacheGet<PostItem[]>(cacheKeyPosts);
       if (cachedCategories?.length) setCategories(cachedCategories);
       if (cachedPosts?.length) setPosts(cachedPosts);
-      if (cachedCategories && cachedPosts) setInitialLoading(false);
 
       const [categoriesRes, postsRes] = await Promise.all([
-        fetch(`/api/categories?locale=${locale}&limit=50&sortBy=order`).then((r) => r.json()),
+        fetch(`/api/categories?locale=${locale}&limit=12&sortBy=order`).then((r) => r.json()),
         axios.get("/api/posts", { params: { locale, limit: 3 } }).then((r) => r.data),
       ]);
       if (cancelled) return;
@@ -108,16 +96,15 @@ const HomePage: React.FC<HomePageContentProps> = ({ firstHeroImage }) => {
       const postList = Array.isArray(postItems) ? postItems : [];
       setPosts(postList);
       cacheSet(cacheKeyPosts, postList);
-
-      setInitialLoading(false);
     };
     run();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [locale]);
 
   return (
     <div className="bg-white">
-      {initialLoading && <HomeLoadingScreen />}
       <style dangerouslySetInnerHTML={{ __html: `@keyframes shimmer{0%,100%{transform:translateX(-100%)}50%{transform:translateX(150%)}}` }} />
 
       {/* ── Hero Slider ── */}
@@ -135,7 +122,7 @@ const HomePage: React.FC<HomePageContentProps> = ({ firstHeroImage }) => {
               {t("viewAll") || "Tümünü Gör"} <MoreHorizontal className="w-4 h-4" />
             </Link>
           </div>
-          <CampaignsSlider limit={12}/>
+          <CampaignsSlider />
         </div>
       </section>
 

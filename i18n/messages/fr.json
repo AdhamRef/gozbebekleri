@@ -81,7 +81,11 @@
     "remaining": "restant",
     "contributor": "contributeur",
     "openGoal": "Objectif ouvert",
-    "sharesMode": "Parts — {currency}{price} chacune"
+    "sharesMode": "Parts — {currency}{price} chacune",
+    "noCampaigns": "Aucun projet disponible pour le moment.",
+    "showMore": "Afficher plus de projets",
+    "loadingMore": "Chargement…",
+    "loadError": "Impossible de charger les projets. Veuillez réessayer."
   },
   "QuickDonate": {
     "associationName": "Association de secours et de solidarité Qurrat Al-Ayun",

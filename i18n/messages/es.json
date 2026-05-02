@@ -81,7 +81,11 @@
     "remaining": "restante",
     "contributor": "contribuyente",
     "openGoal": "Meta abierta",
-    "sharesMode": "Cuotas — {currency}{price} cada una"
+    "sharesMode": "Cuotas — {currency}{price} cada una",
+    "noCampaigns": "No hay proyectos disponibles en este momento.",
+    "showMore": "Ver más proyectos",
+    "loadingMore": "Cargando…",
+    "loadError": "No se pudieron cargar los proyectos. Inténtalo de nuevo."
   },
   "QuickDonate": {
     "associationName": "Asociación de Socorro y Solidaridad Qurrat Al-Ayun",

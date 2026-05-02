@@ -27,7 +27,6 @@ import CategoryIcon, { CATEGORY_ICON_NAMES } from '@/components/CategoryIcon';
 
 const formSchema = z.object({
   name: z.string().min(1, 'اسم الحملة مطلوب').max(50, 'اسم الحملة طويل جداً'),
-  slug: z.string().max(80, 'الـ slug طويل جداً').optional().or(z.literal('')),
   description: z.string().max(500, 'الوصف طويل جداً').optional(),
   image: z.string().optional(),
   icon: z.string().optional(),
@@ -71,7 +70,6 @@ export default function EditCategoryPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
-      slug: '',
       description: '',
       image: '',
       icon: '',
@@ -100,7 +98,6 @@ export default function EditCategoryPage() {
         const en = getTr('en'); const fr = getTr('fr'); const tr = getTr('tr'); const id = getTr('id'); const pt = getTr('pt'); const es = getTr('es');
         form.reset({
           name: category.name || '',
-          slug: category.slug || '',
           description: category.description || '',
           image: category.image || '',
           icon: category.icon || '',
@@ -129,7 +126,6 @@ export default function EditCategoryPage() {
     try {
       await axios.put(`/api/categories/${params.id}`, {
         name: values.name,
-        slug: values.slug ?? '',
         description: values.description,
         image: values.image,
         icon: values.icon,
@@ -217,18 +213,6 @@ export default function EditCategoryPage() {
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          {/* Slug — outside the language tabs (one URL per category, derived from English) */}
-          <Card className="p-6">
-            <FormField control={form.control} name="slug" render={({ field }) => (
-              <FormItem>
-                <FormLabel>الرابط (slug) — اختياري</FormLabel>
-                <FormControl><Input {...field} placeholder="مثال: emergency-relief" dir="ltr" /></FormControl>
-                <FormDescription>تغييره سيغيّر رابط هذه الحملة — احرص على إعادة توجيه الروابط القديمة. اتركه فارغاً لإعادة التوليد من الاسم الإنجليزي.</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )} />
-          </Card>
-
           <Tabs defaultValue="ar" className="w-full">
             <TabsList className="flex flex-wrap gap-1 mb-4" dir="rtl">
               <TabsTrigger value="ar" className="gap-2">

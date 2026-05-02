@@ -81,7 +81,11 @@
     "remaining": "tersisa",
     "contributor": "kontributor",
     "openGoal": "Target terbuka",
-    "sharesMode": "Saham — {currency}{price} per saham"
+    "sharesMode": "Saham — {currency}{price} per saham",
+    "noCampaigns": "Belum ada proyek yang tersedia saat ini.",
+    "showMore": "Tampilkan lebih banyak proyek",
+    "loadingMore": "Memuat…",
+    "loadError": "Gagal memuat proyek. Silakan coba lagi."
   },
   "QuickDonate": {
     "associationName": "Asosiasi Bantuan dan Solidaritas Qurrat Al-Ayun",

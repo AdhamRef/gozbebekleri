@@ -81,7 +81,11 @@
     "remaining": "left",
     "contributor": "contributor",
     "openGoal": "Open goal",
-    "sharesMode": "Shares — {currency}{price} each"
+    "sharesMode": "Shares — {currency}{price} each",
+    "noCampaigns": "No projects available at the moment.",
+    "showMore": "Show more projects",
+    "loadingMore": "Loading…",
+    "loadError": "Could not load projects. Please try again."
   },
   "QuickDonate": {
     "associationName": "Qurrat Al-Ayun Relief and Solidarity Association",

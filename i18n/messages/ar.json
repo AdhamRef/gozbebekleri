@@ -81,7 +81,11 @@
     "remaining": "تبقى",
     "contributor": "متبرع",
     "openGoal": "هدف مفتوح",
-    "sharesMode": "سهوم — {currency}{price} للسهم"
+    "sharesMode": "سهوم — {currency}{price} للسهم",
+    "noCampaigns": "لا توجد مشاريع متاحة حالياً.",
+    "showMore": "عرض المزيد من المشاريع",
+    "loadingMore": "جاري التحميل…",
+    "loadError": "تعذر تحميل المشاريع. حاول مرة أخرى."
   },
   "QuickDonate": {
     "associationName": "جمعية قرة العيون للإغاثة والتكافل",
