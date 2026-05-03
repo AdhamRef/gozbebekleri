@@ -29,6 +29,7 @@ import {
   normalizeUserSlug,
   whereByIdOrLocaleSlug,
 } from "@/lib/slug";
+import { EMPTY_TIPTAP_DOC_JSON } from "@/lib/tiptap-empty-doc";
 
 // ✅ Prisma Singleton - Reuse connection across requests
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
@@ -455,8 +456,13 @@ export async function PUT(
 
           const translationData: Record<string, string | null> = {};
           if (data.title !== undefined) translationData.title = data.title;
-          if (data.description !== undefined)
-            translationData.description = data.description;
+          if (data.description !== undefined) {
+            const d = data.description;
+            translationData.description =
+              d == null || d === ""
+                ? EMPTY_TIPTAP_DOC_JSON
+                : String(d);
+          }
           if (data.image !== undefined) {
             translationData.image =
               typeof data.image === "string" && data.image.trim() ? data.image.trim() : null;

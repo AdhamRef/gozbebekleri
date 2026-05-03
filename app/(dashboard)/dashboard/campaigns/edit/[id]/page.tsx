@@ -71,6 +71,7 @@ import {
   parseSuggestedShareCounts,
   type SuggestedShareCountsConfig,
 } from '@/lib/campaign/campaign-modes';
+import { EMPTY_TIPTAP_DOC_JSON } from '@/lib/tiptap-empty-doc';
 import {
   SuggestedDonationsSection,
   type SuggestedDonationsSectionRef,
@@ -438,7 +439,7 @@ export default function EditCampaignPage() {
         translations: {
           en: {
             title: values.title_en,
-            description: descriptionEn,
+            description: descriptionEn ?? EMPTY_TIPTAP_DOC_JSON,
             image: values.image_en ?? '',
             videoUrl: values.videoUrl_en ?? '',
           },
@@ -446,7 +447,7 @@ export default function EditCampaignPage() {
             ? {
                 fr: {
                   title: values.title_fr,
-                  description: descriptionFr,
+                  description: descriptionFr ?? EMPTY_TIPTAP_DOC_JSON,
                   image: values.image_fr ?? '',
                   videoUrl: values.videoUrl_fr ?? '',
                 },
@@ -456,7 +457,7 @@ export default function EditCampaignPage() {
             ? {
                 tr: {
                   title: values.title_tr,
-                  description: descriptionTr,
+                  description: descriptionTr ?? EMPTY_TIPTAP_DOC_JSON,
                   image: values.image_tr ?? '',
                   videoUrl: values.videoUrl_tr ?? '',
                 },
@@ -466,7 +467,7 @@ export default function EditCampaignPage() {
             ? {
                 id: {
                   title: values.title_id,
-                  description: descriptionId,
+                  description: descriptionId ?? EMPTY_TIPTAP_DOC_JSON,
                   image: values.image_id ?? '',
                   videoUrl: values.videoUrl_id ?? '',
                 },
@@ -476,7 +477,7 @@ export default function EditCampaignPage() {
             ? {
                 pt: {
                   title: values.title_pt,
-                  description: descriptionPt,
+                  description: descriptionPt ?? EMPTY_TIPTAP_DOC_JSON,
                   image: values.image_pt ?? '',
                   videoUrl: values.videoUrl_pt ?? '',
                 },
@@ -486,7 +487,7 @@ export default function EditCampaignPage() {
             ? {
                 es: {
                   title: values.title_es,
-                  description: descriptionEs,
+                  description: descriptionEs ?? EMPTY_TIPTAP_DOC_JSON,
                   image: values.image_es ?? '',
                   videoUrl: values.videoUrl_es ?? '',
                 },
