@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import axios from 'axios';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { useForm, type FieldErrors } from 'react-hook-form';
 import * as z from 'zod';
 import { toast } from 'react-hot-toast';
 import { Card } from '@/components/ui/card';
@@ -81,13 +81,11 @@ import {
   type SuggestedShareCountsSectionRef,
 } from '../../_components/SuggestedShareCountsSection';
 
-// ✅ Enhanced schema with translations
+// ✅ Enhanced schema with translations (limits aligned with DB / real data — not stricter than Prisma)
 const formSchema = z
   .object({
-  title: z.string()
-    .min(1, 'العنوان مطلوب')
-    .max(100, 'العنوان طويل جداً'),
-  targetAmount: z.number().min(0).max(1000000),
+  title: z.string().min(1, 'العنوان مطلوب').max(2000, 'العنوان طويل جداً'),
+  targetAmount: z.coerce.number().min(0).max(1000000),
   goalType: z.enum(['FIXED', 'OPEN']),
   fundraisingMode: z.enum(['AMOUNT', 'SHARES']),
   sharePriceUSD: z.number().min(0).max(1000000).optional(),
@@ -96,9 +94,9 @@ const formSchema = z
   isActive: z.boolean(),
   images: z.array(z.string())
     .min(1, 'صورة واحدة على الأقل مطلوبة')
-    .max(5, 'الحد الأقصى 5 صور'),
+    .max(20, 'الحد الأقصى 20 صورة'),
   videoUrl: z.string().optional(),
-  currentAmount: z.number(),
+  currentAmount: z.coerce.number().min(0),
   title_en: z.string().min(1, 'English title is required'),
   title_fr: z.string().optional(),
   title_tr: z.string().optional(),
@@ -160,6 +158,35 @@ const updateSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 type UpdateFormValues = z.infer<typeof updateSchema>;
+
+function firstCampaignFormErrorMessage(errors: FieldErrors<FormValues>): string {
+  const stack: unknown[] = [errors];
+  while (stack.length) {
+    const cur = stack.pop();
+    if (!cur || typeof cur !== 'object') continue;
+    const o = cur as Record<string, unknown>;
+    if (typeof o.message === 'string' && o.message) return o.message;
+    for (const v of Object.values(o)) {
+      if (v && typeof v === 'object') stack.push(v);
+    }
+  }
+  return 'يرجى إكمال الحقول المطلوبة أو تصحيح القيم المرفوضة';
+}
+
+function tabForCampaignInvalidField(name: string): 'ar' | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es' {
+  if (name === 'title_en' || name === 'image_en' || name === 'videoUrl_en') return 'en';
+  if (name.startsWith('title_fr') || name.startsWith('image_fr') || name.startsWith('videoUrl_fr'))
+    return 'fr';
+  if (name.startsWith('title_tr') || name.startsWith('image_tr') || name.startsWith('videoUrl_tr'))
+    return 'tr';
+  if (name.startsWith('title_id') || name.startsWith('image_id') || name.startsWith('videoUrl_id'))
+    return 'id';
+  if (name.startsWith('title_pt') || name.startsWith('image_pt') || name.startsWith('videoUrl_pt'))
+    return 'pt';
+  if (name.startsWith('title_es') || name.startsWith('image_es') || name.startsWith('videoUrl_es'))
+    return 'es';
+  return 'ar';
+}
 
 interface Category {
   id: string;
@@ -335,18 +362,23 @@ export default function EditCampaignPage() {
         const getTr = (locale: string) => allTranslations.find((t: any) => t.locale === locale);
         const en = getTr('en'), fr = getTr('fr'), tr = getTr('tr'), id = getTr('id'), pt = getTr('pt'), es = getTr('es');
 
+        const safeGoal = campaign.goalType === 'OPEN' ? 'OPEN' : 'FIXED';
+        const safeMode =
+          campaign.fundraisingMode === 'SHARES' ? 'SHARES' : 'AMOUNT';
+        const imgs = Array.isArray(campaign.images) ? campaign.images : [];
         form.reset({
-          title: campaign.title,
-          targetAmount: campaign.targetAmount,
-          goalType: campaign.goalType ?? 'FIXED',
-          fundraisingMode: campaign.fundraisingMode ?? 'AMOUNT',
-          sharePriceUSD: campaign.sharePriceUSD ?? 0,
-          currentAmount: campaign.currentAmount,
-          categoryId: campaign.category.id,
-          isActive: campaign.isActive,
-          images: campaign.images,
+          title: campaign.title ?? '',
+          targetAmount: Number(campaign.targetAmount) || 0,
+          goalType: safeGoal,
+          fundraisingMode: safeMode,
+          sharePriceUSD: Number(campaign.sharePriceUSD) || 0,
+          currentAmount: Number(campaign.currentAmount) || 0,
+          categoryId: campaign.category?.id ?? '',
+          isActive: Boolean(campaign.isActive),
+          images: imgs,
           videoUrl: campaign.videoUrl || '',
-          title_en: en?.title || '',
+          // Legacy rows may lack EN; fall back to Arabic title so validation passes until translated.
+          title_en: (en?.title && String(en.title).trim()) || (campaign.title && String(campaign.title).trim()) || '',
           title_fr: fr?.title || '',
           title_tr: tr?.title || '',
           title_id: id?.title || '',
@@ -519,6 +551,12 @@ export default function EditCampaignPage() {
     }
   };
 
+  const onCampaignFormInvalid = (errors: FieldErrors<FormValues>) => {
+    const first = Object.keys(errors)[0];
+    if (first) setActiveTab(tabForCampaignInvalidField(first));
+    toast.error(firstCampaignFormErrorMessage(errors));
+  };
+
   // Per-locale single-image upload (optional override — fallback is the main Arabic cover).
   const [uploadingLocale, setUploadingLocale] = useState<
     null | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es'
@@ -663,8 +701,8 @@ export default function EditCampaignPage() {
     if (!files || files.length === 0) return;
 
     const currentImages = form.getValues('images');
-    if (currentImages.length + files.length > 5) {
-      toast.error('الحد الأقصى 5 صور');
+    if (currentImages.length + files.length > 20) {
+      toast.error('الحد الأقصى 20 صورة');
       return;
     }
 
@@ -919,6 +957,7 @@ export default function EditCampaignPage() {
           </div>
         </div>
         <Button
+          type="button"
           variant="outline"
           onClick={() => router.push('/dashboard/campaigns')}
           className="gap-2"
@@ -929,7 +968,7 @@ export default function EditCampaignPage() {
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(onSubmit, onCampaignFormInvalid)} className="space-y-6">
           {/* ✅ Multi-Language Tabs for Campaign Info */}
           <Card className="p-6">
             <div className="flex items-center gap-2 mb-4">
@@ -1554,7 +1593,7 @@ export default function EditCampaignPage() {
                             </div>
                           );
                         })}
-                        {field.value.length < 5 && (
+                        {field.value.length < 20 && (
                           <div className="relative">
                             <input
                               type="file"
@@ -1584,7 +1623,7 @@ export default function EditCampaignPage() {
                         )}
                       </div>
                       <FormDescription>
-                        يمكنك رفع حتى 5 صور للمشروع. <strong>الصورة الأولى</strong> ستكون الصورة الرئيسية المعروضة.
+                        يمكنك رفع حتى 20 صورة للمشروع. <strong>الصورة الأولى</strong> ستكون الصورة الرئيسية المعروضة.
                         <br />
                         اسحب الصور لإعادة ترتيبها، أو اضغط زر <strong>«جعلها الرئيسية»</strong> لتغيير الصورة الرئيسية.
                         <br />
@@ -1639,7 +1678,7 @@ export default function EditCampaignPage() {
               <h2 className="text-xl font-semibold text-gray-800">إنجازات المشروع</h2>
               <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button className="gap-2">
+                  <Button type="button" className="gap-2">
                     <Plus className="w-4 h-4" />
                     إضافة تحديث
                   </Button>
@@ -1861,6 +1900,7 @@ export default function EditCampaignPage() {
                       </div>
                       <div className="flex gap-2">
                         <Button
+                          type="button"
                           variant="ghost"
                           size="sm"
                           onClick={() => openEditDialog(update)}
@@ -1868,6 +1908,7 @@ export default function EditCampaignPage() {
                           <Edit3 className="w-4 h-4" />
                         </Button>
                         <Button
+                          type="button"
                           variant="ghost"
                           size="sm"
                           className="text-red-600 hover:text-red-700"
