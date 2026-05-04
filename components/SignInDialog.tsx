@@ -322,34 +322,36 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl, onSkip }: S
           {/* ── OPTIONS screen ─────────────────────────────────────────── */}
           {screen === "options" && (
             <>
-              {/* Google — featured */}
-              <div className="relative pt-1">
+              {/* Google — same footprint as email + gradient frame */}
+              <div className="relative pt-2">
                 <div
-                  className={`pointer-events-none absolute -top-0.5 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500 px-2 py-0.5 text-[10px] font-bold leading-none text-white shadow-md ring-2 ring-white sm:text-[11px] ${
+                  className={`pointer-events-none absolute -top-1 z-10 flex max-w-[calc(100%-2rem)] items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500 px-2 py-1 text-[10px] font-bold leading-none text-white shadow-md ring-2 ring-white sm:text-[11px] ${
                     isRTL ? "left-3" : "right-3"
                   }`}
                 >
                   <Zap className="h-3 w-3 shrink-0 fill-white/90" aria-hidden />
-                  <span>{t("googleFastestWay")}</span>
+                  <span className="whitespace-nowrap">{t("googleFastestWay")}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleGoogleSignIn}
-                  className="group relative w-full overflow-hidden rounded-2xl border-2 border-transparent bg-gradient-to-br from-white via-white to-slate-50 py-3.5 px-4 shadow-[0_4px_20px_-4px_rgba(2,94,184,0.35),0_0_0_1px_rgba(2,94,184,0.08)] ring-1 ring-slate-200/80 transition-all hover:shadow-[0_8px_28px_-6px_rgba(2,94,184,0.45),0_0_0_1px_rgba(2,94,184,0.12)] hover:ring-[#025EB8]/25 active:scale-[0.99] sm:py-4 min-h-[3.25rem] touch-manipulation"
-                >
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#025EB8]/[0.06] via-transparent to-amber-400/10 opacity-0 transition-opacity group-hover:opacity-100"
-                  />
-                  <span className="relative flex items-center justify-center gap-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-black/5">
-                      <Image src="/google.svg" alt="" width={22} height={22} className="h-[22px] w-[22px]" />
-                    </span>
-                    <span className="min-w-0 flex-1 text-center text-sm font-semibold text-slate-800 sm:text-base">
-                      {t("signInWithGoogle")}
-                    </span>
-                  </span>
-                </button>
+                <div className="rounded-xl bg-gradient-to-br from-[#025EB8] via-[#6366f1] to-[#f59e0b] p-[2px] shadow-[0_4px_16px_-4px_rgba(2,94,184,0.45)]">
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignIn}
+                    className="group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-[10px] bg-gradient-to-b from-white to-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 shadow-inner shadow-white/50 transition-all hover:from-slate-50 hover:to-white hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.9)] active:scale-[0.98] sm:py-3.5 touch-manipulation"
+                  >
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#025EB8]/5 via-transparent to-amber-400/[0.07] opacity-0 transition-opacity group-hover:opacity-100"
+                    />
+                    <Image
+                      src="/google.svg"
+                      alt=""
+                      width={20}
+                      height={20}
+                      className="relative h-5 w-5 shrink-0"
+                    />
+                    <span className="relative">{t("signInWithGoogle")}</span>
+                  </button>
+                </div>
               </div>
 
               {/* Divider */}

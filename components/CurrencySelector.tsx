@@ -18,9 +18,8 @@ const currencies = [
   ...SUPPORTED_CURRENCY_OPTIONS,
 ];
 
-const BASE_CURRENCY = "USD";
 const CACHE_KEY = "cachedExchangeRates";
-const CACHE_DURATION = 24 * 60 * 60 * 1000;
+const CACHE_DURATION = 50 * 60 * 1000;
 
 type CurrencySelectorProps = {
   showDefaultCurrencyOption?: boolean;
@@ -42,8 +41,6 @@ function CurrencySelectorInner({
   const visibleCurrencies = showDefaultCurrencyOption
     ? currencies
     : currencies.filter((c) => c.code !== DEFAULT_CURRENCY_CODE);
-
-  const exchangeRateApiKey = "db9e1f2395aac69fe3648487";
 
   const applyCookieToUi = useCallback(
     (saved: string | undefined) => {
@@ -117,16 +114,20 @@ function CurrencySelectorInner({
         return;
       }
     }
-    fetch(
-      `https://v6.exchangerate-api.com/v6/${exchangeRateApiKey}/latest/${BASE_CURRENCY}`
-    )
+    fetch("/api/exchange/rates", { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
-        if (data.result === "success") {
-          setExchangeRates(data.conversion_rates);
+        if (data.result === "success" && (data.conversion_rates || data.rates)) {
+          const rates = (data.conversion_rates || data.rates) as Record<string, number>;
+          setExchangeRates(rates);
+          const updated = data.time_last_update_utc || data.updatedAt || new Date().toISOString();
           localStorage.setItem(
             CACHE_KEY,
-            JSON.stringify({ rates: data.conversion_rates, timestamp: Date.now() })
+            JSON.stringify({
+              rates,
+              timestamp: Date.now(),
+              time_last_update_utc: updated,
+            })
           );
         }
       })

@@ -7,21 +7,23 @@ interface ExchangeRates {
   time_last_update_utc: string; // API provides the last update time
 }
 
-const EXCHANGE_RATE_API_KEY = 'db9e1f2395aac69fe3648487';
-const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const CACHE_DURATION = 50 * 60 * 1000; // align with server hourly refresh
 
-// Function to fetch exchange rates from the API
+// Function to fetch exchange rates (our API reads from DB; one credit-free path for users)
 const fetchExchangeRates = async (): Promise<ExchangeRates> => {
-  const response = await fetch(
-    `https://v6.exchangerate-api.com/v6/${EXCHANGE_RATE_API_KEY}/latest/USD`
-  );
+  const response = await fetch("/api/exchange/rates", { cache: "no-store" });
   if (!response.ok) {
-    throw new Error('Failed to fetch exchange rates');
+    throw new Error("Failed to fetch exchange rates");
   }
   const data = await response.json();
+  if (data.result !== "success" || (!data.conversion_rates && !data.rates)) {
+    throw new Error("Invalid exchange rate payload");
+  }
+  const rates = (data.conversion_rates || data.rates) as Record<string, number>;
+  const ts = data.time_last_update_utc || data.updatedAt || new Date().toISOString();
   return {
-    rates: data.conversion_rates, // The API returns rates under `conversion_rates`
-    time_last_update_utc: data.time_last_update_utc, // Timestamp from the API
+    rates,
+    time_last_update_utc: ts,
   };
 };
 

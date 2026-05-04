@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import Cookies from 'js-cookie';
 
-const BASE_CURRENCY = "USD";
 const CACHE_KEY = "cachedExchangeRates";
-const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24h
-const EXCHANGE_API_KEY = "db9e1f2395aac69fe3648487";
+/** Slightly under 1h so we pick up server hourly refresh without extra third-party API calls. */
+const CACHE_DURATION = 50 * 60 * 1000;
 
 const useCurrencyConverter = () => {
   const [exchangeRates, setExchangeRates] = useState<{ [key: string]: number } | null>(null);
@@ -12,11 +11,20 @@ const useCurrencyConverter = () => {
 
   const fetchRates = async () => {
     try {
-      const res = await fetch(`https://v6.exchangerate-api.com/v6/${EXCHANGE_API_KEY}/latest/${BASE_CURRENCY}`);
+      const res = await fetch("/api/exchange/rates", { cache: "no-store" });
       const data = await res.json();
-      if (data.result === "success") {
-        setExchangeRates(data.conversion_rates);
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ rates: data.conversion_rates, timestamp: Date.now() }));
+      if (data.result === "success" && (data.conversion_rates || data.rates)) {
+        const map = (data.conversion_rates || data.rates) as Record<string, number>;
+        setExchangeRates(map);
+        const updated = data.time_last_update_utc || data.updatedAt || new Date().toISOString();
+        localStorage.setItem(
+          CACHE_KEY,
+          JSON.stringify({
+            rates: map,
+            timestamp: Date.now(),
+            time_last_update_utc: updated,
+          })
+        );
       }
     } catch (err) {
       console.error("Failed to fetch exchange rates", err);

@@ -8,20 +8,15 @@ import {
   payForLang,
   payForHash,
 } from "@/lib/payfor";
+import {
+  convertAmountInCurrencyToTry,
+  getUsdBaseRatesForServer,
+} from "@/lib/exchange/rates-service";
 
-/** Convert any amount to TRY using the exchange rate API. */
+/** Convert any amount to TRY using USD-base rates from the database (same as donations). */
 async function toTRY(amount: number, fromCurrency: string): Promise<number> {
-  if (fromCurrency.toUpperCase() === "TRY") return amount;
-  const apiKey = process.env.EXCHANGE_RATE_API_KEY;
-  if (!apiKey) throw new Error("EXCHANGE_RATE_API_KEY not set");
-  const res = await fetch(
-    `https://v6.exchangerate-api.com/v6/${apiKey}/pair/${fromCurrency.toUpperCase()}/TRY`
-  );
-  if (!res.ok) throw new Error(`Exchange rate fetch failed: ${res.status}`);
-  const data = await res.json();
-  const rate: number = data.conversion_rate;
-  if (!rate || rate <= 0) throw new Error("Invalid exchange rate");
-  return Math.round(amount * rate * 100) / 100;
+  const rates = await getUsdBaseRatesForServer();
+  return convertAmountInCurrencyToTry(amount, fromCurrency, rates);
 }
 
 type InitiateBody = {

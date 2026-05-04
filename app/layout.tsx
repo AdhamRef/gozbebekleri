@@ -290,7 +290,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="dns-prefetch" href="https://i.ibb.co" />
-        <link rel="preconnect" href="https://v6.exchangerate-api.com" />
         <link rel="preconnect" href="https://ipapi.co" />
         <link rel="preload" href="/bg.webp" as="image" type="image/webp" />
       </head>

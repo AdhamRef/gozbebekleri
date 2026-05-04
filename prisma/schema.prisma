@@ -689,6 +689,18 @@ type AmountRange {
   label        String // e.g., "high", "medium", "low"
 }
 
+/* ===================== EXCHANGE RATES (USD base; hourly cron + DB reads) ===================== */
+/// Single row: key = "usd_latest". `rates` = same shape as ExchangeRate-API `conversion_rates` (foreign per 1 USD).
+model ExchangeRateSnapshot {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  key       String   @unique
+  baseCode  String   @default("USD")
+  rates     Json
+  fetchedAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 /* ===================== TRACKING PIXELS (dashboard configurable) ===================== */
 model TrackingSettings {
   id                      String   @id @default(auto()) @map("_id") @db.ObjectId

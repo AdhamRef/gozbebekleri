@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "backfill:slugs": "tsx prisma/backfill-slugs.ts",
-    "backfill:donation-countries": "tsx scripts/backfill-donation-donor-country.ts"
+    "backfill:donation-countries": "tsx scripts/backfill-donation-donor-country.ts",
+    "exchange-rates:refresh": "tsx scripts/refresh-exchange-rates.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
