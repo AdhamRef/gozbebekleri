@@ -8,6 +8,7 @@ import {
 } from '@/lib/dashboard/permissions';
 import { requireAdminSession } from '@/lib/dashboard/api-auth';
 import { writeAuditLog } from '@/lib/audit-log';
+import { getBadgeIdsByUser } from '@/lib/badge-criteria';
 
 function roleLabelAr(r: string) {
   if (r === 'ADMIN') return 'مدير';
@@ -93,8 +94,33 @@ export async function GET(
       ...monthlyDonations.map((d) => withType(d, 'MONTHLY')),
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
+    const [totalsRows, allBadges] = await Promise.all([
+      prisma.donation.groupBy({
+        by: ['donorId'],
+        where: { donorId: id, status: 'PAID' },
+        _sum: { totalAmount: true, amountUSD: true },
+        _max: { createdAt: true },
+        _count: { id: true },
+      }),
+      prisma.badge.findMany({
+        select: { id: true, criteria: true },
+        orderBy: { order: 'asc' },
+      }),
+    ]);
+    const t = totalsRows[0];
+    const badgeIdsByUser =
+      allBadges.length > 0 ? await getBadgeIdsByUser([id], allBadges) : new Map<string, string[]>();
+
+    const profileCard = {
+      totalDonationsCount: t?._count.id ?? 0,
+      totalDonatedAmount: t?._sum.totalAmount ?? 0,
+      totalDonatedAmountUSD: t?._sum.amountUSD ?? 0,
+      lastDonationAt: t?._max.createdAt ?? null,
+      badgeIds: badgeIdsByUser.get(id) ?? [],
+    };
+
     return NextResponse.json({
-      user: { ...user, donations: donationsForUser },
+      user: { ...user, donations: donationsForUser, ...profileCard },
       oneTimeDonations: oneTimeDonations.map((d) => withType(d, 'ONE_TIME')),
       monthlyDonations: monthlyDonations.map((d) => withType(d, 'MONTHLY')),
     });

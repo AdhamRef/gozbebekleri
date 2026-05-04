@@ -78,7 +78,15 @@ export async function GET(request: NextRequest) {
           createdAt: true,
           nextBillingDate: true,
           lastBillingDate: true,
-          donor: { select: { id: true, name: true, email: true } },
+          donor: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              countryCode: true,
+              countryName: true,
+            },
+          },
           referral: { select: { id: true, code: true } },
           items: { select: { campaign: { select: { id: true, title: true } } } },
           categoryItems: { select: { category: { select: { id: true, name: true } } } },

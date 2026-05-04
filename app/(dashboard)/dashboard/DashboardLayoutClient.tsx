@@ -21,6 +21,7 @@ import { CurrencyProvider } from "@/context/CurrencyContext";
 import CurrencySelector from "@/components/CurrencySelector";
 import { CurrencyFromUrlSync } from "@/components/CurrencyFromUrlSync";
 import { DashboardThemeProvider } from "@/context/DashboardThemeContext";
+import { ViewUserProfileProvider } from "@/context/ViewUserProfileContext";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Session } from "next-auth";
@@ -314,11 +315,13 @@ export default function DashboardLayoutClient({
           <CurrencyFromUrlSync />
         </Suspense>
         <SessionProvider session={session}>
-          <DashboardThemeProvider>
-            <DashboardContent locale={locale}>
-              {children}
-            </DashboardContent>
-          </DashboardThemeProvider>
+          <ViewUserProfileProvider>
+            <DashboardThemeProvider>
+              <DashboardContent locale={locale}>
+                {children}
+              </DashboardContent>
+            </DashboardThemeProvider>
+          </ViewUserProfileProvider>
           <ConfettiProvider />
           <Toaster position="top-center" toastOptions={{
             style: { fontFamily: 'inherit', fontSize: '14px' },

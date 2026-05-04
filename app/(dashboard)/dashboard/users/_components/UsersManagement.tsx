@@ -13,12 +13,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogOverlay,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogOverlay, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
@@ -38,13 +33,6 @@ import {
   BarChart3,
   MoreHorizontal,
   UserCircle,
-  Mail,
-  Globe,
-  Phone,
-  Calendar,
-  Hash,
-  Award,
-  MapPin,
 } from "lucide-react";
 import ReactCountryFlag from "react-country-flag";
 import { useCurrency } from "@/context/CurrencyContext";
@@ -52,31 +40,12 @@ import { cn } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { userHasDashboardPermission } from "@/lib/dashboard/permissions";
 import { DASHBOARD_PERMISSION_ROWS } from "@/lib/dashboard/nav-config";
+import { useViewUserProfile } from "@/context/ViewUserProfileContext";
+import type { UserProfileCardData } from "@/lib/dashboard/user-profile-card";
 
 const PAGE_SIZE = 10;
 
-interface UserRow {
-  id: string;
-  name: string | null;
-  email: string | null;
-  image: string | null;
-  role: string;
-  dashboardPermissions?: string[];
-  preferredLang: string | null;
-  country: string | null;
-  countryCode: string | null;
-  countryName: string | null;
-  region: string | null;
-  city: string | null;
-  phone: string | null;
-  createdAt: string;
-  updatedAt: string;
-  totalDonationsCount: number;
-  totalDonatedAmount: number;
-  totalDonatedAmountUSD: number;
-  lastDonationAt: string | null;
-  badgeIds: string[];
-}
+type UserRow = UserProfileCardData;
 
 interface BadgeOption {
   id: string;
@@ -103,7 +72,7 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
-  const [viewUser, setViewUser] = useState<UserRow | null>(null);
+  const { openUserProfileCard } = useViewUserProfile();
 
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -611,7 +580,7 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="start" className="min-w-[160px]">
-                              <DropdownMenuItem onClick={() => setViewUser(u)}>
+                              <DropdownMenuItem onClick={() => openUserProfileCard(u)}>
                                   <UserCircle className="w-4 h-4 me-2" />
                                   عرض الملف
                                 </DropdownMenuItem>
@@ -736,221 +705,6 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                 <Button onClick={handleUserAuthoritySave}>حفظ</Button>
               </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* عرض الملف — بطاقة بيانات المستخدم كاملة */}
-      <Dialog open={!!viewUser} onOpenChange={(open) => !open && setViewUser(null)}>
-        <DialogOverlay className="fixed inset-0 bg-black/30" />
-        <DialogContent
-          className="fixed left-1/2 top-1/2 w-[calc(100%-2rem)] max-w-2xl p-0 transform -translate-x-1/2 -translate-y-1/2 border border-border rounded-xl shadow-xl bg-card"
-          {...({ closeClassName: "left-4 right-auto text-white hover:text-white opacity-90 hover:opacity-100" } as React.ComponentProps<typeof DialogContent>)}
-          dir="rtl"
-          aria-labelledby="view-user-title"
-        >
-          {viewUser && (
-            <>
-              <DialogTitle id="view-user-title" className="sr-only">ملف المستخدم — {viewUser.name ?? viewUser.email ?? viewUser.id}</DialogTitle>
-              <div className="rounded-xl overflow-hidden">
-                {/* Header */}
-                <div className="bg-gradient-to-br from-slate-800 to-slate-700 text-white px-5 py-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center overflow-hidden shrink-0">
-                      {viewUser.image ? (
-                        <img src={viewUser.image} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <UserCircle className="w-8 h-8 text-white/80" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h2 className="text-lg font-bold truncate">{viewUser.name || "—"}</h2>
-                      <p className="text-white/80 text-sm truncate">{viewUser.email || "—"}</p>
-                      <span className={cn(
-                        "inline-block mt-1.5 px-2.5 py-0.5 rounded-full text-sm font-medium",
-                        viewUser.role === "ADMIN"
-                          ? "bg-[#FA5D17]/8/90 text-white"
-                          : viewUser.role === "STAFF"
-                            ? "bg-[#025EB8]/90 text-white"
-                            : "bg-white/20 text-white"
-                      )}>
-                        {viewUser.role === "ADMIN"
-                          ? "مدير"
-                          : viewUser.role === "STAFF"
-                            ? "طاقم"
-                            : "متبرع"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-5 space-y-4 bg-background">
-                  <div className="grid grid-cols-[1.6fr_1fr] gap-4">
-                    {/* الحساب */}
-                    <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                      <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2 mb-2">
-                        <UserCircle className="w-4 h-4" /> الحساب
-                      </h3>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
-                        <span className="text-muted-foreground shrink-0">البريد:</span>
-                        <span className="font-medium truncate" title={viewUser.email ?? undefined}>{viewUser.email ?? "—"}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
-                        <span className="text-muted-foreground shrink-0">اللغة:</span>
-                        <span className="font-medium">{LOCALE_LABELS[viewUser.preferredLang as keyof typeof LOCALE_LABELS] ?? "—"}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
-                        <span className="text-muted-foreground shrink-0">الدولة:</span>
-                        <span className="font-medium inline-flex items-center gap-1.5 min-w-0">
-                          {viewUser.countryCode && /^[A-Za-z]{2}$/.test(viewUser.countryCode) ? (
-                            <ReactCountryFlag
-                              countryCode={viewUser.countryCode.toUpperCase()}
-                              svg
-                              style={{ width: "1.15em", height: "1.15em" }}
-                            />
-                          ) : null}
-                          <span className="truncate">{viewUser.countryName ?? viewUser.country ?? "—"}</span>
-                          {viewUser.countryCode ? (
-                            <span className="text-muted-foreground text-xs shrink-0">({viewUser.countryCode})</span>
-                          ) : null}
-                        </span>
-                      </div>
-                      {(viewUser.city || viewUser.region) && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
-                        <span className="text-muted-foreground shrink-0">المدينة / المنطقة:</span>
-                        <span className="font-medium">
-                          {[viewUser.city, viewUser.region].filter(Boolean).join(" — ") || "—"}
-                        </span>
-                      </div>
-                      )}
-                      <div className="flex items-center gap-2 text-sm">
-                        <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
-                        <span className="text-muted-foreground shrink-0">الهاتف:</span>
-                        <span className="font-medium dir-ltr">{viewUser.phone ?? "—"}</span>
-                      </div>
-                    </div>
-
-                    {/* التبرعات */}
-                    <div className="rounded-lg border border-border bg-muted/30 p-4">
-                      <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2 mb-2">
-                        <Receipt className="w-4 h-4" /> التبرعات
-                      </h3>
-                      <div className="space-y-1.5 text-sm">
-                        <div className="flex justify-between gap-2">
-                          <span className="text-muted-foreground">عدد التبرعات</span>
-                          <span className="font-medium">{viewUser.totalDonationsCount ?? "—"}</span>
-                        </div>
-                        <div className="flex justify-between gap-2">
-                          <span className="text-muted-foreground">الإجمالي (USD)</span>
-                          <span className="font-medium dir-ltr">{viewUser.totalDonatedAmountUSD != null ? formatMoney(viewUser.totalDonatedAmountUSD) : "—"}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                    <h3 className="text-sm font-semibold text-muted-foreground mb-1">
-                      الأدوار والصلاحيات
-                    </h3>
-                    <p className="text-sm">
-                      <span className="text-muted-foreground">الدور: </span>
-                      <span className="font-medium">
-                        {viewUser.role === "ADMIN"
-                          ? "مدير — وصول كامل لجميع حملات لوحة التحكم"
-                          : viewUser.role === "STAFF"
-                            ? "عضو طاقم — وصول جزئي حسب الحملات أدناه"
-                            : "متبرع — حساب عام بدون لوحة تحكم إدارية"}
-                      </span>
-                    </p>
-                    {viewUser.role === "STAFF" && (
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        {(viewUser.dashboardPermissions ?? []).length === 0 ? (
-                          <span className="text-xs text-muted-foreground">
-                            لا توجد حملات مفعّلة
-                          </span>
-                        ) : (
-                          (viewUser.dashboardPermissions ?? []).map((key) => {
-                            // if (key === "users") {
-                            //   return (
-                            //     <span
-                            //       key="legacy-users"
-                            //       className="inline-flex px-2.5 py-1 rounded-full text-xs bg-slate-200 text-slate-800"
-                            //     >
-                            //       مستخدمين (ترميز قديم)
-                            //     </span>
-                            //   );
-                            // }
-                            const row = DASHBOARD_PERMISSION_ROWS.find((r) => r.key === key);
-                            if (!row) return null;
-                            return (
-                              <span
-                                key={key}
-                                className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-[#025EB8] text-white"
-                              >
-                                {row.title}
-                              </span>
-                            );
-                          })
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* التواريخ: تسجيل، آخر تبرع، آخر تحديث */}
-                  <div className="rounded-lg border border-border bg-muted/30 p-4">
-                    <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2 mb-2">
-                      <Calendar className="w-4 h-4" /> التواريخ
-                    </h3>
-                    <div className="grid grid-cols-3 gap-3 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">تاريخ التسجيل</p>
-                        <p className="font-medium mt-0.5">{new Date(viewUser.createdAt).toLocaleDateString("ar-EG", { dateStyle: "medium" })}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">آخر تبرع</p>
-                        <p className="font-medium mt-0.5">
-                          {viewUser.lastDonationAt ? new Date(viewUser.lastDonationAt).toLocaleDateString("ar-EG", { dateStyle: "medium" }) : "—"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">آخر تحديث</p>
-                        <p className="font-medium mt-0.5">{new Date(viewUser.updatedAt).toLocaleDateString("ar-EG", { dateStyle: "medium" })}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 pt-2 mt-2 border-t border-border">
-                      <Hash className="w-4 h-4 text-muted-foreground shrink-0" />
-                      <span className="text-muted-foreground text-sm font-mono truncate" title={viewUser.id}>{viewUser.id}</span>
-                    </div>
-                  </div>
-
-                  {/* الشارات */}
-                  <div className="rounded-lg border border-border bg-muted/30 p-4">
-                    <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2 mb-2">
-                      <Award className="w-4 h-4" /> الشارات
-                    </h3>
-                    {(viewUser.badgeIds ?? []).length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {viewUser.badgeIds.map((bid) => {
-                          const badge = badges.find((b) => b.id === bid);
-                          if (!badge) return null;
-                          return (
-                            <span key={bid} className="inline-flex px-2.5 py-1 rounded-full text-sm font-medium text-white" style={{ backgroundColor: badge.color }}>
-                              {badge.translatedName || badge.name}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">—</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </>
           )}
         </DialogContent>
       </Dialog>
