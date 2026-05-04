@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 import Stripe from "stripe";
+import { getDonorCountryCodeForSnapshot } from "@/lib/donations/donor-country-code";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
@@ -53,6 +54,10 @@ export async function POST(req: NextRequest) {
     let targetDonationId = donationId;
 
     if (donation.status === "FAILED") {
+      const donorCountrySnapshot =
+        donation.donorCountryCode ??
+        (await getDonorCountryCodeForSnapshot(prisma, donation.donorId)) ??
+        undefined;
       const newDonation = await prisma.donation.create({
         data: {
           amount: donation.amount,
@@ -64,6 +69,7 @@ export async function POST(req: NextRequest) {
           totalAmount: donation.totalAmount,
           status: "PAID",
           locale: donation.locale ?? locale,
+          donorCountryCode: donorCountrySnapshot,
           donorId: donation.donorId,
           paymentMethod: "CARD",
           provider: "STRIPE",

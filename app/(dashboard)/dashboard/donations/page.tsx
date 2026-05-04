@@ -44,6 +44,7 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Link, useRouter } from "@/i18n/routing";
 import { toast } from 'react-hot-toast';
+import DonationCountryFlag from '@/components/DonationCountryFlag';
 
 interface Donation {
   id: string;
@@ -54,6 +55,7 @@ interface Donation {
   coverFees: boolean;
   fees: number;
   totalAmount: number;
+  donorCountryCode?: string | null;
   donorId: string;
   donor: {
     id: string;
@@ -260,6 +262,9 @@ export default function DonationsPage() {
                 />
               </TableHead>
               <TableHead className="text-right">المتبرع</TableHead>
+              <TableHead className="w-10 px-2 text-center">
+                <span className="sr-only">دولة المتبرع</span>
+              </TableHead>
               <TableHead className="text-right">المبلغ</TableHead>
               <TableHead className="text-right">العملة</TableHead>
               <TableHead className="text-right">النوع</TableHead>
@@ -305,6 +310,9 @@ export default function DonationsPage() {
   </div>
 </div>
 
+                </TableCell>
+                <TableCell className="w-10 px-2 text-center align-middle">
+                  <DonationCountryFlag countryCode={donation.donorCountryCode} />
                 </TableCell>
                 <TableCell>{donation.totalAmount.toLocaleString()}</TableCell>
                 <TableCell>{donation.currency}</TableCell>

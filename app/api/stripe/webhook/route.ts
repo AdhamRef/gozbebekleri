@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import Stripe from "stripe";
+import { getDonorCountryCodeForSnapshot } from "@/lib/donations/donor-country-code";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
@@ -133,6 +134,10 @@ export async function POST(req: NextRequest) {
           dbSubscription.teamSupport +
           (dbSubscription.coverFees ? fees : 0);
 
+        const donorCountrySnapshot =
+          (await getDonorCountryCodeForSnapshot(prisma, dbSubscription.donorId)) ??
+          undefined;
+
         await prisma.$transaction(async (tx) => {
           // Check if there is an existing PAID first donation for this invoice.
           // This is the donation created by POST /api/donations before payment.
@@ -171,6 +176,7 @@ export async function POST(req: NextRequest) {
                 totalAmount: finalTotal,
                 status: "PAID",
                 paidAt,
+                donorCountryCode: donorCountrySnapshot,
                 donorId: dbSubscription.donorId,
                 subscriptionId: dbSubscription.id,
                 paymentMethod: "CARD",
@@ -251,6 +257,10 @@ export async function POST(req: NextRequest) {
           dbSubscription.teamSupport +
           (dbSubscription.coverFees ? fees : 0);
 
+        const donorCountrySnapshot =
+          (await getDonorCountryCodeForSnapshot(prisma, dbSubscription.donorId)) ??
+          undefined;
+
         await prisma.donation.create({
           data: {
             amount: dbSubscription.amount,
@@ -261,6 +271,7 @@ export async function POST(req: NextRequest) {
             fees: dbSubscription.coverFees ? fees : 0,
             totalAmount: finalTotal,
             status: "FAILED",
+            donorCountryCode: donorCountrySnapshot,
             donorId: dbSubscription.donorId,
             subscriptionId: dbSubscription.id,
             paymentMethod: "CARD",

@@ -8,6 +8,7 @@ import {
   convertAmountInCurrencyToUsd,
   normalizeDonationCurrencyCode,
 } from "@/lib/exchange/convert-amount-in-currency-to-usd";
+import { getDonorCountryCodeForSnapshot } from "@/lib/donations/donor-country-code";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
@@ -156,6 +157,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const donorCountrySnapshot =
+      (await getDonorCountryCodeForSnapshot(prisma, session.user.id)) ?? undefined;
+
     // ────────────────────────────────────────────────────────
     // MONTHLY — create subscription-linked donation + Stripe Subscription
     // ────────────────────────────────────────────────────────
@@ -212,6 +219,7 @@ export async function POST(req: NextRequest) {
               totalAmount: finalTotal,
               status: "PAID",
               locale: validLocale ?? undefined,
+              donorCountryCode: donorCountrySnapshot,
               donorId: session.user.id,
               referralId: referralId ?? undefined,
               subscriptionId: sub.id,
@@ -344,6 +352,7 @@ export async function POST(req: NextRequest) {
             totalAmount: finalTotal,
             status: "PAID",
             locale: validLocale ?? undefined,
+            donorCountryCode: donorCountrySnapshot,
             donorId: session.user.id,
             referralId: referralId ?? undefined,
             paymentMethod: "CARD",

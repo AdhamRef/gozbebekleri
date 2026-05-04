@@ -4,6 +4,7 @@ import {
   convertAmountInCurrencyToUsd,
   normalizeDonationCurrencyCode,
 } from "@/lib/exchange/convert-amount-in-currency-to-usd";
+import { getDonorCountryCodeForSnapshot } from "@/lib/donations/donor-country-code";
 
 /** Returns the next billing date: one month after `from`, clamped to the target month's last day. */
 function getNextBillingDate(from: Date): Date {
@@ -85,6 +86,9 @@ export async function GET(request: NextRequest) {
         }))
       );
 
+      const donorCountrySnapshot =
+        (await getDonorCountryCodeForSnapshot(prisma, sub.donorId)) ?? undefined;
+
       await prisma.$transaction(async (tx) => {
         const donation = await tx.donation.create({
           data: {
@@ -96,6 +100,7 @@ export async function GET(request: NextRequest) {
             coverFees: sub.coverFees,
             fees,
             status: "PAID",
+            donorCountryCode: donorCountrySnapshot,
             donorId: sub.donorId,
             referralId: sub.referralId ?? undefined,
             subscriptionId: sub.id,

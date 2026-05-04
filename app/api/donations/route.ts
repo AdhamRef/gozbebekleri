@@ -9,6 +9,10 @@ import {
   convertAmountInCurrencyToUsd,
   normalizeDonationCurrencyCode,
 } from "@/lib/exchange/convert-amount-in-currency-to-usd";
+import {
+  getDonorCountryCodeForSnapshot,
+  normalizeDonorCountryCode,
+} from "@/lib/donations/donor-country-code";
 
 // GET /api/donations - Get all donations (admin) or user's donations
 export async function GET(request: NextRequest) {
@@ -181,6 +185,12 @@ export async function POST(request: NextRequest) {
     } else {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const donorCountrySnapshot =
+      session?.user?.id
+        ? (await getDonorCountryCodeForSnapshot(prisma, donorId)) ?? undefined
+        : normalizeDonorCountryCode(guest?.countryCode) ??
+          ((await getDonorCountryCodeForSnapshot(prisma, donorId)) ?? undefined);
 
     // Card payments are handled via PayFor 3D Secure redirect flow (we do not store PAN/CVV).
 
@@ -361,6 +371,7 @@ export async function POST(request: NextRequest) {
             totalAmount: finalTotalAmount,
             status: "PAID",
             locale: validLocale ?? undefined,
+            donorCountryCode: donorCountrySnapshot,
             donorId,
             referralId: referralId ?? undefined,
             subscriptionId: sub.id,
@@ -445,6 +456,7 @@ export async function POST(request: NextRequest) {
           totalAmount: finalTotalAmount,
           status: "PAID",
           locale: validLocale ?? undefined,
+          donorCountryCode: donorCountrySnapshot,
           donorId,
           referralId: referralId ?? undefined,
           paymentMethod,

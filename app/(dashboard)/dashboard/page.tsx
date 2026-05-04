@@ -61,6 +61,7 @@ import {
 import { formatUtcCalendarMonthLong } from "@/lib/admin/current-calendar-month-utc";
 import { StatsMetricCard } from "@/components/dashboard/StatsMetricCard";
 import { getDashboardChartPeriodLabelAr } from "@/lib/dashboard/chart-period-label-ar";
+import DonationCountryFlag from "@/components/DonationCountryFlag";
 
 interface ChartDataPoint {
   date: string;
@@ -107,6 +108,7 @@ interface DonationRow {
   providerErrorMessage?: string | null;
   createdAt: string;
   donor: { id: string; name: string | null; email: string };
+  donorCountryCode?: string | null;
   campaigns: { id: string; title: string }[];
   categories: { id: string; name: string }[];
   referral: { id: string; code: string; name?: string | null } | null;
@@ -1622,6 +1624,9 @@ export default function DashboardPage() {
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">
                         المتبرع
                       </th>
+                      <th className="w-10 px-2 py-3 text-center font-semibold text-slate-700">
+                        <span className="sr-only">دولة المتبرع</span>
+                      </th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">
                         التبرع
                       </th>
@@ -1654,19 +1659,19 @@ export default function DashboardPage() {
                   <tbody>
                     {donationsLoading && donations.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="py-12 text-center">
+                        <td colSpan={11} className="py-12 text-center">
                           <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" />
                         </td>
                       </tr>
                     ) : !donationsFetchedOnce ? (
                       <tr>
-                        <td colSpan={10} className="py-12 text-center text-slate-500">
+                        <td colSpan={11} className="py-12 text-center text-slate-500">
                           جاري التحميل...
                         </td>
                       </tr>
                     ) : donations.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="py-12 text-center text-slate-500">
+                        <td colSpan={11} className="py-12 text-center text-slate-500">
                           لا توجد تبرعات تطابق التصفية
                         </td>
                       </tr>
@@ -1685,6 +1690,9 @@ export default function DashboardPage() {
                                 {d.donor.email}
                               </p>
                             )}
+                          </td>
+                          <td className="py-3 px-2 text-center align-middle w-10">
+                            <DonationCountryFlag countryCode={d.donorCountryCode} />
                           </td>
                           <td className="py-3 px-4 font-medium text-slate-800" dir="rtl">
                             <span dir="ltr">
