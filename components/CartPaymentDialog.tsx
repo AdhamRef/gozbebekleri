@@ -139,6 +139,10 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
   const confetti = useConfettiStore();
 
   const convertToUSD = useConvetToUSD;
+  const payCurrencyCode = useCallback((): string => {
+    const c = getCurrency();
+    return !c || c === "DEFAULT" ? "USD" : c;
+  }, []);
 
   // ── derived ────────────────────────────────────────────────────────────
   const fees        = (amount + teamSupport) * 0.03;
@@ -146,7 +150,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
 
   // Minimum Stripe charge = 1 USD converted to the selected currency, rounded up.
   const stripeMinAmount = (() => {
-    const cur = getCurrency();
+    const cur = payCurrencyCode();
     if (cur === "USD") return 1;
     try {
       const cached = typeof window !== "undefined" ? localStorage.getItem("cachedExchangeRates") : null;
@@ -174,8 +178,8 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
     if (!isOpen || !tracking || cartItems.length === 0 || checkoutTrackedRef.current) return;
     checkoutTrackedRef.current = true;
     const ids = cartItems.map((i) => i.campaign?.id).filter(Boolean) as string[];
-    tracking.trackInitiateCheckout({ value: amount, currency: getCurrency(), numItems: cartItems.length, contentIds: ids.length ? ids : undefined });
-  }, [isOpen, tracking, cartItems, amount]);
+    tracking.trackInitiateCheckout({ value: totalAmount, currency: getCurrency(), numItems: cartItems.length, contentIds: ids.length ? ids : undefined });
+  }, [isOpen, tracking, cartItems, totalAmount]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -285,7 +289,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
           amount: item.amount,
           amountUSD: item.amountUSD != null && item.amountUSD > 0
             ? item.amountUSD
-            : convertToUSD(item.amount, getCurrency()),
+            : convertToUSD(item.amount, payCurrencyCode()),
           ...(item.shareCount != null && item.shareCount > 0 ? { shareCount: item.shareCount } : {}),
         }))
       );

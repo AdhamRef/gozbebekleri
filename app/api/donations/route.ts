@@ -5,6 +5,10 @@ import { authOptions } from "../auth/[...nextauth]/options";
 import { resolveReferralId } from "@/lib/referral-server";
 import { isRevenueDashboardUser } from "@/lib/dashboard/api-auth";
 import { writeAuditLog, auditStreamForRole } from "@/lib/audit-log";
+import {
+  convertAmountInCurrencyToUsd,
+  normalizeDonationCurrencyCode,
+} from "@/lib/exchange/convert-amount-in-currency-to-usd";
 
 // GET /api/donations - Get all donations (admin) or user's donations
 export async function GET(request: NextRequest) {
@@ -184,11 +188,66 @@ export async function POST(request: NextRequest) {
     const campaignTotal = hasCampaignItems ? items.reduce((sum: number, item: { amount: number }) => sum + item.amount, 0) : 0;
     const categoryTotal = hasCategoryItems ? categoryItems.reduce((sum: number, item: { amount: number }) => sum + item.amount, 0) : 0;
     const totalAmount = campaignTotal + categoryTotal;
-    const campaignTotalUSD = hasCampaignItems ? items.reduce((sum: number, item: { amountUSD?: number }) => sum + (item.amountUSD || 0), 0) : 0;
-    const categoryTotalUSD = hasCategoryItems ? categoryItems.reduce((sum: number, item: { amountUSD?: number }) => sum + (item.amountUSD || 0), 0) : 0;
-    const totalAmountUSD = campaignTotalUSD + categoryTotalUSD;
     const fees = (totalAmount + teamSupport) * 0.03;
     const finalTotalAmount = totalAmount + teamSupport + (coverFees ? fees : 0);
+
+    const currencyNorm = normalizeDonationCurrencyCode(currency);
+    let donationTotalUsd: number;
+    try {
+      donationTotalUsd = await convertAmountInCurrencyToUsd(finalTotalAmount, currencyNorm);
+    } catch (e) {
+      console.error("convertAmountInCurrencyToUsd (donation total):", e);
+      return NextResponse.json(
+        { error: "Exchange rate unavailable. Please try again in a moment." },
+        { status: 503 }
+      );
+    }
+
+    type CampaignItemIn = {
+      campaignId: string;
+      amount: number;
+      amountUSD?: number;
+      shareCount?: number;
+    };
+    type CategoryItemIn = { categoryId: string; amount: number; amountUSD?: number };
+
+    let campaignItemsResolved: Array<{
+      campaignId: string;
+      amount: number;
+      amountUSD: number;
+      shareCount?: number;
+    }> = [];
+    let categoryItemsResolved: Array<{ categoryId: string; amount: number; amountUSD: number }> = [];
+
+    try {
+      if (hasCampaignItems) {
+        campaignItemsResolved = await Promise.all(
+          (items as CampaignItemIn[]).map(async (item) => ({
+            campaignId: item.campaignId,
+            amount: item.amount,
+            amountUSD: await convertAmountInCurrencyToUsd(item.amount, currencyNorm),
+            ...(item.shareCount != null && item.shareCount > 0
+              ? { shareCount: Math.floor(item.shareCount) }
+              : {}),
+          }))
+        );
+      }
+      if (hasCategoryItems) {
+        categoryItemsResolved = await Promise.all(
+          (categoryItems as CategoryItemIn[]).map(async (item) => ({
+            categoryId: item.categoryId,
+            amount: item.amount,
+            amountUSD: await convertAmountInCurrencyToUsd(item.amount, currencyNorm),
+          }))
+        );
+      }
+    } catch (e) {
+      console.error("convertAmountInCurrencyToUsd (line items):", e);
+      return NextResponse.json(
+        { error: "Exchange rate unavailable. Please try again in a moment." },
+        { status: 503 }
+      );
+    }
 
     // Verify all campaigns exist and are active (if any)
     if (hasCampaignItems) {
@@ -256,7 +315,7 @@ export async function POST(request: NextRequest) {
           data: {
             status: "ACTIVE",
             amount: totalAmount,
-            amountUSD: totalAmountUSD,
+            amountUSD: donationTotalUsd,
             currency,
             teamSupport,
             coverFees,
@@ -268,26 +327,19 @@ export async function POST(request: NextRequest) {
             lastBillingDate: new Date(),
             items: hasCampaignItems
               ? {
-                  create: items.map(
-                    (item: {
-                      campaignId: string;
-                      amount: number;
-                      amountUSD?: number;
-                      shareCount?: number;
-                    }) => ({
-                      campaignId: item.campaignId,
-                      amount: item.amount,
-                      amountUSD: item.amountUSD,
-                      ...(item.shareCount != null && item.shareCount > 0
-                        ? { shareCount: Math.floor(item.shareCount) }
-                        : {}),
-                    })
-                  ),
+                  create: campaignItemsResolved.map((item) => ({
+                    campaignId: item.campaignId,
+                    amount: item.amount,
+                    amountUSD: item.amountUSD,
+                    ...(item.shareCount != null && item.shareCount > 0
+                      ? { shareCount: item.shareCount }
+                      : {}),
+                  })),
                 }
               : undefined,
             categoryItems: hasCategoryItems
               ? {
-                  create: categoryItems.map((item: { categoryId: string; amount: number; amountUSD?: number }) => ({
+                  create: categoryItemsResolved.map((item) => ({
                     categoryId: item.categoryId,
                     amount: item.amount,
                     amountUSD: item.amountUSD,
@@ -301,7 +353,7 @@ export async function POST(request: NextRequest) {
         const donation = await tx.donation.create({
           data: {
             amount: totalAmount,
-            amountUSD: totalAmountUSD,
+            amountUSD: donationTotalUsd,
             teamSupport,
             coverFees,
             currency,
@@ -316,26 +368,19 @@ export async function POST(request: NextRequest) {
             cardDetails: null,
             items: hasCampaignItems
               ? {
-                  create: items.map(
-                    (item: {
-                      campaignId: string;
-                      amount: number;
-                      amountUSD?: number;
-                      shareCount?: number;
-                    }) => ({
-                      campaignId: item.campaignId,
-                      amount: item.amount,
-                      amountUSD: item.amountUSD,
-                      ...(item.shareCount != null && item.shareCount > 0
-                        ? { shareCount: Math.floor(item.shareCount) }
-                        : {}),
-                    })
-                  ),
+                  create: campaignItemsResolved.map((item) => ({
+                    campaignId: item.campaignId,
+                    amount: item.amount,
+                    amountUSD: item.amountUSD,
+                    ...(item.shareCount != null && item.shareCount > 0
+                      ? { shareCount: item.shareCount }
+                      : {}),
+                  })),
                 }
               : undefined,
             categoryItems: hasCategoryItems
               ? {
-                  create: categoryItems.map((item: { categoryId: string; amount: number; amountUSD?: number }) => ({
+                  create: categoryItemsResolved.map((item) => ({
                     categoryId: item.categoryId,
                     amount: item.amount,
                     amountUSD: item.amountUSD,
@@ -373,10 +418,10 @@ export async function POST(request: NextRequest) {
         actorName: donorName,
         actorRole,
         action: "DONATION_MONTHLY_CHECKOUT_START",
-        messageAr: `${donorName ?? "متبرع"} بدأ عملية دفع اشتراك شهري (≈ ${totalAmountUSD.toFixed(0)} USD لكل دورة)`,
+        messageAr: `${donorName ?? "متبرع"} بدأ عملية دفع اشتراك شهري (≈ ${donationTotalUsd.toFixed(0)} USD لكل دورة)`,
         entityType: "Donation",
         entityId: d.id,
-        metadata: { amountUSD: totalAmountUSD, status: "PENDING", provider: "PAYFOR" },
+        metadata: { amountUSD: donationTotalUsd, status: "PENDING", provider: "PAYFOR" },
         stream: auditStreamForRole(actorRole),
       });
 
@@ -392,7 +437,7 @@ export async function POST(request: NextRequest) {
       const d = await tx.donation.create({
         data: {
           amount: totalAmount,
-          amountUSD: totalAmountUSD,
+          amountUSD: donationTotalUsd,
           teamSupport,
           coverFees,
           currency,
@@ -406,26 +451,19 @@ export async function POST(request: NextRequest) {
           cardDetails: null,
           items: hasCampaignItems
             ? {
-                create: items.map(
-                  (item: {
-                    campaignId: string;
-                    amount: number;
-                    amountUSD?: number;
-                    shareCount?: number;
-                  }) => ({
-                    campaignId: item.campaignId,
-                    amount: item.amount,
-                    amountUSD: item.amountUSD,
-                    ...(item.shareCount != null && item.shareCount > 0
-                      ? { shareCount: Math.floor(item.shareCount) }
-                      : {}),
-                  })
-                ),
+                create: campaignItemsResolved.map((item) => ({
+                  campaignId: item.campaignId,
+                  amount: item.amount,
+                  amountUSD: item.amountUSD,
+                  ...(item.shareCount != null && item.shareCount > 0
+                    ? { shareCount: item.shareCount }
+                    : {}),
+                })),
               }
             : undefined,
           categoryItems: hasCategoryItems
             ? {
-                create: categoryItems.map((item: { categoryId: string; amount: number; amountUSD?: number }) => ({
+                create: categoryItemsResolved.map((item) => ({
                   categoryId: item.categoryId,
                   amount: item.amount,
                   amountUSD: item.amountUSD,
@@ -462,10 +500,10 @@ export async function POST(request: NextRequest) {
       actorName: donorName,
       actorRole,
       action: "DONATION_ONE_TIME_CHECKOUT_START",
-      messageAr: `${donorName ?? "متبرع"} بدأ عملية دفع تبرع لمرة واحدة (≈ ${totalAmountUSD.toFixed(0)} USD)`,
+      messageAr: `${donorName ?? "متبرع"} بدأ عملية دفع تبرع لمرة واحدة (≈ ${donationTotalUsd.toFixed(0)} USD)`,
       entityType: "Donation",
       entityId: donation.id,
-      metadata: { amountUSD: totalAmountUSD, status: "PENDING", provider: "PAYFOR" },
+      metadata: { amountUSD: donationTotalUsd, status: "PENDING", provider: "PAYFOR" },
       stream: auditStreamForRole(actorRole),
     });
 

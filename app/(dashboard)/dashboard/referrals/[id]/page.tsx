@@ -47,6 +47,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import {
+  createFormatDashboardMoney,
+  donationDisplayTotalLocal,
+} from "@/lib/dashboard/format-dashboard-money";
 import { formatUtcCalendarMonthLong } from "@/lib/admin/current-calendar-month-utc";
 import { StatsMetricCard } from "@/components/dashboard/StatsMetricCard";
 import { getDashboardChartPeriodLabelAr } from "@/lib/dashboard/chart-period-label-ar";
@@ -78,7 +82,7 @@ interface DonationRow {
   id: string;
   totalAmount: number;
   amount: number;
-  amountUSD: number;
+  amountUSD?: number | null;
   currency: string;
   teamSupport: number;
   fees: number;
@@ -347,30 +351,14 @@ export default function ReferralAnalyticsPage() {
 
   const hasMoreDonations = donations.length < donationsTotal && !donationsLoading;
 
-  const currencySymbol: Record<string, string> = { USD: "$", EUR: "€", GBP: "£", TRY: "₺", EGP: "EGP " };
-  const formatMoney = (n: number, sourceCurrency?: string, amountUSD?: number, approximate?: boolean) => {
-    const decimals = approximate ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : { minimumFractionDigits: 0, maximumFractionDigits: 2 };
-    const selected = getSelectedCurrency?.() ?? "DEFAULT";
-    if (selected === "DEFAULT" && sourceCurrency) {
-      const sym = currencySymbol[sourceCurrency] ?? sourceCurrency + " ";
-      const val = typeof n === "number" ? (approximate ? Math.round(n) : n) : 0;
-      return sym + val.toLocaleString(undefined, decimals);
-    }
-    if (sourceCurrency && sourceCurrency === selected) {
-      const sym = currencySymbol[sourceCurrency] ?? sourceCurrency + " ";
-      const val = typeof n === "number" ? (approximate ? Math.round(n) : n) : 0;
-      return sym + val.toLocaleString(undefined, decimals);
-    }
-    const valueToConvert = amountUSD != null ? amountUSD : n;
-    const r = convertToCurrency(valueToConvert);
-    if (r?.convertedValue != null && r?.currency) {
-      const sym = currencySymbol[r.currency] ?? r.currency + " ";
-      const val = typeof r.convertedValue === "number" ? (approximate ? Math.round(r.convertedValue) : r.convertedValue) : 0;
-      return sym + val.toLocaleString(undefined, decimals);
-    }
-    const val = typeof n === "number" ? (approximate ? Math.round(n) : n) : 0;
-    return "$" + val.toLocaleString(undefined, decimals);
-  };
+  const formatMoney = useMemo(
+    () =>
+      createFormatDashboardMoney({
+        getSelectedCurrency,
+        convertToCurrency,
+      }),
+    [getSelectedCurrency, convertToCurrency]
+  );
 
   if (!id) return null;
   if (loading && !stats) {
@@ -834,7 +822,7 @@ export default function ReferralAnalyticsPage() {
                             {d.donor?.email && <p className="text-xs text-slate-500 truncate max-w-[180px]">{d.donor.email}</p>}
                           </td>
                           <td className="py-3 px-4 font-medium text-slate-800" dir="ltr">
-                            <span dir="ltr">{formatMoney((d.amount ?? d.totalAmount ?? 0) as number, d.currency, d.amountUSD)}</span>
+                            <span dir="ltr">{formatMoney(donationDisplayTotalLocal(d), d.currency, d.amountUSD ?? undefined)}</span>
                           </td>
                           <td className="py-3 px-4">
                             <span

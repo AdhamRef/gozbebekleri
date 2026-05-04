@@ -31,6 +31,7 @@ import {
   FUNDRAISING_SHARES,
   GOAL_TYPE_OPEN,
 } from "@/lib/campaign/campaign-modes";
+import { LocalizedSharePrice } from "@/components/LocalizedSharePrice";
 
 interface BlogPostProps {
   params: Promise<{ locale: string; postId: string }>;
@@ -197,6 +198,7 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
                   goalType?: string;
                   fundraisingMode?: string;
                   sharePriceUSD?: number | null;
+                  suggestedShareCounts?: unknown;
                 }[];
                 if (!list.length) return null;
                 return (
@@ -258,7 +260,11 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
                                 ) : isShares && camp.sharePriceUSD != null && camp.sharePriceUSD > 0 ? (
                                   <span className="text-gray-600 text-right whitespace-nowrap">
                                     {t("sharePriceUsd")}{" "}
-                                    <span className="font-semibold">${Number(camp.sharePriceUSD).toLocaleString()}</span>
+                                    <LocalizedSharePrice
+                                      className="font-semibold"
+                                      sharePriceUSD={Number(camp.sharePriceUSD)}
+                                      suggestedShareCounts={camp.suggestedShareCounts}
+                                    />
                                   </span>
                                 ) : (
                                   <span className="text-gray-600 text-right whitespace-nowrap">{t("campaignOpenGoal")}</span>

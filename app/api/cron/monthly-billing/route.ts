@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import {
+  convertAmountInCurrencyToUsd,
+  normalizeDonationCurrencyCode,
+} from "@/lib/exchange/convert-amount-in-currency-to-usd";
 
 /** Returns the next billing date: one month after `from`, clamped to the target month's last day. */
 function getNextBillingDate(from: Date): Date {
@@ -51,16 +55,41 @@ export async function GET(request: NextRequest) {
 
       attempted++;
       const transactionDate = sub.nextBillingDate || now;
-      const amountUSD = sub.amountUSD ?? sub.amount ?? 0;
       const totalAmount = sub.amount ?? 0;
       const fees = 0; // subscription template doesn't store per-charge fees; could be computed if needed
       const finalTotalAmount = totalAmount + (sub.teamSupport ?? 0) + fees;
+
+      let donationAmountUsd = sub.amountUSD ?? 0;
+      try {
+        donationAmountUsd = await convertAmountInCurrencyToUsd(
+          finalTotalAmount,
+          normalizeDonationCurrencyCode(sub.currency)
+        );
+      } catch {
+        /* keep subscription.template amountUSD if API fails */
+      }
+
+      const curNorm = normalizeDonationCurrencyCode(sub.currency);
+      const campaignLineCreates = await Promise.all(
+        sub.items.map(async (item) => ({
+          campaignId: item.campaignId,
+          amount: item.amount,
+          amountUSD: await convertAmountInCurrencyToUsd(item.amount, curNorm),
+        }))
+      );
+      const categoryLineCreates = await Promise.all(
+        sub.categoryItems.map(async (item) => ({
+          categoryId: item.categoryId,
+          amount: item.amount,
+          amountUSD: await convertAmountInCurrencyToUsd(item.amount, curNorm),
+        }))
+      );
 
       await prisma.$transaction(async (tx) => {
         const donation = await tx.donation.create({
           data: {
             amount: totalAmount,
-            amountUSD,
+            amountUSD: donationAmountUsd,
             totalAmount: finalTotalAmount,
             currency: sub.currency,
             teamSupport: sub.teamSupport ?? 0,
@@ -72,24 +101,8 @@ export async function GET(request: NextRequest) {
             subscriptionId: sub.id,
             paymentMethod: sub.paymentMethod,
             cardDetails: null,
-            items: sub.items.length
-              ? {
-                  create: sub.items.map((item) => ({
-                    campaignId: item.campaignId,
-                    amount: item.amount,
-                    amountUSD: item.amountUSD ?? undefined,
-                  })),
-                }
-              : undefined,
-            categoryItems: sub.categoryItems.length
-              ? {
-                  create: sub.categoryItems.map((item) => ({
-                    categoryId: item.categoryId,
-                    amount: item.amount,
-                    amountUSD: item.amountUSD ?? undefined,
-                  })),
-                }
-              : undefined,
+            items: sub.items.length ? { create: campaignLineCreates } : undefined,
+            categoryItems: sub.categoryItems.length ? { create: categoryLineCreates } : undefined,
           },
         });
         // TODO: Call PayFor 2D recurring charge using sub.payforToken.

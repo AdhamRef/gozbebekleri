@@ -1455,7 +1455,7 @@ export default function DashboardPage() {
                           </td>
                           <td className="py-3 px-4 font-medium text-slate-800" dir="rtl">
                             <span dir="ltr">
-                              {formatMoney((d.amount ?? d.totalAmount ?? 0) as number, d.currency, d.amountUSD)}
+                              {formatMoney((d.totalAmount ?? d.amount ?? 0) as number, d.currency, d.amountUSD)}
                             </span>
                           </td>
                           <td className="py-3 px-4 font-medium text-slate-800" dir="rtl">

@@ -49,6 +49,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import {
+  createFormatDashboardMoney,
+  donationDisplayTotalLocal,
+} from "@/lib/dashboard/format-dashboard-money";
 import { formatUtcCalendarMonthLong } from "@/lib/admin/current-calendar-month-utc";
 import { StatsMetricCard } from "@/components/dashboard/StatsMetricCard";
 import { getDashboardChartPeriodLabelAr } from "@/lib/dashboard/chart-period-label-ar";
@@ -86,7 +90,7 @@ interface DonationRow {
   id: string;
   totalAmount: number;
   amount: number;
-  amountUSD: number;
+  amountUSD?: number | null;
   currency: string;
   teamSupport: number;
   fees: number;
@@ -185,19 +189,6 @@ const CHART_COLORS = {
   secondary: "#1d4ed8",
   grid: "#e2e8f0",
   text: "#334155",
-};
-
-const DASHBOARD_CURRENCY_SYMBOL: Record<string, string> = {
-  USD: "$",
-  EUR: "€",
-  GBP: "£",
-  TRY: "₺",
-  SAR: "﷼",
-  AED: "د.إ",
-  KWD: "د.ك",
-  EGP: "EGP ",
-  QAR: "﷼",
-  BHD: "ب.د",
 };
 
 const PAGE_SIZE = 10;
@@ -582,34 +573,18 @@ export default function MonthlySubscriptionsDashboardPage() {
   const hasMoreDonations =
     donations.length < donationsTotal && !donationsLoading;
 
+  const formatMoney = useMemo(
+    () =>
+      createFormatDashboardMoney({
+        getSelectedCurrency,
+        convertToCurrency,
+      }),
+    [getSelectedCurrency, convertToCurrency]
+  );
+
   if (loading) {
     return <LoadingSkeleton />;
   }
-
-  const currencySymbol: Record<string, string> = { USD: "$", EUR: "€", GBP: "£", TRY: "₺", EGP: "EGP " };
-  const formatMoney = (n: number, sourceCurrency?: string, amountUSD?: number, approximate?: boolean) => {
-    const decimals = approximate ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : { minimumFractionDigits: 0, maximumFractionDigits: 2 };
-    const selected = getSelectedCurrency?.() ?? "DEFAULT";
-    if (selected === "DEFAULT" && sourceCurrency) {
-      const sym = currencySymbol[sourceCurrency] ?? sourceCurrency + " ";
-      const val = typeof n === "number" ? (approximate ? Math.round(n) : n) : 0;
-      return sym + val.toLocaleString(undefined, decimals);
-    }
-    if (sourceCurrency && sourceCurrency === selected) {
-      const sym = currencySymbol[sourceCurrency] ?? sourceCurrency + " ";
-      const val = typeof n === "number" ? (approximate ? Math.round(n) : n) : 0;
-      return sym + val.toLocaleString(undefined, decimals);
-    }
-    const valueToConvert = amountUSD != null ? amountUSD : n;
-    const r = convertToCurrency(valueToConvert);
-    if (r?.convertedValue != null && r?.currency) {
-      const sym = currencySymbol[r.currency] ?? r.currency + " ";
-      const val = typeof r.convertedValue === "number" ? (approximate ? Math.round(r.convertedValue) : r.convertedValue) : 0;
-      return sym + val.toLocaleString(undefined, decimals);
-    }
-    const val = typeof n === "number" ? (approximate ? Math.round(n) : n) : 0;
-    return "$" + val.toLocaleString(undefined, decimals);
-  };
 
   const revenueSplitData = [
     {
@@ -1692,7 +1667,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                           </td>
                           <td className="py-3 px-4 font-medium text-slate-800" dir="rtl">
                             <span dir="ltr">
-                              {formatMoney((d.amount ?? d.totalAmount ?? 0) as number, d.currency, d.amountUSD)}
+                              {formatMoney(donationDisplayTotalLocal(d), d.currency, d.amountUSD ?? undefined)}
                             </span>
                           </td>
                           <td className="py-3 px-4">

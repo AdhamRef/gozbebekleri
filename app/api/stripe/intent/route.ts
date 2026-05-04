@@ -4,6 +4,10 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 import Stripe from "stripe";
 import { resolveReferralId } from "@/lib/referral-server";
+import {
+  convertAmountInCurrencyToUsd,
+  normalizeDonationCurrencyCode,
+} from "@/lib/exchange/convert-amount-in-currency-to-usd";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
@@ -56,14 +60,6 @@ export async function POST(req: NextRequest) {
       : 0;
     const totalAmount = campaignTotal + categoryTotal;
 
-    const campaignTotalUSD = hasCampaignItems
-      ? (items as { amountUSD?: number }[]).reduce((s, i) => s + (i.amountUSD ?? 0), 0)
-      : 0;
-    const categoryTotalUSD = hasCategoryItems
-      ? (categoryItems as { amountUSD?: number }[]).reduce((s, i) => s + (i.amountUSD ?? 0), 0)
-      : 0;
-    const totalAmountUSD = campaignTotalUSD + categoryTotalUSD;
-
     const fees = (totalAmount + teamSupport) * 0.03;
     const finalTotal = totalAmount + teamSupport + (coverFees ? fees : 0);
     const stripeCurrency = String(currency).toLowerCase();
@@ -102,6 +98,64 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "One or more categories not found" }, { status: 404 });
     }
 
+    const currencyNorm = normalizeDonationCurrencyCode(currency);
+    let donationTotalUsd: number;
+    try {
+      donationTotalUsd = await convertAmountInCurrencyToUsd(finalTotal, currencyNorm);
+    } catch (e) {
+      console.error("[Stripe Intent] convertAmountInCurrencyToUsd (total):", e);
+      return NextResponse.json(
+        { error: "Exchange rate unavailable. Please try again in a moment." },
+        { status: 503 }
+      );
+    }
+
+    type CampIn = {
+      campaignId: string;
+      amount: number;
+      amountUSD?: number;
+      shareCount?: number;
+    };
+    type CatIn = { categoryId: string; amount: number; amountUSD?: number };
+
+    let campaignItemsResolved: Array<{
+      campaignId: string;
+      amount: number;
+      amountUSD: number;
+      shareCount?: number;
+    }> = [];
+    let categoryItemsResolved: Array<{ categoryId: string; amount: number; amountUSD: number }> = [];
+
+    try {
+      if (hasCampaignItems) {
+        campaignItemsResolved = await Promise.all(
+          (items as CampIn[]).map(async (item) => ({
+            campaignId: item.campaignId,
+            amount: item.amount,
+            amountUSD: await convertAmountInCurrencyToUsd(item.amount, currencyNorm),
+            ...(item.shareCount != null && item.shareCount > 0
+              ? { shareCount: Math.floor(item.shareCount) }
+              : {}),
+          }))
+        );
+      }
+      if (hasCategoryItems) {
+        categoryItemsResolved = await Promise.all(
+          (categoryItems as CatIn[]).map(async (item) => ({
+            categoryId: item.categoryId,
+            amount: item.amount,
+            amountUSD: await convertAmountInCurrencyToUsd(item.amount, currencyNorm),
+          }))
+        );
+      }
+    } catch (e) {
+      console.error("[Stripe Intent] convertAmountInCurrencyToUsd (lines):", e);
+      return NextResponse.json(
+        { error: "Exchange rate unavailable. Please try again in a moment." },
+        { status: 503 }
+      );
+    }
+
     // ────────────────────────────────────────────────────────
     // MONTHLY — create subscription-linked donation + Stripe Subscription
     // ────────────────────────────────────────────────────────
@@ -116,7 +170,7 @@ export async function POST(req: NextRequest) {
             data: {
               status: "ACTIVE",
               amount: totalAmount,
-              amountUSD: totalAmountUSD,
+              amountUSD: donationTotalUsd,
               currency,
               teamSupport,
               coverFees,
@@ -127,21 +181,21 @@ export async function POST(req: NextRequest) {
               lastBillingDate: new Date(),
               items: hasCampaignItems
                 ? {
-                    create: (items as { campaignId: string; amount: number; amountUSD?: number; shareCount?: number }[]).map(
-                      (i) => ({
-                        campaignId: i.campaignId,
-                        amount: i.amount,
-                        amountUSD: i.amountUSD,
-                        ...(i.shareCount ? { shareCount: Math.floor(i.shareCount) } : {}),
-                      })
-                    ),
+                    create: campaignItemsResolved.map((i) => ({
+                      campaignId: i.campaignId,
+                      amount: i.amount,
+                      amountUSD: i.amountUSD,
+                      ...(i.shareCount != null && i.shareCount > 0 ? { shareCount: i.shareCount } : {}),
+                    })),
                   }
                 : undefined,
               categoryItems: hasCategoryItems
                 ? {
-                    create: (categoryItems as { categoryId: string; amount: number; amountUSD?: number }[]).map(
-                      (i) => ({ categoryId: i.categoryId, amount: i.amount, amountUSD: i.amountUSD })
-                    ),
+                    create: categoryItemsResolved.map((i) => ({
+                      categoryId: i.categoryId,
+                      amount: i.amount,
+                      amountUSD: i.amountUSD,
+                    })),
                   }
                 : undefined,
             },
@@ -150,7 +204,7 @@ export async function POST(req: NextRequest) {
           const d = await tx.donation.create({
             data: {
               amount: totalAmount,
-              amountUSD: totalAmountUSD,
+              amountUSD: donationTotalUsd,
               teamSupport,
               coverFees,
               currency,
@@ -165,21 +219,21 @@ export async function POST(req: NextRequest) {
               provider: "STRIPE",
               items: hasCampaignItems
                 ? {
-                    create: (items as { campaignId: string; amount: number; amountUSD?: number; shareCount?: number }[]).map(
-                      (i) => ({
-                        campaignId: i.campaignId,
-                        amount: i.amount,
-                        amountUSD: i.amountUSD,
-                        ...(i.shareCount ? { shareCount: Math.floor(i.shareCount) } : {}),
-                      })
-                    ),
+                    create: campaignItemsResolved.map((i) => ({
+                      campaignId: i.campaignId,
+                      amount: i.amount,
+                      amountUSD: i.amountUSD,
+                      ...(i.shareCount != null && i.shareCount > 0 ? { shareCount: i.shareCount } : {}),
+                    })),
                   }
                 : undefined,
               categoryItems: hasCategoryItems
                 ? {
-                    create: (categoryItems as { categoryId: string; amount: number; amountUSD?: number }[]).map(
-                      (i) => ({ categoryId: i.categoryId, amount: i.amount, amountUSD: i.amountUSD })
-                    ),
+                    create: categoryItemsResolved.map((i) => ({
+                      categoryId: i.categoryId,
+                      amount: i.amount,
+                      amountUSD: i.amountUSD,
+                    })),
                   }
                 : undefined,
             },
@@ -282,7 +336,7 @@ export async function POST(req: NextRequest) {
         const d = await tx.donation.create({
           data: {
             amount: totalAmount,
-            amountUSD: totalAmountUSD,
+            amountUSD: donationTotalUsd,
             teamSupport,
             coverFees,
             currency,
@@ -296,21 +350,21 @@ export async function POST(req: NextRequest) {
             provider: "STRIPE",
             items: hasCampaignItems
               ? {
-                  create: (items as { campaignId: string; amount: number; amountUSD?: number; shareCount?: number }[]).map(
-                    (i) => ({
-                      campaignId: i.campaignId,
-                      amount: i.amount,
-                      amountUSD: i.amountUSD,
-                      ...(i.shareCount ? { shareCount: Math.floor(i.shareCount) } : {}),
-                    })
-                  ),
+                  create: campaignItemsResolved.map((i) => ({
+                    campaignId: i.campaignId,
+                    amount: i.amount,
+                    amountUSD: i.amountUSD,
+                    ...(i.shareCount != null && i.shareCount > 0 ? { shareCount: i.shareCount } : {}),
+                  })),
                 }
               : undefined,
             categoryItems: hasCategoryItems
               ? {
-                  create: (categoryItems as { categoryId: string; amount: number; amountUSD?: number }[]).map(
-                    (i) => ({ categoryId: i.categoryId, amount: i.amount, amountUSD: i.amountUSD })
-                  ),
+                  create: categoryItemsResolved.map((i) => ({
+                    categoryId: i.categoryId,
+                    amount: i.amount,
+                    amountUSD: i.amountUSD,
+                  })),
                 }
               : undefined,
           },

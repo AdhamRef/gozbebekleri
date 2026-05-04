@@ -118,6 +118,11 @@ const DonationDialog = ({
     [suggestedShareCounts]
   );
   const sharePickCounts = parsedShareCounts.counts;
+  /** Cookie currency for pricing; DEFAULT → USD (matches server conversion). */
+  const payCurrencyCode = useCallback((): string => {
+    const c = getCurrency();
+    return !c || c === "DEFAULT" ? "USD" : c;
+  }, []);
   const t = useTranslations("DonationDialog");
   const locale = useLocale() as "ar" | "en" | "fr";
   const isRTL = locale === "ar";
@@ -338,7 +343,7 @@ const DonationDialog = ({
   /** Per-share display price in the donor's currently selected currency. */
   const getSharePriceInCurrency = (): number => {
     if (sharePriceUSD == null) return 0;
-    const override = resolveSharePriceOverride(parsedShareCounts, getCurrency());
+    const override = resolveSharePriceOverride(parsedShareCounts, payCurrencyCode());
     if (override != null) return override;
     const r = convertToCurrency(sharePriceUSD);
     return r?.convertedValue != null && Number.isFinite(r.convertedValue)
@@ -349,11 +354,11 @@ const DonationDialog = ({
   /** USD equivalent of one share, used for `amountUSD` sent to the server. */
   const getSharePriceUSDEffective = (): number => {
     if (sharePriceUSD == null) return 0;
-    const override = resolveSharePriceOverride(parsedShareCounts, getCurrency());
+    const cur = payCurrencyCode();
+    const override = resolveSharePriceOverride(parsedShareCounts, cur);
     if (override == null) return sharePriceUSD;
     // Override is the absolute price in the donor's currency — convert back to USD via cached rate.
-    const cur = getCurrency();
-    if (cur === "USD" || cur === "DEFAULT") return override;
+    if (cur === "USD") return override;
     const rate = exchangeRates?.[cur];
     if (!rate || !Number.isFinite(rate) || rate <= 0) return sharePriceUSD;
     return override / rate;
@@ -386,14 +391,14 @@ const DonationDialog = ({
 
   // Minimum Stripe charge = 1 USD converted to the selected currency, rounded up.
   const stripeMinAmount = (() => {
-    const cur = getCurrency();
+    const cur = payCurrencyCode();
     if (cur === "USD") return 1;
     try {
       const cached = typeof window !== "undefined" ? localStorage.getItem("cachedExchangeRates") : null;
       if (!cached) return 1;
       const { rates } = JSON.parse(cached) as { rates: Record<string, number> };
       const rate = rates?.[cur];
-      return rate ? Math.ceil(rate+1) : 1;
+      return rate ? Math.ceil(rate + 1) : 1;
     } catch {
       return 1;
     }
@@ -746,7 +751,7 @@ const DonationDialog = ({
                       const amountUSD =
                         shareMode && sharePriceUSD != null
                           ? shareCount * getSharePriceUSDEffective()
-                          : useConvetToUSD(donationAmount, getCurrency());
+                          : useConvetToUSD(donationAmount, payCurrencyCode());
                       if (guestMode) {
                         // Guest: add to Zustand only (no DB call — not authenticated)
                         addItem({
@@ -1208,7 +1213,7 @@ const DonationDialog = ({
       const amountUSD =
         shareMode && sharePriceUSD != null
           ? shareCount * getSharePriceUSDEffective()
-          : convertToUSD(donationAmount, getCurrency());
+          : convertToUSD(donationAmount, payCurrencyCode());
 
       // Resolve guest geo (used for both tracking and API request)
       let geoCountryCode: string | undefined;

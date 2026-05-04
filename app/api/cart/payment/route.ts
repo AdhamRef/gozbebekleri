@@ -5,6 +5,10 @@ import { authOptions } from "../../auth/[...nextauth]/options";
 import { resolveReferralId } from "@/lib/referral-server";
 import { userHasDashboardPermission } from "@/lib/dashboard/permissions";
 import { writeAuditLog, auditStreamForRole } from "@/lib/audit-log";
+import {
+  convertAmountInCurrencyToUsd,
+  normalizeDonationCurrencyCode,
+} from "@/lib/exchange/convert-amount-in-currency-to-usd";
 
 export async function GET(request: NextRequest) {
   try {
@@ -160,16 +164,60 @@ export async function POST(request: NextRequest) {
     // Card payments are handled via PayFor 3D Secure redirect flow (we do not store PAN/CVV).
 
     // Calculate totals
-    const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
-    const totalAmountUSD = items.reduce(
-      (sum, item) => sum + (item.amountUSD || 0),
+    const totalAmount = (items as { amount: number }[]).reduce(
+      (sum: number, item: { amount: number }) => sum + item.amount,
       0
     );
     const fees = (totalAmount + teamSupport) * 0.03;
     const finalTotalAmount = totalAmount + teamSupport + (coverFees ? fees : 0);
 
+    const currencyNorm = normalizeDonationCurrencyCode(currency);
+    let donationTotalUsd: number;
+    try {
+      donationTotalUsd = await convertAmountInCurrencyToUsd(finalTotalAmount, currencyNorm);
+    } catch (e) {
+      console.error("[cart/payment] convert total to USD:", e);
+      return NextResponse.json(
+        { error: "Exchange rate unavailable. Please try again in a moment." },
+        { status: 503 }
+      );
+    }
+
+    type CartItemIn = {
+      campaignId: string;
+      amount: number;
+      amountUSD?: number;
+      shareCount?: number;
+    };
+
+    let itemsResolved: Array<{
+      campaignId: string;
+      amount: number;
+      amountUSD: number;
+      shareCount?: number;
+    }>;
+
+    try {
+      itemsResolved = await Promise.all(
+        (items as CartItemIn[]).map(async (item) => ({
+          campaignId: item.campaignId,
+          amount: item.amount,
+          amountUSD: await convertAmountInCurrencyToUsd(item.amount, currencyNorm),
+          ...(item.shareCount != null && item.shareCount > 0
+            ? { shareCount: Math.floor(item.shareCount) }
+            : {}),
+        }))
+      );
+    } catch (e) {
+      console.error("[cart/payment] convert lines to USD:", e);
+      return NextResponse.json(
+        { error: "Exchange rate unavailable. Please try again in a moment." },
+        { status: 503 }
+      );
+    }
+
     // Verify all campaigns exist and are active
-    const campaignIds = items.map((item) => item.campaignId);
+    const campaignIds = (items as { campaignId: string }[]).map((item) => item.campaignId);
     const campaigns = await prisma.campaign.findMany({
       where: { id: { in: campaignIds } },
     });
@@ -205,7 +253,7 @@ export async function POST(request: NextRequest) {
           data: {
             status: "ACTIVE",
             amount: totalAmount,
-            amountUSD: totalAmountUSD,
+            amountUSD: donationTotalUsd,
             currency,
             teamSupport,
             coverFees,
@@ -216,21 +264,14 @@ export async function POST(request: NextRequest) {
             nextBillingDate: nextBilling,
             lastBillingDate: new Date(),
             items: {
-              create: items.map(
-                (item: {
-                  campaignId: string;
-                  amount: number;
-                  amountUSD?: number;
-                  shareCount?: number;
-                }) => ({
-                  campaignId: item.campaignId,
-                  amount: item.amount,
-                  amountUSD: item.amountUSD,
-                  ...(item.shareCount != null && item.shareCount > 0
-                    ? { shareCount: Math.floor(item.shareCount) }
-                    : {}),
-                })
-              ),
+              create: itemsResolved.map((item) => ({
+                campaignId: item.campaignId,
+                amount: item.amount,
+                amountUSD: item.amountUSD,
+                ...(item.shareCount != null && item.shareCount > 0
+                  ? { shareCount: item.shareCount }
+                  : {}),
+              })),
             },
           },
         });
@@ -238,7 +279,7 @@ export async function POST(request: NextRequest) {
         const donation = await tx.donation.create({
           data: {
             amount: totalAmount,
-            amountUSD: totalAmountUSD,
+            amountUSD: donationTotalUsd,
             teamSupport,
             coverFees,
             currency,
@@ -252,21 +293,14 @@ export async function POST(request: NextRequest) {
             paymentMethod,
             cardDetails: null,
             items: {
-              create: items.map(
-                (item: {
-                  campaignId: string;
-                  amount: number;
-                  amountUSD?: number;
-                  shareCount?: number;
-                }) => ({
-                  campaignId: item.campaignId,
-                  amount: item.amount,
-                  amountUSD: item.amountUSD,
-                  ...(item.shareCount != null && item.shareCount > 0
-                    ? { shareCount: Math.floor(item.shareCount) }
-                    : {}),
-                })
-              ),
+              create: itemsResolved.map((item) => ({
+                campaignId: item.campaignId,
+                amount: item.amount,
+                amountUSD: item.amountUSD,
+                ...(item.shareCount != null && item.shareCount > 0
+                  ? { shareCount: item.shareCount }
+                  : {}),
+              })),
             },
           },
           include: {
@@ -298,10 +332,10 @@ export async function POST(request: NextRequest) {
         actorName: donorName,
         actorRole,
         action: "DONATION_MONTHLY_CHECKOUT_START",
-        messageAr: `${donorName ?? "متبرع"} بدأ عملية دفع اشتراكًا شهريًا عبر السلة (≈ ${totalAmountUSD.toFixed(0)} USD لكل دورة)`,
+        messageAr: `${donorName ?? "متبرع"} بدأ عملية دفع اشتراكًا شهريًا عبر السلة (≈ ${donationTotalUsd.toFixed(0)} USD لكل دورة)`,
         entityType: "Donation",
         entityId: d.id,
-        metadata: { amountUSD: totalAmountUSD, via: "cart_payment", status: "PENDING", provider: "PAYFOR" },
+        metadata: { amountUSD: donationTotalUsd, via: "cart_payment", status: "PENDING", provider: "PAYFOR" },
         stream: auditStreamForRole(actorRole),
       });
 
@@ -316,7 +350,7 @@ export async function POST(request: NextRequest) {
       const d = await tx.donation.create({
         data: {
           amount: totalAmount,
-          amountUSD: totalAmountUSD,
+          amountUSD: donationTotalUsd,
           teamSupport,
           coverFees,
           currency,
@@ -329,21 +363,14 @@ export async function POST(request: NextRequest) {
           paymentMethod,
           cardDetails: null,
           items: {
-            create: items.map(
-              (item: {
-                campaignId: string;
-                amount: number;
-                amountUSD?: number;
-                shareCount?: number;
-              }) => ({
-                campaignId: item.campaignId,
-                amount: item.amount,
-                amountUSD: item.amountUSD,
-                ...(item.shareCount != null && item.shareCount > 0
-                  ? { shareCount: Math.floor(item.shareCount) }
-                  : {}),
-              })
-            ),
+            create: itemsResolved.map((item) => ({
+              campaignId: item.campaignId,
+              amount: item.amount,
+              amountUSD: item.amountUSD,
+              ...(item.shareCount != null && item.shareCount > 0
+                ? { shareCount: item.shareCount }
+                : {}),
+            })),
           },
         },
         include: {
@@ -374,10 +401,10 @@ export async function POST(request: NextRequest) {
       actorName: donorName,
       actorRole,
       action: "DONATION_ONE_TIME_CHECKOUT_START",
-      messageAr: `${donorName ?? "متبرع"} بدأ عملية دفع تبرعًا لمرة واحدة عبر السلة (≈ ${totalAmountUSD.toFixed(0)} USD)`,
+      messageAr: `${donorName ?? "متبرع"} بدأ عملية دفع تبرعًا لمرة واحدة عبر السلة (≈ ${donationTotalUsd.toFixed(0)} USD)`,
       entityType: "Donation",
       entityId: donation.id,
-      metadata: { amountUSD: totalAmountUSD, via: "cart_payment", status: "PENDING", provider: "PAYFOR" },
+      metadata: { amountUSD: donationTotalUsd, via: "cart_payment", status: "PENDING", provider: "PAYFOR" },
       stream: auditStreamForRole(actorRole),
     });
 
