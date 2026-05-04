@@ -44,6 +44,7 @@ import { useCart } from "@/hooks/useCart";
 import { useTracking } from "@/components/TrackingPixels";
 import { useRouter } from "@/i18n/routing";
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
+import { getDonationAttributionPayload } from "@/lib/attribution/client-payload";
 import { useTranslations, useLocale } from "next-intl";
 import { useSession } from "next-auth/react";
 import { PhoneInput } from "react-international-phone";
@@ -1285,6 +1286,7 @@ const DonationDialog = ({
         paymentMethod,
         cardDetails: null,
         locale,
+        attribution: getDonationAttributionPayload(),
         ...(guestMode && {
           guest: {
             firstName: guestFirstName.trim() || undefined,

@@ -32,15 +32,15 @@ const ACCENT_CLASSES: Record<
 };
 
 function formatValue(value: number, format?: "money" | "number" | "percent"): string {
+  const latn = (n: number, options?: Intl.NumberFormatOptions) =>
+    n.toLocaleString("en-US", { numberingSystem: "latn", ...options });
   if (format === "money") {
-    if (value >= 1_000_000)
-      return `$${(value / 1_000_000).toFixed(2)}M`;
-    if (value >= 1_000)
-      return `$${(value / 1_000).toFixed(1)}K`;
+    if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
+    if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
     return `$${value.toFixed(2)}`;
   }
   if (format === "percent") return `${value.toFixed(1)}%`;
-  return value.toLocaleString("ar-SA");
+  return latn(value, { maximumFractionDigits: 0 });
 }
 
 interface StatsMetricCardProps {
@@ -75,10 +75,10 @@ export function StatsMetricCard({
         isHero && "ring-2 ring-offset-1 ring-current ring-opacity-20",
       )}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-2 min-w-0">
         <p
           className={cn(
-            "font-medium leading-tight text-slate-700 text-right flex-1",
+            "font-medium leading-tight text-slate-700 text-right flex-1 min-w-0",
             compact ? "text-[11px]" : "text-xs",
           )}
         >
@@ -86,7 +86,7 @@ export function StatsMetricCard({
         </p>
         <span
           className={cn(
-            "rounded-lg p-1.5 shrink-0",
+            "rounded-lg p-1.5 shrink-0 mt-0.5",
             colors.bg,
             colors.icon,
           )}

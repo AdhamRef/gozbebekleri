@@ -67,14 +67,27 @@ function buildDonationWhereAllTime(categoryId: string | null, campaignId: string
   return base;
 }
 
+function mergeLocaleFilter(where: Record<string, unknown>, locale: string | null): Record<string, unknown> {
+  if (!locale || locale === 'all') return where;
+  const lw =
+    locale === '__unset'
+      ? { OR: [{ locale: null }, { locale: '' }] }
+      : { locale };
+  return { AND: [where, lw] };
+}
+
 function buildDonationItemWhere(
   startDate: Date,
   endDate: Date,
   categoryId: string | null,
-  campaignId: string | null
+  campaignId: string | null,
+  locale: string | null
 ) {
   const base: Record<string, unknown> = {
-    donation: { createdAt: { gte: startDate, lte: endDate }, ...PAID_DONATION_FILTER },
+    donation: mergeLocaleFilter(
+      { createdAt: { gte: startDate, lte: endDate }, ...PAID_DONATION_FILTER },
+      locale
+    ),
   };
   if (campaignId && campaignId !== 'all') {
     base.campaignId = campaignId;
@@ -87,10 +100,14 @@ function buildDonationItemWhere(
 function buildDonationCategoryItemWhere(
   startDate: Date,
   endDate: Date,
-  categoryId: string | null
+  categoryId: string | null,
+  locale: string | null
 ) {
   const base: Record<string, unknown> = {
-    donation: { createdAt: { gte: startDate, lte: endDate }, ...PAID_DONATION_FILTER },
+    donation: mergeLocaleFilter(
+      { createdAt: { gte: startDate, lte: endDate }, ...PAID_DONATION_FILTER },
+      locale
+    ),
   };
   if (categoryId && categoryId !== 'all') {
     base.categoryId = categoryId;
@@ -110,10 +127,17 @@ export async function GET(request: NextRequest) {
     const endParam = searchParams.get('end');
     const categoryId = searchParams.get('categoryId');
     const campaignId = searchParams.get('campaignId');
+    const locale = searchParams.get('locale')?.trim() ?? null;
 
     const { startDate, endDate } = getDateRange(period, startParam, endParam);
-    const donationWhere = buildDonationWhere(startDate, endDate, categoryId, campaignId);
-    const donationWhereAllTime = buildDonationWhereAllTime(categoryId, campaignId);
+    const donationWhere = mergeLocaleFilter(
+      buildDonationWhere(startDate, endDate, categoryId, campaignId),
+      locale
+    );
+    const donationWhereAllTime = mergeLocaleFilter(
+      buildDonationWhereAllTime(categoryId, campaignId),
+      locale
+    );
 
     // Only donations that actually settled (status=PAID + paidAt set) count toward revenue.
     // status=PAID alone includes abandoned checkouts that never increment campaign.currentAmount.
@@ -123,7 +147,10 @@ export async function GET(request: NextRequest) {
     const failedWhere = { ...donationWhere, status: 'FAILED' as const };
 
     const { monthStart, monthEnd } = getCurrentCalendarMonthUtcRange();
-    const thisMonthDonationWhere = buildDonationWhere(monthStart, monthEnd, categoryId, campaignId);
+    const thisMonthDonationWhere = mergeLocaleFilter(
+      buildDonationWhere(monthStart, monthEnd, categoryId, campaignId),
+      locale
+    );
     const thisMonthPaidWhere = { ...thisMonthDonationWhere, ...PAID_DONATION_FILTER };
 
     const subscriptionWhere: Record<string, unknown> = { status: 'ACTIVE' };
@@ -206,12 +233,12 @@ export async function GET(request: NextRequest) {
       prisma.donationItem.aggregate({
         _sum: { amountUSD: true, amount: true },
         _count: { id: true },
-        where: buildDonationItemWhere(startDate, endDate, categoryId, campaignId),
+        where: buildDonationItemWhere(startDate, endDate, categoryId, campaignId, locale),
       }),
       prisma.donationCategoryItem.aggregate({
         _sum: { amountUSD: true, amount: true },
         _count: { id: true },
-        where: buildDonationCategoryItemWhere(startDate, endDate, categoryId),
+        where: buildDonationCategoryItemWhere(startDate, endDate, categoryId, locale),
       }),
       prisma.donation.findMany({
         take: 10,

@@ -414,6 +414,11 @@ model Donation {
   paymentMethod PaymentMethod
   cardDetails   CardDetails?
 
+  /// UTM/ads/GA/Meta snapshot from client at checkout (JSON). Server conversions use the same donation id as event_id.
+  attribution            Json?
+  /// Set when Meta CAPI + GA4 MP were sent for this row (idempotent).
+  conversionEventsSentAt  DateTime?
+
   createdAt DateTime @default(now())
   paidAt    DateTime?
 

@@ -13,6 +13,7 @@ import {
   getDonorCountryCodeForSnapshot,
   normalizeDonorCountryCode,
 } from "@/lib/donations/donor-country-code";
+import { sanitizeDonationAttribution } from "@/lib/attribution/sanitize";
 
 // GET /api/donations - Get all donations (admin) or user's donations
 export async function GET(request: NextRequest) {
@@ -45,8 +46,9 @@ export async function GET(request: NextRequest) {
       isAdmin &&
       (searchParams.get("subscriptionOnly") === "true" || searchParams.get("subscriptionOnly") === "1");
     const statusFilter = isAdmin ? searchParams.get("status") : null;
+    const localeFilter = isAdmin ? searchParams.get("locale")?.trim() : null;
 
-    const where: Record<string, unknown> = {
+    const baseWhere: Record<string, unknown> = {
       ...(campaignId && { items: { some: { campaignId } } }),
       ...(userId && { donorId: userId }),
       ...(referralId && isAdmin && { referralId }),
@@ -57,11 +59,21 @@ export async function GET(request: NextRequest) {
       ...(statusFilter && ["PAID", "FAILED"].includes(statusFilter) && { status: statusFilter }),
     };
     if (categoryId && isAdmin) {
-      where.OR = [
+      baseWhere.OR = [
         { items: { some: { campaign: { categoryId } } } },
         { categoryItems: { some: { categoryId } } },
       ];
     }
+
+    const localeWhere =
+      localeFilter && localeFilter !== "all"
+        ? localeFilter === "__unset"
+          ? { OR: [{ locale: null }, { locale: "" }] }
+          : { locale: localeFilter }
+        : null;
+
+    const where: Record<string, unknown> =
+      localeWhere != null ? { AND: [baseWhere, localeWhere] } : baseWhere;
 
     const orderBy =
       sortBy === "amount"
@@ -111,6 +123,20 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     const body = await request.json();
+    const forwardedFor = request.headers.get("x-forwarded-for");
+    const clientIp =
+      forwardedFor?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      undefined;
+    const userAgent = request.headers.get("user-agent")?.slice(0, 500) || undefined;
+    const attribution = sanitizeDonationAttribution({
+      ...((body.attribution && typeof body.attribution === "object" && !Array.isArray(body.attribution)
+        ? body.attribution
+        : {}) as Record<string, unknown>),
+      ...(userAgent ? { user_agent: userAgent } : {}),
+      ...(clientIp ? { client_ip: clientIp } : {}),
+    });
+
     const {
       items,
       categoryItems,
@@ -371,6 +397,7 @@ export async function POST(request: NextRequest) {
             totalAmount: finalTotalAmount,
             status: "PAID",
             locale: validLocale ?? undefined,
+            attribution: attribution ?? undefined,
             donorCountryCode: donorCountrySnapshot,
             donorId,
             referralId: referralId ?? undefined,
@@ -456,6 +483,7 @@ export async function POST(request: NextRequest) {
           totalAmount: finalTotalAmount,
           status: "PAID",
           locale: validLocale ?? undefined,
+          attribution: attribution ?? undefined,
           donorCountryCode: donorCountrySnapshot,
           donorId,
           referralId: referralId ?? undefined,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import Stripe from "stripe";
 import { getDonorCountryCodeForSnapshot } from "@/lib/donations/donor-country-code";
+import { sendDonationServerConversions } from "@/lib/tracking/donation-conversion-server";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
@@ -86,6 +87,7 @@ export async function POST(req: NextRequest) {
               });
             }
           });
+          void sendDonationServerConversions(donationId);
         }
         break;
       }
@@ -231,6 +233,15 @@ export async function POST(req: NextRequest) {
             },
           });
         });
+        const paidForInvoice = await prisma.donation.findFirst({
+          where: {
+            subscriptionId: dbSubscription.id,
+            providerOrderId: invoice.id,
+            status: "PAID",
+          },
+          select: { id: true },
+        });
+        if (paidForInvoice) void sendDonationServerConversions(paidForInvoice.id);
         break;
       }
 
@@ -329,6 +340,7 @@ export async function POST(req: NextRequest) {
             });
           }
         });
+        void sendDonationServerConversions(donationId);
         break;
       }
 

@@ -33,6 +33,15 @@ function toDateStr(d: Date) {
   return d.toISOString().split('T')[0];
 }
 
+function mergeLocaleFilter(where: Record<string, unknown>, locale: string | null): Record<string, unknown> {
+  if (!locale || locale === 'all') return where;
+  const lw =
+    locale === '__unset'
+      ? { OR: [{ locale: null }, { locale: '' }] }
+      : { locale };
+  return { AND: [where, lw] };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -47,25 +56,28 @@ export async function GET(request: NextRequest) {
     const startParam = searchParams.get('start');
     const endParam = searchParams.get('end');
     const showFailed = searchParams.get('showFailed') === 'true';
+    const locale = searchParams.get('locale')?.trim() ?? null;
 
     const { startDate, endDate } = getDateRange(period, startParam, endParam);
 
-    const baseWhere: Record<string, unknown> = {
+    const innerWhere: Record<string, unknown> = {
       createdAt: { gte: startDate, lte: endDate },
     };
 
     if (userId && userId !== 'all') {
-      baseWhere.donorId = userId;
+      innerWhere.donorId = userId;
     }
 
     if (campaignId && campaignId !== 'all') {
-      baseWhere.items = { some: { campaignId } };
+      innerWhere.items = { some: { campaignId } };
     } else if (categoryId && categoryId !== 'all') {
-      baseWhere.OR = [
+      innerWhere.OR = [
         { items: { some: { campaign: { categoryId } } } },
         { categoryItems: { some: { categoryId } } },
       ];
     }
+
+    const baseWhere = mergeLocaleFilter(innerWhere, locale);
 
     // Always fetch both paid and failed donations
     const donations = await prisma.donation.findMany({
