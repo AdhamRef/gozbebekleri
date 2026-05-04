@@ -106,7 +106,7 @@ interface ReferralStats {
   failedTotalAmount?: number;
   totalAmount: number;
   allTimeRevenue?: number;
-  /** All PAID for this referral (USD) — ignores category/campaign filters */
+  /** All PAID for this referral (USD) _ ignores category/campaign filters */
   paidRevenueAllTimeUnfiltered?: number;
   oneTimeCount: number;
   monthlyCount: number;
