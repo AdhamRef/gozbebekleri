@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Inbox,
   Calendar,
+  Zap,
 } from "lucide-react";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { PhoneInput } from "react-international-phone";
@@ -254,7 +255,7 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl, onSkip }: S
       <DialogContent
         hideCloseButton
         dir={dir}
-        className="sm:max-w-sm p-0 overflow-hidden rounded-2xl border-0 shadow-2xl"
+        className="flex w-[min(100%,calc(100vw-1.25rem))] max-w-[min(26rem,calc(100vw-1.25rem))] flex-col p-0 overflow-hidden rounded-2xl border-0 shadow-2xl max-h-[min(92dvh,44rem)] sm:max-w-md"
       >
         <DialogClose
           className="absolute top-3.5 end-3.5 z-50 w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
@@ -263,19 +264,8 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl, onSkip }: S
           <X className="w-3.5 h-3.5 text-white" />
         </DialogClose>
 
-        {/* Skip — mirrors X on the opposite side, only on options screen */}
-        {screen === "options" && onSkip && (
-          <button
-            type="button"
-            onClick={() => { onClose(); onSkip(); }}
-            className="absolute top-3.5 start-3.5 z-50 h-7 px-3 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-[11px] font-semibold text-white transition-colors"
-          >
-            {t("skipAndDonate")}
-          </button>
-        )}
-
         {/* ── Header ─────────────────────────────────────────────────────── */}
-        <div className="bg-[#025EB8] px-6 pt-7 pb-6 text-center relative">
+        <div className="bg-[#025EB8] px-4 pt-6 pb-5 sm:px-6 sm:pt-7 sm:pb-6 text-center relative shrink-0">
           {screen !== "options" && (
             <button
               type="button"
@@ -327,40 +317,74 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl, onSkip }: S
         </div>
 
         {/* ── Body ───────────────────────────────────────────────────────── */}
-        <div className="bg-white px-6 pt-5 pb-5 space-y-4">
+        <div className="bg-white px-4 pt-4 pb-5 sm:px-6 sm:pt-5 space-y-4 min-h-0 flex-1 overflow-y-auto overscroll-contain">
 
           {/* ── OPTIONS screen ─────────────────────────────────────────── */}
           {screen === "options" && (
             <>
-              {/* Google */}
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-xl border border-gray-200 shadow-sm hover:shadow transition-all active:scale-[0.98]"
-              >
-                <Image src="/google.svg" alt="Google" width={20} height={20} className="flex-shrink-0" />
-                {t("signInWithGoogle")}
-              </button>
+              {/* Google — featured */}
+              <div className="relative pt-1">
+                <div
+                  className={`pointer-events-none absolute -top-0.5 z-10 flex max-w-[calc(100%-1.5rem)] items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500 px-2 py-0.5 text-[10px] font-bold leading-none text-white shadow-md ring-2 ring-white sm:text-[11px] ${
+                    isRTL ? "left-3" : "right-3"
+                  }`}
+                >
+                  <Zap className="h-3 w-3 shrink-0 fill-white/90" aria-hidden />
+                  <span>{t("googleFastestWay")}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  className="group relative w-full overflow-hidden rounded-2xl border-2 border-transparent bg-gradient-to-br from-white via-white to-slate-50 py-3.5 px-4 shadow-[0_4px_20px_-4px_rgba(2,94,184,0.35),0_0_0_1px_rgba(2,94,184,0.08)] ring-1 ring-slate-200/80 transition-all hover:shadow-[0_8px_28px_-6px_rgba(2,94,184,0.45),0_0_0_1px_rgba(2,94,184,0.12)] hover:ring-[#025EB8]/25 active:scale-[0.99] sm:py-4 min-h-[3.25rem] touch-manipulation"
+                >
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#025EB8]/[0.06] via-transparent to-amber-400/10 opacity-0 transition-opacity group-hover:opacity-100"
+                  />
+                  <span className="relative flex items-center justify-center gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-black/5">
+                      <Image src="/google.svg" alt="" width={22} height={22} className="h-[22px] w-[22px]" />
+                    </span>
+                    <span className="min-w-0 flex-1 text-center text-sm font-semibold text-slate-800 sm:text-base">
+                      {t("signInWithGoogle")}
+                    </span>
+                  </span>
+                </button>
+              </div>
 
               {/* Divider */}
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-gray-100" />
-                <span className="text-[11px] text-gray-400 font-medium">{t("orContinueWith")}</span>
-                <div className="flex-1 h-px bg-gray-100" />
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="min-w-0 flex-1 h-px bg-gray-100" />
+                <span className="shrink-0 text-[11px] text-gray-400 font-medium">{t("orContinueWith")}</span>
+                <div className="min-w-0 flex-1 h-px bg-gray-100" />
               </div>
 
               {/* Email option */}
               <button
                 type="button"
                 onClick={() => { setScreen("auth"); setError(null); }}
-                className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-[#025EB8] hover:bg-[#0150a0] text-white text-sm font-medium rounded-xl shadow-sm hover:shadow transition-all active:scale-[0.98]"
+                className="w-full flex items-center justify-center gap-3 px-4 py-3 sm:py-3.5 bg-[#025EB8] hover:bg-[#0150a0] text-white text-sm font-semibold rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.98]"
               >
                 <Mail className="w-4 h-4 flex-shrink-0" />
                 {t("signInWithEmail")}
               </button>
 
+              {/* Skip — visible below login choices */}
+              {onSkip && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onSkip();
+                  }}
+                  className="w-full rounded-xl border border-dashed border-gray-300 bg-gray-50/80 py-3 text-sm font-medium text-gray-600 transition-colors hover:border-gray-400 hover:bg-gray-100 hover:text-gray-800 active:scale-[0.99]"
+                >
+                  {t("skipAndDonate")}
+                </button>
+              )}
+
               {/* Terms */}
-              <p className="text-[11px] text-center text-gray-400 leading-relaxed">
+              <p className="text-[11px] text-center text-gray-400 leading-relaxed pt-1">
                 {t("termsAgreement")}{" "}
                 <Link href="/terms" className="text-[#025EB8] hover:underline font-medium">{t("termsOfUse")}</Link>
                 {" "}{t("and")}{" "}
