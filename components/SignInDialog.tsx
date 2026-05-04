@@ -249,7 +249,7 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl, onSkip }: S
 
   const ipCountry = useIpCountry();
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────────────────────
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
