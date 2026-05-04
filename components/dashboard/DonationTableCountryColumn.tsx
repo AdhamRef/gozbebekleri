@@ -19,11 +19,11 @@ export function DonationTableCountryColumn({
     (intlName !== "—" ? intlName : "—");
 
   return (
-    <div className="inline-flex items-center gap-2 min-w-0 max-w-[220px]">
-      <span className="shrink-0" title={label !== "—" ? label : undefined}>
+    <div className="inline-flex items-center gap-1 min-w-0 max-w-[148px] leading-tight">
+      <span className="shrink-0 scale-90 origin-right" title={label !== "—" ? label : undefined}>
         <DonationCountryFlag countryCode={countryCode} />
       </span>
-      <span className="text-sm text-slate-800 truncate" title={label !== "—" ? label : undefined}>
+      <span className="text-[11px] text-slate-800 truncate" title={label !== "—" ? label : undefined}>
         {label}
       </span>
     </div>

@@ -57,6 +57,7 @@ import { formatUtcCalendarMonthLong } from "@/lib/admin/current-calendar-month-u
 import { StatsMetricCard } from "@/components/dashboard/StatsMetricCard";
 import { getDashboardChartPeriodLabelAr } from "@/lib/dashboard/chart-period-label-ar";
 import { DonationTableCountryColumn } from "@/components/dashboard/DonationTableCountryColumn";
+import { DashboardPieLegendByValue } from "@/components/dashboard/DashboardPieLegend";
 import { useViewUserProfile } from "@/context/ViewUserProfileContext";
 
 interface ChartDataPoint {
@@ -117,13 +118,7 @@ interface SubscriptionRow {
   createdAt: string;
   nextBillingDate: string | null;
   lastBillingDate: string | null;
-  donor: {
-    id: string;
-    name: string | null;
-    email: string | null;
-    countryCode?: string | null;
-    countryName?: string | null;
-  };
+  donor: { id: string; name: string | null; email: string | null };
   campaigns: { id: string; title: string }[];
   categories: { id: string; name: string }[];
   referral: { id: string; code: string } | null;
@@ -1240,9 +1235,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                                 paddingAngle={2}
                                 dataKey="value"
                                 nameKey="name"
-                                label={({ name, percent }) =>
-                                  `${name} ${(percent * 100).toFixed(0)}%`
-                                }
+                                label={false}
                               >
                                 {revenueSplitData.map((entry) => (
                                   <Cell key={entry.name} fill={entry.color} />
@@ -1257,7 +1250,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                                   ];
                                 }}
                               />
-                              <Legend />
+                              <Legend content={DashboardPieLegendByValue} />
                             </PieChart>
                           </ResponsiveContainer>
                         ) : (
@@ -1279,9 +1272,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                                 paddingAngle={2}
                                 dataKey="value"
                                 nameKey="name"
-                                label={({ name, percent }) =>
-                                  `${name} ${(percent * 100).toFixed(0)}%`
-                                }
+                                label={false}
                               >
                                 {statusSplitData.map((entry) => (
                                   <Cell key={entry.name} fill={entry.color} />
@@ -1296,7 +1287,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                                   ];
                                 }}
                               />
-                              <Legend />
+                              <Legend content={DashboardPieLegendByValue} />
                             </PieChart>
                           </ResponsiveContainer>
                         ) : (
@@ -1326,6 +1317,252 @@ export default function MonthlySubscriptionsDashboardPage() {
             </CardContent>
           </Card>
         </section>
+
+                {/* تصفية النتائج — تؤثر على الرسم وجدول التبرعات (فترة، فئة، مشروع، مستخدم، نوع الرسم) */}
+                <Card className="border-border shadow-sm">
+          <CardHeader className="py-4">
+            <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2 justify-end">
+              <Search className="w-4 h-4 shrink-0" />
+              <span>تصفية النتائج</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-4" dir="rtl">
+
+<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+
+    {/* Period — مع من/إلى/مسح تحته عند مخصص */}
+    <div className="space-y-2 text-right">
+      <label className="text-[11px] font-medium text-slate-500">
+        الفترة
+      </label>
+      <Select
+        value={chartPeriod === "custom" || (dateFrom && dateTo) ? "custom" : chartPeriod}
+        onValueChange={(v) => {
+          const p = v as ChartPeriod;
+          setChartPeriod(p);
+          if (p === "custom") {
+            const end = new Date();
+            const start = new Date(end);
+            start.setDate(start.getDate() - 30);
+            setDateTo(end.toISOString().slice(0, 10));
+            setDateFrom(start.toISOString().slice(0, 10));
+          } else {
+            setDateFrom("");
+            setDateTo("");
+          }
+        }}
+      >
+        <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+          <SelectValue placeholder="اختر الفترة" />
+        </SelectTrigger>
+        <SelectContent>
+          {(Object.keys(PERIOD_LABELS) as ChartPeriod[]).map((p) => (
+            <SelectItem key={p} value={p} className="text-xs">
+              {PERIOD_LABELS[p]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {chartPeriod === "custom" && (
+        <div className="flex gap-2 pt-1 border-slate-100">
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-slate-500">من</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-slate-500">إلى</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+
+  {/* Category */}
+  <div className="space-y-1 text-right">
+    <label className="text-[11px] font-medium text-slate-500">
+      الفئة
+    </label>
+    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectValue placeholder="اختر الفئة" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all" className="text-xs">جميع الفئات</SelectItem>
+        {categories.map((c) => (
+          <SelectItem key={c.id} value={c.id} className="text-xs">
+            {c.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
+
+  {/* Campaign */}
+  <div className="space-y-1 text-right">
+    <label className="text-[11px] font-medium text-slate-500">
+      المشروع
+    </label>
+    <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
+      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectValue placeholder="اختر المشروع" />
+      </SelectTrigger>
+      <SelectContent>
+        <div className="p-2 border-b border-slate-100">
+          <Input
+            placeholder="بحث..."
+            value={searchCampaign}
+            onChange={(e) => setSearchCampaign(e.target.value)}
+            className="w-full h-8 text-xs"
+          />
+        </div>
+        <SelectItem value="all" className="text-xs">جميع المشاريع</SelectItem>
+        {campaigns
+          .filter(
+            (c) =>
+              (selectedCategory === "all" || c.categoryId === selectedCategory) &&
+              (!searchCampaign ||
+                c.title.toLowerCase().includes(searchCampaign.toLowerCase()))
+          )
+          .map((c) => (
+            <SelectItem key={c.id} value={c.id} className="text-xs">
+              {c.title}
+            </SelectItem>
+          ))}
+      </SelectContent>
+    </Select>
+  </div>
+
+  {/* User — hidden when viewing a specific user via link (?userId=...) */}
+  {!searchParams.get("userId") && (
+    <div className="space-y-1 text-right">
+      <label className="text-[11px] font-medium text-slate-500">
+        المستخدم
+      </label>
+      <Select
+        value={selectedUserId}
+        onValueChange={(v) => {
+          setSelectedUserId(v);
+          if (v === "all") {
+            setUsersSearchInput("");
+            setUsersSearchCommitted("");
+            setUsers([]);
+          }
+        }}
+      >
+        <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+          <SelectValue placeholder="اختر المستخدم" />
+        </SelectTrigger>
+        <SelectContent>
+          <div className="p-2 border-b border-slate-100 flex gap-1.5 flex-row-reverse items-center">
+            <Input
+              placeholder="بحث… ثم Enter أو زر البحث"
+              value={usersSearchInput}
+              onChange={(e) => setUsersSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitUsersSearch();
+                }
+              }}
+              className="w-full h-8 text-xs flex-1 min-w-0"
+            />
+            <button
+              type="button"
+              title="بحث"
+              disabled={usersSearchLoading}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                commitUsersSearch();
+              }}
+              className="shrink-0 h-8 w-8 inline-flex items-center justify-center rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 disabled:opacity-50"
+            >
+              {usersSearchLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />
+              ) : (
+                <Search className="w-3.5 h-3.5 text-slate-600" />
+              )}
+            </button>
+          </div>
+          <SelectItem value="all" className="text-xs">الكل</SelectItem>
+          {users.map((u) => (
+            <SelectItem key={u.id} value={u.id} className="text-xs">
+              {u.name || u.email}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )}
+
+  {/* Chart Metric */}
+  <div className="space-y-1 text-right">
+    <label className="text-[11px] font-medium text-slate-500">
+      القيمة
+    </label>
+    <Select value={chartMetric} onValueChange={(v) => setChartMetric(v as ChartMetric)}>
+      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectValue placeholder="اختر القيمة" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="amount" className="text-xs">المبلغ</SelectItem>
+        <SelectItem value="teamSupport" className="text-xs">دعم الفريق</SelectItem>
+        <SelectItem value="fees" className="text-xs">الرسوم</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+
+  {/* Chart Type */}
+  <div className="space-y-1 text-right">
+    <label className="text-[11px] font-medium text-slate-500">
+      نوع الرسم
+    </label>
+    <Select value={chartView} onValueChange={(v) => setChartView(v as ChartViewType)}>
+      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectValue placeholder="اختر النوع" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="bar" className="text-xs">أعمدة</SelectItem>
+        <SelectItem value="line" className="text-xs">خط</SelectItem>
+        <SelectItem value="area" className="text-xs">منطقة</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+
+  {/* Donation Status Filter */}
+  <div className="space-y-1 text-right">
+    <label className="text-[11px] font-medium text-slate-500">
+      حالة الدفعة
+    </label>
+    <Select value={donationsStatusFilter} onValueChange={(v) => setDonationsStatusFilter(v as typeof donationsStatusFilter)}>
+      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectValue placeholder="الحالة" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all" className="text-xs">كل الحالات</SelectItem>
+        <SelectItem value="PAID" className="text-xs">ناجح</SelectItem>
+        <SelectItem value="FAILED" className="text-xs">فاشل</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+
+</div>
+
+</CardContent>
+
+
+
+        </Card>
 
         {/* الدفعات الشهرية */}
         <section className="space-y-4">
@@ -1365,37 +1602,37 @@ export default function MonthlySubscriptionsDashboardPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto" dir="rtl">
-                <table className="w-full text-sm text-right">
+                <table className="w-full text-xs text-right leading-snug">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50/80">
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
                         المتبرع
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700 min-w-[160px]">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 min-w-[100px] max-w-[130px]">
                         الدولة
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
                         التبرع
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
                         الحالة
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
                         البوابة
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
                         دعم الفريق
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
                         مشاركة الرسوم
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
                         الإحالة
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[160px]">
                         المشروع / الفئة
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
                         التاريخ
                       </th>
                     </tr>
@@ -1425,32 +1662,32 @@ export default function MonthlySubscriptionsDashboardPage() {
                           key={d.id}
                           className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
                         >
-                          <td className="py-3 px-4">
+                          <td className="py-1.5 px-2">
                             <button
                               type="button"
                               onClick={() => d.donor?.id && openUserProfile(d.donor.id)}
-                              className="text-right w-full max-w-[260px] rounded-md -mx-1 px-1 py-0.5 hover:bg-slate-100/80 transition-colors cursor-pointer border-0 bg-transparent"
+                              className="text-right w-full max-w-[200px] rounded-md -mx-0.5 px-0.5 py-0 hover:bg-slate-100/80 transition-colors cursor-pointer border-0 bg-transparent"
                             >
                               <p className="font-medium text-slate-900">
                                 {d.donor?.name || "—"}
                               </p>
                               {d.donor?.email && (
-                                <p className="text-xs text-slate-500 truncate max-w-[180px]">
+                                <p className="text-[10px] text-slate-500 truncate max-w-[160px]">
                                   {d.donor.email}
                                 </p>
                               )}
                             </button>
                           </td>
-                          <td className="py-3 px-4 align-middle min-w-[160px]">
+                          <td className="py-1.5 px-2 align-middle max-w-[130px]">
                             <DonationTableCountryColumn countryCode={d.donorCountryCode} />
                           </td>
-                          <td className="py-3 px-4 font-medium text-slate-800" dir="rtl">
+                          <td className="py-1.5 px-2 font-medium text-slate-800" dir="rtl">
                             <span dir="ltr">
                               {formatMoney(donationDisplayTotalLocal(d), d.currency, d.amountUSD ?? undefined)}
                             </span>
                           </td>
-                          <td className="py-3 px-4">
-                            <span className={cn("inline-block px-2 py-0.5 rounded-full text-xs font-medium", d.status === "PAID" ? "bg-green-100 text-green-700" : d.status === "FAILED" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700")}>
+                          <td className="py-1.5 px-2">
+                            <span className={cn("inline-block px-1.5 py-px rounded-full text-[11px] font-medium", d.status === "PAID" ? "bg-green-100 text-green-700" : d.status === "FAILED" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700")}>
                               {d.status === "PAID" ? "ناجح" : d.status === "FAILED" ? "فاشل" : "معلق"}
                             </span>
                             {d.status === "FAILED" && d.providerErrorMessage && (
@@ -1459,7 +1696,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               </p>
                             )}
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-1.5 px-2">
                             {d.provider === "STRIPE" ? (
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-[#635bff]/10 text-[#635bff]">Stripe</span>
                             ) : d.provider === "PAYFOR" ? (
@@ -1467,14 +1704,14 @@ export default function MonthlySubscriptionsDashboardPage() {
                                 <img
                                   src="/ziraat.jpg"
                                   alt="PayFor"
-                                  className="h-14 w-auto max-w-[120px] object-contain rounded"
+                                  className="h-8 w-auto max-w-[72px] object-contain rounded"
                                 />
                               </span>
                             ) : (
                               <span className="text-slate-400 text-xs">—</span>
                             )}
                           </td>
-                          <td className="py-3 px-4 font-medium text-slate-800" dir="rtl">
+                          <td className="py-1.5 px-2 font-medium text-slate-800" dir="rtl">
                             {(d.teamSupport ?? 0) > 0 ? (
                               <span dir="ltr">
                                 {formatMoney(d.teamSupport ?? 0, d.currency, (d.totalAmount && (d.amountUSD != null)) ? ((d.teamSupport ?? 0) / d.totalAmount) * d.amountUSD : undefined)}
@@ -1483,7 +1720,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               <span className="text-slate-500">—</span>
                             )}
                           </td>
-                          <td className="py-3 px-4 font-medium text-slate-800" dir="rtl">
+                          <td className="py-1.5 px-2 font-medium text-slate-800" dir="rtl">
                             {(d.fees ?? 0) > 0 ? (
                               <span dir="ltr">
                                 {formatMoney(d.fees ?? 0, d.currency, (d.totalAmount && (d.amountUSD != null)) ? ((d.fees ?? 0) / d.totalAmount) * d.amountUSD : undefined)}
@@ -1492,11 +1729,11 @@ export default function MonthlySubscriptionsDashboardPage() {
                               <span className="text-slate-500">—</span>
                             )}
                           </td>
-                          <td className="py-3 px-4 align-top">
+                          <td className="py-1.5 px-2 align-top">
                             {d.referral ? (
                               <Link
                                 href={`/dashboard/referrals/${d.referral.id}`}
-                                className="text-sm font-medium text-[#025EB8] hover:text-[#025EB8] hover:underline"
+                                className="text-xs font-medium text-[#025EB8] hover:text-[#025EB8] hover:underline"
                               >
                                 {d.referral.code}
                               </Link>
@@ -1504,7 +1741,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               <span className="text-slate-400">—</span>
                             )}
                           </td>
-                          <td className="py-3 px-4 text-slate-600 max-w-[240px]">
+                          <td className="py-1.5 px-2 text-slate-600 max-w-[160px]">
                             {d.campaigns?.length > 0 ? (
                               <span>
                                 {d.campaigns.map((c) => c.title).join(", ")}
@@ -1517,7 +1754,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               "—"
                             )}
                           </td>
-                          <td className="py-3 px-4 text-slate-500">
+                          <td className="py-1.5 px-2 text-slate-500 whitespace-nowrap">
                             {new Date(d.createdAt).toLocaleDateString("en-US", {
                               dateStyle: "medium",
                             })}
@@ -1683,36 +1920,35 @@ export default function MonthlySubscriptionsDashboardPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto" dir="rtl">
-                <table className="w-full text-sm text-right">
+                <table className="w-full text-xs text-right leading-snug">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50/90 ">
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">المشترك</th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700 min-w-[160px]">الدولة</th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">المبلغ الشهري</th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">الحالة</th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">المشروع / الفئة</th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">الإحالة</th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">آخر دفعة</th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">الدفعة القادمة</th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">بدء الاشتراك</th>
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">المشترك</th>
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">المبلغ الشهري</th>
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">الحالة</th>
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[160px]">المشروع / الفئة</th>
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">الإحالة</th>
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">آخر دفعة</th>
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">الدفعة القادمة</th>
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">بدء الاشتراك</th>
                     </tr>
                   </thead>
                   <tbody>
                     {subsLoading && subsRows.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-14 text-center">
+                        <td colSpan={8} className="py-14 text-center">
                           <Loader2 className="w-8 h-8 animate-spin mx-auto text-[#025EB8]" />
                         </td>
                       </tr>
                     ) : !subsFetchedOnce ? (
                       <tr>
-                        <td colSpan={9} className="py-14 text-center text-slate-500">
+                        <td colSpan={8} className="py-14 text-center text-slate-500">
                           جاري التحميل...
                         </td>
                       </tr>
                     ) : subsRows.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-14 text-center text-slate-500">
+                        <td colSpan={8} className="py-14 text-center text-slate-500">
                           لا توجد اشتراكات تطابق التصفية
                         </td>
                       </tr>
@@ -1722,31 +1958,25 @@ export default function MonthlySubscriptionsDashboardPage() {
                           key={s.id}
                           className="border-b border-slate-100 /80 hover:bg-gray-50/50 transition-colors"
                         >
-                          <td className="py-3 px-4 align-top">
+                          <td className="py-1.5 px-2 align-top">
                             <button
                               type="button"
                               onClick={() => s.donor?.id && openUserProfile(s.donor.id)}
-                              className="text-right w-full max-w-[260px] rounded-md -mx-1 px-1 py-0.5 hover:bg-slate-100/80 transition-colors cursor-pointer border-0 bg-transparent"
+                              className="text-right w-full max-w-[200px] rounded-md -mx-0.5 px-0.5 py-0 hover:bg-slate-100/80 transition-colors cursor-pointer border-0 bg-transparent"
                             >
                               <p className="font-medium text-slate-900">{s.donor?.name || "—"}</p>
                               {s.donor?.email && (
-                                <p className="text-xs text-slate-500 truncate max-w-[200px]">{s.donor.email}</p>
+                                <p className="text-[10px] text-slate-500 truncate max-w-[160px]">{s.donor.email}</p>
                               )}
                             </button>
                           </td>
-                          <td className="py-3 px-4 align-top min-w-[160px]">
-                            <DonationTableCountryColumn
-                              countryCode={s.donor?.countryCode}
-                              countryName={s.donor?.countryName}
-                            />
-                          </td>
-                          <td className="py-3 px-4 font-semibold text-slate-800 align-top" dir="ltr">
+                          <td className="py-1.5 px-2 font-semibold text-slate-800 align-top" dir="ltr">
                             <span dir="ltr">
                               {formatMoney(s.amount, s.currency, s.amountUSD ?? undefined)}
                             </span>
                           </td>
-                          <td className="py-3 px-4 align-top min-w-[150px]">
-                            <div className="flex items-center justify-end flex-row-reverse">
+                          <td className="py-1.5 px-2 align-top min-w-[118px]">
+                            <div className="flex items-center justify-end flex-row-reverse gap-1">
                               <Select
                                 value={s.status}
                                 disabled={subsStatusUpdatingId === s.id}
@@ -1760,7 +1990,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               >
                                 <SelectTrigger
                                   className={cn(
-                                    "h-8 text-xs w-full border-gray-200 bg-white/90",
+                                    "h-7 text-[11px] w-full border-gray-200 bg-white/90 py-0",
                                     s.status === "ACTIVE" && "text-[#025EB8] border-[#025EB8]/20",
                                     s.status === "PAUSED" && "text-[#FA5D17] border-[#FA5D17]/20",
                                     s.status === "CANCELLED" && "text-slate-700 border-slate-200"
@@ -1785,7 +2015,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               )}
                             </div>
                           </td>
-                          <td className="py-3 px-4 text-slate-600 max-w-[220px] align-top">
+                          <td className="py-1.5 px-2 text-slate-600 max-w-[160px] align-top">
                             {s.campaigns?.length > 0 ? (
                               <span>{s.campaigns.map((c) => c.title).join("، ")}</span>
                             ) : s.categories?.length > 0 ? (
@@ -1794,11 +2024,11 @@ export default function MonthlySubscriptionsDashboardPage() {
                               "—"
                             )}
                           </td>
-                          <td className="py-3 px-4 align-top">
+                          <td className="py-1.5 px-2 align-top">
                             {s.referral ? (
                               <Link
                                 href={`/dashboard/referrals/${s.referral.id}`}
-                                className="text-sm font-medium text-[#025EB8] hover:underline"
+                                className="text-xs font-medium text-[#025EB8] hover:underline"
                               >
                                 {s.referral.code}
                               </Link>
@@ -1806,7 +2036,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               <span className="text-slate-400">—</span>
                             )}
                           </td>
-                          <td className="py-3 px-4 text-slate-600 align-top whitespace-nowrap">
+                          <td className="py-1.5 px-2 text-slate-600 align-top whitespace-nowrap">
                             {s.lastBillingDate
                               ? new Date(s.lastBillingDate).toLocaleDateString("ar-EG", {
                                   year: "numeric",
@@ -1815,7 +2045,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                                 })
                               : "—"}
                           </td>
-                          <td className="py-3 px-4 text-slate-600 align-top whitespace-nowrap">
+                          <td className="py-1.5 px-2 text-slate-600 align-top whitespace-nowrap">
                             {s.nextBillingDate
                               ? new Date(s.nextBillingDate).toLocaleDateString("ar-EG", {
                                   year: "numeric",
@@ -1824,7 +2054,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                                 })
                               : "—"}
                           </td>
-                          <td className="py-3 px-4 text-slate-500 align-top whitespace-nowrap">
+                          <td className="py-1.5 px-2 text-slate-500 align-top whitespace-nowrap">
                             {new Date(s.createdAt).toLocaleDateString("ar-EG", {
                               year: "numeric",
                               month: "short",

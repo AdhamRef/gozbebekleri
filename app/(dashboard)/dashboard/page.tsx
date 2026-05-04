@@ -62,6 +62,10 @@ import { formatUtcCalendarMonthLong } from "@/lib/admin/current-calendar-month-u
 import { StatsMetricCard } from "@/components/dashboard/StatsMetricCard";
 import { getDashboardChartPeriodLabelAr } from "@/lib/dashboard/chart-period-label-ar";
 import { DonationTableCountryColumn } from "@/components/dashboard/DonationTableCountryColumn";
+import {
+  DashboardPieLegendByCount,
+  DashboardPieLegendByValue,
+} from "@/components/dashboard/DashboardPieLegend";
 import { useViewUserProfile } from "@/context/ViewUserProfileContext";
 
 interface ChartDataPoint {
@@ -1197,9 +1201,7 @@ export default function DashboardPage() {
                                 paddingAngle={2}
                                 dataKey="value"
                                 nameKey="name"
-                                label={({ name, percent }) =>
-                                  `${name} ${(percent * 100).toFixed(0)}%`
-                                }
+                                label={false}
                               >
                                 {revenueSplitData.map((entry) => (
                                   <Cell key={entry.name} fill={entry.color} />
@@ -1214,7 +1216,7 @@ export default function DashboardPage() {
                                   ];
                                 }}
                               />
-                              <Legend />
+                              <Legend content={DashboardPieLegendByValue} />
                             </PieChart>
                           </ResponsiveContainer>
                         ) : (
@@ -1236,9 +1238,7 @@ export default function DashboardPage() {
                                 paddingAngle={2}
                                 dataKey="value"
                                 nameKey="name"
-                                label={({ name, percent }) =>
-                                  `${name} ${(percent * 100).toFixed(0)}%`
-                                }
+                                label={false}
                               >
                                 {typeSplitData.map((entry) => (
                                   <Cell key={entry.name} fill={entry.color} />
@@ -1253,7 +1253,7 @@ export default function DashboardPage() {
                                   ];
                                 }}
                               />
-                              <Legend />
+                              <Legend content={DashboardPieLegendByValue} />
                             </PieChart>
                           </ResponsiveContainer>
                         ) : (
@@ -1275,9 +1275,7 @@ export default function DashboardPage() {
                                 paddingAngle={2}
                                 dataKey="count"
                                 nameKey="name"
-                                label={({ name, percent }) =>
-                                  `${name} ${(percent * 100).toFixed(0)}%`
-                                }
+                                label={false}
                               >
                                 {paidFailedSplitData.map((entry) => (
                                   <Cell key={entry.name} fill={entry.color} />
@@ -1292,7 +1290,7 @@ export default function DashboardPage() {
                                   ];
                                 }}
                               />
-                              <Legend />
+                              <Legend content={DashboardPieLegendByCount} />
                             </PieChart>
                           </ResponsiveContainer>
                         ) : (
@@ -1623,40 +1621,40 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto" dir="rtl">
-                <table className="w-full text-sm text-right">
+                <table className="w-full text-xs text-right leading-snug">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50/80">
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
                         المتبرع
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700 min-w-[160px]">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 min-w-[100px] max-w-[130px]">
                         الدولة
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
                         التبرع
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
                         الحالة
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
                         البوابة
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
                         دعم الفريق
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
                         مشاركة الرسوم
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
                         النوع
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
                         الإحالة
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[160px]">
                         المشروع / الفئة
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
                         التاريخ
                       </th>
                     </tr>
@@ -1686,34 +1684,34 @@ export default function DashboardPage() {
                           key={d.id}
                           className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
                         >
-                          <td className="py-3 px-4">
+                          <td className="py-1.5 px-2">
                             <button
                               type="button"
                               onClick={() => d.donor?.id && openUserProfile(d.donor.id)}
-                              className="text-right w-full max-w-[260px] rounded-md -mx-1 px-1 py-0.5 hover:bg-slate-100/80 transition-colors cursor-pointer border-0 bg-transparent"
+                              className="text-right w-full max-w-[200px] rounded-md -mx-0.5 px-0.5 py-0 hover:bg-slate-100/80 transition-colors cursor-pointer border-0 bg-transparent"
                             >
                               <p className="font-medium text-slate-900">
                                 {d.donor?.name || "—"}
                               </p>
                               {d.donor?.email && (
-                                <p className="text-xs text-slate-500 truncate max-w-[180px]">
+                                <p className="text-[10px] text-slate-500 truncate max-w-[160px]">
                                   {d.donor.email}
                                 </p>
                               )}
                             </button>
                           </td>
-                          <td className="py-3 px-4 align-middle min-w-[160px]">
+                          <td className="py-1.5 px-2 align-middle max-w-[130px]">
                             <DonationTableCountryColumn countryCode={d.donorCountryCode} />
                           </td>
-                          <td className="py-3 px-4 font-medium text-slate-800" dir="rtl">
+                          <td className="py-1.5 px-2 font-medium text-slate-800" dir="rtl">
                             <span dir="ltr">
                               {formatMoney(donationDisplayTotalLocal(d), d.currency, d.amountUSD ?? undefined)}
                             </span>
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-1.5 px-2">
                             <span
                               className={cn(
-                                "inline-block px-2 py-0.5 rounded-full text-xs font-medium",
+                                "inline-block px-1.5 py-px rounded-full text-[11px] font-medium",
                                 d.status === "PAID"
                                   ? "bg-green-100 text-green-700"
                                   : d.status === "FAILED"
@@ -1729,7 +1727,7 @@ export default function DashboardPage() {
                               </p>
                             )}
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-1.5 px-2">
                             {d.provider === "STRIPE" ? (
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-[#635bff]/10 text-[#635bff]">
                                 Stripe
@@ -1740,14 +1738,14 @@ export default function DashboardPage() {
                                 <img
                                   src="/ziraat.jpg"
                                   alt="PayFor"
-                                  className="h-14 w-auto max-w-[120px] object-contain rounded"
+                                  className="h-8 w-auto max-w-[72px] object-contain rounded"
                                 />
                               </span>
                             ) : (
                               <span className="text-slate-400 text-xs">—</span>
                             )}
                           </td>
-                          <td className="py-3 px-4 font-medium text-slate-800" dir="rtl">
+                          <td className="py-1.5 px-2 font-medium text-slate-800" dir="rtl">
                             {(d.teamSupport ?? 0) > 0 ? (
                               <span dir="ltr">
                                 {formatMoney(d.teamSupport ?? 0, d.currency, (d.totalAmount && (d.amountUSD != null)) ? ((d.teamSupport ?? 0) / d.totalAmount) * d.amountUSD : undefined)}
@@ -1756,7 +1754,7 @@ export default function DashboardPage() {
                               <span className="text-slate-500">—</span>
                             )}
                           </td>
-                          <td className="py-3 px-4 font-medium text-slate-800" dir="rtl">
+                          <td className="py-1.5 px-2 font-medium text-slate-800" dir="rtl">
                             {(d.fees ?? 0) > 0 ? (
                               <span dir="ltr">
                                 {formatMoney(d.fees ?? 0, d.currency, (d.totalAmount && (d.amountUSD != null)) ? ((d.fees ?? 0) / d.totalAmount) * d.amountUSD : undefined)}
@@ -1765,10 +1763,10 @@ export default function DashboardPage() {
                               <span className="text-slate-500">—</span>
                             )}
                           </td>
-                          <td className="py-3 px-4">
+                          <td className="py-1.5 px-2">
                             <span
                               className={cn(
-                                "inline-block w-max px-2 py-0.5 rounded-full text-[12px]",
+                                "inline-block w-max px-1.5 py-px rounded-full text-[11px]",
                                 d.type === "MONTHLY"
                                   ? "bg-[#025EB8]/10 text-[#025EB8]"
                                   : "bg-gray-100 text-gray-600"
@@ -1777,11 +1775,11 @@ export default function DashboardPage() {
                               {d.type === "MONTHLY" ? "شهري" : "مرة واحدة"}
                             </span>
                           </td>
-                          <td className="py-3 px-4 align-top">
+                          <td className="py-1.5 px-2 align-top">
                             {d.referral ? (
                               <Link
                                 href={`/dashboard/referrals/${d.referral.id}`}
-                                className="text-sm font-medium text-[#025EB8] hover:text-[#025EB8] hover:underline"
+                                className="text-xs font-medium text-[#025EB8] hover:text-[#025EB8] hover:underline"
                               >
                                 {d.referral.code}
                               </Link>
@@ -1789,7 +1787,7 @@ export default function DashboardPage() {
                               <span className="text-slate-400">—</span>
                             )}
                           </td>
-                          <td className="py-3 px-4 text-slate-600 max-w-[240px]">
+                          <td className="py-1.5 px-2 text-slate-600 max-w-[160px]">
                             {d.campaigns?.length > 0 ? (
                               <span>
                                 {d.campaigns.map((c) => c.title).join(", ")}
@@ -1802,7 +1800,7 @@ export default function DashboardPage() {
                               "—"
                             )}
                           </td>
-                          <td className="py-3 px-4 text-slate-500">
+                          <td className="py-1.5 px-2 text-slate-500">
                             {new Date(d.createdAt).toLocaleDateString("en-US", {
                               dateStyle: "medium",
                             })}
