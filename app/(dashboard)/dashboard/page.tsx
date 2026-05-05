@@ -627,285 +627,7 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        <Card className="border-border shadow-sm">
-          <CardHeader className="py-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between flex-row-reverse">
-              <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2 justify-end">
-                <Search className="w-4 h-4 shrink-0" />
-                <span>تصفية النتائج</span>
-              </CardTitle>
-              <a
-                href={exportDonationsCsvUrl}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 shrink-0"
-              >
-                <Download className="w-4 h-4" />
-                تصدير Excel (CSV)
-              </a>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0 space-y-4" dir="rtl">
 
-<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-
-    {/* Period — مع من/إلى/مسح تحته عند مخصص */}
-    <div className="space-y-2 text-right">
-      <label className="text-[11px] font-medium text-slate-500">
-        الفترة
-      </label>
-      <Select
-        value={chartPeriod === "custom" || (dateFrom && dateTo) ? "custom" : chartPeriod}
-        onValueChange={(v) => {
-          const p = v as ChartPeriod;
-          setChartPeriod(p);
-          if (p === "custom") {
-            const end = new Date();
-            const start = new Date(end);
-            start.setDate(start.getDate() - 30);
-            setDateTo(end.toISOString().slice(0, 10));
-            setDateFrom(start.toISOString().slice(0, 10));
-          } else {
-            setDateFrom("");
-            setDateTo("");
-          }
-        }}
-      >
-        <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
-          <SelectValue placeholder="اختر الفترة" />
-        </SelectTrigger>
-        <SelectContent>
-          {(Object.keys(PERIOD_LABELS) as ChartPeriod[]).map((p) => (
-            <SelectItem key={p} value={p} className="text-xs">
-              {PERIOD_LABELS[p]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {chartPeriod === "custom" && (
-        <div className="flex gap-2 pt-1 border-slate-100">
-          <div className="space-y-1">
-            <label className="text-[11px] font-medium text-slate-500">من</label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[11px] font-medium text-slate-500">إلى</label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
-            />
-          </div>
-        </div>
-      )}
-    </div>
-
-  {/* Category */}
-  <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
-      الفئة
-    </label>
-    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
-        <SelectValue placeholder="اختر الفئة" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all" className="text-xs">جميع الفئات</SelectItem>
-        {categories.map((c) => (
-          <SelectItem key={c.id} value={c.id} className="text-xs">
-            {c.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  </div>
-
-  {/* Campaign */}
-  <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
-      المشروع
-    </label>
-    <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
-        <SelectValue placeholder="اختر المشروع" />
-      </SelectTrigger>
-      <SelectContent>
-        <div className="p-2 border-b border-slate-100">
-          <Input
-            placeholder="بحث..."
-            value={searchCampaign}
-            onChange={(e) => setSearchCampaign(e.target.value)}
-            className="w-full h-8 text-xs"
-          />
-        </div>
-        <SelectItem value="all" className="text-xs">جميع المشاريع</SelectItem>
-        {campaigns
-          .filter(
-            (c) =>
-              (selectedCategory === "all" || c.categoryId === selectedCategory) &&
-              (!searchCampaign ||
-                c.title.toLowerCase().includes(searchCampaign.toLowerCase()))
-          )
-          .map((c) => (
-            <SelectItem key={c.id} value={c.id} className="text-xs">
-              {c.title}
-            </SelectItem>
-          ))}
-      </SelectContent>
-    </Select>
-  </div>
-
-  {/* User — hidden when viewing a specific user via link (?userId=...) */}
-  {!searchParams.get("userId") && (
-    <div className="space-y-1 text-right">
-      <label className="text-[11px] font-medium text-slate-500">
-        المستخدم
-      </label>
-      <Select
-        value={selectedUserId}
-        onValueChange={(v) => {
-          setSelectedUserId(v);
-          if (v === "all") {
-            setUsersSearchInput("");
-            setUsersSearchCommitted("");
-            setUsers([]);
-          }
-        }}
-      >
-        <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
-          <SelectValue placeholder="اختر المستخدم" />
-        </SelectTrigger>
-        <SelectContent>
-          <div className="p-2 border-b border-slate-100 flex gap-1.5 flex-row-reverse items-center">
-            <Input
-              placeholder="بحث… ثم Enter أو زر البحث"
-              value={usersSearchInput}
-              onChange={(e) => setUsersSearchInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  commitUsersSearch();
-                }
-              }}
-              className="w-full h-8 text-xs flex-1 min-w-0"
-            />
-            <button
-              type="button"
-              title="بحث"
-              disabled={usersSearchLoading}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                commitUsersSearch();
-              }}
-              className="shrink-0 h-8 w-8 inline-flex items-center justify-center rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 disabled:opacity-50"
-            >
-              {usersSearchLoading ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />
-              ) : (
-                <Search className="w-3.5 h-3.5 text-slate-600" />
-              )}
-            </button>
-          </div>
-          <SelectItem value="all" className="text-xs">الكل</SelectItem>
-          {users.map((u) => (
-            <SelectItem key={u.id} value={u.id} className="text-xs">
-              {u.name || u.email}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  )}
-
-  {/* Chart Metric */}
-  <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
-      القيمة
-    </label>
-    <Select value={chartMetric} onValueChange={(v) => setChartMetric(v as ChartMetric)}>
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
-        <SelectValue placeholder="اختر القيمة" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="amount" className="text-xs">المبلغ</SelectItem>
-        <SelectItem value="teamSupport" className="text-xs">دعم الفريق</SelectItem>
-        <SelectItem value="fees" className="text-xs">الرسوم</SelectItem>
-      </SelectContent>
-    </Select>
-  </div>
-
-  {/* Chart Type */}
-  <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
-      نوع الرسم
-    </label>
-    <Select value={chartView} onValueChange={(v) => setChartView(v as ChartViewType)}>
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
-        <SelectValue placeholder="اختر النوع" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="bar" className="text-xs">أعمدة</SelectItem>
-        <SelectItem value="line" className="text-xs">خط</SelectItem>
-        <SelectItem value="area" className="text-xs">منطقة</SelectItem>
-      </SelectContent>
-    </Select>
-  </div>
-
-  {/* Site language (donation row locale) */}
-  <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
-      لغة الموقع (التبرع)
-    </label>
-    <Select
-      value={donationLocaleFilter}
-      onValueChange={(v) => setDonationLocaleFilter(v as typeof donationLocaleFilter)}
-    >
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
-        <SelectValue placeholder="اللغة" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all" className="text-xs">كل اللغات</SelectItem>
-        <SelectItem value="ar" className="text-xs">العربية</SelectItem>
-        <SelectItem value="en" className="text-xs">English</SelectItem>
-        <SelectItem value="fr" className="text-xs">Français</SelectItem>
-        <SelectItem value="tr" className="text-xs">Türkçe</SelectItem>
-        <SelectItem value="id" className="text-xs">Indonesia</SelectItem>
-        <SelectItem value="pt" className="text-xs">Português</SelectItem>
-        <SelectItem value="es" className="text-xs">Español</SelectItem>
-        <SelectItem value="__unset" className="text-xs">غير محدد</SelectItem>
-      </SelectContent>
-    </Select>
-  </div>
-
-  {/* Donation Status Filter */}
-  <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
-      حالة التبرع
-    </label>
-    <Select value={donationsStatusFilter} onValueChange={(v) => setDonationsStatusFilter(v as typeof donationsStatusFilter)}>
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
-        <SelectValue placeholder="الحالة" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all" className="text-xs">كل الحالات</SelectItem>
-        <SelectItem value="PAID" className="text-xs">ناجح</SelectItem>
-        <SelectItem value="FAILED" className="text-xs">فاشل</SelectItem>
-      </SelectContent>
-    </Select>
-  </div>
-
-</div>
-
-</CardContent>
-
-
-
-        </Card>
 
 
         {/* المؤشرات — تختفي عند عرض تبرعات مستخدم معين عبر الرابط */}
@@ -1650,6 +1372,285 @@ export default function DashboardPage() {
           </Card>
         </section>
 
+        <Card className="border-border shadow-sm">
+          <CardHeader className="py-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between flex-row-reverse">
+              <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2 justify-end">
+                <Search className="w-4 h-4 shrink-0" />
+                <span>تصفية النتائج</span>
+              </CardTitle>
+              <a
+                href={exportDonationsCsvUrl}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 shrink-0"
+              >
+                <Download className="w-4 h-4" />
+                تصدير Excel (CSV)
+              </a>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-4" dir="rtl">
+
+<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+
+    {/* Period — مع من/إلى/مسح تحته عند مخصص */}
+    <div className="space-y-2 text-right">
+      <label className="text-[11px] font-medium text-slate-500">
+        الفترة
+      </label>
+      <Select
+        value={chartPeriod === "custom" || (dateFrom && dateTo) ? "custom" : chartPeriod}
+        onValueChange={(v) => {
+          const p = v as ChartPeriod;
+          setChartPeriod(p);
+          if (p === "custom") {
+            const end = new Date();
+            const start = new Date(end);
+            start.setDate(start.getDate() - 30);
+            setDateTo(end.toISOString().slice(0, 10));
+            setDateFrom(start.toISOString().slice(0, 10));
+          } else {
+            setDateFrom("");
+            setDateTo("");
+          }
+        }}
+      >
+        <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+          <SelectValue placeholder="اختر الفترة" />
+        </SelectTrigger>
+        <SelectContent>
+          {(Object.keys(PERIOD_LABELS) as ChartPeriod[]).map((p) => (
+            <SelectItem key={p} value={p} className="text-xs">
+              {PERIOD_LABELS[p]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {chartPeriod === "custom" && (
+        <div className="flex gap-2 pt-1 border-slate-100">
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-slate-500">من</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-slate-500">إلى</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+
+  {/* Category */}
+  <div className="space-y-1 text-right">
+    <label className="text-[11px] font-medium text-slate-500">
+      الفئة
+    </label>
+    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectValue placeholder="اختر الفئة" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all" className="text-xs">جميع الفئات</SelectItem>
+        {categories.map((c) => (
+          <SelectItem key={c.id} value={c.id} className="text-xs">
+            {c.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
+
+  {/* Campaign */}
+  <div className="space-y-1 text-right">
+    <label className="text-[11px] font-medium text-slate-500">
+      المشروع
+    </label>
+    <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
+      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectValue placeholder="اختر المشروع" />
+      </SelectTrigger>
+      <SelectContent>
+        <div className="p-2 border-b border-slate-100">
+          <Input
+            placeholder="بحث..."
+            value={searchCampaign}
+            onChange={(e) => setSearchCampaign(e.target.value)}
+            className="w-full h-8 text-xs"
+          />
+        </div>
+        <SelectItem value="all" className="text-xs">جميع المشاريع</SelectItem>
+        {campaigns
+          .filter(
+            (c) =>
+              (selectedCategory === "all" || c.categoryId === selectedCategory) &&
+              (!searchCampaign ||
+                c.title.toLowerCase().includes(searchCampaign.toLowerCase()))
+          )
+          .map((c) => (
+            <SelectItem key={c.id} value={c.id} className="text-xs">
+              {c.title}
+            </SelectItem>
+          ))}
+      </SelectContent>
+    </Select>
+  </div>
+
+  {/* User — hidden when viewing a specific user via link (?userId=...) */}
+  {!searchParams.get("userId") && (
+    <div className="space-y-1 text-right">
+      <label className="text-[11px] font-medium text-slate-500">
+        المستخدم
+      </label>
+      <Select
+        value={selectedUserId}
+        onValueChange={(v) => {
+          setSelectedUserId(v);
+          if (v === "all") {
+            setUsersSearchInput("");
+            setUsersSearchCommitted("");
+            setUsers([]);
+          }
+        }}
+      >
+        <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+          <SelectValue placeholder="اختر المستخدم" />
+        </SelectTrigger>
+        <SelectContent>
+          <div className="p-2 border-b border-slate-100 flex gap-1.5 flex-row-reverse items-center">
+            <Input
+              placeholder="بحث… ثم Enter أو زر البحث"
+              value={usersSearchInput}
+              onChange={(e) => setUsersSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitUsersSearch();
+                }
+              }}
+              className="w-full h-8 text-xs flex-1 min-w-0"
+            />
+            <button
+              type="button"
+              title="بحث"
+              disabled={usersSearchLoading}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                commitUsersSearch();
+              }}
+              className="shrink-0 h-8 w-8 inline-flex items-center justify-center rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 disabled:opacity-50"
+            >
+              {usersSearchLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />
+              ) : (
+                <Search className="w-3.5 h-3.5 text-slate-600" />
+              )}
+            </button>
+          </div>
+          <SelectItem value="all" className="text-xs">الكل</SelectItem>
+          {users.map((u) => (
+            <SelectItem key={u.id} value={u.id} className="text-xs">
+              {u.name || u.email}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )}
+
+  {/* Chart Metric */}
+  <div className="space-y-1 text-right">
+    <label className="text-[11px] font-medium text-slate-500">
+      القيمة
+    </label>
+    <Select value={chartMetric} onValueChange={(v) => setChartMetric(v as ChartMetric)}>
+      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectValue placeholder="اختر القيمة" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="amount" className="text-xs">المبلغ</SelectItem>
+        <SelectItem value="teamSupport" className="text-xs">دعم الفريق</SelectItem>
+        <SelectItem value="fees" className="text-xs">الرسوم</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+
+  {/* Chart Type */}
+  <div className="space-y-1 text-right">
+    <label className="text-[11px] font-medium text-slate-500">
+      نوع الرسم
+    </label>
+    <Select value={chartView} onValueChange={(v) => setChartView(v as ChartViewType)}>
+      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectValue placeholder="اختر النوع" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="bar" className="text-xs">أعمدة</SelectItem>
+        <SelectItem value="line" className="text-xs">خط</SelectItem>
+        <SelectItem value="area" className="text-xs">منطقة</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+
+  {/* Site language (donation row locale) */}
+  <div className="space-y-1 text-right">
+    <label className="text-[11px] font-medium text-slate-500">
+      لغة الموقع (التبرع)
+    </label>
+    <Select
+      value={donationLocaleFilter}
+      onValueChange={(v) => setDonationLocaleFilter(v as typeof donationLocaleFilter)}
+    >
+      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectValue placeholder="اللغة" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all" className="text-xs">كل اللغات</SelectItem>
+        <SelectItem value="ar" className="text-xs">العربية</SelectItem>
+        <SelectItem value="en" className="text-xs">English</SelectItem>
+        <SelectItem value="fr" className="text-xs">Français</SelectItem>
+        <SelectItem value="tr" className="text-xs">Türkçe</SelectItem>
+        <SelectItem value="id" className="text-xs">Indonesia</SelectItem>
+        <SelectItem value="pt" className="text-xs">Português</SelectItem>
+        <SelectItem value="es" className="text-xs">Español</SelectItem>
+        <SelectItem value="__unset" className="text-xs">غير محدد</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+
+  {/* Donation Status Filter */}
+  <div className="space-y-1 text-right">
+    <label className="text-[11px] font-medium text-slate-500">
+      حالة التبرع
+    </label>
+    <Select value={donationsStatusFilter} onValueChange={(v) => setDonationsStatusFilter(v as typeof donationsStatusFilter)}>
+      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectValue placeholder="الحالة" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all" className="text-xs">كل الحالات</SelectItem>
+        <SelectItem value="PAID" className="text-xs">ناجح</SelectItem>
+        <SelectItem value="FAILED" className="text-xs">فاشل</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+
+</div>
+
+</CardContent>
+
+
+
+        </Card>
 
         {/* التبرعات */}
         <section className="space-y-4">
