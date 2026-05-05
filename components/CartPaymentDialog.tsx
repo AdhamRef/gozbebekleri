@@ -30,6 +30,7 @@ import { useRouter } from "@/i18n/routing";
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
 import { useTranslations, useLocale } from "next-intl";
 import { useSession } from "next-auth/react";
+import SignInDialog from "@/components/SignInDialog";
 import { PhoneInput } from "react-international-phone";
 import "react-international-phone/style.css";
 import { useIpCountry } from "@/hooks/useIpCountry";
@@ -124,6 +125,9 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
   const [guestFirstName, setGuestFirstName] = useState("");
   const [guestLastName, setGuestLastName]   = useState("");
   const [guestEmail, setGuestEmail]         = useState("");
+  const [forceGuestCheckout, setForceGuestCheckout] = useState(false);
+  const [isAuthPromptOpen, setIsAuthPromptOpen] = useState(false);
+  const resumeSubmitAfterAuthRef = useRef(false);
   const [savedCards, setSavedCards] = useState<{ id: string; last4: string; cardType: string; expiryDate: string; cardholderName?: string | null; isDefault: boolean; nickname?: string | null }[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
@@ -131,6 +135,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
   const payforPollRef  = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { data: session } = useSession();
+  const isGuestCheckout = guestMode || forceGuestCheckout;
   const { clearItems } = useCart();
   const router = useRouter();
   const getReferralCode = useReferralCode();
@@ -213,8 +218,19 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
     if (!isOpen) {
       setGuestFirstName(""); setGuestLastName(""); setGuestEmail("");
       setSelectedCardId(null); setSavedCards([]);
+      setForceGuestCheckout(false);
+      setIsAuthPromptOpen(false);
+      resumeSubmitAfterAuthRef.current = false;
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!session?.user?.id || !resumeSubmitAfterAuthRef.current) return;
+    resumeSubmitAfterAuthRef.current = false;
+    setIsAuthPromptOpen(false);
+    void handleSubmit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id]);
 
   // Load saved cards when dialog opens (authenticated users only)
   useEffect(() => {
@@ -250,6 +266,12 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
   const handleSubmit = async () => {
     let isRedirecting = false;
     try {
+      if (!session?.user?.id && !isGuestCheckout) {
+        setLoading(false);
+        resumeSubmitAfterAuthRef.current = true;
+        setIsAuthPromptOpen(true);
+        return;
+      }
       setLoading(true);
 
       // Save phone if new
@@ -261,7 +283,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
       let geoCountryCode: string | undefined;
       let geoCity: string | undefined;
       let geoRegion: string | undefined;
-      if (guestMode) {
+      if (isGuestCheckout) {
         try {
           const cached = typeof window !== "undefined" ? localStorage.getItem("ipapi_cache") : null;
           const cacheData = cached ? JSON.parse(cached) as { data?: { country_code?: string; city?: string; region?: string }; ts?: number } : null;
@@ -302,7 +324,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
         type: "ONE_TIME",
         paymentMethod,
         locale,
-        ...(guestMode && {
+        ...(isGuestCheckout && {
           guest: {
             firstName:   guestFirstName.trim() || undefined,
             lastName:    guestLastName.trim()  || undefined,
@@ -738,7 +760,33 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
         </AnimatePresence>
 
         {/* Guest fields */}
-        {guestMode && (
+        {!session?.user?.id && !isGuestCheckout && (
+          <div className="rounded-lg border border-[#025EB8]/20 bg-[#025EB8]/5 p-3 text-sm text-slate-700">
+            <p className="font-medium text-slate-800 mb-2">أكمل الدفع بعد تسجيل سريع</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                onClick={() => {
+                  resumeSubmitAfterAuthRef.current = true;
+                  setIsAuthPromptOpen(true);
+                }}
+                className="h-8 bg-[#025EB8] hover:bg-[#014fa0] text-white"
+              >
+                تسجيل الدخول
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-8"
+                onClick={() => setForceGuestCheckout(true)}
+              >
+                المتابعة كضيف
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {isGuestCheckout && (
           <div className="space-y-3 pt-2 border-t border-border" dir={dir}>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -782,7 +830,8 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
             disabled={
               loading ||
               !isPhoneValid() ||
-              (guestMode && (!guestFirstName.trim() || !guestEmail.trim())) ||
+              (!session?.user?.id && !isGuestCheckout) ||
+              (isGuestCheckout && (!guestFirstName.trim() || !guestEmail.trim())) ||
               (paymentMethod === "CARD" && selectedCardId && cardDetails.cvv.length < 3) ||
               (paymentMethod === "CARD" && !selectedCardId && !use3D && !stripeReady) ||
               (paymentMethod === "CARD" && !selectedCardId && !use3D && totalAmount < stripeMinAmount) ||
@@ -807,6 +856,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
 
   // ── render ─────────────────────────────────────────────────────────────
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={() => {
       if (payforPollRef.current) clearInterval(payforPollRef.current);
       if (payforPopupRef.current && !payforPopupRef.current.closed) payforPopupRef.current.close();
@@ -870,6 +920,19 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
         )}
       </DialogContent>
     </Dialog>
+    <SignInDialog
+      isOpen={isAuthPromptOpen}
+      onClose={() => {
+        setIsAuthPromptOpen(false);
+        resumeSubmitAfterAuthRef.current = false;
+      }}
+      onSkip={() => {
+        setIsAuthPromptOpen(false);
+        setForceGuestCheckout(true);
+        resumeSubmitAfterAuthRef.current = false;
+      }}
+    />
+    </>
   );
 };
 

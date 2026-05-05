@@ -10,8 +10,6 @@ import { getCurrencySymbol } from "@/hooks/useCampaignValue";
 import { formatNumber } from "@/hooks/formatNumber";
 import { useCurrency } from "@/context/CurrencyContext";
 import { useTranslations } from "next-intl";
-import { useSession } from "next-auth/react";
-import SignInDialog from "@/components/SignInDialog";
 
 const DonationDialog = dynamic(() => import("@/components/DonationDialog"), { ssr: false });
 import CategoryIcon from "@/components/CategoryIcon";
@@ -69,14 +67,11 @@ interface CampaignCardProps {
 export function CampaignCard({ campaign, className, onClick, isFeatured = false, compact = false, listView = false }: CampaignCardProps) {
   const t = useTranslations("CampaignsPage");
   const { convertToCurrency } = useCurrency();
-  const { data: session } = useSession();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [donationOpen, setDonationOpen] = useState(false);
   const [donationContext, setDonationContext] = useState<DonationDialogCampaignContext | null>(null);
-  const [signInOpen, setSignInOpen] = useState(false);
-  const [isGuestDonation, setIsGuestDonation] = useState(false);
 
   const snapshotDonationContext = (): DonationDialogCampaignContext => ({
     goalType: campaign.goalType,
@@ -108,17 +103,7 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
   const handleDonateClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (session?.user) {
-      setDonationContext(snapshotDonationContext());
-      setDonationOpen(true);
-    } else {
-      setSignInOpen(true);
-    }
-  };
-
-  const handleGuestDonate = () => {
     setDonationContext(snapshotDonationContext());
-    setIsGuestDonation(true);
     setDonationOpen(true);
   };
 
@@ -260,9 +245,7 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
         onClose={() => {
           setDonationOpen(false);
           setDonationContext(null);
-          setIsGuestDonation(false);
         }}
-        guestMode={isGuestDonation}
         campaignId={campaign.id}
         campaignTitle={campaign.title}
         campaignImage={rawImgSrc}
@@ -273,20 +256,6 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
         sharePriceUSD={donationContext?.sharePriceUSD ?? campaign.sharePriceUSD ?? null}
         suggestedShareCounts={donationContext?.suggestedShareCounts ?? campaign.suggestedShareCounts ?? null}
         suggestedDonations={donationContext?.suggestedDonations ?? campaign.suggestedDonations ?? null}
-      />
-
-      <SignInDialog
-        isOpen={signInOpen}
-        onClose={() => setSignInOpen(false)}
-        onSkip={handleGuestDonate}
-        callbackUrl={
-          typeof window !== "undefined"
-            ? appendCurrencyQuery(
-                `${pathname}?openCampaignDonation=1`,
-                getCurrencyCodeForLinks()
-              )
-            : undefined
-        }
       />
     </>
   );

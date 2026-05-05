@@ -1,14 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import DonationDialog from "@/components/DonationDialog";
 import SharePopup from "@/components/SharePopup";
-import SignInDialog from "@/components/SignInDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCurrency } from "@/context/CurrencyContext";
 import { usePathname, useRouter } from "@/i18n/routing";
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
 import { Award, Clock, Gift, HandCoins, HandHeart, Share2 } from "lucide-react";
-import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import React, { useState, useEffect } from "react";
 import { useTranslations, useLocale } from "next-intl";
@@ -24,15 +22,12 @@ interface DonationSidebarProps {
 const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarProps) => {
   const t = useTranslations("Campaign");
   const locale = useLocale() as "ar" | "en" | "fr";
-  const { data: session } = useSession();
   const { convertToCurrency } = useCurrency();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isDonationOpen, setIsDonationOpen] = useState(false);
-  const [isSignInOpen, setIsSignInOpen] = useState(false);
-  const [isGuestDonation, setIsGuestDonation] = useState(false);
 
   // After sign-in redirect: open donation dialog once and clean URL (only one instance handles it)
   useEffect(() => {
@@ -45,11 +40,6 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
     setIsDonationOpen(true);
     router.replace(appendCurrencyQuery(pathname, getCurrencyCodeForLinks()));
   }, [searchParams, pathname, router]);
-
-  const donationCallbackUrl =
-    typeof window !== "undefined"
-      ? appendCurrencyQuery(`${pathname}?openDonation=1`, getCurrencyCodeForLinks())
-      : undefined;
 
   // Helper function to get locale-specific property
   const getLocalizedProperty = (obj: any, key: string) => {
@@ -91,16 +81,6 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
   };
 
   const handleDonate = () => {
-    if (session) {
-      setIsGuestDonation(false);
-      setIsDonationOpen(true);
-    } else {
-      setIsSignInOpen(true);
-    }
-  };
-
-  const handleGuestDonate = () => {
-    setIsGuestDonation(true);
     setIsDonationOpen(true);
   };
   
@@ -126,7 +106,7 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
 
         <DonationDialog
           isOpen={isDonationOpen}
-          onClose={() => { setIsDonationOpen(false); setIsGuestDonation(false); }}
+          onClose={() => { setIsDonationOpen(false); }}
           campaignTitle={getLocalizedProperty(campaign, "title")}
           campaignImage={campaign.images[0]}
           targetAmount={campaign.targetAmount}
@@ -137,14 +117,6 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
           fundraisingMode={campaign.fundraisingMode}
           sharePriceUSD={campaign.sharePriceUSD}
           suggestedShareCounts={campaign.suggestedShareCounts}
-          guestMode={isGuestDonation}
-        />
-
-        <SignInDialog
-          isOpen={isSignInOpen}
-          onClose={() => setIsSignInOpen(false)}
-          onSkip={handleGuestDonate}
-          callbackUrl={donationCallbackUrl}
         />
 
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t-2 border-gray-200 shadow-2xl">
@@ -243,7 +215,7 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
 
       <DonationDialog
         isOpen={isDonationOpen}
-        onClose={() => { setIsDonationOpen(false); setIsGuestDonation(false); }}
+        onClose={() => { setIsDonationOpen(false); }}
         campaignTitle={getLocalizedProperty(campaign, "title")}
         campaignImage={campaign.images[0]}
         targetAmount={campaign.targetAmount}
@@ -254,14 +226,6 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
         fundraisingMode={campaign.fundraisingMode}
         sharePriceUSD={campaign.sharePriceUSD}
         suggestedShareCounts={campaign.suggestedShareCounts}
-        guestMode={isGuestDonation}
-      />
-
-      <SignInDialog
-        isOpen={isSignInOpen}
-        onClose={() => setIsSignInOpen(false)}
-        onSkip={handleGuestDonate}
-        callbackUrl={donationCallbackUrl}
       />
 
       <div className="sticky top-24 gap-y-6">

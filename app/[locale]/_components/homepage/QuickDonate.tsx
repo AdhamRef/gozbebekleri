@@ -6,9 +6,7 @@ import { usePathname, useRouter } from "@/i18n/routing";
 import { useTranslations, useLocale } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
 import DonationDialog from "@/components/DonationDialog";
-import SignInDialog from "@/components/SignInDialog";
 import { Link } from "@/i18n/routing";
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
 
@@ -18,13 +16,10 @@ interface CategoryOption {
   image?: string | null;
 }
 
-const QUICK_DONATE_RESUME_KEY = "quickDonateResume";
-
 const QuickDonate = () => {
   const t = useTranslations("QuickDonate");
   const tDonation = useTranslations("DonationDialog");
   const locale = useLocale() as "ar" | "en" | "fr";
-  const { data: session } = useSession();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -33,7 +28,6 @@ const QuickDonate = () => {
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const [donationDialogOpen, setDonationDialogOpen] = useState(false);
-  const [signInOpen, setSignInOpen] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
@@ -59,22 +53,9 @@ const QuickDonate = () => {
     }
   }, []);
 
-  // After sign-in redirect: restore selection, open donation dialog, clean URL
+  // Restore donation modal from URL trigger (if any), then clean URL
   useEffect(() => {
     if (searchParams.get("openDonation") !== "1") return;
-    try {
-      const stored = typeof window !== "undefined" ? sessionStorage.getItem(QUICK_DONATE_RESUME_KEY) : null;
-      if (stored) {
-        const data = JSON.parse(stored) as { categoryId?: string; categoryName?: string; categoryImage?: string; amount?: number };
-        if (data.categoryId) setResumeCategoryId(data.categoryId);
-        if (data.categoryName) setResumeCategoryName(data.categoryName);
-        if (data.categoryImage) setResumeCategoryImage(data.categoryImage);
-        if (typeof data.amount === "number" && data.amount > 0) setResumeAmount(data.amount);
-        sessionStorage.removeItem(QUICK_DONATE_RESUME_KEY);
-      }
-    } catch {
-      /* ignore */
-    }
     setDonationDialogOpen(true);
     router.replace(
       appendCurrencyQuery(`${pathname}#quick_donate`, getCurrencyCodeForLinks())
@@ -123,22 +104,7 @@ const QuickDonate = () => {
   const handleDonateClick = () => {
     if (!selectedCategoryId || !selectedCategory) return;
     if (displayAmount <= 0) return;
-    if (session) {
-      setDonationDialogOpen(true);
-    } else {
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem(
-          QUICK_DONATE_RESUME_KEY,
-          JSON.stringify({
-            categoryId: selectedCategoryId,
-            categoryName: selectedCategory.name,
-            categoryImage: selectedCategory.image ?? undefined,
-            amount: displayAmount,
-          })
-        );
-      }
-      setSignInOpen(true);
-    }
+    setDonationDialogOpen(true);
   };
 
   const stats = [
@@ -360,19 +326,6 @@ const QuickDonate = () => {
         </div>
 
       </div>
-
-      <SignInDialog
-        isOpen={signInOpen}
-        onClose={() => setSignInOpen(false)}
-        callbackUrl={
-          typeof window !== "undefined"
-            ? appendCurrencyQuery(
-                `${pathname}?openDonation=1#quick_donate`,
-                getCurrencyCodeForLinks()
-              )
-            : undefined
-        }
-      />
 
       <DonationDialog
         isOpen={donationDialogOpen}

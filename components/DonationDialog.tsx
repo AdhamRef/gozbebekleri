@@ -50,6 +50,7 @@ import { useSession } from "next-auth/react";
 import { PhoneInput } from "react-international-phone";
 import "react-international-phone/style.css";
 import { useIpCountry } from "@/hooks/useIpCountry";
+import SignInDialog from "@/components/SignInDialog";
 
 type DonationType = "ONE_TIME" | "MONTHLY";
 type PaymentMethod = "CARD" | "PAYPAL" | null;
@@ -214,6 +215,9 @@ const DonationDialog = ({
   const [phoneValue, setPhoneValue] = useState("");
   const [guestFirstName, setGuestFirstName] = useState("");
   const [guestLastName, setGuestLastName] = useState("");
+  const [forceGuestCheckout, setForceGuestCheckout] = useState(false);
+  const [isAuthPromptOpen, setIsAuthPromptOpen] = useState(false);
+  const resumeSubmitAfterAuthRef = useRef(false);
   // Saved cards
   const [savedCards, setSavedCards] = useState<{ id: string; last4: string; cardType: string; expiryDate: string; cardholderName?: string | null; isDefault: boolean; nickname?: string | null }[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -231,6 +235,7 @@ const DonationDialog = ({
     birthdate?: string | null;
   } | null>(null);
   const { data: session } = useSession();
+  const isGuestCheckout = guestMode || forceGuestCheckout;
   const { convertToCurrency, exchangeRates } = useCurrency();
   const [shareCount, setShareCount] = useState(1);
   const { addItem, setItems } = useCart();
@@ -289,8 +294,19 @@ const DonationDialog = ({
     if (!isOpen) {
       setGuestFirstName(""); setGuestLastName(""); setGuestEmail("");
       setSelectedCardId(null); setSavedCards([]);
+      setForceGuestCheckout(false);
+      setIsAuthPromptOpen(false);
+      resumeSubmitAfterAuthRef.current = false;
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!session?.user?.id || !resumeSubmitAfterAuthRef.current) return;
+    resumeSubmitAfterAuthRef.current = false;
+    setIsAuthPromptOpen(false);
+    void handleSubmit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id]);
 
   // Load saved cards when dialog opens (authenticated users only)
   useEffect(() => {
@@ -753,7 +769,7 @@ const DonationDialog = ({
                         shareMode && sharePriceUSD != null
                           ? shareCount * getSharePriceUSDEffective()
                           : useConvetToUSD(donationAmount, payCurrencyCode());
-                      if (guestMode) {
+                      if (isGuestCheckout) {
                         // Guest: add to Zustand only (no DB call — not authenticated)
                         addItem({
                           id: crypto.randomUUID(),
@@ -781,7 +797,7 @@ const DonationDialog = ({
                         contentName: campaignTitle,
                         quantity: 1,
                       });
-                      if (!guestMode) window.location.reload();
+                      if (!isGuestCheckout) window.location.reload();
                     } catch (error) {
                       console.error("Error adding to cart:", error);
                       toast.error(t("failedToAddToCart"));
@@ -1108,7 +1124,33 @@ const DonationDialog = ({
               />
             )}
 
-            {guestMode && (
+            {!session?.user?.id && !isGuestCheckout && (
+              <div className="rounded-lg border border-[#025EB8]/20 bg-[#025EB8]/5 p-3 text-sm text-slate-700">
+                <p className="font-medium text-slate-800 mb-2">أكمل الدفع بعد تسجيل سريع</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      resumeSubmitAfterAuthRef.current = true;
+                      setIsAuthPromptOpen(true);
+                    }}
+                    className="h-8 bg-[#025EB8] hover:bg-[#014fa0] text-white"
+                  >
+                    تسجيل الدخول
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8"
+                    onClick={() => setForceGuestCheckout(true)}
+                  >
+                    المتابعة كضيف
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {isGuestCheckout && (
               <div className="space-y-3 pt-2 border-t border-border" dir={dir}>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
@@ -1171,6 +1213,7 @@ const DonationDialog = ({
                 disabled={
                   loading ||
                   !isPhoneValid() ||
+                  (!session?.user?.id && !isGuestCheckout) ||
                   (paymentMethod === "CARD" && !use3D && !selectedCardId && !stripeReady) ||
                   (paymentMethod === "CARD" && selectedCardId && cardDetails.cvv.length < 3) ||
                   (paymentMethod === "CARD" && use3D && !selectedCardId && (
@@ -1205,6 +1248,12 @@ const DonationDialog = ({
   const handleSubmit = async () => {
     let isRedirecting = false;
     try {
+      if (!session?.user?.id && !isGuestCheckout) {
+        setLoading(false);
+        resumeSubmitAfterAuthRef.current = true;
+        setIsAuthPromptOpen(true);
+        return;
+      }
       setLoading(true);
       if (session?.user?.id && !currentUser?.phone && phoneValue.trim()) {
         await axios.put(`/api/users/${session.user.id}`, {
@@ -1220,7 +1269,7 @@ const DonationDialog = ({
       let geoCountryCode: string | undefined;
       let geoCity: string | undefined;
       let geoRegion: string | undefined;
-      if (guestMode) {
+      if (isGuestCheckout) {
         try {
           const cached = typeof window !== "undefined" ? localStorage.getItem("ipapi_cache") : null;
           const cacheData = cached ? JSON.parse(cached) as { data?: { country_code?: string; city?: string; region?: string }; ts?: number } : null;
@@ -1242,7 +1291,7 @@ const DonationDialog = ({
       }
 
       // Push user data for enhanced matching
-      if (guestMode) {
+      if (isGuestCheckout) {
         tracking?.setUserData({
           email:        guestEmail.trim() || undefined,
           phone:        phoneValue.trim() || undefined,
@@ -1287,7 +1336,7 @@ const DonationDialog = ({
         cardDetails: null,
         locale,
         attribution: getDonationAttributionPayload(),
-        ...(guestMode && {
+        ...(isGuestCheckout && {
           guest: {
             firstName: guestFirstName.trim() || undefined,
             lastName:  guestLastName.trim() || undefined,
@@ -1504,6 +1553,7 @@ const DonationDialog = ({
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={() => {
       // Clean up PayFor polling if dialog is closed mid-flow
       if (payforPollRef.current) {
@@ -1584,6 +1634,19 @@ const DonationDialog = ({
         )}
       </DialogContent>
     </Dialog>
+    <SignInDialog
+      isOpen={isAuthPromptOpen}
+      onClose={() => {
+        setIsAuthPromptOpen(false);
+        resumeSubmitAfterAuthRef.current = false;
+      }}
+      onSkip={() => {
+        setIsAuthPromptOpen(false);
+        setForceGuestCheckout(true);
+        resumeSubmitAfterAuthRef.current = false;
+      }}
+    />
+    </>
   );
 };
 
