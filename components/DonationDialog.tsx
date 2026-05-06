@@ -2,6 +2,7 @@ import { Elements } from "@stripe/react-stripe-js";
 import { getStripePromise } from "@/lib/stripe-client";
 import { StripePaymentStep, type StripePaymentHandle } from "@/components/StripePaymentStep";
 import { PayForCardForm, type PayForCardState } from "@/components/PayForCardForm";
+import SignInDialog from "@/components/SignInDialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,10 +51,11 @@ import { useSession } from "next-auth/react";
 import { PhoneInput } from "react-international-phone";
 import "react-international-phone/style.css";
 import { useIpCountry } from "@/hooks/useIpCountry";
-import SignInDialog from "@/components/SignInDialog";
 
 type DonationType = "ONE_TIME" | "MONTHLY";
 type PaymentMethod = "CARD" | "PAYPAL" | null;
+const DONATION_CHECKOUT_RESUME_KEY = "alafiya:donation-checkout-resume:v1";
+const CHECKOUT_RESUME_TTL_MS = 30 * 60 * 1000;
 
 interface DonationStep {
   title: string;
@@ -84,6 +86,10 @@ interface DonationDialogProps {
   suggestedShareCounts?: { counts: number[]; priceByCurrency?: Record<string, number> } | null;
   /** When true, user skipped sign-in — collect contact info inline */
   guestMode?: boolean;
+  /** URL used by OAuth/email verification to reopen this checkout. */
+  authCallbackUrl?: string;
+  /** Lets the parent persist any props it owns before an auth redirect. */
+  onAuthCheckpoint?: () => void;
 }
 
 
@@ -106,6 +112,8 @@ const DonationDialog = ({
   sharePriceUSD,
   suggestedShareCounts,
   guestMode = false,
+  authCallbackUrl,
+  onAuthCheckpoint,
 }: DonationDialogProps) => {
   const isCategoryMode = Boolean(categoryId);
   const openGoal = goalType === GOAL_TYPE_OPEN;
@@ -215,9 +223,7 @@ const DonationDialog = ({
   const [phoneValue, setPhoneValue] = useState("");
   const [guestFirstName, setGuestFirstName] = useState("");
   const [guestLastName, setGuestLastName] = useState("");
-  const [forceGuestCheckout, setForceGuestCheckout] = useState(false);
-  const [isAuthPromptOpen, setIsAuthPromptOpen] = useState(false);
-  const resumeSubmitAfterAuthRef = useRef(false);
+  const [authDialogOpen, setAuthDialogOpen] = useState(false);
   // Saved cards
   const [savedCards, setSavedCards] = useState<{ id: string; last4: string; cardType: string; expiryDate: string; cardholderName?: string | null; isDefault: boolean; nickname?: string | null }[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -234,8 +240,8 @@ const DonationDialog = ({
     gender?: string | null;
     birthdate?: string | null;
   } | null>(null);
-  const { data: session } = useSession();
-  const isGuestCheckout = guestMode || forceGuestCheckout;
+  const { data: session, status: sessionStatus } = useSession();
+  const useGuestCheckout = guestMode && !session?.user?.id;
   const { convertToCurrency, exchangeRates } = useCurrency();
   const [shareCount, setShareCount] = useState(1);
   const { addItem, setItems } = useCart();
@@ -294,19 +300,8 @@ const DonationDialog = ({
     if (!isOpen) {
       setGuestFirstName(""); setGuestLastName(""); setGuestEmail("");
       setSelectedCardId(null); setSavedCards([]);
-      setForceGuestCheckout(false);
-      setIsAuthPromptOpen(false);
-      resumeSubmitAfterAuthRef.current = false;
     }
   }, [isOpen]);
-
-  useEffect(() => {
-    if (!session?.user?.id || !resumeSubmitAfterAuthRef.current) return;
-    resumeSubmitAfterAuthRef.current = false;
-    setIsAuthPromptOpen(false);
-    void handleSubmit();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.user?.id]);
 
   // Load saved cards when dialog opens (authenticated users only)
   useEffect(() => {
@@ -396,6 +391,66 @@ const DonationDialog = ({
     }
   }, [isOpen, initialDonationAmount]);
 
+  useEffect(() => {
+    if (!isOpen || typeof window === "undefined") return;
+
+    try {
+      const stored = sessionStorage.getItem(DONATION_CHECKOUT_RESUME_KEY);
+      if (!stored) return;
+
+      const resume = JSON.parse(stored) as {
+        createdAt?: number;
+        campaignId?: string;
+        categoryId?: string;
+        donationType?: DonationType | null;
+        donationAmount?: number;
+        teamSupport?: number;
+        coverFees?: boolean;
+        paymentMethod?: PaymentMethod;
+        shareCount?: number;
+      };
+
+      if (!resume.createdAt || Date.now() - resume.createdAt > CHECKOUT_RESUME_TTL_MS) {
+        sessionStorage.removeItem(DONATION_CHECKOUT_RESUME_KEY);
+        return;
+      }
+
+      if ((resume.campaignId || "") !== (campaignId || "")) return;
+      if ((resume.categoryId || "") !== (categoryId || "")) return;
+
+      const restoredType =
+        resume.donationType === "ONE_TIME" || resume.donationType === "MONTHLY"
+          ? resume.donationType
+          : donationType;
+      if (restoredType) setDonationType(restoredType);
+      if (typeof resume.donationAmount === "number") setDonationAmount(resume.donationAmount);
+      if (typeof resume.teamSupport === "number") setTeamSupport(resume.teamSupport);
+      if (typeof resume.coverFees === "boolean") setCoverFees(resume.coverFees);
+      if (resume.paymentMethod) setPaymentMethod(resume.paymentMethod);
+      if (typeof resume.shareCount === "number" && resume.shareCount > 0) setShareCount(resume.shareCount);
+
+      const steps = restoredType ? DONATION_STEPS[restoredType] : [];
+      const paymentStep = steps.findIndex((step) => step.title === t("paymentInfo"));
+      const confirmationStep = steps.findIndex((step) => step.title === t("confirmation"));
+
+      if (sessionStatus === "authenticated" && session?.user?.id) {
+        if (paymentStep >= 0) setCurrentStep(paymentStep);
+        sessionStorage.removeItem(DONATION_CHECKOUT_RESUME_KEY);
+      } else if (confirmationStep >= 0) {
+        setCurrentStep(confirmationStep);
+      }
+    } catch {
+      sessionStorage.removeItem(DONATION_CHECKOUT_RESUME_KEY);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, campaignId, categoryId, sessionStatus, session?.user?.id]);
+
+  useEffect(() => {
+    if (!isOpen || !authDialogOpen || !session?.user?.id) return;
+    resumePaymentInfoStep();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, authDialogOpen, session?.user?.id]);
+
   const confetti = useConfettiStore();
 
   const presetDonationAmounts = useMemo(() => {
@@ -457,16 +512,80 @@ const DonationDialog = ({
   // Alias: useConvetToUSD is a plain utility (not a React hook) — alias to avoid rules-of-hooks lint errors
   const convertToUSD = useConvetToUSD;
 
+  const getPaymentInfoStepIndex = (steps = getSteps()) =>
+    steps.findIndex((step) => step.title === t("paymentInfo"));
+
+  const trackPaymentInfoStep = () => {
+    if (paymentInfoTrackedRef.current) return;
+    paymentInfoTrackedRef.current = true;
+    tracking?.trackAddPaymentInfo({
+      value:         donationAmount,
+      currency:      getCurrency(),
+      causeId:       campaignId || categoryId || undefined,
+      causeName:     campaignTitle || categoryName || undefined,
+      paymentMethod: paymentMethod ?? "CARD",
+    });
+  };
+
+  const persistCheckoutResume = (targetStep?: number) => {
+    if (typeof window === "undefined") return;
+    try {
+      sessionStorage.setItem(
+        DONATION_CHECKOUT_RESUME_KEY,
+        JSON.stringify({
+          createdAt: Date.now(),
+          campaignId,
+          categoryId,
+          categoryName,
+          categoryImage,
+          donationType,
+          donationAmount,
+          teamSupport,
+          coverFees,
+          paymentMethod,
+          shareCount,
+          currentStep: targetStep ?? getPaymentInfoStepIndex(),
+        })
+      );
+    } catch {
+      /* Resume state is a convenience; checkout can still continue in-session. */
+    }
+  };
+
+  const resumePaymentInfoStep = () => {
+    const paymentStep = getPaymentInfoStepIndex();
+    if (paymentStep >= 0) {
+      setCurrentStep(paymentStep);
+      trackPaymentInfoStep();
+    }
+    setAuthDialogOpen(false);
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem(DONATION_CHECKOUT_RESUME_KEY);
+    }
+  };
+
+  const requestCheckoutSignIn = (targetStep: number) => {
+    persistCheckoutResume(targetStep);
+    onAuthCheckpoint?.();
+    setAuthDialogOpen(true);
+  };
+
   const handleNext = () => {
     const steps = getSteps();
     const nextStep = currentStep + 1;
 
     if (currentStep < steps.length - 1) {
+      const nextTitle = steps[nextStep]?.title;
+
+      if (nextTitle === t("paymentInfo") && sessionStatus !== "authenticated") {
+        requestCheckoutSignIn(nextStep);
+        return;
+      }
+
       setCurrentStep(nextStep);
 
       // ── Funnel events on step transitions ──────────────────────────────────
       const currency = getCurrency();
-      const nextTitle = steps[nextStep]?.title;
 
       // Reached confirmation step → InitiateCheckout (once per session)
       if (nextTitle === t("confirmation") && !checkoutTrackedRef.current) {
@@ -481,15 +600,8 @@ const DonationDialog = ({
       }
 
       // Reached payment step → AddPaymentInfo (once per session)
-      if (nextTitle === t("paymentInfo") && !paymentInfoTrackedRef.current) {
-        paymentInfoTrackedRef.current = true;
-        tracking?.trackAddPaymentInfo({
-          value:         donationAmount,
-          currency,
-          causeId:       campaignId || categoryId || undefined,
-          causeName:     campaignTitle || categoryName || undefined,
-          paymentMethod: paymentMethod ?? "CARD",
-        });
+      if (nextTitle === t("paymentInfo")) {
+        trackPaymentInfoStep();
       }
 
       // Amount step → CustomizeProduct with amount
@@ -768,8 +880,8 @@ const DonationDialog = ({
                       const amountUSD =
                         shareMode && sharePriceUSD != null
                           ? shareCount * getSharePriceUSDEffective()
-                          : useConvetToUSD(donationAmount, payCurrencyCode());
-                      if (isGuestCheckout) {
+                          : convertToUSD(donationAmount, payCurrencyCode());
+                      if (!session?.user?.id) {
                         // Guest: add to Zustand only (no DB call — not authenticated)
                         addItem({
                           id: crypto.randomUUID(),
@@ -797,7 +909,7 @@ const DonationDialog = ({
                         contentName: campaignTitle,
                         quantity: 1,
                       });
-                      if (!isGuestCheckout) window.location.reload();
+                      if (session?.user?.id) window.location.reload();
                     } catch (error) {
                       console.error("Error adding to cart:", error);
                       toast.error(t("failedToAddToCart"));
@@ -1124,33 +1236,7 @@ const DonationDialog = ({
               />
             )}
 
-            {!session?.user?.id && !isGuestCheckout && (
-              <div className="rounded-lg border border-[#025EB8]/20 bg-[#025EB8]/5 p-3 text-sm text-slate-700">
-                <p className="font-medium text-slate-800 mb-2">أكمل الدفع بعد تسجيل سريع</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      resumeSubmitAfterAuthRef.current = true;
-                      setIsAuthPromptOpen(true);
-                    }}
-                    className="h-8 bg-[#025EB8] hover:bg-[#014fa0] text-white"
-                  >
-                    تسجيل الدخول
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-8"
-                    onClick={() => setForceGuestCheckout(true)}
-                  >
-                    المتابعة كضيف
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {isGuestCheckout && (
+            {useGuestCheckout && (
               <div className="space-y-3 pt-2 border-t border-border" dir={dir}>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
@@ -1213,7 +1299,6 @@ const DonationDialog = ({
                 disabled={
                   loading ||
                   !isPhoneValid() ||
-                  (!session?.user?.id && !isGuestCheckout) ||
                   (paymentMethod === "CARD" && !use3D && !selectedCardId && !stripeReady) ||
                   (paymentMethod === "CARD" && selectedCardId && cardDetails.cvv.length < 3) ||
                   (paymentMethod === "CARD" && use3D && !selectedCardId && (
@@ -1248,10 +1333,8 @@ const DonationDialog = ({
   const handleSubmit = async () => {
     let isRedirecting = false;
     try {
-      if (!session?.user?.id && !isGuestCheckout) {
-        setLoading(false);
-        resumeSubmitAfterAuthRef.current = true;
-        setIsAuthPromptOpen(true);
+      if (!session?.user?.id) {
+        requestCheckoutSignIn(getPaymentInfoStepIndex());
         return;
       }
       setLoading(true);
@@ -1269,7 +1352,7 @@ const DonationDialog = ({
       let geoCountryCode: string | undefined;
       let geoCity: string | undefined;
       let geoRegion: string | undefined;
-      if (isGuestCheckout) {
+      if (useGuestCheckout) {
         try {
           const cached = typeof window !== "undefined" ? localStorage.getItem("ipapi_cache") : null;
           const cacheData = cached ? JSON.parse(cached) as { data?: { country_code?: string; city?: string; region?: string }; ts?: number } : null;
@@ -1291,7 +1374,7 @@ const DonationDialog = ({
       }
 
       // Push user data for enhanced matching
-      if (isGuestCheckout) {
+      if (useGuestCheckout) {
         tracking?.setUserData({
           email:        guestEmail.trim() || undefined,
           phone:        phoneValue.trim() || undefined,
@@ -1336,7 +1419,7 @@ const DonationDialog = ({
         cardDetails: null,
         locale,
         attribution: getDonationAttributionPayload(),
-        ...(isGuestCheckout && {
+        ...(useGuestCheckout && {
           guest: {
             firstName: guestFirstName.trim() || undefined,
             lastName:  guestLastName.trim() || undefined,
@@ -1563,6 +1646,7 @@ const DonationDialog = ({
       if (payforPopupRef.current && !payforPopupRef.current.closed) {
         payforPopupRef.current.close();
       }
+      setAuthDialogOpen(false);
       onClose();
     }}>
       <DialogContent dir={isRTL ? "rtl" : "ltr"} className="w-full h-full sm:h-auto sm:max-w-lg sm:max-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden p-0 rounded-none sm:rounded-lg top-0 sm:top-[50%] translate-y-0 sm:translate-y-[-50%]" closeClassName="text-white hover:text-white/80" aria-describedby={undefined}>
@@ -1635,16 +1719,11 @@ const DonationDialog = ({
       </DialogContent>
     </Dialog>
     <SignInDialog
-      isOpen={isAuthPromptOpen}
-      onClose={() => {
-        setIsAuthPromptOpen(false);
-        resumeSubmitAfterAuthRef.current = false;
-      }}
-      onSkip={() => {
-        setIsAuthPromptOpen(false);
-        setForceGuestCheckout(true);
-        resumeSubmitAfterAuthRef.current = false;
-      }}
+      isOpen={authDialogOpen}
+      onClose={() => setAuthDialogOpen(false)}
+      onAuthenticated={resumePaymentInfoStep}
+      callbackUrl={authCallbackUrl}
+      variant="checkout"
     />
     </>
   );

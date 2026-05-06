@@ -91,20 +91,47 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
     try {
       const stored = typeof window !== "undefined" ? sessionStorage.getItem(RESUME_KEY) : null;
       if (!stored) return;
-      const data = JSON.parse(stored) as { campaignId?: string };
+      const data = JSON.parse(stored) as { campaignId?: string } & DonationDialogCampaignContext;
       if (data.campaignId !== campaign.id) return;
       sessionStorage.removeItem(RESUME_KEY);
-      setDonationContext(snapshotDonationContext());
+      setDonationContext({
+        goalType: data.goalType ?? campaign.goalType,
+        fundraisingMode: data.fundraisingMode ?? campaign.fundraisingMode,
+        sharePriceUSD: data.sharePriceUSD ?? campaign.sharePriceUSD ?? null,
+        suggestedShareCounts: data.suggestedShareCounts ?? campaign.suggestedShareCounts ?? null,
+        suggestedDonations: data.suggestedDonations ?? campaign.suggestedDonations ?? null,
+      });
       setDonationOpen(true);
     } catch { /* ignore */ }
     router.replace(appendCurrencyQuery(pathname, getCurrencyCodeForLinks()));
-  }, [searchParams, campaign.id, pathname, router]);
+  }, [
+    searchParams,
+    campaign.id,
+    campaign.goalType,
+    campaign.fundraisingMode,
+    campaign.sharePriceUSD,
+    campaign.suggestedShareCounts,
+    campaign.suggestedDonations,
+    pathname,
+    router,
+  ]);
 
   const handleDonateClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDonationContext(snapshotDonationContext());
     setDonationOpen(true);
+  };
+
+  const storeDonationResume = () => {
+    if (typeof window === "undefined") return;
+    sessionStorage.setItem(
+      RESUME_KEY,
+      JSON.stringify({
+        campaignId: campaign.id,
+        ...snapshotDonationContext(),
+      })
+    );
   };
 
   const rawImgSrc = campaign.images[0] || FALLBACK_IMG;
@@ -256,6 +283,15 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
         sharePriceUSD={donationContext?.sharePriceUSD ?? campaign.sharePriceUSD ?? null}
         suggestedShareCounts={donationContext?.suggestedShareCounts ?? campaign.suggestedShareCounts ?? null}
         suggestedDonations={donationContext?.suggestedDonations ?? campaign.suggestedDonations ?? null}
+        authCallbackUrl={
+          typeof window !== "undefined"
+            ? appendCurrencyQuery(
+                `${pathname}?openCampaignDonation=1`,
+                getCurrencyCodeForLinks()
+              )
+            : undefined
+        }
+        onAuthCheckpoint={storeDonationResume}
       />
     </>
   );

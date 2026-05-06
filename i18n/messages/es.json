@@ -337,6 +337,8 @@
   "SignInDialog": {
     "welcomeTitle": "Bienvenido a la plataforma Qurrat Al-Ayun",
     "welcomeSubtitle": "Inicia sesión para continuar y compartir solidaridad",
+    "checkoutTitle": "Un paso rápido más",
+    "checkoutSubtitle": "Inicia sesión ahora y volverás directamente al pago.",
     "signInWithGoogle": "Iniciar sesión con Google",
     "signInWithFacebook": "Iniciar sesión con Facebook",
     "termsAgreement": "Al iniciar sesión, aceptas los",

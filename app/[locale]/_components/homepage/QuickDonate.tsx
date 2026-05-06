@@ -16,6 +16,8 @@ interface CategoryOption {
   image?: string | null;
 }
 
+const QUICK_DONATE_RESUME_KEY = "quickDonateResume";
+
 const QuickDonate = () => {
   const t = useTranslations("QuickDonate");
   const tDonation = useTranslations("DonationDialog");
@@ -53,9 +55,22 @@ const QuickDonate = () => {
     }
   }, []);
 
-  // Restore donation modal from URL trigger (if any), then clean URL
+  // After sign-in redirect: restore selection, open donation dialog, clean URL
   useEffect(() => {
     if (searchParams.get("openDonation") !== "1") return;
+    try {
+      const stored = typeof window !== "undefined" ? sessionStorage.getItem(QUICK_DONATE_RESUME_KEY) : null;
+      if (stored) {
+        const data = JSON.parse(stored) as { categoryId?: string; categoryName?: string; categoryImage?: string; amount?: number };
+        if (data.categoryId) setResumeCategoryId(data.categoryId);
+        if (data.categoryName) setResumeCategoryName(data.categoryName);
+        if (data.categoryImage) setResumeCategoryImage(data.categoryImage);
+        if (typeof data.amount === "number" && data.amount > 0) setResumeAmount(data.amount);
+        sessionStorage.removeItem(QUICK_DONATE_RESUME_KEY);
+      }
+    } catch {
+      /* ignore */
+    }
     setDonationDialogOpen(true);
     router.replace(
       appendCurrencyQuery(`${pathname}#quick_donate`, getCurrencyCodeForLinks())
@@ -100,6 +115,20 @@ const QuickDonate = () => {
 
   const selectedCategory = categories.find((c) => c.id === selectedCategoryId);
   const displayAmount = selectedAmount ?? (customAmount ? parseFloat(customAmount) || 0 : 0);
+
+  const storeQuickDonateResume = () => {
+    if (!selectedCategoryId || !selectedCategory || displayAmount <= 0) return;
+    if (typeof window === "undefined") return;
+    sessionStorage.setItem(
+      QUICK_DONATE_RESUME_KEY,
+      JSON.stringify({
+        categoryId: selectedCategoryId,
+        categoryName: selectedCategory.name,
+        categoryImage: selectedCategory.image ?? undefined,
+        amount: displayAmount,
+      })
+    );
+  };
 
   const handleDonateClick = () => {
     if (!selectedCategoryId || !selectedCategory) return;
@@ -341,6 +370,15 @@ const QuickDonate = () => {
         categoryName={resumeCategoryName || (selectedCategory?.name ?? "")}
         categoryImage={resumeCategoryImage ?? selectedCategory?.image ?? undefined}
         initialDonationAmount={resumeAmount ?? (displayAmount > 0 ? displayAmount : undefined)}
+        authCallbackUrl={
+          typeof window !== "undefined"
+            ? appendCurrencyQuery(
+                `${pathname}?openDonation=1#quick_donate`,
+                getCurrencyCodeForLinks()
+              )
+            : undefined
+        }
+        onAuthCheckpoint={storeQuickDonateResume}
       />
     </div>
   );

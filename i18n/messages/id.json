@@ -337,6 +337,8 @@
   "SignInDialog": {
     "welcomeTitle": "Selamat datang di Platform Qurrat Al-Ayun",
     "welcomeSubtitle": "Masuk untuk melanjutkan dan berbagi kebaikan",
+    "checkoutTitle": "Satu langkah cepat",
+    "checkoutSubtitle": "Masuk sekarang, lalu Anda kembali langsung ke pembayaran.",
     "signInWithGoogle": "Masuk dengan Google",
     "signInWithFacebook": "Masuk dengan Facebook",
     "termsAgreement": "Dengan masuk, Anda setuju dengan",

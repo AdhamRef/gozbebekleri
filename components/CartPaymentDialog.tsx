@@ -5,6 +5,7 @@ import { Elements } from "@stripe/react-stripe-js";
 import { getStripePromise } from "@/lib/stripe-client";
 import { StripePaymentStep, type StripePaymentHandle } from "@/components/StripePaymentStep";
 import { PayForCardForm, type PayForCardState } from "@/components/PayForCardForm";
+import SignInDialog from "@/components/SignInDialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,10 +31,12 @@ import { useRouter } from "@/i18n/routing";
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
 import { useTranslations, useLocale } from "next-intl";
 import { useSession } from "next-auth/react";
-import SignInDialog from "@/components/SignInDialog";
 import { PhoneInput } from "react-international-phone";
 import "react-international-phone/style.css";
 import { useIpCountry } from "@/hooks/useIpCountry";
+
+const CART_CHECKOUT_RESUME_KEY = "alafiya:cart-checkout-resume:v1";
+const CHECKOUT_RESUME_TTL_MS = 30 * 60 * 1000;
 
 interface CartItem {
   id: string;
@@ -54,9 +57,18 @@ interface CartPaymentDialogProps {
   cartItems: CartItem[];
   onSuccess?: () => void;
   guestMode?: boolean;
+  authCallbackUrl?: string;
+  onAuthCheckpoint?: () => void;
 }
 
-const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: CartPaymentDialogProps) => {
+const CartPaymentDialog = ({
+  isOpen,
+  onClose,
+  cartItems,
+  guestMode = false,
+  authCallbackUrl,
+  onAuthCheckpoint,
+}: CartPaymentDialogProps) => {
   const amount = cartItems.reduce((sum, item) => sum + (item.amount ?? item.amountUSD), 0);
   const t = useTranslations("DonationDialog");
   const locale = useLocale() as "ar" | "en" | "fr";
@@ -125,17 +137,15 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
   const [guestFirstName, setGuestFirstName] = useState("");
   const [guestLastName, setGuestLastName]   = useState("");
   const [guestEmail, setGuestEmail]         = useState("");
-  const [forceGuestCheckout, setForceGuestCheckout] = useState(false);
-  const [isAuthPromptOpen, setIsAuthPromptOpen] = useState(false);
-  const resumeSubmitAfterAuthRef = useRef(false);
+  const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [savedCards, setSavedCards] = useState<{ id: string; last4: string; cardType: string; expiryDate: string; cardholderName?: string | null; isDefault: boolean; nickname?: string | null }[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
   const payforPopupRef = useRef<Window | null>(null);
   const payforPollRef  = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const { data: session } = useSession();
-  const isGuestCheckout = guestMode || forceGuestCheckout;
+  const { data: session, status: sessionStatus } = useSession();
+  const useGuestCheckout = guestMode && !session?.user?.id;
   const { clearItems } = useCart();
   const router = useRouter();
   const getReferralCode = useReferralCode();
@@ -218,19 +228,8 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
     if (!isOpen) {
       setGuestFirstName(""); setGuestLastName(""); setGuestEmail("");
       setSelectedCardId(null); setSavedCards([]);
-      setForceGuestCheckout(false);
-      setIsAuthPromptOpen(false);
-      resumeSubmitAfterAuthRef.current = false;
     }
   }, [isOpen]);
-
-  useEffect(() => {
-    if (!session?.user?.id || !resumeSubmitAfterAuthRef.current) return;
-    resumeSubmitAfterAuthRef.current = false;
-    setIsAuthPromptOpen(false);
-    void handleSubmit();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.user?.id]);
 
   // Load saved cards when dialog opens (authenticated users only)
   useEffect(() => {
@@ -246,10 +245,98 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
     }).catch(() => {});
   }, [isOpen, session?.user?.id]);
 
+  useEffect(() => {
+    if (!isOpen || typeof window === "undefined") return;
+
+    try {
+      const stored = sessionStorage.getItem(CART_CHECKOUT_RESUME_KEY);
+      if (!stored) return;
+
+      const resume = JSON.parse(stored) as {
+        createdAt?: number;
+        teamSupport?: number;
+        coverFees?: boolean;
+      };
+
+      if (!resume.createdAt || Date.now() - resume.createdAt > CHECKOUT_RESUME_TTL_MS) {
+        sessionStorage.removeItem(CART_CHECKOUT_RESUME_KEY);
+        return;
+      }
+
+      if (typeof resume.teamSupport === "number") setTeamSupport(resume.teamSupport);
+      if (typeof resume.coverFees === "boolean") setCoverFees(resume.coverFees);
+
+      const paymentStep = STEPS.findIndex((step) => step.title === t("paymentInfo"));
+      const confirmationStep = STEPS.findIndex((step) => step.title === t("confirmation"));
+
+      if (sessionStatus === "authenticated" && session?.user?.id) {
+        if (paymentStep >= 0) setCurrentStep(paymentStep);
+        sessionStorage.removeItem(CART_CHECKOUT_RESUME_KEY);
+      } else if (confirmationStep >= 0) {
+        setCurrentStep(confirmationStep);
+      }
+    } catch {
+      sessionStorage.removeItem(CART_CHECKOUT_RESUME_KEY);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, sessionStatus, session?.user?.id]);
+
+  useEffect(() => {
+    if (!isOpen || !authDialogOpen || !session?.user?.id) return;
+    resumePaymentInfoStep();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, authDialogOpen, session?.user?.id]);
+
+  const getPaymentInfoStepIndex = () =>
+    STEPS.findIndex((step) => step.title === t("paymentInfo"));
+
+  const persistCheckoutResume = (targetStep?: number) => {
+    if (typeof window === "undefined") return;
+    try {
+      sessionStorage.setItem(
+        CART_CHECKOUT_RESUME_KEY,
+        JSON.stringify({
+          createdAt: Date.now(),
+          teamSupport,
+          coverFees,
+          currentStep: targetStep ?? getPaymentInfoStepIndex(),
+        })
+      );
+    } catch {
+      /* Resume state is a convenience; checkout can still continue in-session. */
+    }
+  };
+
+  const resumePaymentInfoStep = () => {
+    const paymentStep = getPaymentInfoStepIndex();
+    if (paymentStep >= 0) setCurrentStep(paymentStep);
+    setAuthDialogOpen(false);
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem(CART_CHECKOUT_RESUME_KEY);
+    }
+  };
+
+  const requestCheckoutSignIn = (targetStep: number) => {
+    persistCheckoutResume(targetStep);
+    onAuthCheckpoint?.();
+    setAuthDialogOpen(true);
+  };
+
   // ── navigation ─────────────────────────────────────────────────────────
   const handleNext = () => {
-    if (currentStep < STEPS.length - 1) setCurrentStep(currentStep + 1);
-    else handleSubmit();
+    if (currentStep < STEPS.length - 1) {
+      const nextStep = currentStep + 1;
+      const nextTitle = STEPS[nextStep]?.title;
+
+      if (nextTitle === t("paymentInfo") && sessionStatus !== "authenticated") {
+        requestCheckoutSignIn(nextStep);
+        return;
+      }
+
+      setCurrentStep(nextStep);
+    } else {
+      handleSubmit();
+    }
   };
   const handleBack = () => { if (currentStep > 0) setCurrentStep(currentStep - 1); };
 
@@ -266,10 +353,8 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
   const handleSubmit = async () => {
     let isRedirecting = false;
     try {
-      if (!session?.user?.id && !isGuestCheckout) {
-        setLoading(false);
-        resumeSubmitAfterAuthRef.current = true;
-        setIsAuthPromptOpen(true);
+      if (!session?.user?.id) {
+        requestCheckoutSignIn(getPaymentInfoStepIndex());
         return;
       }
       setLoading(true);
@@ -283,7 +368,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
       let geoCountryCode: string | undefined;
       let geoCity: string | undefined;
       let geoRegion: string | undefined;
-      if (isGuestCheckout) {
+      if (useGuestCheckout) {
         try {
           const cached = typeof window !== "undefined" ? localStorage.getItem("ipapi_cache") : null;
           const cacheData = cached ? JSON.parse(cached) as { data?: { country_code?: string; city?: string; region?: string }; ts?: number } : null;
@@ -324,7 +409,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
         type: "ONE_TIME",
         paymentMethod,
         locale,
-        ...(isGuestCheckout && {
+        ...(useGuestCheckout && {
           guest: {
             firstName:   guestFirstName.trim() || undefined,
             lastName:    guestLastName.trim()  || undefined,
@@ -760,33 +845,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
         </AnimatePresence>
 
         {/* Guest fields */}
-        {!session?.user?.id && !isGuestCheckout && (
-          <div className="rounded-lg border border-[#025EB8]/20 bg-[#025EB8]/5 p-3 text-sm text-slate-700">
-            <p className="font-medium text-slate-800 mb-2">أكمل الدفع بعد تسجيل سريع</p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                onClick={() => {
-                  resumeSubmitAfterAuthRef.current = true;
-                  setIsAuthPromptOpen(true);
-                }}
-                className="h-8 bg-[#025EB8] hover:bg-[#014fa0] text-white"
-              >
-                تسجيل الدخول
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-8"
-                onClick={() => setForceGuestCheckout(true)}
-              >
-                المتابعة كضيف
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {isGuestCheckout && (
+        {useGuestCheckout && (
           <div className="space-y-3 pt-2 border-t border-border" dir={dir}>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -830,8 +889,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
             disabled={
               loading ||
               !isPhoneValid() ||
-              (!session?.user?.id && !isGuestCheckout) ||
-              (isGuestCheckout && (!guestFirstName.trim() || !guestEmail.trim())) ||
+              (useGuestCheckout && (!guestFirstName.trim() || !guestEmail.trim())) ||
               (paymentMethod === "CARD" && selectedCardId && cardDetails.cvv.length < 3) ||
               (paymentMethod === "CARD" && !selectedCardId && !use3D && !stripeReady) ||
               (paymentMethod === "CARD" && !selectedCardId && !use3D && totalAmount < stripeMinAmount) ||
@@ -860,6 +918,7 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
     <Dialog open={isOpen} onOpenChange={() => {
       if (payforPollRef.current) clearInterval(payforPollRef.current);
       if (payforPopupRef.current && !payforPopupRef.current.closed) payforPopupRef.current.close();
+      setAuthDialogOpen(false);
       onClose();
     }}>
       <DialogContent dir={isRTL ? "rtl" : "ltr"} className="w-full h-full sm:h-auto sm:max-w-lg sm:max-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden p-0 rounded-none sm:rounded-lg top-0 sm:top-[50%] translate-y-0 sm:translate-y-[-50%]" closeClassName="text-white hover:text-white/80" aria-describedby={undefined}>
@@ -921,16 +980,11 @@ const CartPaymentDialog = ({ isOpen, onClose, cartItems, guestMode = false }: Ca
       </DialogContent>
     </Dialog>
     <SignInDialog
-      isOpen={isAuthPromptOpen}
-      onClose={() => {
-        setIsAuthPromptOpen(false);
-        resumeSubmitAfterAuthRef.current = false;
-      }}
-      onSkip={() => {
-        setIsAuthPromptOpen(false);
-        setForceGuestCheckout(true);
-        resumeSubmitAfterAuthRef.current = false;
-      }}
+      isOpen={authDialogOpen}
+      onClose={() => setAuthDialogOpen(false)}
+      onAuthenticated={resumePaymentInfoStep}
+      callbackUrl={authCallbackUrl}
+      variant="checkout"
     />
     </>
   );

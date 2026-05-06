@@ -81,6 +81,8 @@ interface SignInDialogProps {
   onClose: () => void;
   callbackUrl?: string;
   onSkip?: () => void;
+  onAuthenticated?: () => void;
+  variant?: "default" | "checkout";
 }
 
 type Screen = "options" | "auth" | "otp";
@@ -96,12 +98,20 @@ interface FormState {
   password: string;
 }
 
-export default function SignInDialog({ isOpen, onClose, callbackUrl, onSkip }: SignInDialogProps) {
+export default function SignInDialog({
+  isOpen,
+  onClose,
+  callbackUrl,
+  onSkip,
+  onAuthenticated,
+  variant = "default",
+}: SignInDialogProps) {
   const t = useTranslations("SignInDialog");
   const pathname = usePathname();
   const locale = useLocale();
   const isRTL = locale === "ar";
   const dir = isRTL ? "rtl" : "ltr";
+  const isCheckoutVariant = variant === "checkout";
 
   // ── Screen state ──────────────────────────────────────────────────────────
   const [screen, setScreen] = useState<Screen>("options");
@@ -166,6 +176,7 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl, onSkip }: S
         redirect: false,
       });
       if (res?.ok) {
+        onAuthenticated?.();
         onClose();
       } else if (res?.error === "EMAIL_NOT_VERIFIED") {
         // Resend verification link and go to inbox screen
@@ -294,11 +305,15 @@ export default function SignInDialog({ isOpen, onClose, callbackUrl, onSkip }: S
               ? t("verifyEmail")
               : screen === "auth" && authMode === "signup"
               ? t("createAccount")
+              : isCheckoutVariant
+              ? t("checkoutTitle")
               : t("welcomeTitle")}
           </DialogTitle>
           <p className="mt-1 text-xs text-white/70 leading-relaxed">
             {screen === "otp"
               ? t("checkYourEmail")
+              : isCheckoutVariant
+              ? t("checkoutSubtitle")
               : t("welcomeSubtitle")}
           </p>
 

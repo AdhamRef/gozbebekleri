@@ -337,6 +337,8 @@
   "SignInDialog": {
     "welcomeTitle": "Kurratül-Ayn Platformuna Hoş Geldiniz",
     "welcomeSubtitle": "Devam etmek ve iyilik paylaşmak için giriş yapın",
+    "checkoutTitle": "Tek kısa adım",
+    "checkoutSubtitle": "Şimdi giriş yapın; ardından ödeme adımına geri döneceksiniz.",
     "signInWithGoogle": "Google ile giriş yap",
     "signInWithFacebook": "Facebook ile giriş yap",
     "termsAgreement": "Giriş yaparak kabul etmiş olursunuz",

@@ -78,10 +78,11 @@ const Navbar = () => {
 
   useEffect(() => {
     if (searchParams.get("openCartPayment") === "1") {
+      setCartGuestMode(!session?.user && zustandItems.length > 0);
       setIsCartPaymentDialogOpen(true);
       router.replace(appendCurrencyQuery(pathname, getCurrencyCodeForLinks()));
     }
-  }, [searchParams, pathname, router]);
+  }, [searchParams, pathname, router, session?.user, zustandItems.length]);
 
   useEffect(() => {
     const fetchCartItems = async () => {
@@ -169,6 +170,18 @@ const Navbar = () => {
     { href: "/bank-transfer", label: t("bankAccounts") },
     { href: "/contact-us", label: t("contact") },
   ];
+
+  const checkoutCartItems =
+    isCartPaymentDialogOpen && cartGuestMode
+      ? zustandItems
+      : session?.user
+      ? cartItems
+      : zustandItems;
+
+  const cartPaymentCallbackUrl =
+    typeof window !== "undefined"
+      ? appendCurrencyQuery(`${pathname}?openCartPayment=1`, getCurrencyCodeForLinks())
+      : undefined;
 
   return (
     <>
@@ -514,8 +527,9 @@ const Navbar = () => {
       <CartPaymentDialog
         isOpen={isCartPaymentDialogOpen}
         onClose={() => setIsCartPaymentDialogOpen(false)}
-        cartItems={session?.user ? cartItems : zustandItems}
-        guestMode={cartGuestMode}
+        cartItems={checkoutCartItems}
+        guestMode={false}
+        authCallbackUrl={cartPaymentCallbackUrl}
         onSuccess={() => {
           setIsCartPaymentDialogOpen(false);
           setCartItems([]);

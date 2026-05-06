@@ -337,6 +337,8 @@
   "SignInDialog": {
     "welcomeTitle": "مرحباً بك في منصة قرة العيون",
     "welcomeSubtitle": "سجل دخولك للمتابعة ومشاركة الخير",
+    "checkoutTitle": "خطوة سريعة واحدة",
+    "checkoutSubtitle": "سجّل الدخول الآن ثم نعيدك مباشرة إلى خطوة الدفع.",
     "signInWithGoogle": "تسجيل دخول باستخدام Google",
     "signInWithFacebook": "تسجيل دخول باستخدام Facebook",
     "termsAgreement": "بتسجيل دخولك، فإنك توافق على",

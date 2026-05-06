@@ -41,6 +41,11 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
     router.replace(appendCurrencyQuery(pathname, getCurrencyCodeForLinks()));
   }, [searchParams, pathname, router]);
 
+  const donationCallbackUrl =
+    typeof window !== "undefined"
+      ? appendCurrencyQuery(`${pathname}?openDonation=1`, getCurrencyCodeForLinks())
+      : undefined;
+
   // Helper function to get locale-specific property
   const getLocalizedProperty = (obj: any, key: string) => {
     const localeKey = `${key}${locale.charAt(0).toUpperCase() + locale.slice(1)}`;
@@ -106,7 +111,7 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
 
         <DonationDialog
           isOpen={isDonationOpen}
-          onClose={() => { setIsDonationOpen(false); }}
+          onClose={() => setIsDonationOpen(false)}
           campaignTitle={getLocalizedProperty(campaign, "title")}
           campaignImage={campaign.images[0]}
           targetAmount={campaign.targetAmount}
@@ -117,6 +122,7 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
           fundraisingMode={campaign.fundraisingMode}
           sharePriceUSD={campaign.sharePriceUSD}
           suggestedShareCounts={campaign.suggestedShareCounts}
+          authCallbackUrl={donationCallbackUrl}
         />
 
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t-2 border-gray-200 shadow-2xl">
@@ -215,7 +221,7 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
 
       <DonationDialog
         isOpen={isDonationOpen}
-        onClose={() => { setIsDonationOpen(false); }}
+        onClose={() => setIsDonationOpen(false)}
         campaignTitle={getLocalizedProperty(campaign, "title")}
         campaignImage={campaign.images[0]}
         targetAmount={campaign.targetAmount}
@@ -226,6 +232,7 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
         fundraisingMode={campaign.fundraisingMode}
         sharePriceUSD={campaign.sharePriceUSD}
         suggestedShareCounts={campaign.suggestedShareCounts}
+        authCallbackUrl={donationCallbackUrl}
       />
 
       <div className="sticky top-24 gap-y-6">
