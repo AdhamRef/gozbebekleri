@@ -44,7 +44,7 @@ export interface CampaignCardData {
   sharePriceUSD?: number | null;
   suggestedShareCounts?: { counts: number[]; priceByCurrency?: Record<string, number> } | null;
   suggestedDonations?: SuggestedDonationsConfig | null;
-  category?: { id?: string; slug?: string | null; name?: string; icon?: string };
+  category?: { id?: string; slug?: string | null; name?: string; icon?: string | null } | null;
 }
 
 type DonationDialogCampaignContext = {

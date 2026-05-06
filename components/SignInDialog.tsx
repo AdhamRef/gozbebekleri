@@ -76,13 +76,20 @@ function AuthField({
   );
 }
 
-interface SignInDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
+interface SignInPanelProps {
+  isOpen?: boolean;
+  onClose?: () => void;
   callbackUrl?: string;
   onSkip?: () => void;
   onAuthenticated?: () => void;
   variant?: "default" | "checkout";
+  showHeader?: boolean;
+  className?: string;
+}
+
+interface SignInDialogProps extends Omit<SignInPanelProps, "showHeader" | "className"> {
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 type Screen = "options" | "auth" | "otp";
@@ -98,14 +105,16 @@ interface FormState {
   password: string;
 }
 
-export default function SignInDialog({
-  isOpen,
-  onClose,
+export function SignInPanel({
+  isOpen = true,
+  onClose = () => {},
   callbackUrl,
   onSkip,
   onAuthenticated,
   variant = "default",
-}: SignInDialogProps) {
+  showHeader = true,
+  className = "",
+}: SignInPanelProps) {
   const t = useTranslations("SignInDialog");
   const pathname = usePathname();
   const locale = useLocale();
@@ -262,18 +271,12 @@ export default function SignInDialog({
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        hideCloseButton
-        dir={dir}
-        className="flex w-[min(100%,calc(100vw-1.25rem))] max-w-[min(26rem,calc(100vw-1.25rem))] flex-col p-0 overflow-hidden rounded-2xl border-0 shadow-2xl max-h-[min(92dvh,44rem)] sm:max-w-md"
-      >
-        <DialogClose
-          className="absolute top-3.5 end-3.5 z-50 w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
-          aria-label="Close"
-        >
-          <X className="w-3.5 h-3.5 text-white" />
-        </DialogClose>
+    <div
+      dir={dir}
+      className={`flex flex-col bg-white ${showHeader ? "overflow-hidden rounded-2xl" : "overflow-visible"} ${className}`}
+    >
+      {showHeader && (
+        <>
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="bg-[#025EB8] px-4 pt-6 pb-5 sm:px-6 sm:pt-7 sm:pb-6 text-center relative shrink-0">
@@ -300,7 +303,7 @@ export default function SignInDialog({
             />
           </div>
 
-          <DialogTitle className="text-lg font-bold text-white">
+          <h2 className="text-lg font-bold text-white">
             {screen === "otp"
               ? t("verifyEmail")
               : screen === "auth" && authMode === "signup"
@@ -308,7 +311,7 @@ export default function SignInDialog({
               : isCheckoutVariant
               ? t("checkoutTitle")
               : t("welcomeTitle")}
-          </DialogTitle>
+          </h2>
           <p className="mt-1 text-xs text-white/70 leading-relaxed">
             {screen === "otp"
               ? t("checkYourEmail")
@@ -330,9 +333,25 @@ export default function SignInDialog({
             </div>
           )}
         </div>
+        </>
+      )}
 
         {/* ── Body ───────────────────────────────────────────────────────── */}
-        <div className="bg-white px-4 pt-4 pb-5 sm:px-6 sm:pt-5 space-y-4 min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className={showHeader ? "bg-white px-4 pt-4 pb-5 sm:px-6 sm:pt-5 space-y-4 min-h-0 flex-1 overflow-y-auto overscroll-contain" : "bg-transparent px-0 pt-0 pb-0 space-y-4 overflow-visible"}>
+          {!showHeader && screen !== "options" && (
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                if (screen === "otp") setScreen("auth");
+                else setScreen("options");
+              }}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-700"
+              aria-label="Back"
+            >
+              <ArrowLeft className={`w-4 h-4 ${isRTL ? "rotate-180" : ""}`} />
+            </button>
+          )}
 
           {/* ── OPTIONS screen ─────────────────────────────────────────── */}
           {screen === "options" && (
@@ -613,6 +632,48 @@ export default function SignInDialog({
             </div>
           )}
         </div>
+    </div>
+  );
+}
+
+export default function SignInDialog({
+  isOpen,
+  onClose,
+  callbackUrl,
+  onSkip,
+  onAuthenticated,
+  variant = "default",
+}: SignInDialogProps) {
+  const t = useTranslations("SignInDialog");
+  const locale = useLocale();
+  const dir = locale === "ar" ? "rtl" : "ltr";
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        hideCloseButton
+        dir={dir}
+        className="flex w-[min(100%,calc(100vw-1.25rem))] max-w-[min(26rem,calc(100vw-1.25rem))] flex-col p-0 overflow-hidden rounded-2xl border-0 shadow-2xl max-h-[min(92dvh,44rem)] sm:max-w-md"
+      >
+        <DialogTitle className="sr-only">
+          {variant === "checkout" ? t("checkoutTitle") : t("welcomeTitle")}
+        </DialogTitle>
+        <DialogClose
+          className="absolute top-3.5 end-3.5 z-50 w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+          aria-label="Close"
+        >
+          <X className="w-3.5 h-3.5 text-white" />
+        </DialogClose>
+        <SignInPanel
+          isOpen={isOpen}
+          onClose={onClose}
+          callbackUrl={callbackUrl}
+          onSkip={onSkip}
+          onAuthenticated={onAuthenticated}
+          variant={variant}
+          showHeader
+          className="min-h-0 flex-1"
+        />
       </DialogContent>
     </Dialog>
   );

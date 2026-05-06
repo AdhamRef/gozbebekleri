@@ -24,6 +24,9 @@ export async function GET(
     const searchParams = request.nextUrl.searchParams;
     const cursor = searchParams.get('cursor'); // Last item's ID from previous batch
     const limit = Math.min(Number(searchParams.get('limit')) || 10, 100); // cap for safety
+    const page = Math.max(1, Math.floor(Number(searchParams.get('page')) || 1));
+    const usePagePagination = searchParams.has('page');
+    const offset = (page - 1) * limit;
     const locale = searchParams.get('locale') || 'ar';
 
     // Filters
@@ -31,7 +34,11 @@ export async function GET(
     const sortBy = searchParams.get('sortBy') || 'newest';
     const minAmount = Number(searchParams.get('minAmount')) || 0;
     const maxAmount = Number(searchParams.get('maxAmount')) || Infinity;
-    const isActive = searchParams.get('isActive') === 'true';
+    const includeInactive =
+      searchParams.get('includeInactive') === 'true' ||
+      searchParams.get('isActiveFalse') === 'true' ||
+      searchParams.get('isActive') === 'false';
+    const activeOnly = !includeInactive;
     const hasPriority = searchParams.get('hasPriority') === 'true';
 
     // Check that category exists and fetch localized name if available. Resolves the
@@ -58,7 +65,7 @@ export async function GET(
       AND: [
         { targetAmount: { gte: minAmount } },
         maxAmount < Infinity ? { targetAmount: { lte: maxAmount } } : {},
-        isActive ? { isActive: true } : {},
+        activeOnly ? { isActive: true } : {},
         hasPriority ? { NOT: { priority: null } } : {}
       ].filter(Boolean)
     };
@@ -86,10 +93,10 @@ export async function GET(
     const applyPriorityFallbackSort = sortBy === 'newest' || !sortBy || sortBy === 'priority';
     switch (sortBy) {
       case 'amount-high':
-        orderBy = { currentAmount: 'desc' };
+        orderBy = { targetAmount: 'desc' };
         break;
       case 'amount-low':
-        orderBy = { currentAmount: 'asc' };
+        orderBy = { targetAmount: 'asc' };
         break;
       case 'progress':
         // We'll sort by progress in-memory after fetching the page
@@ -129,7 +136,59 @@ export async function GET(
       },
     } satisfies Prisma.CampaignSelect;
 
+    const total = await prisma.campaign.count({ where });
+
     const campaigns = await (async () => {
+      if (usePagePagination && applyPriorityFallbackSort) {
+        const priorityWhere = {
+          ...where,
+          OR: [{ NOT: { categoryPriority: null } }, { NOT: { priority: null } }],
+        };
+        const recentWhere = { ...where, categoryPriority: null, priority: null };
+        const priorityCount = await prisma.campaign.count({ where: priorityWhere });
+        const rows: Prisma.CampaignGetPayload<{ select: typeof selectShape }>[] = [];
+        let remaining = limit + 1;
+
+        if (offset < priorityCount) {
+          const priRows = await prisma.campaign.findMany({
+            where: priorityWhere,
+            orderBy: [
+              { categoryPriority: 'asc' },
+              { priority: 'asc' },
+              { createdAt: 'desc' },
+            ],
+            skip: offset,
+            take: remaining,
+            select: selectShape,
+          });
+          rows.push(...priRows);
+          remaining -= priRows.length;
+        }
+
+        if (remaining > 0) {
+          const recentRows = await prisma.campaign.findMany({
+            where: recentWhere,
+            orderBy: { createdAt: 'desc' },
+            skip: Math.max(0, offset - priorityCount),
+            take: remaining,
+            select: selectShape,
+          });
+          rows.push(...recentRows);
+        }
+
+        return rows;
+      }
+
+      if (usePagePagination) {
+        return prisma.campaign.findMany({
+          where,
+          skip: offset,
+          take: limit + 1,
+          orderBy,
+          select: selectShape,
+        });
+      }
+
       if (applyPriorityFallbackSort && !cursor) {
         // First page: prioritized rows (categoryPriority asc, then global priority asc),
         // then non-prioritized rows by createdAt desc to fill the page.
@@ -158,6 +217,39 @@ export async function GET(
         return [...priRows, ...recentRows];
       }
       if (applyPriorityFallbackSort && cursor) {
+        const cursorRow = await prisma.campaign.findUnique({
+          where: { id: cursor },
+          select: { categoryPriority: true, priority: true },
+        });
+
+        if (cursorRow?.categoryPriority != null || cursorRow?.priority != null) {
+          const priRows = await prisma.campaign.findMany({
+            where: {
+              ...where,
+              OR: [{ NOT: { categoryPriority: null } }, { NOT: { priority: null } }],
+            },
+            take: limit + 1,
+            skip: 1,
+            cursor: { id: cursor },
+            orderBy: [
+              { categoryPriority: 'asc' },
+              { priority: 'asc' },
+              { createdAt: 'desc' },
+            ],
+            select: selectShape,
+          });
+          const remaining = Math.max(0, limit + 1 - priRows.length);
+          const recentRows = remaining > 0
+            ? await prisma.campaign.findMany({
+                where: { ...where, categoryPriority: null, priority: null },
+                orderBy: { createdAt: 'desc' },
+                take: remaining,
+                select: selectShape,
+              })
+            : [];
+          return [...priRows, ...recentRows];
+        }
+
         // Subsequent pages: paginate non-prioritized rows by createdAt desc.
         return prisma.campaign.findMany({
           where: { ...where, categoryPriority: null, priority: null },
@@ -179,7 +271,7 @@ export async function GET(
 
     // Sort by progress in-memory if requested. Other sorts (newest/priority/amount) are
     // already in the desired order from the queries above.
-    let sorted = [...campaigns];
+    const sorted = [...campaigns];
     if (sortBy === 'progress') {
       sorted.sort((a, b) => {
         const ga = normalizeGoalType(a.goalType);
@@ -214,6 +306,8 @@ export async function GET(
         targetAmount: c.targetAmount,
         currentAmount: c.currentAmount,
         isActive: c.isActive,
+        categoryId: c.category?.id ?? id,
+        categoryPriority: c.categoryPriority,
         priority: c.priority,
         donationCount: c._count?.donations ?? 0,
         progress: computeCampaignProgressPercent(
@@ -259,9 +353,11 @@ export async function GET(
     return NextResponse.json({
       items: transformed,
       nextCursor,
+      nextPage: hasMore ? page + 1 : null,
       hasMore,
+      total,
       category: localizedCategory,
-      filters: { search, sortBy, minAmount, maxAmount, isActive, hasPriority, locale }
+      filters: { search, sortBy, minAmount, maxAmount, activeOnly, hasPriority, locale }
     });
   } catch (error) {
     console.error('Error fetching category campaigns:', error);

@@ -2,7 +2,7 @@ import { Elements } from "@stripe/react-stripe-js";
 import { getStripePromise } from "@/lib/stripe-client";
 import { StripePaymentStep, type StripePaymentHandle } from "@/components/StripePaymentStep";
 import { PayForCardForm, type PayForCardState } from "@/components/PayForCardForm";
-import SignInDialog from "@/components/SignInDialog";
+import { SignInPanel } from "@/components/SignInDialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -134,7 +134,8 @@ const DonationDialog = ({
     return !c || c === "DEFAULT" ? "USD" : c;
   }, []);
   const t = useTranslations("DonationDialog");
-  const locale = useLocale() as "ar" | "en" | "fr";
+  const tAuth = useTranslations("SignInDialog");
+  const locale = useLocale();
   const isRTL = locale === "ar";
   const dir = isRTL ? "rtl" : "ltr";
   const btnRow = "inline-flex items-center justify-center gap-2";
@@ -177,6 +178,7 @@ const DonationDialog = ({
       { title: t("teamSupport"), subtitle: t("teamSupportDesc") },
       { title: t("paymentFees"), subtitle: t("paymentFeesDesc") },
       { title: t("confirmation"), subtitle: t("confirmationDesc") },
+      { title: tAuth("checkoutTitle"), subtitle: tAuth("checkoutSubtitle") },
       { title: t("paymentInfo"), subtitle: t("paymentInfoDesc") },
     ],
     MONTHLY: [
@@ -187,6 +189,7 @@ const DonationDialog = ({
       { title: t("teamSupport"), subtitle: t("teamSupportDesc") },
       { title: t("paymentFees"), subtitle: t("paymentFeesDesc") },
       { title: t("confirmation"), subtitle: t("confirmationDesc") },
+      { title: tAuth("checkoutTitle"), subtitle: tAuth("checkoutSubtitle") },
       { title: t("paymentInfo"), subtitle: t("paymentInfoDesc") },
     ],
   };
@@ -223,7 +226,6 @@ const DonationDialog = ({
   const [phoneValue, setPhoneValue] = useState("");
   const [guestFirstName, setGuestFirstName] = useState("");
   const [guestLastName, setGuestLastName] = useState("");
-  const [authDialogOpen, setAuthDialogOpen] = useState(false);
   // Saved cards
   const [savedCards, setSavedCards] = useState<{ id: string; last4: string; cardType: string; expiryDate: string; cardholderName?: string | null; isDefault: boolean; nickname?: string | null }[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -431,11 +433,14 @@ const DonationDialog = ({
 
       const steps = restoredType ? DONATION_STEPS[restoredType] : [];
       const paymentStep = steps.findIndex((step) => step.title === t("paymentInfo"));
+      const signInStep = steps.findIndex((step) => step.title === tAuth("checkoutTitle"));
       const confirmationStep = steps.findIndex((step) => step.title === t("confirmation"));
 
       if (sessionStatus === "authenticated" && session?.user?.id) {
         if (paymentStep >= 0) setCurrentStep(paymentStep);
         sessionStorage.removeItem(DONATION_CHECKOUT_RESUME_KEY);
+      } else if (signInStep >= 0) {
+        setCurrentStep(signInStep);
       } else if (confirmationStep >= 0) {
         setCurrentStep(confirmationStep);
       }
@@ -446,10 +451,13 @@ const DonationDialog = ({
   }, [isOpen, campaignId, categoryId, sessionStatus, session?.user?.id]);
 
   useEffect(() => {
-    if (!isOpen || !authDialogOpen || !session?.user?.id) return;
-    resumePaymentInfoStep();
+    if (!isOpen || !session?.user?.id) return;
+    const steps = getSteps();
+    if (steps[currentStep]?.title === tAuth("checkoutTitle")) {
+      resumePaymentInfoStep();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, authDialogOpen, session?.user?.id]);
+  }, [isOpen, currentStep, session?.user?.id]);
 
   const confetti = useConfettiStore();
 
@@ -515,6 +523,9 @@ const DonationDialog = ({
   const getPaymentInfoStepIndex = (steps = getSteps()) =>
     steps.findIndex((step) => step.title === t("paymentInfo"));
 
+  const getSignInStepIndex = (steps = getSteps()) =>
+    steps.findIndex((step) => step.title === tAuth("checkoutTitle"));
+
   const trackPaymentInfoStep = () => {
     if (paymentInfoTrackedRef.current) return;
     paymentInfoTrackedRef.current = true;
@@ -558,7 +569,6 @@ const DonationDialog = ({
       setCurrentStep(paymentStep);
       trackPaymentInfoStep();
     }
-    setAuthDialogOpen(false);
     if (typeof window !== "undefined") {
       sessionStorage.removeItem(DONATION_CHECKOUT_RESUME_KEY);
     }
@@ -567,7 +577,8 @@ const DonationDialog = ({
   const requestCheckoutSignIn = (targetStep: number) => {
     persistCheckoutResume(targetStep);
     onAuthCheckpoint?.();
-    setAuthDialogOpen(true);
+    const signInStep = getSignInStepIndex();
+    if (signInStep >= 0) setCurrentStep(signInStep);
   };
 
   const handleNext = () => {
@@ -576,6 +587,15 @@ const DonationDialog = ({
 
     if (currentStep < steps.length - 1) {
       const nextTitle = steps[nextStep]?.title;
+
+      if (nextTitle === tAuth("checkoutTitle")) {
+        if (sessionStatus === "authenticated") {
+          resumePaymentInfoStep();
+          return;
+        }
+        requestCheckoutSignIn(getPaymentInfoStepIndex(steps));
+        return;
+      }
 
       if (nextTitle === t("paymentInfo") && sessionStatus !== "authenticated") {
         requestCheckoutSignIn(nextStep);
@@ -1141,6 +1161,30 @@ const DonationDialog = ({
           </div>
         );
 
+      case tAuth("checkoutTitle"):
+        return (
+          <div className="space-y-5">
+            <div className="text-center space-y-2">
+              <h3 className="text-xl font-semibold text-gray-900">{tAuth("checkoutTitle")}</h3>
+              <p className="text-gray-600 text-sm">{tAuth("checkoutSubtitle")}</p>
+            </div>
+            <SignInPanel
+              isOpen={isOpen && steps[currentStep]?.title === tAuth("checkoutTitle")}
+              onClose={() => {}}
+              onAuthenticated={resumePaymentInfoStep}
+              callbackUrl={authCallbackUrl}
+              variant="checkout"
+              showHeader={false}
+              className="w-full"
+            />
+            <div dir={dir} className="flex justify-between gap-4">
+              <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">
+                {backLabel}
+              </Button>
+            </div>
+          </div>
+        );
+
       case t("paymentInfo"):
         return (
           <div className="space-y-6 overflow-visible">
@@ -1646,7 +1690,6 @@ const DonationDialog = ({
       if (payforPopupRef.current && !payforPopupRef.current.closed) {
         payforPopupRef.current.close();
       }
-      setAuthDialogOpen(false);
       onClose();
     }}>
       <DialogContent dir={isRTL ? "rtl" : "ltr"} className="w-full h-full sm:h-auto sm:max-w-lg sm:max-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden p-0 rounded-none sm:rounded-lg top-0 sm:top-[50%] translate-y-0 sm:translate-y-[-50%]" closeClassName="text-white hover:text-white/80" aria-describedby={undefined}>
@@ -1718,13 +1761,6 @@ const DonationDialog = ({
         )}
       </DialogContent>
     </Dialog>
-    <SignInDialog
-      isOpen={authDialogOpen}
-      onClose={() => setAuthDialogOpen(false)}
-      onAuthenticated={resumePaymentInfoStep}
-      callbackUrl={authCallbackUrl}
-      variant="checkout"
-    />
     </>
   );
 };

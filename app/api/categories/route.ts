@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     const locale = params.get('locale') || 'ar';
     const search = params.get('search')?.toLowerCase();
     const includeCounts = params.get('counts') === 'true';
+    const activeCounts = params.get('activeCounts') === 'true';
     const sortBy = params.get('sortBy') || 'order';
 
     // Build order
@@ -45,7 +46,9 @@ export async function GET(request: NextRequest) {
           take: 2,
           select: { locale: true, name: true, description: true, slug: true }
         },
-        ...(includeCounts ? { _count: { select: { campaigns: true } } } : {})
+        ...(includeCounts
+          ? { _count: { select: { campaigns: activeCounts ? { where: { isActive: true } } : true } } }
+          : {})
       }
     });
 
@@ -87,7 +90,7 @@ export async function GET(request: NextRequest) {
       items: transformed,
       nextCursor,
       hasMore,
-      filters: { search, locale, includeCounts, sortBy, limit }
+      filters: { search, locale, includeCounts, activeCounts, sortBy, limit }
     });
 
   } catch (error) {

@@ -28,7 +28,10 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const cursor = searchParams.get('cursor');
-    const limit = Number(searchParams.get('limit')) || 10000;
+    const limit = Math.min(Math.max(Number(searchParams.get('limit')) || 12, 1), 100);
+    const page = Math.max(1, Math.floor(Number(searchParams.get('page')) || 1));
+    const usePagePagination = searchParams.has('page');
+    const offset = (page - 1) * limit;
     const locale = searchParams.get('locale') || 'ar'; // Default to Arabic
     
     // Filter parameters
@@ -52,6 +55,17 @@ export async function GET(request: NextRequest) {
       ].filter(condition => Object.keys(condition).length > 0)
     };
 
+    if (search) {
+      where.AND.push({
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+          { translations: { some: { locale, title: { contains: search, mode: 'insensitive' } } } },
+          { translations: { some: { locale, description: { contains: search, mode: 'insensitive' } } } },
+        ],
+      });
+    }
+
     // Build orderBy based on sortBy parameter.
     // Default ("newest") applies global priority first (asc, nulls last) then createdAt desc,
     // so admin-set priority surfaces without the client opting in. Explicit user-picked
@@ -64,10 +78,10 @@ export async function GET(request: NextRequest) {
     const applyPriorityFallbackSort = sortBy === 'newest' || !sortBy || sortBy === 'priority';
     switch (sortBy) {
       case 'amount-high':
-        orderBy = { currentAmount: 'desc' };
+        orderBy = { targetAmount: 'desc' };
         break;
       case 'amount-low':
-        orderBy = { currentAmount: 'asc' };
+        orderBy = { targetAmount: 'asc' };
         break;
       case 'progress':
         orderBy = { currentAmount: 'desc' };
@@ -96,7 +110,52 @@ export async function GET(request: NextRequest) {
       },
     } satisfies Prisma.CampaignInclude;
 
+    const total = await prisma.campaign.count({ where });
+
     const campaigns = await (async () => {
+      if (usePagePagination && applyPriorityFallbackSort) {
+        const priorityWhere = { ...where, NOT: { priority: null } };
+        const recentWhere = { ...where, priority: null };
+        const priorityCount = await prisma.campaign.count({ where: priorityWhere });
+        const rows: Prisma.CampaignGetPayload<{ include: typeof includeShape }>[] = [];
+        let remaining = limit + 1;
+
+        if (offset < priorityCount) {
+          const priRows = await prisma.campaign.findMany({
+            where: priorityWhere,
+            orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
+            skip: offset,
+            take: remaining,
+            include: includeShape,
+          });
+          rows.push(...priRows);
+          remaining -= priRows.length;
+        }
+
+        if (remaining > 0) {
+          const recentRows = await prisma.campaign.findMany({
+            where: recentWhere,
+            orderBy: { createdAt: 'desc' },
+            skip: Math.max(0, offset - priorityCount),
+            take: remaining,
+            include: includeShape,
+          });
+          rows.push(...recentRows);
+        }
+
+        return rows;
+      }
+
+      if (usePagePagination) {
+        return prisma.campaign.findMany({
+          where,
+          skip: offset,
+          take: limit + 1,
+          orderBy,
+          include: includeShape,
+        });
+      }
+
       if (applyPriorityFallbackSort && !cursor) {
         // First page with priority-aware default ordering: split into two queries.
         // 1) prioritized rows (asc priority, createdAt desc tiebreak), capped at limit + 1.
@@ -119,9 +178,32 @@ export async function GET(request: NextRequest) {
         return [...priRows, ...recentRows];
       }
       if (applyPriorityFallbackSort && cursor) {
-        // Subsequent pages: paginate the non-prioritized list by createdAt desc.
-        // Page 1 already showed all prioritized rows that fit, so we exclude them here to
-        // avoid duplicates and gaps.
+        const cursorRow = await prisma.campaign.findUnique({
+          where: { id: cursor },
+          select: { priority: true },
+        });
+
+        if (cursorRow?.priority != null) {
+          const priRows = await prisma.campaign.findMany({
+            where: { ...where, NOT: { priority: null } },
+            take: limit + 1,
+            skip: 1,
+            cursor: { id: cursor },
+            orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
+            include: includeShape,
+          });
+          const remaining = Math.max(0, limit + 1 - priRows.length);
+          const recentRows = remaining > 0
+            ? await prisma.campaign.findMany({
+                where: { ...where, priority: null },
+                orderBy: { createdAt: 'desc' },
+                take: remaining,
+                include: includeShape,
+              })
+            : [];
+          return [...priRows, ...recentRows];
+        }
+
         return prisma.campaign.findMany({
           where: { ...where, priority: null },
           take: limit + 1,
@@ -140,25 +222,10 @@ export async function GET(request: NextRequest) {
       });
     })();
 
-    // Filter by search term if provided (search in both base and translated fields)
-    let filteredCampaigns = campaigns;
-    if (search) {
-      filteredCampaigns = campaigns.filter(campaign => {
-        const t = pickTranslation(campaign.translations, locale);
-        const title = t?.title || campaign.title;
-        const description = t?.description || campaign.description;
-
-        return (
-          title?.toLowerCase().includes(search) ||
-          description?.toLowerCase().includes(search)
-        );
-      });
-    }
-
     // Handle in-memory sorting. With applyPriorityFallbackSort the fan-out above already
     // returns rows in the desired (prioritized → newest) order, so we only re-sort here for
     // the special cases that can't be expressed in the Prisma orderBy.
-    let sortedCampaigns = [...filteredCampaigns];
+    const sortedCampaigns = [...campaigns];
     if (sortBy === 'progress') {
       sortedCampaigns.sort((a, b) => {
         const ga = normalizeGoalType(a.goalType);
@@ -226,7 +293,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       items: transformedCampaigns,
       nextCursor,
+      nextPage: hasMore ? page + 1 : null,
       hasMore,
+      total,
       filters: {
         search,
         sortBy,
@@ -413,7 +482,10 @@ export async function POST(request: NextRequest) {
           priority: data.priority || null,
           goalType,
           fundraisingMode,
-          sharePriceUSD: Number.isFinite(sharePriceUSD) && sharePriceUSD > 0 ? sharePriceUSD : null,
+          sharePriceUSD:
+            sharePriceUSD != null && Number.isFinite(sharePriceUSD) && sharePriceUSD > 0
+              ? sharePriceUSD
+              : null,
           ...(suggestedDonations !== undefined ? { suggestedDonations } : {}),
           ...(suggestedShareCounts !== undefined
             ? { suggestedShareCounts }

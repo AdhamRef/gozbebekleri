@@ -35,12 +35,15 @@ export async function getInitialCampaignsForPage(locale: string) {
       _count: { select: { donations: true } },
     } as const;
 
-    const priRows = await prisma.campaign.findMany({
-      where: { isActive: true, NOT: { priority: null } },
-      orderBy: [{ priority: "asc" }, { createdAt: "desc" }],
-      take: CAMPAIGNS_PER_PAGE + 1,
-      include: includeShape,
-    });
+    const [total, priRows] = await Promise.all([
+      prisma.campaign.count({ where: { isActive: true } }),
+      prisma.campaign.findMany({
+        where: { isActive: true, NOT: { priority: null } },
+        orderBy: [{ priority: "asc" }, { createdAt: "desc" }],
+        take: CAMPAIGNS_PER_PAGE + 1,
+        include: includeShape,
+      }),
+    ]);
     const remaining = Math.max(0, CAMPAIGNS_PER_PAGE + 1 - priRows.length);
     const recentRows = remaining > 0
       ? await prisma.campaign.findMany({
@@ -105,10 +108,10 @@ export async function getInitialCampaignsForPage(locale: string) {
       };
     });
 
-    return { items: transformed, nextCursor, hasMore };
+    return { items: transformed, nextCursor, hasMore, total };
   } catch (err) {
     console.error("getInitialCampaignsForPage failed:", err);
-    return { items: [], nextCursor: null as string | null, hasMore: false };
+    return { items: [], nextCursor: null as string | null, hasMore: false, total: 0 };
   }
 }
 

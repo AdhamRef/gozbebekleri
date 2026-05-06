@@ -5,7 +5,7 @@ import { Elements } from "@stripe/react-stripe-js";
 import { getStripePromise } from "@/lib/stripe-client";
 import { StripePaymentStep, type StripePaymentHandle } from "@/components/StripePaymentStep";
 import { PayForCardForm, type PayForCardState } from "@/components/PayForCardForm";
-import SignInDialog from "@/components/SignInDialog";
+import { SignInPanel } from "@/components/SignInDialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,7 +71,8 @@ const CartPaymentDialog = ({
 }: CartPaymentDialogProps) => {
   const amount = cartItems.reduce((sum, item) => sum + (item.amount ?? item.amountUSD), 0);
   const t = useTranslations("DonationDialog");
-  const locale = useLocale() as "ar" | "en" | "fr";
+  const tAuth = useTranslations("SignInDialog");
+  const locale = useLocale();
   const isRTL = locale === "ar";
   const dir = isRTL ? "rtl" : "ltr";
   const btnRow = "inline-flex items-center justify-center gap-2";
@@ -96,6 +97,7 @@ const CartPaymentDialog = ({
     { title: t("teamSupport"),    subtitle: t("teamSupportDesc") },
     { title: t("paymentFees"),    subtitle: t("paymentFeesDesc") },
     { title: t("confirmation"),   subtitle: t("confirmationDesc") },
+    { title: tAuth("checkoutTitle"), subtitle: tAuth("checkoutSubtitle") },
     { title: t("paymentInfo"),    subtitle: t("paymentInfoDesc") },
   ];
 
@@ -137,7 +139,6 @@ const CartPaymentDialog = ({
   const [guestFirstName, setGuestFirstName] = useState("");
   const [guestLastName, setGuestLastName]   = useState("");
   const [guestEmail, setGuestEmail]         = useState("");
-  const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [savedCards, setSavedCards] = useState<{ id: string; last4: string; cardType: string; expiryDate: string; cardholderName?: string | null; isDefault: boolean; nickname?: string | null }[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
@@ -267,11 +268,14 @@ const CartPaymentDialog = ({
       if (typeof resume.coverFees === "boolean") setCoverFees(resume.coverFees);
 
       const paymentStep = STEPS.findIndex((step) => step.title === t("paymentInfo"));
+      const signInStep = STEPS.findIndex((step) => step.title === tAuth("checkoutTitle"));
       const confirmationStep = STEPS.findIndex((step) => step.title === t("confirmation"));
 
       if (sessionStatus === "authenticated" && session?.user?.id) {
         if (paymentStep >= 0) setCurrentStep(paymentStep);
         sessionStorage.removeItem(CART_CHECKOUT_RESUME_KEY);
+      } else if (signInStep >= 0) {
+        setCurrentStep(signInStep);
       } else if (confirmationStep >= 0) {
         setCurrentStep(confirmationStep);
       }
@@ -282,13 +286,18 @@ const CartPaymentDialog = ({
   }, [isOpen, sessionStatus, session?.user?.id]);
 
   useEffect(() => {
-    if (!isOpen || !authDialogOpen || !session?.user?.id) return;
-    resumePaymentInfoStep();
+    if (!isOpen || !session?.user?.id) return;
+    if (STEPS[currentStep]?.title === tAuth("checkoutTitle")) {
+      resumePaymentInfoStep();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, authDialogOpen, session?.user?.id]);
+  }, [isOpen, currentStep, session?.user?.id]);
 
   const getPaymentInfoStepIndex = () =>
     STEPS.findIndex((step) => step.title === t("paymentInfo"));
+
+  const getSignInStepIndex = () =>
+    STEPS.findIndex((step) => step.title === tAuth("checkoutTitle"));
 
   const persistCheckoutResume = (targetStep?: number) => {
     if (typeof window === "undefined") return;
@@ -310,7 +319,6 @@ const CartPaymentDialog = ({
   const resumePaymentInfoStep = () => {
     const paymentStep = getPaymentInfoStepIndex();
     if (paymentStep >= 0) setCurrentStep(paymentStep);
-    setAuthDialogOpen(false);
     if (typeof window !== "undefined") {
       sessionStorage.removeItem(CART_CHECKOUT_RESUME_KEY);
     }
@@ -319,7 +327,8 @@ const CartPaymentDialog = ({
   const requestCheckoutSignIn = (targetStep: number) => {
     persistCheckoutResume(targetStep);
     onAuthCheckpoint?.();
-    setAuthDialogOpen(true);
+    const signInStep = getSignInStepIndex();
+    if (signInStep >= 0) setCurrentStep(signInStep);
   };
 
   // ── navigation ─────────────────────────────────────────────────────────
@@ -327,6 +336,15 @@ const CartPaymentDialog = ({
     if (currentStep < STEPS.length - 1) {
       const nextStep = currentStep + 1;
       const nextTitle = STEPS[nextStep]?.title;
+
+      if (nextTitle === tAuth("checkoutTitle")) {
+        if (sessionStatus === "authenticated") {
+          resumePaymentInfoStep();
+          return;
+        }
+        requestCheckoutSignIn(getPaymentInfoStepIndex());
+        return;
+      }
 
       if (nextTitle === t("paymentInfo") && sessionStatus !== "authenticated") {
         requestCheckoutSignIn(nextStep);
@@ -731,6 +749,27 @@ const CartPaymentDialog = ({
       </div>
     );
 
+    if (step.title === tAuth("checkoutTitle")) return (
+      <div className="space-y-5">
+        <div className="text-center space-y-2">
+          <h3 className="text-xl font-semibold text-gray-900">{tAuth("checkoutTitle")}</h3>
+          <p className="text-gray-600 text-sm">{tAuth("checkoutSubtitle")}</p>
+        </div>
+        <SignInPanel
+          isOpen={isOpen && step.title === tAuth("checkoutTitle")}
+          onClose={() => {}}
+          onAuthenticated={resumePaymentInfoStep}
+          callbackUrl={authCallbackUrl}
+          variant="checkout"
+          showHeader={false}
+          className="w-full"
+        />
+        <div dir={dir} className="flex justify-between gap-4">
+          <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">{backLabel}</Button>
+        </div>
+      </div>
+    );
+
     // Payment Info
     if (step.title === t("paymentInfo")) return (
       <div className="space-y-6 overflow-visible">
@@ -918,7 +957,6 @@ const CartPaymentDialog = ({
     <Dialog open={isOpen} onOpenChange={() => {
       if (payforPollRef.current) clearInterval(payforPollRef.current);
       if (payforPopupRef.current && !payforPopupRef.current.closed) payforPopupRef.current.close();
-      setAuthDialogOpen(false);
       onClose();
     }}>
       <DialogContent dir={isRTL ? "rtl" : "ltr"} className="w-full h-full sm:h-auto sm:max-w-lg sm:max-h-[90vh] max-h-screen overflow-y-auto overflow-x-hidden p-0 rounded-none sm:rounded-lg top-0 sm:top-[50%] translate-y-0 sm:translate-y-[-50%]" closeClassName="text-white hover:text-white/80" aria-describedby={undefined}>
@@ -979,13 +1017,6 @@ const CartPaymentDialog = ({
         )}
       </DialogContent>
     </Dialog>
-    <SignInDialog
-      isOpen={authDialogOpen}
-      onClose={() => setAuthDialogOpen(false)}
-      onAuthenticated={resumePaymentInfoStep}
-      callbackUrl={authCallbackUrl}
-      variant="checkout"
-    />
     </>
   );
 };

@@ -35,6 +35,7 @@ export default async function CampaignsPage({ params }: Props) {
       initialCampaigns={initial.items}
       initialCursor={initial.nextCursor}
       initialHasMore={initial.hasMore}
+      initialTotal={initial.total}
       initialCategories={categories}
     />
   );

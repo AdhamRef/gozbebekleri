@@ -1,31 +1,38 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import axios from "axios";
 import { Search, HandHeart, ArrowRight, SlidersHorizontal, X, ChevronRight } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import CampaignCard from "@/app/[locale]/_components/CampaignCard";
 import { useDebounce } from "use-debounce";
-import { useSession } from "next-auth/react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import CategoryIcon from "@/components/CategoryIcon";
 
 interface Campaign {
   id: string;
+  slug?: string | null;
+  baseSlug?: string | null;
   images: string[];
   title: string;
   description: string;
   currentAmount: number;
   targetAmount: number;
+  videoUrl?: string | null;
   progress?: number;
   showProgress?: boolean;
+  goalType?: string;
   fundraisingMode?: string;
+  sharePriceUSD?: number | null;
+  suggestedShareCounts?: { counts: number[]; priceByCurrency?: Record<string, number> } | null;
+  suggestedDonations?: import("@/lib/campaign/suggested-donations").SuggestedDonationsConfig | null;
   isActive?: boolean;
   categoryId?: string;
-  category: { id?: string; name: string; icon?: string };
+  category?: { id?: string; slug?: string | null; name?: string; icon?: string | null } | null;
   createdAt: string;
+  updatedAt?: string;
   // Admin-set ordering fields. Lower number = higher priority. null = unprioritized.
   priority?: number | null;
   categoryPriority?: number | null;
@@ -33,8 +40,10 @@ interface Campaign {
 
 interface Category {
   id: string;
+  slug?: string | null;
+  baseSlug?: string | null;
   name: string;
-  icon?: string;
+  icon?: string | null;
   campaignCount?: number;
 }
 
@@ -51,16 +60,16 @@ interface CampaignsPageContentProps {
   initialCategories?: Category[];
   initialCursor?: string | null;
   initialHasMore?: boolean;
+  initialTotal?: number;
 }
 
 const CampaignsPage = ({
   initialCampaigns = [],
   initialCategories = [],
-  initialCursor = null,
   initialHasMore = false,
+  initialTotal = initialCampaigns.length,
 }: CampaignsPageContentProps = {}) => {
   const t = useTranslations("CampaignsPage");
-  const { data: session } = useSession();
   const [campaigns, setCampaigns] = useState<Campaign[]>(initialCampaigns);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [loading, setLoading] = useState(initialCampaigns.length === 0);
@@ -71,78 +80,116 @@ const CampaignsPage = ({
   const [filters, setFilters] = useState<FilterState>({ sortBy: "newest", minAmount: 0, maxAmount: 100000000 });
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(initialHasMore);
-  const [cursor, setCursor] = useState<string | null>(initialCursor);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(initialTotal);
   const didHydrateRef = useRef(false);
+  const requestSeqRef = useRef(0);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const ITEMS_PER_PAGE = 12;
   const locale = useLocale() as string;
   const isRTL = locale === "ar";
 
-  const fetchData = async (cursorParam?: string | null) => {
+  const fetchData = useCallback(async (pageToLoad = 1) => {
+    const requestId = ++requestSeqRef.current;
     try {
       setIsLoadingMore(true);
       const [campaignsRes, categoriesRes] = await Promise.all([
         selectedCategory !== "all"
           ? axios.get(`/api/categories/${selectedCategory}/campaigns`, {
-              params: { cursor: cursorParam, limit: ITEMS_PER_PAGE, search: debouncedSearch, locale, ...filters },
+              params: { page: pageToLoad, limit: ITEMS_PER_PAGE, search: debouncedSearch, locale, ...filters },
             })
           : axios.get("/api/campaigns", {
-              params: { cursor: cursorParam, limit: ITEMS_PER_PAGE, search: debouncedSearch, locale, ...filters },
+              params: { page: pageToLoad, limit: ITEMS_PER_PAGE, search: debouncedSearch, locale, ...filters },
             }),
         !categories.length
-          ? axios.get("/api/categories", { params: { locale, counts: true, limit: 100 } })
-          : Promise.resolve({ data: { items: categories } }),
+          ? axios.get("/api/categories", { params: { locale, counts: true, activeCounts: true, limit: 100 } })
+          : Promise.resolve({ data: { items: [] } }),
       ]);
+      if (requestId !== requestSeqRef.current) return;
       const campaignsItems = campaignsRes.data.items || campaignsRes.data;
       const newCampaigns = (campaignsItems as Campaign[]).map((campaign) => ({
         ...campaign,
         // Ensure categoryId is always set so the local filter works correctly
         categoryId: campaign.categoryId || campaign.category?.id || (selectedCategory !== "all" ? selectedCategory : undefined),
-        category: { ...campaign.category, id: campaign.category?.id || campaign.categoryId || (selectedCategory !== "all" ? selectedCategory : "") },
+        category: {
+          ...(campaign.category ?? {}),
+          id: campaign.category?.id || campaign.categoryId || (selectedCategory !== "all" ? selectedCategory : ""),
+        },
       }));
-      if (cursorParam) {
-        setCampaigns((prev) => [...prev, ...newCampaigns]);
+      if (pageToLoad > 1) {
+        setCampaigns((prev) => {
+          const seen = new Set(prev.map((campaign) => campaign.id));
+          const merged = [...prev];
+          for (const campaign of newCampaigns) {
+            if (!seen.has(campaign.id)) {
+              seen.add(campaign.id);
+              merged.push(campaign);
+            }
+          }
+          return merged;
+        });
       } else {
         setCampaigns(newCampaigns);
       }
       setHasMore(Boolean(campaignsRes.data.hasMore));
-      setCursor(campaignsRes.data.nextCursor || null);
+      setPage(pageToLoad);
+      setTotalCount(Number(campaignsRes.data.total) || newCampaigns.length);
       const catData = categoriesRes.data.items || categoriesRes.data;
       if (catData && !categories.length) setCategories(catData as Category[]);
     } catch (err) {
+      if (requestId !== requestSeqRef.current) return;
       setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
+      if (requestId !== requestSeqRef.current) return;
       setIsLoadingMore(false);
       setLoading(false);
     }
-  };
-``
+  }, [categories.length, debouncedSearch, filters, locale, selectedCategory]);
+
   useEffect(() => {
     // Skip first run: initial data was provided by the server render.
     if (!didHydrateRef.current) {
       didHydrateRef.current = true;
       // If the server returned nothing (empty DB / error), still do a client fetch so the page isn't empty.
       if (initialCampaigns.length === 0) {
-        setCursor(null);
+        setPage(1);
         setHasMore(true);
         setCampaigns([]);
-        fetchData();
+        fetchData(1);
       }
       return;
     }
-    setCursor(null);
+    setPage(1);
     setHasMore(true);
     setCampaigns([]);
-    fetchData();
+    fetchData(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, selectedCategory, debouncedSearch]);
+  }, [filters, selectedCategory, debouncedSearch, locale, initialCampaigns.length]);
 
-  const loadMore = () => { if (!isLoadingMore && hasMore) fetchData(cursor); };
+  const loadMore = useCallback(() => {
+    if (!isLoadingMore && hasMore) fetchData(page + 1);
+  }, [fetchData, hasMore, isLoadingMore, page]);
+
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || !hasMore || isLoadingMore || loading) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMore();
+      },
+      { rootMargin: "700px 0px" }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, isLoadingMore, loadMore, loading]);
 
   const filteredCampaigns = campaigns.filter((c) => {
-    const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) || c.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (c.title || "").toLowerCase().includes(searchQuery.toLowerCase()) || (c.description || "").toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "all" || c.categoryId === selectedCategory;
     const matchesAmount = c.targetAmount >= filters.minAmount && c.targetAmount <= filters.maxAmount;
-    return matchesSearch && matchesCategory && matchesAmount && c.isActive;
+    return matchesSearch && matchesCategory && matchesAmount && c.isActive !== false;
   });
 
   const sortedCampaigns = [...filteredCampaigns].sort((a, b) => {
@@ -174,6 +221,9 @@ const CampaignsPage = ({
   };
 
   const hasActiveFilters = filters.sortBy !== "newest" || filters.minAmount !== 0 || filters.maxAmount !== 100000000;
+  const resultCountLabel = totalCount > sortedCampaigns.length
+    ? `${sortedCampaigns.length} / ${totalCount}`
+    : String(sortedCampaigns.length);
 
   if (loading) return <LoadingSkeleton />;
 
@@ -372,7 +422,7 @@ const CampaignsPage = ({
         {!loading && sortedCampaigns.length > 0 && (
           <div className="flex items-center justify-between mb-6">
             <p className="text-sm text-gray-500">
-              <span className="font-semibold text-gray-800">{sortedCampaigns.length}</span>{" "}
+              <span className="font-semibold text-gray-800">{resultCountLabel}</span>{" "}
               {t("resultsFound") || "campaigns found"}
             </p>
             {hasActiveFilters && (
@@ -412,10 +462,14 @@ const CampaignsPage = ({
               <CampaignCard key={campaign.id} campaign={campaign} />
             ))}
             {/* Inline loading more skeletons */}
-            {isLoadingMore && Array.from({ length: 3 }).map((_, i) => (
+            {isLoadingMore && sortedCampaigns.length > 0 && Array.from({ length: 3 }).map((_, i) => (
               <CardSkeleton key={`more-${i}`} />
             ))}
           </div>
+        )}
+
+        {hasMore && sortedCampaigns.length > 0 && (
+          <div ref={loadMoreRef} className="h-1" aria-hidden="true" />
         )}
 
         {/* Load more */}
