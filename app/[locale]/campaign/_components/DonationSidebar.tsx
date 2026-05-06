@@ -94,6 +94,9 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
   };
 
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+  const isOpenGoal = String(campaign.goalType ?? "").toLowerCase() === "open";
+  const hasTargetAmount = Number(campaign.targetAmount) > 0;
+  const hideAmountAndDonors = isOpenGoal && !hasTargetAmount;
 
   // Mobile Sticky Bottom Bar
   if (isMobileSticky) {
@@ -130,30 +133,28 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
             {/* Progress Info - Compact */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex lg:flex-col gap-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-lg font-bold text-gray-900">
-                    {formatMoney(campaign.currentAmount)}
-                  </span>
-                  {campaign.showProgress !== false ? (
-                    <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-md">
-                      {t("from")} {formatMoney(campaign.targetAmount)}
-                    </span>
-                  ) : campaign.fundraisingMode === "SHARES" ? (
-                    // <span className="text-xs text-violet-700 bg-violet-50 px-2 py-1 rounded-md">
-                    //   {t("sharesCampaignBadge")}
-                    // </span>
-                    <></>
-                  ) : (
-                    // <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md">
-                    //   {t("openGoalBadge")}
-                    // </span>
-                    <></>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <HandHeart className="w-4 h-4" />
-                  <span>{campaign.donationCount} {t("donor")}</span>
-                </div>
+                {!hideAmountAndDonors && (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-lg font-bold text-gray-900">
+                        {formatMoney(campaign.currentAmount)}
+                      </span>
+                      {campaign.showProgress !== false ? (
+                        <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded-md">
+                          {t("from")} {formatMoney(campaign.targetAmount)}
+                        </span>
+                      ) : campaign.fundraisingMode === "SHARES" ? (
+                        <></>
+                      ) : (
+                        <></>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <HandHeart className="w-4 h-4" />
+                      <span>{campaign.donationCount} {t("donor")}</span>
+                    </div>
+                  </>
+                )}
               </div>
 
               {campaign.showProgress !== false ? (
@@ -242,36 +243,34 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
             <div className="mb-6">
               <div className="flex items-start justify-between mb-1">
                 <div className="flex flex-col gap-2">
-                  <h2 className="text-[2rem] font-bold text-gray-900 leading-none">
-                    {formatMoney(campaign.currentAmount)}
-                  </h2>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {campaign.showProgress !== false ? (
-                      <p className="text-white bg-primary px-2 py-1 rounded-md text-sm font-medium">
-                        {t("outOfGoal")} {formatMoney(campaign.targetAmount)}
-                      </p>
-                    ) : (
-                      <>
-                        {campaign.fundraisingMode === "SHARES" &&
-                        campaign.sharePriceUSD != null &&
-                        campaign.sharePriceUSD > 0 ? (
-                          // <p className="text-white bg-violet-600 px-2 py-1 rounded-md text-sm font-medium">
-                          //   {t("sharesCampaignBadge")}
-                          // </p>
-                          <></>
+                  {!hideAmountAndDonors && (
+                    <>
+                      <h2 className="text-[2rem] font-bold text-gray-900 leading-none">
+                        {formatMoney(campaign.currentAmount)}
+                      </h2>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {campaign.showProgress !== false ? (
+                          <p className="text-white bg-primary px-2 py-1 rounded-md text-sm font-medium">
+                            {t("outOfGoal")} {formatMoney(campaign.targetAmount)}
+                          </p>
                         ) : (
-                          // <p className="text-white bg-emerald-600 px-2 py-1 rounded-md text-sm font-medium">
-                          //   {t("openGoalBadge")}
-                          // </p>
-                          <></>
+                          <>
+                            {campaign.fundraisingMode === "SHARES" &&
+                            campaign.sharePriceUSD != null &&
+                            campaign.sharePriceUSD > 0 ? (
+                              <></>
+                            ) : (
+                              <></>
+                            )}
+                          </>
                         )}
-                      </>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-stone-800">
-                    <HandHeart className="w-5 h-5" />
-                    {campaign.donationCount} {t("peopleDonated")}
-                  </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-stone-800">
+                        <HandHeart className="w-5 h-5" />
+                        {campaign.donationCount} {t("peopleDonated")}
+                      </div>
+                    </>
+                  )}
                 </div>
                 {campaign.showProgress !== false ? (
                   <div className="relative w-16 h-16">

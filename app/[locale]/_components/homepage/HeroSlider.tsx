@@ -20,6 +20,14 @@ interface HeroSliderProps {
   initialFirstImage?: string | null;
 }
 
+function optimizeHeroImage(src: string, width = 1920, height = 1080): string {
+  if (!src.includes("res.cloudinary.com")) return src;
+  return src.replace(
+    /\/upload\//,
+    `/upload/f_auto,q_auto:eco,w_${width},h_${height},c_fill,g_auto/`
+  );
+}
+
 const HeroSlider: React.FC<HeroSliderProps> = ({ initialFirstImage }) => {
   const t = useTranslations("HeroSlider");
   const locale = useLocale() as "ar" | "en" | "fr";
@@ -69,11 +77,13 @@ const HeroSlider: React.FC<HeroSliderProps> = ({ initialFirstImage }) => {
       <div className="relative w-full h-[350px] sm:h-[400px] md:h-[450px] lg:h-[500px] xl:h-[550px] overflow-hidden">
         <div className="absolute inset-0 bg-[#0f172a]">
           <Image
-            src={initialFirstImage}
+            src={optimizeHeroImage(initialFirstImage)}
             alt=""
             fill
             priority
             sizes="100vw"
+            quality={60}
+            fetchPriority="high"
             className="object-cover object-center"
           />
           <div className="absolute inset-0 bg-gradient-to-br from-black/30 to-black/50 z-10" />
@@ -99,11 +109,14 @@ const HeroSlider: React.FC<HeroSliderProps> = ({ initialFirstImage }) => {
             <div className="absolute inset-0 bg-[#0f172a]">
                 {slide.image && (
                   <Image
-                    src={slide.image}
+                    src={optimizeHeroImage(slide.image)}
                     alt=""
                     fill
                     priority={index === 0}
                     sizes="100vw"
+                    quality={60}
+                    loading={index === 0 ? "eager" : "lazy"}
+                    fetchPriority={index === 0 ? "high" : "auto"}
                     className="object-cover object-center"
                   />
                 )}

@@ -20,6 +20,15 @@ const CampaignsSlider = ({ listView = false }: { listView?: boolean }) => {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1024px)");
+    const apply = () => setIsDesktop(media.matches);
+    apply();
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,35 +114,35 @@ const CampaignsSlider = ({ listView = false }: { listView?: boolean }) => {
 
   return (
     <div className="w-full space-y-4">
-      {/* ── Mobile: horizontal snap-scroll ── */}
-      <div className="lg:hidden flex overflow-x-auto gap-3 pb-3 px-4 snap-x snap-mandatory scrollbar-hide">
-        <div className="flex-shrink-0 w-[78vw] max-w-[320px] snap-start">
-          <CampaignCard campaign={featured} />
-        </div>
-        {others.map((c) => (
-          <div key={c.id} className="flex-shrink-0 w-[78vw] max-w-[320px] snap-start">
-            <CampaignCard campaign={c} listView={listView} />
+      {!isDesktop ? (
+        <div className="flex overflow-x-auto gap-3 pb-3 px-4 snap-x snap-mandatory scrollbar-hide">
+          <div className="flex-shrink-0 w-[78vw] max-w-[320px] snap-start">
+            <CampaignCard campaign={featured} />
           </div>
-        ))}
-      </div>
-
-      {/* ── Desktop: featured + 4 compact ── */}
-      <div className="hidden lg:grid grid-cols-4 auto-rows-fr gap-3">
-        <div className="col-span-2 row-span-2">
-          <CampaignCard campaign={featured} isFeatured className="h-full" />
-        </div>
-        {top4.map((c) => (
-          <CampaignCard key={c.id} campaign={c} compact />
-        ))}
-      </div>
-
-      {/* ── Desktop: additional rows ── */}
-      {rest.length > 0 && (
-        <div className="hidden lg:grid grid-cols-4 gap-3 pt-2">
-          {rest.map((c) => (
-            <CampaignCard key={c.id} campaign={c} />
+          {others.map((c) => (
+            <div key={c.id} className="flex-shrink-0 w-[78vw] max-w-[320px] snap-start">
+              <CampaignCard campaign={c} listView={listView} />
+            </div>
           ))}
         </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-4 auto-rows-fr gap-3">
+            <div className="col-span-2 row-span-2">
+              <CampaignCard campaign={featured} isFeatured className="h-full" />
+            </div>
+            {top4.map((c) => (
+              <CampaignCard key={c.id} campaign={c} compact />
+            ))}
+          </div>
+          {rest.length > 0 && (
+            <div className="grid grid-cols-4 gap-3 pt-2">
+              {rest.map((c) => (
+                <CampaignCard key={c.id} campaign={c} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {(hasMore || loadingMore) && (
