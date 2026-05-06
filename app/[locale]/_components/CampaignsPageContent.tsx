@@ -93,44 +93,85 @@ const CampaignsPage = ({
     const requestId = ++requestSeqRef.current;
     try {
       setIsLoadingMore(true);
-      const [campaignsRes, categoriesRes] = await Promise.all([
+      const getCampaignsPage = async (pageNumber: number) =>
         selectedCategory !== "all"
           ? axios.get(`/api/categories/${selectedCategory}/campaigns`, {
-              params: { page: pageToLoad, limit: ITEMS_PER_PAGE, search: debouncedSearch, locale, ...filters },
+              params: { page: pageNumber, limit: ITEMS_PER_PAGE, search: debouncedSearch, locale, ...filters },
             })
           : axios.get("/api/campaigns", {
-              params: { page: pageToLoad, limit: ITEMS_PER_PAGE, search: debouncedSearch, locale, ...filters },
-            }),
-        !categories.length
-          ? axios.get("/api/categories", { params: { locale, counts: true, activeCounts: true, limit: 100 } })
-          : Promise.resolve({ data: { items: [] } }),
-      ]);
+              params: { page: pageNumber, limit: ITEMS_PER_PAGE, search: debouncedSearch, locale, ...filters },
+            });
+
+      const categoriesPromise = !categories.length
+        ? axios.get("/api/categories", { params: { locale, counts: true, activeCounts: true, limit: 100 } })
+        : Promise.resolve({ data: { items: [] } });
+
+      // For first page/category/filter/search loads, collect all pages to ensure
+      // the list fully matches the reported category counts.
+      if (pageToLoad === 1) {
+        const [firstRes, categoriesRes] = await Promise.all([getCampaignsPage(1), categoriesPromise]);
+        if (requestId !== requestSeqRef.current) return;
+
+        const allItems = [...((firstRes.data.items || firstRes.data) as Campaign[])];
+        let currentPage = 1;
+        let nextHasMore = Boolean(firstRes.data.hasMore);
+
+        while (nextHasMore && requestId === requestSeqRef.current) {
+          currentPage += 1;
+          const nextRes = await getCampaignsPage(currentPage);
+          const batch = (nextRes.data.items || nextRes.data) as Campaign[];
+          allItems.push(...batch);
+          nextHasMore = Boolean(nextRes.data.hasMore);
+        }
+
+        if (requestId !== requestSeqRef.current) return;
+
+        const deduped = allItems.reduce<Campaign[]>((acc, campaign) => {
+          if (!acc.some((c) => c.id === campaign.id)) acc.push(campaign);
+          return acc;
+        }, []);
+
+        const normalized = deduped.map((campaign) => ({
+          ...campaign,
+          categoryId: campaign.categoryId || campaign.category?.id || (selectedCategory !== "all" ? selectedCategory : undefined),
+          category: {
+            ...(campaign.category ?? {}),
+            id: campaign.category?.id || campaign.categoryId || (selectedCategory !== "all" ? selectedCategory : ""),
+          },
+        }));
+
+        setCampaigns(normalized);
+        setHasMore(false);
+        setPage(currentPage);
+        setTotalCount(Number(firstRes.data.total) || normalized.length);
+
+        const catData = categoriesRes.data.items || categoriesRes.data;
+        if (catData && !categories.length) setCategories(catData as Category[]);
+        return;
+      }
+
+      const [campaignsRes, categoriesRes] = await Promise.all([getCampaignsPage(pageToLoad), categoriesPromise]);
       if (requestId !== requestSeqRef.current) return;
       const campaignsItems = campaignsRes.data.items || campaignsRes.data;
       const newCampaigns = (campaignsItems as Campaign[]).map((campaign) => ({
         ...campaign,
-        // Ensure categoryId is always set so the local filter works correctly
         categoryId: campaign.categoryId || campaign.category?.id || (selectedCategory !== "all" ? selectedCategory : undefined),
         category: {
           ...(campaign.category ?? {}),
           id: campaign.category?.id || campaign.categoryId || (selectedCategory !== "all" ? selectedCategory : ""),
         },
       }));
-      if (pageToLoad > 1) {
-        setCampaigns((prev) => {
-          const seen = new Set(prev.map((campaign) => campaign.id));
-          const merged = [...prev];
-          for (const campaign of newCampaigns) {
-            if (!seen.has(campaign.id)) {
-              seen.add(campaign.id);
-              merged.push(campaign);
-            }
+      setCampaigns((prev) => {
+        const seen = new Set(prev.map((campaign) => campaign.id));
+        const merged = [...prev];
+        for (const campaign of newCampaigns) {
+          if (!seen.has(campaign.id)) {
+            seen.add(campaign.id);
+            merged.push(campaign);
           }
-          return merged;
-        });
-      } else {
-        setCampaigns(newCampaigns);
-      }
+        }
+        return merged;
+      });
       setHasMore(Boolean(campaignsRes.data.hasMore));
       setPage(pageToLoad);
       setTotalCount(Number(campaignsRes.data.total) || newCampaigns.length);

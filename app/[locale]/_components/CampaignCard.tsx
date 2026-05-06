@@ -85,6 +85,9 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
   const raised = convertToCurrency(Math.round(campaign.currentAmount)).convertedValue ?? 0;
   const target = convertToCurrency(Math.round(campaign.targetAmount)).convertedValue ?? 0;
   const symbol = getCurrencySymbol();
+  const isOpenGoal = String(campaign.goalType ?? "").toLowerCase() === "open";
+  const hasTargetAmount = Number(campaign.targetAmount) > 0;
+  const hideBottomStats = isOpenGoal && !hasTargetAmount;
 
   useEffect(() => {
     if (searchParams.get("openCampaignDonation") !== "1") return;
@@ -213,7 +216,7 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
                 {campaign.title}
               </h3>
 
-              {campaign.showProgress !== false ? (
+              {!hideBottomStats && (campaign.showProgress !== false ? (
                 <>
                   <div className={`flex items-end justify-between ${isFeatured ? "mb-2" : "mb-1"}`}>
                     <div>
@@ -243,7 +246,7 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
                     {campaign.fundraisingMode === "SHARES" ? t("sharesCampaignLabel") : t("openGoalLabel")}
                   </span>
                 </div>
-              )}
+              ))}
             </div>
           </div>
         </Link>
