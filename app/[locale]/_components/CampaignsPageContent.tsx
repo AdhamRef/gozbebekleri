@@ -189,7 +189,8 @@ const CampaignsPage = ({
   const filteredCampaigns = campaigns.filter((c) => {
     const matchesSearch = (c.title || "").toLowerCase().includes(searchQuery.toLowerCase()) || (c.description || "").toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "all" || c.categoryId === selectedCategory;
-    const matchesAmount = c.targetAmount >= filters.minAmount && c.targetAmount <= filters.maxAmount;
+    const normalizedTarget = Number(c.targetAmount ?? 0);
+    const matchesAmount = normalizedTarget >= filters.minAmount && normalizedTarget <= filters.maxAmount;
     return matchesSearch && matchesCategory && matchesAmount && c.isActive !== false;
   });
 

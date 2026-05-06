@@ -59,12 +59,26 @@ export async function GET(
     }
     const id = category.id;
 
+    const isDefaultAmountRange = minAmount <= 0 && maxAmount === Infinity;
+    const amountConditions = isDefaultAmountRange
+      ? [
+          {
+            OR: [
+              { targetAmount: { gte: minAmount } },
+              { targetAmount: null },
+            ],
+          },
+        ]
+      : [
+          { targetAmount: { gte: minAmount } },
+          maxAmount < Infinity ? { targetAmount: { lte: maxAmount } } : {},
+        ];
+
     // Build where clause
     const where: any = {
       categoryId: id,
       AND: [
-        { targetAmount: { gte: minAmount } },
-        maxAmount < Infinity ? { targetAmount: { lte: maxAmount } } : {},
+        ...amountConditions,
         activeOnly ? { isActive: true } : {},
         hasPriority ? { NOT: { priority: null } } : {}
       ].filter(Boolean)

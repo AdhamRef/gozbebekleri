@@ -42,12 +42,26 @@ export async function GET(request: NextRequest) {
     const includeInactive = parseIncludeInactive(searchParams);
     const hasPriority = searchParams.get('hasPriority') === 'true';
 
+    const isDefaultAmountRange = minAmount <= 0 && maxAmount === Infinity;
+    const amountConditions = isDefaultAmountRange
+      ? [
+          {
+            OR: [
+              { targetAmount: { gte: minAmount } },
+              { targetAmount: null },
+            ],
+          },
+        ]
+      : [
+          { targetAmount: { gte: minAmount } },
+          maxAmount < Infinity ? { targetAmount: { lte: maxAmount } } : {},
+        ];
+
     // Build where clause for main fields
     const where: any = {
       AND: [
-        // Amount range
-        { targetAmount: { gte: minAmount } },
-        maxAmount < Infinity ? { targetAmount: { lte: maxAmount } } : {},
+        // Amount range: include null/open-goal targets for default filters.
+        ...amountConditions,
         // Default: active campaigns only; isActiveFalse=true includes inactive
         includeInactive ? {} : { isActive: true },
         // Priority filter
