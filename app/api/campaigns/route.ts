@@ -44,14 +44,7 @@ export async function GET(request: NextRequest) {
 
     const isDefaultAmountRange = minAmount <= 0 && maxAmount === Infinity;
     const amountConditions = isDefaultAmountRange
-      ? [
-          {
-            OR: [
-              { targetAmount: { gte: minAmount } },
-              { targetAmount: null },
-            ],
-          },
-        ]
+      ? []
       : [
           { targetAmount: { gte: minAmount } },
           maxAmount < Infinity ? { targetAmount: { lte: maxAmount } } : {},
