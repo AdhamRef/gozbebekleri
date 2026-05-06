@@ -85,7 +85,7 @@ const CampaignsPage = ({
   const didHydrateRef = useRef(false);
   const requestSeqRef = useRef(0);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  const ITEMS_PER_PAGE = 12;
+  const ITEMS_PER_PAGE = 6;
   const locale = useLocale() as string;
   const isRTL = locale === "ar";
 
@@ -106,50 +106,6 @@ const CampaignsPage = ({
         ? axios.get("/api/categories", { params: { locale, counts: true, activeCounts: true, limit: 100 } })
         : Promise.resolve({ data: { items: [] } });
 
-      // For first page/category/filter/search loads, collect all pages to ensure
-      // the list fully matches the reported category counts.
-      if (pageToLoad === 1) {
-        const [firstRes, categoriesRes] = await Promise.all([getCampaignsPage(1), categoriesPromise]);
-        if (requestId !== requestSeqRef.current) return;
-
-        const allItems = [...((firstRes.data.items || firstRes.data) as Campaign[])];
-        let currentPage = 1;
-        let nextHasMore = Boolean(firstRes.data.hasMore);
-
-        while (nextHasMore && requestId === requestSeqRef.current) {
-          currentPage += 1;
-          const nextRes = await getCampaignsPage(currentPage);
-          const batch = (nextRes.data.items || nextRes.data) as Campaign[];
-          allItems.push(...batch);
-          nextHasMore = Boolean(nextRes.data.hasMore);
-        }
-
-        if (requestId !== requestSeqRef.current) return;
-
-        const deduped = allItems.reduce<Campaign[]>((acc, campaign) => {
-          if (!acc.some((c) => c.id === campaign.id)) acc.push(campaign);
-          return acc;
-        }, []);
-
-        const normalized = deduped.map((campaign) => ({
-          ...campaign,
-          categoryId: campaign.categoryId || campaign.category?.id || (selectedCategory !== "all" ? selectedCategory : undefined),
-          category: {
-            ...(campaign.category ?? {}),
-            id: campaign.category?.id || campaign.categoryId || (selectedCategory !== "all" ? selectedCategory : ""),
-          },
-        }));
-
-        setCampaigns(normalized);
-        setHasMore(false);
-        setPage(currentPage);
-        setTotalCount(Number(firstRes.data.total) || normalized.length);
-
-        const catData = categoriesRes.data.items || categoriesRes.data;
-        if (catData && !categories.length) setCategories(catData as Category[]);
-        return;
-      }
-
       const [campaignsRes, categoriesRes] = await Promise.all([getCampaignsPage(pageToLoad), categoriesPromise]);
       if (requestId !== requestSeqRef.current) return;
       const campaignsItems = campaignsRes.data.items || campaignsRes.data;
@@ -161,17 +117,21 @@ const CampaignsPage = ({
           id: campaign.category?.id || campaign.categoryId || (selectedCategory !== "all" ? selectedCategory : ""),
         },
       }));
-      setCampaigns((prev) => {
-        const seen = new Set(prev.map((campaign) => campaign.id));
-        const merged = [...prev];
-        for (const campaign of newCampaigns) {
-          if (!seen.has(campaign.id)) {
-            seen.add(campaign.id);
-            merged.push(campaign);
+      if (pageToLoad > 1) {
+        setCampaigns((prev) => {
+          const seen = new Set(prev.map((campaign) => campaign.id));
+          const merged = [...prev];
+          for (const campaign of newCampaigns) {
+            if (!seen.has(campaign.id)) {
+              seen.add(campaign.id);
+              merged.push(campaign);
+            }
           }
-        }
-        return merged;
-      });
+          return merged;
+        });
+      } else {
+        setCampaigns(newCampaigns);
+      }
       setHasMore(Boolean(campaignsRes.data.hasMore));
       setPage(pageToLoad);
       setTotalCount(Number(campaignsRes.data.total) || newCampaigns.length);
