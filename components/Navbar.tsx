@@ -52,7 +52,7 @@ interface CartItem {
 }
 
 const LOGO_URL = "https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png";
-const LOGO_MOBILE_URL = "https://i.ibb.co/Q7KLSBpH/gozbebekleri.png";
+const LOGO_MOBILE_URL = "/logo-white.png";
 
 const Navbar = () => {
   const t = useTranslations("Navbar");

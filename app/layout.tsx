@@ -18,7 +18,7 @@ const notoKufiArabic = Noto_Kufi_Arabic({
 });
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gozbebekleri.com";
-const OG_IMAGE = `https://i.ibb.co/Q7KLSBpH/gozbebekleri.png`;
+const OG_IMAGE = `/logo-white.png`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
