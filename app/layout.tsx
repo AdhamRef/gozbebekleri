@@ -17,8 +17,8 @@ const notoKufiArabic = Noto_Kufi_Arabic({
   display: "swap",
 });
 
-const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gozbebekleri.com";
-const OG_IMAGE = `/logo-white.png`;
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gozbebekleri.org";
+const OG_IMAGE = `/logo.png`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
@@ -201,7 +201,7 @@ const faqSchema = {
       name: "كيف يمكنني التبرع لجمعية قرة العيون؟",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "يمكنك التبرع مباشرة عبر موقعنا الإلكتروني gozbebekleri.com باختيار الحملة المناسبة وإتمام الدفع بأمان عبر بطاقتك الائتمانية أو خدمات الدفع الإلكتروني. جميع التبرعات موثقة وتصل مباشرة للمستفيدين.",
+        text: "يمكنك التبرع مباشرة عبر موقعنا الإلكتروني gozbebekleri.org باختيار الحملة المناسبة وإتمام الدفع بأمان عبر بطاقتك الائتمانية أو خدمات الدفع الإلكتروني. جميع التبرعات موثقة وتصل مباشرة للمستفيدين.",
       },
     },
     {
@@ -233,7 +233,7 @@ const faqSchema = {
       name: "Gözbebekleri derneğine nasıl bağış yapabilirim?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "gozbebekleri.com adresinden dilediğiniz projeyi seçerek güvenli ödeme altyapımız üzerinden kredi kartı veya diğer ödeme yöntemleriyle bağışınızı yapabilirsiniz. Tüm bağışlar belgelenmiş olup doğrudan ihtiyaç sahiplerine ulaştırılmaktadır.",
+        text: "gozbebekleri.org adresinden dilediğiniz projeyi seçerek güvenli ödeme altyapımız üzerinden kredi kartı veya diğer ödeme yöntemleriyle bağışınızı yapabilirsiniz. Tüm bağışlar belgelenmiş olup doğrudan ihtiyaç sahiplerine ulaştırılmaktadır.",
       },
     },
     {

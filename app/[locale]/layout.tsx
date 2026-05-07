@@ -42,7 +42,7 @@ export async function generateMetadata({
     title: { default: seo.title, template: seo.titleTemplate },
     description: seo.description,
     keywords: seo.keywords,
-    icons: { icon: "/logo-white.png" },
+    icons: { icon: "/logo.png" },
     alternates,
     openGraph: {
       title: seo.title,

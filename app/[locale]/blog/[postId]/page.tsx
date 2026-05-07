@@ -116,7 +116,7 @@ export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
 
 export default async function BlogPost({ params: paramsPromise }: BlogPostProps) {
   const params = await paramsPromise;
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.com";
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.org";
   const locale = params.locale || "ar";
   const msgs = await import(`../../../../i18n/messages/${locale}.json`);
   const t = (k: string) => msgs?.default?.Blog?.[k] ?? k;
@@ -180,7 +180,7 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
                 </CardContent>
 
                 <CardFooter>
-                  <ShareButton label={t('sharePost')} copiedMessage={t('linkCopied')} url={`https://gozbebekleri.com/${locale}/blog/${post?.slug || params.postId}`} />
+                  <ShareButton label={t('sharePost')} copiedMessage={t('linkCopied')} url={`https://gozbebekleri.org/${locale}/blog/${post?.slug || params.postId}`} />
                 </CardFooter>
               </Card>
             </div>
