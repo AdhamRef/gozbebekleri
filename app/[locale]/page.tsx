@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { LOCALE_SEO, buildPageMetadata, SITE_URL } from "@/lib/seo";
 import type { Locale } from "@/lib/seo";
 import HomePageContent from "./_components/homepage/HomePageContent";
@@ -7,11 +8,6 @@ import type { SlideItem } from "./_components/homepage/HeroSlider";
 interface Props {
   params: Promise<{ locale: string }>;
 }
-
-// Revalidate the homepage at most every 5 minutes. The page becomes static-ISR-cacheable,
-// so Lighthouse / PSI gets a CDN-cached HTML response with sub-100ms TTFB instead of
-// re-running 4 SSR API fetches on every audit.
-export const revalidate = 300;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -25,11 +21,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 /**
- * Resolve the request's own origin without calling `headers()` — `headers()` opts the
- * route out of static generation, which means PSI re-runs full SSR on every audit.
- * Vercel always sets VERCEL_URL to the current deployment hostname; that's preferred.
+ * Resolve the request's own origin. We try the actual incoming request host first
+ * (works in every environment), then fall back to env vars, then to the hardcoded
+ * SITE_URL — making sure SSR self-fetches always reach the same deployment they
+ * were rendered from.
  */
-function baseUrl(): string {
+async function baseUrl(): Promise<string> {
+  try {
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    const proto = h.get("x-forwarded-proto") ?? "https";
+    if (host) return `${proto}://${host}`;
+  } catch {
+    /* fall through */
+  }
   if (process.env.NEXT_PUBLIC_SITE_URL) {
     return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
   }
@@ -74,7 +79,7 @@ function buildHeroSrc(src: string, width: number): string {
 
 export default async function HomePage({ params }: Props) {
   const { locale } = await params;
-  const base = baseUrl();
+  const base = await baseUrl();
 
   // Fetch every above-the-fold data source server-side and pass them to the client tree
   // as initial state. This eliminates the empty-section → skeleton → real-content swap

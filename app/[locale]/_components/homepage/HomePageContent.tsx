@@ -1,7 +1,8 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import axios from "axios";
 import { Globe, MoreHorizontal, Baby, Home, Map, ArrowRight } from "lucide-react";
 import CategoryIcon from "@/components/CategoryIcon";
 
@@ -9,7 +10,7 @@ import HeroSlider, { type SlideItem } from "./HeroSlider";
 import CampaignsSlider from "./CampaignsSlider";
 import QuickDonate from "./QuickDonate";
 import BlogCard from "../BlogCard";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
 import type { CampaignCardData } from "../CampaignCard";
 
@@ -66,6 +67,47 @@ const HomePage: React.FC<HomePageContentProps> = ({
   initialPosts,
 }) => {
   const t = useTranslations("HomePage");
+  const locale = useLocale();
+
+  // Mirror SSR-provided data into local state. If SSR's internal fetches failed
+  // (e.g. base-URL resolution mismatch, internal API timeout), we'll populate them
+  // from the browser as a fallback so the homepage is never blank.
+  const [categories, setCategories] = useState<CategoryItem[]>(initialCategories);
+  const [posts, setPosts] = useState<PostItem[]>(initialPosts);
+
+  useEffect(() => {
+    if (categories.length > 0) return;
+    let cancelled = false;
+    fetch(`/api/categories?locale=${locale}&limit=12&sortBy=order`)
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((data) => {
+        if (cancelled) return;
+        const items = Array.isArray(data?.items) ? data.items : [];
+        setCategories(items as CategoryItem[]);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locale]);
+
+  useEffect(() => {
+    if (posts.length > 0) return;
+    let cancelled = false;
+    axios
+      .get("/api/posts", { params: { locale, limit: 3 } })
+      .then((r) => {
+        if (cancelled) return;
+        const items = Array.isArray(r.data?.items) ? r.data.items : [];
+        setPosts(items as PostItem[]);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locale]);
 
   return (
     <div className="bg-white">
@@ -108,7 +150,7 @@ const HomePage: React.FC<HomePageContentProps> = ({
       >
         <div className="relative z-10 max-w-7xl mx-auto">
           <Suspense fallback={null}>
-            <QuickDonate initialCategories={initialCategories} />
+            <QuickDonate initialCategories={categories} />
           </Suspense>
         </div>
       </section>
@@ -137,7 +179,7 @@ const HomePage: React.FC<HomePageContentProps> = ({
       </section>
 
       {/* ── Donation Categories ── */}
-      {initialCategories.length > 0 && (
+      {categories.length > 0 && (
         <section
           className="bg-gray-50 py-7 border-y border-gray-100"
           style={{
@@ -159,7 +201,7 @@ const HomePage: React.FC<HomePageContentProps> = ({
             </div>
 
             <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
-              {initialCategories.slice(0, 6).map((cat) => (
+              {categories.slice(0, 6).map((cat) => (
                 <Link
                   key={cat.id}
                   href={`/category/${cat.slug || cat.id}`}
@@ -185,7 +227,7 @@ const HomePage: React.FC<HomePageContentProps> = ({
       )}
 
       {/* ── News / Blog ── */}
-      {initialPosts.length > 0 && (
+      {posts.length > 0 && (
         <section className="bg-white py-10 sm:py-14">
           <div className="max-w-7xl mx-auto px-4">
             <div className="flex items-center justify-between mb-8">
@@ -198,7 +240,7 @@ const HomePage: React.FC<HomePageContentProps> = ({
               </Link>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {initialPosts.map((post) => (
+              {posts.map((post) => (
                 <BlogCard
                   key={post.id}
                   title={post.title}

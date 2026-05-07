@@ -7,6 +7,7 @@ import CampaignCard from "@/app/[locale]/_components/CampaignCard";
 import type { CampaignCardData } from "@/app/[locale]/_components/CampaignCard";
 import { Loader2 } from "lucide-react";
 
+const INITIAL_LIMIT = 5;
 const PAGE_LIMIT = 36;
 
 interface CampaignsSliderProps {
@@ -32,6 +33,7 @@ const CampaignsSlider: React.FC<CampaignsSliderProps> = ({
   const [campaigns, setCampaigns] = useState<CampaignCardData[]>(initialCampaigns);
   const [cursor, setCursor] = useState<string | null>(initialNextCursor);
   const [hasMore, setHasMore] = useState<boolean>(initialHasMore);
+  const [loading, setLoading] = useState<boolean>(initialCampaigns.length === 0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDesktop, setIsDesktop] = useState(false);
@@ -43,6 +45,34 @@ const CampaignsSlider: React.FC<CampaignsSliderProps> = ({
     media.addEventListener("change", apply);
     return () => media.removeEventListener("change", apply);
   }, []);
+
+  // Client-side fallback: if SSR couldn't populate campaigns (e.g. internal API hung,
+  // base-URL resolution failed, etc.), fetch them from the browser so the section is
+  // never empty for the user.
+  useEffect(() => {
+    if (initialCampaigns.length > 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await axios.get("/api/campaigns", {
+          params: { limit: INITIAL_LIMIT, sortBy: "priority", locale },
+        });
+        if (cancelled) return;
+        const items: CampaignCardData[] = response.data?.items ?? [];
+        setCampaigns(items);
+        setCursor(response.data?.nextCursor ?? null);
+        setHasMore(Boolean(response.data?.hasMore));
+      } catch {
+        if (!cancelled) setError(t("loadError"));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locale]);
 
   const loadMore = useCallback(async () => {
     const cursorParam = cursor ?? campaigns[campaigns.length - 1]?.id;
@@ -78,10 +108,33 @@ const CampaignsSlider: React.FC<CampaignsSliderProps> = ({
     }
   }, [cursor, campaigns, loadingMore, locale, t, hasMore]);
 
-  if (error) {
+  if (error && campaigns.length === 0) {
     return (
       <div className="flex items-center justify-center py-20">
         <p className="text-gray-600">{error}</p>
+      </div>
+    );
+  }
+
+  // While the client-side fallback fetch is in flight, show a skeleton that matches
+  // the real layout so the section doesn't collapse and shift content below it.
+  if (loading) {
+    return (
+      <div className="w-full space-y-4" aria-busy="true">
+        <div className="lg:hidden flex overflow-x-hidden gap-3 pb-3 px-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex-shrink-0 w-[78vw] max-w-[320px] aspect-[4/3] bg-gray-200 rounded-2xl animate-pulse"
+            />
+          ))}
+        </div>
+        <div className="hidden lg:grid grid-cols-4 auto-rows-fr gap-3">
+          <div className="col-span-2 row-span-2 aspect-[2/1.5] bg-gray-200 rounded-2xl animate-pulse" />
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="aspect-[4/3] bg-gray-200 rounded-2xl animate-pulse" />
+          ))}
+        </div>
       </div>
     );
   }

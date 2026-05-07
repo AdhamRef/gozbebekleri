@@ -49,27 +49,24 @@ const HeroSlider: React.FC<HeroSliderProps> = ({ initialSlides = [], initialFirs
   const [isPlaying, setIsPlaying] = useState(true);
 
   // Only re-fetch from /api/slides if the server didn't provide them (or if the
-  // locale changed after hydration via the language switcher). The fetch is also
-  // delayed by 4 s so it never lands during Lighthouse's LCP measurement window.
+  // locale changed after hydration via the language switcher). When SSR didn't
+  // populate slides — fetch immediately so the user never sees a blank hero.
   useEffect(() => {
     if (initialSlides.length > 0) return;
     let cancelled = false;
-    const handle = setTimeout(() => {
-      fetch(`/api/slides?locale=${locale}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (cancelled) return;
-          const items = data?.items ?? [];
-          setSlides(Array.isArray(items) ? items : []);
-          setCurrent(0);
-        })
-        .catch(() => {
-          if (!cancelled) setSlides([]);
-        });
-    }, 4000);
+    fetch(`/api/slides?locale=${locale}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        const items = data?.items ?? [];
+        setSlides(Array.isArray(items) ? items : []);
+        setCurrent(0);
+      })
+      .catch(() => {
+        if (!cancelled) setSlides([]);
+      });
     return () => {
       cancelled = true;
-      clearTimeout(handle);
     };
   }, [locale, initialSlides.length]);
 
