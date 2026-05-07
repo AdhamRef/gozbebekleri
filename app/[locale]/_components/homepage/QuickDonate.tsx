@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
@@ -5,7 +7,6 @@ import { Heart, TrendingUp, Users, Award, CheckCircle, ArrowLeft, Sparkles, Chev
 import { getCurrency } from "@/hooks/useCampaignValue";
 import { usePathname, useRouter } from "@/i18n/routing";
 import { useTranslations, useLocale } from "next-intl";
-import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/routing";
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
@@ -20,9 +21,15 @@ interface CategoryOption {
   image?: string | null;
 }
 
+interface QuickDonateProps {
+  /** Server-fetched categories — when provided we skip the client fetch + loading state,
+   *  which means the SSR HTML already contains the final dropdown content (no CLS). */
+  initialCategories?: CategoryOption[];
+}
+
 const QUICK_DONATE_RESUME_KEY = "quickDonateResume";
 
-const QuickDonate = () => {
+const QuickDonate: React.FC<QuickDonateProps> = ({ initialCategories = [] }) => {
   const t = useTranslations("QuickDonate");
   const tDonation = useTranslations("DonationDialog");
   const locale = useLocale() as "ar" | "en" | "fr";
@@ -31,12 +38,14 @@ const QuickDonate = () => {
   const searchParams = useSearchParams();
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState<string>("");
-  const [categories, setCategories] = useState<CategoryOption[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [categories, setCategories] = useState<CategoryOption[]>(initialCategories);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(
+    initialCategories[0]?.id ?? ""
+  );
   const [donationDialogOpen, setDonationDialogOpen] = useState(false);
   // Gate the actual mount so the Stripe / dialog chunk doesn't load on page paint.
   const [donationDialogMounted, setDonationDialogMounted] = useState(false);
-  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [categoriesLoading, setCategoriesLoading] = useState(initialCategories.length === 0);
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const [currencyLabel, setCurrencyLabel] = useState<string>("USD");
@@ -95,8 +104,11 @@ const QuickDonate = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Fetch categories with locale for translations
+  // Categories arrive as a prop from the server — only re-fetch on the client if the
+  // server failed to populate them (e.g. /api/categories was 5xx during SSR).
   useEffect(() => {
+    if (initialCategories.length > 0) return;
+    let cancelled = false;
     const fetchCategories = async () => {
       try {
         const res = await fetch(`/api/categories?locale=${locale}&limit=100`);
@@ -107,6 +119,7 @@ const QuickDonate = () => {
           name: c.name || "",
           image: c.image ?? null,
         }));
+        if (cancelled) return;
         setCategories(items);
         if (items.length > 0 && !selectedCategoryId) {
           setSelectedCategoryId(items[0].id);
@@ -114,10 +127,14 @@ const QuickDonate = () => {
       } catch (e) {
         console.error("Failed to fetch categories:", e);
       } finally {
-        setCategoriesLoading(false);
+        if (!cancelled) setCategoriesLoading(false);
       }
     };
     fetchCategories();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locale]);
 
   const selectedCategory = categories.find((c) => c.id === selectedCategoryId);
@@ -279,20 +296,11 @@ const QuickDonate = () => {
               </div>
 
               {/* Stripe minimum hint */}
-              <AnimatePresence>
-                {stripeMinAmount > 1 && displayAmount > 0 && displayAmount < stripeMinAmount && (
-                  <motion.p
-                    key="stripe-min"
-                    className="text-xs text-center text-amber-600 font-medium"
-                    initial={{ opacity: 0, y: -6, height: 0 }}
-                    animate={{ opacity: 1, y: 0, height: "auto" }}
-                    exit={{ opacity: 0, y: -6, height: 0 }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
-                  >
-                    {tDonation("stripeMinDonation", { amount: stripeMinAmount, currency: currencyLabel })}
-                  </motion.p>
-                )}
-              </AnimatePresence>
+              {stripeMinAmount > 1 && displayAmount > 0 && displayAmount < stripeMinAmount && (
+                <p className="text-xs text-center text-amber-600 font-medium animate-fade-in">
+                  {tDonation("stripeMinDonation", { amount: stripeMinAmount, currency: currencyLabel })}
+                </p>
+              )}
 
               {/* CTA */}
               <button

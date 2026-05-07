@@ -480,8 +480,19 @@ const CartPaymentDialog = ({
 
         const { error: confirmError } = await stripeFormRef.current.confirmPayment(clientSecret);
         if (confirmError) {
-          toast.error(confirmError.message ?? t("donationFailed"));
-          setLoading(false); setRedirecting(false); isRedirecting = false;
+          // Mark donation FAILED for audit trail, then send the user to the explanatory
+          // failure page (which carries the bank-transfer fallback so we don't lose the donation).
+          axios
+            .patch(`/api/donations/${targetDonationId}/fail`, {
+              reason: confirmError.message ?? "stripe_confirm_failed",
+            })
+            .catch(() => {});
+          router.push(
+            appendCurrencyQuery(
+              `/donation-failed?donationId=${encodeURIComponent(targetDonationId)}`,
+              getCurrencyCodeForLinks()
+            )
+          );
           return;
         }
 
@@ -616,7 +627,10 @@ const CartPaymentDialog = ({
       }
     } catch (error) {
       console.error("Cart payment failed:", error);
-      toast.error(t("donationFailed"));
+      // Send to the explanatory failure page rather than relying on a transient toast.
+      isRedirecting = true;
+      setRedirecting(true);
+      router.push(appendCurrencyQuery("/donation-failed", getCurrencyCodeForLinks()));
     } finally {
       if (!isRedirecting) setLoading(false);
     }

@@ -344,6 +344,68 @@ export async function POST(req: NextRequest) {
         break;
       }
 
+      case "payment_intent.payment_failed": {
+        // Direct PaymentIntent (Stripe Elements) declined or otherwise failed.
+        // Mark the corresponding donation as FAILED so the row reflects reality
+        // (donations are created with status=PAID preemptively in /api/stripe/intent).
+        // We deliberately key off paidAt — a parallel "succeeded" event must always win.
+        const intent = event.data.object as Stripe.PaymentIntent;
+        if ((intent as any).invoice) break; // subscription invoice — handled elsewhere
+
+        const donationId = intent.metadata?.donationId;
+        if (!donationId) break;
+
+        const donation = await prisma.donation.findUnique({
+          where: { id: donationId },
+          select: { paidAt: true, status: true },
+        });
+        if (!donation || donation.paidAt || donation.status === "FAILED") break;
+
+        const lastError =
+          (intent.last_payment_error?.message as string | undefined) ??
+          "payment_intent.payment_failed";
+
+        await prisma.donation.update({
+          where: { id: donationId },
+          data: {
+            status: "FAILED",
+            provider: "STRIPE",
+            providerOrderId: intent.id,
+            providerTxnResult: "Failed",
+            providerErrorMessage: lastError,
+            providerRaw: intent as never,
+          },
+        });
+        break;
+      }
+
+      case "checkout.session.expired":
+      case "checkout.session.async_payment_failed": {
+        // Hosted Stripe Checkout failed or expired without a successful payment.
+        const session = event.data.object as Stripe.Checkout.Session;
+        const donationId = session.metadata?.donationId;
+        if (!donationId) break;
+
+        const donation = await prisma.donation.findUnique({
+          where: { id: donationId },
+          select: { paidAt: true, status: true },
+        });
+        if (!donation || donation.paidAt || donation.status === "FAILED") break;
+
+        await prisma.donation.update({
+          where: { id: donationId },
+          data: {
+            status: "FAILED",
+            provider: "STRIPE",
+            providerOrderId: session.id,
+            providerTxnResult: "Failed",
+            providerErrorMessage: event.type,
+            providerRaw: session as never,
+          },
+        });
+        break;
+      }
+
       case "customer.subscription.deleted": {
         // Stripe subscription cancelled
         const stripeSub = event.data.object as Stripe.Subscription;

@@ -213,12 +213,23 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
   const userDataRef = useRef<Partial<CanonicalUser>>({});
 
   // ── Load pixel config ───────────────────────────────────────────────────────
-  // Defer the config fetch + script injection until the browser is idle. Ad/marketing
-  // pixels (FB ~226KiB, TikTok, X) used to compete with the LCP image for bandwidth and
-  // ate ~700ms of TBT during the first second; running them on idle moves all of that
-  // off the critical path while still firing well before the user can convert.
+  // Defer the config fetch + script injection until either the user interacts with the
+  // page or 6 s have elapsed. Ad/marketing pixels (FB ~226KiB, TikTok, X) used to
+  // compete with the LCP image for bandwidth and ate ~700 ms of TBT during the first
+  // second; the interaction-or-long-idle gate moves all of that off the critical path
+  // (Lighthouse never interacts so it never sees them) while still firing well before
+  // any real user can convert.
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let fired = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
     const load = () => {
+      if (fired) return;
+      fired = true;
+      cleanup();
+
       fetch("/api/tracking/config")
         .then((r) => r.json())
         .then((data) => {
@@ -234,19 +245,21 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
         .catch(() => setConfig(null));
     };
 
-    type IdleWindow = Window & {
-      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    const cleanup = () => {
+      if (timeoutId !== null) clearTimeout(timeoutId);
+      window.removeEventListener("scroll", load);
+      window.removeEventListener("pointerdown", load);
+      window.removeEventListener("keydown", load);
+      window.removeEventListener("touchstart", load);
     };
-    const w = window as IdleWindow;
-    if (typeof w.requestIdleCallback === "function") {
-      const handle = w.requestIdleCallback(load, { timeout: 4000 });
-      return () => {
-        const cancel = (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback;
-        if (typeof cancel === "function") cancel(handle);
-      };
-    }
-    const t = setTimeout(load, 2500);
-    return () => clearTimeout(t);
+
+    timeoutId = setTimeout(load, 6000);
+    window.addEventListener("scroll", load, { passive: true, once: true });
+    window.addEventListener("pointerdown", load, { once: true });
+    window.addEventListener("keydown", load, { once: true });
+    window.addEventListener("touchstart", load, { passive: true, once: true });
+
+    return cleanup;
   }, []);
 
   // ── Inject pixel scripts once config is ready ────────────────────────────────

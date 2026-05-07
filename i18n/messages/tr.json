@@ -42,6 +42,13 @@
     "copied": "Kopyalandı!",
     "footer": "Sorularınız için"
   },
+  "DonationFailed": {
+    "badge": "Bağış işlemi tamamlanamadı",
+    "title": "Üzgünüz, bağışınız gerçekleştirilemedi",
+    "description": "Ödeme işlemini tamamlayamadık. Bunun nedeni kart reddi, ağ hatası veya ödeme sağlayıcısıyla yaşanan bir kesinti olabilir. Hesabınızdan herhangi bir tutar tahsil edilmemiştir.",
+    "tryAgain": "Tekrar bağış yap",
+    "manualFallback": "Kartla tekrar denemek istemiyorsanız, aşağıdaki banka hesaplarından birine havale yaparak bağışınızı tamamlayabilirsiniz."
+  },
   "BlogCard": {
     "readMore": "Devamını oku"
   },

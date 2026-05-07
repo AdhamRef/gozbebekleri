@@ -31,7 +31,8 @@ import SignInDialog from "@/components/SignInDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import dynamic from "next/dynamic";
 const CartPaymentDialog = dynamic(() => import("./CartPaymentDialog"), { ssr: false });
-import { AnimatePresence, motion } from "framer-motion";
+// framer-motion removed — replaced with CSS-only fade animations to keep ~70 KiB
+// of motion JS off the homepage critical path.
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
 import { getSocialLinks } from "@/lib/social-links";
 
@@ -322,15 +323,10 @@ const Navbar = () => {
                   </Avatar>
                   <ChevronDown className="w-3.5 h-3.5 text-gray-500 hidden lg:block" />
                 </button>
-                <AnimatePresence>
-                  {isUserMenuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 8 }}
-                      transition={{ duration: 0.15 }}
-                      className={`absolute mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 ${isRTL ? "left-0" : "right-0"}`}
-                    >
+                {isUserMenuOpen && (
+                  <div
+                    className={`absolute mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 animate-fade-in ${isRTL ? "left-0" : "right-0"}`}
+                  >
                       <div className="px-4 py-3 border-b border-gray-100">
                         <p className="text-sm font-semibold text-gray-800 truncate">{session.user.name}</p>
                         <p className="text-xs text-gray-500 truncate">{session.user.email}</p>
@@ -362,9 +358,8 @@ const Navbar = () => {
                         <LogOut className="w-4 h-4" />
                         {t("signOut") || "Çıkış"}
                       </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                  </div>
+                )}
               </div>
             ) : (
               <button
@@ -395,15 +390,8 @@ const Navbar = () => {
           </div>
 
           {/* ── Mobile Menu ── */}
-          <AnimatePresence>
-            {isMobileMenuOpen && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="lg:hidden overflow-hidden border-t border-gray-200 bg-white"
-              >
+          {isMobileMenuOpen && (
+            <div className="lg:hidden overflow-hidden border-t border-gray-200 bg-white animate-fade-in">
                 {/* Search */}
                 {/* <form
                   onSubmit={handleSearch}
@@ -508,9 +496,8 @@ const Navbar = () => {
                     <MessageCircle className="w-4 h-4" />
                   </a>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+            </div>
+          )}
         </nav>
       </header>
 

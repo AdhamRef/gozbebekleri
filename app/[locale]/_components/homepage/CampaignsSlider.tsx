@@ -7,17 +7,31 @@ import CampaignCard from "@/app/[locale]/_components/CampaignCard";
 import type { CampaignCardData } from "@/app/[locale]/_components/CampaignCard";
 import { Loader2 } from "lucide-react";
 
-/** Initial fetch keeps the homepage light (fewer images + smaller JSON). More rows load on demand. */
-const INITIAL_LIMIT = 5;
 const PAGE_LIMIT = 36;
 
-const CampaignsSlider = ({ listView = false }: { listView?: boolean }) => {
+interface CampaignsSliderProps {
+  listView?: boolean;
+  /**
+   * Server-fetched campaigns. When provided, the slider renders them in the SSR HTML
+   * with no loading state — eliminating the empty→skeleton→content swap that previously
+   * caused CLS=0.92 on the homepage.
+   */
+  initialCampaigns?: CampaignCardData[];
+  initialNextCursor?: string | null;
+  initialHasMore?: boolean;
+}
+
+const CampaignsSlider: React.FC<CampaignsSliderProps> = ({
+  listView = false,
+  initialCampaigns = [],
+  initialNextCursor = null,
+  initialHasMore = false,
+}) => {
   const t = useTranslations("CampaignsSlider");
   const locale = useLocale();
-  const [campaigns, setCampaigns] = useState<CampaignCardData[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [campaigns, setCampaigns] = useState<CampaignCardData[]>(initialCampaigns);
+  const [cursor, setCursor] = useState<string | null>(initialNextCursor);
+  const [hasMore, setHasMore] = useState<boolean>(initialHasMore);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDesktop, setIsDesktop] = useState(false);
@@ -29,35 +43,6 @@ const CampaignsSlider = ({ listView = false }: { listView?: boolean }) => {
     media.addEventListener("change", apply);
     return () => media.removeEventListener("change", apply);
   }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    const fetchInitial = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        setCampaigns([]);
-        setCursor(null);
-        setHasMore(false);
-        const response = await axios.get("/api/campaigns", {
-          params: { limit: INITIAL_LIMIT, sortBy: "priority", locale },
-        });
-        if (cancelled) return;
-        const items = response.data?.items ?? [];
-        setCampaigns(items);
-        setCursor(response.data?.nextCursor ?? null);
-        setHasMore(Boolean(response.data?.hasMore));
-      } catch {
-        if (!cancelled) setError(t("loadError"));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    fetchInitial();
-    return () => {
-      cancelled = true;
-    };
-  }, [locale, t]);
 
   const loadMore = useCallback(async () => {
     const cursorParam = cursor ?? campaigns[campaigns.length - 1]?.id;
@@ -93,19 +78,21 @@ const CampaignsSlider = ({ listView = false }: { listView?: boolean }) => {
     }
   }, [cursor, campaigns, loadingMore, locale, t, hasMore]);
 
-  if (loading) return <LoadingSkeleton />;
-  if (error)
+  if (error) {
     return (
       <div className="flex items-center justify-center py-20">
         <p className="text-gray-600">{error}</p>
       </div>
     );
-  if (campaigns.length === 0)
+  }
+
+  if (campaigns.length === 0) {
     return (
       <div className="flex items-center justify-center py-20">
         <p className="text-gray-600">{t("noCampaigns")}</p>
       </div>
     );
+  }
 
   const featured = campaigns[0];
   const top4 = campaigns.slice(1, 5);
@@ -167,28 +154,5 @@ const CampaignsSlider = ({ listView = false }: { listView?: boolean }) => {
     </div>
   );
 };
-
-function LoadingSkeleton() {
-  return (
-    <div className="w-full space-y-4" aria-busy="true">
-      {/* Mobile: matches the flex overflow-x-auto card row exactly */}
-      <div className="lg:hidden flex overflow-x-hidden gap-3 pb-3 px-4">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div
-            key={i}
-            className="flex-shrink-0 w-[78vw] max-w-[320px] aspect-[4/3] bg-gray-200 rounded-2xl animate-pulse"
-          />
-        ))}
-      </div>
-      {/* Desktop: matches the grid-cols-4 layout with featured 2x2 + 4 small cards */}
-      <div className="hidden lg:grid grid-cols-4 auto-rows-fr gap-3">
-        <div className="col-span-2 row-span-2 aspect-[2/1.5] bg-gray-200 rounded-2xl animate-pulse" />
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="aspect-[4/3] bg-gray-200 rounded-2xl animate-pulse" />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export default CampaignsSlider;

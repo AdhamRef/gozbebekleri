@@ -1,77 +1,52 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { Suspense } from "react";
 import dynamic from "next/dynamic";
 import { Globe, MoreHorizontal, Baby, Home, Map, ArrowRight } from "lucide-react";
 import CategoryIcon from "@/components/CategoryIcon";
 
 import HeroSlider from "./HeroSlider";
+import CampaignsSlider from "./CampaignsSlider";
+import QuickDonate from "./QuickDonate";
 import BlogCard from "../BlogCard";
-
-interface HomePageContentProps {
-  firstHeroImage?: string | null;
-}
-import { useTranslations, useLocale } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
-import axios from "axios";
+import type { CampaignCardData } from "../CampaignCard";
 
-/**
- * Skeleton MUST mirror CampaignsSlider's two render branches exactly so the layout
- * doesn't shift when hydration replaces it (mobile = horizontal scroll, desktop = 2x grid).
- */
-const CampaignsSliderSkeleton = () => (
-  <div className="w-full space-y-4" aria-busy="true">
-    {/* Mobile horizontal scroll skeleton — matches the flex overflow-x-auto layout */}
-    <div className="lg:hidden flex overflow-x-hidden gap-3 pb-3 px-4">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div
-          key={i}
-          className="flex-shrink-0 w-[78vw] max-w-[320px] aspect-[4/3] bg-gray-200 rounded-2xl animate-pulse"
-        />
-      ))}
-    </div>
-    {/* Desktop 2x grid skeleton — matches the lg grid-cols-4 with featured 2x2 layout */}
-    <div className="hidden lg:grid grid-cols-4 auto-rows-fr gap-3">
-      <div className="col-span-2 row-span-2 aspect-[2/1.5] bg-gray-200 rounded-2xl animate-pulse" />
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="aspect-[4/3] bg-gray-200 rounded-2xl animate-pulse" />
-      ))}
-    </div>
-  </div>
-);
-
-const CampaignsSlider = dynamic(() => import("./CampaignsSlider"), {
-  loading: CampaignsSliderSkeleton,
-  ssr: false,
-});
-
-const QuickDonate = dynamic(() => import("./QuickDonate"), { loading: () => <div className="min-h-[200px]" aria-hidden />, ssr: false });
-
+// LiveDonationsTicker is a non-critical floating widget — keep it client-only
+// and below-the-fold so it doesn't pull its chunk into the LCP critical path.
 const LiveDonationsTicker = dynamic(() => import("@/components/LiveDonationsTicker"), {
   loading: () => null,
   ssr: false,
 });
 
-const CACHE_TTL_MS = 5 * 60 * 1000;
+interface CategoryItem {
+  id: string;
+  slug?: string | null;
+  name: string;
+  image?: string | null;
+  icon?: string | null;
+  order?: number;
+}
 
-const cacheGet = <T,>(key: string): T | null => {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = sessionStorage.getItem(key);
-    if (!raw) return null;
-    const { data, expires } = JSON.parse(raw) as { data: T; expires: number };
-    if (Date.now() > expires) { sessionStorage.removeItem(key); return null; }
-    return data;
-  } catch { return null; }
-};
+interface PostItem {
+  id: string;
+  slug?: string | null;
+  title: string;
+  description: string | null;
+  image: string | null;
+  published: boolean;
+  createdAt: string;
+}
 
-const cacheSet = <T,>(key: string, data: T): void => {
-  if (typeof window === "undefined") return;
-  try { sessionStorage.setItem(key, JSON.stringify({ data, expires: Date.now() + CACHE_TTL_MS })); } catch { /* ignore */ }
-};
-
-interface CategoryItem { id: string; slug?: string | null; name: string; image?: string | null; icon?: string | null; order?: number; }
-interface PostItem { id: string; slug?: string | null; title: string; description: string | null; image: string | null; published: boolean; createdAt: string; }
+interface HomePageContentProps {
+  firstHeroImage?: string | null;
+  initialCampaigns: CampaignCardData[];
+  initialNextCursor: string | null;
+  initialHasMore: boolean;
+  initialCategories: CategoryItem[];
+  initialPosts: PostItem[];
+}
 
 const STATS = [
   { icon: Home, valueKey: "stat1Value", labelKey: "stat1Label", value: "100K+" },
@@ -80,44 +55,15 @@ const STATS = [
   { icon: Map, valueKey: "stat4Value", labelKey: "stat4Label", value: "4" },
 ];
 
-const HomePage: React.FC<HomePageContentProps> = ({ firstHeroImage }) => {
+const HomePage: React.FC<HomePageContentProps> = ({
+  firstHeroImage,
+  initialCampaigns,
+  initialNextCursor,
+  initialHasMore,
+  initialCategories,
+  initialPosts,
+}) => {
   const t = useTranslations("HomePage");
-  const locale = useLocale();
-  const [categories, setCategories] = useState<CategoryItem[]>([]);
-  const [posts, setPosts] = useState<PostItem[]>([]);
-
-  useEffect(() => {
-    const cacheKeyCategories = `home_categories_${locale}`;
-    const cacheKeyPosts = `home_posts_${locale}`;
-    let cancelled = false;
-
-    const run = async () => {
-      const cachedCategories = cacheGet<CategoryItem[]>(cacheKeyCategories);
-      const cachedPosts = cacheGet<PostItem[]>(cacheKeyPosts);
-      if (cachedCategories?.length) setCategories(cachedCategories);
-      if (cachedPosts?.length) setPosts(cachedPosts);
-
-      const [categoriesRes, postsRes] = await Promise.all([
-        fetch(`/api/categories?locale=${locale}&limit=12&sortBy=order`).then((r) => r.json()),
-        axios.get("/api/posts", { params: { locale, limit: 3 } }).then((r) => r.data),
-      ]);
-      if (cancelled) return;
-
-      const categoryItems = categoriesRes?.items ?? categoriesRes ?? [];
-      const newCategories = Array.isArray(categoryItems) ? categoryItems : [];
-      setCategories(newCategories);
-      cacheSet(cacheKeyCategories, newCategories);
-
-      const postItems = postsRes?.items ?? postsRes ?? [];
-      const postList = Array.isArray(postItems) ? postItems : [];
-      setPosts(postList);
-      cacheSet(cacheKeyPosts, postList);
-    };
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [locale]);
 
   return (
     <div className="bg-white">
@@ -126,10 +72,9 @@ const HomePage: React.FC<HomePageContentProps> = ({ firstHeroImage }) => {
       {/* ── Hero Slider ── */}
       <HeroSlider initialFirstImage={firstHeroImage ?? null} />
 
-      {/* ── Featured Campaigns Slider ── */}
-      {/* min-height matches the rendered slider so the SSR-empty client-only slot does not
-          collapse to 0 before hydration (was causing CLS=0.39). */}
-      <section className="bg-gray-50 pt-10 sm:pt-12 pb-5 sm:pb-6 min-h-[420px] lg:min-h-[760px]">
+      {/* ── Featured Campaigns Slider — fully SSR'd from server-fetched data, so the
+              cards render in the initial HTML and there's nothing to shift in. */}
+      <section className="bg-gray-50 pt-10 sm:pt-12 pb-5 sm:pb-6">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-end justify-between mb-6">
             <div>
@@ -140,33 +85,44 @@ const HomePage: React.FC<HomePageContentProps> = ({ firstHeroImage }) => {
               {t("viewAll") || "Tümünü Gör"} <MoreHorizontal className="w-4 h-4" />
             </Link>
           </div>
-          <CampaignsSlider />
+          {/* Suspense boundary required because CampaignCard descendants call useSearchParams. */}
+          <Suspense fallback={null}>
+            <CampaignsSlider
+              initialCampaigns={initialCampaigns}
+              initialNextCursor={initialNextCursor}
+              initialHasMore={initialHasMore}
+            />
+          </Suspense>
         </div>
       </section>
 
-      {/* ── Quick Donate ── */}
+      {/* ── Quick Donate — also SSR'd with the categories the server already fetched. */}
       <section
         className="relative lg:py-10 sm:py-14 overflow-hidden bg-gray-50"
         style={{
           backgroundImage: "url('/bg.webp')",
-          // backgroundImage: "url('/confetti-doodles.svg')",
           backgroundRepeat: "repeat",
           backgroundSize: "320px",
           backgroundBlendMode: "multiply",
         }}
       >
         <div className="relative z-10 max-w-7xl mx-auto">
-          <QuickDonate />
+          <Suspense fallback={null}>
+            <QuickDonate initialCategories={initialCategories} />
+          </Suspense>
         </div>
       </section>
 
       {/* ── Statistics Banner ── */}
-      <section className="bg-[#ff6a25] py-10 sm:py-14"        style={{
+      <section
+        className="bg-[#ff6a25] py-10 sm:py-14"
+        style={{
           backgroundImage: "url('/confetti-doodles (1).svg')",
           backgroundRepeat: "repeat",
           backgroundSize: "400px",
           backgroundBlendMode: "multiply",
-        }}>
+        }}
+      >
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
             {STATS.map((stat, i) => (
@@ -181,16 +137,17 @@ const HomePage: React.FC<HomePageContentProps> = ({ firstHeroImage }) => {
       </section>
 
       {/* ── Donation Categories ── */}
-      {categories.length > 0 && (
-        <section className="bg-gray-50 py-7 border-y border-gray-100"         style={{
-          backgroundImage: "url('/bg.webp')",
-          // backgroundImage: "url('/confetti-doodles.svg')",
-          backgroundRepeat: "repeat",
-          backgroundSize: "200px",
-          backgroundBlendMode: "multiply",
-        }}>
+      {initialCategories.length > 0 && (
+        <section
+          className="bg-gray-50 py-7 border-y border-gray-100"
+          style={{
+            backgroundImage: "url('/bg.webp')",
+            backgroundRepeat: "repeat",
+            backgroundSize: "200px",
+            backgroundBlendMode: "multiply",
+          }}
+        >
           <div className="max-w-7xl mx-auto px-4">
-            {/* Header */}
             <div className="flex items-center justify-between mb-5">
               <div>
                 <span className="text-sm font-bold text-[#FA5D17] uppercase tracking-widest">{t("weHelp") || "WE HELP"}</span>
@@ -201,9 +158,8 @@ const HomePage: React.FC<HomePageContentProps> = ({ firstHeroImage }) => {
               </Link>
             </div>
 
-            {/* Cards */}
             <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
-              {categories.slice(0, 6).map((cat) => (
+              {initialCategories.slice(0, 6).map((cat) => (
                 <Link
                   key={cat.id}
                   href={`/category/${cat.slug || cat.id}`}
@@ -219,7 +175,6 @@ const HomePage: React.FC<HomePageContentProps> = ({ firstHeroImage }) => {
               ))}
             </div>
 
-            {/* Mobile view-all */}
             <div className="sm:hidden text-center mt-6">
               <Link href="/campaigns" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#025EB8]">
                 {t("viewAll") || "View all"} <ArrowRight className="w-4 h-4" />
@@ -230,7 +185,7 @@ const HomePage: React.FC<HomePageContentProps> = ({ firstHeroImage }) => {
       )}
 
       {/* ── News / Blog ── */}
-      {posts.length > 0 && (
+      {initialPosts.length > 0 && (
         <section className="bg-white py-10 sm:py-14">
           <div className="max-w-7xl mx-auto px-4">
             <div className="flex items-center justify-between mb-8">
@@ -243,7 +198,7 @@ const HomePage: React.FC<HomePageContentProps> = ({ firstHeroImage }) => {
               </Link>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {posts.map((post) => (
+              {initialPosts.map((post) => (
                 <BlogCard
                   key={post.id}
                   title={post.title}

@@ -1530,10 +1530,29 @@ const DonationDialog = ({
 
         const { error: confirmError } = await stripeFormRef.current.confirmPayment(clientSecret);
         if (confirmError) {
-          toast.error(confirmError.message ?? t("donationFailed"));
-          setLoading(false);
-          setRedirecting(false);
-          isRedirecting = false;
+          // Mark the preemptively-created donation as FAILED so we keep an audit trail and
+          // prevent the row from incorrectly counting as PAID. Fire-and-forget — the
+          // donation-failed page works even if this PATCH fails.
+          axios
+            .patch(`/api/donations/${targetDonationId}/fail`, {
+              reason: confirmError.message ?? "stripe_confirm_failed",
+            })
+            .catch(() => {});
+          tracking?.trackPaymentFailed({
+            value: donationAmount,
+            currency: getCurrency(),
+            causeId: campaignId || categoryId || undefined,
+            reason: confirmError.message ?? "stripe_confirm_failed",
+            gateway: "stripe",
+          });
+          // Redirect to /donation-failed so the user lands on the explanatory page
+          // with the bank-transfer fallback — toast alone disappears too quickly.
+          router.push(
+            appendCurrencyQuery(
+              `/donation-failed?donationId=${encodeURIComponent(targetDonationId)}`,
+              getCurrencyCodeForLinks()
+            )
+          );
           return;
         }
 
@@ -1646,7 +1665,15 @@ const DonationDialog = ({
                 if (data.status === "FAILED" || payforPopupRef.current?.closed || polls >= FALLBACK_AFTER_POLLS) {
                   clearInterval(payforPollRef.current!);
                   payforPollRef.current = null;
-                  router.push("/bank-transfer");
+                  if (payforPopupRef.current && !payforPopupRef.current.closed) {
+                    payforPopupRef.current.close();
+                  }
+                  router.push(
+                    appendCurrencyQuery(
+                      `/donation-failed?donationId=${encodeURIComponent(donationId)}`,
+                      getCurrencyCodeForLinks()
+                    )
+                  );
                 }
               } catch {
                 // Ignore transient errors
@@ -1666,7 +1693,6 @@ const DonationDialog = ({
       onClose();
     } catch (error) {
       console.error("Payment failed:", error);
-      toast.error(t("donationFailed"));
       tracking?.trackPaymentFailed({
         value:   donationAmount,
         currency: getCurrency(),
@@ -1674,6 +1700,12 @@ const DonationDialog = ({
         reason:  error instanceof Error ? error.message : "unknown",
         gateway: use3D ? "payfor" : "stripe",
       });
+      // Land on the explanatory failure page (with bank-transfer fallback) instead of
+      // a toast that disappears in 3s. We may not have a donationId yet (e.g. /api/donations
+      // itself threw) — the page handles a missing query param gracefully.
+      isRedirecting = true;
+      setRedirecting(true);
+      router.push(appendCurrencyQuery("/donation-failed", getCurrencyCodeForLinks()));
     } finally {
       if (!isRedirecting) setLoading(false);
     }

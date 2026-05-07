@@ -13,6 +13,13 @@
     "copied": "Copied!",
     "footer": "For inquiries, contact us at"
   },
+  "DonationFailed": {
+    "badge": "Donation could not be processed",
+    "title": "Sorry, your donation did not go through",
+    "description": "We were unable to complete your payment. This can happen due to a card decline, a network issue, or an interruption with the payment provider. No amount has been charged.",
+    "tryAgain": "Try donating again",
+    "manualFallback": "If you'd rather not retry the card payment, you can still complete your donation by sending a bank transfer to one of the accounts below."
+  },
   "BlogCard": {
     "readMore": "Read More"
   },
@@ -138,41 +145,41 @@
     "pageTitle": "About Us",
     "associationName": "Qurrat Al-Ayun Relief and Solidarity Association",
     "aboutUsTitle": "Who Are We?",
-    "aboutUsDesc1": "A Turkish relief and solidarity association active in the field of child care worldwide. We seek to secure a better life and future for children, contribute to alleviating their suffering, enable them to exercise their rights, and build their mental and physical capabilities.",
-    "aboutUsDesc2": "We work to integrate needy children into society, raise their awareness of their rights, and enhance the social, economic, and psychological status of their families through distinguished quality programs and projects.",
+    "aboutUsDesc1": "We are a Turkish relief and solidarity association working in the field of child care and support around the world. We strive to provide children with a better life and a safer future, ease their suffering, support their access to basic rights, and contribute to the development of their mental and physical abilities.",
+    "aboutUsDesc2": "We also work to integrate children in need into society, raise their awareness of their rights, and improve the social, economic, and psychological conditions of their families through meaningful, high-quality programs and projects.",
     "beneficiaries": "Beneficiaries",
     "vision": "Our Vision",
     "visionTitle": "Towards a Better Future",
-    "visionQuote": "Making a difference in the world of childhood for a productive generation, and raising a generation that elevates itself and society",
+    "visionQuote": "To make a real difference in the world of childhood and contribute to raising a productive generation that uplifts itself and its community.",
     "goals": "Our Goals",
-    "goalsTitle": "What We Strive to Achieve",
-    "goalsDesc": "We work to achieve a set of noble goals to serve children and society",
+    "goalsTitle": "The Goals We Strive to Achieve",
+    "goalsDesc": "We work to achieve a set of humanitarian, social, and educational goals that serve children, their families, and society.",
     "goalsCount": "7 Goals",
     "goalsSubtitle": "For a Better Future",
     "presidentMessage": "President's Message",
-    "presidentTitle": "Message from the Association President",
-    "presidentName": "Mr. Fadil",
-    "presidentPosition": "General Association President",
+    "presidentTitle": "A Message from the Association President",
+    "presidentName": "Mr. Fazıl Hak",
+    "presidentPosition": "General President of the Association",
     "ctaTitle": "Be Part of the Change",
     "ctaDesc": "Join us on our journey to build a better future for children around the world",
     "donateNow": "Donate Now",
     "contactUs": "Contact Us",
     "goalsList": [
-      "Providing the best living, health, psychological, and educational services for children and their families",
-      "Preparing a generation that excels beyond itself and overcomes the challenges it faces",
-      "Discovering skills, developing creativity, and building children's capabilities",
-      "Protecting children from all forms of exploitation and developing their awareness",
-      "Raising generations with sound values and ethics",
-      "Creating a modern educational, learning, and health system",
-      "Elevating children towards a bright future"
+      "To provide quality services for children and their families in the areas of living support, healthcare, psychological support, and education.",
+      "To raise generations capable of developing themselves, facing challenges, and building strong personalities.",
+      "To discover children's skills, support their creativity, and develop their abilities and talents.",
+      "To protect children from all forms of exploitation and neglect, and to strengthen their awareness of their rights.",
+      "To contribute to raising generations built on strong values and solid moral principles.",
+      "To support sustainable systems in education, training, care, and healthcare services.",
+      "To help children reach a brighter, safer, and more hopeful future."
     ],
     "presidentMessageParagraphs": [
-      "In our world today, especially in the Islamic geography, those who suffer most from problems such as political crises, economic crises, and natural disasters are undoubtedly our children.",
-      "In order not to remain mere spectators of these situations, we have moved to make the future more suitable for all children we can reach, especially orphans.",
-      "At the Gozbebekleri Association, we have been working to support our children and orphans through various projects that include their families, especially in the fields of health, education, and nutrition since 2011.",
-      "When it comes to our children, our leader is our great Prophet (peace be upon him). We try to take this sensitivity of our Prophet as an example, and we try to alleviate the concerns of our children wherever they are.",
-      "We work to support and touch the lives of hundreds of thousands of children by reminding them that they are not helpless, in cooperation with our trained staff and volunteers in various countries around the world.",
-      "Our association will continue to work with you with the most sincere feelings, away from any profit motive, based on the principle \"Serving the people is serving God\"."
+      "In today's world, especially across the Islamic world, children are among the groups most affected by political crises, economic hardship, wars, and natural disasters.",
+      "In the face of this painful reality, we refused to remain mere spectators. Instead, we took action to help build a safer, more hopeful, and more dignified future for every child we can reach, especially orphaned children.",
+      "Since 2011, Gözbebekleri Association has been carrying out various projects to support children in need and orphans, particularly in the fields of healthcare, education, nutrition, and social support, while also caring for their families and surrounding environments.",
+      "When it comes to children, our guide and example is Prophet Muhammad ﷺ, who was sent as a mercy to all worlds. We seek to follow his compassion and sensitivity toward children by easing their pain, meeting their needs, and becoming a reason for smiles on their faces wherever they may be.",
+      "Through our specialized teams and volunteers in different regions of the world, we work to make children feel that they are not alone. We strive to touch their lives, improve their conditions, and open new doors of hope before them.",
+      "Our association continues its work without any profit motive, guided by the principle: \"Serving people is serving Allah.\" With sincerity, responsibility, and through your support and trust, we continue delivering goodness to those who need it most."
     ]
   },
   "ContactUs": {

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { LOCALE_SEO, buildPageMetadata, SITE_URL } from "@/lib/seo";
 import type { Locale } from "@/lib/seo";
 import HomePageContent from "./_components/homepage/HomePageContent";
@@ -18,17 +19,29 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-async function getFirstSlideImage(locale: string): Promise<string | null> {
+/**
+ * Resolve the request's own origin so SSR fetches always hit the same deployment,
+ * even when NEXT_PUBLIC_SITE_URL is unset or points at a different domain.
+ */
+async function baseUrl(): Promise<string> {
   try {
-    const base = process.env.NEXT_PUBLIC_SITE_URL || SITE_URL;
-    const res = await fetch(`${base}/api/slides?locale=${locale}&limit=1`, {
-      next: { revalidate: 300 },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.items?.[0]?.image ?? null;
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    const proto = h.get("x-forwarded-proto") ?? "https";
+    if (host) return `${proto}://${host}`;
   } catch {
-    return null;
+    /* fall through to env var */
+  }
+  return process.env.NEXT_PUBLIC_SITE_URL || SITE_URL;
+}
+
+async function safeFetch<T>(url: string, fallback: T, revalidate = 300): Promise<T> {
+  try {
+    const res = await fetch(url, { next: { revalidate } });
+    if (!res.ok) return fallback;
+    return (await res.json()) as T;
+  } catch {
+    return fallback;
   }
 }
 
@@ -46,7 +59,36 @@ function buildHeroSrc(src: string, width: number): string {
 
 export default async function HomePage({ params }: Props) {
   const { locale } = await params;
-  const firstHeroImage = await getFirstSlideImage(locale);
+  const base = await baseUrl();
+
+  // Fetch every above-the-fold data source server-side and pass them to the client tree
+  // as initial state. This eliminates the empty-section → skeleton → real-content swap
+  // (which was the root cause of CLS=0.92) and avoids a client waterfall on hydration.
+  const [slidesData, campaignsData, categoriesData, postsData] = await Promise.all([
+    safeFetch<{ items?: Array<{ image?: string }> }>(
+      `${base}/api/slides?locale=${locale}&limit=1`,
+      { items: [] }
+    ),
+    safeFetch<{ items?: unknown[]; nextCursor?: string | null; hasMore?: boolean }>(
+      `${base}/api/campaigns?limit=5&sortBy=priority&locale=${locale}`,
+      { items: [], hasMore: false }
+    ),
+    safeFetch<{ items?: unknown[] }>(
+      `${base}/api/categories?locale=${locale}&limit=12&sortBy=order`,
+      { items: [] }
+    ),
+    safeFetch<{ items?: unknown[] }>(
+      `${base}/api/posts?locale=${locale}&limit=3`,
+      { items: [] }
+    ),
+  ]);
+
+  const firstHeroImage = slidesData?.items?.[0]?.image ?? null;
+  const initialCampaigns = (campaignsData?.items as Parameters<typeof HomePageContent>[0]["initialCampaigns"]) ?? [];
+  const initialNextCursor = campaignsData?.nextCursor ?? null;
+  const initialHasMore = Boolean(campaignsData?.hasMore);
+  const initialCategories = (categoriesData?.items as Parameters<typeof HomePageContent>[0]["initialCategories"]) ?? [];
+  const initialPosts = (postsData?.items as Parameters<typeof HomePageContent>[0]["initialPosts"]) ?? [];
 
   // Preload the LCP image with a srcset that matches what the browser will actually request.
   // Cloudinary URLs are used directly (not the /_next/image proxy) so the preload fires immediately
@@ -70,7 +112,14 @@ export default async function HomePage({ params }: Props) {
           fetchPriority="high"
         />
       )}
-      <HomePageContent firstHeroImage={firstHeroImage} />
+      <HomePageContent
+        firstHeroImage={firstHeroImage}
+        initialCampaigns={initialCampaigns}
+        initialNextCursor={initialNextCursor}
+        initialHasMore={initialHasMore}
+        initialCategories={initialCategories}
+        initialPosts={initialPosts}
+      />
     </>
   );
 }

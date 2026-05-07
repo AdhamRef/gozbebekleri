@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   const locale = (searchParams.get("locale") || "en").toLowerCase();
 
   if (!donationId) {
-    return NextResponse.redirect(new URL(`/${locale}/campaigns?payment=failed`, origin));
+    return NextResponse.redirect(new URL(`/${locale}/donation-failed`, origin));
   }
 
   const form = await req.formData();
@@ -213,12 +213,12 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.redirect(
-      new URL(`/${locale}/campaigns?payment=failed&donationId=${encodeURIComponent(donationId)}`, origin)
+      new URL(`/${locale}/donation-failed?donationId=${encodeURIComponent(donationId)}`, origin)
     );
   } catch (e) {
     console.error("PayFor OK callback error:", e);
     return NextResponse.redirect(
-      new URL(`/${locale}/campaigns?payment=failed&donationId=${encodeURIComponent(donationId)}`, origin)
+      new URL(`/${locale}/donation-failed?donationId=${encodeURIComponent(donationId)}`, origin)
     );
   }
 }

@@ -42,6 +42,13 @@
     "copied": "Tersalin!",
     "footer": "Untuk pertanyaan, hubungi kami di"
   },
+  "DonationFailed": {
+    "badge": "Donasi tidak dapat diproses",
+    "title": "Maaf, donasi Anda tidak berhasil diproses",
+    "description": "Kami tidak dapat menyelesaikan pembayaran Anda. Hal ini dapat terjadi karena kartu ditolak, masalah jaringan, atau gangguan pada penyedia pembayaran. Tidak ada nominal yang ditagihkan.",
+    "tryAgain": "Coba donasi lagi",
+    "manualFallback": "Jika Anda tidak ingin mencoba lagi dengan kartu, Anda tetap dapat menyelesaikan donasi Anda melalui transfer bank ke salah satu rekening di bawah ini."
+  },
   "BlogCard": {
     "readMore": "Baca selengkapnya"
   },
@@ -138,41 +145,41 @@
     "pageTitle": "Tentang Kami",
     "associationName": "Asosiasi Bantuan dan Solidaritas Qurrat Al-Ayun",
     "aboutUsTitle": "Siapa Kami?",
-    "aboutUsDesc1": "Sebuah asosiasi bantuan dan solidaritas Turki yang aktif di bidang perawatan anak di seluruh dunia. Kami berupaya menjamin kehidupan dan masa depan yang lebih baik bagi anak-anak, meringankan penderitaan mereka, memungkinkan mereka menjalankan hak-hak mereka, dan membangun kemampuan mental serta fisik mereka.",
-    "aboutUsDesc2": "Kami bekerja untuk mengintegrasikan anak-anak yang membutuhkan ke dalam masyarakat, meningkatkan kesadaran mereka akan hak-hak mereka, dan meningkatkan status sosial, ekonomi, dan psikologis keluarga mereka melalui program dan proyek berkualitas.",
+    "aboutUsDesc1": "Kami adalah sebuah lembaga bantuan kemanusiaan dan solidaritas asal Turki yang bergerak di bidang perawatan dan dukungan untuk anak-anak di seluruh dunia. Kami berupaya memberikan kehidupan yang lebih baik dan masa depan yang lebih aman bagi anak-anak, meringankan penderitaan mereka, mendukung akses mereka terhadap hak-hak dasar, serta berkontribusi dalam pengembangan kemampuan mental dan fisik mereka.",
+    "aboutUsDesc2": "Kami juga bekerja untuk membantu anak-anak yang membutuhkan agar dapat berintegrasi dengan masyarakat, meningkatkan kesadaran mereka tentang hak-hak mereka, serta memperbaiki kondisi sosial, ekonomi, dan psikologis keluarga mereka melalui program dan proyek yang berkualitas dan bermakna.",
     "beneficiaries": "Penerima Manfaat",
     "vision": "Visi Kami",
     "visionTitle": "Menuju Masa Depan yang Lebih Baik",
-    "visionQuote": "Membuat perbedaan di dunia anak untuk generasi yang produktif, dan membesarkan generasi yang mengangkat diri dan masyarakat",
+    "visionQuote": "Menciptakan perubahan nyata dalam dunia anak-anak dan berkontribusi dalam membentuk generasi produktif yang mampu membangun dirinya sendiri dan masyarakatnya.",
     "goals": "Tujuan Kami",
-    "goalsTitle": "Apa yang Kami Perjuangkan",
-    "goalsDesc": "Kami bekerja untuk mencapai serangkaian tujuan mulia untuk melayani anak-anak dan masyarakat",
+    "goalsTitle": "Tujuan yang Kami Upayakan",
+    "goalsDesc": "Kami bekerja untuk mencapai serangkaian tujuan kemanusiaan, sosial, dan pendidikan demi melayani anak-anak, keluarga mereka, dan masyarakat.",
     "goalsCount": "7 Tujuan",
     "goalsSubtitle": "Untuk Masa Depan yang Lebih Baik",
-    "presidentMessage": "Pesan Presiden",
-    "presidentTitle": "Pesan dari Presiden Asosiasi",
-    "presidentName": "Bapak Fadil",
-    "presidentPosition": "Presiden Umum Asosiasi",
+    "presidentMessage": "Pesan Ketua",
+    "presidentTitle": "Pesan dari Ketua Lembaga",
+    "presidentName": "Bapak Fazıl Hak",
+    "presidentPosition": "Ketua Umum Lembaga",
     "ctaTitle": "Jadilah Bagian dari Perubahan",
     "ctaDesc": "Bergabunglah dengan kami dalam perjalanan membangun masa depan yang lebih baik bagi anak-anak di seluruh dunia",
     "donateNow": "Donasi Sekarang",
     "contactUs": "Hubungi Kami",
     "goalsList": [
-      "Memberikan layanan kehidupan, kesehatan, psikologis, dan pendidikan terbaik bagi anak-anak dan keluarga mereka",
-      "Mempersiapkan generasi yang melampaui dirinya sendiri dan mengatasi tantangan yang dihadapinya",
-      "Menemukan keterampilan, mengembangkan kreativitas, dan membangun kemampuan anak",
-      "Melindungi anak dari segala bentuk eksploitasi dan menumbuhkan kesadaran mereka",
-      "Membesarkan generasi dengan nilai dan etika yang baik",
-      "Menciptakan sistem pendidikan, pembelajaran, dan kesehatan modern",
-      "Mengangkat anak-anak menuju masa depan yang cerah"
+      "Memberikan layanan berkualitas bagi anak-anak dan keluarga mereka dalam bidang dukungan kehidupan, kesehatan, dukungan psikologis, dan pendidikan.",
+      "Membentuk generasi yang mampu mengembangkan diri, menghadapi tantangan, dan membangun kepribadian yang kuat.",
+      "Menemukan keterampilan anak-anak, mendukung kreativitas mereka, serta mengembangkan kemampuan dan bakat mereka.",
+      "Melindungi anak-anak dari segala bentuk eksploitasi dan penelantaran, serta meningkatkan kesadaran mereka tentang hak-hak mereka.",
+      "Berkontribusi dalam membentuk generasi yang berlandaskan nilai-nilai kuat dan prinsip moral yang kokoh.",
+      "Mendukung sistem yang berkelanjutan dalam bidang pendidikan, pelatihan, perawatan, dan layanan kesehatan.",
+      "Membantu anak-anak mencapai masa depan yang lebih cerah, aman, dan penuh harapan."
     ],
     "presidentMessageParagraphs": [
-      "Di dunia kita saat ini, terutama di kawasan Islam, mereka yang paling menderita akibat masalah seperti krisis politik, krisis ekonomi, dan bencana alam tidak diragukan lagi adalah anak-anak kita.",
-      "Agar tidak hanya menjadi penonton dari situasi-situasi ini, kami bergerak untuk membuat masa depan lebih layak bagi semua anak yang dapat kami jangkau, terutama anak yatim.",
-      "Di Asosiasi Gozbebekleri, kami telah bekerja sejak tahun 2011 untuk mendukung anak-anak dan yatim piatu kami melalui berbagai proyek yang melibatkan keluarga mereka, terutama di bidang kesehatan, pendidikan, dan gizi.",
-      "Ketika menyangkut anak-anak kita, pemimpin kita adalah Nabi besar kita (saw). Kami berusaha menjadikan kepekaan Nabi kita sebagai teladan, dan kami berusaha meringankan kekhawatiran anak-anak kita di mana pun mereka berada.",
-      "Kami bekerja untuk mendukung dan menyentuh kehidupan ratusan ribu anak dengan mengingatkan mereka bahwa mereka tidak tidak berdaya, bekerja sama dengan staf terlatih dan relawan kami di berbagai negara di seluruh dunia.",
-      "Asosiasi kami akan terus bekerja bersama Anda dengan perasaan yang paling tulus, jauh dari motif keuntungan apa pun, berdasarkan prinsip \"Melayani rakyat adalah melayani Tuhan\"."
+      "Di dunia saat ini, khususnya di dunia Islam, anak-anak termasuk kelompok yang paling terdampak oleh krisis politik, kesulitan ekonomi, peperangan, dan bencana alam.",
+      "Menghadapi kenyataan yang menyakitkan ini, kami menolak untuk hanya menjadi penonton. Kami memilih untuk bergerak dan berkontribusi dalam membangun masa depan yang lebih aman, lebih bermartabat, dan lebih penuh harapan bagi setiap anak yang dapat kami jangkau, terutama anak-anak yatim.",
+      "Sejak tahun 2011, Gözbebekleri Association telah menjalankan berbagai proyek untuk mendukung anak-anak yang membutuhkan dan anak-anak yatim, khususnya dalam bidang kesehatan, pendidikan, gizi, dan dukungan sosial, dengan tetap memperhatikan keluarga serta lingkungan mereka.",
+      "Ketika berbicara tentang anak-anak, teladan dan pembimbing kami adalah Nabi Muhammad ﷺ, yang diutus sebagai rahmat bagi seluruh alam. Kami berusaha meneladani kasih sayang dan kepedulian beliau terhadap anak-anak, dengan meringankan penderitaan mereka, memenuhi kebutuhan mereka, dan menjadi sebab hadirnya senyuman di wajah mereka, di mana pun mereka berada.",
+      "Melalui tim khusus dan para relawan kami di berbagai wilayah dunia, kami bekerja agar anak-anak merasa bahwa mereka tidak sendirian. Kami berupaya menyentuh kehidupan mereka, memperbaiki kondisi mereka, dan membuka pintu-pintu harapan baru bagi mereka.",
+      "Lembaga kami terus menjalankan tugasnya tanpa tujuan mencari keuntungan, dengan berpegang pada prinsip: \"Melayani manusia adalah melayani Allah.\" Dengan ketulusan, tanggung jawab, serta berkat dukungan dan kepercayaan Anda, kami terus menyalurkan kebaikan kepada mereka yang paling membutuhkan."
     ]
   },
   "ContactUs": {

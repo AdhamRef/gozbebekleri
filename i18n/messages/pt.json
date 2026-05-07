@@ -42,6 +42,13 @@
     "copied": "Copiado!",
     "footer": "Para dúvidas, entre em contato conosco em"
   },
+  "DonationFailed": {
+    "badge": "Não foi possível processar a doação",
+    "title": "Desculpe, sua doação não foi concluída",
+    "description": "Não conseguimos finalizar o seu pagamento. Isso pode ter ocorrido devido a uma recusa do cartão, um problema de rede ou uma interrupção com o provedor de pagamento. Nenhum valor foi cobrado.",
+    "tryAgain": "Tentar doar novamente",
+    "manualFallback": "Se preferir não tentar novamente com cartão, você ainda pode concluir sua doação fazendo uma transferência bancária para uma das contas abaixo."
+  },
   "BlogCard": {
     "readMore": "Ler mais"
   },
@@ -138,41 +145,41 @@
     "pageTitle": "Sobre nós",
     "associationName": "Associação de Socorro e Solidariedade Qurrat Al-Ayun",
     "aboutUsTitle": "Quem somos?",
-    "aboutUsDesc1": "Uma associação turca de socorro e solidariedade ativa no cuidado infantil em todo o mundo. Procuramos garantir uma vida e um futuro melhores para as crianças, aliviar o seu sofrimento, permitir que exerçam os seus direitos e desenvolver as suas capacidades físicas e mentais.",
-    "aboutUsDesc2": "Trabalhamos para integrar crianças necessitadas na sociedade, sensibilizá-las para os seus direitos e melhorar o estatuto social, económico e psicológico das suas famílias através de programas e projetos de qualidade.",
+    "aboutUsDesc1": "Somos uma associação turca de ajuda humanitária e solidariedade que atua na área de cuidado e apoio à infância em todo o mundo. Trabalhamos para oferecer às crianças uma vida melhor e um futuro mais seguro, aliviar seu sofrimento, apoiar seu acesso aos direitos fundamentais e contribuir para o desenvolvimento de suas capacidades mentais e físicas.",
+    "aboutUsDesc2": "Também trabalhamos para integrar crianças em situação de necessidade à sociedade, conscientizá-las sobre seus direitos e melhorar as condições sociais, econômicas e psicológicas de suas famílias por meio de programas e projetos qualificados e significativos.",
     "beneficiaries": "Beneficiários",
-    "vision": "A nossa visão",
+    "vision": "Nossa visão",
     "visionTitle": "Rumo a um futuro melhor",
-    "visionQuote": "Fazer a diferença no mundo da infância para uma geração produtiva e formar uma geração que se eleve a si mesma e à sociedade",
-    "goals": "Os nossos objetivos",
-    "goalsTitle": "O que nos esforçamos por alcançar",
-    "goalsDesc": "Trabalhamos para alcançar um conjunto de objetivos nobres ao serviço das crianças e da sociedade",
+    "visionQuote": "Fazer uma verdadeira diferença no mundo da infância e contribuir para formar uma geração produtiva, capaz de elevar a si mesma e à sua sociedade.",
+    "goals": "Nossos objetivos",
+    "goalsTitle": "Os objetivos que buscamos alcançar",
+    "goalsDesc": "Trabalhamos para alcançar um conjunto de objetivos humanitários, sociais e educacionais a serviço das crianças, de suas famílias e da sociedade.",
     "goalsCount": "7 objetivos",
     "goalsSubtitle": "Por um futuro melhor",
     "presidentMessage": "Mensagem do presidente",
     "presidentTitle": "Mensagem do presidente da associação",
-    "presidentName": "Sr. Fadil",
-    "presidentPosition": "Presidente geral da associação",
+    "presidentName": "Sr. Fazıl Hak",
+    "presidentPosition": "Presidente Geral da Associação",
     "ctaTitle": "Faça parte da mudança",
     "ctaDesc": "Junte-se a nós na nossa jornada para construir um futuro melhor para as crianças em todo o mundo",
     "donateNow": "Doar agora",
     "contactUs": "Contacto",
     "goalsList": [
-      "Fornecer os melhores serviços de vida, saúde, psicológicos e educacionais às crianças e às suas famílias",
-      "Preparar uma geração que se supera a si mesma e supera os desafios que enfrenta",
-      "Descobrir habilidades, desenvolver a criatividade e construir as capacidades das crianças",
-      "Proteger as crianças de todas as formas de exploração e desenvolver a sua consciência",
-      "Criar gerações com valores e ética sólidos",
-      "Criar um sistema moderno de educação, aprendizagem e saúde",
-      "Elevar as crianças rumo a um futuro brilhante"
+      "Oferecer serviços de qualidade às crianças e suas famílias nas áreas de apoio à vida diária, saúde, apoio psicológico e educação.",
+      "Formar gerações capazes de se desenvolver, enfrentar desafios e construir uma personalidade forte.",
+      "Descobrir as habilidades das crianças, apoiar sua criatividade e desenvolver suas capacidades e talentos.",
+      "Proteger as crianças contra todas as formas de exploração e negligência, e fortalecer sua consciência sobre seus direitos.",
+      "Contribuir para a formação de gerações baseadas em valores sólidos e princípios morais firmes.",
+      "Apoiar sistemas sustentáveis nas áreas de educação, formação, cuidado e serviços de saúde.",
+      "Ajudar as crianças a alcançar um futuro mais luminoso, seguro e cheio de esperança."
     ],
     "presidentMessageParagraphs": [
-      "No mundo de hoje, especialmente na geografia islâmica, aqueles que mais sofrem com problemas como crises políticas, crises económicas e desastres naturais são, sem dúvida, as nossas crianças.",
-      "Para não permanecermos meros espectadores destas situações, mobilizámo-nos para tornar o futuro mais adequado a todas as crianças que podemos alcançar, especialmente os órfãos.",
-      "Na Associação Gozbebekleri, trabalhamos desde 2011 para apoiar as nossas crianças e órfãos através de diversos projetos que envolvem as suas famílias, sobretudo nas áreas da saúde, educação e nutrição.",
-      "Quando se trata das nossas crianças, o nosso líder é o nosso grande Profeta (que a paz esteja com ele). Procuramos tomar como exemplo essa sensibilidade do nosso Profeta e tentamos aliviar as preocupações das nossas crianças onde quer que estejam.",
-      "Trabalhamos para apoiar e tocar a vida de centenas de milhares de crianças, lembrando-lhes que não estão desamparadas, em cooperação com o nosso pessoal formado e voluntários em vários países do mundo.",
-      "A nossa associação continuará a trabalhar consigo com os mais sinceros sentimentos, longe de qualquer motivo de lucro, com base no princípio \"Servir o povo é servir a Deus\"."
+      "No mundo de hoje, especialmente no mundo islâmico, as crianças estão entre os grupos mais afetados por crises políticas, dificuldades econômicas, guerras e desastres naturais.",
+      "Diante dessa dolorosa realidade, recusamo-nos a permanecer como meros espectadores. Decidimos agir para contribuir na construção de um futuro mais seguro, mais digno e mais esperançoso para cada criança que pudermos alcançar, especialmente as crianças órfãs.",
+      "Desde 2011, a Associação Gözbebekleri realiza diversos projetos para apoiar crianças necessitadas e órfãs, especialmente nas áreas de saúde, educação, nutrição e apoio social, levando também em consideração suas famílias e o ambiente em que vivem.",
+      "Quando se trata de crianças, nosso guia e exemplo é o Profeta Muhammad ﷺ, enviado como misericórdia para todos os mundos. Procuramos seguir seu exemplo de compaixão e sensibilidade para com as crianças, aliviando seu sofrimento, atendendo às suas necessidades e sendo motivo de sorriso em seus rostos, onde quer que estejam.",
+      "Por meio de nossas equipes especializadas e voluntários em diferentes regiões do mundo, trabalhamos para que as crianças sintam que não estão sozinhas. Esforçamo-nos para tocar suas vidas, melhorar suas condições e abrir diante delas novas portas de esperança.",
+      "Nossa associação continua seu trabalho sem qualquer finalidade lucrativa, guiada pelo princípio: \"Servir às pessoas é servir a Allah.\" Com sinceridade, responsabilidade e graças ao seu apoio e confiança, continuamos levando o bem a quem mais precisa."
     ]
   },
   "ContactUs": {

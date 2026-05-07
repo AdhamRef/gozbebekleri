@@ -1,7 +1,11 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useConfettiStore } from "@/hooks/use-confetti-store";
-import ReactConfetti from "react-confetti";
+
+// react-confetti weighs ~30 KiB and only fires after a successful donation, so
+// load it lazily on first open instead of pulling it into the homepage bundle.
+const ReactConfetti = dynamic(() => import("react-confetti"), { ssr: false });
 
 export const ConfettiProvider = () => {
   const confetti = useConfettiStore();
