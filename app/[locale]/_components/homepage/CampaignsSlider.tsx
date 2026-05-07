@@ -171,8 +171,18 @@ const CampaignsSlider = ({ listView = false }: { listView?: boolean }) => {
 function LoadingSkeleton() {
   return (
     <div className="w-full space-y-4" aria-busy="true">
-      <div className="grid grid-cols-2 lg:grid-cols-4 auto-rows-fr gap-3">
-        <div className="col-span-2 row-span-2 aspect-[4/3] bg-gray-200 rounded-2xl animate-pulse" />
+      {/* Mobile: matches the flex overflow-x-auto card row exactly */}
+      <div className="lg:hidden flex overflow-x-hidden gap-3 pb-3 px-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex-shrink-0 w-[78vw] max-w-[320px] aspect-[4/3] bg-gray-200 rounded-2xl animate-pulse"
+          />
+        ))}
+      </div>
+      {/* Desktop: matches the grid-cols-4 layout with featured 2x2 + 4 small cards */}
+      <div className="hidden lg:grid grid-cols-4 auto-rows-fr gap-3">
+        <div className="col-span-2 row-span-2 aspect-[2/1.5] bg-gray-200 rounded-2xl animate-pulse" />
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="aspect-[4/3] bg-gray-200 rounded-2xl animate-pulse" />
         ))}

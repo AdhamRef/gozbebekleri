@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { Heart, TrendingUp, Users, Award, CheckCircle, ArrowLeft, Sparkles, ChevronDown, Check } from "lucide-react";
 import { getCurrency } from "@/hooks/useCampaignValue";
@@ -6,9 +7,12 @@ import { usePathname, useRouter } from "@/i18n/routing";
 import { useTranslations, useLocale } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams } from "next/navigation";
-import DonationDialog from "@/components/DonationDialog";
 import { Link } from "@/i18n/routing";
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
+
+// DonationDialog pulls in @stripe/stripe-js (~230KiB) plus the Stripe utility script.
+// Loading it lazily keeps Stripe out of the homepage critical path entirely.
+const DonationDialog = dynamic(() => import("@/components/DonationDialog"), { ssr: false });
 
 interface CategoryOption {
   id: string;
@@ -30,6 +34,8 @@ const QuickDonate = () => {
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const [donationDialogOpen, setDonationDialogOpen] = useState(false);
+  // Gate the actual mount so the Stripe / dialog chunk doesn't load on page paint.
+  const [donationDialogMounted, setDonationDialogMounted] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
@@ -71,6 +77,7 @@ const QuickDonate = () => {
     } catch {
       /* ignore */
     }
+    setDonationDialogMounted(true);
     setDonationDialogOpen(true);
     router.replace(
       appendCurrencyQuery(`${pathname}#quick_donate`, getCurrencyCodeForLinks())
@@ -133,6 +140,7 @@ const QuickDonate = () => {
   const handleDonateClick = () => {
     if (!selectedCategoryId || !selectedCategory) return;
     if (displayAmount <= 0) return;
+    setDonationDialogMounted(true);
     setDonationDialogOpen(true);
   };
 
@@ -356,30 +364,32 @@ const QuickDonate = () => {
 
       </div>
 
-      <DonationDialog
-        isOpen={donationDialogOpen}
-        onClose={() => {
-          setDonationDialogOpen(false);
-          setResumeAmount(undefined);
-          setResumeCategoryId("");
-          setResumeCategoryName("");
-          setResumeCategoryImage(undefined);
-        }}
-        monthlyOnly
-        categoryId={resumeCategoryId || selectedCategoryId}
-        categoryName={resumeCategoryName || (selectedCategory?.name ?? "")}
-        categoryImage={resumeCategoryImage ?? selectedCategory?.image ?? undefined}
-        initialDonationAmount={resumeAmount ?? (displayAmount > 0 ? displayAmount : undefined)}
-        authCallbackUrl={
-          typeof window !== "undefined"
-            ? appendCurrencyQuery(
-                `${pathname}?openDonation=1#quick_donate`,
-                getCurrencyCodeForLinks()
-              )
-            : undefined
-        }
-        onAuthCheckpoint={storeQuickDonateResume}
-      />
+      {donationDialogMounted && (
+        <DonationDialog
+          isOpen={donationDialogOpen}
+          onClose={() => {
+            setDonationDialogOpen(false);
+            setResumeAmount(undefined);
+            setResumeCategoryId("");
+            setResumeCategoryName("");
+            setResumeCategoryImage(undefined);
+          }}
+          monthlyOnly
+          categoryId={resumeCategoryId || selectedCategoryId}
+          categoryName={resumeCategoryName || (selectedCategory?.name ?? "")}
+          categoryImage={resumeCategoryImage ?? selectedCategory?.image ?? undefined}
+          initialDonationAmount={resumeAmount ?? (displayAmount > 0 ? displayAmount : undefined)}
+          authCallbackUrl={
+            typeof window !== "undefined"
+              ? appendCurrencyQuery(
+                  `${pathname}?openDonation=1#quick_donate`,
+                  getCurrencyCodeForLinks()
+                )
+              : undefined
+          }
+          onAuthCheckpoint={storeQuickDonateResume}
+        />
+      )}
     </div>
   );
 };

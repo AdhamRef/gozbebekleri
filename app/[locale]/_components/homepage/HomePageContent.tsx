@@ -15,17 +15,33 @@ import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
 import axios from "axios";
 
-const CampaignsSlider = dynamic(() => import("./CampaignsSlider"), {
-  loading: () => (
-    <div className="w-full space-y-4" aria-busy="true">
-      <div className="grid grid-cols-2 lg:grid-cols-4 auto-rows-fr gap-3">
-        <div className="col-span-2 row-span-2 aspect-[4/3] bg-gray-200 rounded-2xl animate-pulse" />
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="aspect-[4/3] bg-gray-200 rounded-2xl animate-pulse" />
-        ))}
-      </div>
+/**
+ * Skeleton MUST mirror CampaignsSlider's two render branches exactly so the layout
+ * doesn't shift when hydration replaces it (mobile = horizontal scroll, desktop = 2x grid).
+ */
+const CampaignsSliderSkeleton = () => (
+  <div className="w-full space-y-4" aria-busy="true">
+    {/* Mobile horizontal scroll skeleton — matches the flex overflow-x-auto layout */}
+    <div className="lg:hidden flex overflow-x-hidden gap-3 pb-3 px-4">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div
+          key={i}
+          className="flex-shrink-0 w-[78vw] max-w-[320px] aspect-[4/3] bg-gray-200 rounded-2xl animate-pulse"
+        />
+      ))}
     </div>
-  ),
+    {/* Desktop 2x grid skeleton — matches the lg grid-cols-4 with featured 2x2 layout */}
+    <div className="hidden lg:grid grid-cols-4 auto-rows-fr gap-3">
+      <div className="col-span-2 row-span-2 aspect-[2/1.5] bg-gray-200 rounded-2xl animate-pulse" />
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="aspect-[4/3] bg-gray-200 rounded-2xl animate-pulse" />
+      ))}
+    </div>
+  </div>
+);
+
+const CampaignsSlider = dynamic(() => import("./CampaignsSlider"), {
+  loading: CampaignsSliderSkeleton,
   ssr: false,
 });
 
@@ -111,7 +127,9 @@ const HomePage: React.FC<HomePageContentProps> = ({ firstHeroImage }) => {
       <HeroSlider initialFirstImage={firstHeroImage ?? null} />
 
       {/* ── Featured Campaigns Slider ── */}
-      <section className="bg-gray-50 pt-10 sm:pt-12 pb-5 sm:pb-6">
+      {/* min-height matches the rendered slider so the SSR-empty client-only slot does not
+          collapse to 0 before hydration (was causing CLS=0.39). */}
+      <section className="bg-gray-50 pt-10 sm:pt-12 pb-5 sm:pb-6 min-h-[420px] lg:min-h-[760px]">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-end justify-between mb-6">
             <div>

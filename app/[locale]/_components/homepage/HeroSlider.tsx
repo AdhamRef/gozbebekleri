@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
-import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
@@ -20,12 +19,18 @@ interface HeroSliderProps {
   initialFirstImage?: string | null;
 }
 
-function optimizeHeroImage(src: string, width = 1920, height = 1080): string {
+function buildHeroSrc(src: string, width: number): string {
   if (!src.includes("res.cloudinary.com")) return src;
   return src.replace(
     /\/upload\//,
-    `/upload/f_auto,q_auto:eco,w_${width},h_${height},c_fill,g_auto/`
+    `/upload/f_auto,q_auto:eco,w_${width},c_limit/`
   );
+}
+
+function buildHeroSrcSet(src: string): string {
+  return [640, 1024, 1536]
+    .map((w) => `${buildHeroSrc(src, w)} ${w}w`)
+    .join(", ");
 }
 
 const HeroSlider: React.FC<HeroSliderProps> = ({ initialFirstImage }) => {
@@ -70,21 +75,22 @@ const HeroSlider: React.FC<HeroSliderProps> = ({ initialFirstImage }) => {
   }, [isPlaying, nextSlide]);
 
   // While slides are loading from API, show the SSR-provided first image immediately
-  // so the browser doesn't blank the hero for ~1,590ms
+  // so the browser doesn't blank the hero. Use a raw <img> with srcset that matches the
+  // <link rel="preload" imageSrcSet> in the page — guarantees a cache hit on the LCP fetch.
   if (slides.length === 0) {
     if (!initialFirstImage) return null;
     return (
       <div className="relative w-full h-[350px] sm:h-[400px] md:h-[450px] lg:h-[500px] xl:h-[550px] overflow-hidden">
         <div className="absolute inset-0 bg-[#0f172a]">
-          <Image
-            src={optimizeHeroImage(initialFirstImage)}
-            alt=""
-            fill
-            priority
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={buildHeroSrc(initialFirstImage, 1024)}
+            srcSet={buildHeroSrcSet(initialFirstImage)}
             sizes="100vw"
-            quality={60}
+            alt=""
+            decoding="async"
             fetchPriority="high"
-            className="object-cover object-center"
+            className="absolute inset-0 w-full h-full object-cover object-center"
           />
           <div className="absolute inset-0 bg-gradient-to-br from-black/30 to-black/50 z-10" />
         </div>
@@ -108,16 +114,16 @@ const HeroSlider: React.FC<HeroSliderProps> = ({ initialFirstImage }) => {
           >
             <div className="absolute inset-0 bg-[#0f172a]">
                 {slide.image && (
-                  <Image
-                    src={optimizeHeroImage(slide.image)}
-                    alt=""
-                    fill
-                    priority={index === 0}
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={buildHeroSrc(slide.image, 1024)}
+                    srcSet={buildHeroSrcSet(slide.image)}
                     sizes="100vw"
-                    quality={60}
+                    alt=""
+                    decoding="async"
                     loading={index === 0 ? "eager" : "lazy"}
                     fetchPriority={index === 0 ? "high" : "auto"}
-                    className="object-cover object-center"
+                    className="absolute inset-0 w-full h-full object-cover object-center"
                   />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-br from-black/30 to-black/50 z-10"></div>

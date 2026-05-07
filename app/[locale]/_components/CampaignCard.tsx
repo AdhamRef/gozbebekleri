@@ -19,13 +19,14 @@ import type { SuggestedDonationsConfig } from "@/lib/campaign/suggested-donation
 const RESUME_KEY = "campaignDonateResume";
 const FALLBACK_IMG = "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg";
 
-// 16:9 crop — matches the aspect-[4/3] container used everywhere
-// 4:3 crop — matches the aspect-[4/3] container used everywhere
+// 4:3 crop — matches the aspect-[4/3] container used everywhere.
+// q_auto:eco is ~30% smaller than q_auto:good with no perceptible quality loss for thumbnails;
+// f_auto serves AVIF/WebP automatically based on the Accept header.
 function buildImgSrc(src: string, width = 640, height = 480): string {
   if (!src.includes("res.cloudinary.com")) return src;
   return src.replace(
     /\/upload\//,
-    `/upload/f_auto,q_auto:good,w_${width},h_${height},c_fill,g_auto/`
+    `/upload/f_auto,q_auto:eco,w_${width},h_${height},c_fill,g_auto/`
   );
 }
 
@@ -71,6 +72,7 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
   const router = useRouter();
   const searchParams = useSearchParams();
   const [donationOpen, setDonationOpen] = useState(false);
+  const [donationDialogMounted, setDonationDialogMounted] = useState(false);
   const [donationContext, setDonationContext] = useState<DonationDialogCampaignContext | null>(null);
 
   const snapshotDonationContext = (): DonationDialogCampaignContext => ({
@@ -104,6 +106,7 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
         suggestedShareCounts: data.suggestedShareCounts ?? campaign.suggestedShareCounts ?? null,
         suggestedDonations: data.suggestedDonations ?? campaign.suggestedDonations ?? null,
       });
+      setDonationDialogMounted(true);
       setDonationOpen(true);
     } catch { /* ignore */ }
     router.replace(appendCurrencyQuery(pathname, getCurrencyCodeForLinks()));
@@ -123,6 +126,7 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
     e.preventDefault();
     e.stopPropagation();
     setDonationContext(snapshotDonationContext());
+    setDonationDialogMounted(true);
     setDonationOpen(true);
   };
 
@@ -178,13 +182,14 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
         <Link href={`/campaign/${campaign.slug || campaign.id}`} prefetch={true} onClick={onClick} className="relative flex-1 block">
           <div className={`relative w-full overflow-hidden ${isFeatured ? "h-full" : "aspect-[4/3]"}`}>
             <Image
-              src={isFeatured ? buildImgSrc(rawImgSrc, 1280, 960) : imgSrc}
+              src={isFeatured ? buildImgSrc(rawImgSrc, 960, 720) : imgSrc}
               alt={campaign.title}
               fill
               sizes={isFeatured ? "(max-width: 640px) 90vw, 50vw" : "(max-width: 640px) 70vw, (max-width: 1024px) 300px, 25vw"}
               className="object-cover group-hover/card:scale-105 transition-transform duration-700 ease-out"
               draggable={false}
               priority={isFeatured}
+              quality={70}
             />
 
             {/* Scrim */}
@@ -270,6 +275,7 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
         </div>
       </div>
 
+      {donationDialogMounted && (
       <DonationDialog
         isOpen={donationOpen}
         onClose={() => {
@@ -296,6 +302,7 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
         }
         onAuthCheckpoint={storeDonationResume}
       />
+      )}
     </>
   );
 }

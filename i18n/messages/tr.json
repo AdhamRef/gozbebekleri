@@ -88,7 +88,7 @@
     "loadError": "Projeler yüklenemedi. Lütfen tekrar deneyin."
   },
   "QuickDonate": {
-    "associationName": "Kurratül-Ayn Yardım ve Dayanışma Derneği",
+    "associationName": "Göz Bebekleri Yardımlaşma ve Dayanışma Derneği",
     "hadithQuote": "Allah Resulü (sallallahü aleyhi ve sellem) buyurdu",
     "hadithText": "En hayırlı sadaka sürekli olandır, az da olsa",
     "description": "Verdiğinizi sürekli kılın ve ihtiyaç sahiplerinin hayatında fark yaratın. Aylık taahhüdünüz sadakanın etkisini artırır ve yardım çalışmalarının sürdürülebilirliğini sağlar.",
@@ -112,7 +112,7 @@
   },
   "Footer": {
     "aboutUsDesc1": "Dünya genelinde çocuk bakımı alanında faaliyet gösteren bir Türk yardım ve dayanışma derneği. Çocuklara daha iyi bir yaşam ve gelecek sağlamak, onların acılarını hafifletmek, haklarını kullanmalarını sağlamak ve zihinsel ve fiziksel yeteneklerini geliştirmek için çalışıyoruz.",
-    "description": "Kurratül-Ayn platformu, Suriye'deki ihtiyaç sahiplerine kritik tıbbi vakalara yardım ve tıbbi destek sağlamayı hedefleyen hayırsever bir platformdur.",
+    "description": "Göz Bebekleri platformu, Suriye'deki ihtiyaç sahiplerine kritik tıbbi vakalara yardım ve tıbbi destek sağlamayı hedefleyen hayırsever bir platformdur.",
     "messageTitle": "Bize mesaj gönderin",
     "messageDesc": "Bir sorunuz veya öneriniz mi var? Bize ulaşın, en kısa sürede size dönelim.",
     "messagePlaceholder": "Mesajınızı buraya yazın...",
@@ -131,48 +131,48 @@
     "quickLinks": "Hızlı Bağlantılar",
     "categories": "Kampanyalar",
     "contactUs": "İletişim",
-    "copyright": "© {year} Kurratül-Ayn Platformu. Tüm hakları saklıdır.",
+    "copyright": "© {year} Göz Bebekleri Platformu. Tüm hakları saklıdır.",
     "developedBy": "2026 Geliştirildi"
   },
   "AboutUs": {
     "pageTitle": "Hakkımızda",
-    "associationName": "Kurratül-Ayn Yardım ve Dayanışma Derneği",
+    "associationName": "Göz Bebekleri Yardım ve Dayanışma Derneği",
     "aboutUsTitle": "Biz Kimiz?",
-    "aboutUsDesc1": "Dünya genelinde çocuk bakımı alanında faaliyet gösteren bir Türk yardım ve dayanışma derneği. Çocuklara daha iyi bir yaşam ve gelecek sağlamak, onların acılarını hafifletmek, haklarını kullanmalarını sağlamak ve zihinsel ve fiziksel yeteneklerini geliştirmek için çalışıyoruz.",
-    "aboutUsDesc2": "İhtiyaç sahibi çocukları topluma kazandırmak, hakları konusunda bilinçlendirmek ve nitelikli programlar ve projelerle ailelerinin sosyal, ekonomik ve psikolojik durumunu iyileştirmek için çalışıyoruz.",
+    "aboutUsDesc1": "Dünya genelinde çocuklara yönelik bakım, yardım ve dayanışma alanlarında faaliyet gösteren bir Türk sivil toplum kuruluşuyuz. Çocuklara daha iyi bir yaşam ve daha güvenli bir gelecek sunmak; yaşadıkları zorlukları hafifletmek, temel haklarına erişimlerini desteklemek, zihinsel ve fiziksel gelişimlerine katkı sağlamak için çalışıyoruz.",
+    "aboutUsDesc2": "İhtiyaç sahibi çocukların topluma kazandırılması, hakları konusunda bilinçlendirilmesi ve nitelikli programlar ile projeler aracılığıyla ailelerinin sosyal, ekonomik ve psikolojik durumlarının iyileştirilmesi için çaba gösteriyoruz.",
     "beneficiaries": "Yararlanıcılar",
     "vision": "Vizyonumuz",
     "visionTitle": "Daha İyi Bir Geleceğe Doğru",
-    "visionQuote": "Üretken bir nesil için çocukluk dünyasında fark yaratmak ve kendini ve toplumu yükselten bir nesil yetiştirmek",
+    "visionQuote": "Çocukların dünyasında fark oluşturarak üretken, kendisine ve topluma değer katan nesiller yetiştirmek.",
     "goals": "Hedeflerimiz",
-    "goalsTitle": "Ulaşmaya Çalıştığımız Hedefler",
-    "goalsDesc": "Çocuklara ve topluma hizmet etmek için bir dizi asil hedefe ulaşmaya çalışıyoruz",
+    "goalsTitle": "Ulaşmak İçin Çalıştığımız Hedefler",
+    "goalsDesc": "Çocuklara, ailelerine ve topluma hizmet etmek amacıyla insani, sosyal ve eğitim odaklı hedefler doğrultusunda çalışmalar yürütüyoruz.",
     "goalsCount": "7 Hedef",
     "goalsSubtitle": "Daha İyi Bir Gelecek İçin",
     "presidentMessage": "Başkanın Mesajı",
     "presidentTitle": "Dernek Başkanından Mesaj",
-    "presidentName": "Sayın Fazilhak",
+    "presidentName": "Sayın Fazıl Hak",
     "presidentPosition": "Dernek Genel Başkanı",
     "ctaTitle": "Değişimin Parçası Olun",
     "ctaDesc": "Dünya genelinde çocuklar için daha iyi bir gelecek inşa etme yolculuğumuzda bize katılın",
     "donateNow": "Bağış Yap",
     "contactUs": "İletişim",
     "goalsList": [
-      "Çocuklara ve ailelerine en iyi yaşam, sağlık, psikolojik ve eğitim hizmetlerini sunmak",
-      "Kendini aşan ve karşılaştığı zorlukların üstesinden gelen bir nesil yetiştirmek",
-      "Becerileri keşfetmek, yaratıcılığı geliştirmek ve çocukların yeteneklerini inşa etmek",
-      "Çocukları her türlü istismardan korumak ve farkındalıklarını geliştirmek",
-      "Sağlam değerlere ve ahlaka sahip nesiller yetiştirmek",
-      "Modern bir eğitim, öğretim ve sağlık sistemi oluşturmak",
-      "Çocukları aydınlık bir geleceğe yükseltmek"
+      "Çocuklara ve ailelerine yaşam, sağlık, psikolojik destek ve eğitim alanlarında nitelikli hizmetler sunmak.",
+      "Kendini geliştiren, zorluklarla başa çıkabilen ve güçlü bir kişiliğe sahip nesiller yetiştirmek.",
+      "Çocukların becerilerini keşfetmek, yaratıcılıklarını desteklemek ve yeteneklerini geliştirmek.",
+      "Çocukları her türlü istismar ve ihmalden korumak, hakları konusunda farkındalıklarını artırmak.",
+      "Sağlam değerler ve güçlü ahlaki ilkeler üzerine yetişen nesillerin gelişimine katkı sağlamak.",
+      "Modern eğitim, öğretim, bakım ve sağlık hizmetlerini destekleyen sürdürülebilir sistemler oluşturmak.",
+      "Çocukların daha aydınlık, güvenli ve umut dolu bir geleceğe ulaşmalarına katkıda bulunmak."
     ],
     "presidentMessageParagraphs": [
-      "Bugünün dünyasında, özellikle İslam coğrafyasında, siyasi krizler, ekonomik krizler ve doğal afetler gibi sorunlardan en çok etkilenenler şüphesiz çocuklarımızdır.",
-      "Bu durumların yalnızca seyircisi olarak kalmamak için, ulaşabildiğimiz tüm çocuklar, özellikle de yetimler için geleceği daha uygun hale getirmek üzere harekete geçtik.",
-      "Gözbebekleri Derneği olarak, 2011 yılından bu yana özellikle sağlık, eğitim ve beslenme alanlarında ailelerini de kapsayan çeşitli projelerle çocuklarımızı ve yetimleri desteklemek için çalışıyoruz.",
-      "Söz konusu çocuklarımız olduğunda rehberimiz büyük Peygamberimiz (sallallahu aleyhi ve sellem)'dir. Peygamberimizin bu hassasiyetini örnek almaya çalışıyor ve çocuklarımızın nerede olurlarsa olsunlar dertlerini hafifletmeye çalışıyoruz.",
-      "Dünyanın çeşitli ülkelerindeki eğitimli personelimiz ve gönüllülerimizle iş birliği içinde, çaresiz olmadıklarını hatırlatarak yüz binlerce çocuğun hayatını desteklemek ve dokunmak için çalışıyoruz.",
-      "Derneğimiz, \"Halka hizmet, Hakk'a hizmettir\" ilkesinden yola çıkarak, herhangi bir kâr amacı gütmeden, en samimi duygularla sizinle birlikte çalışmaya devam edecektir."
+      "Günümüz dünyasında, özellikle İslam coğrafyasında yaşanan siyasi krizler, ekonomik sıkıntılar, savaşlar ve doğal afetlerden en çok etkilenen kesimlerin başında şüphesiz çocuklar gelmektedir.",
+      "Bizler, bu acı gerçek karşısında yalnızca seyirci kalmamak adına; ulaşabildiğimiz tüm çocuklar, özellikle de yetimler için daha güvenli, daha umut dolu ve daha yaşanabilir bir gelecek inşa etmek amacıyla harekete geçtik.",
+      "Gözbebekleri Derneği olarak 2011 yılından bu yana; sağlık, eğitim, beslenme ve sosyal destek başta olmak üzere, çocukları ve ailelerini kapsayan çeşitli projelerle ihtiyaç sahibi çocuklara ve yetimlere destek olmak için çalışmalar yürütüyoruz.",
+      "Söz konusu çocuklar olduğunda rehberimiz, âlemlere rahmet olarak gönderilen Peygamber Efendimiz Hz. Muhammed'dir (sallallahu aleyhi ve sellem). Onun çocuklara gösterdiği merhameti ve hassasiyeti örnek alarak, nerede olurlarsa olsunlar çocukların acılarını hafifletmeye, ihtiyaçlarını gidermeye ve yüzlerinde bir tebessüm olmaya gayret ediyoruz.",
+      "Dünyanın farklı bölgelerinde görev yapan uzman ekiplerimiz ve gönüllülerimizle birlikte, çocuklara yalnız olmadıklarını hissettirmek; onların hayatlarına dokunmak ve daha iyi şartlara ulaşmalarına katkı sağlamak için çalışıyoruz.",
+      "Derneğimiz, \"Halka hizmet, Hakk'a hizmettir\" anlayışıyla, hiçbir kâr amacı gütmeden, samimiyet ve sorumluluk bilinciyle siz değerli bağışçılarımızın desteğiyle çalışmalarına devam edecektir."
     ]
   },
   "ContactUs": {
@@ -208,7 +208,7 @@
     "whatsapp": "WhatsApp"
   },
   "Blog": {
-    "metaTitleSuffix": " - Kurratül-Ayn",
+    "metaTitleSuffix": " - Göz Bebekleri",
     "sharePost": "Yazıyı Paylaş",
     "similarPosts": "Benzer Yazılar",
     "relatedCampaign": "İlgili Projeler",
@@ -335,7 +335,7 @@
     "videoThumbnail": "Video küçük resmi"
   },
   "SignInDialog": {
-    "welcomeTitle": "Kurratül-Ayn Platformuna Hoş Geldiniz",
+    "welcomeTitle": "Göz Bebekleri Platformuna Hoş Geldiniz",
     "welcomeSubtitle": "Devam etmek ve iyilik paylaşmak için giriş yapın",
     "checkoutTitle": "Tek kısa adım",
     "checkoutSubtitle": "Şimdi giriş yapın; ardından ödeme adımına geri döneceksiniz.",

@@ -32,19 +32,43 @@ async function getFirstSlideImage(locale: string): Promise<string | null> {
   }
 }
 
+/**
+ * Build a Cloudinary-hosted, format-negotiated, mobile-first hero URL at the given width.
+ * Cloudinary serves AVIF/WebP automatically via f_auto and aggressive compression via q_auto:eco.
+ */
+function buildHeroSrc(src: string, width: number): string {
+  if (!src.includes("res.cloudinary.com")) return src;
+  return src.replace(
+    /\/upload\//,
+    `/upload/f_auto,q_auto:eco,w_${width},c_limit/`
+  );
+}
+
 export default async function HomePage({ params }: Props) {
   const { locale } = await params;
   const firstHeroImage = await getFirstSlideImage(locale);
-  // Preload the first slide image so the browser fetches it immediately
-  // instead of waiting for client-side API call (~1,590ms delay)
-  const preloadHref = firstHeroImage
-    ? `/_next/image?url=${encodeURIComponent(firstHeroImage)}&w=1920&q=85`
+
+  // Preload the LCP image with a srcset that matches what the browser will actually request.
+  // Cloudinary URLs are used directly (not the /_next/image proxy) so the preload fires immediately
+  // without waiting for the Next.js image optimizer round-trip.
+  const preloadSrcSet = firstHeroImage
+    ? [
+        `${buildHeroSrc(firstHeroImage, 640)} 640w`,
+        `${buildHeroSrc(firstHeroImage, 1024)} 1024w`,
+        `${buildHeroSrc(firstHeroImage, 1536)} 1536w`,
+      ].join(", ")
     : null;
 
   return (
     <>
-      {preloadHref && (
-        <link rel="preload" as="image" href={preloadHref} fetchPriority="high" />
+      {preloadSrcSet && firstHeroImage && (
+        <link
+          rel="preload"
+          as="image"
+          imageSrcSet={preloadSrcSet}
+          imageSizes="100vw"
+          fetchPriority="high"
+        />
       )}
       <HomePageContent firstHeroImage={firstHeroImage} />
     </>

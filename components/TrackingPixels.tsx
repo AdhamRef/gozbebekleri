@@ -213,20 +213,40 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
   const userDataRef = useRef<Partial<CanonicalUser>>({});
 
   // ── Load pixel config ───────────────────────────────────────────────────────
+  // Defer the config fetch + script injection until the browser is idle. Ad/marketing
+  // pixels (FB ~226KiB, TikTok, X) used to compete with the LCP image for bandwidth and
+  // ate ~700ms of TBT during the first second; running them on idle moves all of that
+  // off the critical path while still firing well before the user can convert.
   useEffect(() => {
-    fetch("/api/tracking/config")
-      .then((r) => r.json())
-      .then((data) => {
-        const c: TrackingConfig = {
-          facebookPixelId: data.facebookPixelId || null,
-          gaMeasurementId: data.gaMeasurementId || null,
-          tiktokPixelId:   data.tiktokPixelId   || null,
-          xPixelId:        data.xPixelId        || null,
-        };
-        configRef.current = c;
-        setConfig(c);
-      })
-      .catch(() => setConfig(null));
+    const load = () => {
+      fetch("/api/tracking/config")
+        .then((r) => r.json())
+        .then((data) => {
+          const c: TrackingConfig = {
+            facebookPixelId: data.facebookPixelId || null,
+            gaMeasurementId: data.gaMeasurementId || null,
+            tiktokPixelId:   data.tiktokPixelId   || null,
+            xPixelId:        data.xPixelId        || null,
+          };
+          configRef.current = c;
+          setConfig(c);
+        })
+        .catch(() => setConfig(null));
+    };
+
+    type IdleWindow = Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    };
+    const w = window as IdleWindow;
+    if (typeof w.requestIdleCallback === "function") {
+      const handle = w.requestIdleCallback(load, { timeout: 4000 });
+      return () => {
+        const cancel = (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback;
+        if (typeof cancel === "function") cancel(handle);
+      };
+    }
+    const t = setTimeout(load, 2500);
+    return () => clearTimeout(t);
   }, []);
 
   // ── Inject pixel scripts once config is ready ────────────────────────────────
