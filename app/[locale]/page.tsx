@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { LOCALE_SEO, buildPageMetadata, SITE_URL } from "@/lib/seo";
 import type { Locale } from "@/lib/seo";
 import HomePageContent from "./_components/homepage/HomePageContent";
+import type { SlideItem } from "./_components/homepage/HeroSlider";
 
 interface Props {
   params: Promise<{ locale: string }>;
 }
+
+// Revalidate the homepage at most every 5 minutes. The page becomes static-ISR-cacheable,
+// so Lighthouse / PSI gets a CDN-cached HTML response with sub-100ms TTFB instead of
+// re-running 4 SSR API fetches on every audit.
+export const revalidate = 300;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -20,28 +25,38 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 /**
- * Resolve the request's own origin so SSR fetches always hit the same deployment,
- * even when NEXT_PUBLIC_SITE_URL is unset or points at a different domain.
+ * Resolve the request's own origin without calling `headers()` — `headers()` opts the
+ * route out of static generation, which means PSI re-runs full SSR on every audit.
+ * Vercel always sets VERCEL_URL to the current deployment hostname; that's preferred.
  */
-async function baseUrl(): Promise<string> {
-  try {
-    const h = await headers();
-    const host = h.get("x-forwarded-host") ?? h.get("host");
-    const proto = h.get("x-forwarded-proto") ?? "https";
-    if (host) return `${proto}://${host}`;
-  } catch {
-    /* fall through to env var */
+function baseUrl(): string {
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
   }
-  return process.env.NEXT_PUBLIC_SITE_URL || SITE_URL;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return SITE_URL;
 }
 
-async function safeFetch<T>(url: string, fallback: T, revalidate = 300): Promise<T> {
+/**
+ * Fetch with a hard timeout so a slow/hanging API can never block the SSR render.
+ * PSI / Lighthouse aborts the audit if the document takes longer than ~60 s, returning
+ * ERROR with no LCP value — capping each upstream request at 3 s keeps total SSR latency
+ * bounded even under degraded backends.
+ */
+async function safeFetch<T>(url: string, fallback: T, revalidateSeconds = 300, timeoutMs = 3000): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { next: { revalidate } });
+    const res = await fetch(url, {
+      next: { revalidate: revalidateSeconds },
+      signal: controller.signal,
+    });
     if (!res.ok) return fallback;
     return (await res.json()) as T;
   } catch {
     return fallback;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -59,14 +74,15 @@ function buildHeroSrc(src: string, width: number): string {
 
 export default async function HomePage({ params }: Props) {
   const { locale } = await params;
-  const base = await baseUrl();
+  const base = baseUrl();
 
   // Fetch every above-the-fold data source server-side and pass them to the client tree
   // as initial state. This eliminates the empty-section → skeleton → real-content swap
   // (which was the root cause of CLS=0.92) and avoids a client waterfall on hydration.
+  // All requests run in parallel with a 3 s hard timeout each.
   const [slidesData, campaignsData, categoriesData, postsData] = await Promise.all([
-    safeFetch<{ items?: Array<{ image?: string }> }>(
-      `${base}/api/slides?locale=${locale}&limit=1`,
+    safeFetch<{ items?: SlideItem[] }>(
+      `${base}/api/slides?locale=${locale}`,
       { items: [] }
     ),
     safeFetch<{ items?: unknown[]; nextCursor?: string | null; hasMore?: boolean }>(
@@ -83,16 +99,17 @@ export default async function HomePage({ params }: Props) {
     ),
   ]);
 
-  const firstHeroImage = slidesData?.items?.[0]?.image ?? null;
+  const initialSlides = Array.isArray(slidesData?.items) ? slidesData.items : [];
+  const firstHeroImage = initialSlides[0]?.image ?? null;
   const initialCampaigns = (campaignsData?.items as Parameters<typeof HomePageContent>[0]["initialCampaigns"]) ?? [];
   const initialNextCursor = campaignsData?.nextCursor ?? null;
   const initialHasMore = Boolean(campaignsData?.hasMore);
   const initialCategories = (categoriesData?.items as Parameters<typeof HomePageContent>[0]["initialCategories"]) ?? [];
   const initialPosts = (postsData?.items as Parameters<typeof HomePageContent>[0]["initialPosts"]) ?? [];
 
-  // Preload the LCP image with a srcset that matches what the browser will actually request.
-  // Cloudinary URLs are used directly (not the /_next/image proxy) so the preload fires immediately
-  // without waiting for the Next.js image optimizer round-trip.
+  // Preload the LCP image with a srcset that matches what the browser will actually
+  // request. We use Cloudinary URLs directly (not the /_next/image proxy) so the
+  // preload fires immediately without waiting for the Next.js image optimizer round-trip.
   const preloadSrcSet = firstHeroImage
     ? [
         `${buildHeroSrc(firstHeroImage, 640)} 640w`,
@@ -114,6 +131,7 @@ export default async function HomePage({ params }: Props) {
       )}
       <HomePageContent
         firstHeroImage={firstHeroImage}
+        initialSlides={initialSlides}
         initialCampaigns={initialCampaigns}
         initialNextCursor={initialNextCursor}
         initialHasMore={initialHasMore}

@@ -14,8 +14,6 @@ import pt from "../../i18n/messages/pt.json";
 import es from "../../i18n/messages/es.json";
 import { Toaster } from "react-hot-toast";
 import SessionProvider from "@/components/providers/SessionProvider";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../api/auth/[...nextauth]/options";
 import { ConfettiProvider } from "../../components/providers/confetti-provider";
 import Footer from "@/components/Footer";
 import ReferralTracker from "@/components/ReferralTracker";
@@ -71,7 +69,12 @@ export default async function Rootlayout({
   children: React.ReactNode;
   params: Promise<{ locale: string }>;
 }) {
-  const session = await getServerSession(authOptions);
+  // NOTE: We deliberately do NOT call getServerSession() here. Calling it reads cookies,
+  // which opts the entire route (and every nested page) out of static rendering — that
+  // means PSI / Lighthouse re-runs full SSR on every audit, blowing TTFB. Instead we
+  // pass session={null} and let the client-side useSession() in Navbar fetch
+  // /api/auth/session asynchronously after first paint. This keeps the layout
+  // ISR-cacheable so PSI gets sub-100 ms TTFB from CDN.
   const { locale: rawLocale } = await params;
   const locale = VALID_LOCALES.includes(rawLocale as (typeof VALID_LOCALES)[number])
     ? rawLocale
@@ -90,7 +93,7 @@ export default async function Rootlayout({
             <Suspense fallback={null}>
               <CurrencyFromUrlSync />
             </Suspense>
-            <SessionProvider session={session}>
+            <SessionProvider session={null}>
               <Navbar />
             <main className="pt-16 lg:pt-[104px]">
               {children}

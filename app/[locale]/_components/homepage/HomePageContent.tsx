@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { Globe, MoreHorizontal, Baby, Home, Map, ArrowRight } from "lucide-react";
 import CategoryIcon from "@/components/CategoryIcon";
 
-import HeroSlider from "./HeroSlider";
+import HeroSlider, { type SlideItem } from "./HeroSlider";
 import CampaignsSlider from "./CampaignsSlider";
 import QuickDonate from "./QuickDonate";
 import BlogCard from "../BlogCard";
@@ -41,6 +41,7 @@ interface PostItem {
 
 interface HomePageContentProps {
   firstHeroImage?: string | null;
+  initialSlides?: SlideItem[];
   initialCampaigns: CampaignCardData[];
   initialNextCursor: string | null;
   initialHasMore: boolean;
@@ -57,6 +58,7 @@ const STATS = [
 
 const HomePage: React.FC<HomePageContentProps> = ({
   firstHeroImage,
+  initialSlides = [],
   initialCampaigns,
   initialNextCursor,
   initialHasMore,
@@ -67,10 +69,8 @@ const HomePage: React.FC<HomePageContentProps> = ({
 
   return (
     <div className="bg-white">
-      <style dangerouslySetInnerHTML={{ __html: `@keyframes shimmer{0%,100%{transform:translateX(-100%)}50%{transform:translateX(150%)}}` }} />
-
       {/* ── Hero Slider ── */}
-      <HeroSlider initialFirstImage={firstHeroImage ?? null} />
+      <HeroSlider initialSlides={initialSlides} initialFirstImage={firstHeroImage ?? null} />
 
       {/* ── Featured Campaigns Slider — fully SSR'd from server-fetched data, so the
               cards render in the initial HTML and there's nothing to shift in. */}

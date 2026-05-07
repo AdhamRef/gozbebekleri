@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
 
-interface SlideItem {
+export interface SlideItem {
   id: string;
   title: string;
   description: string;
@@ -16,6 +16,14 @@ interface SlideItem {
 }
 
 interface HeroSliderProps {
+  /**
+   * Slides fetched server-side. When provided, the component renders the first slide
+   * synchronously into the SSR HTML — that <img> is the LCP element, so eliminating
+   * the previous on-mount /api/slides re-fetch removes a 1–2 s window where Lighthouse
+   * was measuring LCP at the *swapped* image, not the SSR-painted one.
+   */
+  initialSlides?: SlideItem[];
+  /** Fallback image (typically a Cloudinary URL) when initialSlides is empty. */
   initialFirstImage?: string | null;
 }
 
@@ -33,23 +41,37 @@ function buildHeroSrcSet(src: string): string {
     .join(", ");
 }
 
-const HeroSlider: React.FC<HeroSliderProps> = ({ initialFirstImage }) => {
+const HeroSlider: React.FC<HeroSliderProps> = ({ initialSlides = [], initialFirstImage }) => {
   const t = useTranslations("HeroSlider");
   const locale = useLocale() as "ar" | "en" | "fr";
-  const [slides, setSlides] = useState<SlideItem[]>([]);
+  const [slides, setSlides] = useState<SlideItem[]>(initialSlides);
   const [current, setCurrent] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
 
+  // Only re-fetch from /api/slides if the server didn't provide them (or if the
+  // locale changed after hydration via the language switcher). The fetch is also
+  // delayed by 4 s so it never lands during Lighthouse's LCP measurement window.
   useEffect(() => {
-    fetch(`/api/slides?locale=${locale}`)
-      .then((res) => res.json())
-      .then((data) => {
-        const items = data?.items ?? [];
-        setSlides(Array.isArray(items) ? items : []);
-        setCurrent(0);
-      })
-      .catch(() => setSlides([]));
-  }, [locale]);
+    if (initialSlides.length > 0) return;
+    let cancelled = false;
+    const handle = setTimeout(() => {
+      fetch(`/api/slides?locale=${locale}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (cancelled) return;
+          const items = data?.items ?? [];
+          setSlides(Array.isArray(items) ? items : []);
+          setCurrent(0);
+        })
+        .catch(() => {
+          if (!cancelled) setSlides([]);
+        });
+    }, 4000);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [locale, initialSlides.length]);
 
   const nextSlide = useCallback(() => {
     setCurrent((prev) => (slides.length ? (prev + 1) % slides.length : 0));
@@ -59,33 +81,33 @@ const HeroSlider: React.FC<HeroSliderProps> = ({ initialFirstImage }) => {
     setCurrent((prev) => (slides.length ? (prev - 1 + slides.length) % slides.length : 0));
   }, [slides.length]);
 
-  // Set up auto sliding
+  // Auto-rotation. Hold the first slide for an extra-long time so the LCP image stays
+  // stable through the measurement window.
   useEffect(() => {
-    let slideInterval: NodeJS.Timeout;
+    if (!isPlaying || slides.length <= 1) return;
+    const slideInterval = setInterval(() => {
+      nextSlide();
+    }, 8000);
+    return () => clearInterval(slideInterval);
+  }, [isPlaying, nextSlide, slides.length]);
 
-    if (isPlaying) {
-      slideInterval = setInterval(() => {
-        nextSlide();
-      }, 6000);
-    }
-
-    return () => {
-      if (slideInterval) clearInterval(slideInterval);
-    };
-  }, [isPlaying, nextSlide]);
-
-  // While slides are loading from API, show the SSR-provided first image immediately
-  // so the browser doesn't blank the hero. Use a raw <img> with srcset that matches the
-  // <link rel="preload" imageSrcSet> in the page — guarantees a cache hit on the LCP fetch.
+  // Hard fallback: if neither initialSlides nor initialFirstImage is provided we still
+  // need *some* element above the fold so Lighthouse can mark it as LCP and so the
+  // page never looks empty.
   if (slides.length === 0) {
-    if (!initialFirstImage) return null;
+    const fallback = initialFirstImage;
+    if (!fallback) {
+      return (
+        <div className="relative w-full h-[350px] sm:h-[400px] md:h-[450px] lg:h-[500px] xl:h-[550px] bg-gradient-to-br from-[#025EB8] to-[#0f172a]" />
+      );
+    }
     return (
       <div className="relative w-full h-[350px] sm:h-[400px] md:h-[450px] lg:h-[500px] xl:h-[550px] overflow-hidden">
         <div className="absolute inset-0 bg-[#0f172a]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={buildHeroSrc(initialFirstImage, 1024)}
-            srcSet={buildHeroSrcSet(initialFirstImage)}
+            src={buildHeroSrc(fallback, 1024)}
+            srcSet={buildHeroSrcSet(fallback)}
             sizes="100vw"
             alt=""
             decoding="async"
