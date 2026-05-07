@@ -6,7 +6,7 @@ import type { Session } from "next-auth";
 
 interface Props {
   children: React.ReactNode;
-  session: Session | null;
+  session?: Session | null;
 }
 
 /** Fills donor location (countryCode, countryName, region, city) from IP / edge geo after login when not yet set */

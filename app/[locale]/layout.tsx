@@ -93,7 +93,7 @@ export default async function Rootlayout({
             <Suspense fallback={null}>
               <CurrencyFromUrlSync />
             </Suspense>
-            <SessionProvider session={null}>
+            <SessionProvider>
               <Navbar />
             <main className="pt-16 lg:pt-[104px]">
               {children}
