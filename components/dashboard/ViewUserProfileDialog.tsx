@@ -18,12 +18,15 @@ import {
   Award,
   MapPin,
   Receipt,
+  MessageCircle,
 } from "lucide-react";
 import ReactCountryFlag from "react-country-flag";
 import { useCurrency } from "@/context/CurrencyContext";
 import { cn } from "@/lib/utils";
 import { DASHBOARD_PERMISSION_ROWS } from "@/lib/dashboard/nav-config";
 import type { UserProfileCardData } from "@/lib/dashboard/user-profile-card";
+import { Button } from "@/components/ui/button";
+import { SendTemplateDialog } from "@/components/dashboard/SendTemplateDialog";
 
 export interface ViewUserBadgeOption {
   id: string;
@@ -46,6 +49,10 @@ export function ViewUserProfileDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { convertToCurrency } = useCurrency();
+  const [sendDialog, setSendDialog] = React.useState<{
+    open: boolean;
+    channel: "email" | "whatsapp";
+  }>({ open: false, channel: "email" });
 
   const formatMoney = (n: number) => {
     const r = convertToCurrency(n);
@@ -219,7 +226,7 @@ export function ViewUserProfileDialog({
                   </h3>
                   <p className="text-sm">
                     <span className="text-muted-foreground">الدور: </span>
-                    <span className="font-medium">
+              <span className="font-medium">
                       {user.role === "ADMIN"
                         ? "مدير — وصول كامل لجميع حملات لوحة التحكم"
                         : user.role === "STAFF"
@@ -316,11 +323,40 @@ export function ViewUserProfileDialog({
                     <p className="text-sm text-muted-foreground">—</p>
                   )}
                 </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-border">
+                  <Button
+                    size="sm"
+                    onClick={() => setSendDialog({ open: true, channel: "email" })}
+                    disabled={!user.email}
+                    title={!user.email ? "لا يوجد بريد إلكتروني" : undefined}
+                    className="gap-2 bg-[#025EB8] hover:bg-[#025EB8]/90"
+                  >
+                    <Mail className="w-4 h-4" /> إرسال بريد
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => setSendDialog({ open: true, channel: "whatsapp" })}
+                    disabled={!user.phone}
+                    title={!user.phone ? "لا يوجد رقم هاتف" : undefined}
+                    className="gap-2 bg-[#25D366] hover:bg-[#25D366]/90 text-white"
+                  >
+                    <MessageCircle className="w-4 h-4" /> إرسال واتساب
+                  </Button>
+                </div>
               </div>
             </div>
           </>
         )}
       </DialogContent>
+      {user && (
+        <SendTemplateDialog
+          open={sendDialog.open}
+          onOpenChange={(open) => setSendDialog((prev) => ({ ...prev, open }))}
+          channel={sendDialog.channel}
+          target={{ kind: "user", userId: user.id }}
+        />
+      )}
     </Dialog>
   );
 }

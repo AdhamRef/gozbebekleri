@@ -33,7 +33,10 @@ import {
   BarChart3,
   MoreHorizontal,
   UserCircle,
+  Mail,
+  MessageCircle,
 } from "lucide-react";
+import { SendTemplateDialog, type SendTarget } from "@/components/dashboard/SendTemplateDialog";
 import ReactCountryFlag from "react-country-flag";
 import { useCurrency } from "@/context/CurrencyContext";
 import { cn } from "@/lib/utils";
@@ -85,6 +88,10 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
   const [badges, setBadges] = useState<BadgeOption[]>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [editPermissions, setEditPermissions] = useState<string[]>([]);
+  const [sendDialog, setSendDialog] = useState<{
+    open: boolean;
+    channel: "email" | "whatsapp";
+  }>({ open: false, channel: "email" });
   const router = useRouter();
 
   const fetchUsers = useCallback(
@@ -384,21 +391,57 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
             {scope === "donors" ? "قائمة المتبرعين" : "قائمة فريق العمل"}
           </h2>
           <Card className="border-border shadow-sm">
-            {selectedUserIds.size > 0 && (
+            {scope === "donors" && (
+              <div
+                className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-slate-200 bg-slate-50/80"
+                dir="rtl"
+              >
+                <span className="text-sm text-slate-700">
+                  {selectedUserIds.size > 0
+                    ? `تم اختيار ${selectedUserIds.size} مستخدم`
+                    : `إرسال للنتائج المُصفّاة الحالية (${total})`}
+                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {selectedUserIds.size > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedUserIds(new Set())}
+                    >
+                      إلغاء التحديد
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    onClick={() => setSendDialog({ open: true, channel: "email" })}
+                    disabled={total === 0}
+                    className="gap-2 bg-[#025EB8] hover:bg-[#025EB8]/90"
+                  >
+                    <Mail className="w-4 h-4" /> إرسال بريد
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => setSendDialog({ open: true, channel: "whatsapp" })}
+                    disabled={total === 0}
+                    className="gap-2 bg-[#25D366] hover:bg-[#25D366]/90 text-white"
+                  >
+                    <MessageCircle className="w-4 h-4" /> إرسال واتساب
+                  </Button>
+                </div>
+              </div>
+            )}
+            {scope !== "donors" && selectedUserIds.size > 0 && (
               <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-slate-200 bg-slate-50/80" dir="rtl">
                 <span className="text-sm text-slate-700">
                   تم اختيار {selectedUserIds.size} مستخدم
                 </span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedUserIds(new Set())}
-                  >
-                    إلغاء التحديد
-                  </Button>
-                  {/* Future: إرسال بريد، تصدير، إلخ */}
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedUserIds(new Set())}
+                >
+                  إلغاء التحديد
+                </Button>
               </div>
             )}
             <CardContent className="p-0">
@@ -708,6 +751,25 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
           )}
         </DialogContent>
       </Dialog>
+
+      {scope === "donors" && (
+        <SendTemplateDialog
+          open={sendDialog.open}
+          onOpenChange={(open) => setSendDialog((prev) => ({ ...prev, open }))}
+          channel={sendDialog.channel}
+          target={
+            {
+              kind: "filtered",
+              filters: {
+                search: search || undefined,
+                preferredLang:
+                  preferredLangFilter !== "all" ? preferredLangFilter : undefined,
+                badgeId: badgeFilter !== "all" ? badgeFilter : undefined,
+              },
+            } satisfies SendTarget
+          }
+        />
+      )}
     </div>
   );
 }

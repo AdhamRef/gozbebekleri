@@ -231,3 +231,58 @@ export async function sendVerificationEmail(
     html: buildVerificationHtml(verificationUrl, locale),
   });
 }
+
+/* ===================== BULK / TEMPLATE EMAIL ===================== */
+
+export interface BulkEmailRecipient {
+  to: string;
+  subject: string;
+  html: string;
+}
+
+export interface BulkEmailResult {
+  sent: number;
+  failed: { to: string; error: string }[];
+}
+
+/**
+ * Send personalized emails to many recipients via SendGrid.
+ * Each recipient gets its own send call (parallel, capped) because the HTML
+ * body is per-donor and SendGrid's `personalizations` array doesn't support
+ * different HTML per recipient — it only swaps merge tokens.
+ */
+export async function sendBulkEmail(
+  recipients: BulkEmailRecipient[]
+): Promise<BulkEmailResult> {
+  const from = process.env.SENDGRID_FROM ?? "noreply@gozbebekleri.org.tr";
+  const out: BulkEmailResult = { sent: 0, failed: [] };
+
+  if (recipients.length === 0) return out;
+
+  if (!process.env.SENDGRID_API_KEY) {
+    console.log(`\n[BULK EMAIL - DEV] would send to ${recipients.length} recipients`);
+    out.sent = recipients.length;
+    return out;
+  }
+
+  const CONCURRENCY = 8;
+  let cursor = 0;
+  async function worker() {
+    while (true) {
+      const i = cursor++;
+      if (i >= recipients.length) return;
+      const r = recipients[i];
+      try {
+        await sgMail.send({ to: r.to, from, subject: r.subject, html: r.html });
+        out.sent += 1;
+      } catch (err) {
+        out.failed.push({
+          to: r.to,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, recipients.length) }, worker));
+  return out;
+}

@@ -9,7 +9,7 @@ import {
   PenLine, ImageIcon, Ticket, PieChart, Link2,
   Award, BarChart3, MessageSquare, Repeat, ScrollText,
   UserCircle, ChevronRight,
-  ChevronLeft,
+  ChevronLeft, FileText,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -79,6 +79,7 @@ function DashboardContent({
     logs:       <ScrollText  className="w-[18px] h-[18px] shrink-0" />,
     badges:     <Award       className="w-[18px] h-[18px] shrink-0" />,
     messages:   <MessageSquare className="w-[18px] h-[18px] shrink-0" />,
+    templates:  <FileText      className="w-[18px] h-[18px] shrink-0" />,
     campaigns:  <Heart       className="w-[18px] h-[18px] shrink-0" />,
     categories: <FolderOpen  className="w-[18px] h-[18px] shrink-0" />,
     blog:       <PenLine     className="w-[18px] h-[18px] shrink-0" />,

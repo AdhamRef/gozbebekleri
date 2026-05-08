@@ -706,6 +706,33 @@ model ExchangeRateSnapshot {
   updatedAt DateTime @updatedAt
 }
 
+/* ===================== MESSAGE TEMPLATES (admin outreach) ===================== */
+
+model EmailTemplate {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  subject     String
+  /// TReaderDocument JSON from @usewaypoint/email-builder
+  document    Json
+  createdById String?  @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
+}
+
+model WhatsappTemplate {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  /// Plain text body with {{variables}}
+  body        String
+  createdById String?  @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
+}
+
 /* ===================== TRACKING PIXELS (dashboard configurable) ===================== */
 model TrackingSettings {
   id                      String   @id @default(auto()) @map("_id") @db.ObjectId

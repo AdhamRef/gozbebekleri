@@ -22,6 +22,7 @@ export const DASHBOARD_NAV_GROUPS: {
       { key: "team", title: "فريق العمل", href: "/dashboard/users/team" },
       { key: "badges", title: "الشارات", href: "/dashboard/badges" },
       { key: "messages", title: "الرسائل", href: "/dashboard/messages" },
+      { key: "templates", title: "القوالب", href: "/dashboard/templates" },
     ],
   },
   {
