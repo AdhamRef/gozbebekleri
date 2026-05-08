@@ -18,7 +18,7 @@ const notoKufiArabic = Noto_Kufi_Arabic({
 });
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.gozbebekleri.org";
-const OG_IMAGE = `/logo.png`;
+const OG_IMAGE = `/circle-logo.png`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
@@ -138,7 +138,7 @@ const organizationSchema = {
   url: SITE,
   logo: {
     "@type": "ImageObject",
-    url: "https://i.ibb.co/ZwcJcN1/logo.webp",
+    url: "circle-logo.png",
     width: 374,
     height: 206,
   },

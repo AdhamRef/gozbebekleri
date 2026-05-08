@@ -1587,7 +1587,13 @@ const DonationDialog = ({
         const donationId = response.data.donation.id as string;
 
         if (paymentMethod === "CARD" && use3D) {
-            const init = await axios.post("/api/payfor/3dpay/initiate", { donationId, locale });
+            // Saved card: server decrypts PAN + uses stored Expiry/CardHolderName.
+            // New card: server returns base fields; browser appends Pan/Expiry/CardHolderName/Cvv2.
+            const init = await axios.post("/api/payfor/3dpay/initiate", {
+              donationId,
+              locale,
+              savedCardId: selectedCardId ?? undefined,
+            });
             const { actionUrl, fields } = init.data as {
               actionUrl: string;
               fields: Record<string, string>;
@@ -1604,33 +1610,31 @@ const DonationDialog = ({
               form.appendChild(input);
             });
 
-            const [mm, yy] = cardDetails.expiryDate.split("/");
+            // Card fields the browser still has to add — depends on flow.
+            const browserCardFields: Record<string, string> = {};
+            if (selectedCardId) {
+              // Pan/Expiry/CardHolderName already in `fields`; add CVC only.
+              browserCardFields.Cvv2 = cardDetails.cvv;
+            } else {
+              const [mm, yy] = cardDetails.expiryDate.split("/");
+              const newPan = cardDetails.cardNumber.replace(/\s/g, "");
 
-            // Determine the real card number to send to PayFor
-            // When using a saved card, we don't have the full number here — PayFor won't work
-            // with masked numbers; saved-card flow would require server-side decryption (future).
-            // For now: if a new card was entered, save it; if saved card selected, use CVC only
-            const realCardNumber = selectedCardId
-              ? "" // PayFor still needs real card; saved-card one-click needs server flow
-              : cardDetails.cardNumber.replace(/\s/g, "");
+              // Save new card (fire-and-forget, non-blocking)
+              if (session?.user?.id && newPan.length >= 13) {
+                axios.post("/api/credit-cards", {
+                  cardNumber: newPan,
+                  expiryDate: cardDetails.expiryDate,
+                  cvc: cardDetails.cvv,
+                  cardholderName: cardDetails.cardholderName || undefined,
+                }).catch(() => {});
+              }
 
-            // Save new card (fire-and-forget, non-blocking)
-            if (!selectedCardId && session?.user?.id && realCardNumber.length >= 13) {
-              axios.post("/api/credit-cards", {
-                cardNumber: realCardNumber,
-                expiryDate: cardDetails.expiryDate,
-                cvc: cardDetails.cvv,
-                cardholderName: cardDetails.cardholderName || undefined,
-              }).catch(() => {});
+              browserCardFields.Pan = newPan;
+              browserCardFields.Expiry = `${mm ?? ""}${yy ?? ""}`;
+              browserCardFields.Cvv2 = cardDetails.cvv;
+              browserCardFields.CardHolderName = cardDetails.cardholderName;
             }
-
-            const cardFields: Record<string, string> = {
-              Pan: realCardNumber || cardDetails.cardNumber.replace(/\s/g, ""),
-              Expiry: `${mm ?? ""}${yy ?? ""}`, // MMYY as required by Ziraat Katılım
-              Cvv2: cardDetails.cvv,
-              CardHolderName: cardDetails.cardholderName,
-            };
-            Object.entries(cardFields).forEach(([name, value]) => {
+            Object.entries(browserCardFields).forEach(([name, value]) => {
               const input = document.createElement("input");
               input.type = "hidden";
               input.name = name;

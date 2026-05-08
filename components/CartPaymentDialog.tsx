@@ -509,7 +509,13 @@ const CartPaymentDialog = ({
         if (!res.data?.success) { onClose(); return; }
         const donationId = res.data.donation.id as string;
 
-        const init = await axios.post("/api/payfor/3dpay/initiate", { donationId, locale });
+        // Saved card: server decrypts PAN + uses stored Expiry/CardHolderName.
+        // New card: server returns base fields; browser appends Pan/Expiry/CardHolderName/Cvv2.
+        const init = await axios.post("/api/payfor/3dpay/initiate", {
+          donationId,
+          locale,
+          savedCardId: selectedCardId ?? undefined,
+        });
         const { actionUrl, fields } = init.data as { actionUrl: string; fields: Record<string, string> };
 
         const form = document.createElement("form");
@@ -521,26 +527,28 @@ const CartPaymentDialog = ({
           form.appendChild(input);
         });
 
-        const realCardNumber = selectedCardId ? "" : cardDetails.cardNumber.replace(/\s/g, "");
-
-        // Save new card fire-and-forget
-        if (!selectedCardId && session?.user?.id && realCardNumber.length >= 13) {
-          axios.post("/api/credit-cards", {
-            cardNumber:     realCardNumber,
-            expiryDate:     cardDetails.expiryDate,
-            cvc:            cardDetails.cvv,
-            cardholderName: cardDetails.cardholderName || undefined,
-          }).catch(() => {});
+        const browserCardFields: Record<string, string> = {};
+        if (selectedCardId) {
+          // Pan/Expiry/CardHolderName already in `fields`; add CVC only.
+          browserCardFields.Cvv2 = cardDetails.cvv;
+        } else {
+          const newPan = cardDetails.cardNumber.replace(/\s/g, "");
+          // Save new card fire-and-forget
+          if (session?.user?.id && newPan.length >= 13) {
+            axios.post("/api/credit-cards", {
+              cardNumber:     newPan,
+              expiryDate:     cardDetails.expiryDate,
+              cvc:            cardDetails.cvv,
+              cardholderName: cardDetails.cardholderName || undefined,
+            }).catch(() => {});
+          }
+          const [mm, yy] = cardDetails.expiryDate.split("/");
+          browserCardFields.Pan = newPan;
+          browserCardFields.Expiry = `${mm ?? ""}${yy ?? ""}`; // MMYY
+          browserCardFields.Cvv2 = cardDetails.cvv;
+          browserCardFields.CardHolderName = cardDetails.cardholderName;
         }
-
-        const [mm, yy] = cardDetails.expiryDate.split("/");
-        const cardFields: Record<string, string> = {
-          Pan:            realCardNumber || cardDetails.cardNumber.replace(/\s/g, ""),
-          Expiry:         `${mm ?? ""}${yy ?? ""}`, // MMYY as required by Ziraat Katılım
-          Cvv2:           cardDetails.cvv,
-          CardHolderName: cardDetails.cardholderName,
-        };
-        Object.entries(cardFields).forEach(([name, value]) => {
+        Object.entries(browserCardFields).forEach(([name, value]) => {
           const input = document.createElement("input");
           input.type = "hidden"; input.name = name; input.value = value;
           form.appendChild(input);

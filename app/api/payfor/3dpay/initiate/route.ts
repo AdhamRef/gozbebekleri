@@ -12,6 +12,7 @@ import {
   convertAmountInCurrencyToTry,
   getUsdBaseRatesForServer,
 } from "@/lib/exchange/rates-service";
+import { decryptCard } from "@/lib/card-crypto";
 
 /** Convert any amount to TRY using USD-base rates from the database (same as donations). */
 async function toTRY(amount: number, fromCurrency: string): Promise<number> {
@@ -22,6 +23,10 @@ async function toTRY(amount: number, fromCurrency: string): Promise<number> {
 type InitiateBody = {
   donationId: string;
   locale?: string;
+  /** Optional saved-card id. When provided, the server fills Pan/Expiry/CardHolderName
+   *  in the returned fields by decrypting the stored card. Only the user's own cards
+   *  are accepted. The browser still appends Cvv2 (CVC isn't stored). */
+  savedCardId?: string;
 };
 
 export async function POST(req: NextRequest) {
@@ -129,7 +134,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const formFields = {
+    const formFields: Record<string, string> = {
       MbrId: mbrId,
       MerchantID: merchantId,
       UserCode: userCode,
@@ -146,9 +151,53 @@ export async function POST(req: NextRequest) {
       MOTO: "0",
       Rnd: rnd,
       Hash: hash,
-      // Card fields (Pan, Expiry, Cvv2, CardHolderName) are added client-side
-      // in DonationDialog and posted directly browser → bank. Never sent to our server.
+      // For new cards: Pan/Expiry/Cvv2/CardHolderName are added client-side and posted
+      //   directly browser → bank.
+      // For saved cards: Pan/Expiry/CardHolderName are filled below from decrypted DB
+      //   row; the browser still appends Cvv2 (CVC isn't stored).
     };
+
+    // Saved-card path: decrypt the stored PAN and pass it to the bank.
+    // PayFor returns MR07 "Request CardBrand Error" if the PAN is masked
+    // (asterisks), which is what happened before we wired this flow up.
+    const savedCardId = body.savedCardId?.trim();
+    if (savedCardId) {
+      if (!session?.user?.id) {
+        return NextResponse.json(
+          { error: "Authentication required for saved cards" },
+          { status: 401 }
+        );
+      }
+      const savedCard = await prisma.creditCard.findUnique({
+        where: { id: savedCardId },
+        select: {
+          userId: true,
+          cardNumber: true,
+          expiryDate: true,
+          cardholderName: true,
+        },
+      });
+      if (!savedCard || savedCard.userId !== session.user.id) {
+        return NextResponse.json(
+          { error: "Saved card not found" },
+          { status: 404 }
+        );
+      }
+      let pan: string;
+      try {
+        pan = decryptCard(savedCard.cardNumber).replace(/\D/g, "");
+      } catch {
+        return NextResponse.json(
+          { error: "Failed to decrypt saved card" },
+          { status: 500 }
+        );
+      }
+      // Stored as "MM/YY" → PayFor wants "MMYY"
+      const expiry = (savedCard.expiryDate || "").replace(/\D/g, "");
+      formFields.Pan = pan;
+      formFields.Expiry = expiry;
+      formFields.CardHolderName = savedCard.cardholderName ?? "";
+    }
 
     console.log("[PayFor INITIATE] Sending fields to bank:", {
       ...formFields,
