@@ -55,6 +55,7 @@ import { formatUtcCalendarMonthLong } from "@/lib/admin/current-calendar-month-u
 import { StatsMetricCard } from "@/components/dashboard/StatsMetricCard";
 import { getDashboardChartPeriodLabelAr } from "@/lib/dashboard/chart-period-label-ar";
 import { DonationTableCountryColumn } from "@/components/dashboard/DonationTableCountryColumn";
+import { getCountryDisplayNameFromCode } from "@/lib/dashboard/country-display-name";
 import { DashboardPieLegendByValue } from "@/components/dashboard/DashboardPieLegend";
 import { useViewUserProfile } from "@/context/ViewUserProfileContext";
 
@@ -214,6 +215,9 @@ export default function ReferralAnalyticsPage() {
   const [donationsSortBy, setDonationsSortBy] = useState<"date" | "amount">("date");
   const [donationsSortOrder, setDonationsSortOrder] = useState<"asc" | "desc">("desc");
   const [donationsStatusFilter, setDonationsStatusFilter] = useState<"all" | "PAID" | "FAILED">("all");
+  const [donationCountryFilter, setDonationCountryFilter] = useState<string>("all");
+  const [countryOptions, setCountryOptions] = useState<{ code: string; count: number }[]>([]);
+  const [countryUnsetCount, setCountryUnsetCount] = useState(0);
   const [donations, setDonations] = useState<DonationRow[]>([]);
   const [donationsPage, setDonationsPage] = useState(1);
   const [donationsTotal, setDonationsTotal] = useState(0);
@@ -245,6 +249,23 @@ export default function ReferralAnalyticsPage() {
     fetchFilters();
   }, []);
 
+  // Fetch distinct donor countries (scoped to this referral)
+  useEffect(() => {
+    if (!id) return;
+    const fetchCountries = async () => {
+      try {
+        const res = await fetch(`/api/admin/donations/countries?referralId=${id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setCountryOptions(Array.isArray(data?.countries) ? data.countries : []);
+        setCountryUnsetCount(Number(data?.unsetCount) || 0);
+      } catch (error) {
+        console.error("Error fetching donor countries:", error);
+      }
+    };
+    fetchCountries();
+  }, [id]);
+
   // Stats
   useEffect(() => {
     if (!id) return;
@@ -258,6 +279,7 @@ export default function ReferralAnalyticsPage() {
         }
         if (selectedCategory !== "all") searchParams.set("categoryId", selectedCategory);
         if (selectedCampaign !== "all") searchParams.set("campaignId", selectedCampaign);
+        if (donationCountryFilter !== "all") searchParams.set("country", donationCountryFilter);
         const res = await fetch(`/api/admin/referrals/${id}/stats?${searchParams}`);
         const data = await res.json();
         if (!res.ok) {
@@ -276,7 +298,7 @@ export default function ReferralAnalyticsPage() {
       }
     };
     fetchStats();
-  }, [id, chartPeriod, dateFrom, dateTo, selectedCategory, selectedCampaign, router]);
+  }, [id, chartPeriod, dateFrom, dateTo, selectedCategory, selectedCampaign, donationCountryFilter, router]);
 
   // Chart
   useEffect(() => {
@@ -292,6 +314,7 @@ export default function ReferralAnalyticsPage() {
         }
         if (selectedCategory !== "all") searchParams.set("categoryId", selectedCategory);
         if (selectedCampaign !== "all") searchParams.set("campaignId", selectedCampaign);
+        if (donationCountryFilter !== "all") searchParams.set("country", donationCountryFilter);
         const res = await fetch(`/api/admin/referrals/${id}/chart?${searchParams}`);
         if (!res.ok) return;
         const data = await res.json();
@@ -303,7 +326,7 @@ export default function ReferralAnalyticsPage() {
       }
     };
     fetchChart();
-  }, [id, chartPeriod, dateFrom, dateTo, selectedCategory, selectedCampaign]);
+  }, [id, chartPeriod, dateFrom, dateTo, selectedCategory, selectedCampaign, donationCountryFilter]);
 
   const fetchDonations = useCallback(
     async (page: number, append: boolean) => {
@@ -322,6 +345,7 @@ export default function ReferralAnalyticsPage() {
         if (start) searchParams.set("start", start);
         if (end) searchParams.set("end", end);
         if (donationsStatusFilter !== "all") searchParams.set("status", donationsStatusFilter);
+        if (donationCountryFilter !== "all") searchParams.set("country", donationCountryFilter);
         const res = await fetch(`/api/donations?${searchParams}`);
         const data = await res.json();
         if (!res.ok) {
@@ -338,14 +362,14 @@ export default function ReferralAnalyticsPage() {
         setDonationsFetchedOnce(true);
       }
     },
-    [id, selectedCategory, selectedCampaign, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, donationsStatusFilter]
+    [id, selectedCategory, selectedCampaign, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, donationsStatusFilter, donationCountryFilter]
   );
 
   useEffect(() => {
     if (!id || loading) return;
     setDonationsPage(1);
     fetchDonations(1, false);
-  }, [id, loading, selectedCategory, selectedCampaign, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, donationsStatusFilter, fetchDonations]);
+  }, [id, loading, selectedCategory, selectedCampaign, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, donationsStatusFilter, donationCountryFilter, fetchDonations]);
 
   const loadMoreDonations = () => {
     const next = donationsPage + 1;
@@ -740,6 +764,27 @@ export default function ReferralAnalyticsPage() {
                     <SelectItem value="all" className="text-xs">كل الحالات</SelectItem>
                     <SelectItem value="PAID" className="text-xs">ناجح</SelectItem>
                     <SelectItem value="FAILED" className="text-xs">فاشل</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 text-right">
+                <label className="text-[11px] font-medium text-slate-500">الدولة</label>
+                <Select value={donationCountryFilter} onValueChange={(v) => setDonationCountryFilter(v)}>
+                  <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+                    <SelectValue placeholder="الدولة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs">كل الدول</SelectItem>
+                    {countryOptions.map((c) => (
+                      <SelectItem key={c.code} value={c.code} className="text-xs">
+                        {getCountryDisplayNameFromCode(c.code, locale || "ar")} ({c.count})
+                      </SelectItem>
+                    ))}
+                    {countryUnsetCount > 0 && (
+                      <SelectItem value="__unset" className="text-xs">
+                        غير محدد ({countryUnsetCount})
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

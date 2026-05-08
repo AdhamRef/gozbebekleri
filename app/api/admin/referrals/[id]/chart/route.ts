@@ -57,6 +57,7 @@ export async function GET(
     const endParam = searchParams.get("end");
     const categoryId = searchParams.get("categoryId");
     const campaignId = searchParams.get("campaignId");
+    const country = searchParams.get("country")?.trim() ?? null;
 
     const { startDate, endDate } = getDateRange(period, startParam, endParam);
     // status=PAID alone includes abandoned checkouts that never settled; require paidAt too.
@@ -73,9 +74,18 @@ export async function GET(
         { categoryItems: { some: { categoryId } } },
       ];
     }
+    const countryWhere: Prisma.DonationWhereInput | null =
+      country && country !== "all"
+        ? country === "__unset"
+          ? { OR: [{ donorCountryCode: null }, { donorCountryCode: "" }] }
+          : { donorCountryCode: country.toUpperCase() }
+        : null;
+    const finalDonationWhere: Prisma.DonationWhereInput = countryWhere
+      ? { AND: [donationWhere, countryWhere] }
+      : donationWhere;
 
     const donations = await prisma.donation.findMany({
-      where: donationWhere,
+      where: finalDonationWhere,
       select: {
         createdAt: true,
         subscriptionId: true,

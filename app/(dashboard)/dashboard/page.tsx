@@ -63,6 +63,7 @@ import { formatUtcCalendarMonthLong } from "@/lib/admin/current-calendar-month-u
 import { StatsMetricCard } from "@/components/dashboard/StatsMetricCard";
 import { getDashboardChartPeriodLabelAr } from "@/lib/dashboard/chart-period-label-ar";
 import { DonationTableCountryColumn } from "@/components/dashboard/DonationTableCountryColumn";
+import { getCountryDisplayNameFromCode } from "@/lib/dashboard/country-display-name";
 import {
   DashboardPieLegendByCount,
   DashboardPieLegendByValue,
@@ -300,6 +301,9 @@ export default function DashboardPage() {
   const [donationLocaleFilter, setDonationLocaleFilter] = useState<
     "all" | "ar" | "en" | "fr" | "tr" | "id" | "pt" | "es" | "__unset"
   >("all");
+  const [donationCountryFilter, setDonationCountryFilter] = useState<string>("all");
+  const [countryOptions, setCountryOptions] = useState<{ code: string; count: number }[]>([]);
+  const [countryUnsetCount, setCountryUnsetCount] = useState(0);
 
   const [donations, setDonations] = useState<DonationRow[]>([]);
   const [donationsPage, setDonationsPage] = useState(1);
@@ -332,6 +336,22 @@ export default function DashboardPage() {
     };
     fetchFilters();
   }, [locale]);
+
+  // Fetch distinct donor countries for the country filter dropdown
+  useEffect(() => {
+    const fetchCountries = async () => {
+      try {
+        const res = await fetch("/api/admin/donations/countries");
+        if (!res.ok) return;
+        const data = await res.json();
+        setCountryOptions(Array.isArray(data?.countries) ? data.countries : []);
+        setCountryUnsetCount(Number(data?.unsetCount) || 0);
+      } catch (error) {
+        console.error("Error fetching donor countries:", error);
+      }
+    };
+    fetchCountries();
+  }, []);
 
   const commitUsersSearch = useCallback(() => {
     setUsersSearchCommitted(usersSearchInput.trim());
@@ -405,6 +425,7 @@ export default function DashboardPage() {
         if (effectiveUserId !== "all") params.append("userId", effectiveUserId);
         if (showFailed) params.set("showFailed", "true");
         if (donationLocaleFilter !== "all") params.set("locale", donationLocaleFilter);
+        if (donationCountryFilter !== "all") params.set("country", donationCountryFilter);
         const response = await axios.get(`/api/admin/donations/chart?${params}`);
         setChartData(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
@@ -416,7 +437,7 @@ export default function DashboardPage() {
       }
     };
     fetchChartData();
-  }, [selectedCategory, selectedCampaign, selectedUserId, searchParams, chartPeriod, dateFrom, dateTo, showFailed, donationLocaleFilter]);
+  }, [selectedCategory, selectedCampaign, selectedUserId, searchParams, chartPeriod, dateFrom, dateTo, showFailed, donationLocaleFilter, donationCountryFilter]);
 
   // Stats — affected by فترة (period + dateFrom/dateTo) and category/campaign filters
   useEffect(() => {
@@ -431,6 +452,7 @@ export default function DashboardPage() {
         if (selectedCategory !== "all") params.set("categoryId", selectedCategory);
         if (selectedCampaign !== "all") params.set("campaignId", selectedCampaign);
         if (donationLocaleFilter !== "all") params.set("locale", donationLocaleFilter);
+        if (donationCountryFilter !== "all") params.set("country", donationCountryFilter);
         const response = await fetch(`/api/admin/stats?${params}`);
         const data = await response.json();
         if (!response.ok) {
@@ -447,7 +469,7 @@ export default function DashboardPage() {
       }
     };
     fetchStats();
-  }, [chartPeriod, dateFrom, dateTo, selectedCategory, selectedCampaign, donationLocaleFilter]);
+  }, [chartPeriod, dateFrom, dateTo, selectedCategory, selectedCampaign, donationLocaleFilter, donationCountryFilter]);
 
   // Donations list — uses تصفية النتائج + chart time span (period + from/to) + sort
   const fetchDonations = useCallback(
@@ -467,6 +489,7 @@ export default function DashboardPage() {
         if (end) params.set("end", end);
         if (donationsStatusFilter !== "all") params.set("status", donationsStatusFilter);
         if (donationLocaleFilter !== "all") params.set("locale", donationLocaleFilter);
+        if (donationCountryFilter !== "all") params.set("country", donationCountryFilter);
         const res = await fetch(`/api/donations?${params}`);
         const data = await res.json();
         if (!res.ok) {
@@ -495,6 +518,7 @@ export default function DashboardPage() {
       donationsSortOrder,
       donationsStatusFilter,
       donationLocaleFilter,
+      donationCountryFilter,
     ]
   );
 
@@ -503,7 +527,7 @@ export default function DashboardPage() {
     if (loading) return;
     setDonationsPage(1);
     fetchDonations(1, false);
-  }, [loading, selectedCategory, selectedCampaign, selectedUserId, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, donationsStatusFilter, donationLocaleFilter, fetchDonations]);
+  }, [loading, selectedCategory, selectedCampaign, selectedUserId, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, donationsStatusFilter, donationLocaleFilter, donationCountryFilter, fetchDonations]);
 
   const loadMoreDonations = () => {
     const next = donationsPage + 1;
@@ -535,6 +559,7 @@ export default function DashboardPage() {
     if (selectedUserId !== "all") params.set("userId", selectedUserId);
     if (donationsStatusFilter !== "all") params.set("status", donationsStatusFilter);
     if (donationLocaleFilter !== "all") params.set("locale", donationLocaleFilter);
+    if (donationCountryFilter !== "all") params.set("country", donationCountryFilter);
     params.set("sortBy", donationsSortBy);
     params.set("sortOrder", donationsSortOrder);
     return `/api/admin/donations/export?${params.toString()}`;
@@ -547,6 +572,7 @@ export default function DashboardPage() {
     selectedUserId,
     donationsStatusFilter,
     donationLocaleFilter,
+    donationCountryFilter,
     donationsSortBy,
     donationsSortOrder,
   ]);
@@ -1623,6 +1649,34 @@ export default function DashboardPage() {
         <SelectItem value="pt" className="text-xs">Português</SelectItem>
         <SelectItem value="es" className="text-xs">Español</SelectItem>
         <SelectItem value="__unset" className="text-xs">غير محدد</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+
+  {/* Donor country */}
+  <div className="space-y-1 text-right">
+    <label className="text-[11px] font-medium text-slate-500">
+      الدولة
+    </label>
+    <Select
+      value={donationCountryFilter}
+      onValueChange={(v) => setDonationCountryFilter(v)}
+    >
+      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectValue placeholder="الدولة" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all" className="text-xs">كل الدول</SelectItem>
+        {countryOptions.map((c) => (
+          <SelectItem key={c.code} value={c.code} className="text-xs">
+            {getCountryDisplayNameFromCode(c.code, locale || "ar")} ({c.count})
+          </SelectItem>
+        ))}
+        {countryUnsetCount > 0 && (
+          <SelectItem value="__unset" className="text-xs">
+            غير محدد ({countryUnsetCount})
+          </SelectItem>
+        )}
       </SelectContent>
     </Select>
   </div>

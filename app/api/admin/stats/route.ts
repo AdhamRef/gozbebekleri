@@ -76,17 +76,36 @@ function mergeLocaleFilter(where: Record<string, unknown>, locale: string | null
   return { AND: [where, lw] };
 }
 
+function mergeCountryFilter(where: Record<string, unknown>, country: string | null): Record<string, unknown> {
+  if (!country || country === 'all') return where;
+  const cw =
+    country === '__unset'
+      ? { OR: [{ donorCountryCode: null }, { donorCountryCode: '' }] }
+      : { donorCountryCode: country.toUpperCase() };
+  return { AND: [where, cw] };
+}
+
+function mergeFilters(
+  where: Record<string, unknown>,
+  locale: string | null,
+  country: string | null
+) {
+  return mergeCountryFilter(mergeLocaleFilter(where, locale), country);
+}
+
 function buildDonationItemWhere(
   startDate: Date,
   endDate: Date,
   categoryId: string | null,
   campaignId: string | null,
-  locale: string | null
+  locale: string | null,
+  country: string | null
 ) {
   const base: Record<string, unknown> = {
-    donation: mergeLocaleFilter(
+    donation: mergeFilters(
       { createdAt: { gte: startDate, lte: endDate }, ...PAID_DONATION_FILTER },
-      locale
+      locale,
+      country
     ),
   };
   if (campaignId && campaignId !== 'all') {
@@ -101,12 +120,14 @@ function buildDonationCategoryItemWhere(
   startDate: Date,
   endDate: Date,
   categoryId: string | null,
-  locale: string | null
+  locale: string | null,
+  country: string | null
 ) {
   const base: Record<string, unknown> = {
-    donation: mergeLocaleFilter(
+    donation: mergeFilters(
       { createdAt: { gte: startDate, lte: endDate }, ...PAID_DONATION_FILTER },
-      locale
+      locale,
+      country
     ),
   };
   if (categoryId && categoryId !== 'all') {
@@ -128,15 +149,18 @@ export async function GET(request: NextRequest) {
     const categoryId = searchParams.get('categoryId');
     const campaignId = searchParams.get('campaignId');
     const locale = searchParams.get('locale')?.trim() ?? null;
+    const country = searchParams.get('country')?.trim() ?? null;
 
     const { startDate, endDate } = getDateRange(period, startParam, endParam);
-    const donationWhere = mergeLocaleFilter(
+    const donationWhere = mergeFilters(
       buildDonationWhere(startDate, endDate, categoryId, campaignId),
-      locale
+      locale,
+      country
     );
-    const donationWhereAllTime = mergeLocaleFilter(
+    const donationWhereAllTime = mergeFilters(
       buildDonationWhereAllTime(categoryId, campaignId),
-      locale
+      locale,
+      country
     );
 
     // Only donations that actually settled (status=PAID + paidAt set) count toward revenue.
@@ -147,9 +171,10 @@ export async function GET(request: NextRequest) {
     const failedWhere = { ...donationWhere, status: 'FAILED' as const };
 
     const { monthStart, monthEnd } = getCurrentCalendarMonthUtcRange();
-    const thisMonthDonationWhere = mergeLocaleFilter(
+    const thisMonthDonationWhere = mergeFilters(
       buildDonationWhere(monthStart, monthEnd, categoryId, campaignId),
-      locale
+      locale,
+      country
     );
     const thisMonthPaidWhere = { ...thisMonthDonationWhere, ...PAID_DONATION_FILTER };
 
@@ -233,12 +258,12 @@ export async function GET(request: NextRequest) {
       prisma.donationItem.aggregate({
         _sum: { amountUSD: true, amount: true },
         _count: { id: true },
-        where: buildDonationItemWhere(startDate, endDate, categoryId, campaignId, locale),
+        where: buildDonationItemWhere(startDate, endDate, categoryId, campaignId, locale, country),
       }),
       prisma.donationCategoryItem.aggregate({
         _sum: { amountUSD: true, amount: true },
         _count: { id: true },
-        where: buildDonationCategoryItemWhere(startDate, endDate, categoryId, locale),
+        where: buildDonationCategoryItemWhere(startDate, endDate, categoryId, locale, country),
       }),
       prisma.donation.findMany({
         take: 10,

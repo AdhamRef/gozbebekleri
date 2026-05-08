@@ -57,6 +57,7 @@ import { formatUtcCalendarMonthLong } from "@/lib/admin/current-calendar-month-u
 import { StatsMetricCard } from "@/components/dashboard/StatsMetricCard";
 import { getDashboardChartPeriodLabelAr } from "@/lib/dashboard/chart-period-label-ar";
 import { DonationTableCountryColumn } from "@/components/dashboard/DonationTableCountryColumn";
+import { getCountryDisplayNameFromCode } from "@/lib/dashboard/country-display-name";
 import { DashboardPieLegendByValue } from "@/components/dashboard/DashboardPieLegend";
 import { useViewUserProfile } from "@/context/ViewUserProfileContext";
 
@@ -263,6 +264,9 @@ export default function MonthlySubscriptionsDashboardPage() {
   const [donationsSortBy, setDonationsSortBy] = useState<"date" | "amount">("date");
   const [donationsSortOrder, setDonationsSortOrder] = useState<"asc" | "desc">("desc");
   const [donationsStatusFilter, setDonationsStatusFilter] = useState<"all" | "PAID" | "FAILED">("all");
+  const [donationCountryFilter, setDonationCountryFilter] = useState<string>("all");
+  const [countryOptions, setCountryOptions] = useState<{ code: string; count: number }[]>([]);
+  const [countryUnsetCount, setCountryUnsetCount] = useState(0);
 
   const [donations, setDonations] = useState<DonationRow[]>([]);
   const [donationsPage, setDonationsPage] = useState(1);
@@ -305,6 +309,22 @@ export default function MonthlySubscriptionsDashboardPage() {
     };
     fetchFilters();
   }, [locale]);
+
+  // Fetch distinct donor countries for the country filter dropdown
+  useEffect(() => {
+    const fetchCountries = async () => {
+      try {
+        const res = await fetch("/api/admin/donations/countries");
+        if (!res.ok) return;
+        const data = await res.json();
+        setCountryOptions(Array.isArray(data?.countries) ? data.countries : []);
+        setCountryUnsetCount(Number(data?.unsetCount) || 0);
+      } catch (error) {
+        console.error("Error fetching donor countries:", error);
+      }
+    };
+    fetchCountries();
+  }, []);
 
   const commitUsersSearch = useCallback(() => {
     setUsersSearchCommitted(usersSearchInput.trim());
@@ -435,6 +455,7 @@ export default function MonthlySubscriptionsDashboardPage() {
         if (end) params.set("end", end);
         params.set("subscriptionOnly", "1");
         if (donationsStatusFilter !== "all") params.set("status", donationsStatusFilter);
+        if (donationCountryFilter !== "all") params.set("country", donationCountryFilter);
         const res = await fetch(`/api/donations?${params}`);
         const data = await res.json();
         if (!res.ok) {
@@ -462,6 +483,7 @@ export default function MonthlySubscriptionsDashboardPage() {
       donationsSortBy,
       donationsSortOrder,
       donationsStatusFilter,
+      donationCountryFilter,
     ]
   );
 
@@ -470,7 +492,7 @@ export default function MonthlySubscriptionsDashboardPage() {
     if (loading) return;
     setDonationsPage(1);
     fetchDonations(1, false);
-  }, [loading, selectedCategory, selectedCampaign, selectedUserId, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, donationsStatusFilter, fetchDonations]);
+  }, [loading, selectedCategory, selectedCampaign, selectedUserId, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, donationsStatusFilter, donationCountryFilter, fetchDonations]);
 
   const fetchSubscriptions = useCallback(
     async (page: number, append: boolean) => {
@@ -1535,6 +1557,34 @@ export default function MonthlySubscriptionsDashboardPage() {
         <SelectItem value="bar" className="text-xs">أعمدة</SelectItem>
         <SelectItem value="line" className="text-xs">خط</SelectItem>
         <SelectItem value="area" className="text-xs">منطقة</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
+
+  {/* Donor country (الدفعات فقط) */}
+  <div className="space-y-1 text-right">
+    <label className="text-[11px] font-medium text-slate-500">
+      الدولة (الدفعات)
+    </label>
+    <Select
+      value={donationCountryFilter}
+      onValueChange={(v) => setDonationCountryFilter(v)}
+    >
+      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectValue placeholder="الدولة" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all" className="text-xs">كل الدول</SelectItem>
+        {countryOptions.map((c) => (
+          <SelectItem key={c.code} value={c.code} className="text-xs">
+            {getCountryDisplayNameFromCode(c.code, locale || "ar")} ({c.count})
+          </SelectItem>
+        ))}
+        {countryUnsetCount > 0 && (
+          <SelectItem value="__unset" className="text-xs">
+            غير محدد ({countryUnsetCount})
+          </SelectItem>
+        )}
       </SelectContent>
     </Select>
   </div>

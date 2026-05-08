@@ -59,27 +59,39 @@ export async function GET(
     const endParam = searchParams.get("end");
     const categoryId = searchParams.get("categoryId");
     const campaignId = searchParams.get("campaignId");
+    const country = searchParams.get("country")?.trim() ?? null;
 
     const { startDate, endDate } = getDateRange(period, startParam, endParam);
-    const donationWhere: Prisma.DonationWhereInput = {
+    const countryClause: Prisma.DonationWhereInput | null =
+      country && country !== "all"
+        ? country === "__unset"
+          ? { OR: [{ donorCountryCode: null }, { donorCountryCode: "" }] }
+          : { donorCountryCode: country.toUpperCase() }
+        : null;
+    const withCountry = (w: Prisma.DonationWhereInput): Prisma.DonationWhereInput =>
+      countryClause ? { AND: [w, countryClause] } : w;
+
+    const baseDonationWhere: Prisma.DonationWhereInput = {
       referralId,
       createdAt: { gte: startDate, lte: endDate },
     };
     /** Same category/campaign filters as donationWhere, but no date — for all-time إيرادات card */
-    const allTimeDonationWhere: Prisma.DonationWhereInput = { referralId };
+    const baseAllTimeDonationWhere: Prisma.DonationWhereInput = { referralId };
     if (campaignId && campaignId !== "all") {
-      donationWhere.items = { some: { campaignId } };
-      allTimeDonationWhere.items = { some: { campaignId } };
+      baseDonationWhere.items = { some: { campaignId } };
+      baseAllTimeDonationWhere.items = { some: { campaignId } };
     } else if (categoryId && categoryId !== "all") {
-      donationWhere.OR = [
+      baseDonationWhere.OR = [
         { items: { some: { campaign: { categoryId } } } },
         { categoryItems: { some: { categoryId } } },
       ];
-      allTimeDonationWhere.OR = [
+      baseAllTimeDonationWhere.OR = [
         { items: { some: { campaign: { categoryId } } } },
         { categoryItems: { some: { categoryId } } },
       ];
     }
+    const donationWhere = withCountry(baseDonationWhere);
+    const allTimeDonationWhere = withCountry(baseAllTimeDonationWhere);
 
     // status=PAID alone includes abandoned checkouts that never settled; require paidAt too.
     const paidDonationWhere: Prisma.DonationWhereInput = { ...donationWhere, ...PAID_DONATION_FILTER };
@@ -98,18 +110,19 @@ export async function GET(
     }
 
     const { monthStart, monthEnd } = getCurrentCalendarMonthUtcRange();
-    const thisMonthDonationWhere: Prisma.DonationWhereInput = {
+    const thisMonthBaseWhere: Prisma.DonationWhereInput = {
       referralId,
       createdAt: { gte: monthStart, lte: monthEnd },
     };
     if (campaignId && campaignId !== "all") {
-      thisMonthDonationWhere.items = { some: { campaignId } };
+      thisMonthBaseWhere.items = { some: { campaignId } };
     } else if (categoryId && categoryId !== "all") {
-      thisMonthDonationWhere.OR = [
+      thisMonthBaseWhere.OR = [
         { items: { some: { campaign: { categoryId } } } },
         { categoryItems: { some: { categoryId } } },
       ];
     }
+    const thisMonthDonationWhere = withCountry(thisMonthBaseWhere);
     const thisMonthPaidWhere: Prisma.DonationWhereInput = { ...thisMonthDonationWhere, ...PAID_DONATION_FILTER };
     const allTimePaidWhere: Prisma.DonationWhereInput = { ...allTimeDonationWhere, ...PAID_DONATION_FILTER };
 

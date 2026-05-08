@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
       (searchParams.get("subscriptionOnly") === "true" || searchParams.get("subscriptionOnly") === "1");
     const statusFilter = isAdmin ? searchParams.get("status") : null;
     const localeFilter = isAdmin ? searchParams.get("locale")?.trim() : null;
+    const countryFilter = isAdmin ? searchParams.get("country")?.trim() : null;
 
     const baseWhere: Record<string, unknown> = {
       ...(campaignId && { items: { some: { campaignId } } }),
@@ -72,8 +73,16 @@ export async function GET(request: NextRequest) {
           : { locale: localeFilter }
         : null;
 
+    const countryWhere =
+      countryFilter && countryFilter !== "all"
+        ? countryFilter === "__unset"
+          ? { OR: [{ donorCountryCode: null }, { donorCountryCode: "" }] }
+          : { donorCountryCode: countryFilter.toUpperCase() }
+        : null;
+
+    const extraFilters = [localeWhere, countryWhere].filter((w) => w != null);
     const where: Record<string, unknown> =
-      localeWhere != null ? { AND: [baseWhere, localeWhere] } : baseWhere;
+      extraFilters.length > 0 ? { AND: [baseWhere, ...extraFilters] } : baseWhere;
 
     const orderBy =
       sortBy === "amount"

@@ -42,6 +42,15 @@ function mergeLocaleFilter(where: Record<string, unknown>, locale: string | null
   return { AND: [where, lw] };
 }
 
+function mergeCountryFilter(where: Record<string, unknown>, country: string | null): Record<string, unknown> {
+  if (!country || country === 'all') return where;
+  const cw =
+    country === '__unset'
+      ? { OR: [{ donorCountryCode: null }, { donorCountryCode: '' }] }
+      : { donorCountryCode: country.toUpperCase() };
+  return { AND: [where, cw] };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -57,6 +66,7 @@ export async function GET(request: NextRequest) {
     const endParam = searchParams.get('end');
     const showFailed = searchParams.get('showFailed') === 'true';
     const locale = searchParams.get('locale')?.trim() ?? null;
+    const country = searchParams.get('country')?.trim() ?? null;
 
     const { startDate, endDate } = getDateRange(period, startParam, endParam);
 
@@ -77,7 +87,7 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const baseWhere = mergeLocaleFilter(innerWhere, locale);
+    const baseWhere = mergeCountryFilter(mergeLocaleFilter(innerWhere, locale), country);
 
     // Always fetch both paid and failed donations
     const donations = await prisma.donation.findMany({

@@ -906,7 +906,7 @@ const DonationDialog = ({
               {!isCategoryMode && campaignId && donationType !== "MONTHLY" && (
                 <Button
                   variant={oneTimeOnly ? "default" : "outline"}
-                  disabled={oneTimeOnly && !donationAmount}
+                  disabled={oneTimeOnly && (shareMode ? shareCount < 1 : !donationAmount)}
                   onClick={async () => {
                     try {
                       const amountUSD =
