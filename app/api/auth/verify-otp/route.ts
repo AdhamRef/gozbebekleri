@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyOtpCode } from "@/lib/otp";
+import { dispatchEvent } from "@/lib/events/dispatch";
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,10 +18,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Mark email as verified
-    await prisma.user.update({
+    const verifiedUser = await prisma.user.update({
       where: { email: email.toLowerCase().trim() },
       data: { emailVerified: new Date() },
+      select: { id: true },
     });
+    void dispatchEvent("USER_REGISTERED", { userId: verifiedUser.id });
 
     return NextResponse.json({ success: true });
   } catch (err) {

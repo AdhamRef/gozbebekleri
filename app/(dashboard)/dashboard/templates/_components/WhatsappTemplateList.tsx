@@ -99,7 +99,7 @@ export function WhatsappTemplateList() {
                     {new Date(t.updatedAt).toLocaleDateString("ar-EG", { dateStyle: "medium" })}
                   </td>
                   <td className="py-3 px-4 text-left">
-                    <div className="flex justify-start gap-2">
+                    <div className="flex justify-end gap-2">
                       <Button
                         size="sm"
                         variant="outline"

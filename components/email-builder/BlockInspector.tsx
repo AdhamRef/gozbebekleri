@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 import type { EmailDocument } from "./types";
-import { getBlock, setBlock, deleteBlock, getRoot } from "./types";
+import { getBlock, setBlock, deleteBlock, getRoot, FONT_FAMILIES } from "./types";
 import { VARIABLE_CATALOG } from "@/lib/templates/variables";
 
 interface Props {
@@ -79,12 +79,32 @@ export function BlockInspector({ doc, selectedId, onChange, onSelect }: Props) {
             >
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="h1">H1</SelectItem>
+                <SelectItem value="h1">H1 — أكبر</SelectItem>
                 <SelectItem value="h2">H2</SelectItem>
-                <SelectItem value="h3">H3</SelectItem>
+                <SelectItem value="h3">H3 — أصغر</SelectItem>
               </SelectContent>
             </Select>
           </Field>
+          <FontFamilyField value={style.fontFamily as string | undefined} onChange={(v) => update({ style: { fontFamily: v || undefined } })} />
+          <Field label="السمك">
+            <Select
+              value={String(style.fontWeight ?? "bold")}
+              onValueChange={(v) => update({ style: { fontWeight: v } })}
+            >
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="normal">عادي</SelectItem>
+                <SelectItem value="bold">ثقيل</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <ColorField label="لون النص" value={String(style.color ?? "#1F2937")} onChange={(v) => update({ style: { color: v } })} />
+          <ColorField
+            label="لون الخلفية"
+            value={String(style.backgroundColor ?? "")}
+            allowEmpty
+            onChange={(v) => update({ style: { backgroundColor: v || undefined } })}
+          />
           <AlignField value={String(style.textAlign ?? "right")} onChange={(v) => update({ style: { textAlign: v } })} />
         </>
       )}
@@ -98,7 +118,26 @@ export function BlockInspector({ doc, selectedId, onChange, onSelect }: Props) {
               rows={6}
             />
           </Field>
-          <AlignField value={String(style.textAlign ?? "right")} onChange={(v) => update({ style: { textAlign: v } })} />
+          <Field label="تفعيل Markdown">
+            <Select
+              value={String(props.markdown ?? "false")}
+              onValueChange={(v) => update({ props: { markdown: v === "true" } })}
+            >
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="false">نص عادي</SelectItem>
+                <SelectItem value="true">Markdown — يدعم **bold** و _italic_ و [link]()</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <FontFamilyField value={style.fontFamily as string | undefined} onChange={(v) => update({ style: { fontFamily: v || undefined } })} />
+          <NumberField
+            label="حجم الخط (px)"
+            value={Number(style.fontSize ?? 16)}
+            min={10}
+            max={48}
+            onChange={(v) => update({ style: { fontSize: v } })}
+          />
           <Field label="السمك">
             <Select
               value={String(style.fontWeight ?? "normal")}
@@ -111,6 +150,14 @@ export function BlockInspector({ doc, selectedId, onChange, onSelect }: Props) {
               </SelectContent>
             </Select>
           </Field>
+          <ColorField label="لون النص" value={String(style.color ?? "#374151")} onChange={(v) => update({ style: { color: v } })} />
+          <ColorField
+            label="لون الخلفية"
+            value={String(style.backgroundColor ?? "")}
+            allowEmpty
+            onChange={(v) => update({ style: { backgroundColor: v || undefined } })}
+          />
+          <AlignField value={String(style.textAlign ?? "right")} onChange={(v) => update({ style: { textAlign: v } })} />
         </>
       )}
 
@@ -127,6 +174,7 @@ export function BlockInspector({ doc, selectedId, onChange, onSelect }: Props) {
               value={String(props.url ?? "")}
               onChange={(e) => update({ props: { url: e.target.value } })}
               placeholder="https://"
+              dir="ltr"
             />
           </Field>
           <Field label="الشكل">
@@ -142,8 +190,69 @@ export function BlockInspector({ doc, selectedId, onChange, onSelect }: Props) {
               </SelectContent>
             </Select>
           </Field>
-          <ColorField label="لون الخلفية" value={String(style.backgroundColor ?? "#FA5D17")} onChange={(v) => update({ style: { backgroundColor: v } })} />
-          <ColorField label="لون النص" value={String(style.color ?? "#FFFFFF")} onChange={(v) => update({ style: { color: v } })} />
+          <Field label="الحجم">
+            <Select
+              value={String(props.size ?? "medium")}
+              onValueChange={(v) => update({ props: { size: v } })}
+            >
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="x-small">صغير جدًا</SelectItem>
+                <SelectItem value="small">صغير</SelectItem>
+                <SelectItem value="medium">متوسط</SelectItem>
+                <SelectItem value="large">كبير</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="ملء العرض">
+            <Select
+              value={String(props.fullWidth ?? "false")}
+              onValueChange={(v) => update({ props: { fullWidth: v === "true" } })}
+            >
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="false">حسب النص</SelectItem>
+                <SelectItem value="true">ملء عرض البريد</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <ColorField
+            label="لون خلفية الزر"
+            value={String(props.buttonBackgroundColor ?? "#FA5D17")}
+            onChange={(v) => update({ props: { buttonBackgroundColor: v } })}
+          />
+          <ColorField
+            label="لون نص الزر"
+            value={String(props.buttonTextColor ?? "#FFFFFF")}
+            onChange={(v) => update({ props: { buttonTextColor: v } })}
+          />
+          <FontFamilyField value={style.fontFamily as string | undefined} onChange={(v) => update({ style: { fontFamily: v || undefined } })} />
+          <NumberField
+            label="حجم الخط (px)"
+            value={Number(style.fontSize ?? 14)}
+            min={10}
+            max={32}
+            onChange={(v) => update({ style: { fontSize: v } })}
+          />
+          <Field label="سمك الخط">
+            <Select
+              value={String(style.fontWeight ?? "bold")}
+              onValueChange={(v) => update({ style: { fontWeight: v } })}
+            >
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="normal">عادي</SelectItem>
+                <SelectItem value="bold">ثقيل</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <ColorField
+            label="لون خلفية المنطقة"
+            value={String(style.backgroundColor ?? "")}
+            allowEmpty
+            onChange={(v) => update({ style: { backgroundColor: v || undefined } })}
+          />
+          <AlignField value={String(style.textAlign ?? "center")} onChange={(v) => update({ style: { textAlign: v } })} />
         </>
       )}
 
@@ -154,9 +263,10 @@ export function BlockInspector({ doc, selectedId, onChange, onSelect }: Props) {
               value={String(props.url ?? "")}
               onChange={(e) => update({ props: { url: e.target.value } })}
               placeholder="https://"
+              dir="ltr"
             />
           </Field>
-          <Field label="الوصف البديل">
+          <Field label="الوصف البديل (alt)">
             <Input
               value={String(props.alt ?? "")}
               onChange={(e) => update({ props: { alt: e.target.value } })}
@@ -165,10 +275,90 @@ export function BlockInspector({ doc, selectedId, onChange, onSelect }: Props) {
           <Field label="رابط نقر (اختياري)">
             <Input
               value={String(props.linkHref ?? "")}
-              onChange={(e) => update({ props: { linkHref: e.target.value } })}
+              onChange={(e) => update({ props: { linkHref: e.target.value || undefined } })}
               placeholder="https://"
+              dir="ltr"
             />
           </Field>
+          <Field label="محاذاة الصورة">
+            <Select
+              value={String(props.contentAlignment ?? "middle")}
+              onValueChange={(v) => update({ props: { contentAlignment: v } })}
+            >
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="top">أعلى</SelectItem>
+                <SelectItem value="middle">وسط</SelectItem>
+                <SelectItem value="bottom">أسفل</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <NumberField
+            label="العرض (px) — اتركه 0 للتلقائي"
+            value={Number(props.width ?? 0)}
+            min={0}
+            max={1200}
+            onChange={(v) => update({ props: { width: v || undefined } })}
+          />
+          <NumberField
+            label="الارتفاع (px) — اتركه 0 للتلقائي"
+            value={Number(props.height ?? 0)}
+            min={0}
+            max={1200}
+            onChange={(v) => update({ props: { height: v || undefined } })}
+          />
+          <ColorField
+            label="لون الخلفية"
+            value={String(style.backgroundColor ?? "")}
+            allowEmpty
+            onChange={(v) => update({ style: { backgroundColor: v || undefined } })}
+          />
+        </>
+      )}
+
+      {block.type === "Avatar" && (
+        <>
+          <Field label="رابط الصورة">
+            <Input
+              value={String(props.imageUrl ?? "")}
+              onChange={(e) => update({ props: { imageUrl: e.target.value } })}
+              placeholder="https://"
+              dir="ltr"
+            />
+          </Field>
+          <Field label="الوصف البديل (alt)">
+            <Input
+              value={String(props.alt ?? "")}
+              onChange={(e) => update({ props: { alt: e.target.value } })}
+            />
+          </Field>
+          <Field label="الشكل">
+            <Select
+              value={String(props.shape ?? "circle")}
+              onValueChange={(v) => update({ props: { shape: v } })}
+            >
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="circle">دائري</SelectItem>
+                <SelectItem value="square">مربع</SelectItem>
+                <SelectItem value="rounded">دائري الزوايا</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <NumberField
+            label="الحجم (px)"
+            value={Number(props.size ?? 64)}
+            min={16}
+            max={256}
+            onChange={(v) => update({ props: { size: v } })}
+          />
+          <AlignField value={String(style.textAlign ?? "center")} onChange={(v) => update({ style: { textAlign: v } })} />
+          <ColorField
+            label="لون الخلفية"
+            value={String(style.backgroundColor ?? "")}
+            allowEmpty
+            onChange={(v) => update({ style: { backgroundColor: v || undefined } })}
+          />
         </>
       )}
 
@@ -180,11 +370,17 @@ export function BlockInspector({ doc, selectedId, onChange, onSelect }: Props) {
             onChange={(v) => update({ props: { lineColor: v } })}
           />
           <NumberField
-            label="السمك"
+            label="السمك (px)"
             value={Number(props.lineHeight ?? 1)}
             min={1}
-            max={10}
+            max={20}
             onChange={(v) => update({ props: { lineHeight: v } })}
+          />
+          <ColorField
+            label="لون الخلفية"
+            value={String(style.backgroundColor ?? "")}
+            allowEmpty
+            onChange={(v) => update({ style: { backgroundColor: v || undefined } })}
           />
         </>
       )}
@@ -194,9 +390,38 @@ export function BlockInspector({ doc, selectedId, onChange, onSelect }: Props) {
           label="الارتفاع (px)"
           value={Number(props.height ?? 24)}
           min={4}
-          max={200}
+          max={400}
           onChange={(v) => update({ props: { height: v } })}
         />
+      )}
+
+      {block.type === "Html" && (
+        <>
+          <Field label="كود HTML">
+            <Textarea
+              value={String(props.contents ?? "")}
+              onChange={(e) => update({ props: { contents: e.target.value } })}
+              rows={8}
+              dir="ltr"
+              className="font-mono text-xs"
+            />
+          </Field>
+          <FontFamilyField value={style.fontFamily as string | undefined} onChange={(v) => update({ style: { fontFamily: v || undefined } })} />
+          <NumberField
+            label="حجم الخط (px)"
+            value={Number(style.fontSize ?? 14)}
+            min={10}
+            max={48}
+            onChange={(v) => update({ style: { fontSize: v } })}
+          />
+          <ColorField label="لون النص" value={String(style.color ?? "#374151")} onChange={(v) => update({ style: { color: v } })} />
+          <ColorField
+            label="لون الخلفية"
+            value={String(style.backgroundColor ?? "")}
+            allowEmpty
+            onChange={(v) => update({ style: { backgroundColor: v || undefined } })}
+          />
+        </>
       )}
 
       <PaddingField
@@ -231,28 +456,37 @@ function RootInspector({
   return (
     <div className="space-y-4">
       <p className="text-xs text-muted-foreground border-b border-border pb-2">إعدادات البريد العامة</p>
-      <ColorField label="لون الخلفية" value={String(data.backdropColor ?? "#F8F8F8")} onChange={(v) => update({ backdropColor: v })} />
-      <ColorField label="لون البطاقة" value={String(data.canvasColor ?? "#FFFFFF")} onChange={(v) => update({ canvasColor: v })} />
-      <ColorField label="لون النص" value={String(data.textColor ?? "#242424")} onChange={(v) => update({ textColor: v })} />
-      <Field label="الخط">
+      <ColorField label="لون الخلفية الخارجية" value={String(data.backdropColor ?? "#F8F8F8")} onChange={(v) => update({ backdropColor: v })} />
+      <ColorField label="لون البطاقة (الجسم)" value={String(data.canvasColor ?? "#FFFFFF")} onChange={(v) => update({ canvasColor: v })} />
+      <ColorField label="لون النص الافتراضي" value={String(data.textColor ?? "#242424")} onChange={(v) => update({ textColor: v })} />
+      <Field label="الخط الافتراضي">
         <Select
           value={String(data.fontFamily ?? "MODERN_SANS")}
           onValueChange={(v) => update({ fontFamily: v })}
         >
           <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="MODERN_SANS">MODERN_SANS</SelectItem>
-            <SelectItem value="BOOK_SANS">BOOK_SANS</SelectItem>
-            <SelectItem value="ORGANIC_SANS">ORGANIC_SANS</SelectItem>
-            <SelectItem value="GEOMETRIC_SANS">GEOMETRIC_SANS</SelectItem>
-            <SelectItem value="HEAVY_SANS">HEAVY_SANS</SelectItem>
-            <SelectItem value="ROUNDED_SANS">ROUNDED_SANS</SelectItem>
-            <SelectItem value="MODERN_SERIF">MODERN_SERIF</SelectItem>
-            <SelectItem value="BOOK_SERIF">BOOK_SERIF</SelectItem>
-            <SelectItem value="MONOSPACE">MONOSPACE</SelectItem>
+            {FONT_FAMILIES.map((f) => (
+              <SelectItem key={f.value} value={f.value}>
+                {f.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </Field>
+      <NumberField
+        label="استدارة زوايا البطاقة (px)"
+        value={Number(data.borderRadius ?? 0)}
+        min={0}
+        max={48}
+        onChange={(v) => update({ borderRadius: v })}
+      />
+      <ColorField
+        label="لون حدود البطاقة"
+        value={String(data.borderColor ?? "")}
+        allowEmpty
+        onChange={(v) => update({ borderColor: v || undefined })}
+      />
     </div>
   );
 }
@@ -270,21 +504,41 @@ function ColorField({
   label,
   value,
   onChange,
+  allowEmpty,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  allowEmpty?: boolean;
 }) {
+  const isEmpty = allowEmpty && !value;
   return (
     <Field label={label}>
       <div className="flex items-center gap-2">
         <input
           type="color"
-          value={value}
+          value={isEmpty ? "#ffffff" : value}
           onChange={(e) => onChange(e.target.value)}
           className="w-9 h-9 rounded border border-border cursor-pointer"
         />
-        <Input value={value} onChange={(e) => onChange(e.target.value)} className="flex-1" dir="ltr" />
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="flex-1"
+          placeholder={allowEmpty ? "اتركه فارغًا للشفاف" : undefined}
+          dir="ltr"
+        />
+        {allowEmpty && value && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onChange("")}
+            className="h-9 px-2 text-xs"
+          >
+            مسح
+          </Button>
+        )}
       </div>
     </Field>
   );
@@ -354,6 +608,30 @@ function AlignField({ value, onChange }: { value: string; onChange: (v: string) 
           <SelectItem value="right">يمين</SelectItem>
           <SelectItem value="center">وسط</SelectItem>
           <SelectItem value="left">يسار</SelectItem>
+        </SelectContent>
+      </Select>
+    </Field>
+  );
+}
+
+function FontFamilyField({
+  value,
+  onChange,
+}: {
+  value: string | undefined;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <Field label="الخط">
+      <Select value={value ?? "__inherit__"} onValueChange={(v) => onChange(v === "__inherit__" ? "" : v)}>
+        <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__inherit__">حسب البريد العام</SelectItem>
+          {FONT_FAMILIES.map((f) => (
+            <SelectItem key={f.value} value={f.value}>
+              {f.label}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
     </Field>

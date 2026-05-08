@@ -2,7 +2,15 @@ import type { TReaderDocument } from "@usewaypoint/email-builder";
 
 export type EmailDocument = TReaderDocument;
 
-export type BlockType = "Heading" | "Text" | "Button" | "Image" | "Divider" | "Spacer";
+export type BlockType =
+  | "Heading"
+  | "Text"
+  | "Button"
+  | "Image"
+  | "Avatar"
+  | "Divider"
+  | "Spacer"
+  | "Html";
 
 export interface AddableBlock {
   type: BlockType;
@@ -15,8 +23,22 @@ export const ADDABLE_BLOCKS: AddableBlock[] = [
   { type: "Text", label: "نص", description: "فقرة عادية" },
   { type: "Button", label: "زر", description: "زر CTA قابل للنقر" },
   { type: "Image", label: "صورة", description: "صورة من رابط" },
+  { type: "Avatar", label: "صورة دائرية", description: "Avatar / صورة مستديرة" },
   { type: "Divider", label: "فاصل", description: "خط أفقي" },
   { type: "Spacer", label: "مسافة", description: "مساحة فارغة" },
+  { type: "Html", label: "HTML خام", description: "إدراج كود HTML مباشر" },
+];
+
+export const FONT_FAMILIES: { value: string; label: string }[] = [
+  { value: "MODERN_SANS", label: "Modern Sans" },
+  { value: "BOOK_SANS", label: "Book Sans" },
+  { value: "ORGANIC_SANS", label: "Organic Sans" },
+  { value: "GEOMETRIC_SANS", label: "Geometric Sans" },
+  { value: "HEAVY_SANS", label: "Heavy Sans" },
+  { value: "ROUNDED_SANS", label: "Rounded Sans" },
+  { value: "MODERN_SERIF", label: "Modern Serif" },
+  { value: "BOOK_SERIF", label: "Book Serif" },
+  { value: "MONOSPACE", label: "Monospace" },
 ];
 
 let blockCounter = 0;
@@ -38,6 +60,8 @@ export function makeBlock(type: BlockType): { id: string; block: Record<string, 
             style: {
               padding: { top: 16, bottom: 16, right: 24, left: 24 },
               textAlign: "right",
+              color: "#1F2937",
+              fontWeight: "bold",
             },
           },
         },
@@ -52,7 +76,9 @@ export function makeBlock(type: BlockType): { id: string; block: Record<string, 
             style: {
               padding: { top: 8, bottom: 8, right: 24, left: 24 },
               fontWeight: "normal",
+              fontSize: 16,
               textAlign: "right",
+              color: "#374151",
             },
           },
         },
@@ -63,11 +89,20 @@ export function makeBlock(type: BlockType): { id: string; block: Record<string, 
         block: {
           type: "Button",
           data: {
-            props: { text: "اضغط هنا", url: "https://", buttonStyle: "rectangle" },
+            props: {
+              text: "اضغط هنا",
+              url: "https://",
+              buttonStyle: "rectangle",
+              size: "medium",
+              fullWidth: false,
+              buttonBackgroundColor: "#FA5D17",
+              buttonTextColor: "#FFFFFF",
+            },
             style: {
               padding: { top: 16, bottom: 16, right: 24, left: 24 },
-              backgroundColor: "#FA5D17",
-              color: "#FFFFFF",
+              fontSize: 14,
+              fontWeight: "bold",
+              textAlign: "center",
             },
           },
         },
@@ -78,8 +113,27 @@ export function makeBlock(type: BlockType): { id: string; block: Record<string, 
         block: {
           type: "Image",
           data: {
-            props: { url: "https://placehold.co/600x200", alt: "صورة" },
+            props: { url: "https://placehold.co/600x200", alt: "صورة", contentAlignment: "middle" },
             style: { padding: { top: 16, bottom: 16, right: 24, left: 24 } },
+          },
+        },
+      };
+    case "Avatar":
+      return {
+        id,
+        block: {
+          type: "Avatar",
+          data: {
+            props: {
+              imageUrl: "https://placehold.co/96",
+              alt: "Avatar",
+              shape: "circle",
+              size: 64,
+            },
+            style: {
+              padding: { top: 16, bottom: 16, right: 24, left: 24 },
+              textAlign: "center",
+            },
           },
         },
       };
@@ -90,7 +144,10 @@ export function makeBlock(type: BlockType): { id: string; block: Record<string, 
           type: "Divider",
           data: {
             props: { lineColor: "#E5E7EB", lineHeight: 1 },
-            style: { padding: { top: 12, bottom: 12, right: 24, left: 24 } },
+            style: {
+              padding: { top: 12, bottom: 12, right: 24, left: 24 },
+              backgroundColor: "transparent",
+            },
           },
         },
       };
@@ -100,6 +157,21 @@ export function makeBlock(type: BlockType): { id: string; block: Record<string, 
         block: {
           type: "Spacer",
           data: { props: { height: 24 } },
+        },
+      };
+    case "Html":
+      return {
+        id,
+        block: {
+          type: "Html",
+          data: {
+            props: { contents: "<p style=\"text-align:center\">HTML خام</p>" },
+            style: {
+              padding: { top: 8, bottom: 8, right: 24, left: 24 },
+              color: "#374151",
+              fontSize: 14,
+            },
+          },
         },
       };
   }

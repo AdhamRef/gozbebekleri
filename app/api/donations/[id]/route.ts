@@ -12,6 +12,7 @@ import {
   auditStreamForRole,
 } from '@/lib/audit-log';
 import Stripe from 'stripe';
+import { dispatchDonationPaid } from "@/lib/events/dispatch";
 
 const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-03-25.dahlia' })
@@ -71,6 +72,7 @@ async function reconcileStripeDonation(donationId: string) {
         });
       }
     });
+    void dispatchDonationPaid(donationId);
   } catch (err) {
     console.error('[donation reconcile] Finalize failed:', err);
   }

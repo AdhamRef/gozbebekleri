@@ -297,7 +297,7 @@ export function SignInPanel({
           <div className="flex justify-center mb-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png"
+              src="logo-white.png"
               alt="Logo"
               className="h-12 w-auto object-contain brightness-0 invert"
             />

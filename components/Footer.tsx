@@ -11,7 +11,7 @@ import SignInDialog from '@/components/SignInDialog';
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from '@/lib/currency-link';
 import { getSocialLinks } from '@/lib/social-links';
 
-const LOGO_URL = 'https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png';
+const LOGO_URL = 'logo-white.png';
 
 const Footer = () => {
   const t = useTranslations('Footer');

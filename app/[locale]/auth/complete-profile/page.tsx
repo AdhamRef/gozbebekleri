@@ -34,7 +34,7 @@ function ChevronDown() {
   );
 }
 
-const LOGO_URL = "https://i.ibb.co/Y4RZj4cs/output-onlinepngtools.png";
+const LOGO_URL = "logo-white.png";
 
 export default function CompleteProfilePage() {
   const { data: session, status } = useSession();

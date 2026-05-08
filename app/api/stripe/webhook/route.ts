@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import Stripe from "stripe";
 import { getDonorCountryCodeForSnapshot } from "@/lib/donations/donor-country-code";
 import { sendDonationServerConversions } from "@/lib/tracking/donation-conversion-server";
+import { dispatchDonationPaid, dispatchEvent } from "@/lib/events/dispatch";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
@@ -88,6 +89,10 @@ export async function POST(req: NextRequest) {
             }
           });
           void sendDonationServerConversions(donationId);
+          void dispatchDonationPaid(donationId);
+          if (isMonthly && subscriptionDbId) {
+            void dispatchEvent("SUBSCRIPTION_CREATED", { donationId });
+          }
         }
         break;
       }
@@ -241,7 +246,10 @@ export async function POST(req: NextRequest) {
           },
           select: { id: true },
         });
-        if (paidForInvoice) void sendDonationServerConversions(paidForInvoice.id);
+        if (paidForInvoice) {
+          void sendDonationServerConversions(paidForInvoice.id);
+          void dispatchEvent("SUBSCRIPTION_PAYMENT", { donationId: paidForInvoice.id });
+        }
         break;
       }
 
@@ -341,6 +349,7 @@ export async function POST(req: NextRequest) {
           }
         });
         void sendDonationServerConversions(donationId);
+        void dispatchDonationPaid(donationId);
         break;
       }
 
@@ -376,6 +385,7 @@ export async function POST(req: NextRequest) {
             providerRaw: intent as never,
           },
         });
+        void dispatchEvent("DONATION_FAILED", { donationId });
         break;
       }
 
@@ -403,6 +413,7 @@ export async function POST(req: NextRequest) {
             providerRaw: session as never,
           },
         });
+        void dispatchEvent("DONATION_FAILED", { donationId });
         break;
       }
 
@@ -417,6 +428,7 @@ export async function POST(req: NextRequest) {
             where: { id: dbSubscription.id },
             data: { status: "CANCELLED" },
           });
+          void dispatchEvent("SUBSCRIPTION_CANCELLED", { userId: dbSubscription.donorId });
         }
         break;
       }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { dispatchEvent } from "@/lib/events/dispatch";
 
 /**
  * Mark a donation as FAILED.
@@ -56,6 +57,7 @@ export async function PATCH(
         providerTxnResult: "Failed",
       },
     });
+    void dispatchEvent("DONATION_FAILED", { donationId: id });
 
     return NextResponse.json({ ok: true });
   } catch (err) {

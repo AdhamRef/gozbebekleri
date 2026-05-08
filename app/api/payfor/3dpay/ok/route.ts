@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import Stripe from "stripe";
 import { getDonorCountryCodeForSnapshot } from "@/lib/donations/donor-country-code";
 import { sendDonationServerConversions } from "@/lib/tracking/donation-conversion-server";
+import { dispatchDonationPaid, dispatchEvent } from "@/lib/events/dispatch";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
@@ -116,7 +117,11 @@ export async function POST(req: NextRequest) {
 
     if (result.ok) {
       void sendDonationServerConversions(donationId);
+      void dispatchDonationPaid(donationId);
       return NextResponse.redirect(new URL(`/${locale}/success/${donationId}`, origin));
+    }
+    if (!result.ok && result.reason === "failed") {
+      void dispatchEvent("DONATION_FAILED", { donationId });
     }
 
     // PayFor failed — attempt Stripe fallback if we have donation data

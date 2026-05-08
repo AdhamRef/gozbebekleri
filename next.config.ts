@@ -52,6 +52,9 @@ const nextConfig: NextConfig = {
     position: 'bottom-right',
   },
   reactStrictMode: true,
+  // @usewaypoint/email-builder runs React.createContext at module init.
+  // Externalizing it on the server avoids Next's RSC React shim, which has no createContext.
+  serverExternalPackages: ["@usewaypoint/email-builder"],
   // Strip console.* calls from production bundles (preserve error/warn for prod debugging).
   compiler: {
     removeConsole: process.env.NODE_ENV === "production"

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import Stripe from "stripe";
 import { getDonorCountryCodeForSnapshot } from "@/lib/donations/donor-country-code";
+import { dispatchEvent } from "@/lib/events/dispatch";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
           providerRaw: raw as Record<string, unknown>,
         },
       });
+      void dispatchEvent("DONATION_FAILED", { donationId });
 
       // ── Stripe fallback ──────────────────────────────────────────────────────
       // Clone the failed donation as a new record, then redirect the

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyToken, createAutoSignInToken } from "@/lib/otp";
+import { dispatchEvent } from "@/lib/events/dispatch";
 
 const VALID_LOCALES = new Set(["ar", "en", "tr", "fr", "es", "pt", "id"]);
 
@@ -33,11 +34,13 @@ export async function GET(req: NextRequest) {
     return errorRedirect(result.error === "EXPIRED" ? "expired" : "invalid");
   }
 
-  // Mark email as verified
-  await prisma.user.update({
+  // Mark email as verified — capture id for the event dispatch
+  const verifiedUser = await prisma.user.update({
     where: { email: normalizedEmail },
     data: { emailVerified: new Date() },
+    select: { id: true },
   });
+  void dispatchEvent("USER_REGISTERED", { userId: verifiedUser.id });
 
   // Create a short-lived auto-sign-in token so the user lands signed in
   const autoToken = await createAutoSignInToken(normalizedEmail);

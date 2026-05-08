@@ -46,12 +46,49 @@ const SAMPLE_CTX = (() => {
         status: "PAID",
         createdAt: get("createdAt"),
         campaignTitle: get("campaignTitle"),
+        itemCount: "1",
+        items: [
+          {
+            campaignTitle: get("campaignTitle"),
+            amount: get("amount"),
+            amountUSD: get("amountUSD"),
+            currency: get("currency"),
+            shareCount: "",
+          },
+        ],
       },
     ],
     totals: {
       count: get("totals.count"),
       amountUSD: get("totals.amountUSD"),
       lastAt: get("totals.lastAt"),
+    },
+    donation: {
+      id: "sample-1",
+      amount: get("amount"),
+      amountUSD: get("amountUSD"),
+      currency: get("currency"),
+      totalAmount: get("amount"),
+      status: "PAID",
+      createdAt: get("createdAt"),
+      campaignTitle: get("campaignTitle"),
+      itemCount: "2",
+      items: [
+        {
+          campaignTitle: get("campaignTitle"),
+          amount: "25",
+          amountUSD: "25",
+          currency: get("currency"),
+          shareCount: "",
+        },
+        {
+          campaignTitle: "حملة الشتاء",
+          amount: "25",
+          amountUSD: "25",
+          currency: get("currency"),
+          shareCount: "",
+        },
+      ],
     },
   };
 })();

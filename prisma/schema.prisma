@@ -733,6 +733,36 @@ model WhatsappTemplate {
   @@index([name])
 }
 
+enum MessageTriggerEvent {
+  DONATION_PAID
+  DONATION_FAILED
+  FIRST_DONATION
+  USER_REGISTERED
+  SUBSCRIPTION_CREATED
+  SUBSCRIPTION_PAYMENT
+  SUBSCRIPTION_CANCELLED
+}
+
+enum MessageChannel {
+  EMAIL
+  WHATSAPP
+}
+
+model MessageTrigger {
+  id           String              @id @default(auto()) @map("_id") @db.ObjectId
+  event        MessageTriggerEvent
+  channel      MessageChannel
+  /// Refers to EmailTemplate.id when channel=EMAIL, WhatsappTemplate.id when channel=WHATSAPP
+  templateId   String              @db.ObjectId
+  enabled      Boolean             @default(true)
+  createdById  String?             @db.ObjectId
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@index([event, enabled])
+  @@index([templateId])
+}
+
 /* ===================== TRACKING PIXELS (dashboard configurable) ===================== */
 model TrackingSettings {
   id                      String   @id @default(auto()) @map("_id") @db.ObjectId
