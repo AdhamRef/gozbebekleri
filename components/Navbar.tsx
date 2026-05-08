@@ -51,7 +51,7 @@ interface CartItem {
   };
 }
 
-const LOGO_URL = "logo-white.png";
+const LOGO_URL = "logo.png";
 const LOGO_MOBILE_URL = "/logo.png";
 
 const Navbar = () => {

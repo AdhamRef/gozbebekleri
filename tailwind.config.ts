@@ -83,8 +83,8 @@ export default {
   			'accordion-up': 'accordion-up 0.2s ease-out'
   		},
   		backgroundImage: {
-			'logo': "url('logo-white.png')",
-			'logo_white': "url('logo-white.png')",
+			'logo': "url('logo.png')",
+			'logo_white': "url('logo.png')",
   			'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
   			'gradient-conic':
   				'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',

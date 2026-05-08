@@ -787,7 +787,7 @@ const CartPaymentDialog = ({
     // Payment Info
     if (step.title === t("paymentInfo")) return (
       <div className="space-y-6 overflow-visible">
-        {paymentMethod === "CARD" ? (
+        {/* {paymentMethod === "CARD" ? (
           <div className="text-center space-y-1">
             <p className="text-gray-900 font-semibold">{t("bankCard")}</p>
             <p className="text-sm text-gray-500">{t("secure3DCardPrompt")}</p>
@@ -796,7 +796,7 @@ const CartPaymentDialog = ({
           <div className="text-center">
             <p className="text-gray-600">{t("paypalRedirect")}</p>
           </div>
-        )}
+        )} */}
 
         {/* ── Saved cards picker — shown when user has any saved card ── */}
         {savedCards.length > 0 && (
