@@ -72,6 +72,8 @@ interface DonationDialogProps {
   amountRaised?: number;
   /** When true, skip one-time/monthly choice and use monthly only */
   monthlyOnly?: boolean;
+  /** When true, skip one-time/monthly choice and use one-time only (e.g. Add to Cart flow) */
+  oneTimeOnly?: boolean;
   /** Category donation: donate to a category instead of a campaign */
   categoryId?: string;
   categoryName?: string;
@@ -102,6 +104,7 @@ const DonationDialog = ({
   targetAmount = 0,
   amountRaised = 0,
   monthlyOnly = false,
+  oneTimeOnly = false,
   categoryId = "",
   categoryName = "",
   categoryImage,
@@ -345,6 +348,14 @@ const DonationDialog = ({
       setCurrentStep(0);
     }
   }, [isOpen, monthlyOnly, donationType]);
+
+  // When oneTimeOnly (e.g. Add to Cart flow), pre-select one-time and skip type step
+  useEffect(() => {
+    if (isOpen && oneTimeOnly && !donationType) {
+      setDonationType("ONE_TIME");
+      setCurrentStep(0);
+    }
+  }, [isOpen, oneTimeOnly, donationType]);
 
   useEffect(() => {
     if (isOpen && shareMode) {
@@ -647,7 +658,7 @@ const DonationDialog = ({
 
   /** Donation Value step: return to type choice, previous step, or close dialog. */
   const handleBackFromDonationValueStep = () => {
-    if (!monthlyOnly && !shareMode && donationType) {
+    if (!monthlyOnly && !oneTimeOnly && !shareMode && donationType) {
       setDonationType(null);
       setCurrentStep(0);
       return;
@@ -682,7 +693,7 @@ const DonationDialog = ({
   const getStepContent = () => {
     if (!mounted) return null;
 
-    if (!donationType && !monthlyOnly && !shareMode) {
+    if (!donationType && !monthlyOnly && !oneTimeOnly && !shareMode) {
       return (
         <div className="space-y-6">
           <div className="text-center mb-8">

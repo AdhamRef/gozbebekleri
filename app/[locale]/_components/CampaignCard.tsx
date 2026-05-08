@@ -13,7 +13,7 @@ import { useTranslations } from "next-intl";
 
 const DonationDialog = dynamic(() => import("@/components/DonationDialog"), { ssr: false });
 import CategoryIcon from "@/components/CategoryIcon";
-import { Heart, Zap } from "lucide-react";
+import { Heart, ShoppingCart, Zap } from "lucide-react";
 import type { SuggestedDonationsConfig } from "@/lib/campaign/suggested-donations";
 
 const RESUME_KEY = "campaignDonateResume";
@@ -74,6 +74,7 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
   const [donationOpen, setDonationOpen] = useState(false);
   const [donationDialogMounted, setDonationDialogMounted] = useState(false);
   const [donationContext, setDonationContext] = useState<DonationDialogCampaignContext | null>(null);
+  const [addToCartMode, setAddToCartMode] = useState(false);
 
   const snapshotDonationContext = (): DonationDialogCampaignContext => ({
     goalType: campaign.goalType,
@@ -125,6 +126,16 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
   const handleDonateClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    setAddToCartMode(false);
+    setDonationContext(snapshotDonationContext());
+    setDonationDialogMounted(true);
+    setDonationOpen(true);
+  };
+
+  const handleAddToCartClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setAddToCartMode(true);
     setDonationContext(snapshotDonationContext());
     setDonationDialogMounted(true);
     setDonationOpen(true);
@@ -265,13 +276,13 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
             <Heart className={`fill-white/30 group-hover/btn:fill-white/60 transition-all ${isFeatured ? "w-4 h-4" : "w-3 h-3"}`} />
             {t("donateNow") || "تبرع الآن"}
           </button>
-          <Link
-            href={`/campaign/${campaign.slug || campaign.id}`}
-            onClick={onClick}
-            className={`flex-1 flex items-center justify-center text-gray-500 hover:text-[#025EB8] font-semibold transition-colors border-e border-gray-100 ${isFeatured ? "text-sm py-3.5" : compact ? "text-[11px] py-2" : "text-xs py-2.5"}`}
+          <button
+            onClick={handleAddToCartClick}
+            className={`flex-1 flex items-center justify-center gap-1.5 text-[#025EB8] hover:bg-[#025EB8]/10 font-semibold transition-colors border-e border-gray-100 ${isFeatured ? "text-sm py-3.5" : compact ? "text-[11px] py-2" : "text-xs py-2.5"}`}
           >
-            {t("details") || "التفاصيل"}
-          </Link>
+            <ShoppingCart className={`${isFeatured ? "w-4 h-4" : "w-3 h-3"}`} />
+            {t("addToCart") || "أضف للسلة"}
+          </button>
         </div>
       </div>
 
@@ -281,7 +292,9 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
         onClose={() => {
           setDonationOpen(false);
           setDonationContext(null);
+          setAddToCartMode(false);
         }}
+        oneTimeOnly={addToCartMode}
         campaignId={campaign.id}
         campaignTitle={campaign.title}
         campaignImage={rawImgSrc}
