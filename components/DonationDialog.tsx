@@ -905,7 +905,8 @@ const DonationDialog = ({
               </Button>
               {!isCategoryMode && campaignId && donationType !== "MONTHLY" && (
                 <Button
-                  variant="outline"
+                  variant={oneTimeOnly ? "default" : "outline"}
+                  disabled={oneTimeOnly && !donationAmount}
                   onClick={async () => {
                     try {
                       const amountUSD =
@@ -948,19 +949,25 @@ const DonationDialog = ({
                       onClose();
                     }
                   }}
-                  className="flex-1 min-w-[6rem] flex justify-center items-center gap-2 bg-[#025EB8]/10 text-[#025EB8] hover:bg-[#025EB8]/20 !border-none !shadow-none"
+                  className={
+                    oneTimeOnly
+                      ? "flex-1 min-w-[6rem] bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2"
+                      : "flex-1 min-w-[6rem] flex justify-center items-center gap-2 bg-[#025EB8]/10 text-[#025EB8] hover:bg-[#025EB8]/20 !border-none !shadow-none"
+                  }
                 >
                   <ShoppingCart className="w-4 h-4" />
                   {t("addToCart")}
                 </Button>
               )}
-              <Button
-                onClick={handleNext}
-                disabled={!donationAmount || (!use3D && donationAmount < stripeMinAmount)}
-                className="flex-1 min-w-[6rem] bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2"
-              >
-                {nextLabel}
-              </Button>
+              {!oneTimeOnly && (
+                <Button
+                  onClick={handleNext}
+                  disabled={!donationAmount || (!use3D && donationAmount < stripeMinAmount)}
+                  className="flex-1 min-w-[6rem] bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2"
+                >
+                  {nextLabel}
+                </Button>
+              )}
             </div>
           </div>
         );
