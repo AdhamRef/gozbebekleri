@@ -398,13 +398,17 @@ export function BlockInspector({ doc, selectedId, onChange, onSelect }: Props) {
       {block.type === "Html" && (
         <>
           <Field label="كود HTML">
-            <Textarea
+            <TextareaWithVariables
               value={String(props.contents ?? "")}
-              onChange={(e) => update({ props: { contents: e.target.value } })}
-              rows={8}
+              onChange={(v) => update({ props: { contents: v } })}
+              rows={10}
               dir="ltr"
               className="font-mono text-xs"
             />
+            <p className="text-[10px] text-slate-500 leading-relaxed mt-1">
+              المتغيّرات تعمل مباشرة داخل أي مكان في الكود. مثال: <code dir="ltr" className="font-mono">{"<p>مرحباً {{user.name}}</p>"}</code>
+              <br />يدعم كذلك تكرار البنود: <code dir="ltr" className="font-mono">{"{{#donation.items}}<li>{{campaignTitle}}</li>{{/donation.items}}"}</code>
+            </p>
           </Field>
           <FontFamilyField value={style.fontFamily as string | undefined} onChange={(v) => update({ style: { fontFamily: v || undefined } })} />
           <NumberField
@@ -642,10 +646,14 @@ function TextareaWithVariables({
   value,
   onChange,
   rows = 3,
+  dir,
+  className,
 }: {
   value: string;
   onChange: (v: string) => void;
   rows?: number;
+  dir?: "ltr" | "rtl";
+  className?: string;
 }) {
   const ref = React.useRef<HTMLTextAreaElement>(null);
   const insert = (token: string) => {
@@ -671,7 +679,8 @@ function TextareaWithVariables({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={rows}
-        className="font-mono text-xs"
+        dir={dir}
+        className={className ?? "font-mono text-xs"}
       />
       <details className="group">
         <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-700">إدراج متغيّر</summary>
