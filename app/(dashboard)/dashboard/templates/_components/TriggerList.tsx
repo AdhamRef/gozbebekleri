@@ -4,6 +4,7 @@ import * as React from "react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Plus, Trash2, Mail, MessageCircle } from "lucide-react";
 import { TriggerEditorDialog } from "./TriggerEditorDialog";
 import { EVENT_CATALOG } from "@/lib/events/catalog";
@@ -131,15 +132,13 @@ export function TriggerList() {
                     {t.templateName ?? <span className="text-red-500 text-xs">القالب محذوف</span>}
                   </td>
                   <td className="py-3 px-4">
-                    <label className="inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={t.enabled}
-                        onChange={(e) => toggleEnabled(t.id, e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#025EB8] relative" />
-                    </label>
+                    <Checkbox
+                      checked={t.enabled}
+                      onCheckedChange={(checked) =>
+                        toggleEnabled(t.id, checked === true)
+                      }
+                      aria-label={t.enabled ? "تعطيل الحدث" : "تفعيل الحدث"}
+                    />
                   </td>
                   <td className="py-3 px-4">
                     <Button
