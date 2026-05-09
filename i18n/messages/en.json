@@ -354,6 +354,8 @@
     "and": "and",
     "privacyPolicy": "Privacy Policy",
     "skipAndDonate": "Skip",
+    "donateAsGuest": "Donate as guest",
+    "withoutLoginBadge": "without login",
     "googleFastestWay": "Fastest way",
     "orContinueWith": "or",
     "secure": "Secure",

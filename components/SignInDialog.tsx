@@ -403,29 +403,35 @@ export function SignInPanel({
                 {t("signInWithEmail")}
               </button>
 
-              {/* Skip — branded "go straight to donating" path */}
+              {/* Donate-as-guest — white card with a "without login" badge */}
               {onSkip && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onSkip();
-                  }}
-                  className="group relative flex w-full items-center justify-center gap-2.5 overflow-hidden rounded-xl border-2 border-[#FA5D17]/35 bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50 px-4 py-3 text-sm font-bold text-[#FA5D17] shadow-sm transition-all hover:border-[#FA5D17] hover:from-[#FA5D17] hover:via-[#FA5D17] hover:to-[#FA5D17] hover:text-white hover:shadow-lg hover:shadow-[#FA5D17]/25 active:scale-[0.99] sm:py-3.5"
-                >
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/45 to-transparent transition-transform duration-700 group-hover:translate-x-full"
-                  />
-                  <User className="relative h-4 w-4 fill-current shrink-0" aria-hidden />
-                  <span className="relative">{t("skipAndDonate")}</span>
-                  <ArrowRight
-                    aria-hidden
-                    className={`relative h-4 w-4 shrink-0 transition-transform ${
-                      isRTL ? "rotate-180 group-hover:-translate-x-1" : "group-hover:translate-x-1"
+                <div className="relative pt-2">
+                  <div
+                    className={`pointer-events-none absolute -top-1 z-10 flex max-w-[calc(100%-2rem)] items-center gap-1 rounded-full bg-gradient-to-r from-[#025EB8] via-[#0e7bd1] to-[#39a0ec] px-2 py-1 text-[10px] font-bold leading-none text-white shadow-md ring-2 ring-white sm:text-[11px] ${
+                      isRTL ? "left-3" : "right-3"
                     }`}
-                  />
-                </button>
+                  >
+                    <User className="h-3 w-3 shrink-0 fill-white/90" aria-hidden />
+                    <span className="whitespace-nowrap">{t("withoutLoginBadge")}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onSkip();
+                    }}
+                    className="group relative flex w-full items-center justify-center gap-2.5 overflow-hidden rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 shadow-sm transition-all hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 hover:shadow-md active:scale-[0.99] sm:py-3.5"
+                  >
+                    <Heart className="relative h-4 w-4 shrink-0 text-[#FA5D17]" aria-hidden />
+                    <span className="relative">{t("donateAsGuest")}</span>
+                    <ArrowRight
+                      aria-hidden
+                      className={`relative h-4 w-4 shrink-0 text-gray-400 transition-transform group-hover:text-gray-600 ${
+                        isRTL ? "rotate-180 group-hover:-translate-x-1" : "group-hover:translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
               )}
 
               {/* Terms */}
