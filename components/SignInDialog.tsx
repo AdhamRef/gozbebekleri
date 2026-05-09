@@ -17,6 +17,7 @@ import {
   Eye,
   EyeOff,
   ArrowLeft,
+  ArrowRight,
   Loader2,
   CheckCircle2,
   RefreshCw,
@@ -394,7 +395,7 @@ export function SignInPanel({
                 {t("signInWithEmail")}
               </button>
 
-              {/* Skip — visible below login choices */}
+              {/* Skip — branded "go straight to donating" path */}
               {onSkip && (
                 <button
                   type="button"
@@ -402,9 +403,20 @@ export function SignInPanel({
                     onClose();
                     onSkip();
                   }}
-                  className="w-full rounded-xl border border-dashed border-gray-300 bg-gray-50/80 py-3 text-sm font-medium text-gray-600 transition-colors hover:border-gray-400 hover:bg-gray-100 hover:text-gray-800 active:scale-[0.99]"
+                  className="group relative flex w-full items-center justify-center gap-2.5 overflow-hidden rounded-xl border-2 border-[#FA5D17]/35 bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50 px-4 py-3 text-sm font-bold text-[#FA5D17] shadow-sm transition-all hover:border-[#FA5D17] hover:from-[#FA5D17] hover:via-[#FA5D17] hover:to-[#FA5D17] hover:text-white hover:shadow-lg hover:shadow-[#FA5D17]/25 active:scale-[0.99] sm:py-3.5"
                 >
-                  {t("skipAndDonate")}
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/45 to-transparent transition-transform duration-700 group-hover:translate-x-full"
+                  />
+                  <Heart className="relative h-4 w-4 fill-current shrink-0" aria-hidden />
+                  <span className="relative">{t("skipAndDonate")}</span>
+                  <ArrowRight
+                    aria-hidden
+                    className={`relative h-4 w-4 shrink-0 transition-transform ${
+                      isRTL ? "rotate-180 group-hover:-translate-x-1" : "group-hover:translate-x-1"
+                    }`}
+                  />
                 </button>
               )}
 
