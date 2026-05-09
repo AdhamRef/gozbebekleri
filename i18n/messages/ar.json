@@ -426,9 +426,9 @@
     "goal": "الهدف",
     "sharePriceLabel": "سعر السهم الواحد:",
     "sharesLabel": "سهمًا",
-    "sharesPickHint": "اختر عدد الأسهم (سهوم) التي تود التبرع بها",
+    "sharesPickHint": "اختر عدد الأسهم التي تود التبرع بها",
     "donationTotal": "إجمالي التبرع",
-    "sharesLine": "{count} سهم (سهوم)",
+    "sharesLine": "{count} سهم",
     "enterDonationAmount": "أدخل مبلغ التبرع",
     "addToCart": "أضف للسلة",
     "addedToCart": "تم إضافة المبلغ إلى السلة",
@@ -520,7 +520,7 @@
     "transactionFees": "رسوم المعاملة",
     "supportedCampaign": "المشروع المدعومة",
     "campaignsDonatedTo": "المشاريع التي تم التبرع لها",
-    "itemShares": "{count} سهم (سهوم)",
+    "itemShares": "{count} سهم",
     "categoriesDonatedTo": "الفئات التي تم التبرع لها",
     "campaignsAndCategoriesDonatedTo": "المشاريع والفئات التي تم التبرع لها",
     "donateToAnotherCampaign": "تبرع لمشروع أخرى",
@@ -551,7 +551,7 @@
     "total": "الإجمالي",
     "proceedToDonate": "متابعة للتبرع",
     "secureCheckout": "تبرعك آمن ومشفر",
-    "sharesLine": "{count} سهم (سهوم)"
+    "sharesLine": "{count} سهم"
   },
   "LiveDonationsTicker": {
     "donated": "تبرع بـ",

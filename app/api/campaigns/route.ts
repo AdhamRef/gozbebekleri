@@ -355,7 +355,7 @@ export async function POST(request: NextRequest) {
       const sp = Number(data.sharePriceUSD);
       if (!Number.isFinite(sp) || sp <= 0) {
         return NextResponse.json(
-          { error: "sharePriceUSD is required and must be positive for share-based (سهوم) campaigns" },
+          { error: "sharePriceUSD is required and must be positive for share-based campaigns" },
           { status: 400 }
         );
       }

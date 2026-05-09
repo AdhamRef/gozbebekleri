@@ -711,9 +711,13 @@ model ExchangeRateSnapshot {
 model EmailTemplate {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   name        String
+  /// Canonical Arabic subject (also the fallback when a locale variation is missing).
   subject     String
-  /// TReaderDocument JSON from @usewaypoint/email-builder
+  /// Canonical Arabic TReaderDocument JSON from @usewaypoint/email-builder.
   document    Json
+  /// Per-locale overrides: Record<locale, { subject?: string; document?: TReaderDocument }>.
+  /// Locales not present here fall back to the canonical Arabic subject/document.
+  translations Json?
   createdById String?  @db.ObjectId
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -724,8 +728,10 @@ model EmailTemplate {
 model WhatsappTemplate {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   name        String
-  /// Plain text body with {{variables}}
+  /// Canonical Arabic body (also the fallback when a locale variation is missing).
   body        String
+  /// Per-locale overrides: Record<locale, { body?: string }>.
+  translations Json?
   createdById String?  @db.ObjectId
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

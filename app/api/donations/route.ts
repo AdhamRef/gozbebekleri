@@ -14,6 +14,7 @@ import {
   normalizeDonorCountryCode,
 } from "@/lib/donations/donor-country-code";
 import { sanitizeDonationAttribution } from "@/lib/attribution/sanitize";
+import { inferLocaleFromRequest } from "@/lib/preferred-lang";
 
 // GET /api/donations - Get all donations (admin) or user's donations
 export async function GET(request: NextRequest) {
@@ -196,6 +197,7 @@ export async function POST(request: NextRequest) {
               countryCode: guest.countryCode || undefined,
               city: guest.city || undefined,
               region: guest.region || undefined,
+              preferredLang: inferLocaleFromRequest(request, donationLocale),
             },
             select: { id: true },
           });
@@ -211,6 +213,7 @@ export async function POST(request: NextRequest) {
             countryCode: guest.countryCode || undefined,
             city: guest.city || undefined,
             region: guest.region || undefined,
+            preferredLang: inferLocaleFromRequest(request, donationLocale),
           },
           select: { id: true },
         });

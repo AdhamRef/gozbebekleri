@@ -8,9 +8,13 @@ import { auditActorFromDashboardSession, writeAuditLog } from "@/lib/audit-log";
 import { resolveDonorIds } from "@/lib/users/donor-filter";
 import { loadContextsForUserIds, mergeText } from "@/lib/templates/variables";
 import { sendBulkWhatsapp, type WhatsappRecipient } from "@/lib/whatsapp";
+import { pickLocale, resolveWhatsappBody } from "@/lib/templates/locale-resolver";
 
 const sendSchema = z.object({
   templateId: z.string().min(1),
+  /** Optional explicit locale. Omit to use each recipient's preferredLang
+   *  (with fallback to ar when the user has none). */
+  locale: z.string().optional(),
   target: z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("user"), userId: z.string().min(1) }),
     z.object({
@@ -70,9 +74,14 @@ export async function POST(request: NextRequest) {
       skipped += 1;
       continue;
     }
+    const locale = pickLocale({
+      override: parsed.data.locale,
+      recipientLang: ctx.user.preferredLang,
+    });
+    const variant = resolveWhatsappBody(template, locale);
     recipients.push({
       to: ctx.user.phone,
-      body: mergeText(template.body, ctx),
+      body: mergeText(variant.body, ctx),
     });
   }
 
@@ -91,6 +100,7 @@ export async function POST(request: NextRequest) {
       sent: result.sent,
       skipped,
       failed: result.failed.length,
+      localeOverride: parsed.data.locale ?? null,
     },
     stream: "TEAM",
   });

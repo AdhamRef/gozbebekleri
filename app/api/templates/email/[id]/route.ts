@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getServerSession } from "next-auth";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { prisma } from "@/lib/prisma";
@@ -11,6 +11,10 @@ const updateSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   subject: z.string().min(1).max(200).optional(),
   document: z.record(z.unknown()).optional(),
+  translations: z
+    .record(z.object({ subject: z.string().optional(), document: z.record(z.unknown()).optional() }))
+    .nullable()
+    .optional(),
 });
 
 export async function GET(
@@ -55,6 +59,12 @@ export async function PATCH(
   if (parsed.data.subject != null) data.subject = parsed.data.subject;
   if (parsed.data.document != null) {
     data.document = parsed.data.document as Prisma.InputJsonValue;
+  }
+  if (parsed.data.translations !== undefined) {
+    data.translations =
+      parsed.data.translations === null
+        ? (Prisma.DbNull as unknown as Prisma.InputJsonValue)
+        : (parsed.data.translations as Prisma.InputJsonValue);
   }
 
   const updated = await prisma.emailTemplate.update({ where: { id }, data });

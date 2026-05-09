@@ -11,6 +11,9 @@ const createSchema = z.object({
   name: z.string().min(1).max(120),
   subject: z.string().min(1).max(200),
   document: z.record(z.unknown()),
+  translations: z
+    .record(z.object({ subject: z.string().optional(), document: z.record(z.unknown()).optional() }))
+    .optional(),
 });
 
 export async function GET() {
@@ -56,6 +59,9 @@ export async function POST(request: NextRequest) {
       name: parsed.data.name,
       subject: parsed.data.subject,
       document: parsed.data.document as Prisma.InputJsonValue,
+      translations: parsed.data.translations
+        ? (parsed.data.translations as Prisma.InputJsonValue)
+        : undefined,
       createdById: actor.actorId,
     },
   });

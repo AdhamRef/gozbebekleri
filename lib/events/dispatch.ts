@@ -9,6 +9,11 @@ import { renderEmailHtml, renderEmailSubject } from "@/lib/templates/render";
 import { sendBulkEmail } from "@/lib/email";
 import { sendBulkWhatsapp } from "@/lib/whatsapp";
 import { writeAuditLog } from "@/lib/audit-log";
+import {
+  pickLocale,
+  resolveEmailVariant,
+  resolveWhatsappBody,
+} from "@/lib/templates/locale-resolver";
 import type { TReaderDocument } from "@usewaypoint/email-builder";
 
 /** Keep in sync with prisma `enum MessageTriggerEvent`. */
@@ -70,14 +75,19 @@ export async function dispatchEvent(
       return result;
     }
 
+    // Auto-fired events have no admin in the loop, so the only locale signal we
+    // have is the recipient's preferredLang. Falls back to ar when missing.
+    const locale = pickLocale({ recipientLang: ctx.user.preferredLang });
+
     for (const trigger of triggers) {
       try {
         if (trigger.channel === "EMAIL") {
           const tpl = await prisma.emailTemplate.findUnique({ where: { id: trigger.templateId } });
           if (!tpl) continue;
           if (!ctx.user.email) continue;
-          const html = await renderEmailHtml(tpl.document as unknown as TReaderDocument, ctx);
-          const subject = renderEmailSubject(tpl.subject, ctx);
+          const variant = resolveEmailVariant(tpl, locale);
+          const html = await renderEmailHtml(variant.document as TReaderDocument, ctx);
+          const subject = renderEmailSubject(variant.subject, ctx);
           const r = await sendBulkEmail([{ to: ctx.user.email, subject, html }]);
           result.emailsSent += r.sent;
           if (r.failed.length > 0) result.errors += r.failed.length;
@@ -85,7 +95,8 @@ export async function dispatchEvent(
           const tpl = await prisma.whatsappTemplate.findUnique({ where: { id: trigger.templateId } });
           if (!tpl) continue;
           if (!ctx.user.phone) continue;
-          const body = mergeText(tpl.body, ctx);
+          const variant = resolveWhatsappBody(tpl, locale);
+          const body = mergeText(variant.body, ctx);
           const r = await sendBulkWhatsapp([{ to: ctx.user.phone, body }]);
           result.whatsappSent += r.sent;
           if (r.failed.length > 0) result.errors += r.failed.length;

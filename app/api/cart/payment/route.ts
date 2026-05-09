@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/options";
 import { resolveReferralId } from "@/lib/referral-server";
 import { userHasDashboardPermission } from "@/lib/dashboard/permissions";
+import { inferLocaleFromRequest } from "@/lib/preferred-lang";
 import { writeAuditLog, auditStreamForRole } from "@/lib/audit-log";
 import {
   convertAmountInCurrencyToUsd,
@@ -141,6 +142,7 @@ export async function POST(request: NextRequest) {
               countryCode: guest.countryCode || undefined,
               city: guest.city || undefined,
               region: guest.region || undefined,
+              preferredLang: inferLocaleFromRequest(request, donationLocale),
             },
           });
           donorId = newUser.id;
@@ -156,6 +158,7 @@ export async function POST(request: NextRequest) {
             countryCode: guest.countryCode || undefined,
             city: guest.city || undefined,
             region: guest.region || undefined,
+            preferredLang: inferLocaleFromRequest(request, donationLocale),
           },
         });
         donorId = newUser.id;

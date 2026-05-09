@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { ChevronDown } from "lucide-react";
 import ReactCountryFlag from "react-country-flag";
 
@@ -22,6 +23,7 @@ const languages: { code: Locale; name: string; countryCode: string }[] =
 
 export default function LanguageSwitcher({ onDark = true }: { onDark?: boolean }) {
   const pathname = usePathname();
+  const { data: session } = useSession();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -43,6 +45,15 @@ export default function LanguageSwitcher({ onDark = true }: { onDark?: boolean }
     if (newLocale === currentLocale) {
       setOpen(false);
       return;
+    }
+    // Persist the explicit choice for logged-in users (best-effort, non-blocking).
+    if (session?.user?.id) {
+      fetch("/api/users/me/preferred-lang", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locale: newLocale }),
+        keepalive: true,
+      }).catch(() => {});
     }
     const segments = pathname.split("/").filter(Boolean);
     const localeInPath = SUPPORTED_LOCALES.includes(segments[0] as Locale);

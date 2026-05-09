@@ -5,7 +5,23 @@ import GoogleProvider from "next-auth/providers/google";
 import FacebookProvider from "next-auth/providers/facebook";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
+import { cookies } from "next/headers";
 import { verifyToken } from "@/lib/otp";
+import { isValidLocale, DEFAULT_LOCALE, type SupportedLocale } from "@/lib/locales";
+
+/**
+ * NextAuth's signIn callback doesn't receive the request, so we read the
+ * locale from the next-intl cookie. Falls back to ar.
+ */
+async function readLocaleFromCookies(): Promise<SupportedLocale> {
+  try {
+    const c = (await cookies()).get("NEXT_LOCALE")?.value?.toLowerCase().trim();
+    if (c && isValidLocale(c)) return c;
+  } catch {
+    // calling cookies() outside a request scope throws — fall through to default
+  }
+  return DEFAULT_LOCALE;
+}
 
 if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
   throw new Error('Missing Google OAuth Credentials');
@@ -107,23 +123,30 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (existingUser) {
-            // If the user exists, update their information
+            // If the user exists, update their information.
+            // Backfill preferredLang from the cookie ONLY if it's still null —
+            // never overwrite an explicit choice the user has already made.
+            const updateData: Record<string, unknown> = {
+              name: user.name!,
+              image: user.image,
+            };
+            if (!existingUser.preferredLang) {
+              updateData.preferredLang = await readLocaleFromCookies();
+            }
             await prisma.user.update({
               where: { email: user.email! },
-              data: {
-                name: user.name!,
-                image: user.image,
-                // Optionally, you can update the role or other fields
-              },
+              data: updateData,
             });
           } else {
             // If the user does not exist, create a new user
+            const preferredLang = await readLocaleFromCookies();
             await prisma.user.create({
               data: {
                 email: user.email!,
                 name: user.name!,
                 image: user.image,
                 role: 'DONOR', // Default role
+                preferredLang,
               },
             });
           }

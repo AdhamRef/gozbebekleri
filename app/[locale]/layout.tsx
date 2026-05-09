@@ -17,6 +17,7 @@ import SessionProvider from "@/components/providers/SessionProvider";
 import { ConfettiProvider } from "../../components/providers/confetti-provider";
 import Footer from "@/components/Footer";
 import ReferralTracker from "@/components/ReferralTracker";
+import PreferredLangSync from "@/components/PreferredLangSync";
 import SyncHtmlDir from "@/components/SyncHtmlDir";
 import TrackingPixels from "@/components/TrackingPixels";
 import { AttributionCapture } from "@/components/AttributionCapture";
@@ -94,6 +95,7 @@ export default async function Rootlayout({
               <CurrencyFromUrlSync />
             </Suspense>
             <SessionProvider>
+              <PreferredLangSync />
               <Navbar />
             <main className="pt-16 lg:pt-[104px]">
               {children}

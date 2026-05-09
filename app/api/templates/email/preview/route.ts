@@ -10,11 +10,14 @@ import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { prisma } from "@/lib/prisma";
 import { loadContext, VARIABLE_CATALOG, type TemplateContext } from "@/lib/templates/variables";
 import { renderEmailHtml, renderEmailSubject } from "@/lib/templates/render";
+import { pickLocale, resolveEmailVariant } from "@/lib/templates/locale-resolver";
 import type { TReaderDocument } from "@usewaypoint/email-builder";
 
 const previewSchema = z.object({
   templateId: z.string().min(1),
   userId: z.string().optional(),
+  /** Explicit locale override; if absent we use the user's preferredLang or fall back to ar. */
+  locale: z.string().optional(),
 });
 
 function buildSampleContext(): TemplateContext {
@@ -119,9 +122,15 @@ export async function POST(request: NextRequest) {
     (parsed.data.userId ? await loadContext(parsed.data.userId) : null) ??
     buildSampleContext();
 
-  const document = template.document as unknown as TReaderDocument;
+  const locale = pickLocale({
+    override: parsed.data.locale,
+    recipientLang: ctx.user.preferredLang,
+  });
+  const variant = resolveEmailVariant(template, locale);
+
   return NextResponse.json({
-    subject: renderEmailSubject(template.subject, ctx),
-    html: await renderEmailHtml(document, ctx),
+    subject: renderEmailSubject(variant.subject, ctx),
+    html: await renderEmailHtml(variant.document as TReaderDocument, ctx),
+    resolvedLocale: variant.resolvedLocale,
   });
 }

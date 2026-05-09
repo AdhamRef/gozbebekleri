@@ -224,7 +224,7 @@
     "campaignDonations": "doações",
     "campaignRemaining": "restante",
     "campaignOpenBadge": "Meta aberta",
-    "campaignSharesBadge": "Ações (سهوم)",
+    "campaignSharesBadge": "Ações",
     "campaignOpenGoal": "Angariação aberta",
     "sharePriceUsd": "Por ação",
     "article": "Artigo",
@@ -293,7 +293,7 @@
     "resultsFound": "projetos encontradas",
     "featuredBadge": "Projeto Urgente",
     "openGoalLabel": "Meta aberta",
-    "sharesCampaignLabel": "Ações (سهوم)"
+    "sharesCampaignLabel": "Ações"
   },
   "Campaign": {
     "story": "Descrição",
@@ -308,7 +308,7 @@
     "image": "Imagem",
     "from": "de",
     "openGoalBadge": "Meta aberta",
-    "sharesCampaignBadge": "Ações (سهوم)",
+    "sharesCampaignBadge": "Ações",
     "donateNow": "Doar agora",
     "outOfGoal": "do objetivo",
     "peopleDonated": "pessoas apoiaram este caso",
@@ -426,9 +426,9 @@
     "goal": "Objetivo",
     "sharePriceLabel": "Preço por ação:",
     "sharesLabel": "ações",
-    "sharesPickHint": "Escolha quantas ações (سهوم) quer oferecer",
+    "sharesPickHint": "Escolha quantas ações quer oferecer",
     "donationTotal": "Total da doação",
-    "sharesLine": "{count} ações (سهوم)",
+    "sharesLine": "{count} ações",
     "enterDonationAmount": "Introduzir valor da doação",
     "addToCart": "ao carrinho",
     "addedToCart": "Valor adicionado ao carrinho com sucesso",
@@ -520,7 +520,7 @@
     "transactionFees": "Taxas da transação",
     "supportedCampaign": "Projeto apoiada",
     "campaignsDonatedTo": "Projetos a que doou",
-    "itemShares": "{count} ações (سهوم)",
+    "itemShares": "{count} ações",
     "categoriesDonatedTo": "Campanhas a que doou",
     "campaignsAndCategoriesDonatedTo": "Projetos e campanhas a que doou",
     "donateToAnotherCampaign": "Doar a outra projeto",
@@ -551,7 +551,7 @@
     "total": "Total",
     "proceedToDonate": "Prosseguir para doar",
     "secureCheckout": "A sua doação é segura e encriptada",
-    "sharesLine": "{count} ações (سهوم)"
+    "sharesLine": "{count} ações"
   },
   "LiveDonationsTicker": {
     "donated": "doou",

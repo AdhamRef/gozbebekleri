@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getServerSession } from "next-auth";
+import { Prisma } from "@prisma/client";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { prisma } from "@/lib/prisma";
@@ -9,6 +10,10 @@ import { auditActorFromDashboardSession, writeAuditLog } from "@/lib/audit-log";
 const updateSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   body: z.string().min(1).max(4096).optional(),
+  translations: z
+    .record(z.object({ body: z.string().optional() }))
+    .nullable()
+    .optional(),
 });
 
 export async function GET(
@@ -48,9 +53,15 @@ export async function PATCH(
     );
   }
 
-  const data: Record<string, unknown> = {};
+  const data: Prisma.WhatsappTemplateUpdateInput = {};
   if (parsed.data.name != null) data.name = parsed.data.name;
   if (parsed.data.body != null) data.body = parsed.data.body;
+  if (parsed.data.translations !== undefined) {
+    data.translations =
+      parsed.data.translations === null
+        ? (Prisma.DbNull as unknown as Prisma.InputJsonValue)
+        : (parsed.data.translations as Prisma.InputJsonValue);
+  }
 
   const updated = await prisma.whatsappTemplate.update({ where: { id }, data });
   const actor = auditActorFromDashboardSession(session!);

@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { createVerificationToken } from "@/lib/otp";
 import { sendVerificationEmail } from "@/lib/email";
+import { inferLocaleFromRequest } from "@/lib/preferred-lang";
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,6 +28,7 @@ export async function POST(req: NextRequest) {
 
     // ── Create user (unverified) ──────────────────────────────────────────
     const hashed = await bcrypt.hash(password, 12);
+    const preferredLang = inferLocaleFromRequest(req, locale);
     await prisma.user.create({
       data: {
         name: `${firstName.trim()} ${lastName.trim()}`,
@@ -37,6 +39,7 @@ export async function POST(req: NextRequest) {
         gender: gender?.trim() || null,
         role: "DONOR",
         emailVerified: null,
+        preferredLang,
       },
     });
 

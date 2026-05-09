@@ -224,7 +224,7 @@
     "campaignDonations": "bağış",
     "campaignRemaining": "kalan",
     "campaignOpenBadge": "Açık hedef",
-    "campaignSharesBadge": "Hisse (سهوم)",
+    "campaignSharesBadge": "Hisse",
     "campaignOpenGoal": "Açık bağış toplama",
     "sharePriceUsd": "Hisse başına",
     "article": "Makale",
@@ -293,7 +293,7 @@
     "resultsFound": "proje bulundu",
     "featuredBadge": "Acil Proje",
     "openGoalLabel": "Açık hedef",
-    "sharesCampaignLabel": "Hisse (سهوم)"
+    "sharesCampaignLabel": "Hisse"
   },
   "Campaign": {
     "story": "Açıklama",
@@ -308,7 +308,7 @@
     "image": "Görsel",
     "from": " / ",
     "openGoalBadge": "Açık hedef",
-    "sharesCampaignBadge": "Hisse (سهوم)",
+    "sharesCampaignBadge": "Hisse",
     "donateNow": "Bağış Yap",
     "outOfGoal": "hedeften",
     "peopleDonated": "kişi bu vakayı destekledi",
@@ -426,9 +426,9 @@
     "goal": "Hedef",
     "sharePriceLabel": "Hisse başına fiyat:",
     "sharesLabel": "hisse",
-    "sharesPickHint": "Kaç hisse (سهوم) bağışlamak istediğinizi seçin",
+    "sharesPickHint": "Kaç hisse bağışlamak istediğinizi seçin",
     "donationTotal": "Bağış toplamı",
-    "sharesLine": "{count} hisse (سهوم)",
+    "sharesLine": "{count} hisse",
     "enterDonationAmount": "Bağış tutarını girin",
     "addToCart": "Sepete Ekle",
     "addedToCart": "Tutar sepete başarıyla eklendi",
@@ -520,7 +520,7 @@
     "transactionFees": "İşlem Ücretleri",
     "supportedCampaign": "Desteklenen Proje",
     "campaignsDonatedTo": "Bağış Yaptığınız Projeler",
-    "itemShares": "{count} hisse (سهوم)",
+    "itemShares": "{count} hisse",
     "categoriesDonatedTo": "Bağış Yaptığınız Kampanyalar",
     "campaignsAndCategoriesDonatedTo": "Bağış Yaptığınız Projeler ve Kampanyalar",
     "donateToAnotherCampaign": "Başka Bir Projeya Bağış Yap",
@@ -551,7 +551,7 @@
     "total": "Toplam",
     "proceedToDonate": "Bağışa Devam Et",
     "secureCheckout": "Bağışınız güvenli ve şifrelidir",
-    "sharesLine": "{count} hisse (سهوم)"
+    "sharesLine": "{count} hisse"
   },
   "LiveDonationsTicker": {
     "donated": "bağışladı",

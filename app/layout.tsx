@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Poppins, Noto_Kufi_Arabic } from "next/font/google";
 import DeferredGTM from "@/components/DeferredGTM";
+import MicrosoftClarity from "@/components/MicrosoftClarity";
+import EngagementInstrumentation from "@/components/EngagementInstrumentation";
 import "./[locale]/globals.css";
 
 const poppins = Poppins({
@@ -313,10 +316,26 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
         />
         {children}
-        {/* GTM (and Clarity / Ads pixels GTM injects) is loaded after the first user
+        {/* Microsoft Clarity — direct loader (independent of GTM) so paid-traffic
+            sessions that bounce in 2–4 s still get recorded. afterInteractive runs
+            after hydration, off the LCP critical path. Set NEXT_PUBLIC_CLARITY_ID
+            to enable; see components/MicrosoftClarity.tsx. NOTE: remove the Clarity
+            tag from the GTM container so we don't double-record. */}
+        <MicrosoftClarity />
+        {/* Tiny analytics-only listener layer (no UI, no DOM mutations) — emits
+            landing_page_view, page_became_hidden/visible_again, first_scroll,
+            first_click, rage_click, outbound_link_click + tags Clarity sessions
+            with utm_ params, fbclid, gclid, ttclid for paid-traffic filtering.
+            Wrapped in Suspense because it reads useSearchParams. */}
+        <Suspense fallback={null}>
+          <EngagementInstrumentation />
+        </Suspense>
+        {/* GTM (and any Ads pixels GTM injects) is loaded after the first user
             interaction or 6s, whichever comes first. Lighthouse's automated lab pass
             never interacts with the page, so this keeps GTM entirely off the critical
-            path during scoring — saving ~700 ms of TBT and ~400 KiB of unused JS. */}
+            path during scoring — saving ~700 ms of TBT and ~400 KiB of unused JS.
+            Clarity used to be inside GTM; it's now loaded directly above so paid
+            traffic that bounces in <6s still gets recorded. */}
         <DeferredGTM />
       </body>
     </html>

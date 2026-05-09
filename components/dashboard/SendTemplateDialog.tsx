@@ -13,6 +13,9 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Loader2, Mail, MessageCircle, Send } from "lucide-react";
+import { LOCALE_OPTIONS, isValidLocale, type SupportedLocale } from "@/lib/locales";
+
+const LOCALE_AUTO = "__auto__";
 
 export type SendTarget =
   | { kind: "user"; userId: string }
@@ -37,6 +40,7 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
   const [templates, setTemplates] = React.useState<TemplateRow[]>([]);
   const [templatesLoading, setTemplatesLoading] = React.useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = React.useState<string>("");
+  const [localeChoice, setLocaleChoice] = React.useState<string>(LOCALE_AUTO);
   const [previewLoading, setPreviewLoading] = React.useState(false);
   const [previewSubject, setPreviewSubject] = React.useState("");
   const [previewHtml, setPreviewHtml] = React.useState("");
@@ -50,6 +54,7 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
   React.useEffect(() => {
     if (!open) return;
     setSelectedTemplateId("");
+    setLocaleChoice(LOCALE_AUTO);
     setPreviewSubject("");
     setPreviewHtml("");
     setPreviewBody("");
@@ -83,8 +88,9 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
     if (!open || !selectedTemplateId) return;
     setPreviewLoading(true);
     const userId = target.kind === "user" ? target.userId : undefined;
+    const locale = isValidLocale(localeChoice) ? localeChoice : undefined;
     axios
-      .post(`${apiBase}/preview`, { templateId: selectedTemplateId, userId })
+      .post(`${apiBase}/preview`, { templateId: selectedTemplateId, userId, locale })
       .then((res) => {
         if (channel === "email") {
           setPreviewSubject(res.data?.subject ?? "");
@@ -95,7 +101,7 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
       })
       .catch(() => toast.error("فشل تحميل المعاينة"))
       .finally(() => setPreviewLoading(false));
-  }, [selectedTemplateId, open, target, apiBase, channel]);
+  }, [selectedTemplateId, open, target, apiBase, channel, localeChoice]);
 
   const send = async () => {
     if (!selectedTemplateId) {
@@ -107,6 +113,7 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
       const res = await axios.post(`${apiBase}/send`, {
         templateId: selectedTemplateId,
         target,
+        locale: isValidLocale(localeChoice) ? (localeChoice as SupportedLocale) : undefined,
       });
       const { sent, skipped, failed, total } = res.data ?? {};
       const failedCount = Array.isArray(failed) ? failed.length : 0;
@@ -177,6 +184,28 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-slate-600">اللغة (اختياري)</label>
+            <Select value={localeChoice} onValueChange={setLocaleChoice}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={LOCALE_AUTO}>تلقائي — حسب اللغة المفضلة لكل مستلم</SelectItem>
+                {LOCALE_OPTIONS.map((loc) => (
+                  <SelectItem key={loc.code} value={loc.code}>
+                    {loc.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-slate-500 leading-relaxed">
+              في الوضع التلقائي: لكل مستخدم تُختار لغته المفضّلة، وعند غيابها يتم
+              استعمال النسخة العربية. إذا لم توجد نسخة باللغة المختارة يتم الرجوع
+              تلقائيًا إلى النسخة العربية.
+            </p>
           </div>
 
           <div className="space-y-1.5">

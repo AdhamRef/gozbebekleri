@@ -112,7 +112,7 @@ export const SuggestedShareCountsSection = forwardRef<
     <div className="space-y-4" dir="rtl">
       <div className="space-y-2 rounded-lg border border-border p-4 bg-muted/30">
         <Label className="text-sm font-medium">
-          أعداد الأسهم المقترحة (سهوم)
+          أعداد الأسهم المقترحة
         </Label>
         <Input
           value={countsStr}

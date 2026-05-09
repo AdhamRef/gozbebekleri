@@ -224,7 +224,7 @@
     "campaignDonations": "donasi",
     "campaignRemaining": "tersisa",
     "campaignOpenBadge": "Target terbuka",
-    "campaignSharesBadge": "Saham (سهوم)",
+    "campaignSharesBadge": "Saham",
     "campaignOpenGoal": "Penggalangan terbuka",
     "sharePriceUsd": "Per saham",
     "article": "Artikel",
@@ -293,7 +293,7 @@
     "resultsFound": "proyek ditemukan",
     "featuredBadge": "Proyek Mendesak",
     "openGoalLabel": "Target terbuka",
-    "sharesCampaignLabel": "Saham (سهوم)"
+    "sharesCampaignLabel": "Saham"
   },
   "Campaign": {
     "story": "Deskripsi",
@@ -308,7 +308,7 @@
     "image": "Gambar",
     "from": "dari",
     "openGoalBadge": "Target terbuka",
-    "sharesCampaignBadge": "Saham (سهوم)",
+    "sharesCampaignBadge": "Saham",
     "donateNow": "Donasi Sekarang",
     "outOfGoal": "dari target",
     "peopleDonated": "orang mendukung kasus ini",
@@ -426,9 +426,9 @@
     "goal": "Target",
     "sharePriceLabel": "Harga per saham:",
     "sharesLabel": "saham",
-    "sharesPickHint": "Pilih berapa saham (سهوم) yang ingin Anda sumbangkan",
+    "sharesPickHint": "Pilih berapa saham yang ingin Anda sumbangkan",
     "donationTotal": "Total donasi",
-    "sharesLine": "{count} saham (سهوم)",
+    "sharesLine": "{count} saham",
     "enterDonationAmount": "Masukkan jumlah donasi",
     "addToCart": "Tambah ke Keranjang",
     "addedToCart": "Jumlah berhasil ditambahkan ke keranjang",
@@ -520,7 +520,7 @@
     "transactionFees": "Biaya Transaksi",
     "supportedCampaign": "Proyek Didukung",
     "campaignsDonatedTo": "Proyek yang Anda Donasikan",
-    "itemShares": "{count} saham (سهوم)",
+    "itemShares": "{count} saham",
     "categoriesDonatedTo": "Kampanye yang Anda Donasikan",
     "campaignsAndCategoriesDonatedTo": "Proyek & Kampanye yang Anda Donasikan",
     "donateToAnotherCampaign": "Donasi ke Proyek Lain",
@@ -551,7 +551,7 @@
     "total": "Total",
     "proceedToDonate": "Lanjutkan Donasi",
     "secureCheckout": "Donasi Anda aman dan terenkripsi",
-    "sharesLine": "{count} saham (سهوم)"
+    "sharesLine": "{count} saham"
   },
   "LiveDonationsTicker": {
     "donated": "mendonasikan",

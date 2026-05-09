@@ -3,8 +3,8 @@
 import { useEffect } from "react";
 
 /**
- * Defers Google Tag Manager (and the Clarity / Ads pixels GTM injects) until
- * either the user interacts with the page or 6 seconds have elapsed.
+ * Defers Google Tag Manager (and any Ads pixels GTM injects) until either the
+ * user interacts with the page or 6 seconds have elapsed.
  *
  * Lighthouse's automated lab pass doesn't interact with the page, so the
  * 6-second timer ensures GTM never fires during the LCP / TBT measurement
@@ -12,6 +12,13 @@ import { useEffect } from "react";
  *
  * Real users still get full analytics: GTM loads on their first scroll, click,
  * or keypress (well under a second of latency in practice).
+ *
+ * NOTE: Microsoft Clarity is intentionally NOT loaded through GTM anymore.
+ * Paid traffic that bounces in 2–4 s never gave GTM a chance to fire, so
+ * Clarity recorded nothing or recorded only the "page hidden" event when the
+ * tab was already closing. Clarity now has its own loader at
+ * components/MicrosoftClarity.tsx (afterInteractive) — remove the Clarity tag
+ * from the GTM container so we don't double-record.
  */
 const GTM_ID = "GTM-MMNBQQWB";
 const IDLE_DELAY_MS = 6000;

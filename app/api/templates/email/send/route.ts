@@ -13,10 +13,14 @@ import { resolveDonorIds } from "@/lib/users/donor-filter";
 import { loadContextsForUserIds } from "@/lib/templates/variables";
 import { renderEmailHtml, renderEmailSubject } from "@/lib/templates/render";
 import { sendBulkEmail, type BulkEmailRecipient } from "@/lib/email";
+import { pickLocale, resolveEmailVariant } from "@/lib/templates/locale-resolver";
 import type { TReaderDocument } from "@usewaypoint/email-builder";
 
 const sendSchema = z.object({
   templateId: z.string().min(1),
+  /** Optional explicit locale. Omit to use each recipient's preferredLang
+   *  (with fallback to ar when the user has none). */
+  locale: z.string().optional(),
   target: z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("user"), userId: z.string().min(1) }),
     z.object({
@@ -67,7 +71,6 @@ export async function POST(request: NextRequest) {
   }
 
   const contexts = await loadContextsForUserIds(userIds);
-  const document = template.document as unknown as TReaderDocument;
 
   const recipients: BulkEmailRecipient[] = [];
   let skipped = 0;
@@ -77,10 +80,15 @@ export async function POST(request: NextRequest) {
       skipped += 1;
       continue;
     }
+    const locale = pickLocale({
+      override: parsed.data.locale,
+      recipientLang: ctx.user.preferredLang,
+    });
+    const variant = resolveEmailVariant(template, locale);
     recipients.push({
       to: ctx.user.email,
-      subject: renderEmailSubject(template.subject, ctx),
-      html: await renderEmailHtml(document, ctx),
+      subject: renderEmailSubject(variant.subject, ctx),
+      html: await renderEmailHtml(variant.document as TReaderDocument, ctx),
     });
   }
 
@@ -99,6 +107,7 @@ export async function POST(request: NextRequest) {
       sent: result.sent,
       skipped,
       failed: result.failed.length,
+      localeOverride: parsed.data.locale ?? null,
     },
     stream: "TEAM",
   });

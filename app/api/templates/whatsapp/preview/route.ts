@@ -5,10 +5,12 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { prisma } from "@/lib/prisma";
 import { loadContext, mergeText, VARIABLE_CATALOG, type TemplateContext } from "@/lib/templates/variables";
+import { pickLocale, resolveWhatsappBody } from "@/lib/templates/locale-resolver";
 
 const previewSchema = z.object({
   templateId: z.string().min(1),
   userId: z.string().optional(),
+  locale: z.string().optional(),
 });
 
 function buildSampleContext(): TemplateContext {
@@ -113,5 +115,14 @@ export async function POST(request: NextRequest) {
     (parsed.data.userId ? await loadContext(parsed.data.userId) : null) ??
     buildSampleContext();
 
-  return NextResponse.json({ body: mergeText(template.body, ctx) });
+  const locale = pickLocale({
+    override: parsed.data.locale,
+    recipientLang: ctx.user.preferredLang,
+  });
+  const variant = resolveWhatsappBody(template, locale);
+
+  return NextResponse.json({
+    body: mergeText(variant.body, ctx),
+    resolvedLocale: variant.resolvedLocale,
+  });
 }

@@ -224,7 +224,7 @@
     "campaignDonations": "donaciones",
     "campaignRemaining": "restante",
     "campaignOpenBadge": "Meta abierta",
-    "campaignSharesBadge": "Acciones (سهوم)",
+    "campaignSharesBadge": "Acciones",
     "campaignOpenGoal": "Recaudación abierta",
     "sharePriceUsd": "Por acción",
     "article": "Artículo",
@@ -293,7 +293,7 @@
     "resultsFound": "proyectos encontradas",
     "featuredBadge": "Proyecto Urgente",
     "openGoalLabel": "Meta abierta",
-    "sharesCampaignLabel": "Acciones (سهوم)"
+    "sharesCampaignLabel": "Acciones"
   },
   "Campaign": {
     "story": "Descripción",
@@ -308,7 +308,7 @@
     "image": "Imagen",
     "from": "de",
     "openGoalBadge": "Meta abierta",
-    "sharesCampaignBadge": "Acciones (سهوم)",
+    "sharesCampaignBadge": "Acciones",
     "donateNow": "Donar ahora",
     "outOfGoal": "del objetivo",
     "peopleDonated": "personas apoyaron este caso",
@@ -426,9 +426,9 @@
     "goal": "Objetivo",
     "sharePriceLabel": "Precio por acción:",
     "sharesLabel": "acciones",
-    "sharesPickHint": "Elige cuántas acciones (سهوم) quieres donar",
+    "sharesPickHint": "Elige cuántas acciones quieres donar",
     "donationTotal": "Total de la donación",
-    "sharesLine": "{count} acciones (سهوم)",
+    "sharesLine": "{count} acciones",
     "enterDonationAmount": "Introduce la cantidad a donar",
     "addToCart": "Añadir al carrito",
     "addedToCart": "Cantidad añadida al carrito correctamente",
@@ -520,7 +520,7 @@
     "transactionFees": "Comisiones de transacción",
     "supportedCampaign": "Proyecto apoyada",
     "campaignsDonatedTo": "Proyectos a las que has donado",
-    "itemShares": "{count} acciones (سهوم)",
+    "itemShares": "{count} acciones",
     "categoriesDonatedTo": "Campañas a las que has donado",
     "campaignsAndCategoriesDonatedTo": "Proyectos y campañas a las que has donado",
     "donateToAnotherCampaign": "Donar a otra proyecto",
@@ -551,7 +551,7 @@
     "total": "Total",
     "proceedToDonate": "Proceder a donar",
     "secureCheckout": "Tu donación es segura y está cifrada",
-    "sharesLine": "{count} acciones (سهوم)"
+    "sharesLine": "{count} acciones"
   },
   "LiveDonationsTicker": {
     "donated": "donó",
