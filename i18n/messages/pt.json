@@ -448,7 +448,7 @@
     "coverPaymentFees": "Cobrir taxas de pagamento",
     "paymentFeesInfo": "As taxas do serviço de pagamento eletrónico são 3% do valor total",
     "yesCoverFees": "Sim, quero cobrir as taxas de pagamento",
-    "feesWillBeAdded": "{amount} será adicionado para cobrir as taxas",
+    "feesWillBeAdded": "3% ({amount}) será adicionado para cobrir as taxas",
     "confirmation": "Confirmação",
     "confirmationDesc": "Rever doação",
     "donationType": "Tipo de doação",

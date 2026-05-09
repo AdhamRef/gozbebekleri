@@ -448,7 +448,7 @@
     "coverPaymentFees": "Couvrir les frais de paiement",
     "paymentFeesInfo": "Les frais de service de paiement électronique sont de 3% du montant total",
     "yesCoverFees": "Oui, je veux couvrir les frais de paiement",
-    "feesWillBeAdded": "{amount} sera ajouté pour couvrir les frais de paiement",
+    "feesWillBeAdded": "3% ({amount}) sera ajouté pour couvrir les frais de paiement",
     "confirmation": "Confirmation",
     "confirmationDesc": "Examiner le don",
     "donationType": "Type de don",

@@ -448,7 +448,7 @@
     "coverPaymentFees": "تغطية رسوم الدفع",
     "paymentFeesInfo": "رسوم خدمة الدفع الإلكتروني تبلغ 3% من إجمالي المبلغ",
     "yesCoverFees": "نعم، أريد تغطية رسوم الدفع",
-    "feesWillBeAdded": "سيتم إضافة {amount} لتغطية رسوم الدفع",
+    "feesWillBeAdded": "سيتم إضافة 3% ({amount}) لتغطية رسوم الدفع",
     "confirmation": "التأكيد",
     "confirmationDesc": "مراجعة التبرع",
     "donationType": "نوع التبرع",

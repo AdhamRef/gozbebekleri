@@ -448,7 +448,7 @@
     "coverPaymentFees": "Tutup Biaya Pembayaran",
     "paymentFeesInfo": "Biaya layanan pembayaran elektronik adalah 3% dari total jumlah",
     "yesCoverFees": "Ya, saya ingin menutup biaya pembayaran",
-    "feesWillBeAdded": "{amount} akan ditambahkan untuk menutup biaya pembayaran",
+    "feesWillBeAdded": "3% ({amount}) akan ditambahkan untuk menutup biaya pembayaran",
     "confirmation": "Konfirmasi",
     "confirmationDesc": "Tinjau donasi",
     "donationType": "Jenis Donasi",

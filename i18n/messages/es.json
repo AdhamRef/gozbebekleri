@@ -448,7 +448,7 @@
     "coverPaymentFees": "Cubrir comisiones de pago",
     "paymentFeesInfo": "Las comisiones del servicio de pago electrónico son el 3% del total",
     "yesCoverFees": "Sí, quiero cubrir las comisiones",
-    "feesWillBeAdded": "Se añadirá {amount} para cubrir las comisiones",
+    "feesWillBeAdded": "Se añadirá 3% ({amount}) para cubrir las comisiones",
     "confirmation": "Confirmación",
     "confirmationDesc": "Revisar donación",
     "donationType": "Tipo de donación",

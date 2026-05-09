@@ -448,7 +448,7 @@
     "coverPaymentFees": "Cover Payment Fees",
     "paymentFeesInfo": "Electronic payment service fees are 3% of the total amount",
     "yesCoverFees": "Yes, I want to cover payment fees",
-    "feesWillBeAdded": "{amount} will be added to cover payment fees",
+    "feesWillBeAdded": "3% ({amount}) will be added to cover payment fees",
     "confirmation": "Confirmation",
     "confirmationDesc": "Review donation",
     "donationType": "Donation Type",

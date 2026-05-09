@@ -448,7 +448,7 @@
     "coverPaymentFees": "Ödeme Ücretlerini Karşıla",
     "paymentFeesInfo": "Elektronik ödeme hizmet ücreti toplam tutarın %3'üdür",
     "yesCoverFees": "Evet, ödeme ücretlerini karşılamak istiyorum",
-    "feesWillBeAdded": "Ücretleri karşılamak için {amount} eklenecektir",
+    "feesWillBeAdded": "Ücretleri karşılamak için 3% ({amount}) eklenecektir",
     "confirmation": "Onay",
     "confirmationDesc": "Bağışı gözden geçirin",
     "donationType": "Bağış Türü",
