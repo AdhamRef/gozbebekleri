@@ -175,13 +175,13 @@ const DonationDialog = ({
     { label: "100", value: 100 },
   ];
 
+  // Trimmed flow for higher conversion: cover-fees folded into teamSupport,
+  // sign-in step removed entirely (guests skip auth, authed users keep going).
   const DONATION_STEPS: Record<DonationType, DonationStep[]> = {
     ONE_TIME: [
       { title: t("donationAmount"), subtitle: t("donationAmountDesc") },
       { title: t("teamSupport"), subtitle: t("teamSupportDesc") },
-      { title: t("paymentFees"), subtitle: t("paymentFeesDesc") },
       { title: t("confirmation"), subtitle: t("confirmationDesc") },
-      { title: tAuth("checkoutTitle"), subtitle: tAuth("checkoutSubtitle") },
       { title: t("paymentInfo"), subtitle: t("paymentInfoDesc") },
     ],
     MONTHLY: [
@@ -190,9 +190,7 @@ const DonationDialog = ({
         subtitle: t("monthlyDonationAmountDesc"),
       },
       { title: t("teamSupport"), subtitle: t("teamSupportDesc") },
-      { title: t("paymentFees"), subtitle: t("paymentFeesDesc") },
       { title: t("confirmation"), subtitle: t("confirmationDesc") },
-      { title: tAuth("checkoutTitle"), subtitle: tAuth("checkoutSubtitle") },
       { title: t("paymentInfo"), subtitle: t("paymentInfoDesc") },
     ],
   };
@@ -343,7 +341,9 @@ const DonationDialog = ({
       hasFallenBackRef.current = false;
       checkoutTrackedRef.current = false;
       paymentInfoTrackedRef.current = false;
-      setHasSkippedAuth(false);
+      // Auto-skip the (now-removed) sign-in step: guests proceed straight to
+      // the payment step's inline form. Authenticated users are unaffected.
+      setHasSkippedAuth(true);
       // Track opening the donation flow
       tracking?.trackViewContent({
         contentIds:  campaignId ? [campaignId] : categoryId ? [categoryId] : undefined,
@@ -989,8 +989,8 @@ const DonationDialog = ({
 
       case t("teamSupport"):
         return (
-          <div className="space-y-6">
-            <div className="text-center space-y-2">
+          <div className="space-y-5">
+            <div className="text-center space-y-1.5">
               <h3 className="text-lg font-semibold text-gray-900">
                 {t("wantToSupportTeam")}
               </h3>
@@ -1030,6 +1030,38 @@ const DonationDialog = ({
                   </Button>
                 ))}
               </div>
+            </div>
+
+            {/* Cover-fees toggle, folded in here so it isn't its own step */}
+            <button
+              type="button"
+              dir={dir}
+              onClick={() => setCoverFees(!coverFees)}
+              className={`w-full flex items-start gap-3 p-3 rounded-xl border transition-all ${
+                coverFees
+                  ? "border-[#025EB8] bg-[#025EB8]/5"
+                  : "border-gray-200 hover:border-gray-300 bg-white"
+              }`}
+            >
+              <div className={`w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-md border-2 mt-0.5 transition-all ${
+                coverFees ? "bg-[#025EB8] border-[#025EB8]" : "border-gray-300"
+              }`}>
+                {coverFees && <Check className="w-3 h-3 text-white" />}
+              </div>
+              <div className="flex-1 text-start">
+                <p className="text-sm font-semibold text-gray-900">{t("coverPaymentFees")}</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {t("feesWillBeAdded", { amount: `${fees.toFixed(2)} ${getCurrency()}` })}
+                </p>
+              </div>
+            </button>
+
+            {/* Live total preview so the user always sees what they'll pay */}
+            <div dir={dir} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2.5 text-sm">
+              <span className="text-gray-600">{t("total")}</span>
+              <span className="font-bold text-[#025EB8]" dir="ltr">
+                {totalAmount.toFixed(2)} {getCurrency()}
+              </span>
             </div>
 
             <div className="flex justify-between gap-4">

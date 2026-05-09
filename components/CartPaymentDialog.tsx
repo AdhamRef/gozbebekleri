@@ -93,11 +93,11 @@ const CartPaymentDialog = ({
     <span className={btnRow}>{t("confirmDonation")}<ChevronRight className="h-4 w-4 shrink-0" aria-hidden /></span>
   );
 
+  // Trimmed flow for higher conversion: cover-fees folded into teamSupport,
+  // sign-in step removed (guests skip auth, authed users keep going).
   const STEPS = [
     { title: t("teamSupport"),    subtitle: t("teamSupportDesc") },
-    { title: t("paymentFees"),    subtitle: t("paymentFeesDesc") },
     { title: t("confirmation"),   subtitle: t("confirmationDesc") },
-    { title: tAuth("checkoutTitle"), subtitle: tAuth("checkoutSubtitle") },
     { title: t("paymentInfo"),    subtitle: t("paymentInfoDesc") },
   ];
 
@@ -231,6 +231,10 @@ const CartPaymentDialog = ({
       setGuestFirstName(""); setGuestLastName(""); setGuestEmail("");
       setSelectedCardId(null); setSavedCards([]);
       setHasSkippedAuth(false);
+    } else {
+      // Auto-skip the (now-removed) sign-in step: guests proceed straight to
+      // the payment step's inline form. Authenticated users are unaffected.
+      setHasSkippedAuth(true);
     }
   }, [isOpen]);
 
@@ -653,12 +657,12 @@ const CartPaymentDialog = ({
 
     // Team Support
     if (step.title === t("teamSupport")) return (
-      <div className="space-y-6">
-        <div className="text-center space-y-2">
+      <div className="space-y-5">
+        <div className="text-center space-y-1.5">
           <h3 className="text-xl font-semibold text-gray-900">{t("wantToSupportTeam")}</h3>
           <p className="text-gray-600 text-sm">{t("teamSupportHelp")}</p>
         </div>
-        <div className="flex flex-col items-center gap-4">
+        <div className="flex flex-col items-center gap-3">
           <Input type="number" inputMode="numeric" min={0} step={1} value={teamSupport || ""} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ""); setTeamSupport(val ? parseInt(val, 10) : 0); }} onKeyDown={(e) => { if (e.key === "." || e.key === ",") e.preventDefault(); }} placeholder={t("otherAmount")} className="text-center text-lg font-medium" />
           <div className="grid grid-cols-3 gap-3 w-full">
             {TEAM_SUPPORT_OPTIONS.map((o) => (
@@ -669,6 +673,37 @@ const CartPaymentDialog = ({
             ))}
           </div>
         </div>
+
+        {/* Cover-fees toggle, folded in here so it isn't its own step */}
+        <button
+          type="button"
+          dir={dir}
+          onClick={() => setCoverFees(!coverFees)}
+          className={`w-full flex items-start gap-3 p-3 rounded-xl border transition-all ${
+            coverFees
+              ? "border-[#025EB8] bg-[#025EB8]/5"
+              : "border-gray-200 hover:border-gray-300 bg-white"
+          }`}
+        >
+          <div className={`w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-md border-2 mt-0.5 transition-all ${
+            coverFees ? "bg-[#025EB8] border-[#025EB8]" : "border-gray-300"
+          }`}>
+            {coverFees && <Check className="w-3 h-3 text-white" />}
+          </div>
+          <div className="flex-1 text-start">
+            <p className="text-sm font-semibold text-gray-900">{t("coverPaymentFees")}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{t("feesWillBeAdded", { amount: `${fees.toFixed(2)} ${getCurrency()}` })}</p>
+          </div>
+        </button>
+
+        {/* Live total preview so the user always sees what they'll pay */}
+        <div dir={dir} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2.5 text-sm">
+          <span className="text-gray-600">{t("total")}</span>
+          <span className="font-bold text-[#025EB8]" dir="ltr">
+            {totalAmount.toFixed(2)} {getCurrency()}
+          </span>
+        </div>
+
         <div dir={dir} className="flex justify-between gap-4">
           <Button variant="outline" onClick={handleBack} className="flex-1 inline-flex items-center justify-center gap-2">{backLabel}</Button>
           <Button onClick={handleNext} className="flex-1 bg-[#025EB8] hover:bg-[#014fa0] text-white inline-flex items-center justify-center gap-2">{nextLabel}</Button>
