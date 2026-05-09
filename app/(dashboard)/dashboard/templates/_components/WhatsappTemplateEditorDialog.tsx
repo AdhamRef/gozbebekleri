@@ -290,9 +290,6 @@ export function WhatsappTemplateEditorDialog({ id, open, onOpenChange }: Props) 
                   </div>
                 );
               })}
-              <span className="text-[10px] text-slate-400 ms-auto shrink-0">
-                اللغات بدون نسخة تستخدم نسخة العربية تلقائيًا
-              </span>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

@@ -290,9 +290,6 @@ function LocaleTabs({
           </div>
         );
       })}
-      <span className="text-[10px] text-slate-400 ms-auto shrink-0">
-        اللغات بدون نسخة تستخدم نسخة العربية تلقائيًا
-      </span>
     </div>
   );
 }
