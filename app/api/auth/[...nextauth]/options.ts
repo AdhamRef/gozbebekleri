@@ -6,8 +6,11 @@ import FacebookProvider from "next-auth/providers/facebook";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
+import { OAuth2Client, type TokenPayload } from "google-auth-library";
 import { verifyToken } from "@/lib/otp";
 import { isValidLocale, DEFAULT_LOCALE, type SupportedLocale } from "@/lib/locales";
+
+const googleAuthClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 /**
  * NextAuth's signIn callback doesn't receive the request, so we read the
@@ -55,6 +58,65 @@ if (process.env.FACEBOOK_CLIENT_ID && process.env.FACEBOOK_CLIENT_SECRET) {
     })
   );
 }
+
+providers.push(
+  CredentialsProvider({
+    id: "google-onetap",
+    name: "Google",
+    credentials: {
+      idToken: { label: "Google ID Token", type: "text" },
+    },
+    async authorize(credentials) {
+      const idToken = credentials?.idToken;
+      if (!idToken) return null;
+
+      let payload: TokenPayload | undefined;
+      try {
+        const ticket = await googleAuthClient.verifyIdToken({
+          idToken,
+          audience: process.env.GOOGLE_CLIENT_ID,
+        });
+        payload = ticket.getPayload();
+      } catch (e) {
+        console.error("[google-onetap] verifyIdToken failed", e);
+        return null;
+      }
+      if (!payload?.email || !payload.email_verified) return null;
+
+      const email = payload.email.toLowerCase();
+      const name = payload.name ?? "Google User";
+      const image = payload.picture ?? null;
+
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (existing) {
+        const updateData: Record<string, unknown> = { name, image };
+        if (!existing.preferredLang) {
+          updateData.preferredLang = await readLocaleFromCookies();
+        }
+        await prisma.user.update({ where: { id: existing.id }, data: updateData });
+        return {
+          id: existing.id,
+          email: existing.email,
+          name: existing.name ?? name,
+          role: existing.role,
+        };
+      }
+
+      const preferredLang = await readLocaleFromCookies();
+      const created = await prisma.user.create({
+        data: {
+          email,
+          name,
+          image,
+          role: "DONOR",
+          emailVerified: new Date(),
+          preferredLang,
+        },
+      });
+      return { id: created.id, email: created.email, name: created.name, role: created.role };
+    },
+  })
+);
 
 providers.push(
   CredentialsProvider({

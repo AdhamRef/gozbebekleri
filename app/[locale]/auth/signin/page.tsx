@@ -5,6 +5,7 @@ import { useLocale } from 'next-intl';
 import Image from 'next/image';
 import { Link } from '@/i18n/routing';
 import { Heart, ArrowRight } from 'lucide-react';
+import GoogleSignInButton from '@/components/GoogleSignInButton';
 
 const LOGO_URL = 'logo-white.png';
 
@@ -68,13 +69,9 @@ export default function SignIn() {
             <p className="text-sm text-gray-500 mb-8">{labels.welcome}</p>
 
             <div className="space-y-3">
-              <button
-                onClick={() => signIn('google', { callbackUrl: '/' })}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-sm"
-              >
-                <Image src="/google.svg" alt="Google" width={20} height={20} />
-                {labels.google}
-              </button>
+              <div className="flex w-full justify-center">
+                <GoogleSignInButton callbackUrl="/" locale={locale} />
+              </div>
 
               <button
                 onClick={() => signIn('facebook', { callbackUrl: '/' })}

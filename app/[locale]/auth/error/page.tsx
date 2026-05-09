@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { signIn } from 'next-auth/react';
+import GoogleSignInButton from '@/components/GoogleSignInButton';
 
 export default function AuthError() {
   const searchParams = useSearchParams();
@@ -34,14 +35,11 @@ export default function AuthError() {
           {getErrorMessage(error)}
         </p>
         <div className="space-y-4">
-          <Button
-            onClick={() => signIn('google', { callbackUrl })}
-            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 text-gray-700"
-          >
-            <Image src="/google.svg" alt="Google" width={20} height={20} />
-            <span>تسجيل دخول باستخدام Google</span>
-          </Button>
-          
+          <div className="flex w-full justify-center">
+            <GoogleSignInButton callbackUrl={callbackUrl} />
+          </div>
+
+
           <Button
             onClick={() => signIn('facebook', { callbackUrl })}
             className="w-full flex items-center justify-center gap-3 bg-[#1877F2] hover:bg-[#1874EA] text-white"

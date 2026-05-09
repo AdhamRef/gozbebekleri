@@ -81,6 +81,7 @@
     "date-fns": "^4.1.0",
     "fontkit": "^2.0.4",
     "framer-motion": "^12.34.0",
+    "google-auth-library": "^10.6.2",
     "html-pdf-node": "^1.0.8",
     "i18n": "^0.15.1",
     "install": "^0.13.0",

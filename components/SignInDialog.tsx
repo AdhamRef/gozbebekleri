@@ -1,11 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DialogClose } from "@/components/ui/dialog";
 import { signIn } from "next-auth/react";
 import { Link, usePathname } from "@/i18n/routing";
 import { useTranslations, useLocale } from "next-intl";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 import {
   X,
   Heart,
@@ -165,12 +165,11 @@ export function SignInPanel({
     }, 1000);
   }, []);
 
-  // ── Google sign-in ────────────────────────────────────────────────────────
-  const handleGoogleSignIn = () => {
+  // ── Google sign-in callback URL ───────────────────────────────────────────
+  const googleCallbackUrl = (() => {
     const finalCallbackUrl = callbackUrl ?? pathname;
-    const completeProfileUrl = `/${locale}/auth/complete-profile?callbackUrl=${encodeURIComponent(finalCallbackUrl)}`;
-    signIn("google", { callbackUrl: completeProfileUrl });
-  };
+    return `/${locale}/auth/complete-profile?callbackUrl=${encodeURIComponent(finalCallbackUrl)}`;
+  })();
 
   // ── Email sign-in ─────────────────────────────────────────────────────────
   const handleSignIn = async () => {
@@ -367,24 +366,14 @@ export function SignInPanel({
                   <span className="whitespace-nowrap">{t("googleFastestWay")}</span>
                 </div>
                 <div className="rounded-xl bg-gradient-to-br from-[#025EB8] via-[#6366f1] to-[#f59e0b] p-[2px] shadow-[0_4px_16px_-4px_rgba(2,94,184,0.45)]">
-                  <button
-                    type="button"
-                    onClick={handleGoogleSignIn}
-                    className="group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-[10px] bg-gradient-to-b from-white to-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 shadow-inner shadow-white/50 transition-all hover:from-slate-50 hover:to-white hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.9)] active:scale-[0.98] sm:py-3.5 touch-manipulation"
-                  >
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#025EB8]/5 via-transparent to-amber-400/[0.07] opacity-0 transition-opacity group-hover:opacity-100"
+                  <div className="flex items-center justify-center rounded-[10px] bg-gradient-to-b from-white to-slate-50 px-3 py-2 sm:py-2.5">
+                    <GoogleSignInButton
+                      callbackUrl={googleCallbackUrl}
+                      locale={locale}
+                      theme="outline"
+                      text="signin_with"
                     />
-                    <Image
-                      src="/google.svg"
-                      alt=""
-                      width={20}
-                      height={20}
-                      className="relative h-5 w-5 shrink-0"
-                    />
-                    <span className="relative">{t("signInWithGoogle")}</span>
-                  </button>
+                  </div>
                 </div>
               </div>
 
