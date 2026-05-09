@@ -231,6 +231,10 @@ export default function GoogleSignInButton({
 
         const renderInto = () => {
           if (!hostRef.current) return;
+          // Measure the host's actual rendered width so the GSI iframe
+          // matches the container. Google clamps width to [200, 400].
+          const measured = hostRef.current.clientWidth;
+          const target = Math.max(220, Math.min(400, measured || width));
           hostRef.current.innerHTML = "";
           gsi.renderButton(hostRef.current, {
             type: "standard",
@@ -239,16 +243,26 @@ export default function GoogleSignInButton({
             text,
             shape: "rectangular",
             logo_alignment: "center",
-            width: Math.max(220, Math.min(400, hostRef.current.clientWidth || width)),
+            width: target,
             ...(locale ? { locale } : {}),
           });
         };
         renderInto();
         setStatus("ready");
 
-        // Re-render on container width change (responsive layouts).
+        // Re-render on container width change (responsive layouts) — but only
+        // when the width meaningfully changes, to avoid an infinite RO loop
+        // that fires on every iframe paint.
         if (typeof ResizeObserver !== "undefined" && hostRef.current) {
-          resizeObserver = new ResizeObserver(() => renderInto());
+          let lastWidth = hostRef.current.clientWidth;
+          resizeObserver = new ResizeObserver(() => {
+            if (!hostRef.current) return;
+            const w = hostRef.current.clientWidth;
+            if (Math.abs(w - lastWidth) >= 4) {
+              lastWidth = w;
+              renderInto();
+            }
+          });
           resizeObserver.observe(hostRef.current);
         }
       } catch {
@@ -282,10 +296,10 @@ export default function GoogleSignInButton({
   }
 
   return (
-    <div className={`relative ${className ?? ""}`}>
+    <div className={`relative w-full ${className ?? ""}`}>
       <div
         ref={hostRef}
-        className="flex w-full items-center justify-center min-h-[42px]"
+        className="flex w-full items-center justify-center min-h-[44px]"
         aria-busy={status === "loading"}
       />
       {status === "loading" && (

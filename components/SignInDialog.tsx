@@ -371,7 +371,7 @@ export function SignInPanel({
                   <span className="whitespace-nowrap">{t("googleFastestWay")}</span>
                 </div>
                 <div className="rounded-xl bg-gradient-to-br from-[#025EB8] via-[#6366f1] to-[#f59e0b] p-[2px] shadow-[0_4px_16px_-4px_rgba(2,94,184,0.45)]">
-                  <div className="flex items-center justify-center rounded-[10px] bg-gradient-to-b from-white to-slate-50 px-3 py-2 sm:py-2.5">
+                  <div className="flex w-full items-center justify-center rounded-[10px] bg-gradient-to-b from-white to-slate-50 px-1 py-1">
                     <GoogleSignInButton
                       callbackUrl={googleCallbackUrl}
                       onAuthenticated={
@@ -407,7 +407,8 @@ export function SignInPanel({
                 {t("signInWithEmail")}
               </button>
 
-              {/* Donate-as-guest — white card with a "without login" badge */}
+              {/* Donate-as-guest — same gradient-border treatment as Google,
+                  but blue-only to differentiate from the multi-color CTA */}
               {onSkip && (
                 <div className="relative pt-2">
                   <div
@@ -418,23 +419,29 @@ export function SignInPanel({
                     <UserCheck2 className="h-3 w-3 shrink-0 fill-white/90" aria-hidden />
                     <span className="whitespace-nowrap font-medium">{t("withoutLoginBadge")}</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      onSkip();
-                    }}
-                    className="group relative flex w-full items-center justify-center gap-2.5 overflow-hidden rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 shadow-sm transition-all hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 hover:shadow-md active:scale-[0.99] sm:py-3.5"
-                  >
-                    <Heart className="relative h-4 w-4 shrink-0 text-[#FA5D17]" aria-hidden />
-                    <span className="relative">{t("donateAsGuest")}</span>
-                    <ArrowRight
-                      aria-hidden
-                      className={`relative h-4 w-4 shrink-0 text-gray-400 transition-transform group-hover:text-gray-600 ${
-                        isRTL ? "rotate-180 group-hover:-translate-x-1" : "group-hover:translate-x-1"
-                      }`}
-                    />
-                  </button>
+                  <div className="rounded-xl bg-gradient-to-br from-[#025EB8] via-[#3b82f6] to-[#60a5fa] p-[2px] shadow-[0_4px_16px_-4px_rgba(2,94,184,0.35)]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onSkip();
+                      }}
+                      className="group relative flex w-full items-center justify-center gap-2.5 overflow-hidden rounded-[10px] bg-gradient-to-b from-white to-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 shadow-inner shadow-white/50 transition-all hover:from-slate-50 hover:to-white hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.9)] active:scale-[0.98] sm:py-3.5 touch-manipulation"
+                    >
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#025EB8]/5 via-transparent to-[#60a5fa]/[0.07] opacity-0 transition-opacity group-hover:opacity-100"
+                      />
+                      <Heart className="relative h-4 w-4 shrink-0 text-[#FA5D17]" aria-hidden />
+                      <span className="relative">{t("donateAsGuest")}</span>
+                      <ArrowRight
+                        aria-hidden
+                        className={`relative h-4 w-4 shrink-0 text-[#025EB8]/70 transition-transform group-hover:text-[#025EB8] ${
+                          isRTL ? "rotate-180 group-hover:-translate-x-1" : "group-hover:translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
               )}
 
