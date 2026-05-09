@@ -397,6 +397,18 @@
     "genderFemale": "Feminino",
     "genderPreferNotToSay": "Prefiro não dizer"
   },
+  "InAppBrowserNotice": {
+    "title": "Abra a página no seu navegador para entrar",
+    "subtitle": "O Google bloqueia o login a partir de navegadores integrados em aplicações por motivos de segurança. Abra esta página no seu navegador habitual para continuar.",
+    "iosHelp": "Toque no ícone de partilha e escolha «Abrir no Safari» (ou no seu navegador predefinido).",
+    "androidHelp": "Toque no menu (⋮) no topo e escolha «Abrir no navegador» ou «Abrir no Chrome».",
+    "genericHelp": "Abra esta página no seu navegador predefinido e tente entrar novamente com o Google.",
+    "copy": "Copiar",
+    "copied": "Copiado!",
+    "openInChrome": "Abrir no Chrome",
+    "continueAnyway": "Tentar com o Google mesmo assim",
+    "close": "Fechar"
+  },
   "SharePopup": {
     "shareCampaign": "Partilhar projeto com outros",
     "facebook": "Facebook",

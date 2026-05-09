@@ -5,11 +5,14 @@ import Image from 'next/image';
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { signIn } from 'next-auth/react';
+import InAppBrowserNotice from '@/components/InAppBrowserNotice';
+import { useGoogleSignIn } from '@/hooks/useGoogleSignIn';
 
 export default function AuthError() {
   const searchParams = useSearchParams();
   const error = searchParams.get('error');
   const callbackUrl = searchParams.get('callbackUrl') || '/';
+  const { signInWithGoogle, noticeOpen, closeNotice, continueAnyway } = useGoogleSignIn();
 
   const getErrorMessage = (errorCode: string | null) => {
     switch (errorCode) {
@@ -35,7 +38,7 @@ export default function AuthError() {
         </p>
         <div className="space-y-4">
           <Button
-            onClick={() => signIn('google', { callbackUrl })}
+            onClick={() => signInWithGoogle({ callbackUrl })}
             className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 text-gray-700"
           >
             <Image src="/google.svg" alt="Google" width={20} height={20} />
@@ -60,6 +63,12 @@ export default function AuthError() {
           </div>
         </div>
       </div>
+
+      <InAppBrowserNotice
+        isOpen={noticeOpen}
+        onClose={closeNotice}
+        onContinueAnyway={continueAnyway}
+      />
     </div>
   );
-} 
+}

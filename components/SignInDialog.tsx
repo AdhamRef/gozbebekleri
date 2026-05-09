@@ -6,6 +6,8 @@ import { DialogClose } from "@/components/ui/dialog";
 import { signIn } from "next-auth/react";
 import { Link, usePathname } from "@/i18n/routing";
 import { useTranslations, useLocale } from "next-intl";
+import InAppBrowserNotice from "@/components/InAppBrowserNotice";
+import { useGoogleSignIn } from "@/hooks/useGoogleSignIn";
 import {
   X,
   Heart,
@@ -166,10 +168,11 @@ export function SignInPanel({
   }, []);
 
   // ── Google sign-in ────────────────────────────────────────────────────────
+  const { signInWithGoogle, noticeOpen, closeNotice, continueAnyway } = useGoogleSignIn();
   const handleGoogleSignIn = () => {
     const finalCallbackUrl = callbackUrl ?? pathname;
     const completeProfileUrl = `/${locale}/auth/complete-profile?callbackUrl=${encodeURIComponent(finalCallbackUrl)}`;
-    signIn("google", { callbackUrl: completeProfileUrl });
+    signInWithGoogle({ callbackUrl: completeProfileUrl });
   };
 
   // ── Email sign-in ─────────────────────────────────────────────────────────
@@ -632,6 +635,12 @@ export function SignInPanel({
             </div>
           )}
         </div>
+
+        <InAppBrowserNotice
+          isOpen={noticeOpen}
+          onClose={closeNotice}
+          onContinueAnyway={continueAnyway}
+        />
     </div>
   );
 }

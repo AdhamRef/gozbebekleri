@@ -397,6 +397,18 @@
     "genderFemale": "Femme",
     "genderPreferNotToSay": "Préfère ne pas dire"
   },
+  "InAppBrowserNotice": {
+    "title": "Ouvrez la page dans votre navigateur pour vous connecter",
+    "subtitle": "Google bloque la connexion depuis les navigateurs intégrés aux applications pour des raisons de sécurité. Ouvrez cette page dans votre navigateur habituel pour continuer.",
+    "iosHelp": "Touchez l'icône de partage et choisissez « Ouvrir dans Safari » (ou votre navigateur par défaut).",
+    "androidHelp": "Touchez le menu (⋮) en haut et choisissez « Ouvrir dans le navigateur » ou « Ouvrir dans Chrome ».",
+    "genericHelp": "Ouvrez cette page dans votre navigateur par défaut, puis réessayez la connexion Google.",
+    "copy": "Copier",
+    "copied": "Copié !",
+    "openInChrome": "Ouvrir dans Chrome",
+    "continueAnyway": "Essayer Google malgré tout",
+    "close": "Fermer"
+  },
   "SharePopup": {
     "shareCampaign": "Partager la projet avec d'autres",
     "facebook": "Facebook",

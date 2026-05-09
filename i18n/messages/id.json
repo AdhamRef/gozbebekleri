@@ -397,6 +397,18 @@
     "genderFemale": "Perempuan",
     "genderPreferNotToSay": "Tidak ingin menyebutkan"
   },
+  "InAppBrowserNotice": {
+    "title": "Buka di peramban Anda untuk masuk",
+    "subtitle": "Google memblokir login dari peramban dalam aplikasi demi keamanan. Buka halaman ini di peramban biasa untuk melanjutkan.",
+    "iosHelp": "Ketuk ikon bagikan lalu pilih \"Buka di Safari\" (atau peramban default Anda).",
+    "androidHelp": "Ketuk menu (⋮) di bagian atas lalu pilih \"Buka di peramban\" atau \"Buka di Chrome\".",
+    "genericHelp": "Buka halaman ini di peramban default Anda, lalu coba masuk dengan Google lagi.",
+    "copy": "Salin",
+    "copied": "Tersalin!",
+    "openInChrome": "Buka di Chrome",
+    "continueAnyway": "Tetap coba Google",
+    "close": "Tutup"
+  },
   "SharePopup": {
     "shareCampaign": "Bagikan Proyek dengan Orang Lain",
     "facebook": "Facebook",

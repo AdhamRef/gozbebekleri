@@ -397,6 +397,18 @@
     "genderFemale": "Female",
     "genderPreferNotToSay": "Prefer not to say"
   },
+  "InAppBrowserNotice": {
+    "title": "Open in your browser to sign in",
+    "subtitle": "Google blocks sign-in from in-app browsers for security. Open this page in your normal browser to continue.",
+    "iosHelp": "Tap the share icon and choose \"Open in Safari\" (or your default browser).",
+    "androidHelp": "Tap the menu (⋮) at the top and choose \"Open in browser\" or \"Open in Chrome\".",
+    "genericHelp": "Open this page in your default browser, then sign in with Google again.",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "openInChrome": "Open in Chrome",
+    "continueAnyway": "Try Google sign-in anyway",
+    "close": "Close"
+  },
   "SharePopup": {
     "shareCampaign": "Share Project with Others",
     "facebook": "Facebook",

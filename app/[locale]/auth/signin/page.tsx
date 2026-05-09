@@ -5,6 +5,8 @@ import { useLocale } from 'next-intl';
 import Image from 'next/image';
 import { Link } from '@/i18n/routing';
 import { Heart, ArrowRight } from 'lucide-react';
+import InAppBrowserNotice from '@/components/InAppBrowserNotice';
+import { useGoogleSignIn } from '@/hooks/useGoogleSignIn';
 
 const LOGO_URL = 'logo-white.png';
 
@@ -12,6 +14,7 @@ export default function SignIn() {
   const locale = useLocale();
   const isTr = locale === 'tr';
   const isAr = locale === 'ar';
+  const { signInWithGoogle, noticeOpen, closeNotice, continueAnyway } = useGoogleSignIn();
 
   const labels = {
     headline: isTr ? 'HALA ÜYE DEĞİL MİSİNİZ?' : isAr ? 'هل أنت عضو جديد؟' : 'NOT A MEMBER YET?',
@@ -69,7 +72,7 @@ export default function SignIn() {
 
             <div className="space-y-3">
               <button
-                onClick={() => signIn('google', { callbackUrl: '/' })}
+                onClick={() => signInWithGoogle({ callbackUrl: '/' })}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 transition-colors shadow-sm"
               >
                 <Image src="/google.svg" alt="Google" width={20} height={20} />
@@ -100,6 +103,12 @@ export default function SignIn() {
           </div>
         </div>
       </div>
+
+      <InAppBrowserNotice
+        isOpen={noticeOpen}
+        onClose={closeNotice}
+        onContinueAnyway={continueAnyway}
+      />
     </div>
   );
 }
