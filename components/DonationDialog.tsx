@@ -229,6 +229,8 @@ const DonationDialog = ({
   const [phoneValue, setPhoneValue] = useState("");
   const [guestFirstName, setGuestFirstName] = useState("");
   const [guestLastName, setGuestLastName] = useState("");
+  const [birthdateValue, setBirthdateValue] = useState("");
+  const [genderValue, setGenderValue] = useState("");
   // Saved cards
   const [savedCards, setSavedCards] = useState<{ id: string; last4: string; cardType: string; expiryDate: string; cardholderName?: string | null; isDefault: boolean; nickname?: string | null }[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -248,6 +250,13 @@ const DonationDialog = ({
   const { data: session, status: sessionStatus } = useSession();
   const [hasSkippedAuth, setHasSkippedAuth] = useState(false);
   const useGuestCheckout = (guestMode || hasSkippedAuth) && !session?.user?.id;
+  // Authenticated user with profile fields still missing — collected inline on
+  // the payment step instead of bouncing to /auth/complete-profile so that the
+  // donation flow stays in one place after Google sign-in.
+  const needsPhone = !!session?.user?.id && !currentUser?.phone;
+  const needsBirthdate = !!session?.user?.id && !currentUser?.birthdate;
+  const needsGender = !!session?.user?.id && !currentUser?.gender;
+  const needsProfileCompletion = needsPhone || needsBirthdate || needsGender;
   const { convertToCurrency, exchangeRates } = useCurrency();
   const [shareCount, setShareCount] = useState(1);
   const { addItem, setItems } = useCart();
@@ -277,6 +286,8 @@ const DonationDialog = ({
             birthdate: user.birthdate ?? null,
           });
           if (user.phone) setPhoneValue(user.phone);
+          if (user.birthdate) setBirthdateValue(String(user.birthdate));
+          if (user.gender) setGenderValue(user.gender);
         }
       })
       .catch(() => setCurrentUser(null));
@@ -305,6 +316,7 @@ const DonationDialog = ({
   useEffect(() => {
     if (!isOpen) {
       setGuestFirstName(""); setGuestLastName(""); setGuestEmail("");
+      setBirthdateValue(""); setGenderValue("");
       setSelectedCardId(null); setSavedCards([]);
     }
   }, [isOpen]);
@@ -525,7 +537,8 @@ const DonationDialog = ({
   };
 
   const isPhoneValid = () => {
-    if (session?.user?.id) return true; // authenticated — phone not required
+    // Authenticated user who already has a phone on file — nothing to validate
+    if (session?.user?.id && !needsPhone) return true;
     const p = phoneValue.trim().replace(/\s/g, "");
     return p.length >= 10;
   };
@@ -1342,7 +1355,7 @@ const DonationDialog = ({
               </div>
             )}
 
-            {!session?.user?.id && (
+            {(!session?.user?.id || needsPhone) && (
               <div className="space-y-2 overflow-visible pt-2 border-t border-border" dir={locale === "ar" ? "rtl" : "ltr"}>
                 <label className={`block text-sm font-medium text-gray-700 ${locale === "ar" ? "text-right" : "text-left"}`}>{t("contactPhone")}</label>
                 <div className="overflow-visible phone-input-wrapper">
@@ -1355,6 +1368,51 @@ const DonationDialog = ({
                     required
                   />
                 </div>
+              </div>
+            )}
+
+            {/* Inline profile completion — shown only for signed-in users who
+                are missing birthdate / gender so we don't bounce them to a
+                separate page. Only the missing fields render. */}
+            {(needsBirthdate || needsGender) && (
+              <div className="space-y-3 pt-2 border-t border-border" dir={dir}>
+                {needsBirthdate && (
+                  <div className="space-y-1">
+                    <label className="block text-sm font-medium text-gray-700">{tAuth("dateOfBirthLabel")}</label>
+                    <input
+                      type="date"
+                      value={birthdateValue}
+                      onChange={(e) => setBirthdateValue(e.target.value)}
+                      placeholder={tAuth("dateOfBirthPlaceholder")}
+                      max={new Date().toISOString().slice(0, 10)}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                    />
+                  </div>
+                )}
+                {needsGender && (
+                  <div className="space-y-1">
+                    <label className="block text-sm font-medium text-gray-700">{tAuth("genderLabel")}</label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(["male", "female", "preferNotToSay"] as const).map((g) => {
+                        const active = genderValue === g;
+                        return (
+                          <button
+                            key={g}
+                            type="button"
+                            onClick={() => setGenderValue(g)}
+                            className={`py-2 text-xs font-medium rounded-md border transition-all ${
+                              active
+                                ? "bg-[#025EB8] text-white border-[#025EB8]"
+                                : "bg-white text-gray-600 border-gray-200 hover:border-[#025EB8]/40"
+                            }`}
+                          >
+                            {tAuth(`gender${g.charAt(0).toUpperCase() + g.slice(1)}` as "genderMale" | "genderFemale" | "genderPreferNotToSay")}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1372,6 +1430,8 @@ const DonationDialog = ({
                     !guestLastName.trim() ||
                     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim())
                   )) ||
+                  (needsBirthdate && !birthdateValue) ||
+                  (needsGender && !genderValue) ||
                   (paymentMethod === "CARD" && !use3D && !selectedCardId && !stripeReady) ||
                   (paymentMethod === "CARD" && selectedCardId && cardDetails.cvv.length < 3) ||
                   (paymentMethod === "CARD" && use3D && !selectedCardId && (
@@ -1411,10 +1471,23 @@ const DonationDialog = ({
         return;
       }
       setLoading(true);
-      if (session?.user?.id && !currentUser?.phone && phoneValue.trim()) {
-        await axios.put(`/api/users/${session.user.id}`, {
-          phone: phoneValue.trim(),
-        });
+      // Persist any inline-collected profile fields onto the user record
+      // (Google sign-in sends users straight to payment, so we backfill
+      // phone / birthdate / gender here instead of /auth/complete-profile).
+      if (session?.user?.id) {
+        const profileUpdate: Record<string, unknown> = {};
+        if (needsPhone && phoneValue.trim()) profileUpdate.phone = phoneValue.trim();
+        if (needsBirthdate && birthdateValue) profileUpdate.birthdate = birthdateValue;
+        if (needsGender && genderValue) profileUpdate.gender = genderValue;
+        if (Object.keys(profileUpdate).length > 0) {
+          profileUpdate.profileCompletionSeen = true;
+          try {
+            await axios.put(`/api/users/${session.user.id}`, profileUpdate);
+          } catch {
+            // Non-blocking — donation can still proceed; profile prompt
+            // will reappear on next visit.
+          }
+        }
       }
       const amountUSD =
         shareMode && sharePriceUSD != null

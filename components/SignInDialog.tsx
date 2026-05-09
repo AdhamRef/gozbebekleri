@@ -24,6 +24,10 @@ import {
   Inbox,
   Calendar,
   Zap,
+  UserRoundCheck,
+  UserX,
+  UserCheck,
+  UserCheck2,
 } from "lucide-react";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { PhoneInput } from "react-international-phone";
@@ -411,8 +415,8 @@ export function SignInPanel({
                       isRTL ? "left-3" : "right-3"
                     }`}
                   >
-                    <User className="h-3 w-3 shrink-0 fill-white/90" aria-hidden />
-                    <span className="whitespace-nowrap">{t("withoutLoginBadge")}</span>
+                    <UserCheck2 className="h-3 w-3 shrink-0 fill-white/90" aria-hidden />
+                    <span className="whitespace-nowrap font-medium">{t("withoutLoginBadge")}</span>
                   </div>
                   <button
                     type="button"
