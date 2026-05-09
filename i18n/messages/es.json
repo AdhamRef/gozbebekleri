@@ -397,18 +397,6 @@
     "genderFemale": "Femenino",
     "genderPreferNotToSay": "Prefiero no decir"
   },
-  "InAppBrowserNotice": {
-    "title": "Abre la página en tu navegador para iniciar sesión",
-    "subtitle": "Google bloquea el inicio de sesión desde navegadores integrados en aplicaciones por seguridad. Abre esta página en tu navegador habitual para continuar.",
-    "iosHelp": "Toca el icono de compartir y elige «Abrir en Safari» (o tu navegador predeterminado).",
-    "androidHelp": "Toca el menú (⋮) en la parte superior y elige «Abrir en el navegador» o «Abrir en Chrome».",
-    "genericHelp": "Abre esta página en tu navegador predeterminado y vuelve a iniciar sesión con Google.",
-    "copy": "Copiar",
-    "copied": "¡Copiado!",
-    "openInChrome": "Abrir en Chrome",
-    "continueAnyway": "Intentar con Google igualmente",
-    "close": "Cerrar"
-  },
   "SharePopup": {
     "shareCampaign": "Compartir proyecto con otros",
     "facebook": "Facebook",

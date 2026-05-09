@@ -146,7 +146,8 @@ const CartPaymentDialog = ({
   const payforPollRef  = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { data: session, status: sessionStatus } = useSession();
-  const useGuestCheckout = guestMode && !session?.user?.id;
+  const [hasSkippedAuth, setHasSkippedAuth] = useState(false);
+  const useGuestCheckout = (guestMode || hasSkippedAuth) && !session?.user?.id;
   const { clearItems } = useCart();
   const router = useRouter();
   const getReferralCode = useReferralCode();
@@ -229,6 +230,7 @@ const CartPaymentDialog = ({
     if (!isOpen) {
       setGuestFirstName(""); setGuestLastName(""); setGuestEmail("");
       setSelectedCardId(null); setSavedCards([]);
+      setHasSkippedAuth(false);
     }
   }, [isOpen]);
 
@@ -338,7 +340,7 @@ const CartPaymentDialog = ({
       const nextTitle = STEPS[nextStep]?.title;
 
       if (nextTitle === tAuth("checkoutTitle")) {
-        if (sessionStatus === "authenticated") {
+        if (sessionStatus === "authenticated" || hasSkippedAuth) {
           resumePaymentInfoStep();
           return;
         }
@@ -346,7 +348,7 @@ const CartPaymentDialog = ({
         return;
       }
 
-      if (nextTitle === t("paymentInfo") && sessionStatus !== "authenticated") {
+      if (nextTitle === t("paymentInfo") && sessionStatus !== "authenticated" && !hasSkippedAuth) {
         requestCheckoutSignIn(nextStep);
         return;
       }
@@ -371,7 +373,7 @@ const CartPaymentDialog = ({
   const handleSubmit = async () => {
     let isRedirecting = false;
     try {
-      if (!session?.user?.id) {
+      if (!session?.user?.id && !useGuestCheckout) {
         requestCheckoutSignIn(getPaymentInfoStepIndex());
         return;
       }
@@ -781,6 +783,10 @@ const CartPaymentDialog = ({
           isOpen={isOpen && step.title === tAuth("checkoutTitle")}
           onClose={() => {}}
           onAuthenticated={resumePaymentInfoStep}
+          onSkip={() => {
+            setHasSkippedAuth(true);
+            resumePaymentInfoStep();
+          }}
           callbackUrl={authCallbackUrl}
           variant="checkout"
           showHeader={false}
@@ -950,7 +956,11 @@ const CartPaymentDialog = ({
             disabled={
               loading ||
               !isPhoneValid() ||
-              (useGuestCheckout && (!guestFirstName.trim() || !guestEmail.trim())) ||
+              (useGuestCheckout && (
+                !guestFirstName.trim() ||
+                !guestLastName.trim() ||
+                !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim())
+              )) ||
               (paymentMethod === "CARD" && selectedCardId && cardDetails.cvv.length < 3) ||
               (paymentMethod === "CARD" && !selectedCardId && !use3D && !stripeReady) ||
               (paymentMethod === "CARD" && !selectedCardId && !use3D && totalAmount < stripeMinAmount) ||

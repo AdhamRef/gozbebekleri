@@ -246,7 +246,8 @@ const DonationDialog = ({
     birthdate?: string | null;
   } | null>(null);
   const { data: session, status: sessionStatus } = useSession();
-  const useGuestCheckout = guestMode && !session?.user?.id;
+  const [hasSkippedAuth, setHasSkippedAuth] = useState(false);
+  const useGuestCheckout = (guestMode || hasSkippedAuth) && !session?.user?.id;
   const { convertToCurrency, exchangeRates } = useCurrency();
   const [shareCount, setShareCount] = useState(1);
   const { addItem, setItems } = useCart();
@@ -330,6 +331,7 @@ const DonationDialog = ({
       hasFallenBackRef.current = false;
       checkoutTrackedRef.current = false;
       paymentInfoTrackedRef.current = false;
+      setHasSkippedAuth(false);
       // Track opening the donation flow
       tracking?.trackViewContent({
         contentIds:  campaignId ? [campaignId] : categoryId ? [categoryId] : undefined,
@@ -600,7 +602,7 @@ const DonationDialog = ({
       const nextTitle = steps[nextStep]?.title;
 
       if (nextTitle === tAuth("checkoutTitle")) {
-        if (sessionStatus === "authenticated") {
+        if (sessionStatus === "authenticated" || hasSkippedAuth) {
           resumePaymentInfoStep();
           return;
         }
@@ -608,7 +610,7 @@ const DonationDialog = ({
         return;
       }
 
-      if (nextTitle === t("paymentInfo") && sessionStatus !== "authenticated") {
+      if (nextTitle === t("paymentInfo") && sessionStatus !== "authenticated" && !hasSkippedAuth) {
         requestCheckoutSignIn(nextStep);
         return;
       }
@@ -1190,6 +1192,10 @@ const DonationDialog = ({
               isOpen={isOpen && steps[currentStep]?.title === tAuth("checkoutTitle")}
               onClose={() => {}}
               onAuthenticated={resumePaymentInfoStep}
+              onSkip={() => {
+                setHasSkippedAuth(true);
+                resumePaymentInfoStep();
+              }}
               callbackUrl={authCallbackUrl}
               variant="checkout"
               showHeader={false}
@@ -1361,6 +1367,11 @@ const DonationDialog = ({
                 disabled={
                   loading ||
                   !isPhoneValid() ||
+                  (useGuestCheckout && (
+                    !guestFirstName.trim() ||
+                    !guestLastName.trim() ||
+                    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim())
+                  )) ||
                   (paymentMethod === "CARD" && !use3D && !selectedCardId && !stripeReady) ||
                   (paymentMethod === "CARD" && selectedCardId && cardDetails.cvv.length < 3) ||
                   (paymentMethod === "CARD" && use3D && !selectedCardId && (
@@ -1395,7 +1406,7 @@ const DonationDialog = ({
   const handleSubmit = async () => {
     let isRedirecting = false;
     try {
-      if (!session?.user?.id) {
+      if (!session?.user?.id && !useGuestCheckout) {
         requestCheckoutSignIn(getPaymentInfoStepIndex());
         return;
       }

@@ -397,18 +397,6 @@
     "genderFemale": "Kadın",
     "genderPreferNotToSay": "Belirtmek istemiyorum"
   },
-  "InAppBrowserNotice": {
-    "title": "Giriş yapmak için tarayıcınızda açın",
-    "subtitle": "Google, güvenlik nedeniyle uygulama içi tarayıcılardan girişe izin vermez. Devam etmek için bu sayfayı normal tarayıcınızda açın.",
-    "iosHelp": "Paylaş simgesine dokunun ve \"Safari'de Aç\" (veya varsayılan tarayıcınız) seçeneğini seçin.",
-    "androidHelp": "Üstteki menüye (⋮) dokunun ve \"Tarayıcıda aç\" ya da \"Chrome'da aç\" seçeneğini belirleyin.",
-    "genericHelp": "Bu sayfayı varsayılan tarayıcınızda açın ve Google ile tekrar giriş yapmayı deneyin.",
-    "copy": "Kopyala",
-    "copied": "Kopyalandı!",
-    "openInChrome": "Chrome'da Aç",
-    "continueAnyway": "Yine de Google ile dene",
-    "close": "Kapat"
-  },
   "SharePopup": {
     "shareCampaign": "Projeyı Başkalarıyla Paylaş",
     "facebook": "Facebook",
