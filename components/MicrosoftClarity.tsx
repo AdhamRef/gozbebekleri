@@ -1,54 +1,66 @@
-import Script from "next/script";
+"use client";
+
+import { useEffect } from "react";
+import Clarity from "@microsoft/clarity";
 
 /**
- * Loads Microsoft Clarity directly (NOT through GTM) so it starts capturing as
- * soon as the page is interactive — independent of when GTM fires.
+ * Microsoft Clarity loader (uses the official @microsoft/clarity SDK).
  *
- * Why this matters
- * ----------------
- * Previously Clarity was injected by our GTM container, and GTM is deferred 6 s
- * or until first user interaction (DeferredGTM.tsx). Paid Meta/Facebook traffic
- * that bounces in 2–4 s never gave GTM a chance to fire, so Clarity recordings
+ * Why this exists
+ * ---------------
+ * Clarity used to be loaded only via GTM, and GTM is deferred 6 s or until the
+ * first user interaction (DeferredGTM.tsx). Paid Meta/Facebook traffic that
+ * bounces in 2–4 s never gave GTM a chance to fire, so Clarity recordings
  * either didn't exist or started literally at the moment the tab was closing —
- * exactly what produced the "page hidden at 00:01" pattern across many sessions.
+ * exactly what produced the "Page hidden 00:01" pattern.
  *
- * Behaviour
- * ---------
- * - Loaded with `next/script` strategy="afterInteractive" — runs after hydration,
- *   does not block FCP/LCP.
- * - No-op if NEXT_PUBLIC_CLARITY_ID is absent (e.g. local dev without the var).
- * - Production-only by default. To verify in dev set NEXT_PUBLIC_CLARITY_DEBUG=1.
+ * Behaviour now
+ * -------------
+ * - Bundled directly via the SDK; runs on first client mount.
+ * - Project ID falls back to the org's known value (u614k028k2), so it works
+ *   without any env setup. Override with NEXT_PUBLIC_CLARITY_ID if needed.
+ * - Initializes exactly once per page load (guarded with a window-level flag),
+ *   even if the component re-mounts during client navigation.
  * - Survives client-side route changes — Next renders this once at the root
- *   layout level and never re-runs the script tag.
+ *   layout level.
  *
- * IMPORTANT operational note
- * --------------------------
- * The GTM container very likely still has a Clarity tag inside it. Remove that
- * tag from GTM (or pause it) so we don't double-record. Each page now loads
- * Clarity exactly once via this component.
+ * Operational note
+ * ----------------
+ * If your GTM container still has a Clarity tag, remove it so we don't
+ * double-record. Each page now loads Clarity exactly once via this component.
  */
+
+const DEFAULT_CLARITY_PROJECT_ID = "u614k028k2";
+
+declare global {
+  interface Window {
+    __clarityInitialized?: boolean;
+  }
+}
+
 export default function MicrosoftClarity() {
-  const id = process.env.NEXT_PUBLIC_CLARITY_ID?.trim();
-  const isProd = process.env.NODE_ENV === "production";
-  const debug = process.env.NEXT_PUBLIC_CLARITY_DEBUG === "1";
-  if (!id) return null;
-  if (!isProd && !debug) return null;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.__clarityInitialized) return;
 
-  // Standard Clarity bootstrap. This stub creates `window.clarity` immediately
-  // so analytics calls made before the remote script lands get queued.
-  const inline = `
-    (function(c,l,a,r,i,t,y){
-      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-    })(window, document, "clarity", "script", "${id.replace(/"/g, '\\"')}");
-  `;
+    const id = process.env.NEXT_PUBLIC_CLARITY_ID?.trim() || DEFAULT_CLARITY_PROJECT_ID;
+    if (!id) return;
 
-  return (
-    <Script
-      id="ms-clarity"
-      strategy="afterInteractive"
-      dangerouslySetInnerHTML={{ __html: inline }}
-    />
-  );
+    try {
+      Clarity.init(id);
+      window.__clarityInitialized = true;
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.debug("[clarity] initialized", id);
+      }
+    } catch (err) {
+      // Tracking should never throw to the app.
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.warn("[clarity] init failed", err);
+      }
+    }
+  }, []);
+
+  return null;
 }
