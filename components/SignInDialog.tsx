@@ -398,14 +398,14 @@ export function SignInPanel({
               </div>
 
               {/* Email option */}
-              <button
+              {/* <button
                 type="button"
                 onClick={() => { setScreen("auth"); setError(null); }}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3 sm:py-3.5 bg-[#025EB8] hover:bg-[#0150a0] text-white text-sm font-semibold rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.98]"
               >
                 <Mail className="w-4 h-4 flex-shrink-0" />
                 {t("signInWithEmail")}
-              </button>
+              </button> */}
 
               {/* Donate-as-guest — same gradient-border treatment as Google,
                   but blue-only to differentiate from the multi-color CTA */}
