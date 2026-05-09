@@ -120,7 +120,7 @@ function DashboardContent({
         <Link href="/" className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="logo-white.png"
+            src="/logo-white.png"
             alt="Logo"
             className="h-16 w-auto object-contain brightness-0 invert"
           />
