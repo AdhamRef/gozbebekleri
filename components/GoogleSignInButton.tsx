@@ -123,8 +123,16 @@ async function fetchClientId(): Promise<string | null> {
 }
 
 interface Props {
-  /** URL to navigate to after successful sign-in. */
+  /** URL to navigate to after successful sign-in. Ignored when `onAuthenticated` is provided. */
   callbackUrl?: string;
+  /**
+   * Called after the session has been established. When provided, the button
+   * stays on the current page and hands control back to the parent (mirrors
+   * the email-credentials flow used by SignInDialog). This is what lets a
+   * caller like DonationDialog advance an in-progress wizard step instead of
+   * navigating away and re-mounting via sessionStorage.
+   */
+  onAuthenticated?: () => void;
   /** Locale code passed to the GSI button (e.g. "en", "tr", "ar"). */
   locale?: string;
   /** Width of the rendered button (px). Defaults to 320. */
@@ -143,6 +151,7 @@ interface Props {
 
 export default function GoogleSignInButton({
   callbackUrl,
+  onAuthenticated,
   locale,
   width = 320,
   className,
@@ -202,6 +211,14 @@ export default function GoogleSignInButton({
                 setSubmitting(false);
                 return;
               }
+              // If the caller wants to keep the user in place (e.g. an open
+              // wizard like DonationDialog), hand control back. Otherwise
+              // navigate to callbackUrl so standalone pages still work.
+              if (onAuthenticated) {
+                onAuthenticated();
+                setSubmitting(false);
+                return;
+              }
               if (typeof window !== "undefined") {
                 window.location.href = callbackUrl || "/";
               }
@@ -243,7 +260,7 @@ export default function GoogleSignInButton({
       cancelled = true;
       resizeObserver?.disconnect();
     };
-  }, [callbackUrl, locale, theme, text, width, onError]);
+  }, [callbackUrl, onAuthenticated, locale, theme, text, width, onError]);
 
   if (status === "fallback") {
     if (fallbackRender) return <>{fallbackRender(triggerFallback)}</>;

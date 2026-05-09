@@ -370,6 +370,14 @@ export function SignInPanel({
                   <div className="flex items-center justify-center rounded-[10px] bg-gradient-to-b from-white to-slate-50 px-3 py-2 sm:py-2.5">
                     <GoogleSignInButton
                       callbackUrl={googleCallbackUrl}
+                      onAuthenticated={
+                        onAuthenticated
+                          ? () => {
+                              onAuthenticated();
+                              onClose();
+                            }
+                          : undefined
+                      }
                       locale={locale}
                       theme="outline"
                       text="signin_with"
@@ -409,7 +417,7 @@ export function SignInPanel({
                     aria-hidden
                     className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/45 to-transparent transition-transform duration-700 group-hover:translate-x-full"
                   />
-                  <Heart className="relative h-4 w-4 fill-current shrink-0" aria-hidden />
+                  <User className="relative h-4 w-4 fill-current shrink-0" aria-hidden />
                   <span className="relative">{t("skipAndDonate")}</span>
                   <ArrowRight
                     aria-hidden
