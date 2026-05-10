@@ -4,6 +4,7 @@ import { Poppins, Noto_Kufi_Arabic } from "next/font/google";
 import DeferredGTM from "@/components/DeferredGTM";
 import MicrosoftClarity from "@/components/MicrosoftClarity";
 import EngagementInstrumentation from "@/components/EngagementInstrumentation";
+import { Analytics } from "@vercel/analytics/next";
 import "./[locale]/globals.css";
 
 const poppins = Poppins({
@@ -340,6 +341,7 @@ export default function RootLayout({
             Clarity used to be inside GTM; it's now loaded directly above so paid
             traffic that bounces in <6s still gets recorded. */}
         <DeferredGTM />
+        <Analytics />
       </body>
     </html>
   );
