@@ -33,6 +33,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { PhoneInput } from "react-international-phone";
 import "react-international-phone/style.css";
 import { useIpCountry } from "@/hooks/useIpCountry";
+import { track } from "@vercel/analytics";
 
 // ── Module-level component — stable identity, no focus-loss on re-render ────
 interface AuthFieldProps {
@@ -189,15 +190,18 @@ export function SignInPanel({
         redirect: false,
       });
       if (res?.ok) {
+        try { track("signin_success", { method: "credentials", locale }); } catch {}
         onAuthenticated?.();
         onClose();
       } else if (res?.error === "EMAIL_NOT_VERIFIED") {
+        try { track("signin_blocked", { method: "credentials", reason: "email_not_verified", locale }); } catch {}
         // Resend verification link and go to inbox screen
         await sendVerificationLink(form.email.toLowerCase().trim());
         setPendingEmail(form.email.toLowerCase().trim());
         setScreen("otp");
         startCountdown();
       } else {
+        try { track("signin_failed", { method: "credentials", reason: "invalid_credentials", locale }); } catch {}
         setError(t("invalidCredentials"));
       }
     } finally {
@@ -225,10 +229,15 @@ export function SignInPanel({
       });
       const data = await res.json();
       if (res.ok) {
+        try { track("register_started", { method: "credentials", locale }); } catch {}
         setPendingEmail(form.email.toLowerCase().trim());
         setScreen("otp");
         startCountdown();
       } else {
+        const reason = data.error === "EMAIL_EXISTS" ? "email_exists"
+          : data.error === "PASSWORD_TOO_SHORT" ? "password_too_short"
+          : "server_error";
+        try { track("register_failed", { method: "credentials", reason, locale }); } catch {}
         if (data.error === "EMAIL_EXISTS") setError(t("emailAlreadyExists"));
         else if (data.error === "PASSWORD_TOO_SHORT") setError(t("passwordTooShort"));
         else setError(t("serverError"));

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { track as vercelTrack } from "@vercel/analytics/server";
 import { prisma } from "@/lib/prisma";
 import { createVerificationToken } from "@/lib/otp";
 import { sendVerificationEmail } from "@/lib/email";
@@ -56,6 +57,16 @@ export async function POST(req: NextRequest) {
     const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}&email=${encodeURIComponent(normalizedEmail)}&callbackUrl=${encodeURIComponent(safeCallback)}&locale=${safeLocale}`;
 
     await sendVerificationEmail(normalizedEmail, verificationUrl, locale ?? "en");
+
+    try {
+      await vercelTrack("user_registered_server", {
+        method: "credentials",
+        locale: preferredLang ?? locale ?? "en",
+        has_phone: !!(phone && phone.trim()),
+      });
+    } catch (err) {
+      console.error("Vercel user_registered_server track failed", err);
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

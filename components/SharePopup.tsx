@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { useTranslations } from "next-intl";
+import { track } from "@vercel/analytics";
 
 interface SharePopupProps {
   isOpen: boolean;
@@ -50,12 +51,14 @@ const SharePopup = ({
     try {
       await navigator.clipboard.writeText(url);
       toast.success(t("linkCopied"));
+      try { track("share_campaign", { platform: "copy_link", title: title.slice(0, 250) }); } catch {}
     } catch (err) {
       toast.error(t("linkCopyFailed"));
     }
   };
 
   const handleShare = (platform: keyof typeof shareLinks) => {
+    try { track("share_campaign", { platform, title: title.slice(0, 250) }); } catch {}
     window.open(shareLinks[platform], "_blank", "width=600,height=400");
   };
 

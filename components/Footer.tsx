@@ -10,6 +10,7 @@ import { useSearchParams } from 'next/navigation';
 import SignInDialog from '@/components/SignInDialog';
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from '@/lib/currency-link';
 import { getSocialLinks } from '@/lib/social-links';
+import { track } from '@vercel/analytics';
 
 const LOGO_URL = 'logo-white.png';
 
@@ -50,8 +51,10 @@ const Footer = () => {
         window.sessionStorage.removeItem(pendingMessageKey);
         setBody('');
         setSubmitMessage(t('sendSuccess'));
+        try { track('contact_message_sent', { source: 'footer_after_signin', subject: 'COMPLAINT', locale }); } catch {}
         setTimeout(() => setSubmitMessage(''), 4000);
       } catch {
+        try { track('contact_message_failed', { source: 'footer_after_signin', subject: 'COMPLAINT', locale }); } catch {}
         setSubmitMessage(t('sendError'));
         setTimeout(() => setSubmitMessage(''), 3000);
       } finally {
@@ -105,8 +108,10 @@ const Footer = () => {
       if (!res.ok) throw new Error('Failed');
       setSubmitMessage(t('sendSuccess'));
       setBody('');
+      try { track('contact_message_sent', { source: 'footer', subject: 'COMPLAINT', locale }); } catch {}
       setTimeout(() => setSubmitMessage(''), 4000);
     } catch {
+      try { track('contact_message_failed', { source: 'footer', subject: 'COMPLAINT', locale }); } catch {}
       setSubmitMessage(t('sendError'));
       setTimeout(() => setSubmitMessage(''), 3000);
     } finally {

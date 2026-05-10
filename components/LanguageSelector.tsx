@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { ChevronDown } from "lucide-react";
 import ReactCountryFlag from "react-country-flag";
+import { track } from "@vercel/analytics";
 
 import { SUPPORTED_LOCALES, LOCALE_LABELS } from "@/lib/locales";
 
@@ -46,6 +47,7 @@ export default function LanguageSwitcher({ onDark = true }: { onDark?: boolean }
       setOpen(false);
       return;
     }
+    try { track("language_change", { from: currentLocale ?? null, to: newLocale }); } catch {}
     // Persist the explicit choice for logged-in users (best-effort, non-blocking).
     if (session?.user?.id) {
       fetch("/api/users/me/preferred-lang", {

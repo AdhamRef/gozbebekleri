@@ -20,6 +20,7 @@ import {
   subjectLabel,
 } from "@/lib/messages/subjects";
 import { getSocialLinks } from "@/lib/social-links";
+import { track } from "@vercel/analytics";
 
 const PHONE_RAW = "+902122885930";
 const PHONE_DISPLAY = "+90 212 288 59 30";
@@ -74,7 +75,9 @@ const ContactPage = () => {
       });
       if (!res.ok) throw new Error("Failed");
       setIsSuccess(true);
+      try { track("contact_message_sent", { source: "contact_page", subject: formData.messageType, locale }); } catch {}
     } catch {
+      try { track("contact_message_failed", { source: "contact_page", subject: formData.messageType, locale }); } catch {}
       alert(t("errorOccurred"));
     } finally {
       setIsSubmitting(false);

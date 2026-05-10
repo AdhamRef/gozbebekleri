@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, createContext, useContext, useCallback, useState } from "react";
+import { track as vercelTrack } from "@vercel/analytics";
 import {
   generateEventId,
   META_EVENT_MAP,
@@ -13,6 +14,59 @@ import {
   type CanonicalPayment,
   type CanonicalItem,
 } from "@/lib/tracking/canonical";
+
+// ─── Vercel Analytics: which canonical events to forward ──────────────────────
+// Skip page_view (Vercel's <Analytics/> handles it), scroll_depth, and
+// user_engagement (too noisy for the custom-events dashboard).
+const VERCEL_FORWARDED_EVENTS = new Set<CanonicalEventName>([
+  "view_content",
+  "view_donation_page",
+  "customize_product",
+  "add_to_cart",
+  "begin_checkout",
+  "add_payment_info",
+  "payment_submit",
+  "payment_failed",
+  "donation_complete",
+  "sign_up",
+]);
+
+/** Build a flat, Vercel-safe property bag from a CanonicalEvent.
+ *  Vercel custom events allow only strings/numbers/booleans/null,
+ *  no nested objects, ≤255 chars per value. */
+function toVercelProps(event: CanonicalEvent): Record<string, string | number | boolean | null> {
+  const props: Record<string, string | number | boolean | null> = {};
+  const d = event.donation;
+  const p = event.payment;
+  const truncate = (v: string) => (v.length > 250 ? v.slice(0, 250) : v);
+
+  if (d?.amount != null)         props.amount         = d.amount;
+  if (d?.amount_usd != null)     props.amount_usd     = d.amount_usd;
+  if (d?.currency)               props.currency       = d.currency;
+  if (d?.cause_id)               props.cause_id       = truncate(d.cause_id);
+  if (d?.cause_name)             props.cause_name     = truncate(d.cause_name);
+  if (d?.donation_type)          props.donation_type  = d.donation_type;
+  if (d?.recurring != null)      props.recurring      = d.recurring;
+  if (d?.status)                 props.status         = truncate(d.status);
+
+  if (p?.gateway)                props.gateway        = p.gateway;
+  if (p?.is_3ds != null)         props.is_3ds         = p.is_3ds;
+  if (p?.transaction_id)         props.transaction_id = truncate(p.transaction_id);
+  if (p?.failure_reason)         props.failure_reason = truncate(p.failure_reason);
+  if (p?.payment_status)         props.payment_status = p.payment_status;
+
+  if (event.items?.length)       props.num_items      = event.items.length;
+  if (event.page?.language)      props.lang           = event.page.language;
+
+  // Surface scroll/engagement milestones if present
+  const c = event.custom as Record<string, unknown> | undefined;
+  if (c) {
+    if (typeof c.percent === "number")   props.percent   = c.percent;
+    if (typeof c.milestone === "string") props.milestone = truncate(c.milestone);
+  }
+
+  return props;
+}
 
 // ─── Public config (pixel IDs only — no tokens) ───────────────────────────────
 export interface TrackingConfig {
@@ -528,6 +582,11 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
           tw_sale_amount:    d.amount ?? d.amount_usd,
           tw_order_quantity: event.items?.reduce((s, i) => s + (i.quantity ?? 1), 0) ?? 1,
         });
+      }
+
+      // ── Vercel Analytics (custom events) ─────────────────────────────────
+      if (VERCEL_FORWARDED_EVENTS.has(event.event)) {
+        try { vercelTrack(event.event, toVercelProps(event)); } catch { /* never block */ }
       }
 
       // ── Server (CAPI + TikTok Events API) ────────────────────────────────

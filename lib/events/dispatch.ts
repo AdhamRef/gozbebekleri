@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { track as vercelTrack } from "@vercel/analytics/server";
 import {
   loadContext,
   loadContextForDonation,
@@ -127,7 +128,14 @@ export async function dispatchDonationPaid(donationId: string): Promise<void> {
   try {
     const d = await prisma.donation.findUnique({
       where: { id: donationId },
-      select: { donorId: true },
+      select: {
+        donorId: true,
+        amount: true,
+        amountUSD: true,
+        currency: true,
+        type: true,
+        provider: true,
+      },
     });
     if (!d) return;
     const paidCount = await prisma.donation.count({
@@ -135,6 +143,20 @@ export async function dispatchDonationPaid(donationId: string): Promise<void> {
     });
     if (paidCount === 1) {
       await dispatchEvent("FIRST_DONATION", { donationId });
+    }
+    // Vercel Analytics — server-side donation_paid (catches tab-close cases).
+    try {
+      await vercelTrack("donation_paid_server", {
+        donation_id: donationId,
+        amount: d.amount ?? 0,
+        amount_usd: d.amountUSD ?? d.amount ?? 0,
+        currency: d.currency ?? "USD",
+        donation_type: d.type ?? "ONE_TIME",
+        gateway: d.provider ?? null,
+        is_first_donation: paidCount === 1,
+      });
+    } catch (err) {
+      console.error("Vercel donation_paid_server track failed", err);
     }
   } catch (err) {
     console.error("dispatchDonationPaid first-donation check failed", err);
