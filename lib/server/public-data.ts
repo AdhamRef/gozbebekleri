@@ -7,6 +7,7 @@ import {
   parseSuggestedShareCounts,
   showCampaignProgress,
 } from "@/lib/campaign/campaign-modes";
+import { parseSuggestedDonations } from "@/lib/campaign/suggested-donations";
 
 const CAMPAIGNS_PER_PAGE = 12;
 const POSTS_PER_PAGE = 9;
@@ -103,6 +104,7 @@ export async function getInitialCampaignsForPage(locale: string) {
         fundraisingMode,
         sharePriceUSD: c.sharePriceUSD ?? null,
         suggestedShareCounts: parseSuggestedShareCounts(c.suggestedShareCounts),
+        suggestedDonations: parseSuggestedDonations(c.suggestedDonations),
         createdAt: c.createdAt.toISOString(),
         updatedAt: c.updatedAt.toISOString(),
       };
