@@ -1033,7 +1033,7 @@ const DonationDialog = ({
             </div>
 
             {/* Cover-fees toggle, folded in here so it isn't its own step */}
-            <button
+            {/* <button
               type="button"
               dir={dir}
               onClick={() => setCoverFees(!coverFees)}
@@ -1054,7 +1054,7 @@ const DonationDialog = ({
                   {t("feesWillBeAdded", { amount: `${fees.toFixed(2)} ${getCurrency()}` })}
                 </p>
               </div>
-            </button>
+            </button> */}
 
             {/* Live total preview so the user always sees what they'll pay */}
             <div dir={dir} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2.5 text-sm">
