@@ -286,6 +286,9 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://i.ibb.co" />
         <link rel="dns-prefetch" href="https://ipapi.co" />
         <link rel="preload" href="/bg.webp" as="image" type="image/webp" />
+
+        {/* Contentsquare — UX behavior & feedback tracking */}
+        <script src="https://t.contentsquare.net/uxa/e81365186c19c.js" async />
       </head>
       <body
         className={`${poppins.variable} ${notoKufiArabic.variable} font-arabic antialiased`}
