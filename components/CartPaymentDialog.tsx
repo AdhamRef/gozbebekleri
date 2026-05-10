@@ -366,7 +366,7 @@ const CartPaymentDialog = ({
 
   // ── step indicator ─────────────────────────────────────────────────────
   const renderStepIndicator = () => (
-    <div className="flex items-center gap-1 mb-4 px-6">
+    <div className="flex items-center gap-1 mb-3 px-4 sm:mb-4 sm:px-6">
       {STEPS.map((_, i) => (
         <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-300 ${i <= currentStep ? "bg-[#025EB8]" : "bg-gray-200"}`} />
       ))}
@@ -659,7 +659,7 @@ const CartPaymentDialog = ({
     if (step.title === t("teamSupport")) return (
       <div className="space-y-5">
         <div className="text-center space-y-1.5">
-          <h3 className="text-xl font-semibold text-gray-900">{t("wantToSupportTeam")}</h3>
+          <h3 className="text-lg sm:text-xl font-semibold text-gray-900">{t("wantToSupportTeam")}</h3>
           <p className="text-gray-600 text-sm">{t("teamSupportHelp")}</p>
         </div>
         <div className="flex flex-col items-center gap-3">
@@ -715,7 +715,7 @@ const CartPaymentDialog = ({
     if (step.title === t("paymentFees")) return (
       <div className="space-y-6">
         <div className="text-center space-y-2">
-          <h3 className="text-xl font-semibold text-gray-900">{t("coverPaymentFees")}</h3>
+          <h3 className="text-lg sm:text-xl font-semibold text-gray-900">{t("coverPaymentFees")}</h3>
           <p className="text-gray-600 text-sm">{t("paymentFeesInfo")}</p>
         </div>
         <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-5 rounded-xl space-y-3 border border-gray-200">
@@ -755,7 +755,7 @@ const CartPaymentDialog = ({
     if (step.title === t("confirmation")) return (
       <div className="space-y-6 w-full overflow-hidden">
         <div className="text-center space-y-2 mb-6">
-          <h3 className="text-xl font-semibold text-gray-900">{t("confirmation")}</h3>
+          <h3 className="text-lg sm:text-xl font-semibold text-gray-900">{t("confirmation")}</h3>
           <p className="text-gray-600 text-sm">{t("confirmationDesc")}</p>
         </div>
         <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl space-y-4 border border-gray-200 w-full overflow-hidden">
@@ -764,7 +764,7 @@ const CartPaymentDialog = ({
             return (
               <div key={item.id} className={`flex items-center gap-2 w-full min-w-0 ${locale === "ar" ? "flex-row-reverse" : ""}`}>
                 <div className={`flex items-center gap-2 flex-1 min-w-0 overflow-hidden ${locale === "ar" ? "flex-row-reverse" : ""}`}>
-                  <Image src={item.campaign.images[0]} alt={title} width={80} height={80} className="w-20 h-20 rounded-lg object-cover flex-shrink-0 shadow-sm" />
+                  <Image src={item.campaign.images[0]} alt={title} width={80} height={80} className="w-14 h-14 sm:w-20 sm:h-20 rounded-lg object-cover flex-shrink-0 shadow-sm" />
                   <div className={`min-w-0 max-w-48 ${locale === "ar" ? "text-right" : "text-left"}`}>
                     <span className="text-gray-900 font-medium text-sm block line-clamp-3" title={title}>{title}</span>
                     {item.shareCount != null && item.shareCount > 0 && (
@@ -811,7 +811,7 @@ const CartPaymentDialog = ({
     if (step.title === tAuth("checkoutTitle")) return (
       <div className="space-y-5">
         <div className="text-center space-y-2">
-          <h3 className="text-xl font-semibold text-gray-900">{tAuth("checkoutTitle")}</h3>
+          <h3 className="text-lg sm:text-xl font-semibold text-gray-900">{tAuth("checkoutTitle")}</h3>
           <p className="text-gray-600 text-sm">{tAuth("checkoutSubtitle")}</p>
         </div>
         <SignInPanel
@@ -1031,17 +1031,17 @@ const CartPaymentDialog = ({
         {mounted && (
           <>
             {/* Header */}
-            <div className="relative h-24 overflow-hidden rounded-t-lg bg-[#025EB8]">
+            <div className="relative h-20 sm:h-24 overflow-hidden rounded-t-lg bg-[#025EB8]">
               <div className="absolute inset-0 opacity-[0.07] bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]" />
-              <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
-                <p className="text-white/70 text-[11px] font-semibold uppercase tracking-wider mb-1">{t("oneTimeDonation")}</p>
-                <h2 className="text-white font-bold text-base">{t("paymentMethod")}</h2>
+              <div className="absolute inset-0 flex flex-col items-center justify-center px-4 sm:px-6 text-center">
+                <p className="text-white/70 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider mb-0.5 sm:mb-1">{t("oneTimeDonation")}</p>
+                <h2 className="text-white font-bold text-sm sm:text-base">{t("paymentMethod")}</h2>
               </div>
             </div>
 
             {renderStepIndicator()}
 
-            <div className="relative z-10 px-6 pb-6 bg-white overflow-visible">
+            <div className="relative z-10 px-4 pb-5 sm:px-6 sm:pb-6 bg-white overflow-visible">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={redirecting ? "redirecting" : currentStep}
@@ -1052,17 +1052,17 @@ const CartPaymentDialog = ({
                   transition={{ duration: 0.2 }}
                 >
                   {redirecting ? (
-                    <div className="flex flex-col items-center justify-center py-10 gap-5 text-center">
+                    <div className="flex flex-col items-center justify-center py-8 gap-4 sm:py-10 sm:gap-5 text-center">
                       <div className="relative">
-                        <div className={`w-20 h-20 rounded-full flex items-center justify-center transition-colors ${payforSwitching ? "bg-[#635bff]/10" : "bg-[#025EB8]/8"}`}>
-                          <CardIcon className={`h-9 w-9 transition-colors ${payforSwitching ? "text-[#635bff]" : "text-[#025EB8]"}`} />
+                        <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center transition-colors ${payforSwitching ? "bg-[#635bff]/10" : "bg-[#025EB8]/8"}`}>
+                          <CardIcon className={`h-7 w-7 sm:h-9 sm:w-9 transition-colors ${payforSwitching ? "text-[#635bff]" : "text-[#025EB8]"}`} />
                         </div>
                         <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-white border-2 border-[#025EB8]/20 rounded-full flex items-center justify-center">
                           <ExternalLink className="h-3 w-3 text-[#025EB8]" />
                         </span>
                       </div>
                       <div>
-                        <p className="text-base font-semibold text-gray-900">
+                        <p className="text-[15px] sm:text-base font-semibold text-gray-900">
                           {payforSwitching ? t("paymentSwitching") : t("successRedirecting")}
                         </p>
                         <p className="text-sm text-gray-400 mt-1 max-w-xs mx-auto">

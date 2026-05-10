@@ -692,7 +692,7 @@ const DonationDialog = ({
   const renderStepIndicator = () => {
     const steps = getSteps();
     return (
-      <div className="flex items-center gap-1 mb-4 px-6">
+      <div className="flex items-center gap-1 mb-3 px-4 sm:mb-4 sm:px-6">
         {steps.map((step, index) => (
           <div
             key={index}
@@ -712,7 +712,7 @@ const DonationDialog = ({
       return (
         <div className="space-y-6">
           <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
               {t("chooseDonationType")}
             </h2>
             <p className="text-gray-600">
@@ -724,11 +724,11 @@ const DonationDialog = ({
             <Button
               onClick={() => handleTypeSelect("ONE_TIME")}
               variant="outline"
-              className="h-auto p-6 hover:border-[#025EB8] hover:bg-[#025EB8]/5 group transition-all duration-200"
+              className="h-auto p-4 sm:p-6 hover:border-[#025EB8] hover:bg-[#025EB8]/5 group transition-all duration-200"
             >
               <div className="text-center space-y-2">
-                <div className="w-12 h-12 mx-auto rounded-full bg-[#025EB8]/10 flex items-center justify-center group-hover:bg-[#025EB8]/20 transition-colors">
-                  <Heart className="w-6 h-6 text-[#025EB8]" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 mx-auto rounded-full bg-[#025EB8]/10 flex items-center justify-center group-hover:bg-[#025EB8]/20 transition-colors">
+                  <Heart className="w-5 h-5 sm:w-6 sm:h-6 text-[#025EB8]" />
                 </div>
                 <h3 className="font-semibold text-gray-900">{t("oneTimeDonation")}</h3>
                 <p className="text-sm text-gray-500 whitespace-normal break-words">{t("oneTimeDonationDesc")}</p>
@@ -738,11 +738,11 @@ const DonationDialog = ({
             <Button
               onClick={() => handleTypeSelect("MONTHLY")}
               variant="outline"
-              className="h-auto p-6 hover:border-[#025EB8] hover:bg-[#025EB8]/5 group transition-all duration-200"
+              className="h-auto p-4 sm:p-6 hover:border-[#025EB8] hover:bg-[#025EB8]/5 group transition-all duration-200"
             >
               <div className="text-center space-y-2">
-                <div className="w-12 h-12 mx-auto rounded-full bg-[#025EB8]/10 flex items-center justify-center group-hover:bg-[#025EB8]/20 transition-colors">
-                  <Calendar className="w-6 h-6 text-[#025EB8]" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 mx-auto rounded-full bg-[#025EB8]/10 flex items-center justify-center group-hover:bg-[#025EB8]/20 transition-colors">
+                  <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-[#025EB8]" />
                 </div>
                 <h3 className="font-semibold text-gray-900">{t("monthlyDonation")}</h3>
                 <p className="text-sm text-gray-500 whitespace-normal break-words">{t("monthlyDonationDesc")}</p>
@@ -766,7 +766,7 @@ const DonationDialog = ({
         return (
           <div className="space-y-6">
             <div className="text-center space-y-2">
-              <h3 className="text-xl font-semibold text-gray-900">
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-900">
                 {t("donationValue")}
               </h3>
               <p className="text-gray-600 text-sm flex flex-col items-center gap-1">
@@ -818,7 +818,7 @@ const DonationDialog = ({
                       −
                     </Button>
                     <div className="min-w-[5rem] text-center">
-                      <span className="text-2xl font-bold text-gray-900">{shareCount}</span>
+                      <span className="text-xl sm:text-2xl font-bold text-gray-900">{shareCount}</span>
                       <p className="text-xs text-gray-500">{t("sharesLabel")}</p>
                     </div>
                     <Button
@@ -1230,7 +1230,7 @@ const DonationDialog = ({
         return (
           <div className="space-y-5">
             <div className="text-center space-y-2">
-              <h3 className="text-xl font-semibold text-gray-900">{tAuth("checkoutTitle")}</h3>
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-900">{tAuth("checkoutTitle")}</h3>
               <p className="text-gray-600 text-sm">{tAuth("checkoutSubtitle")}</p>
             </div>
             <SignInPanel
@@ -1867,7 +1867,7 @@ const DonationDialog = ({
         {mounted && (
           <>
             {/* Branded header */}
-            <div className="relative h-28 overflow-hidden rounded-t-lg">
+            <div className="relative h-20 sm:h-28 overflow-hidden rounded-t-lg">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={isCategoryMode ? (categoryImage || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg") : (campaignImage || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg")}
@@ -1875,18 +1875,18 @@ const DonationDialog = ({
                 className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-[#025EB8]/80" />
-              <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
-                <p className="text-white/70 text-[11px] font-semibold uppercase tracking-wider mb-1">
+              <div className="absolute inset-0 flex flex-col items-center justify-center px-4 sm:px-6 text-center">
+                <p className="text-white/70 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider mb-0.5 sm:mb-1">
                   {donationType === "MONTHLY" ? t("monthlyDonation") : t("oneTimeDonation")}
                 </p>
-                <h2 className="text-white font-bold text-base line-clamp-2 leading-snug">
+                <h2 className="text-white font-bold text-sm sm:text-base line-clamp-2 leading-snug">
                   {isCategoryMode ? categoryName : campaignTitle}
                 </h2>
               </div>
             </div>
             {/* Step progress bar */}
             {donationType && renderStepIndicator()}
-            <div className="relative z-10 px-6 pb-6 bg-white overflow-visible">
+            <div className="relative z-10 px-4 pb-5 sm:px-6 sm:pb-6 bg-white overflow-visible">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={redirecting ? "redirecting" : currentStep}
@@ -1897,17 +1897,17 @@ const DonationDialog = ({
                   transition={{ duration: 0.2 }}
                 >
                   {redirecting ? (
-                    <div className="flex flex-col items-center justify-center py-10 gap-5 text-center">
+                    <div className="flex flex-col items-center justify-center py-8 gap-4 sm:py-10 sm:gap-5 text-center">
                       <div className="relative">
-                        <div className={`w-20 h-20 rounded-full flex items-center justify-center transition-colors ${false ? "bg-[#635bff]/10" : "bg-[#025EB8]/8"}`}>
-                          <CardIcon className={`h-9 w-9 transition-colors ${false ? "text-[#635bff]" : "text-[#025EB8]"}`} />
+                        <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center transition-colors ${false ? "bg-[#635bff]/10" : "bg-[#025EB8]/8"}`}>
+                          <CardIcon className={`h-7 w-7 sm:h-9 sm:w-9 transition-colors ${false ? "text-[#635bff]" : "text-[#025EB8]"}`} />
                         </div>
                         <span className="absolute -bottom-1 -right-1 w-6 h-6 bg-white border-2 border-[#025EB8]/20 rounded-full flex items-center justify-center">
                           <ExternalLink className="h-3 w-3 text-[#025EB8]" />
                         </span>
                       </div>
                       <div>
-                        <p className="text-base font-semibold text-gray-900">
+                        <p className="text-[15px] sm:text-base font-semibold text-gray-900">
                           {false ? t("paymentSwitching") : t("successRedirecting")}
                         </p>
                         <p className="text-sm text-gray-400 mt-1 max-w-xs mx-auto">
