@@ -4,7 +4,7 @@ export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.gozbeb
 export const SITE_NAME = "Gözbebekleri";
 export const OG_IMAGE = `${SITE_URL}/og-image.jpg`;
 
-export const LOCALES = ["ar", "en", "fr", "tr", "id", "pt", "es"] as const;
+export const LOCALES = ["ar", "en", "fr", "tr", "id", "pt", "es", "de"] as const;
 export type Locale = (typeof LOCALES)[number];
 
 export const OG_LOCALE_MAP: Record<Locale, string> = {
@@ -15,6 +15,7 @@ export const OG_LOCALE_MAP: Record<Locale, string> = {
   id: "id_ID",
   pt: "pt_BR",
   es: "es_ES",
+  de: "de_DE",
 };
 
 type LocaleSEO = {
@@ -240,6 +241,36 @@ export const LOCALE_SEO: Record<Locale, LocaleSEO> = {
     blog: {
       title: "Noticias & Informes de Campo | Gözbebekleri – Actualizaciones Siria",
       description: "Últimos informes de campo y noticias de los proyectos humanitarios, médicos y educativos de Gözbebekleri en Siria.",
+    },
+  },
+
+  de: {
+    siteName: "Gözbebekleri – Humanitärer Verein قرة العيون",
+    title: "Gözbebekleri | Zakat, Spende, Sadaqa & Humanitäre Hilfe Syrien – قرة العيون",
+    description: "Gözbebekleri (قرة العيون) — Vertrauenswürdige islamische Hilfsorganisation seit 2011. Spende deine Zakat, Sadaqa und Soforthilfe für syrische Medizinversorgung, Waisen­patenschaften und humanitäre Hilfe. Transparent und sicher.",
+    keywords: [
+      "Gözbebekleri Verein", "Spende Syrien", "Zakat online", "Sadaqa Spende",
+      "medizinische Hilfe Syrien", "Waisenpatenschaft Syrien", "Spende Notoperation",
+      "humanitäre Hilfe Syrien", "islamische Hilfsorganisation", "muslimische Wohltätigkeit",
+      "syrische Kinder Hilfe", "medizinischer Notfallfonds Syrien", "NGO Syrien",
+      "Ramadan Spende", "syrische Familie patenschaft", "verlässliche Spendenplattform",
+    ],
+    titleTemplate: "%s | Gözbebekleri – قرة العيون",
+    campaigns: {
+      title: "Spendenkampagnen | Gözbebekleri – Zakat, Sadaqa & Syrien-Hilfe",
+      description: "Entdecke aktive medizinische und humanitäre Spendenkampagnen. Deine Zakat und Sadaqa finanzieren dringende Operationen, Waisenversorgung und Hilfe für syrische Familien.",
+    },
+    about: {
+      title: "Über Uns | Gözbebekleri – Vertrauenswürdige Islamische Hilfsorganisation seit 2011",
+      description: "Gözbebekleri ist eine transparente islamische humanitäre Organisation, gegründet 2011, um syrische Leben durch medizinische Hilfe, Waisenpatenschaft und Bildungsförderung zu retten.",
+    },
+    contact: {
+      title: "Kontakt | Gözbebekleri – قرة العيون",
+      description: "Hast du Fragen oder möchtest spenden? Kontaktiere das Gözbebekleri-Team — wir leiten deine Zakat und Sadaqa dorthin, wo sie am dringendsten gebraucht werden.",
+    },
+    blog: {
+      title: "Nachrichten & Feldberichte | Gözbebekleri – Syrien-Hilfe Updates",
+      description: "Aktuelle Feldberichte und Neuigkeiten zu den humanitären, medizinischen und Bildungsprojekten von Gözbebekleri in Syrien.",
     },
   },
 };

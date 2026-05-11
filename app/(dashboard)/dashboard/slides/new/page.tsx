@@ -43,6 +43,9 @@ const schema = z.object({
   title_es: z.string().optional(),
   description_es: z.string().optional(),
   buttonText_es: z.string().optional(),
+  title_de: z.string().optional(),
+  description_de: z.string().optional(),
+  buttonText_de: z.string().optional(),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -60,6 +63,7 @@ export default function NewSlidePage() {
       title_id: '', description_id: '', buttonText_id: '',
       title_pt: '', description_pt: '', buttonText_pt: '',
       title_es: '', description_es: '', buttonText_es: '',
+      title_de: '', description_de: '', buttonText_de: '',
     },
   });
 
@@ -81,6 +85,7 @@ export default function NewSlidePage() {
           id: { title: values.title_id ?? '', description: values.description_id ?? '', buttonText: values.buttonText_id ?? '' },
           pt: { title: values.title_pt ?? '', description: values.description_pt ?? '', buttonText: values.buttonText_pt ?? '' },
           es: { title: values.title_es ?? '', description: values.description_es ?? '', buttonText: values.buttonText_es ?? '' },
+          de: { title: values.title_de ?? '', description: values.description_de ?? '', buttonText: values.buttonText_de ?? '' },
         },
       });
       toast.success('تم إنشاء الشريحة');
@@ -126,6 +131,7 @@ export default function NewSlidePage() {
               <TabsTrigger value="id"><ReactCountryFlag countryCode="ID" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Bahasa</TabsTrigger>
               <TabsTrigger value="pt"><ReactCountryFlag countryCode="PT" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Português</TabsTrigger>
               <TabsTrigger value="es"><ReactCountryFlag countryCode="ES" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Español</TabsTrigger>
+              <TabsTrigger value="de"><ReactCountryFlag countryCode="DE" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Deutsch</TabsTrigger>
             </TabsList>
             <TabsContent value="ar" className="space-y-4 mt-0">
               <Card className="p-6 space-y-4">
@@ -215,6 +221,19 @@ export default function NewSlidePage() {
                 )} />
                 <FormField control={form.control} name="buttonText_es" render={({ field }) => (
                   <FormItem><FormLabel>Texto del botón</FormLabel><FormControl><Input {...field} placeholder="Donar ahora" /></FormControl></FormItem>
+                )} />
+              </Card>
+            </TabsContent>
+            <TabsContent value="de" className="mt-0">
+              <Card className="p-6 space-y-4">
+                <FormField control={form.control} name="title_de" render={({ field }) => (
+                  <FormItem><FormLabel>Titel (Deutsch)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                )} />
+                <FormField control={form.control} name="description_de" render={({ field }) => (
+                  <FormItem><FormLabel>Beschreibung</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>
+                )} />
+                <FormField control={form.control} name="buttonText_de" render={({ field }) => (
+                  <FormItem><FormLabel>Button-Text</FormLabel><FormControl><Input {...field} placeholder="Jetzt spenden" /></FormControl></FormItem>
                 )} />
               </Card>
             </TabsContent>

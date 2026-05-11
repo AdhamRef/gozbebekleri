@@ -12,7 +12,7 @@ import { SUPPORTED_LOCALES, LOCALE_LABELS } from "@/lib/locales";
 type Locale = (typeof SUPPORTED_LOCALES)[number];
 
 const COUNTRY_CODES: Record<Locale, string> = {
-  ar: "SA", en: "US", fr: "FR", tr: "TR", id: "ID", pt: "PT", es: "ES",
+  ar: "SA", en: "US", fr: "FR", tr: "TR", id: "ID", pt: "PT", es: "ES", de: "DE",
 };
 
 const languages: { code: Locale; name: string; countryCode: string }[] =

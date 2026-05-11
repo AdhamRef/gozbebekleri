@@ -20,6 +20,7 @@ export const SUPPORTED_CURRENCY_OPTIONS = [
   { code: "KWD", symbol: "د.ك", name: "Kuwaiti Dinar" },
   { code: "QAR", symbol: "﷼", name: "Qatari Riyal" },
   { code: "BHD", symbol: "ب.د", name: "Bahraini Dinar" },
+  { code: "OMR", symbol: "ر.ع.‏", name: "Omani Rial" },
   { code: "JOD", symbol: "د.أ", name: "Jordanian Dinar" },
   { code: "MAD", symbol: "د.م.", name: "Moroccan Dirham" },
   { code: "EGP", symbol: "EGP", name: "Egyptian Pound" },

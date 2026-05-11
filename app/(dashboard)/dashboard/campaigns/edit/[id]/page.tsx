@@ -103,6 +103,7 @@ const formSchema = z
   title_id: z.string().optional(),
   title_pt: z.string().optional(),
   title_es: z.string().optional(),
+  title_de: z.string().optional(),
   // per-locale image override — optional. main campaign images[] is the only required media (≥1).
   image_en: z.string().optional(),
   image_fr: z.string().optional(),
@@ -110,6 +111,7 @@ const formSchema = z
   image_id: z.string().optional(),
   image_pt: z.string().optional(),
   image_es: z.string().optional(),
+  image_de: z.string().optional(),
   // per-locale video URL override — optional (main videoUrl is also optional).
   videoUrl_en: z.string().optional(),
   videoUrl_fr: z.string().optional(),
@@ -117,6 +119,7 @@ const formSchema = z
   videoUrl_id: z.string().optional(),
   videoUrl_pt: z.string().optional(),
   videoUrl_es: z.string().optional(),
+  videoUrl_de: z.string().optional(),
 })
   .superRefine((data, ctx) => {
     if (data.goalType === 'FIXED' && (!data.targetAmount || data.targetAmount < 1)) {
@@ -154,6 +157,8 @@ const updateSchema = z.object({
   description_pt: z.string().optional(),
   title_es: z.string().optional(),
   description_es: z.string().optional(),
+  title_de: z.string().optional(),
+  description_de: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -173,7 +178,7 @@ function firstCampaignFormErrorMessage(errors: FieldErrors<FormValues>): string 
   return 'يرجى إكمال الحقول المطلوبة أو تصحيح القيم المرفوضة';
 }
 
-function tabForCampaignInvalidField(name: string): 'ar' | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es' {
+function tabForCampaignInvalidField(name: string): 'ar' | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es' | 'de' {
   if (name === 'title_en' || name === 'image_en' || name === 'videoUrl_en') return 'en';
   if (name.startsWith('title_fr') || name.startsWith('image_fr') || name.startsWith('videoUrl_fr'))
     return 'fr';
@@ -185,6 +190,8 @@ function tabForCampaignInvalidField(name: string): 'ar' | 'en' | 'fr' | 'tr' | '
     return 'pt';
   if (name.startsWith('title_es') || name.startsWith('image_es') || name.startsWith('videoUrl_es'))
     return 'es';
+  if (name.startsWith('title_de') || name.startsWith('image_de') || name.startsWith('videoUrl_de'))
+    return 'de';
   return 'ar';
 }
 
@@ -230,8 +237,8 @@ export default function EditCampaignPage() {
   const [updateLoading, setUpdateLoading] = useState(false);
   const [uploadingUpdateImage, setUploadingUpdateImage] = useState(false);
   const [updateImage, setUpdateImage] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<'ar' | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es'>('ar');
-  const [updateActiveTab, setUpdateActiveTab] = useState<'ar' | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es'>('ar');
+  const [activeTab, setActiveTab] = useState<'ar' | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es' | 'de'>('ar');
+  const [updateActiveTab, setUpdateActiveTab] = useState<'ar' | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es' | 'de'>('ar');
   const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
   const [dragOverImageIndex, setDragOverImageIndex] = useState<number | null>(null);
   const [currentAmountUnlocked, setCurrentAmountUnlocked] = useState(false);
@@ -255,6 +262,7 @@ export default function EditCampaignPage() {
   const [descriptionId, setDescriptionId] = useState<string | null>(null);
   const [descriptionPt, setDescriptionPt] = useState<string | null>(null);
   const [descriptionEs, setDescriptionEs] = useState<string | null>(null);
+  const [descriptionDe, setDescriptionDe] = useState<string | null>(null);
 
   const editorClassName = "w-full border border-stone-200 rounded-md bg-white [&_.ProseMirror]:min-h-[150px] [&_.ProseMirror]:p-4 [&_.ProseMirror]:focus:outline-none";
 
@@ -300,18 +308,21 @@ export default function EditCampaignPage() {
       title_id: '',
       title_pt: '',
       title_es: '',
+      title_de: '',
       image_en: '',
       image_fr: '',
       image_tr: '',
       image_id: '',
       image_pt: '',
       image_es: '',
+      image_de: '',
       videoUrl_en: '',
       videoUrl_fr: '',
       videoUrl_tr: '',
       videoUrl_id: '',
       videoUrl_pt: '',
       videoUrl_es: '',
+      videoUrl_de: '',
     },
   });
 
@@ -333,6 +344,8 @@ export default function EditCampaignPage() {
       description_pt: '',
       title_es: '',
       description_es: '',
+      title_de: '',
+      description_de: '',
     }
   });
 
@@ -360,7 +373,7 @@ export default function EditCampaignPage() {
         const allTranslations = allTranslationsRes.data;
 
         const getTr = (locale: string) => allTranslations.find((t: any) => t.locale === locale);
-        const en = getTr('en'), fr = getTr('fr'), tr = getTr('tr'), id = getTr('id'), pt = getTr('pt'), es = getTr('es');
+        const en = getTr('en'), fr = getTr('fr'), tr = getTr('tr'), id = getTr('id'), pt = getTr('pt'), es = getTr('es'), de = getTr('de');
 
         const safeGoal = campaign.goalType === 'OPEN' ? 'OPEN' : 'FIXED';
         const safeMode =
@@ -384,18 +397,21 @@ export default function EditCampaignPage() {
           title_id: id?.title || '',
           title_pt: pt?.title || '',
           title_es: es?.title || '',
+          title_de: de?.title || '',
           image_en: en?.image || '',
           image_fr: fr?.image || '',
           image_tr: tr?.image || '',
           image_id: id?.image || '',
           image_pt: pt?.image || '',
           image_es: es?.image || '',
+          image_de: de?.image || '',
           videoUrl_en: en?.videoUrl || '',
           videoUrl_fr: fr?.videoUrl || '',
           videoUrl_tr: tr?.videoUrl || '',
           videoUrl_id: id?.videoUrl || '',
           videoUrl_pt: pt?.videoUrl || '',
           videoUrl_es: es?.videoUrl || '',
+          videoUrl_de: de?.videoUrl || '',
         });
 
         setDescriptionAr(campaign.description || null);
@@ -405,6 +421,7 @@ export default function EditCampaignPage() {
         setDescriptionId(id?.description || null);
         setDescriptionPt(pt?.description || null);
         setDescriptionEs(es?.description || null);
+        setDescriptionDe(de?.description || null);
         setOriginalCurrentAmount(Number(campaign.currentAmount) || 0);
       } catch (error) {
         console.error('Error fetching campaign:', error);
@@ -525,6 +542,16 @@ export default function EditCampaignPage() {
                 },
               }
             : {}),
+          ...(values.title_de || !isDescEmpty(descriptionDe) || values.image_de || values.videoUrl_de
+            ? {
+                de: {
+                  title: values.title_de,
+                  description: descriptionDe ?? EMPTY_TIPTAP_DOC_JSON,
+                  image: values.image_de ?? '',
+                  videoUrl: values.videoUrl_de ?? '',
+                },
+              }
+            : {}),
         },
         suggestedDonations:
           values.fundraisingMode === 'AMOUNT'
@@ -559,16 +586,16 @@ export default function EditCampaignPage() {
 
   // Per-locale single-image upload (optional override — fallback is the main Arabic cover).
   const [uploadingLocale, setUploadingLocale] = useState<
-    null | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es'
+    null | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es' | 'de'
   >(null);
 
   type LocaleImageKey =
-    | 'image_en' | 'image_fr' | 'image_tr' | 'image_id' | 'image_pt' | 'image_es';
+    | 'image_en' | 'image_fr' | 'image_tr' | 'image_id' | 'image_pt' | 'image_es' | 'image_de';
   type LocaleVideoKey =
-    | 'videoUrl_en' | 'videoUrl_fr' | 'videoUrl_tr' | 'videoUrl_id' | 'videoUrl_pt' | 'videoUrl_es';
+    | 'videoUrl_en' | 'videoUrl_fr' | 'videoUrl_tr' | 'videoUrl_id' | 'videoUrl_pt' | 'videoUrl_es' | 'videoUrl_de';
 
   const handleLocaleImageUpload = async (
-    locale: 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es',
+    locale: 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es' | 'de',
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = e.target.files?.[0];
@@ -595,7 +622,7 @@ export default function EditCampaignPage() {
     }
   };
 
-  const removeLocaleImage = (locale: 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es') => {
+  const removeLocaleImage = (locale: 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es' | 'de') => {
     const key = `image_${locale}` as LocaleImageKey;
     const current = form.getValues(key);
     if (current) {
@@ -606,7 +633,7 @@ export default function EditCampaignPage() {
   };
 
   const renderLocaleMedia = (
-    locale: 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es',
+    locale: 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es' | 'de',
     labels: { image: string; imageHint: string; video: string; videoHint: string; optionalNote: string },
     direction: 'ltr' | 'rtl' = 'ltr',
   ) => {
@@ -813,6 +840,7 @@ export default function EditCampaignPage() {
           id: { title: data.title_id, description: data.description_id },
           pt: { title: data.title_pt, description: data.description_pt },
           es: { title: data.title_es, description: data.description_es },
+          de: { title: data.title_de, description: data.description_de },
         },
       };
 
@@ -851,6 +879,7 @@ export default function EditCampaignPage() {
           id: { title: data.title_id, description: data.description_id },
           pt: { title: data.title_pt, description: data.description_pt },
           es: { title: data.title_es, description: data.description_es },
+          de: { title: data.title_de, description: data.description_de },
         },
       };
 
@@ -907,6 +936,8 @@ export default function EditCampaignPage() {
       description_pt: getUT('pt')?.description || '',
       title_es: getUT('es')?.title || '',
       description_es: getUT('es')?.description || '',
+      title_de: getUT('de')?.title || '',
+      description_de: getUT('de')?.description || '',
     });
     
     setUpdateImage(update.image || '');
@@ -921,8 +952,9 @@ export default function EditCampaignPage() {
     const hasId = !!form.getValues('title_id') && !isDescEmpty(descriptionId);
     const hasPt = !!form.getValues('title_pt') && !isDescEmpty(descriptionPt);
     const hasEs = !!form.getValues('title_es') && !isDescEmpty(descriptionEs);
-    const completed = [hasEn, hasFr, hasTr, hasId, hasPt, hasEs].filter(Boolean).length;
-    return { completed, total: 6, hasEn, hasFr, hasTr, hasId, hasPt, hasEs };
+    const hasDe = !!form.getValues('title_de') && !isDescEmpty(descriptionDe);
+    const completed = [hasEn, hasFr, hasTr, hasId, hasPt, hasEs, hasDe].filter(Boolean).length;
+    return { completed, total: 7, hasEn, hasFr, hasTr, hasId, hasPt, hasEs, hasDe };
   };
 
   if (loading) {
@@ -954,6 +986,7 @@ export default function EditCampaignPage() {
             {translationStatus.hasId && <span title="Indonesian available"><CheckCircle2 className="w-4 h-4 text-orange-500" /></span>}
             {translationStatus.hasPt && <span title="Portuguese available"><CheckCircle2 className="w-4 h-4 text-green-700" /></span>}
             {translationStatus.hasEs && <span title="Spanish available"><CheckCircle2 className="w-4 h-4 text-yellow-600" /></span>}
+            {translationStatus.hasDe && <span title="German available"><CheckCircle2 className="w-4 h-4 text-amber-700" /></span>}
           </div>
         </div>
         <Button
@@ -985,6 +1018,7 @@ export default function EditCampaignPage() {
                 <TabsTrigger value="id" className="gap-2"><ReactCountryFlag countryCode="ID" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Bahasa</TabsTrigger>
                 <TabsTrigger value="pt" className="gap-2"><ReactCountryFlag countryCode="PT" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Português</TabsTrigger>
                 <TabsTrigger value="es" className="gap-2"><ReactCountryFlag countryCode="ES" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Español</TabsTrigger>
+                <TabsTrigger value="de" className="gap-2"><ReactCountryFlag countryCode="DE" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Deutsch</TabsTrigger>
               </TabsList>
 
               {/* Arabic Tab */}
@@ -1202,6 +1236,30 @@ export default function EditCampaignPage() {
                     videoHint: 'Enlace de video específico para el español.',
                     optionalNote:
                       'La imagen y la URL del video son opcionales — reemplazan la portada/video árabe principal solo cuando se proporcionan. Solo la imagen principal en árabe (≥ 1) es obligatoria.',
+                  },
+                  'ltr',
+                )}
+              </TabsContent>
+
+              {/* German Tab */}
+              <TabsContent value="de" className="space-y-6">
+                <Alert><AlertCircle className="h-4 w-4" /><AlertDescription className='mt-[5px]'>Deutsche Übersetzungen sind optional. Wird nichts angegeben, erscheint der arabische Inhalt.</AlertDescription></Alert>
+                <FormField control={form.control} name="title_de" render={({ field }) => (
+                  <FormItem dir='rtl'><FormLabel>Kampagnentitel (Deutsch)</FormLabel><FormControl><Input {...field} placeholder="Kampagnentitel auf Deutsch" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormItem dir='rtl'>
+                  <FormLabel>Kampagnenbeschreibung (Deutsch)</FormLabel>
+                  <WysiwygEditor defaultValue={parseEditorContent(descriptionDe)} onDebouncedUpdate={(editor) => setDescriptionDe(JSON.stringify(editor?.getJSON()))} className={editorClassName} />
+                </FormItem>
+                {renderLocaleMedia(
+                  'de',
+                  {
+                    image: 'Titelbild (Deutsch) — optional',
+                    imageHint: 'Titelbild hochladen',
+                    video: 'Video-URL (Deutsch) — optional',
+                    videoHint: 'Sprachspezifischer Video-Link für Deutsch.',
+                    optionalNote:
+                      'Bild und Video-URL sind optional — sie ersetzen das arabische Hauptbild/-video nur, wenn sie angegeben sind. Nur das arabische Hauptbild (≥ 1) ist erforderlich.',
                   },
                   'ltr',
                 )}
@@ -1698,6 +1756,7 @@ export default function EditCampaignPage() {
                           <TabsTrigger value="id"><ReactCountryFlag countryCode="ID" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Bahasa</TabsTrigger>
                           <TabsTrigger value="pt"><ReactCountryFlag countryCode="PT" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Português</TabsTrigger>
                           <TabsTrigger value="es"><ReactCountryFlag countryCode="ES" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Español</TabsTrigger>
+                          <TabsTrigger value="de"><ReactCountryFlag countryCode="DE" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Deutsch</TabsTrigger>
                         </TabsList>
                         <TabsContent value="ar" className="space-y-4">
                           <FormField control={updateForm.control} name="title" render={({ field }) => (
@@ -1753,6 +1812,14 @@ export default function EditCampaignPage() {
                           )} />
                           <FormField control={updateForm.control} name="description_es" render={({ field }) => (
                             <FormItem dir='rtl'><FormLabel>Descripción (Español)</FormLabel><FormControl><Textarea {...field} placeholder="Descripción en español..." className="min-h-[100px]" /></FormControl></FormItem>
+                          )} />
+                        </TabsContent>
+                        <TabsContent value="de" className="space-y-4">
+                          <FormField control={updateForm.control} name="title_de" render={({ field }) => (
+                            <FormItem dir='rtl'><FormLabel>Update-Titel (Deutsch)</FormLabel><FormControl><Input {...field} placeholder="Titel auf Deutsch" /></FormControl></FormItem>
+                          )} />
+                          <FormField control={updateForm.control} name="description_de" render={({ field }) => (
+                            <FormItem dir='rtl'><FormLabel>Beschreibung (Deutsch)</FormLabel><FormControl><Textarea {...field} placeholder="Beschreibung auf Deutsch..." className="min-h-[100px]" /></FormControl></FormItem>
                           )} />
                         </TabsContent>
                       </Tabs>
@@ -1969,6 +2036,7 @@ export default function EditCampaignPage() {
                     <TabsTrigger value="id"><ReactCountryFlag countryCode="ID" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Bahasa</TabsTrigger>
                     <TabsTrigger value="pt"><ReactCountryFlag countryCode="PT" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Português</TabsTrigger>
                     <TabsTrigger value="es"><ReactCountryFlag countryCode="ES" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Español</TabsTrigger>
+                    <TabsTrigger value="de"><ReactCountryFlag countryCode="DE" svg style={{width:"1em",height:"1em",verticalAlign:"middle"}} /> Deutsch</TabsTrigger>
                   </TabsList>
                   <TabsContent value="ar" className="space-y-4">
                     <FormField control={updateForm.control} name="title" render={({ field }) => (
@@ -2024,6 +2092,14 @@ export default function EditCampaignPage() {
                     )} />
                     <FormField control={updateForm.control} name="description_es" render={({ field }) => (
                       <FormItem dir='rtl'><FormLabel>Descripción (Español)</FormLabel><FormControl><Textarea {...field} placeholder="Descripción en español..." className="min-h-[100px]" /></FormControl></FormItem>
+                    )} />
+                  </TabsContent>
+                  <TabsContent value="de" className="space-y-4">
+                    <FormField control={updateForm.control} name="title_de" render={({ field }) => (
+                      <FormItem dir='rtl'><FormLabel>Update-Titel (Deutsch)</FormLabel><FormControl><Input {...field} placeholder="Titel auf Deutsch" /></FormControl></FormItem>
+                    )} />
+                    <FormField control={updateForm.control} name="description_de" render={({ field }) => (
+                      <FormItem dir='rtl'><FormLabel>Beschreibung (Deutsch)</FormLabel><FormControl><Textarea {...field} placeholder="Beschreibung auf Deutsch..." className="min-h-[100px]" /></FormControl></FormItem>
                     )} />
                   </TabsContent>
                 </Tabs>

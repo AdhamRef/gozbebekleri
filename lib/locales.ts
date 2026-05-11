@@ -10,6 +10,7 @@ export const SUPPORTED_LOCALES = [
   "id",
   "pt",
   "es",
+  "de",
 ] as const;
 
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
@@ -22,6 +23,7 @@ export const LOCALE_LABELS: Record<SupportedLocale, string> = {
   id: "Indonesia",
   pt: "Português",
   es: "Español",
+  de: "Deutsch",
 };
 
 /** Locales for dropdown/select (code + label). */

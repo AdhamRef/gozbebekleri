@@ -42,6 +42,8 @@ const formSchema = z.object({
   description_pt: z.string().max(500).optional(),
   name_es: z.string().max(50).optional(),
   description_es: z.string().max(500).optional(),
+  name_de: z.string().max(50).optional(),
+  description_de: z.string().max(500).optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -70,6 +72,8 @@ export default function NewCategoryPage() {
       description_pt: '',
       name_es: '',
       description_es: '',
+      name_de: '',
+      description_de: '',
     },
   });
 
@@ -88,6 +92,7 @@ export default function NewCategoryPage() {
           id: { name: values.name_id ?? '', description: values.description_id ?? '' },
           pt: { name: values.name_pt ?? '', description: values.description_pt ?? '' },
           es: { name: values.name_es ?? '', description: values.description_es ?? '' },
+          de: { name: values.name_de ?? '', description: values.description_de ?? '' },
         },
       });
       toast.success('تم إنشاء الحملة بنجاح');
@@ -180,6 +185,9 @@ export default function NewCategoryPage() {
               <TabsTrigger value="es" className="gap-2">
                 <ReactCountryFlag countryCode="ES" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Español
               </TabsTrigger>
+              <TabsTrigger value="de" className="gap-2">
+                <ReactCountryFlag countryCode="DE" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Deutsch
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="ar" className="mt-0">
               <Card className="p-6">
@@ -261,6 +269,18 @@ export default function NewCategoryPage() {
                   )} />
                   <FormField control={form.control} name="description_es" render={({ field }) => (
                     <FormItem><FormLabel>Descripción</FormLabel><FormControl><Textarea placeholder="Descripción..." className="resize-y" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
+              </Card>
+            </TabsContent>
+            <TabsContent value="de" className="mt-0">
+              <Card className="p-6">
+                <div className="grid gap-6">
+                  <FormField control={form.control} name="name_de" render={({ field }) => (
+                    <FormItem><FormLabel>Kategoriename (Deutsch)</FormLabel><FormControl><Input {...field} placeholder="Kategoriename" /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="description_de" render={({ field }) => (
+                    <FormItem><FormLabel>Beschreibung</FormLabel><FormControl><Textarea placeholder="Beschreibung..." className="resize-y" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
               </Card>

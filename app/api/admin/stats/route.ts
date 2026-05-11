@@ -169,6 +169,9 @@ export async function GET(request: NextRequest) {
     const oneTimeWhere = { ...paidWhere, subscriptionId: null };
     const fromSubscriptionWhere = { ...paidWhere, subscriptionId: { not: null } };
     const failedWhere = { ...donationWhere, status: 'FAILED' as const };
+    // All-status splits for the "breakdown" cards ("مرة واحدة (عدد)" / "شهرية (عدد)")
+    const oneTimeAllWhere = { ...donationWhere, subscriptionId: null };
+    const monthlyAllWhere = { ...donationWhere, subscriptionId: { not: null } };
 
     const { monthStart, monthEnd } = getCurrentCalendarMonthUtcRange();
     const thisMonthDonationWhere = mergeFilters(
@@ -187,6 +190,9 @@ export async function GET(request: NextRequest) {
         { categoryItems: { some: { categoryId } } },
       ];
     }
+    // ACTIVE subscription without any settled charge isn't really earning revenue —
+    // exclude it from MRR / "التبرعات الشهرية الناشطة" so a failed-only sub doesn't inflate the totals.
+    const activeMonthlyWhere = { ...subscriptionWhere, donations: { some: PAID_DONATION_FILTER } };
 
     const [
       totalCampaigns,
@@ -198,6 +204,8 @@ export async function GET(request: NextRequest) {
       totalAmountResult,
       oneTimeCount,
       fromSubscriptionCount,
+      oneTimeAllCount,
+      monthlyAllCount,
       activeSubscriptionCount,
       stoppedSubscriptionCount,
       monthlyRecurringRevenueResult,
@@ -223,13 +231,15 @@ export async function GET(request: NextRequest) {
       }),
       prisma.donation.count({ where: oneTimeWhere }),
       prisma.donation.count({ where: fromSubscriptionWhere }),
-      prisma.subscription.count({ where: subscriptionWhere }),
+      prisma.donation.count({ where: oneTimeAllWhere }),
+      prisma.donation.count({ where: monthlyAllWhere }),
+      prisma.subscription.count({ where: activeMonthlyWhere }),
       prisma.subscription.count({
         where: { status: { in: ['PAUSED', 'CANCELLED'] } },
       }),
       prisma.subscription.aggregate({
         _sum: { amountUSD: true },
-        where: subscriptionWhere,
+        where: activeMonthlyWhere,
       }),
       prisma.subscription.aggregate({
         _sum: { amountUSD: true },
@@ -400,6 +410,8 @@ export async function GET(request: NextRequest) {
       failedTotalAmount,
       oneTimeCount,
       monthlyCount: fromSubscriptionCount,
+      oneTimeAllCount,
+      monthlyAllCount,
       activeMonthlyCount: activeSubscriptionCount,
       monthlyStoppedCount: stoppedSubscriptionCount,
       monthlyRecurringRevenue,

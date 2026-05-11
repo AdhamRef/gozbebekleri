@@ -42,6 +42,9 @@ const schema = z.object({
   title_es: z.string().optional(),
   description_es: z.string().optional(),
   buttonText_es: z.string().optional(),
+  title_de: z.string().optional(),
+  description_de: z.string().optional(),
+  buttonText_de: z.string().optional(),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -58,6 +61,7 @@ export default function EditSlidePage() {
       title_en: '', description_en: '', buttonText_en: '', title_fr: '', description_fr: '', buttonText_fr: '',
       title_tr: '', description_tr: '', buttonText_tr: '', title_id: '', description_id: '', buttonText_id: '',
       title_pt: '', description_pt: '', buttonText_pt: '', title_es: '', description_es: '', buttonText_es: '',
+      title_de: '', description_de: '', buttonText_de: '',
     },
   });
 
@@ -66,7 +70,7 @@ export default function EditSlidePage() {
       .then((res) => {
         const d = res.data;
         const getTr = (locale: string) => d.translations?.find((t: { locale: string }) => t.locale === locale);
-        const en = getTr('en'); const fr = getTr('fr'); const tr = getTr('tr'); const id = getTr('id'); const pt = getTr('pt'); const es = getTr('es');
+        const en = getTr('en'); const fr = getTr('fr'); const tr = getTr('tr'); const id = getTr('id'); const pt = getTr('pt'); const es = getTr('es'); const de = getTr('de');
         form.reset({
           title: d.title ?? '',
           description: d.description ?? '',
@@ -81,6 +85,7 @@ export default function EditSlidePage() {
           title_id: id?.title ?? '', description_id: id?.description ?? '', buttonText_id: id?.buttonText ?? '',
           title_pt: pt?.title ?? '', description_pt: pt?.description ?? '', buttonText_pt: pt?.buttonText ?? '',
           title_es: es?.title ?? '', description_es: es?.description ?? '', buttonText_es: es?.buttonText ?? '',
+          title_de: de?.title ?? '', description_de: de?.description ?? '', buttonText_de: de?.buttonText ?? '',
         });
       })
       .catch(() => { toast.error('فشل التحميل'); router.push('/dashboard/slides'); })
@@ -105,6 +110,7 @@ export default function EditSlidePage() {
           id: { title: values.title_id ?? '', description: values.description_id ?? '', buttonText: values.buttonText_id ?? '' },
           pt: { title: values.title_pt ?? '', description: values.description_pt ?? '', buttonText: values.buttonText_pt ?? '' },
           es: { title: values.title_es ?? '', description: values.description_es ?? '', buttonText: values.buttonText_es ?? '' },
+          de: { title: values.title_de ?? '', description: values.description_de ?? '', buttonText: values.buttonText_de ?? '' },
         },
       });
       toast.success('تم التحديث');
@@ -152,6 +158,7 @@ export default function EditSlidePage() {
               <TabsTrigger value="id">Bahasa</TabsTrigger>
               <TabsTrigger value="pt">Português</TabsTrigger>
               <TabsTrigger value="es">Español</TabsTrigger>
+              <TabsTrigger value="de">Deutsch</TabsTrigger>
             </TabsList>
             <TabsContent value="ar" className="mt-0">
               <Card className="p-6 space-y-4">
@@ -200,6 +207,13 @@ export default function EditSlidePage() {
                 <FormField control={form.control} name="title_es" render={({ field }) => (<FormItem><FormLabel>Título (Español)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
                 <FormField control={form.control} name="description_es" render={({ field }) => (<FormItem><FormLabel>Descripción</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} />
                 <FormField control={form.control} name="buttonText_es" render={({ field }) => (<FormItem><FormLabel>Texto del botón</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+              </Card>
+            </TabsContent>
+            <TabsContent value="de" className="mt-0">
+              <Card className="p-6 space-y-4">
+                <FormField control={form.control} name="title_de" render={({ field }) => (<FormItem><FormLabel>Titel (Deutsch)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="description_de" render={({ field }) => (<FormItem><FormLabel>Beschreibung</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="buttonText_de" render={({ field }) => (<FormItem><FormLabel>Button-Text</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
               </Card>
             </TabsContent>
           </Tabs>

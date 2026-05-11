@@ -136,60 +136,33 @@ export async function GET(
     // Instead of loading 100+ donations, we get only what we need
     // Use the resolved Prisma id (since the URL param may have been a slug)
     const realId = campaign.id;
+
+    // Orphaned items (item whose parent Donation was deleted out-of-band — MongoDB
+    // doesn't enforce FK integrity) make Prisma throw on the required `donation` relation.
+    // Fetch item + donor in two steps so one orphan can't 500 the whole page.
+    type DonationStat = { amount: number; donor: string | null } | null;
+    const pickStat = async (
+      orderBy: Prisma.DonationItemOrderByWithRelationInput
+    ): Promise<DonationStat> => {
+      const item = await prisma.donationItem.findFirst({
+        where: { campaignId: realId },
+        orderBy,
+        select: { amount: true, donationId: true },
+      });
+      if (!item) return null;
+      const donation = await prisma.donation.findUnique({
+        where: { id: item.donationId },
+        select: { donor: { select: { name: true } } },
+      });
+      return { amount: item.amount, donor: donation?.donor?.name ?? null };
+    };
+
     const [donationCount, firstDonation, lastDonation, largestDonation] =
       await Promise.all([
-        // Total count of donations for this campaign
-        prisma.donationItem.count({
-          where: { campaignId: realId },
-        }),
-
-        // First donation (oldest)
-        prisma.donationItem.findFirst({
-          where: { campaignId: realId },
-          orderBy: { createdAt: "asc" },
-          select: {
-            amount: true,
-            donation: {
-              select: {
-                donor: {
-                  select: { name: true },
-                },
-              },
-            },
-          },
-        }),
-        
-        // Last donation (newest)
-        prisma.donationItem.findFirst({
-          where: { campaignId: realId },
-          orderBy: { createdAt: "desc" },
-          select: {
-            amount: true,
-            donation: {
-              select: {
-                donor: {
-                  select: { name: true },
-                },
-              },
-            },
-          },
-        }),
-        
-        // Largest donation (highest amount)
-        prisma.donationItem.findFirst({
-          where: { campaignId: realId },
-          orderBy: { amount: "desc" },
-          select: {
-            amount: true,
-            donation: {
-              select: {
-                donor: {
-                  select: { name: true },
-                },
-              },
-            },
-          },
-        }),
+        prisma.donationItem.count({ where: { campaignId: realId } }),
+        pickStat({ createdAt: "asc" }),
+        pickStat({ createdAt: "desc" }),
+        pickStat({ amount: "desc" }),
       ]);
 
     const goalType = normalizeGoalType(campaign.goalType);
@@ -258,17 +231,17 @@ export async function GET(
       donationStats: {
         first: firstDonation ? {
           amount: firstDonation.amount,
-          donor: firstDonation.donation?.donor?.name || "Anonymous",
+          donor: firstDonation.donor || "Anonymous",
         } : null,
-        
+
         largest: largestDonation ? {
           amount: largestDonation.amount,
-          donor: largestDonation.donation?.donor?.name || "Anonymous",
+          donor: largestDonation.donor || "Anonymous",
         } : null,
-        
+
         last: lastDonation ? {
           amount: lastDonation.amount,
-          donor: lastDonation.donation?.donor?.name || "Anonymous",
+          donor: lastDonation.donor || "Anonymous",
         } : null,
       },
 

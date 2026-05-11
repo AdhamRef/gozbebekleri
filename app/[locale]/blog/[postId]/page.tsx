@@ -57,15 +57,33 @@ async function fetchPostForSeo(idOrSlug: string, locale: string) {
 // Generate metadata for the blog post page (SEO with translated title +
 // per-locale hreflang/canonical using each locale's own translation slug)
 export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
+  const params = await args.params.catch(() => null);
+  const locale = (params?.locale as string) || "ar";
+  const postId = params?.postId as string | undefined;
+  const seo = LOCALE_SEO[locale as Locale] ?? LOCALE_SEO.en;
+  // Always anchor canonical to the requested URL so the parent layout's
+  // `/{locale}` canonical can never leak through if metadata building fails.
+  const requestedCanonical = postId
+    ? `${SITE_URL}/${locale}/blog/${encodeURIComponent(postId)}`
+    : `${SITE_URL}/${locale}/blog`;
+
   try {
-    const params = await args.params;
-    const locale = (params?.locale as string) || "ar";
-    const postId = params?.postId;
-    const seo = LOCALE_SEO[locale as Locale] ?? LOCALE_SEO.en;
+    if (!postId) {
+      return {
+        title: seo.blog.title,
+        description: seo.blog.description,
+        alternates: { canonical: requestedCanonical },
+      };
+    }
 
     const post = await fetchPostForSeo(postId, locale);
     if (!post) {
-      return { title: seo.blog.title, description: seo.blog.description };
+      return {
+        title: seo.blog.title,
+        description: seo.blog.description,
+        alternates: { canonical: requestedCanonical },
+        robots: { index: false, follow: true },
+      };
     }
 
     const t = pickTranslation(post.translations, locale);
@@ -76,13 +94,19 @@ export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
       post.image ||
       `${SITE_URL}/og-image.jpg`;
 
-    const alternates = buildLocalizedAlternates({
-      basePath: "/blog",
-      baseSlug: post.slug,
-      translations: post.translations,
-      fallback: post.id,
-      currentLocale: locale,
-    });
+    let alternates: { canonical: string; languages?: Record<string, string> };
+    try {
+      alternates = buildLocalizedAlternates({
+        basePath: "/blog",
+        baseSlug: post.slug,
+        translations: post.translations,
+        fallback: post.id,
+        currentLocale: locale,
+      });
+    } catch (err) {
+      console.error("Failed to build alternates for blog post", err);
+      alternates = { canonical: requestedCanonical };
+    }
 
     const fullTitle = `${titleText} | ${seo.siteName}`;
 
@@ -110,7 +134,11 @@ export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
     };
   } catch (err) {
     console.error("Failed to generate metadata", err);
-    return { title: "Blog" };
+    return {
+      title: seo.blog.title,
+      description: seo.blog.description,
+      alternates: { canonical: requestedCanonical },
+    };
   }
 }
 

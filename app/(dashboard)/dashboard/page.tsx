@@ -135,6 +135,8 @@ interface DashboardStats {
   failedTotalAmount?: number;
   oneTimeCount: number;
   monthlyCount: number;
+  oneTimeAllCount?: number;
+  monthlyAllCount?: number;
   activeMonthlyCount: number;
   monthlyStoppedCount?: number;
   activeMonthlyAmountUSD?: number;
@@ -299,7 +301,7 @@ export default function DashboardPage() {
   const [showFailed, setShowFailed] = useState(false);
   const [donationsStatusFilter, setDonationsStatusFilter] = useState<"all" | "PAID" | "FAILED">("all");
   const [donationLocaleFilter, setDonationLocaleFilter] = useState<
-    "all" | "ar" | "en" | "fr" | "tr" | "id" | "pt" | "es" | "__unset"
+    "all" | "ar" | "en" | "fr" | "tr" | "id" | "pt" | "es" | "de" | "__unset"
   >("all");
   const [donationCountryFilter, setDonationCountryFilter] = useState<string>("all");
   const [countryOptions, setCountryOptions] = useState<{ code: string; count: number }[]>([]);
@@ -803,16 +805,18 @@ export default function DashboardPage() {
                 <StatsMetricCard
                   compact
                   title="مرة واحدة (عدد)"
-                  value={stats?.oneTimeCount ?? 0}
+                  value={stats?.oneTimeAllCount ?? 0}
                   icon={Receipt}
                   accent="slate"
+                  subtitle={`ناجح: ${stats?.oneTimeCount ?? 0}`}
                 />
                 <StatsMetricCard
                   compact
                   title="شهرية (عدد)"
-                  value={stats?.monthlyCount ?? 0}
+                  value={stats?.monthlyAllCount ?? 0}
                   icon={Repeat}
                   accent="slate"
+                  subtitle={`ناجح: ${stats?.monthlyCount ?? 0}`}
                 />
                 <StatsMetricCard
                   compact
@@ -1648,6 +1652,7 @@ export default function DashboardPage() {
         <SelectItem value="id" className="text-xs">Indonesia</SelectItem>
         <SelectItem value="pt" className="text-xs">Português</SelectItem>
         <SelectItem value="es" className="text-xs">Español</SelectItem>
+        <SelectItem value="de" className="text-xs">Deutsch</SelectItem>
         <SelectItem value="__unset" className="text-xs">غير محدد</SelectItem>
       </SelectContent>
     </Select>

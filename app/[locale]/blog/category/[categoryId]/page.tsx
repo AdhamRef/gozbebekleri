@@ -43,7 +43,7 @@ export async function generateMetadata({ params }: CategoryProps): Promise<Metad
           alt: category.title,
         },
       ],
-      url: `https://gozbebekleri.org/ar/categories/${(category as any)?.slug || params.categoryId}`,
+      url: `https://gozbebekleri.org/${params.locale || "ar"}/blog/category/${(category as any)?.slug || params.categoryId}`,
       type: "website",
     },
     twitter: {
@@ -53,7 +53,7 @@ export async function generateMetadata({ params }: CategoryProps): Promise<Metad
       images: [category.image || "/default-category-bg.jpg"],
     },
     alternates: {
-      canonical: `https://gozbebekleri.org/ar/categories/${(category as any)?.slug || params.categoryId}`,
+      canonical: `https://gozbebekleri.org/${params.locale || "ar"}/blog/category/${(category as any)?.slug || params.categoryId}`,
     },
   };
 }

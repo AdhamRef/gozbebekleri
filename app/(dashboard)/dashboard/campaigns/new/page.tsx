@@ -89,6 +89,7 @@ const formSchema = z
   title_id: z.string().optional(),
   title_pt: z.string().optional(),
   title_es: z.string().optional(),
+  title_de: z.string().optional(),
   // per-locale image override — optional. main campaign images[] is the only required media (≥1).
   image_en: z.string().optional(),
   image_fr: z.string().optional(),
@@ -96,6 +97,7 @@ const formSchema = z
   image_id: z.string().optional(),
   image_pt: z.string().optional(),
   image_es: z.string().optional(),
+  image_de: z.string().optional(),
   // per-locale video URL override — optional (main videoUrl is also optional).
   videoUrl_en: z.string().optional(),
   videoUrl_fr: z.string().optional(),
@@ -103,6 +105,7 @@ const formSchema = z
   videoUrl_id: z.string().optional(),
   videoUrl_pt: z.string().optional(),
   videoUrl_es: z.string().optional(),
+  videoUrl_de: z.string().optional(),
 })
   .superRefine((data, ctx) => {
     if (data.goalType === 'FIXED' && (!data.targetAmount || data.targetAmount < 1)) {
@@ -135,7 +138,7 @@ export default function NewCampaignPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [activeTab, setActiveTab] = useState<'ar' | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es'>('ar');
+  const [activeTab, setActiveTab] = useState<'ar' | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es' | 'de'>('ar');
   const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
   const [dragOverImageIndex, setDragOverImageIndex] = useState<number | null>(null);
   const [currentAmountUnlocked, setCurrentAmountUnlocked] = useState(false);
@@ -152,6 +155,7 @@ export default function NewCampaignPage() {
   const [descriptionId, setDescriptionId] = useState<string | null>(null);
   const [descriptionPt, setDescriptionPt] = useState<string | null>(null);
   const [descriptionEs, setDescriptionEs] = useState<string | null>(null);
+  const [descriptionDe, setDescriptionDe] = useState<string | null>(null);
 
   const editorClassName = "w-full border border-stone-200 rounded-md bg-white [&_.ProseMirror]:min-h-[150px] [&_.ProseMirror]:p-4 [&_.ProseMirror]:focus:outline-none";
 
@@ -197,18 +201,21 @@ export default function NewCampaignPage() {
       title_id: '',
       title_pt: '',
       title_es: '',
+      title_de: '',
       image_en: '',
       image_fr: '',
       image_tr: '',
       image_id: '',
       image_pt: '',
       image_es: '',
+      image_de: '',
       videoUrl_en: '',
       videoUrl_fr: '',
       videoUrl_tr: '',
       videoUrl_id: '',
       videoUrl_pt: '',
       videoUrl_es: '',
+      videoUrl_de: '',
     },
   });
 
@@ -326,6 +333,16 @@ export default function NewCampaignPage() {
                 },
               }
             : {}),
+          ...(values.title_de && !isDescEmpty(descriptionDe)
+            ? {
+                de: {
+                  title: values.title_de,
+                  description: descriptionDe,
+                  image: values.image_de || null,
+                  videoUrl: values.videoUrl_de || null,
+                },
+              }
+            : {}),
         },
         suggestedDonations:
           values.fundraisingMode === 'AMOUNT'
@@ -350,16 +367,16 @@ export default function NewCampaignPage() {
 
   // Per-locale single-image upload (optional override — fallback is the main Arabic cover).
   const [uploadingLocale, setUploadingLocale] = useState<
-    null | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es'
+    null | 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es' | 'de'
   >(null);
 
   type LocaleImageKey =
-    | 'image_en' | 'image_fr' | 'image_tr' | 'image_id' | 'image_pt' | 'image_es';
+    | 'image_en' | 'image_fr' | 'image_tr' | 'image_id' | 'image_pt' | 'image_es' | 'image_de';
   type LocaleVideoKey =
-    | 'videoUrl_en' | 'videoUrl_fr' | 'videoUrl_tr' | 'videoUrl_id' | 'videoUrl_pt' | 'videoUrl_es';
+    | 'videoUrl_en' | 'videoUrl_fr' | 'videoUrl_tr' | 'videoUrl_id' | 'videoUrl_pt' | 'videoUrl_es' | 'videoUrl_de';
 
   const handleLocaleImageUpload = async (
-    locale: 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es',
+    locale: 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es' | 'de',
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = e.target.files?.[0];
@@ -386,7 +403,7 @@ export default function NewCampaignPage() {
     }
   };
 
-  const removeLocaleImage = (locale: 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es') => {
+  const removeLocaleImage = (locale: 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es' | 'de') => {
     const key = `image_${locale}` as LocaleImageKey;
     const current = form.getValues(key);
     if (current) {
@@ -397,7 +414,7 @@ export default function NewCampaignPage() {
   };
 
   const renderLocaleMedia = (
-    locale: 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es',
+    locale: 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es' | 'de',
     labels: { image: string; imageHint: string; video: string; videoHint: string; optionalNote: string },
     direction: 'ltr' | 'rtl' = 'ltr',
   ) => {
@@ -561,8 +578,9 @@ const getTranslationStatus = () => {
     const hasId = !!form.watch('title_id') && !isDescEmpty(descriptionId);
     const hasPt = !!form.watch('title_pt') && !isDescEmpty(descriptionPt);
     const hasEs = !!form.watch('title_es') && !isDescEmpty(descriptionEs);
-    const completed = [hasEn, hasFr, hasTr, hasId, hasPt, hasEs].filter(Boolean).length;
-    return { completed, total: 6, hasEn, hasFr, hasTr, hasId, hasPt, hasEs };
+    const hasDe = !!form.watch('title_de') && !isDescEmpty(descriptionDe);
+    const completed = [hasEn, hasFr, hasTr, hasId, hasPt, hasEs, hasDe].filter(Boolean).length;
+    return { completed, total: 7, hasEn, hasFr, hasTr, hasId, hasPt, hasEs, hasDe };
   };
 
   if (loading) {
@@ -596,6 +614,7 @@ const getTranslationStatus = () => {
             {translationStatus.hasId && <CheckCircle2 className="w-4 h-4 text-green-600" title="Indonesian ready" />}
             {translationStatus.hasPt && <CheckCircle2 className="w-4 h-4 text-green-600" title="Portuguese ready" />}
             {translationStatus.hasEs && <CheckCircle2 className="w-4 h-4 text-green-600" title="Spanish ready" />}
+            {translationStatus.hasDe && <CheckCircle2 className="w-4 h-4 text-green-600" title="German ready" />}
           </div>
         </div>
         <Button
@@ -647,6 +666,10 @@ const getTranslationStatus = () => {
                 <TabsTrigger value="es" className="gap-2">
                   <ReactCountryFlag countryCode="ES" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Español
                   {translationStatus.hasEs && <CheckCircle2 className="w-3 h-3 text-green-600" />}
+                </TabsTrigger>
+                <TabsTrigger value="de" className="gap-2">
+                  <ReactCountryFlag countryCode="DE" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Deutsch
+                  {translationStatus.hasDe && <CheckCircle2 className="w-3 h-3 text-green-600" />}
                 </TabsTrigger>
               </TabsList>
 
@@ -901,6 +924,27 @@ const getTranslationStatus = () => {
                     videoHint: 'Enlace de video específico para el español.',
                     optionalNote:
                       'La imagen y la URL del video son opcionales — reemplazan la portada/video árabe principal solo cuando se proporcionan. Solo la imagen principal en árabe (≥ 1) es obligatoria.',
+                  },
+                  'ltr',
+                )}
+              </TabsContent>
+              <TabsContent value="de" className="space-y-6">
+                <FormField control={form.control} name="title_de" render={({ field }) => (
+                  <FormItem dir="rtl"><FormLabel>Kampagnentitel (Deutsch)</FormLabel><FormControl><Input {...field} placeholder="Kampagnentitel auf Deutsch" /></FormControl></FormItem>
+                )} />
+                <FormItem dir="rtl">
+                  <FormLabel>Kampagnenbeschreibung</FormLabel>
+                  <WysiwygEditor defaultValue={parseEditorContent(descriptionDe)} onDebouncedUpdate={(editor) => setDescriptionDe(JSON.stringify(editor?.getJSON()))} className={editorClassName} />
+                </FormItem>
+                {renderLocaleMedia(
+                  'de',
+                  {
+                    image: 'Titelbild (Deutsch) — optional',
+                    imageHint: 'Titelbild hochladen',
+                    video: 'Video-URL (Deutsch) — optional',
+                    videoHint: 'Sprachspezifischer Video-Link für Deutsch.',
+                    optionalNote:
+                      'Bild und Video-URL sind optional — sie ersetzen das arabische Hauptbild/-video nur, wenn sie angegeben sind. Nur das arabische Hauptbild (≥ 1) ist erforderlich.',
                   },
                   'ltr',
                 )}

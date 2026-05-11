@@ -112,6 +112,8 @@ interface ReferralStats {
   paidRevenueAllTimeUnfiltered?: number;
   oneTimeCount: number;
   monthlyCount: number;
+  oneTimeAllCount?: number;
+  monthlyAllCount?: number;
   activeMonthlyCount: number;
   monthlyStoppedCount?: number;
   monthlyRecurringRevenue: number;
@@ -170,6 +172,7 @@ const DASHBOARD_CURRENCY_SYMBOL: Record<string, string> = {
   EGP: "EGP ",
   QAR: "﷼",
   BHD: "ب.د",
+  OMR: "ر.ع.‏",
 };
 
 const PAGE_SIZE = 10;
@@ -490,8 +493,8 @@ export default function ReferralAnalyticsPage() {
             )}
             {statCardSet === "breakdown" && (
               <>
-                <StatsMetricCard compact title="مرة واحدة (عدد)" value={stats.oneTimeCount ?? 0} icon={Receipt} accent="slate" />
-                <StatsMetricCard compact title="شهرية (عدد)" value={stats.monthlyCount ?? 0} icon={Repeat} accent="slate" />
+                <StatsMetricCard compact title="مرة واحدة (عدد)" value={stats.oneTimeAllCount ?? 0} icon={Receipt} accent="slate" subtitle={`ناجح: ${stats.oneTimeCount ?? 0}`} />
+                <StatsMetricCard compact title="شهرية (عدد)" value={stats.monthlyAllCount ?? 0} icon={Repeat} accent="slate" subtitle={`ناجح: ${stats.monthlyCount ?? 0}`} />
                 <StatsMetricCard compact title="التبرعات الشهرية الناشطة" value={stats.activeMonthlyAmountUSD ?? 0} icon={Repeat} accent="teal" format="money" subtitle={`عدد: ${stats.activeMonthlyCount ?? 0}`} />
                 <StatsMetricCard compact title="التبرعات الشهرية المتوقفة" value={stats.monthlyStoppedAmountUSD ?? 0} icon={Repeat} accent="indigo" format="money" subtitle={`عدد: ${stats.monthlyStoppedCount ?? 0}`} />
               </>

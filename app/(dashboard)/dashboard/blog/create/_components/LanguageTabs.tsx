@@ -85,10 +85,15 @@ export default function LanguageTabs({ post, categories, campaignOptions = [], m
       label: <><ReactCountryFlag countryCode="PT" svg style={{ width: '1.2em', height: '1.2em' }} /> Português</>, 
       has: hasLocale("pt") 
     },
-    { 
-      value: "es", 
-      label: <><ReactCountryFlag countryCode="ES" svg style={{ width: '1.2em', height: '1.2em' }} /> Español</>, 
-      has: hasLocale("es") 
+    {
+      value: "es",
+      label: <><ReactCountryFlag countryCode="ES" svg style={{ width: '1.2em', height: '1.2em' }} /> Español</>,
+      has: hasLocale("es")
+    },
+    {
+      value: "de",
+      label: <><ReactCountryFlag countryCode="DE" svg style={{ width: '1.2em', height: '1.2em' }} /> Deutsch</>,
+      has: hasLocale("de")
     },
   ];
 
@@ -115,7 +120,7 @@ export default function LanguageTabs({ post, categories, campaignOptions = [], m
         />
       </TabsContent>
 
-      {(["en", "fr", "tr", "id", "pt", "es"] as const).map((loc) => (
+      {(["en", "fr", "tr", "id", "pt", "es", "de"] as const).map((loc) => (
         <TabsContent key={loc} value={loc} className="mt-0">
           {isCreate ? (
             <BlogLocaleBufferEditor locale={loc} />

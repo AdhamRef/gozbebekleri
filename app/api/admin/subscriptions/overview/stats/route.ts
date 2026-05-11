@@ -178,6 +178,13 @@ export async function GET(request: NextRequest) {
 
     const { startDate, endDate } = getDateRange(period, startParam, endParam);
     const subBase = buildSubscriptionWhere(categoryId, campaignId, referralId);
+    // ACTIVE subscription without any settled charge isn't really earning revenue —
+    // exclude it from MRR / "التبرعات الشهرية الناشطة" so a failed-only sub doesn't inflate the totals.
+    const activeMonthlyWhere: Prisma.SubscriptionWhereInput = {
+      ...subBase,
+      status: "ACTIVE",
+      donations: { some: PAID_DONATION_FILTER },
+    };
     const donationChargeBase = buildDonationChargeBase(startDate, endDate, categoryId, campaignId, referralId);
     // status=PAID alone includes abandoned checkouts that never settled; require paidAt too.
     const donationPaidWhere = { ...donationChargeBase, ...PAID_DONATION_FILTER };
@@ -268,12 +275,12 @@ export async function GET(request: NextRequest) {
           categoryItems: { select: { category: { select: { name: true } } } },
         },
       }),
-      prisma.subscription.count({ where: { ...subBase, status: "ACTIVE" } }),
+      prisma.subscription.count({ where: activeMonthlyWhere }),
       prisma.subscription.count({ where: { ...subBase, status: "PAUSED" } }),
       prisma.subscription.count({ where: { ...subBase, status: "CANCELLED" } }),
       prisma.subscription.aggregate({
         _sum: { amountUSD: true },
-        where: { ...subBase, status: "ACTIVE" },
+        where: activeMonthlyWhere,
       }),
       prisma.subscription.aggregate({
         _sum: { amountUSD: true },

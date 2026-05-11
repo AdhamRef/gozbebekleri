@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
-export type BufferedLocale = "en" | "fr" | "tr" | "id" | "pt" | "es";
+export type BufferedLocale = "en" | "fr" | "tr" | "id" | "pt" | "es" | "de";
 
 export type LocaleTranslation = {
   title: string;

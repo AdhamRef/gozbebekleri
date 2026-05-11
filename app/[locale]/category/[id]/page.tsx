@@ -34,13 +34,24 @@ async function fetchCategoryForSeo(idOrSlug: string, locale: string) {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id, locale } = await params;
-  const category = await fetchCategoryForSeo(id, locale);
   const seo = LOCALE_SEO[locale as Locale] ?? LOCALE_SEO.en;
+  // Always anchor canonical to the requested URL so the parent layout's
+  // `/{locale}` canonical can never leak through if the DB lookup fails.
+  const requestedCanonical = `${SITE_URL}/${locale}/category/${encodeURIComponent(id)}`;
+
+  let category: Awaited<ReturnType<typeof fetchCategoryForSeo>> = null;
+  try {
+    category = await fetchCategoryForSeo(id, locale);
+  } catch (err) {
+    console.error("Failed to fetch category for metadata", err);
+  }
 
   if (!category) {
     return {
       title: seo.campaigns.title,
       description: seo.campaigns.description,
+      alternates: { canonical: requestedCanonical },
+      robots: { index: false, follow: true },
     };
   }
 
@@ -50,13 +61,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     (t?.description || category.description || seo.campaigns.description).slice(0, 200);
   const image = category.image || `${SITE_URL}/og-image.jpg`;
 
-  const alternates = buildLocalizedAlternates({
-    basePath: "/category",
-    baseSlug: category.slug,
-    translations: category.translations,
-    fallback: category.id,
-    currentLocale: locale,
-  });
+  let alternates: { canonical: string; languages?: Record<string, string> };
+  try {
+    alternates = buildLocalizedAlternates({
+      basePath: "/category",
+      baseSlug: category.slug,
+      translations: category.translations,
+      fallback: category.id,
+      currentLocale: locale,
+    });
+  } catch (err) {
+    console.error("Failed to build alternates for category", err);
+    alternates = { canonical: requestedCanonical };
+  }
 
   const title = `${name} | ${seo.siteName}`;
 

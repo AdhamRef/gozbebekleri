@@ -90,6 +90,7 @@ export const CURRENCY_SYMBOLS: Record<string, string> = {
   EGP: 'ج.م',
   QAR: 'ر.ق',
   BHD: 'د.ب',
+  OMR: 'ر.ع.‏',
 };
 
 /** Returns currency code (e.g. 'USD'). */

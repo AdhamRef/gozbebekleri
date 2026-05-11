@@ -34,6 +34,7 @@ const CartPaymentDialog = dynamic(() => import("./CartPaymentDialog"), { ssr: fa
 // framer-motion removed — replaced with CSS-only fade animations to keep ~70 KiB
 // of motion JS off the homepage critical path.
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
+import { CURRENCY_COOKIE_UPDATED_EVENT } from "@/components/CurrencyFromUrlSync";
 import { getSocialLinks } from "@/lib/social-links";
 
 interface CartItem {
@@ -76,6 +77,15 @@ const Navbar = () => {
   const [cartGuestMode, setCartGuestMode] = useState(false);
   const { items: zustandItems, removeItem: zustandRemoveItem, clearItems: clearZustandItems } = useCart();
   const userMenuRef = useRef<HTMLDivElement>(null);
+  // Force a re-render when the currency cookie changes so SSR'd `?currency=USD`
+  // links refresh once middleware / CurrencyFromUrlSync settles the real choice.
+  const [, setCurrencyTick] = useState(0);
+  useEffect(() => {
+    setCurrencyTick((n) => n + 1); // hydration: re-read after middleware-set cookie
+    const onUpdate = () => setCurrencyTick((n) => n + 1);
+    window.addEventListener(CURRENCY_COOKIE_UPDATED_EVENT, onUpdate);
+    return () => window.removeEventListener(CURRENCY_COOKIE_UPDATED_EVENT, onUpdate);
+  }, []);
 
   useEffect(() => {
     if (searchParams.get("openCartPayment") === "1") {

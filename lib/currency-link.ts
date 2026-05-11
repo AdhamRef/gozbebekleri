@@ -1,4 +1,3 @@
-import Cookies from "js-cookie";
 import { SUPPORTED_CURRENCY_OPTIONS } from "@/lib/supported-currencies";
 
 /** Stable list for dashboards / link builders (DEFAULT first, then same order as `CurrencySelector`). */
@@ -22,8 +21,16 @@ export function currencyCodeForUrl(cookieValue: string | undefined): string {
   return raw.toUpperCase();
 }
 
+/**
+ * Client-only: reads the `currency` cookie from `document.cookie`. Kept in
+ * this file (instead of importing `js-cookie`) so the helpers above stay
+ * safe to import from the Edge middleware bundle.
+ */
 export function getCurrencyCodeForLinks(): string {
-  return currencyCodeForUrl(Cookies.get("currency"));
+  if (typeof document === "undefined") return currencyCodeForUrl(undefined);
+  const match = document.cookie.match(/(?:^|; )currency=([^;]*)/);
+  const raw = match ? decodeURIComponent(match[1]) : undefined;
+  return currencyCodeForUrl(raw);
 }
 
 export function isValidCurrencyParam(value: string | null | undefined): value is string {

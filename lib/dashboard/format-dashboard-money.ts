@@ -15,6 +15,7 @@ export const DASHBOARD_DISPLAY_SYMBOLS: Record<string, string> = {
   EGP: "EGP ",
   QAR: "﷼",
   BHD: "ب.د",
+  OMR: "ر.ع.‏",
 };
 
 type ConvertResult = {

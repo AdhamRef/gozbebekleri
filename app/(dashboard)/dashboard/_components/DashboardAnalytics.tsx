@@ -111,6 +111,8 @@ interface DashboardStats {
   allTimeRevenue?: number;
   oneTimeCount: number;
   monthlyCount: number;
+  oneTimeAllCount?: number;
+  monthlyAllCount?: number;
   activeMonthlyCount: number;
   monthlyStoppedCount?: number;
   activeMonthlyAmountUSD?: number;
@@ -429,7 +431,7 @@ export default function DashboardPage() {
     return <LoadingSkeleton />;
   }
 
-  const currencySymbol: Record<string, string> = { USD: "$", EUR: "€", GBP: "£", TRY: "₺", EGP: "EGP " };
+  const currencySymbol: Record<string, string> = { USD: "$", EUR: "€", GBP: "£", TRY: "₺", EGP: "EGP ", OMR: "ر.ع.‏" };
   const formatMoney = (n: number, sourceCurrency?: string, amountUSD?: number, approximate?: boolean) => {
     const decimals = approximate ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : { minimumFractionDigits: 0, maximumFractionDigits: 2 };
     const selected = getSelectedCurrency?.() ?? "DEFAULT";
@@ -617,15 +619,17 @@ export default function DashboardPage() {
               <>
                 <StatsCard
                   title="مرة واحدة (عدد)"
-                  value={stats?.oneTimeCount ?? 0}
+                  value={stats?.oneTimeAllCount ?? 0}
                   icon={Receipt}
                   accent="slate"
+                  subtitle={`ناجح: ${stats?.oneTimeCount ?? 0}`}
                 />
                 <StatsCard
                   title="شهرية (عدد)"
-                  value={stats?.monthlyCount ?? 0}
+                  value={stats?.monthlyAllCount ?? 0}
                   icon={Repeat}
                   accent="slate"
+                  subtitle={`ناجح: ${stats?.monthlyCount ?? 0}`}
                 />
                 <StatsCard
                   title="التبرعات الشهرية الناشطة"

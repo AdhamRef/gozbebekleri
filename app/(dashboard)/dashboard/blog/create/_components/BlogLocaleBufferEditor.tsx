@@ -25,6 +25,7 @@ const localeMeta: Record<BufferedLocale, { name: string; required: boolean; dir:
   id: { name: "Bahasa Indonesia", required: false, dir: "ltr" },
   pt: { name: "Português", required: false, dir: "ltr" },
   es: { name: "Español", required: false, dir: "ltr" },
+  de: { name: "Deutsch", required: false, dir: "ltr" },
 };
 
 export default function BlogLocaleBufferEditor({ locale }: { locale: BufferedLocale }) {
