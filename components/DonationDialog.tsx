@@ -248,12 +248,14 @@ const DonationDialog = ({
   const { data: session, status: sessionStatus } = useSession();
   const [hasSkippedAuth, setHasSkippedAuth] = useState(false);
   const useGuestCheckout = (guestMode || hasSkippedAuth) && !session?.user?.id;
-  // Authenticated user with profile fields still missing — collected inline on
-  // the payment step instead of bouncing to /auth/complete-profile so that the
-  // donation flow stays in one place after Google sign-in.
-  const needsPhone = !!session?.user?.id && !currentUser?.phone;
-  const needsBirthdate = !!session?.user?.id && !currentUser?.birthdate;
-  const needsGender = !!session?.user?.id && !currentUser?.gender;
+  // While /api/users/[id] is still in flight we don't yet know which profile fields
+  // the user is missing — treat them all as present so the donate button isn't
+  // pre-disabled (previous behavior locked Google-sign-in users out of payment
+  // until the slow profile fetch resolved and birthdate/gender were re-entered).
+  const profileLoaded = !!currentUser;
+  const needsPhone = !!session?.user?.id && profileLoaded && !currentUser?.phone;
+  const needsBirthdate = !!session?.user?.id && profileLoaded && !currentUser?.birthdate;
+  const needsGender = !!session?.user?.id && profileLoaded && !currentUser?.gender;
   const needsProfileCompletion = needsPhone || needsBirthdate || needsGender;
   const { convertToCurrency, exchangeRates } = useCurrency();
   const [shareCount, setShareCount] = useState(1);
@@ -1462,8 +1464,6 @@ const DonationDialog = ({
                     !guestLastName.trim() ||
                     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim())
                   )) ||
-                  (needsBirthdate && !birthdateValue) ||
-                  (needsGender && !genderValue) ||
                   (paymentMethod === "CARD" && !use3D && !selectedCardId && !stripeReady) ||
                   (paymentMethod === "CARD" && selectedCardId && cardDetails.cvv.length < 3) ||
                   (paymentMethod === "CARD" && use3D && !selectedCardId && (
@@ -1780,7 +1780,10 @@ const DonationDialog = ({
 
 
             let polls = 0;
-            const FALLBACK_AFTER_POLLS = 25;
+            // 60 polls × 2s = 120s. Mobile users routinely need >50s for the SMS-OTP step
+            // of 3D Secure; the previous 25-poll ceiling was firing the failure redirect
+            // while the bank popup was still authenticating.
+            const FALLBACK_AFTER_POLLS = 60;
 
             payforPollRef.current = setInterval(async () => {
               polls++;

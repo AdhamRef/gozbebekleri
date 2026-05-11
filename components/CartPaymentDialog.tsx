@@ -602,7 +602,10 @@ const CartPaymentDialog = ({
         };
 
         let polls = 0;
-        const FALLBACK_AFTER = 25;
+        // 60 polls × 2s = 120s. Mobile users routinely need >50s for the SMS-OTP step
+        // of 3D Secure; the previous 25-poll ceiling was forcing the Stripe fallback
+        // while the bank popup was still authenticating.
+        const FALLBACK_AFTER = 60;
         payforPollRef.current = setInterval(async () => {
           polls++;
           try {
