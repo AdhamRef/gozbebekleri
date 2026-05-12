@@ -192,7 +192,6 @@ const CartSheet: React.FC<CartSheetProps> = ({
                               </p>
                             );
                           })()}
-                          )}
                           <span className="inline-flex items-center self-start gap-1 bg-[#025EB8]/10 text-[#025EB8] text-xs font-bold px-2.5 py-1 rounded-full">
                             {formatAmount(item.amount, item.currency)}
                           </span>
