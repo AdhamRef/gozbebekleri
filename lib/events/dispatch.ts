@@ -53,6 +53,13 @@ export async function dispatchEvent(
 ): Promise<DispatchResult> {
   const result: DispatchResult = { triggers: 0, emailsSent: 0, whatsappSent: 0, errors: 0 };
 
+  // Telegram notification — fired first so it runs even when there are no
+  // email/whatsapp triggers configured, the context fails to load, or the
+  // main try-block throws. Donation-related events only.
+  if (input.donationId && (event === "DONATION_PAID" || event === "DONATION_FAILED" || event === "FIRST_DONATION")) {
+    void notifyDonationEvent(event, input.donationId);
+  }
+
   try {
     const triggers = await prisma.messageTrigger.findMany({
       where: { event, enabled: true },
@@ -118,11 +125,6 @@ export async function dispatchEvent(
     });
   } catch (err) {
     console.error(`dispatchEvent ${event} top-level failure`, err);
-  }
-
-  // Telegram notification — best-effort, never throws. Donation-related events only.
-  if (input.donationId && (event === "DONATION_PAID" || event === "DONATION_FAILED" || event === "FIRST_DONATION")) {
-    void notifyDonationEvent(event, input.donationId);
   }
 
   return result;

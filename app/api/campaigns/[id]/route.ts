@@ -11,6 +11,7 @@ import {
   parseSuggestedDonations,
   validateSuggestedDonationsBody,
 } from "@/lib/campaign/suggested-donations";
+import { parseShareLabels } from "@/lib/campaign/share-labels";
 import {
   computeCampaignProgressPercent,
   normalizeFundraisingMode,
@@ -70,6 +71,7 @@ export async function GET(
         fundraisingMode: true,
         sharePriceUSD: true,
         suggestedShareCounts: true,
+        shareLabels: true,
 
         // Requested locale + English fallback (base Arabic is on the model itself)
         translations: {
@@ -205,6 +207,7 @@ export async function GET(
       fundraisingMode,
       sharePriceUSD: campaign.sharePriceUSD ?? null,
       suggestedShareCounts: parseSuggestedShareCounts(campaign.suggestedShareCounts),
+      shareLabels: parseShareLabels(campaign.shareLabels),
       isActive: campaign.isActive,
       
       // Category with translation
@@ -345,6 +348,15 @@ export async function PUT(
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Invalid suggestedShareCounts";
         return NextResponse.json({ error: msg }, { status: 400 });
+      }
+    }
+
+    if (body.shareLabels !== undefined) {
+      if (body.shareLabels === null) {
+        updateData.shareLabels = null;
+      } else {
+        const v = parseShareLabels(body.shareLabels);
+        updateData.shareLabels = v == null ? null : (v as unknown as Prisma.InputJsonValue);
       }
     }
 
@@ -542,6 +554,7 @@ export async function PUT(
         fundraisingMode: true,
         sharePriceUSD: true,
         suggestedShareCounts: true,
+        shareLabels: true,
         translations: {
           select: {
             locale: true,

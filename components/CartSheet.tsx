@@ -15,6 +15,7 @@ import Image from "next/image";
 import Spinner from "../components/ui/spinner";
 import { useTranslations, useLocale } from "next-intl";
 import { cn } from "@/lib/utils";
+import { resolveShareUnit, type ShareLabelsConfig } from "@/lib/campaign/share-labels";
 
 interface CartItem {
   id: string;
@@ -26,6 +27,9 @@ interface CartItem {
     id: string;
     title: string;
     images: string[];
+    /** Per-campaign custom unit names ("sheep" / "meal" / etc.) keyed by locale.
+     *  When present, the cart shows e.g. "3 sheep" instead of "3 shares". */
+    shareLabels?: ShareLabelsConfig | null;
     translations?: { locale: string; title: string }[];
   };
 }
@@ -171,13 +175,23 @@ const CartSheet: React.FC<CartSheetProps> = ({
                           )}>
                             {campaignTitle}
                           </h3>
-                          {item.shareCount != null && item.shareCount > 0 && (
-                            <p className={cn(
-                              "text-xs text-[#025EB8] font-medium",
-                              isRTL ? "text-right" : "text-left"
-                            )}>
-                              {t('sharesLine', { count: item.shareCount })}
-                            </p>
+                          {item.shareCount != null && item.shareCount > 0 && (() => {
+                            const unit = resolveShareUnit(
+                              item.campaign?.shareLabels ?? null,
+                              locale,
+                              item.shareCount
+                            );
+                            return (
+                              <p className={cn(
+                                "text-xs text-[#025EB8] font-medium",
+                                isRTL ? "text-right" : "text-left"
+                              )}>
+                                {unit
+                                  ? `${item.shareCount} ${unit}`
+                                  : t('sharesLine', { count: item.shareCount })}
+                              </p>
+                            );
+                          })()}
                           )}
                           <span className="inline-flex items-center self-start gap-1 bg-[#025EB8]/10 text-[#025EB8] text-xs font-bold px-2.5 py-1 rounded-full">
                             {formatAmount(item.amount, item.currency)}

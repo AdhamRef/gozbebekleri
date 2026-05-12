@@ -42,6 +42,7 @@ import { useReferralCode } from "@/hooks/useReferralCode";
 import { useCurrency } from "@/context/CurrencyContext";
 import { formatNumber } from "@/hooks/formatNumber";
 import { useCart } from "@/hooks/useCart";
+import { resolveShareUnit, resolveSharePlural, type ShareLabelsConfig } from "@/lib/campaign/share-labels";
 import { useTracking } from "@/components/TrackingPixels";
 import { useRouter } from "@/i18n/routing";
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
@@ -87,6 +88,8 @@ interface DonationDialogProps {
   fundraisingMode?: string;
   sharePriceUSD?: number | null;
   suggestedShareCounts?: { counts: number[]; priceByCurrency?: Record<string, number> } | null;
+  /** Per-campaign custom unit names ("sheep"/"meal"/"hijab" etc.) keyed by locale. */
+  shareLabels?: ShareLabelsConfig | null;
   /** When true, user skipped sign-in — collect contact info inline */
   guestMode?: boolean;
   /** URL used by OAuth/email verification to reopen this checkout. */
@@ -115,6 +118,7 @@ const DonationDialog = ({
   fundraisingMode = "AMOUNT",
   sharePriceUSD,
   suggestedShareCounts,
+  shareLabels,
   guestMode = false,
   authCallbackUrl,
   onAuthCheckpoint,
@@ -804,13 +808,19 @@ const DonationDialog = ({
               {shareMode && sharePriceUSD != null ? (
                 (() => {
                   const sharePriceInCurrency = getSharePriceInCurrency();
+                  const customPlural = resolveSharePlural(shareLabels ?? null, locale);
+                  const unitForCount = resolveShareUnit(shareLabels ?? null, locale, shareCount);
                   return (
                 <>
                   <p className="text-sm text-center text-gray-600">
                     {t("sharePriceLabel")}{" "}
                     <span dir="ltr">{formatNumber(sharePriceInCurrency)} {getCurrency()}</span>
                   </p>
-                  <p className="text-xs text-center text-gray-500">{t("sharesPickHint")}</p>
+                  <p className="text-xs text-center text-gray-500">
+                    {customPlural
+                      ? t("sharesPickHintCustom", { unit: customPlural })
+                      : t("sharesPickHint")}
+                  </p>
                   <div className="flex items-center justify-center gap-3">
                     <Button
                       type="button"
@@ -822,7 +832,7 @@ const DonationDialog = ({
                     </Button>
                     <div className="min-w-[5rem] text-center">
                       <span className="text-xl sm:text-2xl font-bold text-gray-900">{shareCount}</span>
-                      <p className="text-xs text-gray-500">{t("sharesLabel")}</p>
+                      <p className="text-xs text-gray-500">{unitForCount ?? t("sharesLabel")}</p>
                     </div>
                     <Button
                       type="button"
@@ -932,6 +942,12 @@ const DonationDialog = ({
                           ? shareCount * getSharePriceUSDEffective()
                           : convertToUSD(donationAmount, payCurrencyCode());
                       if (!session?.user?.id) {
+                        // Snapshot the campaign's plural unit ("sheep", "meal", …)
+                        // at add-time so the cart preserves it even if the donor
+                        // later changes their UI language.
+                        const shareUnitPlural = shareMode
+                          ? resolveSharePlural(shareLabels ?? null, locale)
+                          : null;
                         // Guest: add to Zustand only (no DB call — not authenticated)
                         addItem({
                           id: crypto.randomUUID(),
@@ -940,15 +956,20 @@ const DonationDialog = ({
                           amountUSD,
                           currency: getCurrency(),
                           ...(shareMode ? { shareCount } : {}),
+                          ...(shareUnitPlural ? { shareUnitPlural } : {}),
                           campaign: { id: campaignId, title: campaignTitle, images: [campaignImage] },
                         });
                       } else {
+                        const shareUnitPlural = shareMode
+                          ? resolveSharePlural(shareLabels ?? null, locale)
+                          : null;
                         const response = await axios.post("/api/cart", {
                           campaignId: campaignId,
                           amount: donationAmount,
                           amountUSD,
                           currency: getCurrency(),
                           ...(shareMode ? { shareCount } : {}),
+                          ...(shareUnitPlural ? { shareUnitPlural } : {}),
                         });
                         addItem(response.data || []);
                       }

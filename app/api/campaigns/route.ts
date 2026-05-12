@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/options";
 import { parseSuggestedDonations, validateSuggestedDonationsBody } from "@/lib/campaign/suggested-donations";
+import { parseShareLabels } from "@/lib/campaign/share-labels";
 import {
   computeCampaignProgressPercent,
   normalizeFundraisingMode,
@@ -291,6 +292,7 @@ export async function GET(request: NextRequest) {
         fundraisingMode,
         sharePriceUSD: campaign.sharePriceUSD ?? null,
         suggestedShareCounts: parseSuggestedShareCounts(campaign.suggestedShareCounts),
+        shareLabels: parseShareLabels(campaign.shareLabels),
         suggestedDonations: parseSuggestedDonations(campaign.suggestedDonations),
         createdAt: campaign.createdAt,
         updatedAt: campaign.updatedAt,
@@ -387,6 +389,17 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Invalid suggestedShareCounts";
         return NextResponse.json({ error: msg }, { status: 400 });
+      }
+    }
+
+    let shareLabels: Prisma.InputJsonValue | null | undefined;
+    if (data.shareLabels !== undefined) {
+      // Null = explicit clear. Otherwise sanitise into a clean record.
+      if (data.shareLabels === null) {
+        shareLabels = null;
+      } else {
+        const v = parseShareLabels(data.shareLabels);
+        shareLabels = v == null ? null : (v as unknown as Prisma.InputJsonValue);
       }
     }
 
@@ -497,6 +510,7 @@ export async function POST(request: NextRequest) {
           ...(suggestedShareCounts !== undefined
             ? { suggestedShareCounts }
             : {}),
+          ...(shareLabels !== undefined ? { shareLabels: shareLabels as Prisma.InputJsonValue } : {}),
         },
       });
 
@@ -547,6 +561,7 @@ export async function POST(request: NextRequest) {
         fundraisingMode: true,
         sharePriceUSD: true,
         suggestedShareCounts: true,
+        shareLabels: true,
         translations: {
           select: {
             locale: true,

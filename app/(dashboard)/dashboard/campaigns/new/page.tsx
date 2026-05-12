@@ -63,6 +63,10 @@ import {
   SuggestedShareCountsSection,
   type SuggestedShareCountsSectionRef,
 } from '../_components/SuggestedShareCountsSection';
+import {
+  ShareLabelsSection,
+  type ShareLabelsSectionRef,
+} from '../_components/ShareLabelsSection';
 
 // ✅ Enhanced schema with translations
 const formSchema = z
@@ -147,6 +151,7 @@ export default function NewCampaignPage() {
   const CURRENT_AMOUNT_UNLOCK_PHRASE = 'أؤكد تعديل المبلغ';
   const suggestedDonationsRef = useRef<SuggestedDonationsSectionRef>(null);
   const suggestedShareCountsRef = useRef<SuggestedShareCountsSectionRef>(null);
+  const shareLabelsRef = useRef<ShareLabelsSectionRef>(null);
 
   const [descriptionAr, setDescriptionAr] = useState<string | null>(null);
   const [descriptionEn, setDescriptionEn] = useState<string | null>(null);
@@ -351,6 +356,10 @@ export default function NewCampaignPage() {
         suggestedShareCounts:
           values.fundraisingMode === 'SHARES'
             ? suggestedShareCountsRef.current?.getPayload()
+            : undefined,
+        shareLabels:
+          values.fundraisingMode === 'SHARES'
+            ? shareLabelsRef.current?.getPayload() ?? null
             : undefined,
       };
 
@@ -1220,8 +1229,9 @@ const getTranslationStatus = () => {
               />
             </div>
             {form.watch('fundraisingMode') === 'SHARES' && (
-              <div className="mt-6">
+              <div className="mt-6 space-y-4">
                 <SuggestedShareCountsSection ref={suggestedShareCountsRef} />
+                <ShareLabelsSection ref={shareLabelsRef} />
               </div>
             )}
             {form.watch('fundraisingMode') === 'AMOUNT' && (

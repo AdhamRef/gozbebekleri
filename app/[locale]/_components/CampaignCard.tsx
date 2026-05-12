@@ -15,6 +15,8 @@ const DonationDialog = dynamic(() => import("@/components/DonationDialog"), { ss
 import CategoryIcon from "@/components/CategoryIcon";
 import { Heart, ShoppingCart, Zap } from "lucide-react";
 import type { SuggestedDonationsConfig } from "@/lib/campaign/suggested-donations";
+import { resolveSharePlural, type ShareLabelsConfig } from "@/lib/campaign/share-labels";
+import { useLocale } from "next-intl";
 
 const RESUME_KEY = "campaignDonateResume";
 const FALLBACK_IMG = "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg";
@@ -45,6 +47,8 @@ export interface CampaignCardData {
   sharePriceUSD?: number | null;
   suggestedShareCounts?: { counts: number[]; priceByCurrency?: Record<string, number> } | null;
   suggestedDonations?: SuggestedDonationsConfig | null;
+  /** Per-campaign custom unit names ("sheep" / "meal" / etc.) keyed by locale. */
+  shareLabels?: ShareLabelsConfig | null;
   category?: { id?: string; slug?: string | null; name?: string; icon?: string | null } | null;
 }
 
@@ -54,6 +58,7 @@ type DonationDialogCampaignContext = {
   sharePriceUSD?: number | null;
   suggestedShareCounts?: { counts: number[]; priceByCurrency?: Record<string, number> } | null;
   suggestedDonations?: SuggestedDonationsConfig | null;
+  shareLabels?: ShareLabelsConfig | null;
 };
 
 interface CampaignCardProps {
@@ -67,6 +72,7 @@ interface CampaignCardProps {
 
 export function CampaignCard({ campaign, className, onClick, isFeatured = false, compact = false, listView = false }: CampaignCardProps) {
   const t = useTranslations("CampaignsPage");
+  const locale = useLocale();
   const { convertToCurrency } = useCurrency();
   const pathname = usePathname();
   const router = useRouter();
@@ -81,6 +87,7 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
     fundraisingMode: campaign.fundraisingMode,
     sharePriceUSD: campaign.sharePriceUSD ?? null,
     suggestedShareCounts: campaign.suggestedShareCounts ?? null,
+    shareLabels: campaign.shareLabels ?? null,
     suggestedDonations: campaign.suggestedDonations ?? null,
   });
 
@@ -106,6 +113,7 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
         sharePriceUSD: data.sharePriceUSD ?? campaign.sharePriceUSD ?? null,
         suggestedShareCounts: data.suggestedShareCounts ?? campaign.suggestedShareCounts ?? null,
         suggestedDonations: data.suggestedDonations ?? campaign.suggestedDonations ?? null,
+        shareLabels: data.shareLabels ?? campaign.shareLabels ?? null,
       });
       setDonationDialogMounted(true);
       setDonationOpen(true);
@@ -259,7 +267,9 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
                 <div className="flex items-center justify-between">
                   <span className={`text-white font-black ${isFeatured ? "text-base" : compact ? "text-[10px]" : "text-[10px] sm:text-xs"}`}>{symbol}{formatNumber(raised)}</span>
                   <span className="text-white/60 text-[9px] sm:text-[10px]">
-                    {campaign.fundraisingMode === "SHARES" ? t("sharesCampaignLabel") : t("openGoalLabel")}
+                    {campaign.fundraisingMode === "SHARES"
+                      ? resolveSharePlural(campaign.shareLabels ?? null, locale) ?? t("sharesCampaignLabel")
+                      : t("openGoalLabel")}
                   </span>
                 </div>
               ))}
@@ -304,6 +314,7 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
         goalType={donationContext?.goalType ?? campaign.goalType}
         sharePriceUSD={donationContext?.sharePriceUSD ?? campaign.sharePriceUSD ?? null}
         suggestedShareCounts={donationContext?.suggestedShareCounts ?? campaign.suggestedShareCounts ?? null}
+        shareLabels={donationContext?.shareLabels ?? campaign.shareLabels ?? null}
         suggestedDonations={donationContext?.suggestedDonations ?? campaign.suggestedDonations ?? null}
         authCallbackUrl={
           typeof window !== "undefined"

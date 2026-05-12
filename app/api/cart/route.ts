@@ -24,6 +24,7 @@ export async function GET() {
             id: true,
             title: true,
             images: true,
+            shareLabels: true,
             translations: {
               select: { locale: true, title: true },
             },
@@ -84,6 +85,7 @@ export async function POST(request: NextRequest) {
             id: true,
             title: true,
             images: true,
+            shareLabels: true,
             translations: {
               select: { locale: true, title: true },
             },

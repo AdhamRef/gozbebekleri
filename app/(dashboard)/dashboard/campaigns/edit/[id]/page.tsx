@@ -80,6 +80,11 @@ import {
   SuggestedShareCountsSection,
   type SuggestedShareCountsSectionRef,
 } from '../../_components/SuggestedShareCountsSection';
+import {
+  ShareLabelsSection,
+  type ShareLabelsSectionRef,
+} from '../../_components/ShareLabelsSection';
+import { parseShareLabels, type ShareLabelsConfig } from '@/lib/campaign/share-labels';
 
 // ✅ Enhanced schema with translations (limits aligned with DB / real data — not stricter than Prisma)
 const formSchema = z
@@ -252,8 +257,10 @@ export default function EditCampaignPage() {
   const [shareCountsSeed, setShareCountsSeed] = useState<
     SuggestedShareCountsConfig | undefined
   >(undefined);
+  const [shareLabelsSeed, setShareLabelsSeed] = useState<ShareLabelsConfig | null | undefined>(undefined);
   const suggestedDonationsRef = useRef<SuggestedDonationsSectionRef>(null);
   const suggestedShareCountsRef = useRef<SuggestedShareCountsSectionRef>(null);
+  const shareLabelsRef = useRef<ShareLabelsSectionRef>(null);
 
   const [descriptionAr, setDescriptionAr] = useState<string | null>(null);
   const [descriptionEn, setDescriptionEn] = useState<string | null>(null);
@@ -367,6 +374,7 @@ export default function EditCampaignPage() {
         setCategories(categoriesRes.data.items);
         setSuggestedSeed(parseSuggestedDonations(campaign.suggestedDonations));
         setShareCountsSeed(parseSuggestedShareCounts(campaign.suggestedShareCounts));
+        setShareLabelsSeed(parseShareLabels(campaign.shareLabels));
 
         // ✅ Fetch all translations for the campaign
         const allTranslationsRes = await axios.get(`/api/campaigns/${params.id}/translations`);
@@ -560,6 +568,10 @@ export default function EditCampaignPage() {
         suggestedShareCounts:
           values.fundraisingMode === 'SHARES'
             ? suggestedShareCountsRef.current?.getPayload()
+            : null,
+        shareLabels:
+          values.fundraisingMode === 'SHARES'
+            ? shareLabelsRef.current?.getPayload() ?? null
             : null,
       };
 
@@ -1540,11 +1552,16 @@ export default function EditCampaignPage() {
             {!loading &&
               shareCountsSeed !== undefined &&
               form.watch('fundraisingMode') === 'SHARES' && (
-                <div className="mt-6">
+                <div className="mt-6 space-y-4">
                   <SuggestedShareCountsSection
                     ref={suggestedShareCountsRef}
                     key={`${params?.id}-shares`}
                     initialConfig={shareCountsSeed}
+                  />
+                  <ShareLabelsSection
+                    ref={shareLabelsRef}
+                    key={`${params?.id}-share-labels`}
+                    initialConfig={shareLabelsSeed ?? null}
                   />
                 </div>
               )}

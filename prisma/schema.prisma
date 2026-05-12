@@ -293,6 +293,13 @@ model Campaign {
   sharePriceUSD         Float?
   /// { "counts": number[] } — quick-pick share counts for سهوم campaigns
   suggestedShareCounts  Json?
+  /// Per-locale custom names for the "share" unit on SHARES-mode campaigns.
+  /// Shape: { "<locale>": { "singular": string, "plural": string } }
+  /// e.g. { "ar": { "singular": "خروف", "plural": "خراف" }, "en": { "singular": "sheep", "plural": "sheep" } }
+  /// When unset (or a specific locale missing), the UI falls back to the generic
+  /// "share"/"shares" translation strings. Lets admins re-label the donation unit
+  /// per campaign without forking the translation files.
+  shareLabels           Json?
 
   categoryId    String   @db.ObjectId
   category      Category @relation(fields: [categoryId], references: [id])

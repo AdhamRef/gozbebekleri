@@ -9,6 +9,7 @@ import {
   showCampaignProgress,
 } from "@/lib/campaign/campaign-modes";
 import { parseSuggestedDonations } from "@/lib/campaign/suggested-donations";
+import { parseShareLabels } from "@/lib/campaign/share-labels";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 import { whereByIdOrLocaleSlug } from "@/lib/slug";
 
@@ -129,6 +130,7 @@ export async function GET(
       fundraisingMode: true,
       sharePriceUSD: true,
       suggestedShareCounts: true,
+      shareLabels: true,
       suggestedDonations: true,
       translations: { where: translationLocaleWhere(locale), take: 2, select: { title: true, description: true, locale: true, slug: true } },
       _count: { select: { donations: true } },
@@ -327,6 +329,7 @@ export async function GET(
         fundraisingMode,
         sharePriceUSD: c.sharePriceUSD ?? null,
         suggestedShareCounts: parseSuggestedShareCounts(c.suggestedShareCounts),
+        shareLabels: parseShareLabels(c.shareLabels),
         suggestedDonations: parseSuggestedDonations(c.suggestedDonations),
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,

@@ -44,6 +44,9 @@ interface CartItem {
   amount: number;
   amountUSD?: number;
   shareCount?: number | null;
+  /** Plural unit label captured at add-time (e.g. "sheep"). Falls back to the
+   *  generic "shares" translation when missing. */
+  shareUnitPlural?: string | null;
   campaign: {
     id: string;
     title: string;
@@ -781,7 +784,11 @@ const CartPaymentDialog = ({
                   <div className={`min-w-0 max-w-48 ${locale === "ar" ? "text-right" : "text-left"}`}>
                     <span className="text-gray-900 font-medium text-sm block line-clamp-3" title={title}>{title}</span>
                     {item.shareCount != null && item.shareCount > 0 && (
-                      <span className="text-xs text-violet-700 block mt-0.5">{t("sharesLine", { count: item.shareCount })}</span>
+                      <span className="text-xs text-violet-700 block mt-0.5">
+                        {item.shareUnitPlural
+                          ? `${item.shareCount} ${item.shareUnitPlural}`
+                          : t("sharesLine", { count: item.shareCount })}
+                      </span>
                     )}
                   </div>
                 </div>

@@ -125,6 +125,7 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
           fundraisingMode={campaign.fundraisingMode}
           sharePriceUSD={campaign.sharePriceUSD}
           suggestedShareCounts={campaign.suggestedShareCounts}
+          shareLabels={campaign.shareLabels}
           authCallbackUrl={donationCallbackUrl}
         />
 
@@ -233,6 +234,7 @@ const DonationSidebar = ({ campaign, isMobileSticky = false }: DonationSidebarPr
         fundraisingMode={campaign.fundraisingMode}
         sharePriceUSD={campaign.sharePriceUSD}
         suggestedShareCounts={campaign.suggestedShareCounts}
+        shareLabels={campaign.shareLabels}
         authCallbackUrl={donationCallbackUrl}
       />
 
