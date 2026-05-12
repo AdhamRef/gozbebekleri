@@ -340,7 +340,11 @@
     "firstDonor": "İlk Bağışçı",
     "largestDonor": "En Büyük Bağışçı",
     "latestDonor": "Son Bağışçı",
-    "videoThumbnail": "Video küçük resmi"
+    "videoThumbnail": "Video küçük resmi",
+    "suggestedTitle": "Önerilen projeler",
+    "suggestedFromCategory": "{category} kategorisinden daha fazlası",
+    "suggestedSubtitle": "Aynı kategoride desteklenmeye değer diğer projeleri keşfedin",
+    "viewAllInCategory": "Tümünü gör"
   },
   "SignInDialog": {
     "welcomeTitle": "Göz Bebekleri Platformuna Hoş Geldiniz",

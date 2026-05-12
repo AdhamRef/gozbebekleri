@@ -16,6 +16,7 @@ import {
   resolveWhatsappBody,
 } from "@/lib/templates/locale-resolver";
 import type { TReaderDocument } from "@usewaypoint/email-builder";
+import { notifyDonationEvent } from "@/lib/telegram/notify";
 
 /** Keep in sync with prisma `enum MessageTriggerEvent`. */
 export type MessageTriggerEvent =
@@ -117,6 +118,11 @@ export async function dispatchEvent(
     });
   } catch (err) {
     console.error(`dispatchEvent ${event} top-level failure`, err);
+  }
+
+  // Telegram notification — best-effort, never throws. Donation-related events only.
+  if (input.donationId && (event === "DONATION_PAID" || event === "DONATION_FAILED" || event === "FIRST_DONATION")) {
+    void notifyDonationEvent(event, input.donationId);
   }
 
   return result;

@@ -340,7 +340,11 @@
     "firstDonor": "أول متبرع",
     "largestDonor": "أكبر متبرع",
     "latestDonor": "آخر متبرع",
-    "videoThumbnail": "معاينة الفيديو"
+    "videoThumbnail": "معاينة الفيديو",
+    "suggestedTitle": "مشاريع مقترحة",
+    "suggestedFromCategory": "مزيد من {category}",
+    "suggestedSubtitle": "اكتشف مشاريع أخرى تستحق دعمك من نفس الفئة",
+    "viewAllInCategory": "عرض الكل"
   },
   "SignInDialog": {
     "welcomeTitle": "مرحباً بك في منصة قرة العيون",

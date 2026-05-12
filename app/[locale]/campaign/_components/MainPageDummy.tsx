@@ -36,6 +36,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
 import CategoryIcon from "@/components/CategoryIcon";
 import WysiwygEditor from "@/app/[locale]/blog/_components/wysiwyg/wysiwyg-editor";
+import SuggestedCampaigns from "./SuggestedCampaigns";
 
 // Types
 interface Category {
@@ -696,6 +697,18 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
               </div>
             </div>
           </div>
+
+          {/* ── Suggested campaigns from the same category ── */}
+          {campaign.category?.id && (
+            <div className="mt-6 sm:mt-10">
+              <SuggestedCampaigns
+                categoryId={campaign.category.id}
+                currentCampaignId={campaign.id}
+                categoryName={getLocalizedProperty(campaign.category, "name")}
+                categorySlug={campaign.category.slug ?? campaign.category.id}
+              />
+            </div>
+          )}
         </div>
 
         {/* Mobile sticky donate bar */}

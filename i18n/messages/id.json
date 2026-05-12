@@ -340,7 +340,11 @@
     "firstDonor": "Donatur Pertama",
     "largestDonor": "Donatur Terbesar",
     "latestDonor": "Donatur Terbaru",
-    "videoThumbnail": "Thumbnail video"
+    "videoThumbnail": "Thumbnail video",
+    "suggestedTitle": "Proyek yang disarankan",
+    "suggestedFromCategory": "Lebih banyak dari {category}",
+    "suggestedSubtitle": "Temukan proyek lain yang layak didukung dari kategori yang sama",
+    "viewAllInCategory": "Lihat semua"
   },
   "SignInDialog": {
     "welcomeTitle": "Selamat datang di Platform Qurrat Al-Ayun",

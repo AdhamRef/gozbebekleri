@@ -340,7 +340,11 @@
     "firstDonor": "First Donor",
     "largestDonor": "Largest Donor",
     "latestDonor": "Latest Donor",
-    "videoThumbnail": "Video thumbnail"
+    "videoThumbnail": "Video thumbnail",
+    "suggestedTitle": "Vorgeschlagene Projekte",
+    "suggestedFromCategory": "Mehr aus {category}",
+    "suggestedSubtitle": "Entdecken Sie weitere unterstützenswerte Projekte aus derselben Kategorie",
+    "viewAllInCategory": "Alle anzeigen"
   },
   "SignInDialog": {
     "welcomeTitle": "Welcome to Qurrat Al-Ayun Platform",
