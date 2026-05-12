@@ -433,6 +433,7 @@
     "sharePriceLabel": "Hisse başına fiyat:",
     "sharesLabel": "hisse",
     "sharesPickHint": "Kaç hisse bağışlamak istediğinizi seçin",
+    "sharesPickHintCustom": "Kaç {unit} bağışlamak istediğinizi seçin",
     "donationTotal": "Bağış toplamı",
     "sharesLine": "{count} hisse",
     "enterDonationAmount": "Bağış tutarını girin",

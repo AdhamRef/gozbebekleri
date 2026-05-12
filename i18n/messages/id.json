@@ -433,6 +433,7 @@
     "sharePriceLabel": "Harga per saham:",
     "sharesLabel": "saham",
     "sharesPickHint": "Pilih berapa saham yang ingin Anda sumbangkan",
+    "sharesPickHintCustom": "Pilih berapa {unit} yang ingin Anda sumbangkan",
     "donationTotal": "Total donasi",
     "sharesLine": "{count} saham",
     "enterDonationAmount": "Masukkan jumlah donasi",

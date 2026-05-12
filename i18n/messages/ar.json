@@ -433,6 +433,7 @@
     "sharePriceLabel": "سعر السهم الواحد:",
     "sharesLabel": "سهمًا",
     "sharesPickHint": "اختر عدد الأسهم التي تود التبرع بها",
+    "sharesPickHintCustom": "اختر عدد {unit} التي تود التبرع بها",
     "donationTotal": "إجمالي التبرع",
     "sharesLine": "{count} سهم",
     "enterDonationAmount": "أدخل مبلغ التبرع",

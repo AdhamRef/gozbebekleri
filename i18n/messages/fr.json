@@ -433,6 +433,7 @@
     "sharePriceLabel": "Prix par part :",
     "sharesLabel": "parts",
     "sharesPickHint": "Choisissez combien de parts offrir",
+    "sharesPickHintCustom": "Choisissez combien de {unit} offrir",
     "donationTotal": "Total du don",
     "sharesLine": "{count} parts",
     "enterDonationAmount": "Entrez le montant du don",

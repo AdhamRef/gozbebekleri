@@ -433,6 +433,7 @@
     "sharePriceLabel": "Price per share:",
     "sharesLabel": "shares",
     "sharesPickHint": "Choose how many shares to give",
+    "sharesPickHintCustom": "Choose how many {unit} to give",
     "donationTotal": "Donation total",
     "sharesLine": "{count} shares",
     "enterDonationAmount": "Enter donation amount",

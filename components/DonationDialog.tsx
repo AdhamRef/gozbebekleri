@@ -942,13 +942,9 @@ const DonationDialog = ({
                           ? shareCount * getSharePriceUSDEffective()
                           : convertToUSD(donationAmount, payCurrencyCode());
                       if (!session?.user?.id) {
-                        // Snapshot the campaign's plural unit ("sheep", "meal", …)
-                        // at add-time so the cart preserves it even if the donor
-                        // later changes their UI language.
-                        const shareUnitPlural = shareMode
-                          ? resolveSharePlural(shareLabels ?? null, locale)
-                          : null;
-                        // Guest: add to Zustand only (no DB call — not authenticated)
+                        // Guest: add to Zustand only (no DB call — not authenticated).
+                        // Embed the campaign's shareLabels so the cart can resolve
+                        // the unit name client-side for any language.
                         addItem({
                           id: crypto.randomUUID(),
                           campaignId,
@@ -956,20 +952,20 @@ const DonationDialog = ({
                           amountUSD,
                           currency: getCurrency(),
                           ...(shareMode ? { shareCount } : {}),
-                          ...(shareUnitPlural ? { shareUnitPlural } : {}),
-                          campaign: { id: campaignId, title: campaignTitle, images: [campaignImage] },
+                          campaign: {
+                            id: campaignId,
+                            title: campaignTitle,
+                            images: [campaignImage],
+                            ...(shareLabels ? { shareLabels } : {}),
+                          },
                         });
                       } else {
-                        const shareUnitPlural = shareMode
-                          ? resolveSharePlural(shareLabels ?? null, locale)
-                          : null;
                         const response = await axios.post("/api/cart", {
                           campaignId: campaignId,
                           amount: donationAmount,
                           amountUSD,
                           currency: getCurrency(),
                           ...(shareMode ? { shareCount } : {}),
-                          ...(shareUnitPlural ? { shareUnitPlural } : {}),
                         });
                         addItem(response.data || []);
                       }

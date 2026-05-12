@@ -433,6 +433,7 @@
     "sharePriceLabel": "Precio por acción:",
     "sharesLabel": "acciones",
     "sharesPickHint": "Elige cuántas acciones quieres donar",
+    "sharesPickHintCustom": "Elige cuántas {unit} quieres donar",
     "donationTotal": "Total de la donación",
     "sharesLine": "{count} acciones",
     "enterDonationAmount": "Introduce la cantidad a donar",

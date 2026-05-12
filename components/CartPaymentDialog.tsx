@@ -24,6 +24,7 @@ import { toast } from "react-hot-toast";
 import { useConfettiStore } from "@/hooks/use-confetti-store";
 import { getCurrency } from "@/hooks/useCampaignValue";
 import { useCart } from "@/hooks/useCart";
+import { resolveShareUnit, type ShareLabelsConfig } from "@/lib/campaign/share-labels";
 import { useTracking } from "@/components/TrackingPixels";
 import useConvetToUSD from "@/hooks/useConvetToUSD";
 import { useReferralCode } from "@/hooks/useReferralCode";
@@ -44,13 +45,12 @@ interface CartItem {
   amount: number;
   amountUSD?: number;
   shareCount?: number | null;
-  /** Plural unit label captured at add-time (e.g. "sheep"). Falls back to the
-   *  generic "shares" translation when missing. */
-  shareUnitPlural?: string | null;
   campaign: {
     id: string;
     title: string;
     images: string[];
+    /** Per-campaign custom unit names ("sheep" / "meal" / etc.) keyed by locale. */
+    shareLabels?: ShareLabelsConfig | null;
     translations?: { locale: string; title: string }[];
   };
 }
@@ -783,13 +783,20 @@ const CartPaymentDialog = ({
                   <Image src={item.campaign.images[0]} alt={title} width={80} height={80} className="w-14 h-14 sm:w-20 sm:h-20 rounded-lg object-cover flex-shrink-0 shadow-sm" />
                   <div className={`min-w-0 max-w-48 ${locale === "ar" ? "text-right" : "text-left"}`}>
                     <span className="text-gray-900 font-medium text-sm block line-clamp-3" title={title}>{title}</span>
-                    {item.shareCount != null && item.shareCount > 0 && (
-                      <span className="text-xs text-violet-700 block mt-0.5">
-                        {item.shareUnitPlural
-                          ? `${item.shareCount} ${item.shareUnitPlural}`
-                          : t("sharesLine", { count: item.shareCount })}
-                      </span>
-                    )}
+                    {item.shareCount != null && item.shareCount > 0 && (() => {
+                      const unit = resolveShareUnit(
+                        item.campaign?.shareLabels ?? null,
+                        locale,
+                        item.shareCount
+                      );
+                      return (
+                        <span className="text-xs text-violet-700 block mt-0.5">
+                          {unit
+                            ? `${item.shareCount} ${unit}`
+                            : t("sharesLine", { count: item.shareCount })}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
                 <span className="font-semibold text-gray-900 text-sm flex-shrink-0 whitespace-nowrap" dir="ltr">{item.amount} {getCurrency()}</span>
