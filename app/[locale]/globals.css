@@ -222,3 +222,12 @@ input[type="checkbox"]:checked::before {
   right: 0 !important;
   left: auto !important;
 }
+
+/* Floating CartReminder entrance */
+@keyframes cart-reminder-in {
+  0%   { transform: translateY(16px) scale(0.9); opacity: 0; }
+  100% { transform: translateY(0)    scale(1);   opacity: 1; }
+}
+.cart-reminder-in {
+  animation: cart-reminder-in 220ms ease-out both;
+}

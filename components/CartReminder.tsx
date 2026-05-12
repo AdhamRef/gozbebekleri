@@ -64,47 +64,16 @@ export default function CartReminder() {
       aria-label={label}
       title={label}
       onClick={() => window.dispatchEvent(new CustomEvent(CART_OPEN_EVENT))}
-      className="
-        fixed bottom-4 end-4 z-40
-        inline-flex items-center gap-2
-        h-12 px-4 rounded-full
-        bg-[#025EB8] text-white
-        shadow-lg shadow-[#025EB8]/30
-        hover:bg-[#024a92] hover:shadow-xl hover:scale-[1.03]
-        active:scale-95
-        transition-all duration-200
-        focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#025EB8]
-        animate-cart-reminder-in
-        pointer-events-auto
-      "
-      style={{
-        // Respect iOS safe area without forcing the rule everywhere
-        marginBottom: "env(safe-area-inset-bottom, 0px)",
-      }}
+      style={{ marginBottom: "env(safe-area-inset-bottom, 0px)" }}
+      className="cart-reminder-in fixed bottom-4 end-4 z-40 inline-flex items-center gap-2 h-12 px-4 rounded-full bg-[#025EB8] text-white shadow-lg shadow-[#025EB8]/30 hover:bg-[#024a92] hover:shadow-xl hover:scale-[1.03] active:scale-95 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#025EB8]"
     >
       <ShoppingCart className="w-5 h-5" aria-hidden="true" />
       <span
-        className="min-w-[1.25rem] h-5 px-1 inline-flex items-center justify-center rounded-full bg-white text-[#025EB8] text-xs font-semibold leading-none"
         dir="ltr"
+        className="min-w-[1.25rem] h-5 px-1 inline-flex items-center justify-center rounded-full bg-white text-[#025EB8] text-xs font-semibold leading-none"
       >
         {count > 99 ? "99+" : count}
       </span>
-
-      <style jsx>{`
-        @keyframes cart-reminder-in {
-          0% {
-            transform: translateY(16px) scale(0.9);
-            opacity: 0;
-          }
-          100% {
-            transform: translateY(0) scale(1);
-            opacity: 1;
-          }
-        }
-        :global(.animate-cart-reminder-in) {
-          animation: cart-reminder-in 220ms ease-out both;
-        }
-      `}</style>
     </button>
   );
 }
