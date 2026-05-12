@@ -1812,7 +1812,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               <span className="text-slate-500">—</span>
                             )}
                           </td>
-                          <td className="py-1.5 px-2 align-top">
+                          <td className="py-1.5 px-2 align-middle">
                             {d.referral ? (
                               <Link
                                 href={`/dashboard/referrals/${d.referral.id}`}
@@ -1901,7 +1901,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               <span>
                                 {new Date(d.createdAt).toLocaleDateString("en-US", {
                                   dateStyle: "medium",
-                                  timeZone: "UTC",
+                                  timeZone: "Europe/Istanbul",
                                 })}
                               </span>
                               <span className="text-[10px] text-slate-400" dir="ltr">
@@ -1909,9 +1909,9 @@ export default function MonthlySubscriptionsDashboardPage() {
                                   hour: "2-digit",
                                   minute: "2-digit",
                                   hour12: false,
-                                  timeZone: "UTC",
+                                  timeZone: "Europe/Istanbul",
                                 })}{" "}
-                                UTC
+                                TR
                               </span>
                             </div>
                           </td>

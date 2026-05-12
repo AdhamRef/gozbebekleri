@@ -1005,9 +1005,9 @@ export default function ReferralAnalyticsPage() {
                           </td>
                           <td className="py-1.5 px-2 text-slate-500 whitespace-nowrap">
                             <div className="flex flex-col leading-tight">
-                              <span>{new Date(d.createdAt).toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "UTC" })}</span>
+                              <span>{new Date(d.createdAt).toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "Europe/Istanbul" })}</span>
                               <span className="text-[10px] text-slate-400" dir="ltr">
-                                {new Date(d.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" })} UTC
+                                {new Date(d.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Istanbul" })} TR
                               </span>
                             </div>
                           </td>
