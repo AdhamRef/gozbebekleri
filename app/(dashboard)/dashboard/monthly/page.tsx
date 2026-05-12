@@ -1697,16 +1697,13 @@ export default function MonthlySubscriptionsDashboardPage() {
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
                         دعم الفريق
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
-                        مشاركة الرسوم
-                      </th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
                         الإحالة
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[140px]">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[120px]">
                         الإعلان
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[160px]">
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[110px]">
                         المشروع / الفئة
                       </th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
@@ -1717,19 +1714,19 @@ export default function MonthlySubscriptionsDashboardPage() {
                   <tbody>
                     {donationsLoading && donations.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="py-12 text-center">
+                        <td colSpan={10} className="py-12 text-center">
                           <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" />
                         </td>
                       </tr>
                     ) : !donationsFetchedOnce ? (
                       <tr>
-                        <td colSpan={11} className="py-12 text-center text-slate-500">
+                        <td colSpan={10} className="py-12 text-center text-slate-500">
                           جاري التحميل...
                         </td>
                       </tr>
                     ) : donations.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="py-12 text-center text-slate-500">
+                        <td colSpan={10} className="py-12 text-center text-slate-500">
                           لا توجد تبرعات تطابق التصفية
                         </td>
                       </tr>
@@ -1815,15 +1812,6 @@ export default function MonthlySubscriptionsDashboardPage() {
                               <span className="text-slate-500">—</span>
                             )}
                           </td>
-                          <td className="py-1.5 px-2 font-medium text-slate-800" dir="rtl">
-                            {(d.fees ?? 0) > 0 ? (
-                              <span dir="ltr">
-                                {formatMoney(d.fees ?? 0, d.currency, (d.totalAmount && (d.amountUSD != null)) ? ((d.fees ?? 0) / d.totalAmount) * d.amountUSD : undefined)}
-                              </span>
-                            ) : (
-                              <span className="text-slate-500">—</span>
-                            )}
-                          </td>
                           <td className="py-1.5 px-2 align-top">
                             {d.referral ? (
                               <Link
@@ -1836,7 +1824,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               <span className="text-slate-400">—</span>
                             )}
                           </td>
-                          <td className="py-1.5 px-2 align-middle max-w-[140px]">
+                          <td className="py-1.5 px-2 align-middle max-w-[120px]">
                             {(() => {
                               const attr = (d.attribution ?? {}) as Record<string, unknown>;
                               const campaign = typeof attr.utm_campaign === "string" ? attr.utm_campaign : "";
@@ -1848,21 +1836,21 @@ export default function MonthlySubscriptionsDashboardPage() {
                                   type="button"
                                   onClick={() => openDonationDetails("attribution", d)}
                                   title={campaign || "عرض تفاصيل الإسناد الإعلاني"}
-                                  className="block max-w-[140px] truncate text-right text-slate-700 hover:text-[#025EB8] hover:underline cursor-pointer"
+                                  className="block max-w-[120px] truncate text-right text-slate-700 hover:text-[#025EB8] hover:underline cursor-pointer"
                                 >
                                   {campaign || "تفاصيل الإسناد"}
                                 </button>
                               );
                             })()}
                           </td>
-                          <td className="py-1.5 px-2 text-slate-600 max-w-[160px]">
+                          <td className="py-1.5 px-2 text-slate-600 max-w-[110px]">
                             {d.campaigns?.length > 0 ? (
                               (() => {
                                 const first = d.campaigns[0];
                                 const more = d.campaigns.length - 1;
                                 const fullList = d.campaigns.map((c) => c.title).join(", ");
                                 return (
-                                  <div className="flex items-center gap-1 max-w-[160px]">
+                                  <div className="flex items-center gap-1 max-w-[110px]">
                                     <Link
                                       href={`/${locale}/campaign/${first.id}`}
                                       target="_blank"
@@ -1886,7 +1874,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                                 const more = d.categories.length - 1;
                                 const fullList = "فئة: " + d.categories.map((c) => c.name).join(", ");
                                 return (
-                                  <div className="flex items-center gap-1 max-w-[160px]">
+                                  <div className="flex items-center gap-1 max-w-[110px]">
                                     <Link
                                       href={`/${locale}/category/${first.id}`}
                                       target="_blank"

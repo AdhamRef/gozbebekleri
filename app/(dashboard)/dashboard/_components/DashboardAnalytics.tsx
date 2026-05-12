@@ -1416,7 +1416,7 @@ export default function DashboardPage() {
                         دعم الفريق
                       </th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
-                        مشاركة الرسوم
+                      الرسوم
                       </th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
                         النوع

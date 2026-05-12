@@ -875,27 +875,26 @@ export default function ReferralAnalyticsPage() {
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">التبرع</th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700">الحالة</th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">دعم الفريق</th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">مشاركة الرسوم</th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700">النوع</th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[140px]">الإعلان</th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[160px]">المشروع / الفئة</th>
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[120px]">الإعلان</th>
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[110px]">المشروع / الفئة</th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">التاريخ</th>
                     </tr>
                   </thead>
                   <tbody>
                     {donationsLoading && donations.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="py-12 text-center">
+                        <td colSpan={9} className="py-12 text-center">
                           <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" />
                         </td>
                       </tr>
                     ) : !donationsFetchedOnce ? (
                       <tr>
-                        <td colSpan={10} className="py-12 text-center text-slate-500">جاري التحميل...</td>
+                        <td colSpan={9} className="py-12 text-center text-slate-500">جاري التحميل...</td>
                       </tr>
                     ) : donations.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="py-12 text-center text-slate-500">لا توجد تبرعات تطابق التصفية</td>
+                        <td colSpan={9} className="py-12 text-center text-slate-500">لا توجد تبرعات تطابق التصفية</td>
                       </tr>
                     ) : (
                       donations.map((d) => (
@@ -949,15 +948,12 @@ export default function ReferralAnalyticsPage() {
                           <td className="py-1.5 px-2 font-medium text-slate-800" dir="ltr">
                             {(d.teamSupport ?? 0) > 0 ? <span dir="ltr">{formatMoney(d.teamSupport ?? 0, d.currency, (d.totalAmount && (d.amountUSD != null)) ? ((d.teamSupport ?? 0) / d.totalAmount) * d.amountUSD : undefined)}</span> : <span className="text-slate-500">—</span>}
                           </td>
-                          <td className="py-1.5 px-2 font-medium text-slate-800" dir="ltr">
-                            {(d.fees ?? 0) > 0 ? <span dir="ltr">{formatMoney(d.fees ?? 0, d.currency, (d.totalAmount && (d.amountUSD != null)) ? ((d.fees ?? 0) / d.totalAmount) * d.amountUSD : undefined)}</span> : <span className="text-slate-500">—</span>}
-                          </td>
                           <td className="py-1.5 px-2">
                             <span className={cn("inline-block px-1.5 py-px rounded-full text-[11px]", d.type === "MONTHLY" ? "bg-[#025EB8] text-white" : "bg-slate-100 text-slate-600")}>
                               {d.type === "MONTHLY" ? "شهري" : "مرة واحدة"}
                             </span>
                           </td>
-                          <td className="py-1.5 px-2 align-middle max-w-[140px]">
+                          <td className="py-1.5 px-2 align-middle max-w-[120px]">
                             {(() => {
                               const attr = (d.attribution ?? {}) as Record<string, unknown>;
                               const campaign = typeof attr.utm_campaign === "string" ? attr.utm_campaign : "";
@@ -969,21 +965,21 @@ export default function ReferralAnalyticsPage() {
                                   type="button"
                                   onClick={() => openDonationDetails("attribution", d)}
                                   title={campaign || "عرض تفاصيل الإسناد الإعلاني"}
-                                  className="block max-w-[140px] truncate text-right text-slate-700 hover:text-[#025EB8] hover:underline cursor-pointer"
+                                  className="block max-w-[120px] truncate text-right text-slate-700 hover:text-[#025EB8] hover:underline cursor-pointer"
                                 >
                                   {campaign || "تفاصيل الإسناد"}
                                 </button>
                               );
                             })()}
                           </td>
-                          <td className="py-1.5 px-2 text-slate-600 max-w-[160px]">
+                          <td className="py-1.5 px-2 text-slate-600 max-w-[110px]">
                             {d.campaigns?.length > 0 ? (
                               (() => {
                                 const first = d.campaigns[0];
                                 const more = d.campaigns.length - 1;
                                 const fullList = d.campaigns.map((c) => c.title).join(", ");
                                 return (
-                                  <div className="flex items-center gap-1 max-w-[160px]">
+                                  <div className="flex items-center gap-1 max-w-[110px]">
                                     <Link href={`/${locale}/campaign/${first.id}`} target="_blank" rel="noopener noreferrer" title={fullList} className="truncate text-slate-700 hover:text-[#025EB8] hover:underline">
                                       {first.title}
                                     </Link>
@@ -997,7 +993,7 @@ export default function ReferralAnalyticsPage() {
                                 const more = d.categories.length - 1;
                                 const fullList = "فئة: " + d.categories.map((c) => c.name).join(", ");
                                 return (
-                                  <div className="flex items-center gap-1 max-w-[160px]">
+                                  <div className="flex items-center gap-1 max-w-[110px]">
                                     <Link href={`/${locale}/category/${first.id}`} target="_blank" rel="noopener noreferrer" title={fullList} className="truncate text-slate-700 hover:text-[#025EB8] hover:underline">
                                       فئة: {first.name}
                                     </Link>
