@@ -111,6 +111,7 @@ interface DonationRow {
   fees: number;
   type: string;
   status: string;
+  paidAt?: string | null;
   provider?: string | null;
   providerErrorMessage?: string | null;
   createdAt: string;
@@ -1840,14 +1841,21 @@ export default function DashboardPage() {
                             <span
                               className={cn(
                                 "inline-block px-1.5 py-px rounded-full text-[11px] font-medium",
-                                d.status === "PAID"
+                                d.status === "PAID" && d.paidAt
                                   ? "bg-green-100 text-green-700"
                                   : d.status === "FAILED"
                                   ? "bg-red-100 text-red-700"
                                   : "bg-amber-100 text-amber-700"
                               )}
+                              title={d.status === "PAID" && !d.paidAt ? "تم بدء الدفع ولم يؤكده مزود الدفع بعد — لا يُحتسب في الإيرادات" : undefined}
                             >
-                              {d.status === "PAID" ? "ناجح" : d.status === "FAILED" ? "فاشل" : "معلق"}
+                              {d.status === "PAID"
+                                ? d.paidAt
+                                  ? "ناجح"
+                                  : "قيد التأكيد"
+                                : d.status === "FAILED"
+                                ? "فاشل"
+                                : "معلق"}
                             </span>
                             {d.status === "FAILED" && d.providerErrorMessage && (
                               <p className="text-[10px] text-red-500 mt-0.5 max-w-[140px] leading-tight" title={d.providerErrorMessage}>
@@ -1933,6 +1941,7 @@ export default function DashboardPage() {
                               <span>
                                 {new Date(d.createdAt).toLocaleDateString("en-US", {
                                   dateStyle: "medium",
+                                  timeZone: "UTC",
                                 })}
                               </span>
                               <span className="text-[10px] text-slate-400" dir="ltr">
@@ -1940,7 +1949,9 @@ export default function DashboardPage() {
                                   hour: "2-digit",
                                   minute: "2-digit",
                                   hour12: false,
-                                })}
+                                  timeZone: "UTC",
+                                })}{" "}
+                                UTC
                               </span>
                             </div>
                           </td>

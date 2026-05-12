@@ -3,6 +3,7 @@ import { LOCALE_SEO, OG_LOCALE_MAP, OG_IMAGE, SITE_URL, buildHreflang } from "@/
 import type { Locale } from "@/lib/seo";
 import { Suspense } from "react";
 import Navbar from "@/components/Navbar";
+import CartReminder from "@/components/CartReminder";
 import { CurrencyFromUrlSync } from "@/components/CurrencyFromUrlSync";
 import IntlProviderClient from "./IntlProviderClient";
 import ar from "../../i18n/messages/ar.json";
@@ -101,6 +102,7 @@ export default async function Rootlayout({
               {children}
             </main>
             <Footer />
+            <CartReminder />
             <ConfettiProvider />
             <Toaster position="top-center" />
           </SessionProvider>

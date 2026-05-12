@@ -25,6 +25,7 @@ import axios from "axios";
 import { useSession, signOut } from "next-auth/react";
 import CartSheet from "../components/CartSheet";
 import { useCart } from "@/hooks/useCart";
+import { CART_OPEN_EVENT, CART_CHANGED_EVENT } from "@/components/CartReminder";
 import CurrencySelector from "./CurrencySelector";
 import LanguageSwitcher from "./LanguageSelector";
 import SignInDialog from "@/components/SignInDialog";
@@ -130,11 +131,13 @@ const Navbar = () => {
   const handleRemoveItem = async (id: string) => {
     if (!session?.user) {
       zustandRemoveItem(id);
+      window.dispatchEvent(new CustomEvent(CART_CHANGED_EVENT));
       return;
     }
     try {
       await axios.delete(`/api/cart/${id}`);
       setCartItems((prev) => prev.filter((item) => item.id !== id));
+      window.dispatchEvent(new CustomEvent(CART_CHANGED_EVENT));
     } catch {}
   };
 
@@ -173,6 +176,14 @@ const Navbar = () => {
       setIsSignInOpen(true);
     }
   };
+
+  // Floating CartReminder asks Navbar to open the cart sheet via this event.
+  useEffect(() => {
+    const onOpen = () => openCart();
+    window.addEventListener(CART_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(CART_OPEN_EVENT, onOpen);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user, zustandItems.length, pathname]);
 
   const navLinks = [
     { href: "/about-us", label: t("about") },
