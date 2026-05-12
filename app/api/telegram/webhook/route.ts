@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTelegramConfig } from "@/lib/telegram/config";
 import { dispatchTelegramCommand } from "@/lib/telegram/commands";
 
+// Bump the Node serverless time budget so cold-start + Prisma connect + a few
+// DB queries + sendMessage all fit. Vercel Hobby caps to 10s regardless;
+// Pro/Enterprise honors this. Telegram's webhook delivery timeout is 60s.
+export const maxDuration = 60;
+
 /**
  * Telegram webhook receiver.
  *
@@ -10,9 +15,25 @@ import { dispatchTelegramCommand } from "@/lib/telegram/commands";
  * compare it before doing anything — that's how we know the caller is really
  * Telegram (and not a random script that found this URL).
  *
- * Behavior: always returns 200 fast. The bot work runs after we ack so a slow
- * DB query never causes Telegram to retry-storm.
+ * Reliability: on Vercel/serverless, work scheduled with `void promise.then()`
+ * after the response is sent gets terminated when the function exits — so
+ * fire-and-forget would intermittently never run. We `await` the dispatcher
+ * before responding. Telegram tolerates up to 60s per webhook delivery; our
+ * commands complete well under that, even cold. The whole handler is wrapped
+ * in a hard 45s safety timeout so we never trip Telegram's retry.
  */
+const MAX_HANDLER_MS = 45_000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`${label} exceeded ${ms}ms`)), ms);
+    p.then(
+      (v) => { clearTimeout(t); resolve(v); },
+      (e) => { clearTimeout(t); reject(e); }
+    );
+  });
+}
+
 export async function POST(req: NextRequest) {
   const cfg = getTelegramConfig();
   if (!cfg) {
@@ -53,16 +74,29 @@ export async function POST(req: NextRequest) {
 
   if (!chat?.id || !text) return NextResponse.json({ ok: true });
 
-  // Fire-and-forget: do not await. Telegram only retries on non-2xx.
-  void dispatchTelegramCommand({
-    chatId: chat.id,
-    fromChatId: chat.id,
-    text,
-    entities,
-    messageId,
-  }).catch((err) => {
-    console.error("[telegram webhook] dispatch threw:", err, "from user:", from?.id);
-  });
+  const started = Date.now();
+  try {
+    await withTimeout(
+      dispatchTelegramCommand({
+        chatId: chat.id,
+        fromChatId: chat.id,
+        text,
+        entities,
+        messageId,
+      }),
+      MAX_HANDLER_MS,
+      "dispatch"
+    );
+    const ms = Date.now() - started;
+    if (ms > 5000) {
+      console.warn(`[telegram webhook] slow command (${ms}ms) text=${text.slice(0, 40)} from=${from?.id}`);
+    }
+  } catch (err) {
+    // Caught here means the dispatcher threw or hit the 45s safety timeout.
+    // We still respond 200 so Telegram doesn't retry-storm us — the command
+    // is just considered lost for this delivery.
+    console.error(`[telegram webhook] dispatch failed after ${Date.now() - started}ms:`, err, "text:", text.slice(0, 80), "from:", from?.id);
+  }
 
   return NextResponse.json({ ok: true });
 }
