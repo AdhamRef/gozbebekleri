@@ -19,7 +19,6 @@ import {
   PieChart as PieChartIcon,
   Search,
   ChevronDown,
-  Megaphone,
 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 import {
@@ -946,16 +945,6 @@ export default function ReferralAnalyticsPage() {
                                   : "معلق"}
                               </span>
                             )}
-                            {d.status === "FAILED" && d.providerErrorMessage && (
-                              <button
-                                type="button"
-                                onClick={() => openDonationDetails("error", d)}
-                                className="block text-[10px] text-red-500 mt-0.5 max-w-[140px] leading-tight text-right hover:text-red-700 hover:underline cursor-pointer"
-                                title="عرض الرسالة الكاملة"
-                              >
-                                {d.providerErrorMessage.length > 50 ? d.providerErrorMessage.slice(0, 50) + "…" : d.providerErrorMessage}
-                              </button>
-                            )}
                           </td>
                           <td className="py-1.5 px-2 font-medium text-slate-800" dir="ltr">
                             {(d.teamSupport ?? 0) > 0 ? <span dir="ltr">{formatMoney(d.teamSupport ?? 0, d.currency, (d.totalAmount && (d.amountUSD != null)) ? ((d.teamSupport ?? 0) / d.totalAmount) * d.amountUSD : undefined)}</span> : <span className="text-slate-500">—</span>}
@@ -980,18 +969,43 @@ export default function ReferralAnalyticsPage() {
                                   type="button"
                                   onClick={() => openDonationDetails("attribution", d)}
                                   title={campaign || "عرض تفاصيل الإسناد الإعلاني"}
-                                  className="inline-flex items-center gap-1 max-w-full px-1.5 py-0.5 rounded-full bg-[#FA5D17]/10 text-[#FA5D17] text-[11px] font-medium hover:bg-[#FA5D17]/20 transition-colors cursor-pointer"
+                                  className="block max-w-[140px] truncate text-right text-slate-700 hover:text-[#025EB8] hover:underline cursor-pointer"
                                 >
-                                  <Megaphone className="w-3 h-3 shrink-0" />
-                                  <span className="truncate max-w-[110px]">
-                                    {campaign || "تفاصيل"}
-                                  </span>
+                                  {campaign || "تفاصيل الإسناد"}
                                 </button>
                               );
                             })()}
                           </td>
                           <td className="py-1.5 px-2 text-slate-600 max-w-[160px]">
-                            {d.campaigns?.length > 0 ? <span>{d.campaigns.map((c) => c.title).join(", ")}</span> : d.categories?.length > 0 ? <span>فئة: {d.categories.map((c) => c.name).join(", ")}</span> : "—"}
+                            {d.campaigns?.length > 0 ? (
+                              (() => {
+                                const first = d.campaigns[0];
+                                const more = d.campaigns.length - 1;
+                                const fullList = d.campaigns.map((c) => c.title).join(", ");
+                                return (
+                                  <div className="flex items-center gap-1 max-w-[160px]">
+                                    <Link href={`/${locale}/campaign/${first.id}`} target="_blank" rel="noopener noreferrer" title={fullList} className="truncate text-slate-700 hover:text-[#025EB8] hover:underline">
+                                      {first.title}
+                                    </Link>
+                                    {more > 0 && <span className="shrink-0 text-[10px] text-slate-400" title={fullList}>+{more}</span>}
+                                  </div>
+                                );
+                              })()
+                            ) : d.categories?.length > 0 ? (
+                              (() => {
+                                const first = d.categories[0];
+                                const more = d.categories.length - 1;
+                                const fullList = "فئة: " + d.categories.map((c) => c.name).join(", ");
+                                return (
+                                  <div className="flex items-center gap-1 max-w-[160px]">
+                                    <Link href={`/${locale}/category/${first.id}`} target="_blank" rel="noopener noreferrer" title={fullList} className="truncate text-slate-700 hover:text-[#025EB8] hover:underline">
+                                      فئة: {first.name}
+                                    </Link>
+                                    {more > 0 && <span className="shrink-0 text-[10px] text-slate-400" title={fullList}>+{more}</span>}
+                                  </div>
+                                );
+                              })()
+                            ) : "—"}
                           </td>
                           <td className="py-1.5 px-2 text-slate-500 whitespace-nowrap">
                             <div className="flex flex-col leading-tight">
