@@ -706,6 +706,7 @@ const IntegratedCampaignPage = ({ id, locale: propLocale }: { id: string; locale
                 currentCampaignId={campaign.id}
                 categoryName={getLocalizedProperty(campaign.category, "name")}
                 categorySlug={campaign.category.slug ?? campaign.category.id}
+                categoryIcon={campaign.category.icon}
               />
             </div>
           )}

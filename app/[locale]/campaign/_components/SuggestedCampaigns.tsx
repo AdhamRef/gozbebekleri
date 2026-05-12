@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { Sparkles, ArrowRight, ArrowLeft } from "lucide-react";
+import { ArrowRight, ArrowLeft } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import CampaignCard, { type CampaignCardData } from "@/app/[locale]/_components/CampaignCard";
+import CategoryIcon from "@/components/CategoryIcon";
 
 interface SuggestedCampaignsProps {
   /** Category id (or slug) used by `/api/categories/[id]/campaigns`. */
@@ -16,6 +17,8 @@ interface SuggestedCampaignsProps {
   categoryName?: string;
   /** Slug for the /category/[slug] link target; falls back to id. */
   categorySlug?: string | null;
+  /** Lucide icon key stored on the category (see CategoryIcon). Falls back to Heart. */
+  categoryIcon?: string | null;
   /** Override how many cards to show. Defaults to 8 — the responsive grid trims naturally. */
   limit?: number;
 }
@@ -43,6 +46,7 @@ export default function SuggestedCampaigns({
   currentCampaignId,
   categoryName,
   categorySlug,
+  categoryIcon,
   limit = 8,
 }: SuggestedCampaignsProps) {
   const locale = useLocale() as string;
@@ -111,7 +115,7 @@ export default function SuggestedCampaigns({
       <div className="flex items-start sm:items-center justify-between gap-4 mb-5 sm:mb-6 flex-col sm:flex-row">
         <div className="flex items-start gap-3 min-w-0">
           <div className="shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#FA5D17] to-[#ff8c55] text-white flex items-center justify-center shadow-sm shadow-[#FA5D17]/30">
-            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+            <CategoryIcon name={categoryIcon} className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
           <div className="min-w-0">
             <h2
