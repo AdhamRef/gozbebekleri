@@ -43,6 +43,13 @@ export async function POST(req: NextRequest) {
   const from = message.from as { id?: number | string } | undefined;
   const text = typeof message.text === "string" ? message.text : "";
   const messageId = typeof message.message_id === "number" ? message.message_id : undefined;
+  // Telegram annotates commands with bot_command entities. Forward them so the
+  // dispatcher can recognise commands even when the text has invisible RTL/BOM
+  // characters that break a naive `text.startsWith("/")` check (common on
+  // Arabic mobile keyboards).
+  const entities = Array.isArray(message.entities)
+    ? (message.entities as Array<{ type?: string; offset?: number; length?: number }>)
+    : null;
 
   if (!chat?.id || !text) return NextResponse.json({ ok: true });
 
@@ -51,6 +58,7 @@ export async function POST(req: NextRequest) {
     chatId: chat.id,
     fromChatId: chat.id,
     text,
+    entities,
     messageId,
   }).catch((err) => {
     console.error("[telegram webhook] dispatch threw:", err, "from user:", from?.id);

@@ -259,11 +259,39 @@ interface ParsedCommand {
   arg: string;
 }
 
-function parseCommand(text: string): ParsedCommand | null {
-  const trimmed = text.trim();
-  if (!trimmed.startsWith("/")) return null;
-  // Telegram appends @botusername to commands in groups — strip it.
-  const m = trimmed.match(/^\/(\w+)(?:@\w+)?(?:\s+([\s\S]+))?$/);
+/** BOM, zero-width, directional and isolate marks. Arabic/Persian mobile
+ *  keyboards inject these before Latin chars so a naive `text.startsWith("/")`
+ *  fails on visually-correct input. */
+const INVISIBLE_CHARS_RE = /[​-‏‪-‮⁦-⁩﻿]/g;
+
+function parseCommand(
+  text: string,
+  entities?: Array<{ type?: string; offset?: number; length?: number }> | null
+): ParsedCommand | null {
+  // 1) Trust Telegram. When the client recognises a `/foo` it tags it as a
+  //    bot_command entity, with offset/length pointing at the slash + name in
+  //    the raw text. Use that first — it's authoritative and immune to weird
+  //    invisible characters the user's keyboard might have injected.
+  if (entities && entities.length > 0) {
+    const cmdEntity = entities.find((e) => e.type === "bot_command");
+    if (cmdEntity && typeof cmdEntity.offset === "number" && typeof cmdEntity.length === "number") {
+      const raw = text.slice(cmdEntity.offset, cmdEntity.offset + cmdEntity.length);
+      // raw is e.g. "/help" or "/help@botname"
+      const m = raw.match(/^\/(\w+)(?:@\w+)?$/);
+      if (m) {
+        const arg = text
+          .slice(cmdEntity.offset + cmdEntity.length)
+          .replace(INVISIBLE_CHARS_RE, "")
+          .trim();
+        return { cmd: m[1].toLowerCase(), arg };
+      }
+    }
+  }
+
+  // 2) Fallback to text parsing — strip invisible chars before checking.
+  const cleaned = text.replace(INVISIBLE_CHARS_RE, "").trim();
+  if (!cleaned.startsWith("/")) return null;
+  const m = cleaned.match(/^\/(\w+)(?:@\w+)?(?:\s+([\s\S]+))?$/);
   if (!m) return null;
   return { cmd: m[1].toLowerCase(), arg: (m[2] ?? "").trim() };
 }
@@ -276,6 +304,7 @@ export async function dispatchTelegramCommand(input: {
   chatId: string | number;
   fromChatId: string | number;
   text: string;
+  entities?: Array<{ type?: string; offset?: number; length?: number }> | null;
   messageId?: number;
 }): Promise<void> {
   const cfg = getTelegramConfig();
@@ -289,7 +318,7 @@ export async function dispatchTelegramCommand(input: {
 
   const ctx: CommandContext = { chatId: input.chatId, replyToMessageId: input.messageId };
 
-  const parsed = parseCommand(input.text);
+  const parsed = parseCommand(input.text, input.entities);
   if (!parsed) {
     await reply(ctx, "🤖 لم أفهم. أرسل <code>/help</code> لعرض الأوامر المتاحة.");
     return;
