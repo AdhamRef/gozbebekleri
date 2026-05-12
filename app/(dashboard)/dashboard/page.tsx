@@ -69,6 +69,8 @@ import {
   DashboardPieLegendByValue,
 } from "@/components/dashboard/DashboardPieLegend";
 import { useViewUserProfile } from "@/context/ViewUserProfileContext";
+import DonationDetailsDialog, { type DonationDetailsTarget } from "@/components/dashboard/DonationDetailsDialog";
+import { Megaphone } from "lucide-react";
 
 interface ChartDataPoint {
   date: string;
@@ -113,7 +115,10 @@ interface DonationRow {
   status: string;
   paidAt?: string | null;
   provider?: string | null;
+  providerOrderId?: string | null;
   providerErrorMessage?: string | null;
+  paymentMethod?: string | null;
+  attribution?: Record<string, unknown> | null;
   createdAt: string;
   donor: { id: string; name: string | null; email: string };
   donorCountryCode?: string | null;
@@ -314,6 +319,25 @@ export default function DashboardPage() {
   const [donationsLoading, setDonationsLoading] = useState(false);
   const [donationsFetchedOnce, setDonationsFetchedOnce] = useState(false);
   const [searchCampaign, setSearchCampaign] = useState("");
+  const [donationDetails, setDonationDetails] = useState<{
+    open: boolean;
+    mode: "attribution" | "payment" | "error";
+    donation: DonationDetailsTarget | null;
+  }>({ open: false, mode: "attribution", donation: null });
+  const openDonationDetails = (mode: "attribution" | "payment" | "error", d: DonationRow) => {
+    setDonationDetails({
+      open: true,
+      mode,
+      donation: {
+        id: d.id,
+        provider: d.provider ?? null,
+        providerOrderId: d.providerOrderId ?? null,
+        providerErrorMessage: d.providerErrorMessage ?? null,
+        paymentMethod: d.paymentMethod ?? null,
+        attribution: d.attribution ?? null,
+      },
+    });
+  };
 
   const chartFilterPeriodLabelAr = useMemo(
     () => getDashboardChartPeriodLabelAr(chartPeriod, dateFrom, dateTo),
@@ -1780,6 +1804,9 @@ export default function DashboardPage() {
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
                         الإحالة
                       </th>
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[140px]">
+                        الإعلان
+                      </th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[160px]">
                         المشروع / الفئة
                       </th>
@@ -1791,19 +1818,19 @@ export default function DashboardPage() {
                   <tbody>
                     {donationsLoading && donations.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="py-12 text-center">
+                        <td colSpan={12} className="py-12 text-center">
                           <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" />
                         </td>
                       </tr>
                     ) : !donationsFetchedOnce ? (
                       <tr>
-                        <td colSpan={11} className="py-12 text-center text-slate-500">
+                        <td colSpan={12} className="py-12 text-center text-slate-500">
                           جاري التحميل...
                         </td>
                       </tr>
                     ) : donations.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="py-12 text-center text-slate-500">
+                        <td colSpan={12} className="py-12 text-center text-slate-500">
                           لا توجد تبرعات تطابق التصفية
                         </td>
                       </tr>
@@ -1838,45 +1865,66 @@ export default function DashboardPage() {
                             </span>
                           </td>
                           <td className="py-1.5 px-2">
-                            <span
-                              className={cn(
-                                "inline-block px-1.5 py-px rounded-full text-[11px] font-medium",
-                                d.status === "PAID" && d.paidAt
-                                  ? "bg-green-100 text-green-700"
-                                  : d.status === "FAILED"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-amber-100 text-amber-700"
-                              )}
-                              title={d.status === "PAID" && !d.paidAt ? "تم بدء الدفع ولم يؤكده مزود الدفع بعد — لا يُحتسب في الإيرادات" : undefined}
-                            >
-                              {d.status === "PAID"
-                                ? d.paidAt
-                                  ? "ناجح"
-                                  : "قيد التأكيد"
-                                : d.status === "FAILED"
-                                ? "فاشل"
-                                : "معلق"}
-                            </span>
+                            {d.status === "FAILED" ? (
+                              <button
+                                type="button"
+                                onClick={() => openDonationDetails("error", d)}
+                                className="inline-block px-1.5 py-px rounded-full text-[11px] font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors cursor-pointer"
+                                title="عرض رسالة الخطأ من بوابة الدفع"
+                              >
+                                فاشل
+                              </button>
+                            ) : (
+                              <span
+                                className={cn(
+                                  "inline-block px-1.5 py-px rounded-full text-[11px] font-medium",
+                                  d.status === "PAID" && d.paidAt
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-amber-100 text-amber-700"
+                                )}
+                                title={d.status === "PAID" && !d.paidAt ? "تم بدء الدفع ولم يؤكده مزود الدفع بعد — لا يُحتسب في الإيرادات" : undefined}
+                              >
+                                {d.status === "PAID"
+                                  ? d.paidAt
+                                    ? "ناجح"
+                                    : "قيد التأكيد"
+                                  : "معلق"}
+                              </span>
+                            )}
                             {d.status === "FAILED" && d.providerErrorMessage && (
-                              <p className="text-[10px] text-red-500 mt-0.5 max-w-[140px] leading-tight" title={d.providerErrorMessage}>
+                              <button
+                                type="button"
+                                onClick={() => openDonationDetails("error", d)}
+                                className="block text-[10px] text-red-500 mt-0.5 max-w-[140px] leading-tight text-right hover:text-red-700 hover:underline cursor-pointer"
+                                title="عرض الرسالة الكاملة"
+                              >
                                 {d.providerErrorMessage.length > 50 ? d.providerErrorMessage.slice(0, 50) + "…" : d.providerErrorMessage}
-                              </p>
+                              </button>
                             )}
                           </td>
                           <td className="py-1.5 px-2">
-                            {d.provider === "STRIPE" ? (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-[#635bff]/10 text-[#635bff]">
-                                Stripe
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
-                              </span>
-                            ) : d.provider === "PAYFOR" ? (
-                              <span className="inline-flex items-center">
-                                <img
-                                  src="/ziraat.jpg"
-                                  alt="PayFor"
-                                  className="h-8 w-auto max-w-[72px] object-contain rounded"
-                                />
-                              </span>
+                            {d.provider === "STRIPE" || d.provider === "PAYFOR" ? (
+                              <button
+                                type="button"
+                                onClick={() => openDonationDetails("payment", d)}
+                                className="inline-flex items-center rounded hover:opacity-80 hover:scale-[1.03] active:scale-95 transition-all"
+                                title="عرض تفاصيل بوابة الدفع"
+                              >
+                                {d.provider === "STRIPE" ? (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-[#635bff]/10 text-[#635bff]">
+                                    Stripe
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center">
+                                    <img
+                                      src="/ziraat.jpg"
+                                      alt="PayFor"
+                                      className="h-8 w-auto max-w-[72px] object-contain rounded"
+                                    />
+                                  </span>
+                                )}
+                              </button>
                             ) : (
                               <span className="text-slate-400 text-xs">—</span>
                             )}
@@ -1922,6 +1970,28 @@ export default function DashboardPage() {
                             ) : (
                               <span className="text-slate-400">—</span>
                             )}
+                          </td>
+                          <td className="py-1.5 px-2 align-middle max-w-[140px]">
+                            {(() => {
+                              const attr = (d.attribution ?? {}) as Record<string, unknown>;
+                              const campaign = typeof attr.utm_campaign === "string" ? attr.utm_campaign : "";
+                              if (!campaign && Object.keys(attr).length === 0) {
+                                return <span className="text-slate-400">—</span>;
+                              }
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => openDonationDetails("attribution", d)}
+                                  title={campaign || "عرض تفاصيل الإسناد الإعلاني"}
+                                  className="inline-flex items-center gap-1 max-w-full px-1.5 py-0.5 rounded-full bg-[#FA5D17]/10 text-[#FA5D17] text-[11px] font-medium hover:bg-[#FA5D17]/20 transition-colors cursor-pointer"
+                                >
+                                  <Megaphone className="w-3 h-3 shrink-0" />
+                                  <span className="truncate max-w-[110px]">
+                                    {campaign || "تفاصيل"}
+                                  </span>
+                                </button>
+                              );
+                            })()}
                           </td>
                           <td className="py-1.5 px-2 text-slate-600 max-w-[160px]">
                             {d.campaigns?.length > 0 ? (
@@ -1987,6 +2057,12 @@ export default function DashboardPage() {
           </Card>
         </section>
       </div>
+      <DonationDetailsDialog
+        open={donationDetails.open}
+        onOpenChange={(o) => setDonationDetails((s) => ({ ...s, open: o }))}
+        mode={donationDetails.mode}
+        donation={donationDetails.donation}
+      />
     </div>
   );
 }

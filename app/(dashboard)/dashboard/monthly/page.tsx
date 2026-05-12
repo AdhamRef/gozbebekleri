@@ -20,6 +20,7 @@ import {
   HandCoins,
   Percent,
   LayoutList,
+  Megaphone,
 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 import {
@@ -60,6 +61,7 @@ import { DonationTableCountryColumn } from "@/components/dashboard/DonationTable
 import { getCountryDisplayNameFromCode } from "@/lib/dashboard/country-display-name";
 import { DashboardPieLegendByValue } from "@/components/dashboard/DashboardPieLegend";
 import { useViewUserProfile } from "@/context/ViewUserProfileContext";
+import DonationDetailsDialog, { type DonationDetailsTarget } from "@/components/dashboard/DonationDetailsDialog";
 
 interface ChartDataPoint {
   date: string;
@@ -102,7 +104,10 @@ interface DonationRow {
   status: string;
   paidAt?: string | null;
   provider?: string | null;
+  providerOrderId?: string | null;
   providerErrorMessage?: string | null;
+  paymentMethod?: string | null;
+  attribution?: Record<string, unknown> | null;
   createdAt: string;
   donor: { id: string; name: string | null; email: string };
   donorCountryCode?: string | null;
@@ -275,6 +280,25 @@ export default function MonthlySubscriptionsDashboardPage() {
   const [donationsLoading, setDonationsLoading] = useState(false);
   const [donationsFetchedOnce, setDonationsFetchedOnce] = useState(false);
   const [searchCampaign, setSearchCampaign] = useState("");
+  const [donationDetails, setDonationDetails] = useState<{
+    open: boolean;
+    mode: "attribution" | "payment" | "error";
+    donation: DonationDetailsTarget | null;
+  }>({ open: false, mode: "attribution", donation: null });
+  const openDonationDetails = (mode: "attribution" | "payment" | "error", d: DonationRow) => {
+    setDonationDetails({
+      open: true,
+      mode,
+      donation: {
+        id: d.id,
+        provider: d.provider ?? null,
+        providerOrderId: d.providerOrderId ?? null,
+        providerErrorMessage: d.providerErrorMessage ?? null,
+        paymentMethod: d.paymentMethod ?? null,
+        attribution: d.attribution ?? null,
+      },
+    });
+  };
 
   const chartFilterPeriodLabelAr = useMemo(
     () => getDashboardChartPeriodLabelAr(chartPeriod, dateFrom, dateTo),
@@ -1680,6 +1704,9 @@ export default function MonthlySubscriptionsDashboardPage() {
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
                         الإحالة
                       </th>
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[140px]">
+                        الإعلان
+                      </th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[160px]">
                         المشروع / الفئة
                       </th>
@@ -1691,19 +1718,19 @@ export default function MonthlySubscriptionsDashboardPage() {
                   <tbody>
                     {donationsLoading && donations.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="py-12 text-center">
+                        <td colSpan={11} className="py-12 text-center">
                           <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" />
                         </td>
                       </tr>
                     ) : !donationsFetchedOnce ? (
                       <tr>
-                        <td colSpan={10} className="py-12 text-center text-slate-500">
+                        <td colSpan={11} className="py-12 text-center text-slate-500">
                           جاري التحميل...
                         </td>
                       </tr>
                     ) : donations.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="py-12 text-center text-slate-500">
+                        <td colSpan={11} className="py-12 text-center text-slate-500">
                           لا توجد تبرعات تطابق التصفية
                         </td>
                       </tr>
@@ -1738,29 +1765,54 @@ export default function MonthlySubscriptionsDashboardPage() {
                             </span>
                           </td>
                           <td className="py-1.5 px-2">
-                            <span
-                              className={cn("inline-block px-1.5 py-px rounded-full text-[11px] font-medium", d.status === "PAID" && d.paidAt ? "bg-green-100 text-green-700" : d.status === "FAILED" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700")}
-                              title={d.status === "PAID" && !d.paidAt ? "تم بدء الدفع ولم يؤكده مزود الدفع بعد — لا يُحتسب في الإيرادات" : undefined}
-                            >
-                              {d.status === "PAID" ? (d.paidAt ? "ناجح" : "قيد التأكيد") : d.status === "FAILED" ? "فاشل" : "معلق"}
-                            </span>
+                            {d.status === "FAILED" ? (
+                              <button
+                                type="button"
+                                onClick={() => openDonationDetails("error", d)}
+                                className="inline-block px-1.5 py-px rounded-full text-[11px] font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors cursor-pointer"
+                                title="عرض رسالة الخطأ من بوابة الدفع"
+                              >
+                                فاشل
+                              </button>
+                            ) : (
+                              <span
+                                className={cn("inline-block px-1.5 py-px rounded-full text-[11px] font-medium", d.status === "PAID" && d.paidAt ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700")}
+                                title={d.status === "PAID" && !d.paidAt ? "تم بدء الدفع ولم يؤكده مزود الدفع بعد — لا يُحتسب في الإيرادات" : undefined}
+                              >
+                                {d.status === "PAID" ? (d.paidAt ? "ناجح" : "قيد التأكيد") : "معلق"}
+                              </span>
+                            )}
                             {d.status === "FAILED" && d.providerErrorMessage && (
-                              <p className="text-[10px] text-red-500 mt-0.5 max-w-[140px] leading-tight" title={d.providerErrorMessage}>
+                              <button
+                                type="button"
+                                onClick={() => openDonationDetails("error", d)}
+                                className="block text-[10px] text-red-500 mt-0.5 max-w-[140px] leading-tight text-right hover:text-red-700 hover:underline cursor-pointer"
+                                title="عرض الرسالة الكاملة"
+                              >
                                 {d.providerErrorMessage.length > 50 ? d.providerErrorMessage.slice(0, 50) + "…" : d.providerErrorMessage}
-                              </p>
+                              </button>
                             )}
                           </td>
                           <td className="py-1.5 px-2">
-                            {d.provider === "STRIPE" ? (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-[#635bff]/10 text-[#635bff]">Stripe</span>
-                            ) : d.provider === "PAYFOR" ? (
-                                                            <span className="inline-flex items-center">
-                                <img
-                                  src="/ziraat.jpg"
-                                  alt="PayFor"
-                                  className="h-8 w-auto max-w-[72px] object-contain rounded"
-                                />
-                              </span>
+                            {d.provider === "STRIPE" || d.provider === "PAYFOR" ? (
+                              <button
+                                type="button"
+                                onClick={() => openDonationDetails("payment", d)}
+                                className="inline-flex items-center rounded hover:opacity-80 hover:scale-[1.03] active:scale-95 transition-all"
+                                title="عرض تفاصيل بوابة الدفع"
+                              >
+                                {d.provider === "STRIPE" ? (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-[#635bff]/10 text-[#635bff]">Stripe</span>
+                                ) : (
+                                  <span className="inline-flex items-center">
+                                    <img
+                                      src="/ziraat.jpg"
+                                      alt="PayFor"
+                                      className="h-8 w-auto max-w-[72px] object-contain rounded"
+                                    />
+                                  </span>
+                                )}
+                              </button>
                             ) : (
                               <span className="text-slate-400 text-xs">—</span>
                             )}
@@ -1794,6 +1846,28 @@ export default function MonthlySubscriptionsDashboardPage() {
                             ) : (
                               <span className="text-slate-400">—</span>
                             )}
+                          </td>
+                          <td className="py-1.5 px-2 align-middle max-w-[140px]">
+                            {(() => {
+                              const attr = (d.attribution ?? {}) as Record<string, unknown>;
+                              const campaign = typeof attr.utm_campaign === "string" ? attr.utm_campaign : "";
+                              if (!campaign && Object.keys(attr).length === 0) {
+                                return <span className="text-slate-400">—</span>;
+                              }
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => openDonationDetails("attribution", d)}
+                                  title={campaign || "عرض تفاصيل الإسناد الإعلاني"}
+                                  className="inline-flex items-center gap-1 max-w-full px-1.5 py-0.5 rounded-full bg-[#FA5D17]/10 text-[#FA5D17] text-[11px] font-medium hover:bg-[#FA5D17]/20 transition-colors cursor-pointer"
+                                >
+                                  <Megaphone className="w-3 h-3 shrink-0" />
+                                  <span className="truncate max-w-[110px]">
+                                    {campaign || "تفاصيل"}
+                                  </span>
+                                </button>
+                              );
+                            })()}
                           </td>
                           <td className="py-1.5 px-2 text-slate-600 max-w-[160px]">
                             {d.campaigns?.length > 0 ? (
@@ -2161,6 +2235,12 @@ export default function MonthlySubscriptionsDashboardPage() {
           </Card>
         </section>
       </div>
+      <DonationDetailsDialog
+        open={donationDetails.open}
+        onOpenChange={(o) => setDonationDetails((s) => ({ ...s, open: o }))}
+        mode={donationDetails.mode}
+        donation={donationDetails.donation}
+      />
     </div>
   );
 }
