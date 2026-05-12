@@ -1928,10 +1928,21 @@ export default function DashboardPage() {
                               "—"
                             )}
                           </td>
-                          <td className="py-1.5 px-2 text-slate-500">
-                            {new Date(d.createdAt).toLocaleDateString("en-US", {
-                              dateStyle: "medium",
-                            })}
+                          <td className="py-1.5 px-2 text-slate-500 whitespace-nowrap">
+                            <div className="flex flex-col leading-tight">
+                              <span>
+                                {new Date(d.createdAt).toLocaleDateString("en-US", {
+                                  dateStyle: "medium",
+                                })}
+                              </span>
+                              <span className="text-[10px] text-slate-400" dir="ltr">
+                                {new Date(d.createdAt).toLocaleTimeString("en-US", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  hour12: false,
+                                })}
+                              </span>
+                            </div>
                           </td>
                         </tr>
                       ))

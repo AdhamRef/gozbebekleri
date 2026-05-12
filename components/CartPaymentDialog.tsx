@@ -29,6 +29,7 @@ import useConvetToUSD from "@/hooks/useConvetToUSD";
 import { useReferralCode } from "@/hooks/useReferralCode";
 import { useRouter } from "@/i18n/routing";
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
+import { shouldSkipPopup } from "@/lib/in-app-browser";
 import { useTranslations, useLocale } from "next-intl";
 import { useSession } from "next-auth/react";
 import { PhoneInput } from "react-international-phone";
@@ -560,11 +561,20 @@ const CartPaymentDialog = ({
           form.appendChild(input);
         });
 
+        // Skip the popup attempt entirely on mobile / in-app browsers (FB, IG, TikTok,
+        // etc.). In those WebViews window.open often returns a truthy-but-invisible
+        // Window object — the form would silently submit to a hidden frame and the
+        // user would see nothing happen. Going straight to a full-page redirect
+        // (target=_self) lets the bank's 3DS page own the screen and redirect back
+        // to /api/payfor/3dpay/ok → /success on completion.
+        const skipPopup = shouldSkipPopup();
         const pw = 600, ph = 700;
-        const popup = window.open(
-          "about:blank", "payfor3d",
-          `width=${pw},height=${ph},left=${Math.round((screen.width  - pw) / 2)},top=${Math.round((screen.height - ph) / 2)},scrollbars=yes,resizable=yes`
-        );
+        const popup = skipPopup
+          ? null
+          : window.open(
+              "about:blank", "payfor3d",
+              `width=${pw},height=${ph},left=${Math.round((screen.width  - pw) / 2)},top=${Math.round((screen.height - ph) / 2)},scrollbars=yes,resizable=yes`
+            );
         form.target = popup ? "payfor3d" : "_self";
         document.body.appendChild(form);
         form.submit();

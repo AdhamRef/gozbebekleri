@@ -95,6 +95,11 @@ const nextConfig: NextConfig = {
         destination: "/tr/contact-us",
         permanent: true,
       },
+      {
+        source: "/donates",
+        destination: "/en/donates",
+        permanent: true,
+      },
     ];
   },
 };
