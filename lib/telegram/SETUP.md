@@ -43,7 +43,7 @@ After deploying, hit the admin-only setup endpoint **as a logged-in ADMIN**:
 ```bash
 curl -X POST https://your-domain.com/api/telegram/setup \
   -H "Cookie: <your admin session cookies>"
-```
+``````
 
 The endpoint auto-derives the webhook URL from the request origin (`<origin>/api/telegram/webhook`). To override, send `{ "url": "https://..." }` in the body.
 
