@@ -1873,7 +1873,7 @@ export default function DashboardPage() {
                             ) : (
                               <span
                                 className={cn(
-                                  "inline-block px-1.5 py-px rounded-full text-[11px] font-medium",
+                                  "inline-block px-1.5 py-px rounded-full text-[11px] font-medium w-max",
                                   d.status === "PAID" && d.paidAt
                                     ? "bg-green-100 text-green-700"
                                     : "bg-amber-100 text-amber-700"

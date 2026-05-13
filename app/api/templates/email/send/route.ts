@@ -15,6 +15,8 @@ import { renderEmailHtml, renderEmailSubject } from "@/lib/templates/render";
 import { sendBulkEmail, type BulkEmailRecipient } from "@/lib/email";
 import { pickLocale, resolveEmailVariant } from "@/lib/templates/locale-resolver";
 import type { TReaderDocument } from "@usewaypoint/email-builder";
+import { logSentMessage } from "@/lib/messaging/log-sent";
+import type { Prisma } from "@prisma/client";
 
 const sendSchema = z.object({
   templateId: z.string().min(1),
@@ -72,12 +74,51 @@ export async function POST(request: NextRequest) {
 
   const contexts = await loadContextsForUserIds(userIds);
 
+  const actor = auditActorFromDashboardSession(session!);
+
+  // Build recipients and remember the rendered version + context per email so
+  // we can write a SentMessage row whether the provider succeeds or fails.
+  type RenderedRecipient = {
+    userId: string;
+    email: string;
+    subject: string;
+    html: string;
+    locale: string;
+    variables: Prisma.InputJsonValue;
+    recipientName: string | null;
+  };
+  const renderedByEmail = new Map<string, RenderedRecipient>();
   const recipients: BulkEmailRecipient[] = [];
   let skipped = 0;
   for (const id of userIds) {
     const ctx = contexts.get(id);
     if (!ctx || !ctx.user.email) {
       skipped += 1;
+      // Log SKIPPED rows so the history shows attempts that never went out.
+      if (ctx) {
+        const localeForSkip = pickLocale({
+          override: parsed.data.locale,
+          recipientLang: ctx.user.preferredLang,
+        });
+        const variantForSkip = resolveEmailVariant(template, localeForSkip);
+        await logSentMessage({
+          channel: "EMAIL",
+          origin: "MANUAL",
+          status: "SKIPPED",
+          templateId: template.id,
+          templateName: template.name,
+          locale: localeForSkip,
+          recipientUserId: ctx.user.id,
+          recipientEmail: null,
+          recipientName: ctx.user.name || null,
+          renderedSubject: variantForSkip.subject,
+          renderedBody: "",
+          variables: ctx as unknown as Prisma.InputJsonValue,
+          errorMessage: "Recipient has no email address",
+          actorId: actor.actorId ?? null,
+          actorName: actor.actorName ?? null,
+        });
+      }
       continue;
     }
     const locale = pickLocale({
@@ -85,16 +126,46 @@ export async function POST(request: NextRequest) {
       recipientLang: ctx.user.preferredLang,
     });
     const variant = resolveEmailVariant(template, locale);
-    recipients.push({
-      to: ctx.user.email,
-      subject: renderEmailSubject(variant.subject, ctx),
-      html: await renderEmailHtml(variant.document as TReaderDocument, ctx),
+    const subject = renderEmailSubject(variant.subject, ctx);
+    const html = await renderEmailHtml(variant.document as TReaderDocument, ctx);
+    recipients.push({ to: ctx.user.email, subject, html });
+    renderedByEmail.set(ctx.user.email, {
+      userId: ctx.user.id,
+      email: ctx.user.email,
+      subject,
+      html,
+      locale,
+      variables: ctx as unknown as Prisma.InputJsonValue,
+      recipientName: ctx.user.name || null,
     });
   }
 
   const result = await sendBulkEmail(recipients);
 
-  const actor = auditActorFromDashboardSession(session!);
+  // One SentMessage row per recipient. Failures from the provider come back as
+  // entries in result.failed; everything else counted as sent.
+  const failedSet = new Map(result.failed.map((f) => [f.to, f.error]));
+  for (const r of renderedByEmail.values()) {
+    const failure = failedSet.get(r.email);
+    await logSentMessage({
+      channel: "EMAIL",
+      origin: "MANUAL",
+      status: failure ? "FAILED" : "SENT",
+      templateId: template.id,
+      templateName: template.name,
+      locale: r.locale,
+      recipientUserId: r.userId,
+      recipientEmail: r.email,
+      recipientName: r.recipientName,
+      renderedSubject: r.subject,
+      renderedBody: r.html,
+      variables: r.variables,
+      errorMessage: failure ?? null,
+      actorId: actor.actorId ?? null,
+      actorName: actor.actorName ?? null,
+    });
+  }
+
   await writeAuditLog({
     ...actor,
     action: "EMAIL_TEMPLATE_SEND",

@@ -17,6 +17,8 @@ import {
 } from "@/lib/templates/locale-resolver";
 import type { TReaderDocument } from "@usewaypoint/email-builder";
 import { notifyDonationEvent } from "@/lib/telegram/notify";
+import { logSentMessage } from "@/lib/messaging/log-sent";
+import type { Prisma } from "@prisma/client";
 
 /** Keep in sync with prisma `enum MessageTriggerEvent`. */
 export type MessageTriggerEvent =
@@ -88,27 +90,101 @@ export async function dispatchEvent(
     // have is the recipient's preferredLang. Falls back to ar when missing.
     const locale = pickLocale({ recipientLang: ctx.user.preferredLang });
 
+    const variablesSnapshot = ctx as unknown as Prisma.InputJsonValue;
+
     for (const trigger of triggers) {
       try {
         if (trigger.channel === "EMAIL") {
           const tpl = await prisma.emailTemplate.findUnique({ where: { id: trigger.templateId } });
           if (!tpl) continue;
-          if (!ctx.user.email) continue;
           const variant = resolveEmailVariant(tpl, locale);
           const html = await renderEmailHtml(variant.document as TReaderDocument, ctx);
           const subject = renderEmailSubject(variant.subject, ctx);
+          if (!ctx.user.email) {
+            await logSentMessage({
+              channel: "EMAIL",
+              origin: "TRIGGER",
+              status: "SKIPPED",
+              templateId: tpl.id,
+              templateName: tpl.name,
+              triggerEvent: event,
+              locale,
+              recipientUserId: ctx.user.id,
+              recipientEmail: null,
+              recipientName: ctx.user.name || null,
+              renderedSubject: subject,
+              renderedBody: html,
+              variables: variablesSnapshot,
+              errorMessage: "Recipient has no email address",
+              donationId: input.donationId ?? null,
+            });
+            continue;
+          }
           const r = await sendBulkEmail([{ to: ctx.user.email, subject, html }]);
           result.emailsSent += r.sent;
           if (r.failed.length > 0) result.errors += r.failed.length;
+          const failure = r.failed[0]?.error;
+          await logSentMessage({
+            channel: "EMAIL",
+            origin: "TRIGGER",
+            status: failure ? "FAILED" : "SENT",
+            templateId: tpl.id,
+            templateName: tpl.name,
+            triggerEvent: event,
+            locale,
+            recipientUserId: ctx.user.id,
+            recipientEmail: ctx.user.email,
+            recipientName: ctx.user.name || null,
+            renderedSubject: subject,
+            renderedBody: html,
+            variables: variablesSnapshot,
+            errorMessage: failure ?? null,
+            donationId: input.donationId ?? null,
+          });
         } else if (trigger.channel === "WHATSAPP") {
           const tpl = await prisma.whatsappTemplate.findUnique({ where: { id: trigger.templateId } });
           if (!tpl) continue;
-          if (!ctx.user.phone) continue;
           const variant = resolveWhatsappBody(tpl, locale);
           const body = mergeText(variant.body, ctx);
+          if (!ctx.user.phone) {
+            await logSentMessage({
+              channel: "WHATSAPP",
+              origin: "TRIGGER",
+              status: "SKIPPED",
+              templateId: tpl.id,
+              templateName: tpl.name,
+              triggerEvent: event,
+              locale,
+              recipientUserId: ctx.user.id,
+              recipientPhone: null,
+              recipientName: ctx.user.name || null,
+              renderedBody: body,
+              variables: variablesSnapshot,
+              errorMessage: "Recipient has no phone number",
+              donationId: input.donationId ?? null,
+            });
+            continue;
+          }
           const r = await sendBulkWhatsapp([{ to: ctx.user.phone, body }]);
           result.whatsappSent += r.sent;
           if (r.failed.length > 0) result.errors += r.failed.length;
+          const failure = r.failed[0]?.error;
+          await logSentMessage({
+            channel: "WHATSAPP",
+            origin: "TRIGGER",
+            status: failure ? "FAILED" : "SENT",
+            templateId: tpl.id,
+            templateName: tpl.name,
+            triggerEvent: event,
+            locale,
+            recipientUserId: ctx.user.id,
+            recipientPhone: ctx.user.phone,
+            recipientName: ctx.user.name || null,
+            renderedBody: body,
+            variables: variablesSnapshot,
+            errorMessage: failure ?? null,
+            donationId: input.donationId ?? null,
+          });
         }
       } catch (err) {
         result.errors += 1;

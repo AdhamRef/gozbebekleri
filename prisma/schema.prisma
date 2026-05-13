@@ -776,6 +776,72 @@ model MessageTrigger {
   @@index([templateId])
 }
 
+enum SentMessageStatus {
+  SENT       // accepted by provider
+  FAILED     // provider rejected or threw
+  SKIPPED    // recipient missing email/phone
+}
+
+enum SentMessageOrigin {
+  MANUAL     // admin clicked send from dashboard
+  TRIGGER    // auto-fired by event dispatcher
+  BACKFILL   // imported from legacy audit logs (no per-recipient detail)
+}
+
+/// Per-recipient log of every templated email or WhatsApp message that goes out.
+/// Stores the rendered subject/body and a snapshot of the variables so the
+/// dashboard history page can show exactly what was sent to each person.
+model SentMessage {
+  id                String              @id @default(auto()) @map("_id") @db.ObjectId
+  channel           MessageChannel
+  origin            SentMessageOrigin
+  status            SentMessageStatus
+
+  // Template snapshot — templateId may point to a deleted template, so we also store the name.
+  templateId        String?             @db.ObjectId
+  templateName      String
+  triggerEvent      MessageTriggerEvent? // set when origin=TRIGGER
+  locale            String
+
+  // Recipient
+  recipientUserId   String?             @db.ObjectId
+  recipientEmail    String?
+  recipientPhone    String?
+  recipientName     String?
+
+  // Rendered content (HTML for email, plain text for WhatsApp)
+  renderedSubject   String?
+  renderedBody      String
+  /// Snapshot of the TemplateContext used to merge variables.
+  variables         Json?
+
+  // Result
+  errorMessage      String?
+  providerMessageId String?
+
+  // Audit
+  actorId           String?             @db.ObjectId
+  actorName         String?
+  donationId        String?             @db.ObjectId
+
+  // Backfill summary aggregates — only populated when origin=BACKFILL.
+  /// Total recipients reported by the source audit log (manual bulk send).
+  backfillTotal     Int?
+  backfillSent      Int?
+  backfillFailed    Int?
+  backfillSkipped   Int?
+
+  createdAt         DateTime            @default(now())
+
+  @@index([channel, createdAt(sort: Desc)])
+  @@index([templateId])
+  @@index([recipientUserId])
+  @@index([status])
+  @@index([origin])
+  @@index([triggerEvent])
+  @@index([createdAt(sort: Desc)])
+}
+
 /* ===================== TRACKING PIXELS (dashboard configurable) ===================== */
 model TrackingSettings {
   id                      String   @id @default(auto()) @map("_id") @db.ObjectId

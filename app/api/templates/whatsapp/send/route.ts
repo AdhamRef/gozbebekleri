@@ -9,6 +9,8 @@ import { resolveDonorIds } from "@/lib/users/donor-filter";
 import { loadContextsForUserIds, mergeText } from "@/lib/templates/variables";
 import { sendBulkWhatsapp, type WhatsappRecipient } from "@/lib/whatsapp";
 import { pickLocale, resolveWhatsappBody } from "@/lib/templates/locale-resolver";
+import { logSentMessage } from "@/lib/messaging/log-sent";
+import type { Prisma } from "@prisma/client";
 
 const sendSchema = z.object({
   templateId: z.string().min(1),
@@ -66,12 +68,46 @@ export async function POST(request: NextRequest) {
 
   const contexts = await loadContextsForUserIds(userIds);
 
+  const actor = auditActorFromDashboardSession(session!);
+
+  type RenderedRecipient = {
+    userId: string;
+    phone: string;
+    body: string;
+    locale: string;
+    variables: Prisma.InputJsonValue;
+    recipientName: string | null;
+  };
+  const renderedByPhone = new Map<string, RenderedRecipient>();
   const recipients: WhatsappRecipient[] = [];
   let skipped = 0;
   for (const id of userIds) {
     const ctx = contexts.get(id);
     if (!ctx || !ctx.user.phone) {
       skipped += 1;
+      if (ctx) {
+        const localeForSkip = pickLocale({
+          override: parsed.data.locale,
+          recipientLang: ctx.user.preferredLang,
+        });
+        const variantForSkip = resolveWhatsappBody(template, localeForSkip);
+        await logSentMessage({
+          channel: "WHATSAPP",
+          origin: "MANUAL",
+          status: "SKIPPED",
+          templateId: template.id,
+          templateName: template.name,
+          locale: localeForSkip,
+          recipientUserId: ctx.user.id,
+          recipientPhone: null,
+          recipientName: ctx.user.name || null,
+          renderedBody: variantForSkip.body,
+          variables: ctx as unknown as Prisma.InputJsonValue,
+          errorMessage: "Recipient has no phone number",
+          actorId: actor.actorId ?? null,
+          actorName: actor.actorName ?? null,
+        });
+      }
       continue;
     }
     const locale = pickLocale({
@@ -79,15 +115,41 @@ export async function POST(request: NextRequest) {
       recipientLang: ctx.user.preferredLang,
     });
     const variant = resolveWhatsappBody(template, locale);
-    recipients.push({
-      to: ctx.user.phone,
-      body: mergeText(variant.body, ctx),
+    const body = mergeText(variant.body, ctx);
+    recipients.push({ to: ctx.user.phone, body });
+    renderedByPhone.set(ctx.user.phone, {
+      userId: ctx.user.id,
+      phone: ctx.user.phone,
+      body,
+      locale,
+      variables: ctx as unknown as Prisma.InputJsonValue,
+      recipientName: ctx.user.name || null,
     });
   }
 
   const result = await sendBulkWhatsapp(recipients);
 
-  const actor = auditActorFromDashboardSession(session!);
+  const failedSet = new Map(result.failed.map((f) => [f.to, f.error]));
+  for (const r of renderedByPhone.values()) {
+    const failure = failedSet.get(r.phone);
+    await logSentMessage({
+      channel: "WHATSAPP",
+      origin: "MANUAL",
+      status: failure ? "FAILED" : "SENT",
+      templateId: template.id,
+      templateName: template.name,
+      locale: r.locale,
+      recipientUserId: r.userId,
+      recipientPhone: r.phone,
+      recipientName: r.recipientName,
+      renderedBody: r.body,
+      variables: r.variables,
+      errorMessage: failure ?? null,
+      actorId: actor.actorId ?? null,
+      actorName: actor.actorName ?? null,
+    });
+  }
+
   await writeAuditLog({
     ...actor,
     action: "WHATSAPP_TEMPLATE_SEND",
