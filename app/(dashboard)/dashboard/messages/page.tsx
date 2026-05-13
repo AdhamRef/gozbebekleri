@@ -20,13 +20,13 @@ export default function MessagesPage() {
 
         <Tabs defaultValue="outbound" dir="rtl" className="w-full">
           <TabsList className="grid grid-cols-2 max-w-md">
-            <TabsTrigger value="inbound" className="gap-2">
-              <Inbox className="w-4 h-4" />
-              رسائل واردة
-            </TabsTrigger>
             <TabsTrigger value="outbound" className="gap-2">
               <Send className="w-4 h-4" />
               سجل القوالب الصادرة
+            </TabsTrigger>
+            <TabsTrigger value="inbound" className="gap-2">
+              <Inbox className="w-4 h-4" />
+              رسائل واردة
             </TabsTrigger>
           </TabsList>
 
