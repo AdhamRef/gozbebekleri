@@ -1007,7 +1007,7 @@ export default function ReferralAnalyticsPage() {
                             <div className="flex flex-col leading-tight">
                               <span>{new Date(d.createdAt).toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "Europe/Istanbul" })}</span>
                               <span className="text-[10px] text-slate-400" dir="ltr">
-                                {new Date(d.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Istanbul" })}
+                                {new Date(d.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Europe/Istanbul" })}
                               </span>
                             </div>
                           </td>

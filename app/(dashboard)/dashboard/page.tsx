@@ -2032,10 +2032,9 @@ export default function DashboardPage() {
                                 {new Date(d.createdAt).toLocaleTimeString("en-US", {
                                   hour: "2-digit",
                                   minute: "2-digit",
-                                  hour12: false,
+                                  hour12: true,
                                   timeZone: "Europe/Istanbul",
-                                })}{" "}
-                                TR
+                                })}
                               </span>
                             </div>
                           </td>

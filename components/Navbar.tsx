@@ -230,7 +230,7 @@ const Navbar = () => {
                 <Twitter className="w-3.5 h-3.5" />
               </a>
               <span className="border-l border-white/30 pl-3 flex items-center gap-1.5">
-                <a href="https://wa.me/902122885930" className="flex items-center gap-1.5 hover:text-blue-200 transition-colors">
+                <a href="https://wa.me/905380308212" className="flex items-center gap-1.5 hover:text-blue-200 transition-colors">
                   <MessageCircle className="w-3.5 h-3.5" />
                   <span dir="ltr">+90 212 288 59 30</span>
                 </a>
@@ -513,7 +513,7 @@ const Navbar = () => {
                   <a href={social.twitter} target="_blank" rel="noopener noreferrer" aria-label="Twitter" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-[#025EB8] hover:text-white transition-colors">
                     <Twitter className="w-4 h-4" />
                   </a>
-                  <a href="https://wa.me/902122885930" aria-label="WhatsApp" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-[#025EB8] hover:text-white transition-colors">
+                  <a href="https://wa.me/905380308212" aria-label="WhatsApp" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-[#025EB8] hover:text-white transition-colors">
                     <MessageCircle className="w-4 h-4" />
                   </a>
                 </div>

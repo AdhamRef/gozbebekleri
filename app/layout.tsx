@@ -165,7 +165,7 @@ const organizationSchema = {
     "https://www.instagram.com/gbyd_foundation/",
     "https://www.youtube.com/channel/UCvvSx8jtGafK9BI2hQnBYSQ",
     "https://x.com/gozbebeklerider",
-    "https://wa.me/902122885930",
+    "https://wa.me/905380308212",
   ],
   address: {
     "@type": "PostalAddress",
