@@ -11,7 +11,6 @@ import {
   XCircle,
   AlertTriangle,
   Calendar,
-  User,
   Eye,
   Loader2,
   FileText,
@@ -30,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { LOCALE_LABELS } from "@/lib/locales";
 import { cn } from "@/lib/utils";
+import { useViewUserProfile } from "@/context/ViewUserProfileContext";
 import SentMessagePreviewDialog from "./SentMessagePreviewDialog";
 import ManualSendDialog from "./ManualSendDialog";
 
@@ -105,6 +105,8 @@ export default function OutboundHistoryTab() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showSendDialog, setShowSendDialog] = useState(false);
+
+  const { openUserProfile } = useViewUserProfile();
 
   const fetchRows = useCallback(
     async (pageNum: number, append: boolean) => {
@@ -281,10 +283,10 @@ export default function OutboundHistoryTab() {
               <table className="w-full text-sm text-right">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/80">
+                    <th className="text-right py-3 px-4 font-semibold text-slate-700">المتبرع</th>
                     <th className="text-right py-3 px-4 font-semibold text-slate-700">القناة</th>
                     <th className="text-right py-3 px-4 font-semibold text-slate-700">القالب</th>
                     <th className="text-right py-3 px-4 font-semibold text-slate-700">المستلم</th>
-                    <th className="text-right py-3 px-4 font-semibold text-slate-700">المصدر</th>
                     <th className="text-right py-3 px-4 font-semibold text-slate-700">الحالة</th>
                     <th className="text-right py-3 px-4 font-semibold text-slate-700">اللغة</th>
                     <th className="text-right py-3 px-4 font-semibold text-slate-700">التاريخ</th>
@@ -309,8 +311,39 @@ export default function OutboundHistoryTab() {
                       const statusStyle = STATUS_STYLES[r.status];
                       const StatusIcon = statusStyle.icon;
                       const ChannelIcon = r.channel === "EMAIL" ? Mail : MessageCircle;
+                      const donorLabel =
+                        r.recipientName || r.recipientEmail || r.recipientPhone || null;
                       return (
                         <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors">
+                          <td className="py-1.5 px-2">
+                            {r.recipientUserId ? (
+                              <button
+                                type="button"
+                                onClick={() => r.recipientUserId && openUserProfile(r.recipientUserId)}
+                                className="text-right w-full max-w-[200px] rounded-md -mx-0.5 px-0.5 py-0 hover:bg-slate-100/80 transition-colors cursor-pointer border-0 bg-transparent"
+                              >
+                                <p className="font-medium text-slate-900">
+                                  {donorLabel || "—"}
+                                </p>
+                                {r.recipientEmail && r.recipientName && (
+                                  <p className="text-[10px] text-slate-500 truncate max-w-[160px]">
+                                    {r.recipientEmail}
+                                  </p>
+                                )}
+                              </button>
+                            ) : (
+                              <div className="text-right max-w-[200px] py-0">
+                                <p className="font-medium text-slate-900">
+                                  {donorLabel || (r.origin === "BACKFILL" ? "—" : "زائر")}
+                                </p>
+                                {r.recipientEmail && r.recipientName && (
+                                  <p className="text-[10px] text-slate-500 truncate max-w-[160px]">
+                                    {r.recipientEmail}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </td>
                           <td className="py-3 px-4">
                             <div className={cn(
                               "inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium",
@@ -323,13 +356,27 @@ export default function OutboundHistoryTab() {
                           <td className="py-3 px-4 max-w-[220px]">
                             <div className="flex flex-col gap-0.5">
                               <span className="font-medium text-slate-900 truncate" title={r.templateName}>
-                                {r.templateName}
+                                {TRIGGER_EVENT_LABELS[r.templateName] ?? r.templateName}
                               </span>
                               {r.renderedSubject && (
                                 <span className="text-xs text-slate-500 truncate" title={r.renderedSubject}>
                                   {r.renderedSubject}
                                 </span>
                               )}
+                              <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 mt-0.5">
+                                {r.origin === "TRIGGER" ? (
+                                  <Zap className="w-2.5 h-2.5" />
+                                ) : r.origin === "MANUAL" ? (
+                                  <Send className="w-2.5 h-2.5" />
+                                ) : (
+                                  <FileText className="w-2.5 h-2.5" />
+                                )}
+                                {ORIGIN_LABELS[r.origin]}
+                                {r.origin === "MANUAL" && r.actorName ? ` · ${r.actorName}` : ""}
+                                {r.triggerEvent && r.origin === "TRIGGER"
+                                  ? ` · ${TRIGGER_EVENT_LABELS[r.triggerEvent] ?? r.triggerEvent}`
+                                  : ""}
+                              </span>
                             </div>
                           </td>
                           <td className="py-3 px-4 max-w-[220px]">
@@ -341,49 +388,21 @@ export default function OutboundHistoryTab() {
                               </span>
                             ) : (
                               <div className="flex flex-col gap-0.5">
-                                {r.recipientName && (
-                                  <span className="font-medium text-slate-900 truncate flex items-center gap-1">
-                                    <User className="w-3 h-3 shrink-0" />
-                                    {r.recipientName}
-                                  </span>
-                                )}
                                 {r.recipientEmail && (
-                                  <span className="text-xs text-slate-500 truncate" title={r.recipientEmail}>
+                                  <span className="text-xs text-slate-600 truncate" title={r.recipientEmail}>
                                     {r.recipientEmail}
                                   </span>
                                 )}
                                 {r.recipientPhone && (
-                                  <span className="text-xs text-slate-500 truncate" dir="ltr">
+                                  <span className="text-xs text-slate-600 truncate" dir="ltr">
                                     {r.recipientPhone}
                                   </span>
                                 )}
-                                {!r.recipientName && !r.recipientEmail && !r.recipientPhone && (
+                                {!r.recipientEmail && !r.recipientPhone && (
                                   <span className="text-xs text-slate-400">—</span>
                                 )}
                               </div>
                             )}
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex flex-col gap-0.5">
-                              <span className="inline-flex items-center gap-1 text-xs text-slate-700">
-                                {r.origin === "TRIGGER" ? (
-                                  <Zap className="w-3 h-3" />
-                                ) : r.origin === "MANUAL" ? (
-                                  <Send className="w-3 h-3" />
-                                ) : (
-                                  <FileText className="w-3 h-3" />
-                                )}
-                                {ORIGIN_LABELS[r.origin]}
-                              </span>
-                              {r.triggerEvent && (
-                                <span className="text-xs text-slate-500">
-                                  {TRIGGER_EVENT_LABELS[r.triggerEvent] ?? r.triggerEvent}
-                                </span>
-                              )}
-                              {r.origin === "MANUAL" && r.actorName && (
-                                <span className="text-xs text-slate-500 truncate">{r.actorName}</span>
-                              )}
-                            </div>
                           </td>
                           <td className="py-3 px-4">
                             <span className={cn(

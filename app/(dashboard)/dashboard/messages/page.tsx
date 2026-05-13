@@ -18,7 +18,7 @@ export default function MessagesPage() {
           </p>
         </header>
 
-        <Tabs defaultValue="inbound" dir="rtl" className="w-full">
+        <Tabs defaultValue="outbound" dir="rtl" className="w-full">
           <TabsList className="grid grid-cols-2 max-w-md">
             <TabsTrigger value="inbound" className="gap-2">
               <Inbox className="w-4 h-4" />
