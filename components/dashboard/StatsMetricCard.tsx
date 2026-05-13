@@ -35,9 +35,7 @@ function formatValue(value: number, format?: "money" | "number" | "percent"): st
   const latn = (n: number, options?: Intl.NumberFormatOptions) =>
     n.toLocaleString("en-US", { numberingSystem: "latn", ...options });
   if (format === "money") {
-    if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
-    if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
-    return `$${value.toFixed(2)}`;
+    return `$${latn(value, { maximumFractionDigits: 2 })}`;
   }
   if (format === "percent") return `${value.toFixed(1)}%`;
   return latn(value, { maximumFractionDigits: 0 });
