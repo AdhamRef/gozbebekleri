@@ -20,6 +20,7 @@ import {
   HandCoins,
   Percent,
   LayoutList,
+  Download,
 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 import {
@@ -61,6 +62,7 @@ import { getCountryDisplayNameFromCode } from "@/lib/dashboard/country-display-n
 import { DashboardPieLegendByValue } from "@/components/dashboard/DashboardPieLegend";
 import { useViewUserProfile } from "@/context/ViewUserProfileContext";
 import DonationDetailsDialog, { type DonationDetailsTarget } from "@/components/dashboard/DonationDetailsDialog";
+import { ExportReportDialog, EXPORT_DEFAULTS, type ExportFormState } from "@/components/dashboard/ExportReportDialog";
 
 interface ChartDataPoint {
   date: string;
@@ -303,6 +305,11 @@ export default function MonthlySubscriptionsDashboardPage() {
     () => getDashboardChartPeriodLabelAr(chartPeriod, dateFrom, dateTo),
     [chartPeriod, dateFrom, dateTo]
   );
+
+  // Export dialog state — opens a popup with every filter from this page plus
+  // a CSV/Excel toggle. Defaults are seeded from the live page filters so the
+  // export reflects what the user is currently looking at.
+  const [exportOpen, setExportOpen] = useState(false);
 
   const [subStatusFilter, setSubStatusFilter] = useState<SubscriptionStatusFilter>("ACTIVE");
   const [subsRows, setSubsRows] = useState<SubscriptionRow[]>([]);
@@ -1367,10 +1374,20 @@ export default function MonthlySubscriptionsDashboardPage() {
                 {/* تصفية النتائج — تؤثر على الرسم وجدول التبرعات (فترة، فئة، مشروع، مستخدم، نوع الرسم) */}
                 <Card className="border-border shadow-sm">
           <CardHeader className="py-4">
-            <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2 justify-end">
-              <Search className="w-4 h-4 shrink-0" />
-              <span>تصفية النتائج</span>
-            </CardTitle>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between flex-row-reverse">
+              <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2 justify-end">
+                <Search className="w-4 h-4 shrink-0" />
+                <span>تصفية النتائج</span>
+              </CardTitle>
+              <button
+                type="button"
+                onClick={() => setExportOpen(true)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 shrink-0"
+              >
+                <Download className="w-4 h-4" />
+                تصدير التقرير
+              </button>
+            </div>
           </CardHeader>
           <CardContent className="pt-0 space-y-4" dir="rtl">
 
@@ -2253,6 +2270,53 @@ export default function MonthlySubscriptionsDashboardPage() {
         onOpenChange={(o) => setDonationDetails((s) => ({ ...s, open: o }))}
         mode={donationDetails.mode}
         donation={donationDetails.donation}
+      />
+      <ExportReportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        endpoint="/api/admin/monthly/export"
+        title="تصدير تقرير الاشتراكات الشهرية"
+        description="يشمل التقرير الاشتراكات والدفعات الشهرية مع ملخص كامل وتفصيل لكل حملة من الأعلى إلى الأدنى."
+        defaults={{
+          ...EXPORT_DEFAULTS,
+          period: chartPeriod === "custom" || (dateFrom && dateTo) ? "custom" : chartPeriod,
+          start: dateFrom || "",
+          end: dateTo || "",
+          categoryId: selectedCategory,
+          campaignId: selectedCampaign,
+          status: donationsStatusFilter,
+          subStatus: subStatusFilter === "all" ? "all" : subStatusFilter,
+          country: donationCountryFilter,
+          sortBy: donationsSortBy,
+          sortOrder: donationsSortOrder,
+        } as ExportFormState}
+        options={{
+          categories: categories.map((c) => ({ value: c.id, label: c.name })),
+          campaigns: campaigns.map((c) => ({ value: c.id, label: c.title })),
+          countries: countryOptions.map((c) => ({ value: c.code, label: c.code })),
+          locales: [
+            { value: "ar", label: "العربية" },
+            { value: "en", label: "English" },
+            { value: "tr", label: "Türkçe" },
+            { value: "fr", label: "Français" },
+            { value: "id", label: "Bahasa" },
+            { value: "pt", label: "Português" },
+            { value: "es", label: "Español" },
+            { value: "de", label: "Deutsch" },
+          ],
+        }}
+        enabledFields={{
+          period: true,
+          dateRange: true,
+          category: true,
+          campaign: true,
+          status: true,
+          subStatus: true,
+          locale: true,
+          country: true,
+          sort: true,
+          limit: true,
+        }}
       />
     </div>
   );

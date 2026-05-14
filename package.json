@@ -80,6 +80,7 @@
     "cmdk": "^1.0.4",
     "cookies-next": "^5.1.0",
     "date-fns": "^4.1.0",
+    "exceljs": "^4.4.0",
     "fontkit": "^2.0.4",
     "framer-motion": "^12.34.0",
     "google-auth-library": "^10.6.2",

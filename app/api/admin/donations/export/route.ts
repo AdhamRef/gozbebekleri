@@ -1,14 +1,35 @@
+/**
+ * GET /api/admin/donations/export
+ *
+ * Returns an XLSX (default) or CSV file containing every donation matching the
+ * dashboard filter selection, plus a cover sheet with KPIs, per-campaign,
+ * per-category, per-currency, per-country, per-referral, per-locale,
+ * per-provider and per-status breakdowns sorted highest to lowest.
+ *
+ * Query params mirror the dashboard donation list:
+ *   format=xlsx|csv (default xlsx)
+ *   start, end       YYYY-MM-DD
+ *   categoryId, campaignId, userId, referralId
+ *   status           PAID | FAILED | all
+ *   locale, country
+ *   subscriptionOnly true|false
+ *   sortBy           date | amount
+ *   sortOrder        asc | desc
+ *   limit            max rows (default 20000, cap 50000)
+ */
+
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
-
-function escapeCsv(v: string | number | null | undefined): string {
-  const s = v == null ? "" : String(v);
-  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
+import {
+  buildDonationExport,
+  type DonationExportRow,
+  type ExportFilterDescriptor,
+  type ExportFormat,
+} from "@/lib/dashboard/donation-export";
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,27 +37,33 @@ export async function GET(request: NextRequest) {
     const denied = requireAdminOrDashboardPermission(session, "revenue");
     if (denied) return denied;
 
-    const { searchParams } = new URL(request.url);
-    const campaignId = searchParams.get("campaignId");
-    const userId = searchParams.get("userId");
-    const categoryId = searchParams.get("categoryId");
-    const startParam = searchParams.get("start");
-    const endParam = searchParams.get("end");
-    const sortBy = (searchParams.get("sortBy") || "date") as "date" | "amount";
-    const sortOrder = (searchParams.get("sortOrder") || "desc") as "asc" | "desc";
-    const status = searchParams.get("status");
-    const locale = searchParams.get("locale")?.trim() ?? null;
-    const limit = Math.min(parseInt(searchParams.get("limit") || "5000", 10) || 5000, 20000);
+    const sp = request.nextUrl.searchParams;
+    const format: ExportFormat = sp.get("format") === "csv" ? "csv" : "xlsx";
+    const campaignId = sp.get("campaignId");
+    const userId = sp.get("userId");
+    const categoryId = sp.get("categoryId");
+    const referralId = sp.get("referralId");
+    const startParam = sp.get("start");
+    const endParam = sp.get("end");
+    const sortBy = (sp.get("sortBy") || "date") as "date" | "amount";
+    const sortOrder = (sp.get("sortOrder") || "desc") as "asc" | "desc";
+    const status = sp.get("status");
+    const locale = sp.get("locale")?.trim() ?? null;
+    const country = sp.get("country")?.trim() ?? null;
+    const subscriptionOnly = sp.get("subscriptionOnly") === "true" || sp.get("subscriptionOnly") === "1";
+    const limit = Math.min(parseInt(sp.get("limit") || "20000", 10) || 20000, 50000);
 
     const dateFilter: { gte?: Date; lte?: Date } = {};
     if (startParam) dateFilter.gte = new Date(startParam + "T00:00:00.000Z");
     if (endParam) dateFilter.lte = new Date(endParam + "T23:59:59.999Z");
 
-    const baseWhere: Record<string, unknown> = {
+    const baseWhere: Prisma.DonationWhereInput = {
       ...(campaignId && campaignId !== "all" && { items: { some: { campaignId } } }),
       ...(userId && userId !== "all" && { donorId: userId }),
+      ...(referralId && referralId !== "all" && { referralId }),
+      ...(subscriptionOnly && { subscriptionId: { not: null } }),
       ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
-      ...(status && ["PAID", "FAILED"].includes(status) && { status }),
+      ...(status && ["PAID", "FAILED"].includes(status) && { status: status as "PAID" | "FAILED" }),
     };
     if (categoryId && categoryId !== "all") {
       baseWhere.OR = [
@@ -45,86 +72,155 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const localeWhere =
-      locale && locale !== "all"
-        ? locale === "__unset"
+    const filters: Prisma.DonationWhereInput[] = [baseWhere];
+    if (locale && locale !== "all") {
+      filters.push(
+        locale === "__unset"
           ? { OR: [{ locale: null }, { locale: "" }] }
           : { locale }
-        : null;
+      );
+    }
+    if (country && country !== "all") {
+      filters.push(
+        country === "__unset"
+          ? { OR: [{ donorCountryCode: null }, { donorCountryCode: "" }] }
+          : { donorCountryCode: country.toUpperCase() }
+      );
+    }
+    const where: Prisma.DonationWhereInput = filters.length > 1 ? { AND: filters } : baseWhere;
 
-    const where: Record<string, unknown> =
-      localeWhere != null ? { AND: [baseWhere, localeWhere] } : baseWhere;
-
-    const orderBy =
+    const orderBy: Prisma.DonationOrderByWithRelationInput =
       sortBy === "amount" ? { amountUSD: sortOrder } : { createdAt: sortOrder };
 
     const rows = await prisma.donation.findMany({
       where,
       include: {
-        donor: { select: { name: true, email: true, phone: true } },
-        items: { include: { campaign: { select: { title: true } } } },
-        categoryItems: { include: { category: { select: { name: true } } } },
-        referral: { select: { code: true } },
+        donor: { select: { id: true, name: true, email: true, phone: true, countryCode: true } },
+        items: { include: { campaign: { select: { id: true, title: true } } } },
+        categoryItems: { include: { category: { select: { id: true, name: true } } } },
+        referral: { select: { id: true, code: true, name: true } },
       },
       orderBy,
       take: limit,
     });
 
-    const headers = [
-      "id",
-      "locale",
-      "status",
-      "amountUSD",
-      "currency",
-      "totalAmount",
-      "donorName",
-      "donorEmail",
-      "donorPhone",
-      "campaigns",
-      "categories",
-      "referralCode",
-      "provider",
-      "type",
-      "createdAt",
-      "paidAt",
-    ];
+    const exportRows: DonationExportRow[] = rows.map((d) => {
+      const teamSupport = Number(d.teamSupport ?? 0);
+      const fees = Number(d.coverFees ? d.fees ?? 0 : 0);
+      const total = Number(d.totalAmount ?? 0);
+      // "amount" should be the donation portion only — split team support
+      // and fees out so finance can run operating costs separately.
+      const baseAmount = Number(d.amount ?? Math.max(0, total - teamSupport - fees));
+      return {
+        id: d.id,
+        status: d.status,
+        type: d.subscriptionId ? "MONTHLY" : "ONE_TIME",
+        createdAt: d.createdAt,
+        paidAt: d.paidAt ?? null,
+        donor: {
+          id: d.donor?.id ?? null,
+          name: d.donor?.name ?? null,
+          email: d.donor?.email ?? null,
+          phone: d.donor?.phone ?? null,
+          countryCode: d.donor?.countryCode ?? null,
+        },
+        donorCountryCode: d.donorCountryCode ?? null,
+        locale: d.locale ?? null,
+        currency: d.currency,
+        amount: baseAmount,
+        amountUSD: d.amountUSD ?? null,
+        teamSupport,
+        fees,
+        totalAmount: total,
+        coverFees: !!d.coverFees,
+        campaigns: d.items.map((i) => ({ id: i.campaign.id, title: i.campaign.title })),
+        categories: d.categoryItems.map((c) => ({ id: c.category.id, name: c.category.name })),
+        referral: d.referral ? { id: d.referral.id, code: d.referral.code, name: d.referral.name } : null,
+        paymentMethod: d.paymentMethod ?? null,
+        provider: d.provider ?? null,
+        providerOrderId: d.providerOrderId ?? null,
+        providerErrorMessage: d.providerErrorMessage ?? null,
+        subscriptionId: d.subscriptionId ?? null,
+        comment: d.comment ?? null,
+        attribution: (d.attribution as Record<string, unknown> | null) ?? null,
+      };
+    });
 
-    const lines = [
-      headers.join(","),
-      ...rows.map((d) =>
-        [
-          escapeCsv(d.id),
-          escapeCsv(d.locale),
-          escapeCsv(d.status),
-          escapeCsv(d.amountUSD ?? ""),
-          escapeCsv(d.currency),
-          escapeCsv(d.totalAmount),
-          escapeCsv(d.donor?.name),
-          escapeCsv(d.donor?.email),
-          escapeCsv(d.donor?.phone),
-          escapeCsv(d.items.map((i) => i.campaign.title).join("; ")),
-          escapeCsv(d.categoryItems.map((c) => c.category.name).join("; ")),
-          escapeCsv(d.referral?.code),
-          escapeCsv(d.provider),
-          escapeCsv(d.subscriptionId ? "MONTHLY" : "ONE_TIME"),
-          escapeCsv(d.createdAt.toISOString()),
-          escapeCsv(d.paidAt?.toISOString() ?? ""),
-        ].join(",")
-      ),
-    ];
+    const exportFilters: ExportFilterDescriptor[] = collectFilterDescriptors({
+      startParam,
+      endParam,
+      categoryId,
+      campaignId,
+      userId,
+      referralId,
+      status,
+      locale,
+      country,
+      subscriptionOnly,
+      sortBy,
+      sortOrder,
+      total: rows.length,
+    });
 
-    const csv = "\uFEFF" + lines.join("\r\n");
-    const filename = `donations-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    let titleSubtitle = "";
+    if (startParam || endParam) {
+      titleSubtitle = `الفترة: ${startParam ?? "—"} → ${endParam ?? "—"}`;
+    } else {
+      titleSubtitle = "الفترة: كل الوقت";
+    }
 
-    return new NextResponse(csv, {
+    const out = await buildDonationExport({
+      format,
+      title: "تقرير التبرعات",
+      subtitle: titleSubtitle,
+      filters: exportFilters,
+      donations: exportRows,
+    });
+
+    return new NextResponse(out.body as unknown as BodyInit, {
       status: 200,
       headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Type": out.contentType,
+        "Content-Disposition": `attachment; filename="${out.filename}"`,
+        "Cache-Control": "no-store",
       },
     });
   } catch (e) {
     console.error("export donations:", e);
     return NextResponse.json({ error: "Export failed" }, { status: 500 });
   }
+}
+
+function collectFilterDescriptors(args: {
+  startParam: string | null;
+  endParam: string | null;
+  categoryId: string | null;
+  campaignId: string | null;
+  userId: string | null;
+  referralId: string | null;
+  status: string | null;
+  locale: string | null;
+  country: string | null;
+  subscriptionOnly: boolean;
+  sortBy: string;
+  sortOrder: string;
+  total: number;
+}): ExportFilterDescriptor[] {
+  const out: ExportFilterDescriptor[] = [];
+  if (args.startParam || args.endParam) {
+    out.push({ label: "الفترة", value: `${args.startParam ?? "—"} → ${args.endParam ?? "—"}` });
+  } else {
+    out.push({ label: "الفترة", value: "كل الوقت" });
+  }
+  if (args.categoryId && args.categoryId !== "all") out.push({ label: "القسم", value: args.categoryId });
+  if (args.campaignId && args.campaignId !== "all") out.push({ label: "الحملة", value: args.campaignId });
+  if (args.userId && args.userId !== "all") out.push({ label: "المتبرع", value: args.userId });
+  if (args.referralId && args.referralId !== "all") out.push({ label: "الإحالة", value: args.referralId });
+  if (args.status && args.status !== "all") out.push({ label: "الحالة", value: args.status });
+  if (args.locale && args.locale !== "all") out.push({ label: "اللغة", value: args.locale });
+  if (args.country && args.country !== "all") out.push({ label: "الدولة", value: args.country });
+  if (args.subscriptionOnly) out.push({ label: "الاشتراكات فقط", value: "نعم" });
+  out.push({ label: "الفرز", value: `${args.sortBy === "amount" ? "بالقيمة" : "بالتاريخ"} • ${args.sortOrder === "asc" ? "تصاعدي" : "تنازلي"}` });
+  out.push({ label: "عدد العمليات", value: String(args.total) });
+  return out;
 }

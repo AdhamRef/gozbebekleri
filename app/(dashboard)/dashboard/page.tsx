@@ -70,6 +70,7 @@ import {
 } from "@/components/dashboard/DashboardPieLegend";
 import { useViewUserProfile } from "@/context/ViewUserProfileContext";
 import DonationDetailsDialog, { type DonationDetailsTarget } from "@/components/dashboard/DonationDetailsDialog";
+import { ExportReportDialog, EXPORT_DEFAULTS, type ExportFormState } from "@/components/dashboard/ExportReportDialog";
 
 interface ChartDataPoint {
   date: string;
@@ -575,33 +576,61 @@ export default function DashboardPage() {
 
   const { openUserProfile } = useViewUserProfile();
 
-  const exportDonationsCsvUrl = useMemo(() => {
-    const params = new URLSearchParams();
+  // ── Export dialog state (popup with full filter setup before download) ─────
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportDefaults: ExportFormState = useMemo(() => {
     const { start, end } = getDonationsDateRange(chartPeriod, dateFrom, dateTo);
-    if (start) params.set("start", start);
-    if (end) params.set("end", end);
-    if (selectedCategory !== "all") params.set("categoryId", selectedCategory);
-    if (selectedCampaign !== "all") params.set("campaignId", selectedCampaign);
-    if (selectedUserId !== "all") params.set("userId", selectedUserId);
-    if (donationsStatusFilter !== "all") params.set("status", donationsStatusFilter);
-    if (donationLocaleFilter !== "all") params.set("locale", donationLocaleFilter);
-    if (donationCountryFilter !== "all") params.set("country", donationCountryFilter);
-    params.set("sortBy", donationsSortBy);
-    params.set("sortOrder", donationsSortOrder);
-    return `/api/admin/donations/export?${params.toString()}`;
+    return {
+      ...EXPORT_DEFAULTS,
+      period: chartPeriod === "custom" || (dateFrom && dateTo) ? "custom" : chartPeriod,
+      start: start ?? "",
+      end: end ?? "",
+      categoryId: selectedCategory,
+      campaignId: selectedCampaign,
+      status: donationsStatusFilter,
+      locale: donationLocaleFilter === "all" ? "all" : String(donationLocaleFilter),
+      country: donationCountryFilter,
+      sortBy: donationsSortBy,
+      sortOrder: donationsSortOrder,
+    };
   }, [
     chartPeriod,
     dateFrom,
     dateTo,
     selectedCategory,
     selectedCampaign,
-    selectedUserId,
     donationsStatusFilter,
     donationLocaleFilter,
     donationCountryFilter,
     donationsSortBy,
     donationsSortOrder,
   ]);
+
+  const exportCategoryOptions = useMemo(
+    () => categories.map((c) => ({ value: c.id, label: c.name })),
+    [categories]
+  );
+  const exportCampaignOptions = useMemo(
+    () => campaigns.map((c) => ({ value: c.id, label: c.title })),
+    [campaigns]
+  );
+  const exportCountryOptions = useMemo(
+    () => countryOptions.map((c) => ({ value: c.code, label: c.code })),
+    [countryOptions]
+  );
+  const exportLocaleOptions = useMemo(
+    () => [
+      { value: "ar", label: "العربية" },
+      { value: "en", label: "English" },
+      { value: "tr", label: "Türkçe" },
+      { value: "fr", label: "Français" },
+      { value: "id", label: "Bahasa" },
+      { value: "pt", label: "Português" },
+      { value: "es", label: "Español" },
+      { value: "de", label: "Deutsch" },
+    ],
+    []
+  );
 
   if (loading) {
     return <LoadingSkeleton />;
@@ -1433,13 +1462,14 @@ export default function DashboardPage() {
                 <Search className="w-4 h-4 shrink-0" />
                 <span>تصفية النتائج</span>
               </CardTitle>
-              <a
-                href={exportDonationsCsvUrl}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 shrink-0"
+              <button
+                type="button"
+                onClick={() => setExportOpen(true)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 shrink-0"
               >
                 <Download className="w-4 h-4" />
-                تصدير Excel (CSV)
-              </a>
+                تصدير التقرير
+              </button>
             </div>
           </CardHeader>
           <CardContent className="pt-0 space-y-4" dir="rtl">
@@ -2075,6 +2105,32 @@ export default function DashboardPage() {
         onOpenChange={(o) => setDonationDetails((s) => ({ ...s, open: o }))}
         mode={donationDetails.mode}
         donation={donationDetails.donation}
+      />
+      <ExportReportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        endpoint="/api/admin/donations/export"
+        title="تصدير تقرير التبرعات"
+        description="اضبط المعايير قبل التصدير. سيشمل التقرير قائمة كاملة بكل العمليات بالإضافة إلى ملخص شامل."
+        defaults={exportDefaults}
+        options={{
+          categories: exportCategoryOptions,
+          campaigns: exportCampaignOptions,
+          countries: exportCountryOptions,
+          locales: exportLocaleOptions,
+        }}
+        enabledFields={{
+          period: true,
+          dateRange: true,
+          category: true,
+          campaign: true,
+          status: true,
+          type: true,
+          locale: true,
+          country: true,
+          sort: true,
+          limit: true,
+        }}
       />
     </div>
   );
