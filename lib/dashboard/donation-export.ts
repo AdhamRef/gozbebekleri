@@ -104,7 +104,10 @@ export interface ExportResult {
   /** Raw bytes (XLSX) or UTF-8 string-as-bytes (CSV) with BOM. */
   body: Buffer;
   contentType: string;
+  /** ASCII-only filename — safe for the legacy `filename=` part of Content-Disposition. */
   filename: string;
+  /** Human-friendly title (may contain Arabic) — emit as RFC 5987 `filename*=UTF-8''…`. */
+  filenameUtf8: string;
 }
 
 // ─── Donation column schema ───────────────────────────────────────────────────
@@ -1033,19 +1036,56 @@ function buildCsv(input: DonationExportInput): Buffer {
 
 // ─── Public entry point ───────────────────────────────────────────────────────
 
+/** Map common Arabic report titles to ASCII slugs so the file works on systems
+ *  that strip non-latin characters from filenames (Windows Explorer is fine,
+ *  but some download tools and email clients are not). The Content-Disposition
+ *  header in the route uses RFC 5987 to expose the full Arabic name too. */
+function asciiSlugFor(title: string): string {
+  const map: Record<string, string> = {
+    "تقرير التبرعات": "donations-report",
+    "تقرير الاشتراكات الشهرية": "monthly-subscriptions-report",
+    "تقرير الإحالة": "referral-report",
+  };
+  if (map[title]) return map[title];
+  // Last resort: keep only ASCII characters, collapse the rest.
+  const ascii = title.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  return ascii || "report";
+}
+
 export async function buildDonationExport(input: DonationExportInput): Promise<ExportResult> {
   const datePart = new Date().toISOString().slice(0, 10);
-  const baseName = input.title.replace(/[^a-zA-Z0-9؀-ۿ]+/g, "-").slice(0, 60) || "report";
+  const ascii = asciiSlugFor(input.title);
+  // Keep the Arabic title in the UTF-8 variant so browsers that honour
+  // filename*=UTF-8'' show the user-friendly name. Strip filesystem-illegal
+  // characters from both variants.
+  const sanitizeFs = (s: string) => s.replace(/[\/\\:*?"<>|]+/g, "-").trim();
+  const utf8Title = sanitizeFs(input.title);
   if (input.format === "csv") {
     return {
       body: buildCsv(input),
       contentType: "text/csv; charset=utf-8",
-      filename: `${baseName}-${datePart}.csv`,
+      filename: `${ascii}-${datePart}.csv`,
+      filenameUtf8: `${utf8Title}-${datePart}.csv`,
     };
   }
   return {
     body: await buildXlsx(input),
     contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    filename: `${baseName}-${datePart}.xlsx`,
+    filename: `${ascii}-${datePart}.xlsx`,
+    filenameUtf8: `${utf8Title}-${datePart}.xlsx`,
   };
+}
+
+/** Build a Content-Disposition header value that is safe for HTTP transport
+ *  (ASCII filename) but also surfaces the original Arabic name in browsers
+ *  that follow RFC 5987 — Chrome, Firefox, Safari all do. */
+export function buildContentDisposition(result: ExportResult): string {
+  const safe = result.filename.replace(/[^\w.\-]/g, "_");
+  // RFC 5987: encode any character that isn't an attr-char. encodeURIComponent
+  // leaves !'()* alone; encode them explicitly to be header-safe.
+  const utf8 = encodeURIComponent(result.filenameUtf8).replace(
+    /[!'()*]/g,
+    (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase()
+  );
+  return `attachment; filename="${safe}"; filename*=UTF-8''${utf8}`;
 }

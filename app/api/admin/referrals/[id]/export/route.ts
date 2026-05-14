@@ -17,6 +17,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import {
   buildDonationExport,
+  buildContentDisposition,
   type DonationExportRow,
   type SubscriptionExportRow,
   type ExportFilterDescriptor,
@@ -235,7 +236,7 @@ export async function GET(
       status: 200,
       headers: {
         "Content-Type": out.contentType,
-        "Content-Disposition": `attachment; filename="${out.filename}"`,
+        "Content-Disposition": buildContentDisposition(out),
         "Cache-Control": "no-store",
       },
     });
