@@ -483,12 +483,21 @@ export default function ReferralAnalyticsPage() {
               <>
                 <StatsMetricCard
                   compact
+                  title={thisMonthRevenueTitle}
+                  value={stats.thisMonthRevenue ?? 0}
+                  icon={Calendar}
+                  accent="emerald"
+                  format="money"
+                  variant="hero"
+                  subtitle="ناجح — الشهر الحالي (UTC)"
+                />
+                <StatsMetricCard
+                  compact
                   title={`إيرادات ناجحة (${chartFilterPeriodLabelAr})`}
                   value={stats.totalAmount ?? 0}
                   icon={DollarSign}
                   accent="emerald"
                   format="money"
-                  variant="hero"
                   subtitle="من التبرعات المدفوعة فقط — حسب الفترة والتصفية"
                 />
                 <StatsMetricCard
@@ -500,7 +509,6 @@ export default function ReferralAnalyticsPage() {
                   format="money"
                   subtitle="كل تبرعات الرابط الناجحة — دون تصفية الفئة أو المشروع"
                 />
-                <StatsMetricCard compact title={thisMonthRevenueTitle} value={stats.thisMonthRevenue ?? 0} icon={Calendar} accent="emerald" format="money" subtitle="ناجح — الشهر الحالي (UTC)" />
                 <StatsMetricCard compact title="إيرادات شهرية متكررة" value={stats.monthlyRecurringRevenue ?? 0} icon={Repeat} accent="emerald" format="money" subtitle="اشتراكات نشطة" />
                 <StatsMetricCard compact title="دعم الفريق" value={stats.teamSupportTotal ?? 0} icon={HandCoins} accent="amber" format="money" subtitle="من التبرعات الناجحة" />
                 <StatsMetricCard compact title="الرسوم" value={stats.feesTotal ?? 0} icon={Percent} accent="orange" format="money" subtitle="من التبرعات الناجحة" />

@@ -745,12 +745,21 @@ export default function MonthlySubscriptionsDashboardPage() {
               <>
                 <StatsMetricCard
                   compact
+                  title={thisMonthRevenueTitle}
+                  value={stats?.thisMonthRevenue ?? 0}
+                  icon={Calendar}
+                  accent="emerald"
+                  format="money"
+                  variant="hero"
+                  subtitle="دفعات ناجحة في الشهر الحالي (UTC)"
+                />
+                <StatsMetricCard
+                  compact
                   title={`إيرادات ناجحة (${chartFilterPeriodLabelAr})`}
                   value={stats?.totalAmount ?? 0}
                   icon={DollarSign}
                   accent="emerald"
                   format="money"
-                  variant="hero"
                   subtitle="دفعات الاشتراك المدفوعة فقط — حسب الفترة والتصفية أعلاه"
                 />
                 <StatsMetricCard
@@ -761,15 +770,6 @@ export default function MonthlySubscriptionsDashboardPage() {
                   accent="emerald"
                   format="money"
                   subtitle="كل دفعات الاشتراك الناجحة — دون تصفية الفئة أو المشروع أو الفترة"
-                />
-                <StatsMetricCard
-                  compact
-                  title={thisMonthRevenueTitle}
-                  value={stats?.thisMonthRevenue ?? 0}
-                  icon={Calendar}
-                  accent="emerald"
-                  format="money"
-                  subtitle="دفعات ناجحة في الشهر الحالي (UTC)"
                 />
                 <StatsMetricCard
                   compact

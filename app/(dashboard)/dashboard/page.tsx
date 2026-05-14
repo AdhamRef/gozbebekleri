@@ -750,12 +750,21 @@ export default function DashboardPage() {
               <>
                 <StatsMetricCard
                   compact
+                  title={thisMonthRevenueTitle}
+                  value={stats?.thisMonthRevenue ?? 0}
+                  icon={Calendar}
+                  accent="emerald"
+                  format="money"
+                  variant="hero"
+                  subtitle="دفعات ناجحة في الشهر الحالي (UTC)"
+                />
+                <StatsMetricCard
+                  compact
                   title={`إيرادات ناجحة (${chartFilterPeriodLabelAr})`}
                   value={stats?.totalAmount ?? 0}
                   icon={DollarSign}
                   accent="emerald"
                   format="money"
-                  variant="hero"
                   subtitle="مجموع التبرعات المدفوعة فقط — حسب الفترة والتصفية أعلاه"
                 />
                 <StatsMetricCard
@@ -765,16 +774,7 @@ export default function DashboardPage() {
                   icon={DollarSign}
                   accent="emerald"
                   format="money"
-                  subtitle="جميع التبرعات الناجحة بشكل عام دول فلتر"
-                />
-                <StatsMetricCard
-                  compact
-                  title={thisMonthRevenueTitle}
-                  value={stats?.thisMonthRevenue ?? 0}
-                  icon={Calendar}
-                  accent="emerald"
-                  format="money"
-                  subtitle="دفعات ناجحة في الشهر الحالي (UTC)"
+                  subtitle="جميع التبرعات الناجحة بشكل عام دون فلتر"
                 />
                 <StatsMetricCard
                   compact

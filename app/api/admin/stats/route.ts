@@ -308,12 +308,27 @@ export async function GET(request: NextRequest) {
 
     let oneTimeTotalAmount = oneTimeTotalResult._sum?.amountUSD ?? 0;
     let fromSubscriptionTotalAmount = fromSubscriptionTotalResult._sum?.amountUSD ?? 0;
-    let totalAmount = oneTimeTotalAmount + fromSubscriptionTotalAmount;
+    // Card 1 (إيرادات ناجحة للفترة) must match the way thisMonthRevenue/allTimeRevenue
+    // are computed — a single sum over paidWhere. Using oneTime + monthly split
+    // can undercount when subscriptionId is *unset* (not explicit null) on legacy
+    // Mongo rows, because Prisma's { subscriptionId: null } and { not: null } both
+    // miss those. Use the unified aggregate as the source of truth.
+    const totalPaidAgg = await prisma.donation.aggregate({
+      _sum: { amountUSD: true },
+      where: paidWhere,
+    });
+    let totalAmount = totalPaidAgg._sum?.amountUSD ?? 0;
     if (totalAmount === 0 && paidCount > 0) {
       const fb = await donationUsdRevenueFallback(paidWhere);
       oneTimeTotalAmount = fb.oneTime;
       fromSubscriptionTotalAmount = fb.monthly;
       totalAmount = fb.total;
+    }
+    // If unified total exceeds the split (legacy unset subscriptionId rows),
+    // attribute the gap to one-time so the pie still sums to totalAmount.
+    const splitSum = oneTimeTotalAmount + fromSubscriptionTotalAmount;
+    if (totalAmount > splitSum) {
+      oneTimeTotalAmount += totalAmount - splitSum;
     }
 
     const monthlyRecurringRevenue = monthlyRecurringRevenueResult._sum?.amountUSD ?? 0;

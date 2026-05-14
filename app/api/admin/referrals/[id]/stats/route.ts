@@ -228,12 +228,26 @@ export async function GET(
 
     let oneTimeTotalAmount = oneTimeTotalResult._sum?.amountUSD ?? 0;
     let fromSubscriptionTotalAmount = fromSubscriptionTotalResult._sum?.amountUSD ?? 0;
-    let totalAmount = oneTimeTotalAmount + fromSubscriptionTotalAmount;
+    // Unified paid total — must match thisMonthRevenue / allTimeRevenue.
+    // The oneTime + monthly split misses rows where subscriptionId is *unset*
+    // on legacy Mongo records (Prisma's null filter doesn't match unset), so
+    // the hero card would report less than the actual paid revenue.
+    const totalPaidAgg = await prisma.donation.aggregate({
+      _sum: { amountUSD: true },
+      where: paidDonationWhere,
+    });
+    let totalAmount = totalPaidAgg._sum?.amountUSD ?? 0;
     if (totalAmount === 0 && paidDonationCount > 0) {
       const fb = await donationUsdRevenueFallback(paidDonationWhere);
       oneTimeTotalAmount = fb.oneTime;
       fromSubscriptionTotalAmount = fb.monthly;
       totalAmount = fb.total;
+    }
+    // If unified total exceeds the split, attribute the gap to one-time so
+    // the pie still sums to totalAmount (legacy unset subscriptionId rows).
+    const splitSumRef = oneTimeTotalAmount + fromSubscriptionTotalAmount;
+    if (totalAmount > splitSumRef) {
+      oneTimeTotalAmount += totalAmount - splitSumRef;
     }
 
     const monthlyRecurringRevenue = monthlyRecurringRevenueResult._sum?.amountUSD ?? 0;
