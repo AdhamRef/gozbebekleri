@@ -159,6 +159,9 @@ interface TrackPaymentFailedOptions {
   causeId?: string;
   reason?: string;
   gateway?: string;
+  /** Donation row id when known. Required for Meta browser↔server dedup with
+   *  the matching server-side DonateFailed CAPI fire keyed by `${id}_failed`. */
+  donationId?: string;
 }
 
 // ─── Context value ────────────────────────────────────────────────────────────
@@ -729,8 +732,11 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
 
   const trackPaymentFailed = useCallback((options: TrackPaymentFailedOptions) => {
     sendCanonical({
+      // event_id must match the server's DonateFailed CAPI fire so Meta dedups
+      // the browser-pixel hit against the webhook hit (see
+      // lib/tracking/donation-conversion-server.ts → sendDonationFailedConversions).
       event:    "payment_failed",
-      event_id: generateEventId("fail"),
+      event_id: options.donationId ? `${options.donationId}_failed` : generateEventId("fail"),
       donation: {
         amount:   options.value,
         currency: options.currency,
@@ -740,6 +746,7 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
         gateway:        options.gateway as CanonicalPayment["gateway"],
         payment_status: "failed",
         failure_reason: options.reason,
+        transaction_id: options.donationId,
       },
     });
   }, [sendCanonical]);
@@ -752,7 +759,13 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
 
     sendCanonical({
       event:    "donation_complete",
-      event_id: generateEventId("pur"),
+      // event_id MUST be donation.id so it matches the server-side Donate CAPI
+      // fire from the payment-provider webhook (donation-conversion-server.ts).
+      // Without that match Meta counts the browser-pixel and server-CAPI hits
+      // as two separate conversions and ad-account totals diverge from the
+      // dashboard. Falls back to a random id only if the caller didn't pass
+      // one in — that path shouldn't happen in production.
+      event_id: orderId ?? generateEventId("pur"),
       // subscription_id is a user_data field in Meta — merge it for this event only
       user: subscriptionId ? { subscription_id: subscriptionId } : undefined,
       donation: {

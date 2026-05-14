@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import Stripe from "stripe";
 import { getDonorCountryCodeForSnapshot } from "@/lib/donations/donor-country-code";
-import { sendDonationServerConversions } from "@/lib/tracking/donation-conversion-server";
+import {
+  sendDonationServerConversions,
+  sendDonationFailedConversions,
+} from "@/lib/tracking/donation-conversion-server";
 import { dispatchDonationPaid, dispatchEvent } from "@/lib/events/dispatch";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -122,6 +125,10 @@ export async function POST(req: NextRequest) {
     }
     if (!result.ok && result.reason === "failed") {
       void dispatchEvent("DONATION_FAILED", { donationId });
+      void sendDonationFailedConversions(donationId);
+    }
+    if (!result.ok && result.reason === "order_mismatch") {
+      void sendDonationFailedConversions(donationId);
     }
 
     // PayFor failed — attempt Stripe fallback if we have donation data

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import Stripe from "stripe";
 import { getDonorCountryCodeForSnapshot } from "@/lib/donations/donor-country-code";
 import { dispatchEvent } from "@/lib/events/dispatch";
+import { sendDonationFailedConversions } from "@/lib/tracking/donation-conversion-server";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
@@ -53,6 +54,10 @@ export async function POST(req: NextRequest) {
         },
       });
       void dispatchEvent("DONATION_FAILED", { donationId });
+      // Seed Meta with the failed attempt so lookalike audiences can include
+      // donors-who-tried. Browser pixel fires the matching DonateFailed hit
+      // with event_id `${donationId}_failed` — same id here for dedup.
+      void sendDonationFailedConversions(donationId);
 
       // ── Stripe fallback ──────────────────────────────────────────────────────
       // Clone the failed donation as a new record, then redirect the

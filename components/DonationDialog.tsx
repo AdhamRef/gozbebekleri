@@ -1696,6 +1696,7 @@ const DonationDialog = ({
             causeId: campaignId || categoryId || undefined,
             reason: confirmError.message ?? "stripe_confirm_failed",
             gateway: "stripe",
+            donationId: targetDonationId,
           });
           // Redirect to /donation-failed so the user lands on the explanatory page
           // with the bank-transfer fallback — toast alone disappears too quickly.
@@ -1837,6 +1838,17 @@ const DonationDialog = ({
                   if (payforPopupRef.current && !payforPopupRef.current.closed) {
                     payforPopupRef.current.close();
                   }
+                  // Browser-side DonateFailed pixel — server CAPI fires the
+                  // matching hit from /api/payfor/3dpay/fail; same event_id
+                  // (`${donationId}_failed`) lets Meta dedup the pair.
+                  tracking?.trackPaymentFailed({
+                    value:      donationAmount,
+                    currency:   getCurrency(),
+                    causeId:    campaignId || categoryId || undefined,
+                    reason:     data.providerErrorMessage ?? data.status ?? "payfor_failed",
+                    gateway:    "payfor",
+                    donationId,
+                  });
                   router.push(
                     appendCurrencyQuery(
                       `/donation-failed?donationId=${encodeURIComponent(donationId)}`,

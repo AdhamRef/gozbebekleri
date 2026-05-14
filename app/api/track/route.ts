@@ -1,33 +1,44 @@
 /**
  * POST /api/track
  *
- * Unified server-side conversion endpoint.
- * Accepts a CanonicalEvent from the browser and:
- *  1. Hashes all PII with SHA-256
- *  2. Forwards to Meta Conversions API
- *  3. Forwards to TikTok Events API
+ * Server-side mirror for the browser canonical funnel events (PageView,
+ * ViewContent, AddToCart, InitiateCheckout, AddPaymentInfo, …). The Meta side
+ * is sent via the shared CAPI sender so the hashing, payload shape, and creds
+ * lookup match what the donation webhook uses.
  *
- * The browser already sent the same event to Meta Pixel / TikTok Pixel
- * with the same event_id, so both platforms deduplicate automatically.
+ * IMPORTANT: We skip donation_complete and payment_failed here — those are
+ * owned by the payment-provider webhook in donation-conversion-server.ts so we
+ * fire exactly one server-side hit per donation. The webhook uses donation.id
+ * as the event_id and the browser-side fbq uses the same id, so Meta dedupes
+ * the browser↔server pair into a single conversion. Mirroring those events
+ * here too would re-introduce the duplicate-counting that drifts ad-account
+ * totals from the dashboard.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import type { CanonicalEvent } from "@/lib/tracking/canonical";
-import { META_EVENT_MAP, TIKTOK_EVENT_MAP } from "@/lib/tracking/canonical";
+import {
+  META_EVENT_MAP,
+  META_CAPI_WEBHOOK_OWNED,
+  TIKTOK_EVENT_MAP,
+} from "@/lib/tracking/canonical";
+import {
+  sendMetaCapiEvent,
+  type MetaUserData,
+  type MetaCustomData,
+} from "@/lib/tracking/meta-capi";
 
-const FB_API_VERSION = "v21.0";
 const TIKTOK_EVENTS_URL = "https://business-api.tiktok.com/open_api/v1.3/event/track/";
 
-// ─── SHA-256 helper (normalise → lowercase → trim) ───────────────────────────
 function sha256(value: string | null | undefined): string | undefined {
   if (!value) return undefined;
   const normalised = String(value).trim().toLowerCase();
+  if (!normalised) return undefined;
   return crypto.createHash("sha256").update(normalised).digest("hex");
 }
 
-// ─── Main handler ─────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
     const event = (await req.json()) as CanonicalEvent;
@@ -35,19 +46,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, reason: "missing event" }, { status: 400 });
     }
 
-    // Real client IP from proxy headers
     const clientIp =
       req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       req.headers.get("x-real-ip") ||
       undefined;
 
     const row = await prisma.trackingSettings.findFirst();
-
     const results: Record<string, unknown> = {};
 
     // ── Meta CAPI ─────────────────────────────────────────────────────────────
     if (row?.facebookPixelId && row?.facebookAccessToken) {
-      results.meta = await sendMetaCAPI(event, row.facebookPixelId, row.facebookAccessToken, clientIp);
+      if (META_CAPI_WEBHOOK_OWNED.has(event.event)) {
+        // donation_complete / payment_failed → webhook owns the server hit.
+        results.meta = { skipped: true, owner: "donation-conversion-server" };
+      } else {
+        results.meta = await mirrorMetaCanonical(event, row.facebookPixelId, row.facebookAccessToken, clientIp);
+      }
     }
 
     // ── TikTok Events API ─────────────────────────────────────────────────────
@@ -62,8 +76,9 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ─── Meta CAPI sender ─────────────────────────────────────────────────────────
-async function sendMetaCAPI(
+// ─── Meta canonical-event mirror ─────────────────────────────────────────────
+
+async function mirrorMetaCanonical(
   event: CanonicalEvent,
   pixelId: string,
   accessToken: string,
@@ -76,89 +91,63 @@ async function sendMetaCAPI(
   const d = event.donation ?? {};
   const p = event.payment ?? {};
 
-  // ── Normalise gender → Meta format ("m" / "f") ───────────────────────────
-  const normalisedGender =
-    u.gender === "male" ? "m" : u.gender === "female" ? "f" : undefined;
-  // ── Normalise DOB → YYYYMMDD (strip dashes from YYYY-MM-DD) ─────────────
-  const normalisedDob = u.date_of_birth
-    ? String(u.date_of_birth).replace(/-/g, "")
-    : undefined;
-
-  const user_data: Record<string, unknown> = {};
-  if (u.email)          user_data.em              = [sha256(u.email)];
-  if (u.phone)          user_data.ph              = [sha256(u.phone)];
-  if (u.first_name)     user_data.fn              = [sha256(u.first_name)];
-  if (u.last_name)      user_data.ln              = [sha256(u.last_name)];
-  if (u.city)           user_data.ct              = [sha256(u.city)];
-  if (u.state)          user_data.st              = [sha256(u.state)];
-  if (u.zip)            user_data.zp              = [sha256(u.zip)];
-  if (u.country_code)   user_data.country         = [sha256(u.country_code)];
-  if (u.external_id)    user_data.external_id     = [sha256(u.external_id)];
-  if (normalisedGender) user_data.ge              = [sha256(normalisedGender)];
-  if (normalisedDob)    user_data.db              = [sha256(normalisedDob)];
-  // Identifiers — not hashed
-  if (u.fbp)            user_data.fbp             = u.fbp;
-  if (u.fbc)            user_data.fbc             = u.fbc;
-  if (u.user_agent)     user_data.client_user_agent = u.user_agent;
-  if (clientIp)         user_data.client_ip_address = clientIp;
-  if (u.subscription_id) user_data.subscription_id = u.subscription_id;
-
-  const custom_data: Record<string, unknown> = {};
-  // ── Core value / currency ─────────────────────────────────────────────────
-  // Send actual transaction currency/amount — not always USD
-  if (d.amount != null)  custom_data.value    = d.amount;
-  if (d.currency)        custom_data.currency = d.currency;
-  // ── Content IDs / Contents ────────────────────────────────────────────────
-  if (event.items?.length) {
-    custom_data.content_ids = event.items.map((i) => i.item_id);
-    custom_data.contents    = event.items.map((i) => ({ id: i.item_id, quantity: i.quantity ?? 1, item_price: i.price ?? 0 }));
-    custom_data.num_items   = event.items.reduce((s, i) => s + (i.quantity ?? 1), 0);
-  } else if (d.cause_id) {
-    custom_data.content_ids = [d.cause_id];
-    custom_data.contents    = [{ id: d.cause_id, quantity: 1, item_price: d.amount_usd ?? d.amount ?? 0 }];
-    custom_data.num_items   = 1;
-  }
-  // ── Content metadata ──────────────────────────────────────────────────────
-  custom_data.content_type = "product";
-  if (d.content_name ?? d.cause_name)        custom_data.content_name     = d.content_name ?? d.cause_name;
-  if (d.content_category ?? d.donation_type) custom_data.content_category = d.content_category ?? d.donation_type?.toLowerCase();
-  if (d.delivery_category)                    custom_data.delivery_category = d.delivery_category;
-  if (d.description)                          custom_data.description       = d.description;
-  if (d.status)                               custom_data.status            = d.status;
-  if (d.payment_info_available != null)       custom_data.payment_info_available = d.payment_info_available;
-  if (d.predicted_ltv != null)                custom_data.predicted_ltv    = d.predicted_ltv;
-  // ── Order / transaction ───────────────────────────────────────────────────
-  if (p.transaction_id)  custom_data.order_id = p.transaction_id;
-
-  const payload = {
-    data: [
-      {
-        event_name:        metaEventName,
-        event_time:        event.event_time,
-        event_id:          event.event_id,
-        action_source:     "website",
-        event_source_url:  event.page?.url,
-        user_data:         Object.keys(user_data).length ? user_data : undefined,
-        custom_data:       Object.keys(custom_data).length ? custom_data : undefined,
-      },
-    ],
+  const user_data: MetaUserData = {
+    email: u.email ?? null,
+    phone: u.phone ?? null,
+    first_name: u.first_name ?? null,
+    last_name: u.last_name ?? null,
+    city: u.city ?? null,
+    state: u.state ?? null,
+    zip: u.zip ?? null,
+    country_code: u.country_code ?? null,
+    external_id: u.external_id ?? null,
+    gender: u.gender ?? null,
+    date_of_birth: u.date_of_birth ?? null,
+    fbp: u.fbp ?? null,
+    fbc: u.fbc ?? null,
+    client_ip: clientIp ?? null,
+    user_agent: u.user_agent ?? null,
+    subscription_id: u.subscription_id ?? null,
   };
 
-  try {
-    const res = await fetch(
-      `https://graph.facebook.com/${FB_API_VERSION}/${pixelId}/events?access_token=${encodeURIComponent(accessToken)}`,
-      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }
-    );
-    const data = await res.json();
-    if (!res.ok) {
-      console.error("[Meta CAPI] error:", data?.error?.message);
-      return { ok: false, error: data?.error?.message };
-    }
-    return { ok: true, events_received: data?.events_received };
-  } catch (e) {
-    console.error("[Meta CAPI] fetch failed:", e);
-    return { ok: false, error: "fetch failed" };
+  const custom_data: MetaCustomData = {};
+  if (d.amount != null) custom_data.value = d.amount;
+  if (d.currency) custom_data.currency = d.currency;
+  if (event.items?.length) {
+    custom_data.content_ids = event.items.map((i) => i.item_id);
+    custom_data.contents = event.items.map((i) => ({
+      id: i.item_id,
+      quantity: i.quantity ?? 1,
+      item_price: i.price ?? 0,
+    }));
+    custom_data.num_items = event.items.reduce((s, i) => s + (i.quantity ?? 1), 0);
+  } else if (d.cause_id) {
+    custom_data.content_ids = [d.cause_id];
+    custom_data.contents = [{ id: d.cause_id, quantity: 1, item_price: d.amount ?? d.amount_usd ?? 0 }];
+    custom_data.num_items = 1;
   }
+  custom_data.content_type = "product";
+  if (d.content_name ?? d.cause_name) custom_data.content_name = d.content_name ?? d.cause_name;
+  if (d.content_category ?? d.donation_type) {
+    custom_data.content_category = d.content_category ?? d.donation_type?.toLowerCase();
+  }
+  if (d.description) custom_data.description = d.description;
+  if (d.status) custom_data.status = d.status;
+  if (d.payment_info_available != null) custom_data.payment_info_available = d.payment_info_available;
+  if (d.predicted_ltv != null) custom_data.predicted_ltv = d.predicted_ltv;
+  if (p.transaction_id) custom_data.order_id = p.transaction_id;
+
+  return sendMetaCapiEvent(
+    {
+      event_name: metaEventName,
+      event_id: event.event_id,
+      event_time: event.event_time,
+      event_source_url: event.page?.url,
+      user_data,
+      custom_data,
+    },
+    { pixelId, accessToken }
+  );
 }
 
 // ─── TikTok Events API sender ─────────────────────────────────────────────────

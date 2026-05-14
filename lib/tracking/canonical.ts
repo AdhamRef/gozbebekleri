@@ -130,8 +130,21 @@ export const META_EVENT_MAP: Partial<Record<CanonicalEventName, string>> = {
   begin_checkout:     "InitiateCheckout",
   add_payment_info:   "AddPaymentInfo",
   donation_complete:  "Donate",
+  payment_failed:     "DonateFailed",  // custom event — lookalike seed for almost-donors
   sign_up:            "CompleteRegistration",
 };
+
+/**
+ * Canonical events the server CAPI mirror in /api/track must SKIP because the
+ * webhook (lib/tracking/donation-conversion-server.ts) is the authoritative
+ * source — firing both would double-count in Meta. Browser-side fbq still fires
+ * these client-side; the webhook handles the matching server-side hit with the
+ * same event_id so Meta deduplicates the pair.
+ */
+export const META_CAPI_WEBHOOK_OWNED: ReadonlySet<CanonicalEventName> = new Set([
+  "donation_complete",
+  "payment_failed",
+]);
 
 export const TIKTOK_EVENT_MAP: Partial<Record<CanonicalEventName, string>> = {
   page_view:          "PageView",

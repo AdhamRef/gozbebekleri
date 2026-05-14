@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { dispatchEvent } from "@/lib/events/dispatch";
+import { sendDonationFailedConversions } from "@/lib/tracking/donation-conversion-server";
 
 /**
  * Mark a donation as FAILED.
@@ -58,6 +59,9 @@ export async function PATCH(
       },
     });
     void dispatchEvent("DONATION_FAILED", { donationId: id });
+    // Seed Meta with the failed attempt — browser pixel fires the matching
+    // DonateFailed hit with event_id `${id}_failed` so the pair deduplicates.
+    void sendDonationFailedConversions(id);
 
     return NextResponse.json({ ok: true });
   } catch (err) {
