@@ -11,6 +11,7 @@ import {
   normalizeDonationCurrencyCode,
 } from "@/lib/exchange/convert-amount-in-currency-to-usd";
 import {
+  countryCodeFromPhone,
   getDonorCountryCodeForSnapshot,
   normalizeDonorCountryCode,
 } from "@/lib/donations/donor-country-code";
@@ -126,6 +127,9 @@ export async function POST(request: NextRequest) {
       donorName = session.user.name ?? null;
     } else if (guest) {
       const email = guest.email?.trim() || null;
+      const guestPhone = guest.phone || undefined;
+      const guestCountry =
+        normalizeDonorCountryCode(guest.countryCode) ?? countryCodeFromPhone(guestPhone) ?? undefined;
       if (email) {
         const existing = await prisma.user.findFirst({ where: { email } });
         if (existing) {
@@ -138,8 +142,8 @@ export async function POST(request: NextRequest) {
               email,
               name,
               role: "DONOR",
-              phone: guest.phone || undefined,
-              countryCode: guest.countryCode || undefined,
+              phone: guestPhone,
+              countryCode: guestCountry,
               city: guest.city || undefined,
               region: guest.region || undefined,
               preferredLang: inferLocaleFromRequest(request, donationLocale),
@@ -154,8 +158,8 @@ export async function POST(request: NextRequest) {
           data: {
             name,
             role: "DONOR",
-            phone: guest.phone || undefined,
-            countryCode: guest.countryCode || undefined,
+            phone: guestPhone,
+            countryCode: guestCountry,
             city: guest.city || undefined,
             region: guest.region || undefined,
             preferredLang: inferLocaleFromRequest(request, donationLocale),
@@ -172,6 +176,7 @@ export async function POST(request: NextRequest) {
       session?.user?.id
         ? (await getDonorCountryCodeForSnapshot(prisma, donorId)) ?? undefined
         : normalizeDonorCountryCode(guest?.countryCode) ??
+          countryCodeFromPhone(guest?.phone) ??
           ((await getDonorCountryCodeForSnapshot(prisma, donorId)) ?? undefined);
 
     // Card payments are handled via PayFor 3D Secure redirect flow (we do not store PAN/CVV).

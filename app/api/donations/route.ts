@@ -10,6 +10,7 @@ import {
   normalizeDonationCurrencyCode,
 } from "@/lib/exchange/convert-amount-in-currency-to-usd";
 import {
+  countryCodeFromPhone,
   getDonorCountryCodeForSnapshot,
   normalizeDonorCountryCode,
 } from "@/lib/donations/donor-country-code";
@@ -182,6 +183,9 @@ export async function POST(request: NextRequest) {
     } else if (guest) {
       const guestEmail: string | undefined = guest.email?.trim() || undefined;
       const guestName = [guest.firstName, guest.lastName].filter(Boolean).join(" ") || "Guest";
+      const guestPhone = guest.phone?.trim() || undefined;
+      const guestCountry =
+        normalizeDonorCountryCode(guest.countryCode) ?? countryCodeFromPhone(guestPhone) ?? undefined;
       if (guestEmail) {
         // Upsert: if real account exists keep it, otherwise create guest record
         const existing = await prisma.user.findUnique({ where: { email: guestEmail }, select: { id: true, name: true } });
@@ -193,8 +197,8 @@ export async function POST(request: NextRequest) {
             data: {
               email: guestEmail,
               name: guestName,
-              phone: guest.phone?.trim() || undefined,
-              countryCode: guest.countryCode || undefined,
+              phone: guestPhone,
+              countryCode: guestCountry,
               city: guest.city || undefined,
               region: guest.region || undefined,
               preferredLang: inferLocaleFromRequest(request, donationLocale),
@@ -209,8 +213,8 @@ export async function POST(request: NextRequest) {
         const anon = await prisma.user.create({
           data: {
             name: guestName || "Guest",
-            phone: guest.phone?.trim() || undefined,
-            countryCode: guest.countryCode || undefined,
+            phone: guestPhone,
+            countryCode: guestCountry,
             city: guest.city || undefined,
             region: guest.region || undefined,
             preferredLang: inferLocaleFromRequest(request, donationLocale),
@@ -228,6 +232,7 @@ export async function POST(request: NextRequest) {
       session?.user?.id
         ? (await getDonorCountryCodeForSnapshot(prisma, donorId)) ?? undefined
         : normalizeDonorCountryCode(guest?.countryCode) ??
+          countryCodeFromPhone(guest?.phone) ??
           ((await getDonorCountryCodeForSnapshot(prisma, donorId)) ?? undefined);
 
     // Card payments are handled via PayFor 3D Secure redirect flow (we do not store PAN/CVV).
