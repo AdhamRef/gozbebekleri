@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from '@/lib/currency-link';
@@ -11,8 +11,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { HandHeartIcon, Receipt, Calendar, Heart, ArrowLeft, Repeat, Info, Download, Loader2, FileText } from 'lucide-react';
 import { useConfettiStore } from '@/hooks/use-confetti-store';
-import { useTracking } from '@/components/TrackingPixels';
-import { useSession } from 'next-auth/react';
 import axios from 'axios';
 import { format } from 'date-fns';
 import type { Locale } from 'date-fns';
@@ -29,14 +27,9 @@ const DonationSuccessPage = () => {
   const t = useTranslations('DonationSuccess');
   const locale = useLocale();
   const confetti = useConfettiStore();
-  const tracking = useTracking();
-  const { data: session } = useSession();
-  const purchaseTracked = useRef(false);
   const [donation, setDonation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
-  // undefined = still loading, null = no session / fetch failed, object = loaded
-  const [userProfile, setUserProfile] = useState<any>(undefined);
   const dateLocale = dateLocales[locale] ?? enUS;
   const isRtl = locale === 'ar';
   const isMonthly = donation?.type === 'MONTHLY';
@@ -49,73 +42,6 @@ const DonationSuccessPage = () => {
       setLoading(false);
     }
   }, [id]);
-
-  // Fetch full user profile for tracking enrichment
-  useEffect(() => {
-    if (!session?.user?.id) { setUserProfile(null); return; }
-    axios.get(`/api/users/${session.user.id}`)
-      .then((res) => setUserProfile(res.data?.user ?? null))
-      .catch(() => setUserProfile(null));
-  }, [session?.user?.id]);
-
-  useEffect(() => {
-    // Wait for donation AND user profile to resolve before firing
-    if (!donation || !id || purchaseTracked.current || !tracking || userProfile === undefined) return;
-    purchaseTracked.current = true;
-
-    // Push full user data for all PII parameters — prefer userProfile, fall back to donation.donor
-    const nameParts = (userProfile?.name ?? donation.donor?.name ?? "").trim().split(/\s+/);
-    tracking.setUserData({
-      external_id:   session?.user?.id ?? donation.donor?.id ?? undefined,
-      email:         userProfile?.email ?? donation.donor?.email ?? undefined,
-      phone:         userProfile?.phone ?? donation.donor?.phone ?? undefined,
-      first_name:    nameParts[0] || undefined,
-      last_name:     nameParts.slice(1).join(" ") || undefined,
-      gender:        userProfile?.gender ?? donation.donor?.gender ?? undefined,
-      date_of_birth: userProfile?.birthdate ?? donation.donor?.birthdate ?? undefined,
-      country_code:  userProfile?.countryCode ?? donation.donor?.countryCode ?? undefined,
-      city:          userProfile?.city ?? donation.donor?.city ?? undefined,
-      state:         userProfile?.region ?? donation.donor?.region ?? undefined,
-    });
-
-    // Use actual charged amount + currency (not always USD)
-    const value    = Number(donation.totalAmount ?? 0);
-    const valueUSD = Number(donation.amountUSD ?? donation.totalAmount ?? 0);
-    const currency = donation.currency ?? "USD";
-
-    const causeName = donation.items?.[0]?.campaign?.title ?? donation.categoryItems?.[0]?.category?.name;
-
-    const itemsFromDonation = [
-      ...(donation.items ?? []).map((item: { campaign?: { id?: string; title?: string }; campaignId?: string; amount?: number; amountUSD?: number }) => ({
-        item_id:       item.campaign?.id ?? item.campaignId ?? "donation",
-        item_name:     item.campaign?.title ?? "Campaign Donation",
-        item_category: "donation",
-        price:         Number(item.amount ?? item.amountUSD ?? 0),
-        quantity:      1,
-      })),
-      ...(donation.categoryItems ?? []).map((ci: { category?: { id?: string; name?: string }; categoryId?: string; amount?: number; amountUSD?: number }) => ({
-        item_id:       ci.category?.id ?? ci.categoryId ?? "category",
-        item_name:     ci.category?.name ?? "Category Donation",
-        item_category: "donation",
-        price:         Number(ci.amount ?? ci.amountUSD ?? 0),
-        quantity:      1,
-      })),
-    ];
-
-    tracking.trackDonate({
-      value,
-      valueUSD,
-      currency,
-      orderId:        donation.id,
-      numItems:       itemsFromDonation.length || 1,
-      items:          itemsFromDonation.length ? itemsFromDonation : undefined,
-      donationType:   donation.type as "ONE_TIME" | "MONTHLY",
-      causeId:        donation.items?.[0]?.campaignId ?? donation.categoryItems?.[0]?.categoryId,
-      causeName,
-      gateway:        donation.provider,
-      subscriptionId: donation.subscriptionId ?? undefined,
-    });
-  }, [donation, id, tracking, session?.user?.id, userProfile]);
 
   const fetchDonation = async () => {
     if (!id) return;
