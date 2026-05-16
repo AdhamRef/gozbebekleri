@@ -15,6 +15,7 @@ import {
   getDonorCountryCodeForSnapshot,
   normalizeDonorCountryCode,
 } from "@/lib/donations/donor-country-code";
+import { resolveGuestDonor } from "@/lib/users/resolve-guest-donor";
 
 export async function GET(request: NextRequest) {
   try {
@@ -126,48 +127,24 @@ export async function POST(request: NextRequest) {
       donorId = session.user.id;
       donorName = session.user.name ?? null;
     } else if (guest) {
-      const email = guest.email?.trim() || null;
       const guestPhone = guest.phone || undefined;
       const guestCountry =
         normalizeDonorCountryCode(guest.countryCode) ?? countryCodeFromPhone(guestPhone) ?? undefined;
-      if (email) {
-        const existing = await prisma.user.findFirst({ where: { email } });
-        if (existing) {
-          donorId = existing.id;
-          donorName = existing.name;
-        } else {
-          const name = [guest.firstName, guest.lastName].filter(Boolean).join(" ") || null;
-          const newUser = await prisma.user.create({
-            data: {
-              email,
-              name,
-              role: "DONOR",
-              phone: guestPhone,
-              countryCode: guestCountry,
-              city: guest.city || undefined,
-              region: guest.region || undefined,
-              preferredLang: inferLocaleFromRequest(request, donationLocale),
-            },
-          });
-          donorId = newUser.id;
-          donorName = newUser.name;
-        }
-      } else {
-        const name = [guest.firstName, guest.lastName].filter(Boolean).join(" ") || null;
-        const newUser = await prisma.user.create({
-          data: {
-            name,
-            role: "DONOR",
-            phone: guestPhone,
-            countryCode: guestCountry,
-            city: guest.city || undefined,
-            region: guest.region || undefined,
-            preferredLang: inferLocaleFromRequest(request, donationLocale),
-          },
-        });
-        donorId = newUser.id;
-        donorName = newUser.name;
-      }
+      const resolved = await resolveGuestDonor(
+        prisma,
+        {
+          firstName: guest.firstName,
+          lastName: guest.lastName,
+          email: guest.email,
+          phone: guest.phone,
+          countryCode: guestCountry ?? null,
+          city: guest.city ?? null,
+          region: guest.region ?? null,
+        },
+        { preferredLang: inferLocaleFromRequest(request, donationLocale) ?? null }
+      );
+      donorId = resolved.donorId;
+      donorName = resolved.donorName;
     } else {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

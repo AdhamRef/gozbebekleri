@@ -511,7 +511,9 @@
     "paymentSwitching": "Transfert vers une passerelle de paiement alternative…",
     "paymentSwitchingDesc": "Une erreur s'est produite avec la passerelle de paiement. Vous serez automatiquement redirigé pour finaliser votre paiement via une passerelle alternative.",
     "sslSecurePayment": "Chiffré SSL 256 bits · Paiement sécurisé",
-    "stripeMinDonation": "Don minimum : {amount} {currency}"
+    "stripeMinDonation": "Don minimum : {amount} {currency}",
+    "certificateNoteTitle": "Recevez votre certificat de don ✨",
+    "certificateNoteBody": "Indiquez votre vraie adresse e-mail pour recevoir le certificat officiel de don de la fondation ainsi que votre reçu — c'est le seul moyen de les obtenir."
   },
   "DonationSuccess": {
     "thankYou": "Merci beaucoup",
@@ -541,7 +543,15 @@
     "receiptDescription": "Reçu officiel de don pour vos enregistrements",
     "downloadPDF": "Télécharger PDF",
     "downloading": "Téléchargement...",
-    "cancelMonthlyHint": "Vous pouvez annuler votre don mensuel à tout moment depuis votre profil ou en contactant le service donateurs."
+    "cancelMonthlyHint": "Vous pouvez annuler votre don mensuel à tout moment depuis votre profil ou en contactant le service donateurs.",
+    "signupCtaTitle": "Conservez votre don pour toujours — créez votre compte",
+    "signupCtaBody": "Inscrivez-vous en quelques secondes et nous rattacherons automatiquement ce don, ainsi que tous vos dons précédents effectués en tant qu'invité, à votre nouveau compte.",
+    "signupCtaButton": "Créer mon compte",
+    "signupCtaBenefitHistory": "Historique complet de vos dons",
+    "signupCtaBenefitReceipts": "Tous les reçus au même endroit",
+    "signupCtaBenefitImpact": "Suivez votre impact",
+    "linkSuccess": "Votre don est désormais lié à votre compte 🎉",
+    "linkFailed": "Nous n'avons pas pu lier ce don automatiquement. Contactez l'assistance et nous le ferons pour vous."
   },
   "CartSheet": {
     "myDonationCart": "Mon panier de dons",

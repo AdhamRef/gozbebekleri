@@ -511,7 +511,9 @@
     "paymentSwitching": "Switching to backup payment gateway…",
     "paymentSwitchingDesc": "An error occurred with the payment gateway. You will be automatically redirected to complete your payment via an alternative gateway.",
     "sslSecurePayment": "256-bit SSL encrypted · Secure payment",
-    "stripeMinDonation": "Minimum donation: {amount} {currency}"
+    "stripeMinDonation": "Minimum donation: {amount} {currency}",
+    "certificateNoteTitle": "Get your donation certificate ✨",
+    "certificateNoteBody": "Add your real email so we can send you the foundation's official donation certificate and receipt — it's the only way you'll receive them."
   },
   "DonationSuccess": {
     "thankYou": "Thank you very much",
@@ -541,7 +543,15 @@
     "receiptDescription": "Official donation receipt for your records",
     "downloadPDF": "Download PDF",
     "downloading": "Downloading...",
-    "cancelMonthlyHint": "You can cancel your monthly donation anytime from your profile or by contacting donor support."
+    "cancelMonthlyHint": "You can cancel your monthly donation anytime from your profile or by contacting donor support.",
+    "signupCtaTitle": "Save your donation forever — create your account",
+    "signupCtaBody": "Sign up in seconds and we'll automatically attach this donation, plus every other guest donation you've made, to your brand-new account.",
+    "signupCtaButton": "Create my account",
+    "signupCtaBenefitHistory": "Full donation history",
+    "signupCtaBenefitReceipts": "All receipts in one place",
+    "signupCtaBenefitImpact": "Track your real impact",
+    "linkSuccess": "Your donation is now safely linked to your account 🎉",
+    "linkFailed": "We couldn't link this donation automatically. Please contact support and we'll do it for you."
   },
   "CartSheet": {
     "myDonationCart": "My Donation Cart",

@@ -511,7 +511,9 @@
     "paymentSwitching": "Beralih ke gerbang pembayaran cadangan…",
     "paymentSwitchingDesc": "Terjadi kesalahan pada gerbang pembayaran. Anda akan dialihkan secara otomatis untuk menyelesaikan pembayaran melalui gerbang alternatif.",
     "sslSecurePayment": "Enkripsi SSL 256-bit · Pembayaran aman",
-    "stripeMinDonation": "Donasi minimum: {amount} {currency}"
+    "stripeMinDonation": "Donasi minimum: {amount} {currency}",
+    "certificateNoteTitle": "Dapatkan sertifikat donasimu ✨",
+    "certificateNoteBody": "Masukkan email aslimu agar kami dapat mengirim sertifikat donasi resmi dari yayasan beserta kuitansimu — hanya dengan begitu kamu akan menerimanya."
   },
   "DonationSuccess": {
     "thankYou": "Terima kasih banyak",
@@ -541,7 +543,15 @@
     "receiptDescription": "Struk donasi resmi untuk catatan Anda",
     "downloadPDF": "Unduh PDF",
     "downloading": "Mengunduh...",
-    "cancelMonthlyHint": "Anda dapat membatalkan donasi bulanan kapan saja dari profil Anda atau dengan menghubungi dukungan donatur."
+    "cancelMonthlyHint": "Anda dapat membatalkan donasi bulanan kapan saja dari profil Anda atau dengan menghubungi dukungan donatur.",
+    "signupCtaTitle": "Simpan donasimu selamanya — buat akunmu sekarang",
+    "signupCtaBody": "Daftar dalam hitungan detik dan kami akan secara otomatis menautkan donasi ini, beserta semua donasi sebelumnya yang kamu buat sebagai tamu, ke akun barumu.",
+    "signupCtaButton": "Buat akun saya",
+    "signupCtaBenefitHistory": "Riwayat donasi lengkap",
+    "signupCtaBenefitReceipts": "Semua kuitansi dalam satu tempat",
+    "signupCtaBenefitImpact": "Pantau dampakmu",
+    "linkSuccess": "Donasimu kini tertaut dengan akunmu 🎉",
+    "linkFailed": "Kami tidak dapat menautkan donasi ini secara otomatis. Hubungi tim dukungan dan kami akan melakukannya untukmu."
   },
   "CartSheet": {
     "myDonationCart": "Keranjang Donasi Saya",

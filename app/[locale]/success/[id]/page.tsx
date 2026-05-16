@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import React, { useEffect, useRef, useState } from 'react';
+import { useParams, usePathname } from 'next/navigation';
 import { useRouter } from '@/i18n/routing';
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from '@/lib/currency-link';
 import { useTranslations } from 'next-intl';
@@ -9,7 +9,7 @@ import { useLocale } from 'next-intl';
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { HandHeartIcon, Receipt, Calendar, Heart, ArrowLeft, Repeat, Info, Download, Loader2, FileText } from 'lucide-react';
+import { HandHeartIcon, Receipt, Calendar, Heart, ArrowLeft, Repeat, Info, Download, Loader2, FileText, ShieldCheck, Sparkles, UserPlus } from 'lucide-react';
 import { useConfettiStore } from '@/hooks/use-confetti-store';
 import axios from 'axios';
 import { format } from 'date-fns';
@@ -17,6 +17,8 @@ import type { Locale } from 'date-fns';
 import { ar, enUS, fr, tr, id, pt, es } from 'date-fns/locale';
 import Image from 'next/image';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useSession } from 'next-auth/react';
+import SignInDialog from '@/components/SignInDialog';
 
 const dateLocales: Record<string, Locale> = { ar, en: enUS, fr, tr, id, pt, es };
 
@@ -24,15 +26,28 @@ const DonationSuccessPage = () => {
   const params = useParams();
   const id = params?.id as string | undefined;
   const router = useRouter();
+  const pathname = usePathname() ?? '/';
   const t = useTranslations('DonationSuccess');
   const locale = useLocale();
   const confetti = useConfettiStore();
+  const { data: session, status: sessionStatus } = useSession();
   const [donation, setDonation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [signInOpen, setSignInOpen] = useState(false);
+  const [linkState, setLinkState] = useState<'idle' | 'linking' | 'linked' | 'failed'>('idle');
+  const linkAttemptedRef = useRef(false);
   const dateLocale = dateLocales[locale] ?? enUS;
   const isRtl = locale === 'ar';
   const isMonthly = donation?.type === 'MONTHLY';
+
+  // Show the signup CTA only to unauthenticated visitors looking at their own
+  // fresh donation — once they're signed in there's nothing more to claim.
+  const showSignupCta =
+    !!donation &&
+    sessionStatus !== 'loading' &&
+    !session?.user?.id &&
+    linkState !== 'linked';
 
   useEffect(() => {
     if (id) {
@@ -54,6 +69,37 @@ const DonationSuccessPage = () => {
       setLoading(false);
     }
   };
+
+  // After the donor signs in (either inline via the dialog or via a Google
+  // redirect that drops them back here), automatically pull every donation
+  // attached to the guest record onto the freshly-authenticated account.
+  useEffect(() => {
+    if (!id) return;
+    if (linkAttemptedRef.current) return;
+    if (sessionStatus !== 'authenticated') return;
+    if (!donation?.donor?.id) return;
+    if (session?.user?.id === donation.donor.id) return;
+
+    linkAttemptedRef.current = true;
+    setLinkState('linking');
+    axios
+      .post('/api/users/link-guest', { donationId: id })
+      .then(async () => {
+        setLinkState('linked');
+        await fetchDonation();
+      })
+      .catch((err) => {
+        const reason = err?.response?.data?.error;
+        // Donor was already a real account (e.g. matched by email) — nothing
+        // to merge, just hide the banner.
+        if (reason === 'GUEST_NOT_ELIGIBLE') {
+          setLinkState('linked');
+        } else {
+          console.error('[link-guest]', err);
+          setLinkState('failed');
+        }
+      });
+  }, [id, sessionStatus, session?.user?.id, donation?.donor?.id]);
 
   const handleDownloadReceipt = async () => {
     if (!donation || !id) return;
@@ -167,6 +213,81 @@ const DonationSuccessPage = () => {
             </CardContent>
           </Card>
         </motion.section>
+
+        {/* Sign-up CTA — guest donations only. Encourages the donor to claim
+            this donation under a real account so their history persists. */}
+        {showSignupCta && (
+          <motion.section
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12, duration: 0.35 }}
+            className="mb-8"
+          >
+            <Card className="border-2 border-[#FA5D17]/30 bg-gradient-to-br from-orange-50 via-amber-50 to-orange-50/40 shadow-sm overflow-hidden">
+              <CardContent className="p-5 sm:p-6">
+                <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-5">
+                  <div className="relative shrink-0">
+                    <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-[#FA5D17] to-orange-600 text-white shadow-md">
+                      <UserPlus className="w-7 h-7" />
+                    </div>
+                    <span className="absolute -top-1 -right-1 inline-flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 text-white shadow ring-2 ring-white">
+                      <Sparkles className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0 text-center sm:text-start">
+                    <p className="text-base sm:text-lg font-bold text-slate-900 mb-1">
+                      {t('signupCtaTitle')}
+                    </p>
+                    <p className="text-sm text-slate-600 leading-relaxed">
+                      {t('signupCtaBody')}
+                    </p>
+                    <ul className="mt-2.5 flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-1.5 text-[12px] text-slate-700">
+                      <li className="inline-flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5 text-[#025EB8]" />
+                        {t('signupCtaBenefitHistory')}
+                      </li>
+                      <li className="inline-flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-[#025EB8]" />
+                        {t('signupCtaBenefitReceipts')}
+                      </li>
+                      <li className="inline-flex items-center gap-1.5">
+                        <Heart className="w-3.5 h-3.5 text-[#FA5D17]" />
+                        {t('signupCtaBenefitImpact')}
+                      </li>
+                    </ul>
+                  </div>
+                  <Button
+                    onClick={() => setSignInOpen(true)}
+                    className="gap-2 bg-[#FA5D17] hover:bg-[#e04d0f] text-white font-semibold px-6 py-5 rounded-xl shadow-md hover:shadow-lg transition-all shrink-0"
+                  >
+                    <UserPlus className="w-5 h-5" />
+                    {t('signupCtaButton')}
+                  </Button>
+                </div>
+                {linkState === 'failed' && (
+                  <p className="mt-3 text-[12px] text-rose-600 text-center sm:text-start">
+                    {t('linkFailed')}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </motion.section>
+        )}
+
+        {/* Tiny confirmation when we've just merged a guest donation onto a
+            signed-in account — gives the donor a clear "your history now
+            includes this donation" signal. */}
+        {linkState === 'linked' && sessionStatus === 'authenticated' && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className="mb-6 flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-700"
+          >
+            <ShieldCheck className="w-4 h-4 shrink-0" />
+            <span>{t('linkSuccess')}</span>
+          </motion.div>
+        )}
 
         {/* Monthly donation highlight */}
         {isMonthly && donation.nextBillingDate && (
@@ -364,6 +485,15 @@ const DonationSuccessPage = () => {
           </Button>
         </motion.div>
       </div>
+
+      {/* Sign-in dialog opened by the guest CTA. We hand it the current path
+          as callbackUrl so a full OAuth redirect drops the donor back here,
+          where the link-guest effect will fire automatically. */}
+      <SignInDialog
+        isOpen={signInOpen}
+        onClose={() => setSignInOpen(false)}
+        callbackUrl={pathname}
+      />
     </main>
   );
 };

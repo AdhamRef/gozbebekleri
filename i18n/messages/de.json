@@ -511,7 +511,9 @@
     "paymentSwitching": "Switching to backup payment gateway…",
     "paymentSwitchingDesc": "An error occurred with the payment gateway. You will be automatically redirected to complete your payment via an alternative gateway.",
     "sslSecurePayment": "256-bit SSL encrypted · Secure payment",
-    "stripeMinDonation": "Minimum donation: {amount} {currency}"
+    "stripeMinDonation": "Minimum donation: {amount} {currency}",
+    "certificateNoteTitle": "Erhalte deine Spendenbescheinigung ✨",
+    "certificateNoteBody": "Gib deine echte E-Mail-Adresse an, damit wir dir die offizielle Spendenbescheinigung und Quittung der Stiftung zusenden können — nur so erreichen sie dich."
   },
   "DonationSuccess": {
     "thankYou": "Thank you very much",
@@ -541,7 +543,15 @@
     "receiptDescription": "Official donation receipt for your records",
     "downloadPDF": "Download PDF",
     "downloading": "Downloading...",
-    "cancelMonthlyHint": "You can cancel your monthly donation anytime from your profile or by contacting donor support."
+    "cancelMonthlyHint": "You can cancel your monthly donation anytime from your profile or by contacting donor support.",
+    "signupCtaTitle": "Sichere deine Spende für immer — erstelle jetzt dein Konto",
+    "signupCtaBody": "Registriere dich in Sekunden und wir verknüpfen diese Spende — und alle weiteren Spenden, die du als Gast getätigt hast — automatisch mit deinem neuen Konto.",
+    "signupCtaButton": "Konto erstellen",
+    "signupCtaBenefitHistory": "Vollständige Spendenhistorie",
+    "signupCtaBenefitReceipts": "Alle Quittungen an einem Ort",
+    "signupCtaBenefitImpact": "Verfolge deine Wirkung",
+    "linkSuccess": "Deine Spende wurde erfolgreich mit deinem Konto verknüpft 🎉",
+    "linkFailed": "Wir konnten diese Spende nicht automatisch verknüpfen. Bitte kontaktiere den Support, und wir erledigen es für dich."
   },
   "CartSheet": {
     "myDonationCart": "My Donation Cart",

@@ -511,7 +511,9 @@
     "paymentSwitching": "A mudar para o gateway de pagamento alternativo…",
     "paymentSwitchingDesc": "Ocorreu um erro com o gateway de pagamento. Será redirecionado automaticamente para concluir o pagamento por uma via alternativa.",
     "sslSecurePayment": "Encriptação SSL de 256 bits · Pagamento seguro",
-    "stripeMinDonation": "Doação mínima: {amount} {currency}"
+    "stripeMinDonation": "Doação mínima: {amount} {currency}",
+    "certificateNoteTitle": "Receba o seu certificado de doação ✨",
+    "certificateNoteBody": "Indique o seu e-mail real para podermos enviar-lhe o certificado oficial de doação da fundação e o recibo — é a única forma de os receber."
   },
   "DonationSuccess": {
     "thankYou": "Muito obrigado",
@@ -541,7 +543,15 @@
     "receiptDescription": "Recibo oficial de doação para os seus registos",
     "downloadPDF": "Descarregar PDF",
     "downloading": "A descarregar...",
-    "cancelMonthlyHint": "Pode cancelar a sua doação mensal a qualquer momento no seu perfil ou contactando o apoio ao doador."
+    "cancelMonthlyHint": "Pode cancelar a sua doação mensal a qualquer momento no seu perfil ou contactando o apoio ao doador.",
+    "signupCtaTitle": "Guarde a sua doação para sempre — crie a sua conta",
+    "signupCtaBody": "Registe-se em segundos e iremos ligar automaticamente esta doação, juntamente com todas as anteriores feitas como convidado, à sua nova conta.",
+    "signupCtaButton": "Criar a minha conta",
+    "signupCtaBenefitHistory": "Histórico completo de doações",
+    "signupCtaBenefitReceipts": "Todos os recibos num só lugar",
+    "signupCtaBenefitImpact": "Acompanhe o seu impacto",
+    "linkSuccess": "A sua doação está agora ligada à sua conta 🎉",
+    "linkFailed": "Não foi possível ligar esta doação automaticamente. Contacte o apoio e trataremos disso por si."
   },
   "CartSheet": {
     "myDonationCart": "O meu carrinho de doações",

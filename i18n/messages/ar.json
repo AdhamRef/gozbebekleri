@@ -511,7 +511,9 @@
     "paymentSwitching": "جارٍ التحويل إلى بوابة دفع بديلة…",
     "paymentSwitchingDesc": "حدث خطأ في بوابة الدفع، سيتم توجيهك تلقائياً لإتمام الدفع عبر بوابة بديلة",
     "sslSecurePayment": "مشفَّر بـ SSL 256-بت · دفع آمن",
-    "stripeMinDonation": "الحد الأدنى للتبرع: {amount} {currency}"
+    "stripeMinDonation": "الحد الأدنى للتبرع: {amount} {currency}",
+    "certificateNoteTitle": "احصل على شهادة تبرعك ✨",
+    "certificateNoteBody": "أدخل بريدك الإلكتروني الحقيقي لتصلك شهادة التبرع الرسمية من المؤسسة وإيصال تبرعك — هذه هي الطريقة الوحيدة لاستلامهما."
   },
   "DonationSuccess": {
     "thankYou": "شكراً جزيلاً",
@@ -541,7 +543,15 @@
     "receiptDescription": "إيصال تبرع رسمي لسجلاتك",
     "downloadPDF": "تحميل PDF",
     "downloading": "جاري التحميل...",
-    "cancelMonthlyHint": "يمكنك إلغاء تبرعك الشهري في أي وقت من خلال صفحة حسابك أو بالتواصل مع خدمة المتبرعين."
+    "cancelMonthlyHint": "يمكنك إلغاء تبرعك الشهري في أي وقت من خلال صفحة حسابك أو بالتواصل مع خدمة المتبرعين.",
+    "signupCtaTitle": "احفظ تبرعك للأبد — أنشئ حسابك الآن",
+    "signupCtaBody": "بإنشاء حسابك سنربط هذا التبرع وكل التبرعات السابقة التي قمت بها كزائر بحسابك الجديد تلقائيًا، لتبقى محفوظة معك إلى الأبد.",
+    "signupCtaButton": "أنشئ حسابي",
+    "signupCtaBenefitHistory": "سجل تبرعاتك كاملاً",
+    "signupCtaBenefitReceipts": "كل الإيصالات في مكان واحد",
+    "signupCtaBenefitImpact": "تابع أثرك بنفسك",
+    "linkSuccess": "تم ربط تبرعك بحسابك بنجاح 🎉",
+    "linkFailed": "تعذر ربط هذا التبرع تلقائيًا. تواصل معنا وسنقوم بربطه نيابة عنك."
   },
   "CartSheet": {
     "myDonationCart": "سلة تبرعاتي",

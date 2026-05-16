@@ -511,7 +511,9 @@
     "paymentSwitching": "Yedek ödeme ağ geçidine geçiliyor…",
     "paymentSwitchingDesc": "Ödeme ağ geçidinde bir hata oluştu. Ödemenizi alternatif bir ağ geçidi üzerinden tamamlamak için otomatik olarak yönlendirileceksiniz.",
     "sslSecurePayment": "256 bit SSL şifreli · Güvenli ödeme",
-    "stripeMinDonation": "Minimum bağış: {amount} {currency}"
+    "stripeMinDonation": "Minimum bağış: {amount} {currency}",
+    "certificateNoteTitle": "Bağış sertifikanızı alın ✨",
+    "certificateNoteBody": "Vakfın resmi bağış sertifikasını ve makbuzunuzu gönderebilmemiz için gerçek e-posta adresinizi girin — yalnızca bu şekilde size ulaşır."
   },
   "DonationSuccess": {
     "thankYou": "Çok teşekkür ederiz",
@@ -541,7 +543,15 @@
     "receiptDescription": "Kayıtlarınız için resmi bağış makbuzu",
     "downloadPDF": "PDF İndir",
     "downloading": "İndiriliyor...",
-    "cancelMonthlyHint": "Aylık bağışınızı istediğiniz zaman profilinizden veya bağışçı destek ile iletişime geçerek iptal edebilirsiniz."
+    "cancelMonthlyHint": "Aylık bağışınızı istediğiniz zaman profilinizden veya bağışçı destek ile iletişime geçerek iptal edebilirsiniz.",
+    "signupCtaTitle": "Bağışınızı sonsuza dek koruyun — hesabınızı oluşturun",
+    "signupCtaBody": "Saniyeler içinde kaydolun; bu bağışı ve misafir olarak yaptığınız tüm önceki bağışları otomatik olarak yeni hesabınıza bağlayalım.",
+    "signupCtaButton": "Hesabımı oluştur",
+    "signupCtaBenefitHistory": "Tüm bağış geçmişiniz",
+    "signupCtaBenefitReceipts": "Tüm makbuzlar tek yerde",
+    "signupCtaBenefitImpact": "Etkinizi takip edin",
+    "linkSuccess": "Bağışınız hesabınıza başarıyla bağlandı 🎉",
+    "linkFailed": "Bağışı otomatik olarak bağlayamadık. Lütfen destek ekibiyle iletişime geçin, sizin için yapalım."
   },
   "CartSheet": {
     "myDonationCart": "Bağış Sepetim",

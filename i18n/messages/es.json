@@ -511,7 +511,9 @@
     "paymentSwitching": "Cambiando a la pasarela de pago alternativa…",
     "paymentSwitchingDesc": "Se produjo un error con la pasarela de pago. Serás redirigido automáticamente para completar el pago por otra vía.",
     "sslSecurePayment": "Cifrado SSL de 256 bits · Pago seguro",
-    "stripeMinDonation": "Donación mínima: {amount} {currency}"
+    "stripeMinDonation": "Donación mínima: {amount} {currency}",
+    "certificateNoteTitle": "Recibe tu certificado de donación ✨",
+    "certificateNoteBody": "Añade tu correo real para que podamos enviarte el certificado oficial de donación de la fundación y tu recibo — es la única forma de recibirlos."
   },
   "DonationSuccess": {
     "thankYou": "Muchas gracias",
@@ -541,7 +543,15 @@
     "receiptDescription": "Recibo oficial de donación para tus registros",
     "downloadPDF": "Descargar PDF",
     "downloading": "Descargando...",
-    "cancelMonthlyHint": "Puedes cancelar tu donación mensual en cualquier momento desde tu perfil o contactando con atención al donante."
+    "cancelMonthlyHint": "Puedes cancelar tu donación mensual en cualquier momento desde tu perfil o contactando con atención al donante.",
+    "signupCtaTitle": "Guarda tu donación para siempre — crea tu cuenta",
+    "signupCtaBody": "Regístrate en segundos y vincularemos automáticamente esta donación y todas las anteriores que hiciste como invitado a tu nueva cuenta.",
+    "signupCtaButton": "Crear mi cuenta",
+    "signupCtaBenefitHistory": "Historial completo de donaciones",
+    "signupCtaBenefitReceipts": "Todos los recibos en un solo lugar",
+    "signupCtaBenefitImpact": "Sigue tu impacto",
+    "linkSuccess": "Tu donación quedó vinculada a tu cuenta 🎉",
+    "linkFailed": "No pudimos vincular esta donación automáticamente. Contáctanos y lo haremos por ti."
   },
   "CartSheet": {
     "myDonationCart": "Mi carrito de donaciones",

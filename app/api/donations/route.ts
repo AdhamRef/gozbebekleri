@@ -16,6 +16,7 @@ import {
 } from "@/lib/donations/donor-country-code";
 import { sanitizeDonationAttribution } from "@/lib/attribution/sanitize";
 import { inferLocaleFromRequest } from "@/lib/preferred-lang";
+import { resolveGuestDonor } from "@/lib/users/resolve-guest-donor";
 
 // GET /api/donations - Get all donations (admin) or user's donations
 export async function GET(request: NextRequest) {
@@ -181,49 +182,24 @@ export async function POST(request: NextRequest) {
       donorId = session.user.id;
       donorName = session.user.name ?? null;
     } else if (guest) {
-      const guestEmail: string | undefined = guest.email?.trim() || undefined;
-      const guestName = [guest.firstName, guest.lastName].filter(Boolean).join(" ") || "Guest";
       const guestPhone = guest.phone?.trim() || undefined;
       const guestCountry =
         normalizeDonorCountryCode(guest.countryCode) ?? countryCodeFromPhone(guestPhone) ?? undefined;
-      if (guestEmail) {
-        // Upsert: if real account exists keep it, otherwise create guest record
-        const existing = await prisma.user.findUnique({ where: { email: guestEmail }, select: { id: true, name: true } });
-        if (existing) {
-          donorId = existing.id;
-          donorName = existing.name;
-        } else {
-          const created = await prisma.user.create({
-            data: {
-              email: guestEmail,
-              name: guestName,
-              phone: guestPhone,
-              countryCode: guestCountry,
-              city: guest.city || undefined,
-              region: guest.region || undefined,
-              preferredLang: inferLocaleFromRequest(request, donationLocale),
-            },
-            select: { id: true },
-          });
-          donorId = created.id;
-          donorName = guestName;
-        }
-      } else {
-        // No email — fully anonymous guest
-        const anon = await prisma.user.create({
-          data: {
-            name: guestName || "Guest",
-            phone: guestPhone,
-            countryCode: guestCountry,
-            city: guest.city || undefined,
-            region: guest.region || undefined,
-            preferredLang: inferLocaleFromRequest(request, donationLocale),
-          },
-          select: { id: true },
-        });
-        donorId = anon.id;
-        donorName = guestName || "Guest";
-      }
+      const resolved = await resolveGuestDonor(
+        prisma,
+        {
+          firstName: guest.firstName,
+          lastName: guest.lastName,
+          email: guest.email,
+          phone: guest.phone,
+          countryCode: guestCountry ?? null,
+          city: guest.city ?? null,
+          region: guest.region ?? null,
+        },
+        { preferredLang: inferLocaleFromRequest(request, donationLocale) ?? null }
+      );
+      donorId = resolved.donorId;
+      donorName = resolved.donorName;
     } else {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

@@ -20,6 +20,7 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
+  Award,
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
@@ -1403,6 +1404,19 @@ const DonationDialog = ({
                     dir="ltr"
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                   />
+                  <div
+                    className={`mt-1.5 flex items-start gap-2 rounded-lg border border-amber-200/70 bg-gradient-to-br from-amber-50 to-orange-50 px-2.5 py-2 ${
+                      dir === "rtl" ? "text-right" : "text-left"
+                    }`}
+                  >
+                    <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-sm">
+                      <Award className="h-3 w-3" aria-hidden />
+                    </span>
+                    <p className="text-[11px] leading-snug text-amber-900">
+                      <span className="font-semibold text-amber-950">{t("certificateNoteTitle")}</span>{" "}
+                      <span className="text-amber-800">{t("certificateNoteBody")}</span>
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
