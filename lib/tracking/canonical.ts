@@ -4,10 +4,29 @@
  * All tracking events are built as a CanonicalEvent first, then mapped
  * to each platform. This guarantees consistent event_id for deduplication
  * between browser (Meta Pixel / TikTok Pixel) and server (CAPI / Events API).
+ *
+ * Donation conversion events (Donate / DonateFailed) are SERVER-ONLY — see
+ * `donation-conversion-server.ts`. The browser pixel deliberately does NOT
+ * map `donation_complete` or `payment_failed` to a Meta event name, so fbq
+ * never fires for them. This was a deliberate change after we caught Meta
+ * receiving phantom DonateFailed events (random event_id, no matching
+ * donation row) from browser-side fires that had no donationId.
  */
 
 export function generateEventId(prefix = "evt"): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
+ * Build the canonical event_id used for server-side donation conversion fires.
+ * Server-only — keep in sync with `sendDonationServerConversions` /
+ * `sendDonationFailedConversions` in `donation-conversion-server.ts`.
+ */
+export function metaDonationEventId(
+  donationId: string,
+  kind: "success" | "failed"
+): string {
+  return kind === "failed" ? `${donationId}_failed` : donationId;
 }
 
 // ─── Canonical event names ────────────────────────────────────────────────────
@@ -121,6 +140,14 @@ export interface CanonicalEvent {
 
 // ─── Platform mapping tables ──────────────────────────────────────────────────
 
+/**
+ * Browser-side fbq + server-side /api/track only fire Meta events for keys that
+ * appear here. `donation_complete` and `payment_failed` are INTENTIONALLY
+ * omitted — Donate and DonateFailed are server-only (webhook-owned).
+ *
+ * Adding either of those back here will silently re-introduce double-counting
+ * and (in the case of payment_failed with no donationId) phantom events. Don't.
+ */
 export const META_EVENT_MAP: Partial<Record<CanonicalEventName, string>> = {
   page_view:          "PageView",
   view_content:       "ViewContent",
@@ -129,17 +156,15 @@ export const META_EVENT_MAP: Partial<Record<CanonicalEventName, string>> = {
   add_to_cart:        "AddToCart",
   begin_checkout:     "InitiateCheckout",
   add_payment_info:   "AddPaymentInfo",
-  donation_complete:  "Donate",
-  payment_failed:     "DonateFailed",  // custom event — lookalike seed for almost-donors
   sign_up:            "CompleteRegistration",
 };
 
 /**
- * Canonical events the server CAPI mirror in /api/track must SKIP because the
- * webhook (lib/tracking/donation-conversion-server.ts) is the authoritative
- * source — firing both would double-count in Meta. Browser-side fbq still fires
- * these client-side; the webhook handles the matching server-side hit with the
- * same event_id so Meta deduplicates the pair.
+ * Canonical events that the server CAPI mirror in /api/track must SKIP because
+ * the donation-conversion-server pipeline (fired from payment-provider
+ * webhooks) is the sole authoritative source. Belt-and-suspenders: even if a
+ * caller somehow synthesises one of these on the browser, the server refuses
+ * to forward it to Meta.
  */
 export const META_CAPI_WEBHOOK_OWNED: ReadonlySet<CanonicalEventName> = new Set([
   "donation_complete",
@@ -153,8 +178,9 @@ export const TIKTOK_EVENT_MAP: Partial<Record<CanonicalEventName, string>> = {
   add_to_cart:        "AddToCart",
   begin_checkout:     "InitiateCheckout",
   add_payment_info:   "AddPaymentInfo",
-  donation_complete:  "CompletePayment",
   sign_up:            "CompleteRegistration",
+  // donation_complete is server-only via donation-conversion-server.ts (no
+  // TikTok mirror yet — see project_meta_capi.md trade-off note).
 };
 
 export const GA4_EVENT_MAP: Partial<Record<CanonicalEventName, string>> = {
@@ -166,7 +192,9 @@ export const GA4_EVENT_MAP: Partial<Record<CanonicalEventName, string>> = {
   begin_checkout:     "begin_checkout",
   add_payment_info:   "add_payment_info",
   payment_failed:     "exception",
-  donation_complete:  "Donate",
+  // donation_complete: GA4 MP purchase fired server-side from the webhook —
+  // not from the browser. Keeping it absent here prevents accidental duplicate
+  // browser sends.
   sign_up:            "sign_up",
   scroll_depth:       "scroll",
   user_engagement:    "user_engagement",

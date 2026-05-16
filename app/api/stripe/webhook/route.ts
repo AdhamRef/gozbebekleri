@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import Stripe from "stripe";
 import { getDonorCountryCodeForSnapshot } from "@/lib/donations/donor-country-code";
-import { sendDonationServerConversions } from "@/lib/tracking/donation-conversion-server";
+import {
+  sendDonationServerConversions,
+  sendDonationFailedConversions,
+} from "@/lib/tracking/donation-conversion-server";
 import { dispatchDonationPaid, dispatchEvent } from "@/lib/events/dispatch";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -280,7 +283,7 @@ export async function POST(req: NextRequest) {
           (await getDonorCountryCodeForSnapshot(prisma, dbSubscription.donorId)) ??
           undefined;
 
-        await prisma.donation.create({
+        const failedRecurring = await prisma.donation.create({
           data: {
             amount: dbSubscription.amount,
             amountUSD: dbSubscription.amountUSD ?? dbSubscription.amount,
@@ -300,6 +303,9 @@ export async function POST(req: NextRequest) {
             providerRaw: invoice as any,
           },
         });
+        // Seed Meta DonateFailed for the failed recurring charge so lookalike
+        // audiences still get the "donor who tried" signal on monthly drops.
+        void sendDonationFailedConversions(failedRecurring.id);
         break;
       }
 
@@ -386,6 +392,10 @@ export async function POST(req: NextRequest) {
           },
         });
         void dispatchEvent("DONATION_FAILED", { donationId });
+        // Browser may have closed before /api/donations/:id/fail PATCH fired —
+        // seed DonateFailed from here so the lookalike audience never misses a
+        // failed Stripe Elements attempt.
+        void sendDonationFailedConversions(donationId);
         break;
       }
 
@@ -414,6 +424,9 @@ export async function POST(req: NextRequest) {
           },
         });
         void dispatchEvent("DONATION_FAILED", { donationId });
+        // Hosted Stripe Checkout expired/failed before payment — seed Meta
+        // DonateFailed so the abandoned-checkout cohort feeds lookalikes.
+        void sendDonationFailedConversions(donationId);
         break;
       }
 

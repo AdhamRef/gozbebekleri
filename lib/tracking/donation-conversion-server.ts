@@ -1,21 +1,36 @@
 /**
  * Server-side conversion senders for donations.
  *
- * Single source of truth for Meta CAPI Donate / DonateFailed events. Fired from
- * the payment provider callbacks (PayFor OK/Fail, Stripe webhook, the explicit
- * /api/donations/:id/fail PATCH) so the dashboard's PAID/FAILED rows and Meta's
- * reported conversions stay 1:1 — exactly one CAPI event per donation, ever.
+ * SINGLE SOURCE OF TRUTH for Meta CAPI `Donate` / `DonateFailed` events.
+ * Fired from the payment-provider callbacks (PayFor OK/Fail, Stripe webhook,
+ * /api/donations/:id/fail PATCH) so the dashboard's PAID/FAILED rows and
+ * Meta's reported conversions stay 1 : 1 — exactly one CAPI event per
+ * donation, ever.
  *
- * Browser-side fbq fires the same event_name with the same eventID (donation.id
- * for success, donation.id + "_failed" for failure) so Meta auto-deduplicates
- * the browser-pixel hit against the server-side hit. Without that pairing Meta
- * counts each donation twice and the ad-account totals diverge from the site.
+ * There is NO browser-side fbq fire for these two events. Removing the
+ * browser leg killed two long-running bugs:
+ *   1. Phantom DonateFailed events with random event_ids from the catch-all
+ *      browser failure handler that had no donation row to anchor against.
+ *   2. /success and /donation-failed refreshes re-firing the pixel past
+ *      Meta's 48 h event_id dedup window.
  *
- * Idempotency:
- *   - Success path keys off `conversionEventsSentAt`.
- *   - Failure path keys off `conversionFailedEventsSentAt`.
- *   The row is also locked to status PAID / FAILED before we send, so a flapping
- *   webhook can't fire DonateFailed for a donation that later succeeds.
+ * Idempotency
+ * -----------
+ * Each path atomically claims its idempotency timestamp BEFORE sending:
+ *
+ *   const { count } = await prisma.donation.updateMany({
+ *     where: { id, conversionEventsSentAt: null, status: "PAID" },
+ *     data:  { conversionEventsSentAt: new Date() },
+ *   });
+ *   if (count === 0) return; // another concurrent firer already claimed
+ *
+ * This collapses the read-then-write race (two webhook retries both seeing
+ * `conversionEventsSentAt: null` and both firing) into a single atomic write.
+ *
+ * If the Graph POST then fails, we DO NOT release the claim. Meta might have
+ * still received the event (network blip on the response leg); replaying it
+ * could double-count. We log loud instead, and the failure is visible in the
+ * /api/admin tracking endpoints.
  */
 
 import { prisma } from "@/lib/prisma";
@@ -25,7 +40,9 @@ import {
   type MetaUserData,
   type MetaCustomData,
   type MetaContent,
+  type MetaCapiResult,
 } from "@/lib/tracking/meta-capi";
+import { metaDonationEventId } from "@/lib/tracking/canonical";
 
 type Attribution = Record<string, string>;
 
@@ -124,27 +141,49 @@ function primaryContentName(row: LoadedDonation): string {
 
 /**
  * Fire Meta CAPI "Donate" + GA4 MP "purchase" for a successfully PAID donation.
+ * Server-only — there is no matching browser pixel fire. event_id is
+ * `donation.id` so this function is the canonical record of "this donation
+ * was reported to Meta".
  *
- * Browser-side fbq fires "Donate" with eventID = donation.id (see
- * TrackingPixels.trackDonate). Using the same event_id here lets Meta dedupe
- * the two hits so reports show 1× per donation, matching the dashboard.
+ * Returns a result so callers can log it (e.g. webhook handler audit log).
  */
-export async function sendDonationServerConversions(donationId: string): Promise<void> {
+export async function sendDonationServerConversions(donationId: string): Promise<MetaCapiResult> {
   try {
     const row = await loadDonationForConversion(donationId);
-    if (!row) return;
-    if (row.status !== "PAID" || row.paidAt == null) return;
-    if (row.conversionEventsSentAt != null) return;
+    if (!row) return { ok: false, skipped: true, reason: "donation not found" };
 
-    const credsPromise = getMetaCapiCredentials();
+    if (row.status !== "PAID") return { ok: false, skipped: true, reason: `status=${row.status}` };
+    if (row.paidAt == null) return { ok: false, skipped: true, reason: "paidAt unset" };
+    if (row.conversionEventsSentAt != null) return { ok: false, skipped: true, reason: "already sent" };
+
+    const amount = Number(row.amount ?? row.amountUSD ?? 0);
+    if (!(amount > 0)) return { ok: false, skipped: true, reason: "amount <= 0" };
+
+    // ── Atomic claim ─────────────────────────────────────────────────────────
+    // Stamp `conversionEventsSentAt` BEFORE sending so two concurrent webhook
+    // retries can't both pass the null-check and both fire. If a second caller
+    // arrives mid-send, its updateMany matches 0 rows and it bails out.
+    const claim = await prisma.donation.updateMany({
+      where: {
+        id: row.id,
+        status: "PAID",
+        paidAt: { not: null },
+        conversionEventsSentAt: null,
+      },
+      data: { conversionEventsSentAt: new Date() },
+    });
+    if (claim.count === 0) {
+      return { ok: false, skipped: true, reason: "lost idempotency claim" };
+    }
+
+    const creds = await getMetaCapiCredentials();
 
     const attribution = (row.attribution ?? undefined) as Attribution | undefined;
     const eventSourceUrl = getStr(attribution, "landing_page");
     const eventTime = Math.floor((row.paidAt ?? new Date()).getTime() / 1000);
 
-    // Use the donation's ACTUAL currency + amount (matches what we charged and
-    // what the dashboard reports). Meta auto-converts to ad-account currency.
-    const amount = Number(row.amount ?? row.amountUSD ?? 0);
+    // Donation's actual currency — matches what we charged and what the
+    // dashboard reports. Meta auto-converts to ad-account currency.
     const currency = row.currency || "USD";
     const contentName = primaryContentName(row);
     const { ids, contents } = buildContents(row);
@@ -165,12 +204,12 @@ export async function sendDonationServerConversions(donationId: string): Promise
       payment_info_available: 1,
     };
 
-    const creds = await credsPromise;
+    let metaResult: MetaCapiResult = { ok: false, skipped: true, reason: "no creds" };
     if (creds) {
-      await sendMetaCapiEvent(
+      metaResult = await sendMetaCapiEvent(
         {
           event_name: "Donate",
-          event_id: row.id,
+          event_id: metaDonationEventId(row.id, "success"),
           event_time: eventTime,
           event_source_url: eventSourceUrl,
           user_data: buildUserDataFromDonation(row),
@@ -180,44 +219,75 @@ export async function sendDonationServerConversions(donationId: string): Promise
       );
     }
 
+    // GA4 MP "purchase" — independent of Meta success. Idempotent via the same
+    // claim above (GA4 dedups by transaction_id=donation.id).
     await sendGa4Purchase(row, amount, currency, contentName, eventTime);
 
-    await prisma.donation.update({
-      where: { id: donationId },
-      data: { conversionEventsSentAt: new Date() },
-    });
+    if (!metaResult.ok && !metaResult.skipped) {
+      // Send failed at the Graph endpoint (not a validation skip). Keep the
+      // claim stamped — Meta might have received the event before the response
+      // failed, so retrying would risk double-counting. Surface loud instead.
+      console.error(
+        "[conversion] Donate send failed but claim retained:",
+        row.id,
+        metaResult.error,
+        metaResult.fbtrace_id
+      );
+    }
+
+    return metaResult;
   } catch (e) {
-    console.error("[conversion] sendDonationServerConversions", e);
+    console.error("[conversion] sendDonationServerConversions", donationId, e);
+    return { ok: false, error: e instanceof Error ? e.message : "unknown" };
   }
 }
 
 // ─── Failure: DonateFailed ────────────────────────────────────────────────────
 
 /**
- * Fire Meta CAPI "DonateFailed" (custom event) for a donation that the bank /
- * Stripe rejected. Use case from marketing: build a lookalike audience seeded
- * on people who *tried* to donate. They're the right segment — the only thing
- * that stopped them was the card.
+ * Fire Meta CAPI "DonateFailed" (custom event) for a donation the bank /
+ * Stripe rejected. Server-only. Use case: build a lookalike audience seeded
+ * on people who *tried* to donate.
  *
  * "DonateFailed" is intentionally a custom event (not the standard "Donate")
  * so it doesn't pollute the conversion column of the ad-account dashboard.
  * It still flows into Custom Audiences and Lookalike sources.
  */
-export async function sendDonationFailedConversions(donationId: string): Promise<void> {
+export async function sendDonationFailedConversions(donationId: string): Promise<MetaCapiResult> {
   try {
     const row = await loadDonationForConversion(donationId);
-    if (!row) return;
-    // Don't seed DonateFailed if the donation later succeeded — protects against
-    // flapping webhooks (e.g. PayFor fail callback fires after OK callback).
-    if (row.status !== "FAILED" || row.paidAt != null) return;
-    if (row.conversionFailedEventsSentAt != null) return;
+    if (!row) return { ok: false, skipped: true, reason: "donation not found" };
+
+    if (row.status !== "FAILED") return { ok: false, skipped: true, reason: `status=${row.status}` };
+    // Don't seed DonateFailed if the donation later succeeded — protects
+    // against flapping webhooks (PayFor fail callback after OK callback).
+    if (row.paidAt != null) return { ok: false, skipped: true, reason: "donation later succeeded" };
+    if (row.conversionFailedEventsSentAt != null) return { ok: false, skipped: true, reason: "already sent" };
+
+    // ── Atomic claim (mirror of the success path) ─────────────────────────
+    const claim = await prisma.donation.updateMany({
+      where: {
+        id: row.id,
+        status: "FAILED",
+        paidAt: null,
+        conversionFailedEventsSentAt: null,
+      },
+      data: { conversionFailedEventsSentAt: new Date() },
+    });
+    if (claim.count === 0) {
+      return { ok: false, skipped: true, reason: "lost idempotency claim" };
+    }
 
     const creds = await getMetaCapiCredentials();
-    if (!creds) return;
+    if (!creds) return { ok: false, skipped: true, reason: "no credentials" };
 
     const attribution = (row.attribution ?? undefined) as Attribution | undefined;
     const eventSourceUrl = getStr(attribution, "landing_page");
-    const eventTime = Math.floor(((row as { updatedAt?: Date }).updatedAt ?? row.createdAt ?? new Date()).getTime() / 1000);
+    // Use updatedAt for failed donations — closest signal of when the bank
+    // rejected. createdAt would back-date the event if the row sat in PENDING.
+    const eventTime = Math.floor(
+      ((row as { updatedAt?: Date }).updatedAt ?? row.createdAt ?? new Date()).getTime() / 1000
+    );
 
     const amount = Number(row.amount ?? row.amountUSD ?? 0);
     const currency = row.currency || "USD";
@@ -242,10 +312,10 @@ export async function sendDonationFailedConversions(donationId: string): Promise
       provider: row.provider ?? undefined,
     };
 
-    await sendMetaCapiEvent(
+    const metaResult = await sendMetaCapiEvent(
       {
         event_name: "DonateFailed",
-        event_id: `${row.id}_failed`,
+        event_id: metaDonationEventId(row.id, "failed"),
         event_time: eventTime,
         event_source_url: eventSourceUrl,
         user_data: buildUserDataFromDonation(row),
@@ -254,13 +324,45 @@ export async function sendDonationFailedConversions(donationId: string): Promise
       creds
     );
 
-    await prisma.donation.update({
-      where: { id: donationId },
-      data: { conversionFailedEventsSentAt: new Date() },
-    });
+    if (!metaResult.ok && !metaResult.skipped) {
+      console.error(
+        "[conversion] DonateFailed send failed but claim retained:",
+        row.id,
+        metaResult.error,
+        metaResult.fbtrace_id
+      );
+    }
+
+    return metaResult;
   } catch (e) {
-    console.error("[conversion] sendDonationFailedConversions", e);
+    console.error("[conversion] sendDonationFailedConversions", donationId, e);
+    return { ok: false, error: e instanceof Error ? e.message : "unknown" };
   }
+}
+
+// ─── Unified dispatcher ──────────────────────────────────────────────────────
+
+/**
+ * Single entry point — call this from anywhere a donation's outcome is known
+ * and let it pick the right CAPI event based on the current row state.
+ *
+ * Useful from generic "donation state changed" handlers (e.g. cron sweepers,
+ * admin bulk actions) so callers don't have to branch on status themselves.
+ */
+export async function syncDonationConversion(donationId: string): Promise<MetaCapiResult> {
+  const row = await prisma.donation.findUnique({
+    where: { id: donationId },
+    select: { id: true, status: true, paidAt: true },
+  });
+  if (!row) return { ok: false, skipped: true, reason: "donation not found" };
+
+  if (row.status === "PAID" && row.paidAt != null) {
+    return sendDonationServerConversions(donationId);
+  }
+  if (row.status === "FAILED" && row.paidAt == null) {
+    return sendDonationFailedConversions(donationId);
+  }
+  return { ok: false, skipped: true, reason: `no terminal state (status=${row.status})` };
 }
 
 // ─── GA4 (success only) ───────────────────────────────────────────────────────

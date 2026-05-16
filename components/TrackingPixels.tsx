@@ -10,14 +10,14 @@ import {
   type CanonicalEvent,
   type CanonicalEventName,
   type CanonicalUser,
-  type CanonicalDonation,
   type CanonicalPayment,
-  type CanonicalItem,
 } from "@/lib/tracking/canonical";
 
 // ─── Vercel Analytics: which canonical events to forward ──────────────────────
 // Skip page_view (Vercel's <Analytics/> handles it), scroll_depth, and
-// user_engagement (too noisy for the custom-events dashboard).
+// user_engagement (too noisy for the custom-events dashboard). donation_complete
+// is intentionally absent — that event is server-only (Meta CAPI from the
+// payment webhook) so there's no browser path that emits it.
 const VERCEL_FORWARDED_EVENTS = new Set<CanonicalEventName>([
   "view_content",
   "view_donation_page",
@@ -27,7 +27,6 @@ const VERCEL_FORWARDED_EVENTS = new Set<CanonicalEventName>([
   "add_payment_info",
   "payment_submit",
   "payment_failed",
-  "donation_complete",
   "sign_up",
 ]);
 
@@ -84,21 +83,6 @@ export interface TrackingItem {
   price?: number;
   quantity?: number;
   item_category?: string;
-}
-
-interface TrackPurchaseOptions {
-  value: number;
-  valueUSD?: number;
-  currency?: string;
-  orderId?: string;
-  numItems?: number;
-  items?: TrackingItem[];
-  donationType?: "ONE_TIME" | "MONTHLY";
-  causeName?: string;
-  causeId?: string;
-  gateway?: string;
-  subscriptionId?: string;
-  description?: string;
 }
 
 interface TrackAddToCartOptions {
@@ -159,8 +143,10 @@ interface TrackPaymentFailedOptions {
   causeId?: string;
   reason?: string;
   gateway?: string;
-  /** Donation row id when known. Required for Meta browser↔server dedup with
-   *  the matching server-side DonateFailed CAPI fire keyed by `${id}_failed`. */
+  /** Donation row id when known. Used by GA4 / Vercel as the order_id of the
+   *  failed attempt. Meta does NOT fire from the browser — the DonateFailed
+   *  CAPI event is owned by `sendDonationFailedConversions` server-side, keyed
+   *  by `donation.id`. See lib/tracking/donation-conversion-server.ts. */
   donationId?: string;
 }
 
@@ -169,7 +155,6 @@ interface TrackPaymentFailedOptions {
 interface TrackingContextValue {
   config: TrackingConfig | null;
   setUserData: (user: Partial<CanonicalUser>) => void;
-  trackDonate: (options: TrackPurchaseOptions) => void;
   trackCompleteRegistration: () => void;
   trackViewContent: (params?: TrackViewContentOptions) => void;
   trackAddToCart: (options: TrackAddToCartOptions) => void;
@@ -731,12 +716,23 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
   }, [sendCanonical]);
 
   const trackPaymentFailed = useCallback((options: TrackPaymentFailedOptions) => {
+    // Browser-side payment_failed fires GA4 "exception" and Vercel Analytics
+    // for funnel/diagnostics only. The Meta DonateFailed CAPI event is owned
+    // by the SERVER (see donation-conversion-server.ts) — `payment_failed` is
+    // deliberately absent from META_EVENT_MAP and listed in
+    // META_CAPI_WEBHOOK_OWNED, so fbq does not fire here and /api/track
+    // refuses to forward it.
+    //
+    // If we don't have a donationId yet (e.g. POST /api/donations itself
+    // threw), we don't synthesise one. The earlier fallback to
+    // `generateEventId("fail")` produced phantom DonateFailed entries in Meta
+    // that had no matching donation row. We just emit a canonical record
+    // tagged "no-donation" so GA4 still gets the diagnostic ping.
     sendCanonical({
-      // event_id must match the server's DonateFailed CAPI fire so Meta dedups
-      // the browser-pixel hit against the webhook hit (see
-      // lib/tracking/donation-conversion-server.ts → sendDonationFailedConversions).
       event:    "payment_failed",
-      event_id: options.donationId ? `${options.donationId}_failed` : generateEventId("fail"),
+      event_id: options.donationId
+        ? `${options.donationId}_failed`
+        : `fail_no_donation_${Date.now()}`,
       donation: {
         amount:   options.value,
         currency: options.currency,
@@ -748,46 +744,6 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
         failure_reason: options.reason,
         transaction_id: options.donationId,
       },
-    });
-  }, [sendCanonical]);
-
-  const trackDonate = useCallback((options: TrackPurchaseOptions) => {
-    const { value, valueUSD, currency = "USD", orderId, numItems = 1, items, donationType, causeName, causeId, gateway, subscriptionId, description } = options;
-    const canonItems: CanonicalItem[] = items?.length
-      ? items.map((i) => ({ ...i }))
-      : [{ item_id: causeId ?? orderId ?? "donation", item_name: causeName ?? "Donation", price: value, quantity: numItems, item_category: "donation" }];
-
-    sendCanonical({
-      event:    "donation_complete",
-      // event_id MUST be donation.id so it matches the server-side Donate CAPI
-      // fire from the payment-provider webhook (donation-conversion-server.ts).
-      // Without that match Meta counts the browser-pixel and server-CAPI hits
-      // as two separate conversions and ad-account totals diverge from the
-      // dashboard. Falls back to a random id only if the caller didn't pass
-      // one in — that path shouldn't happen in production.
-      event_id: orderId ?? generateEventId("pur"),
-      // subscription_id is a user_data field in Meta — merge it for this event only
-      user: subscriptionId ? { subscription_id: subscriptionId } : undefined,
-      donation: {
-        amount:                 value,
-        amount_usd:             valueUSD ?? value,
-        currency,
-        cause_id:               causeId,
-        cause_name:             causeName,
-        content_name:           causeName,
-        content_category:       donationType ? donationType.toLowerCase() : "donation",
-        description,
-        status:                 "completed",
-        payment_info_available: 1,
-        donation_type:          donationType,
-        recurring:              donationType === "MONTHLY",
-      },
-      payment: {
-        transaction_id: orderId,
-        payment_status: "success",
-        gateway:        gateway as CanonicalPayment["gateway"],
-      },
-      items: canonItems,
     });
   }, [sendCanonical]);
 
@@ -813,7 +769,6 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
   const value: TrackingContextValue = {
     config,
     setUserData,
-    trackDonate,
     trackCompleteRegistration,
     trackViewContent,
     trackAddToCart,

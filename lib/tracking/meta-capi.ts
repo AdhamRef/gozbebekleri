@@ -4,25 +4,30 @@
  * One canonical place to:
  *   1. Hash PII (SHA-256, lowercased+trimmed) per Meta's Advanced Matching spec.
  *   2. Build user_data + custom_data payloads.
- *   3. POST to the Graph events endpoint.
+ *   3. POST to the Graph events endpoint with strict pre-send validation.
  *
  * Used by:
  *   - /api/track       → mirrors browser-side canonical funnel events (PageView,
- *                        ViewContent, AddToCart, InitiateCheckout, AddPaymentInfo, …)
- *                        Skips donation_complete and payment_failed — those are
- *                        owned by the webhook below so we never double-count.
+ *                        ViewContent, AddToCart, InitiateCheckout, AddPaymentInfo, …).
+ *                        donation_complete / payment_failed are REFUSED here —
+ *                        those are owned by the webhook below so we never
+ *                        double-count or phantom-emit.
  *   - donation-conversion-server.ts → fires Donate (success) and DonateFailed
  *                        (lookalike-seed for abandoned card attempts) from the
- *                        payment-provider callbacks, keyed by donation.id so the
- *                        browser-side fbq fire with the same eventID auto-dedups.
- *
- * Both sites must pass the same event_id for browser↔server dedup to work.
+ *                        payment-provider callbacks. Server-only — there is no
+ *                        browser-side fbq fire for these two events.
  */
 
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 
 const FB_API_VERSION = "v21.0";
+
+/**
+ * Meta rejects events older than 7 days from the Graph endpoint. We refuse
+ * them client-side so a stale webhook retry can't quietly fail at Meta.
+ */
+const MAX_EVENT_AGE_SECONDS = 7 * 24 * 60 * 60;
 
 export interface MetaUserData {
   email?: string | null;
@@ -75,13 +80,18 @@ export interface MetaCapiEvent {
   user_data: MetaUserData;
   custom_data?: MetaCustomData;
   test_event_code?: string;       // for Events Manager → Test Events tab
+  action_source?: "website" | "email" | "app" | "phone_call" | "chat" | "physical_store" | "system_generated" | "other";
 }
 
 export interface MetaCapiResult {
   ok: boolean;
   events_received?: number;
+  fbtrace_id?: string;
+  event_name?: string;
+  event_id?: string;
   error?: string;
   skipped?: boolean;
+  reason?: string;
 }
 
 // ─── Hashing ──────────────────────────────────────────────────────────────────
@@ -183,24 +193,54 @@ export async function getMetaCapiCredentials(): Promise<MetaCapiCredentials | nu
   return { pixelId, accessToken };
 }
 
+/** Validate an event before sending. Returns reason for rejection or null. */
+function validateEvent(event: MetaCapiEvent): string | null {
+  if (!event.event_name) return "missing event_name";
+  if (!event.event_id) return "missing event_id";
+
+  const eventTime = event.event_time ?? Math.floor(Date.now() / 1000);
+  const ageSeconds = Math.floor(Date.now() / 1000) - eventTime;
+  if (ageSeconds > MAX_EVENT_AGE_SECONDS) {
+    return `event too old (${Math.floor(ageSeconds / 86400)}d) — Meta rejects > 7d`;
+  }
+  if (eventTime > Math.floor(Date.now() / 1000) + 60) {
+    // small clock-skew tolerance
+    return "event_time is in the future";
+  }
+  return null;
+}
+
 export async function sendMetaCapiEvent(
   event: MetaCapiEvent,
   creds?: MetaCapiCredentials
 ): Promise<MetaCapiResult> {
   const c = creds ?? (await getMetaCapiCredentials());
-  if (!c) return { skipped: true, ok: false };
+  if (!c) return { skipped: true, ok: false, reason: "no credentials" };
+
+  const validationError = validateEvent(event);
+  if (validationError) {
+    console.warn("[Meta CAPI] rejected event:", event.event_name, event.event_id, validationError);
+    return { ok: false, skipped: true, reason: validationError, event_name: event.event_name, event_id: event.event_id };
+  }
 
   const user_data = buildMetaUserData(event.user_data);
   if (Object.keys(user_data).length === 0) {
-    // Meta rejects events without at least one user identifier.
-    return { ok: false, error: "no user identifiers" };
+    // Meta rejects events without at least one user identifier. Refuse here
+    // so we don't waste a Graph round-trip and don't spam the error log.
+    return {
+      ok: false,
+      skipped: true,
+      reason: "no user identifiers",
+      event_name: event.event_name,
+      event_id: event.event_id,
+    };
   }
 
   const eventBlock: Record<string, unknown> = {
     event_name: event.event_name,
     event_time: event.event_time ?? Math.floor(Date.now() / 1000),
     event_id: event.event_id,
-    action_source: "website",
+    action_source: event.action_source ?? "website",
     user_data,
   };
   if (event.event_source_url) eventBlock.event_source_url = event.event_source_url;
@@ -222,15 +262,42 @@ export async function sendMetaCapiEvent(
     );
     const data = (await res.json().catch(() => ({}))) as {
       events_received?: number;
-      error?: { message?: string };
+      fbtrace_id?: string;
+      error?: { message?: string; type?: string; code?: number };
     };
     if (!res.ok) {
-      console.error("[Meta CAPI]", event.event_name, "error:", data?.error?.message);
-      return { ok: false, error: data?.error?.message };
+      console.error(
+        "[Meta CAPI]",
+        event.event_name,
+        event.event_id,
+        `status=${res.status}`,
+        "error:",
+        data?.error?.message ?? "unknown",
+        "fbtrace_id:",
+        data?.fbtrace_id ?? "n/a"
+      );
+      return {
+        ok: false,
+        error: data?.error?.message,
+        fbtrace_id: data?.fbtrace_id,
+        event_name: event.event_name,
+        event_id: event.event_id,
+      };
     }
-    return { ok: true, events_received: data?.events_received };
+    return {
+      ok: true,
+      events_received: data?.events_received,
+      fbtrace_id: data?.fbtrace_id,
+      event_name: event.event_name,
+      event_id: event.event_id,
+    };
   } catch (e) {
-    console.error("[Meta CAPI]", event.event_name, "fetch failed:", e);
-    return { ok: false, error: "fetch failed" };
+    console.error("[Meta CAPI]", event.event_name, event.event_id, "fetch failed:", e);
+    return {
+      ok: false,
+      error: "fetch failed",
+      event_name: event.event_name,
+      event_id: event.event_id,
+    };
   }
 }

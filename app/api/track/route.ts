@@ -58,6 +58,15 @@ export async function POST(req: NextRequest) {
     if (row?.facebookPixelId && row?.facebookAccessToken) {
       if (META_CAPI_WEBHOOK_OWNED.has(event.event)) {
         // donation_complete / payment_failed → webhook owns the server hit.
+        // If anyone re-introduces a browser-side sender for these (please
+        // don't), this guard prevents Meta from receiving a duplicate or
+        // phantom hit. Log loud so the regression is visible.
+        console.warn(
+          "[/api/track] refused webhook-owned event:",
+          event.event,
+          "event_id=",
+          event.event_id
+        );
         results.meta = { skipped: true, owner: "donation-conversion-server" };
       } else {
         results.meta = await mirrorMetaCanonical(event, row.facebookPixelId, row.facebookAccessToken, clientIp);
