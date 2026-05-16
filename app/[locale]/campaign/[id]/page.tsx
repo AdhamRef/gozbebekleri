@@ -1,7 +1,8 @@
 import { Metadata } from "next";
+import { redirect } from "next/navigation";
 import MainPageDummy from "../_components/MainPageDummy";
 import { prisma } from "@/lib/prisma";
-import { whereByIdOrLocaleSlug } from "@/lib/slug";
+import { isObjectId, pickLocaleSlug, whereByIdOrAnyLocaleSlug } from "@/lib/slug";
 import { pickTranslation } from "@/lib/i18n/translation-fallback";
 import {
   LOCALE_SEO,
@@ -15,9 +16,9 @@ interface Props {
   params: Promise<{ id: string; locale: string }>;
 }
 
-async function fetchCampaignForSeo(idOrSlug: string, locale: string) {
+async function fetchCampaignForSeo(idOrSlug: string) {
   return prisma.campaign.findFirst({
-    where: whereByIdOrLocaleSlug(idOrSlug, locale),
+    where: whereByIdOrAnyLocaleSlug(idOrSlug),
     select: {
       id: true,
       slug: true,
@@ -51,7 +52,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   let campaign: Awaited<ReturnType<typeof fetchCampaignForSeo>> = null;
   try {
-    campaign = await fetchCampaignForSeo(id, locale);
+    campaign = await fetchCampaignForSeo(id);
   } catch (err) {
     console.error("Failed to fetch campaign for metadata", err);
   }
@@ -115,5 +116,32 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CampaignPage({ params }: Props) {
   const { id, locale } = await params;
+
+  // If the URL slug doesn't match the canonical slug for this locale (e.g. the
+  // language switcher kept the previous locale's slug, or someone shared a link
+  // using the wrong locale's slug), redirect to the right one. ObjectId URLs are
+  // also rewritten to their slug form here.
+  try {
+    const campaign = await prisma.campaign.findFirst({
+      where: whereByIdOrAnyLocaleSlug(id),
+      select: {
+        id: true,
+        slug: true,
+        translations: { select: { locale: true, slug: true } },
+      },
+    });
+    if (campaign) {
+      const canonical = pickLocaleSlug(campaign.slug, campaign.translations, locale) ?? campaign.id;
+      if (id !== canonical && (isObjectId(id) || id !== campaign.id)) {
+        redirect(`/${locale}/campaign/${encodeURIComponent(canonical)}`);
+      }
+    }
+  } catch (err) {
+    // `redirect()` throws a NEXT_REDIRECT error — let it propagate. Only swallow
+    // real DB errors so a transient failure doesn't break the page render.
+    if (err && typeof err === "object" && "digest" in err) throw err;
+    console.error("Failed to resolve canonical campaign slug", err);
+  }
+
   return <MainPageDummy id={id} locale={locale} />;
 }

@@ -3,9 +3,10 @@
 import axios from "axios";
 import Image from "next/image";
 import { Metadata } from "next";
+import { redirect } from "next/navigation";
 import React from "react";
 import { prisma } from "@/lib/prisma";
-import { whereByIdOrLocaleSlug } from "@/lib/slug";
+import { isObjectId, pickLocaleSlug, whereByIdOrAnyLocaleSlug } from "@/lib/slug";
 import { pickTranslation } from "@/lib/i18n/translation-fallback";
 import {
   LOCALE_SEO,
@@ -37,9 +38,9 @@ interface BlogPostProps {
   params: Promise<{ locale: string; postId: string }>;
 }
 
-async function fetchPostForSeo(idOrSlug: string, locale: string) {
+async function fetchPostForSeo(idOrSlug: string) {
   return prisma.post.findFirst({
-    where: whereByIdOrLocaleSlug(idOrSlug, locale),
+    where: whereByIdOrAnyLocaleSlug(idOrSlug),
     select: {
       id: true,
       slug: true,
@@ -76,7 +77,7 @@ export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
       };
     }
 
-    const post = await fetchPostForSeo(postId, locale);
+    const post = await fetchPostForSeo(postId);
     if (!post) {
       return {
         title: seo.blog.title,
@@ -148,6 +149,29 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
   const locale = params.locale || "ar";
   const msgs = await import(`../../../../i18n/messages/${locale}.json`);
   const t = (k: string) => msgs?.default?.Blog?.[k] ?? k;
+
+  // Redirect to the canonical per-locale slug when the URL doesn't match — e.g.
+  // after a language switch keeps the previous locale's slug, or when the URL
+  // uses the ObjectId.
+  try {
+    const post = await prisma.post.findFirst({
+      where: whereByIdOrAnyLocaleSlug(params.postId),
+      select: {
+        id: true,
+        slug: true,
+        translations: { select: { locale: true, slug: true } },
+      },
+    });
+    if (post) {
+      const canonical = pickLocaleSlug(post.slug, post.translations, locale) ?? post.id;
+      if (params.postId !== canonical && (isObjectId(params.postId) || params.postId !== post.id)) {
+        redirect(`/${locale}/blog/${encodeURIComponent(canonical)}`);
+      }
+    }
+  } catch (err) {
+    if (err && typeof err === "object" && "digest" in err) throw err;
+    console.error("Failed to resolve canonical post slug", err);
+  }
 
   // Fetch the post and similar posts (API already returns localized fields)
   const res = await axios.get(`${baseUrl}/api/posts/${params.postId}`, { params: { locale } });

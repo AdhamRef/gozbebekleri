@@ -101,6 +101,26 @@ export function whereByIdOrLocaleSlug(
 }
 
 /**
+ * Like `whereByIdOrLocaleSlug` but matches a translation slug from ANY locale.
+ * Use this when resolving a URL whose slug may belong to a different locale than
+ * the page is rendering — e.g. after a language switch keeps the previous
+ * locale's slug. Pair with `pickLocaleSlug` to compute the canonical slug for
+ * the current locale and redirect when they differ.
+ */
+export function whereByIdOrAnyLocaleSlug(
+  key: string,
+  translationsRelationName = "translations"
+): Record<string, unknown> {
+  if (isObjectId(key)) return { id: key };
+  return {
+    OR: [
+      { slug: key },
+      { [translationsRelationName]: { some: { slug: key } } },
+    ],
+  };
+}
+
+/**
  * Pick the URL slug to display for a localized entity.
  * Prefers the locale-specific translation slug, then base slug, then null.
  *

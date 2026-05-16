@@ -1,8 +1,9 @@
 import React from "react";
 import { Metadata } from "next";
+import { redirect } from "next/navigation";
 import MainPage from "./_components/MainPage";
 import { prisma } from "@/lib/prisma";
-import { whereByIdOrLocaleSlug } from "@/lib/slug";
+import { isObjectId, pickLocaleSlug, whereByIdOrAnyLocaleSlug } from "@/lib/slug";
 import { pickTranslation } from "@/lib/i18n/translation-fallback";
 import {
   LOCALE_SEO,
@@ -16,9 +17,9 @@ interface Props {
   params: Promise<{ id: string; locale: string }>;
 }
 
-async function fetchCategoryForSeo(idOrSlug: string, locale: string) {
+async function fetchCategoryForSeo(idOrSlug: string) {
   return prisma.category.findFirst({
-    where: whereByIdOrLocaleSlug(idOrSlug, locale),
+    where: whereByIdOrAnyLocaleSlug(idOrSlug),
     select: {
       id: true,
       slug: true,
@@ -41,7 +42,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   let category: Awaited<ReturnType<typeof fetchCategoryForSeo>> = null;
   try {
-    category = await fetchCategoryForSeo(id, locale);
+    category = await fetchCategoryForSeo(id);
   } catch (err) {
     console.error("Failed to fetch category for metadata", err);
   }
@@ -103,5 +104,29 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CategoryPage({ params }: Props) {
   const { id, locale } = await params;
+
+  // Redirect to the canonical per-locale slug when the URL doesn't match —
+  // e.g. after a language switch keeps the previous locale's slug, or when
+  // the URL uses the ObjectId.
+  try {
+    const category = await prisma.category.findFirst({
+      where: whereByIdOrAnyLocaleSlug(id),
+      select: {
+        id: true,
+        slug: true,
+        translations: { select: { locale: true, slug: true } },
+      },
+    });
+    if (category) {
+      const canonical = pickLocaleSlug(category.slug, category.translations, locale) ?? category.id;
+      if (id !== canonical && (isObjectId(id) || id !== category.id)) {
+        redirect(`/${locale}/category/${encodeURIComponent(canonical)}`);
+      }
+    }
+  } catch (err) {
+    if (err && typeof err === "object" && "digest" in err) throw err;
+    console.error("Failed to resolve canonical category slug", err);
+  }
+
   return <MainPage id={id} locale={locale} />;
 }
