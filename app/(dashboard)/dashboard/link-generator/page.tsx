@@ -243,6 +243,7 @@ export default function LinkGeneratorPage() {
   const [locale, setLocale] = useState("ar");
   const [autoLocale, setAutoLocale] = useState(false);
   const [currency, setCurrency] = useState("USD");
+  const [autoCurrency, setAutoCurrency] = useState(false);
   const [refCode, setRefCode] = useState<string>("__none__");
   const [openCartPayment, setOpenCartPayment] = useState(false);
 
@@ -281,6 +282,7 @@ export default function LinkGeneratorPage() {
     setLocale("ar");
     setAutoLocale(false);
     setCurrency("USD");
+    setAutoCurrency(false);
     setRefCode("__none__");
     setOpenCartPayment(false);
   };
@@ -375,7 +377,9 @@ export default function LinkGeneratorPage() {
     const pathPart = path === "/" ? "" : path;
     const base = autoLocale ? `${origin}${pathPart}` : `${origin}/${locale}${pathPart}`;
     const q = new URLSearchParams();
-    q.set("currency", currency);
+    // Omit `?currency=` entirely when auto-detect is on so the middleware /
+    // visitor's cookie / geo fallback decides at request time.
+    if (!autoCurrency) q.set("currency", currency);
     if (refCode && refCode !== "__none__") q.set("ref", refCode.toLowerCase());
     if (pageKind === "profile" && profileTab !== "account") q.set("tab", profileTab);
     if (pageKind === "campaigns" && campaignSearch.trim()) q.set("search", campaignSearch.trim());
@@ -385,7 +389,7 @@ export default function LinkGeneratorPage() {
     // `https://host` (no trailing slash) is the homepage with autoLocale on —
     // normalize it so the copied link has a visible path segment.
     return autoLocale && !pathPart ? `${builtUrl.replace(/^([^?#]+?)(\?|#|$)/, "$1/$2")}` : builtUrl;
-  }, [path, locale, currency, refCode, profileTab, pageKind, campaignSearch, openCartPayment, autoLocale]);
+  }, [path, locale, currency, refCode, profileTab, pageKind, campaignSearch, openCartPayment, autoLocale, autoCurrency]);
 
   const showDetailsBlock =
     !!pageKind &&
@@ -568,18 +572,33 @@ export default function LinkGeneratorPage() {
                   </div>
                   <div className="space-y-2">
                     <span className="text-xs text-muted-foreground">?currency=</span>
-                    <Select value={currency} onValueChange={setCurrency}>
+                    <Select value={currency} onValueChange={setCurrency} disabled={autoCurrency}>
                       <SelectTrigger className="h-10">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {bundle.currencies.map((c) => (
-                          <SelectItem key={c} value={c}>
-                            {c === "DEFAULT" ? "DEFAULT (افتراضي العرض)" : c}
-                          </SelectItem>
-                        ))}
+                        {bundle.currencies
+                          .filter((c) => c !== "DEFAULT")
+                          .map((c) => (
+                            <SelectItem key={c} value={c}>
+                              {c}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
+                    <label className="flex items-start gap-2.5 cursor-pointer rounded-lg border border-border/80 bg-muted/30 px-3 py-2.5 hover:bg-muted/50 transition-colors">
+                      <Checkbox
+                        checked={autoCurrency}
+                        onCheckedChange={(c) => setAutoCurrency(c === true)}
+                        className="mt-0.5"
+                      />
+                      <span className="text-sm leading-snug">
+                        اكتشاف العملة تلقائيًا حسب موقع الزائر
+                        <span className="block text-xs text-muted-foreground mt-0.5">
+                          يُنشئ الرابط بدون ?currency=، ويختار الموقع عملة الزائر تلقائيًا حسب الدولة.
+                        </span>
+                      </span>
+                    </label>
                   </div>
                 </div>
                 <div className="space-y-2">
