@@ -5,10 +5,15 @@ import {
   normalizeCurrencyParamToCookie,
 } from '@/lib/currency-link';
 import { currencyForCountry } from '@/lib/geo/country-to-currency';
+import { localeForCountry } from '@/lib/geo/country-to-locale';
+
+const LOCALES = ['ar', 'en', 'fr', 'tr', 'id', 'pt', 'es', 'de'] as const;
+const DEFAULT_LOCALE = 'ar';
+const LOCALE_IN_PATH_RE = /^\/(ar|en|fr|tr|id|pt|es|de)(\/|$)/;
 
 const intl = createIntlMiddleware({
-  locales: ['ar', 'en', 'fr', 'tr', 'id', 'pt', 'es', 'de'],
-  defaultLocale: 'ar',
+  locales: LOCALES,
+  defaultLocale: DEFAULT_LOCALE,
   localePrefix: 'always',
 });
 
@@ -27,6 +32,21 @@ function countryFromHeaders(req: NextRequest): string | null {
 // otherwise scripts/pixels would fire with the default (USD) before the
 // client-side `?currency=` sync catches up.
 export default function middleware(req: NextRequest) {
+  const pathname = req.nextUrl.pathname;
+
+  // Locale-less URL (e.g. a share link generated with auto-locale): pick a
+  // locale from the visitor's country and redirect. URLs that already include
+  // a locale prefix are left alone so explicit choices are never overridden.
+  if (!LOCALE_IN_PATH_RE.test(pathname)) {
+    const country = countryFromHeaders(req);
+    const locale = localeForCountry(country) ?? DEFAULT_LOCALE;
+    const url = req.nextUrl.clone();
+    url.pathname = pathname === '/' ? `/${locale}` : `/${locale}${pathname}`;
+    // The redirect target re-enters this middleware and picks up the currency
+    // cookie there, so we don't need to set it on the 307 response.
+    return NextResponse.redirect(url);
+  }
+
   const currencyParam = req.nextUrl.searchParams.get('currency');
   let normalized: string | null = null;
   if (currencyParam) {
@@ -65,7 +85,9 @@ export default function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Skip all paths that should not be internationalized. This example skips the
-  // folders "api", "_next" and all files with an extension (e.g. favicon.ico)
-  matcher: ['/', '/(ar|en|fr|tr|id|pt|es|de)/:path*']
+  // Catch every public path so locale-less share links also reach the middleware
+  // and can be redirected. Excludes: API/Next internals/Vercel internals,
+  // the standalone dashboard + auth routes (not localized), and any file with
+  // an extension (favicon, images, sitemap.xml, etc.).
+  matcher: ['/((?!api|_next|_vercel|dashboard|auth|.*\\..*).*)'],
 };

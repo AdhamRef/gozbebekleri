@@ -241,6 +241,7 @@ export default function LinkGeneratorPage() {
   const [profileTab, setProfileTab] = useState<"account" | "donations" | "support">("account");
   const [donationId, setDonationId] = useState("");
   const [locale, setLocale] = useState("ar");
+  const [autoLocale, setAutoLocale] = useState(false);
   const [currency, setCurrency] = useState("USD");
   const [refCode, setRefCode] = useState<string>("__none__");
   const [openCartPayment, setOpenCartPayment] = useState(false);
@@ -278,6 +279,7 @@ export default function LinkGeneratorPage() {
     setProfileTab("account");
     setDonationId("");
     setLocale("ar");
+    setAutoLocale(false);
     setCurrency("USD");
     setRefCode("__none__");
     setOpenCartPayment(false);
@@ -338,6 +340,9 @@ export default function LinkGeneratorPage() {
 
   const translationWarning = useMemo(() => {
     if (!pageKind || !locale) return null;
+    // Locale is resolved at runtime from the visitor's country, so a per-locale
+    // translation gap doesn't apply to a single fixed choice.
+    if (autoLocale) return null;
     if (needsResourcePick(pageKind)) {
       if (!selectedResource) return null;
       if (!localeHasContent(selectedResource, locale)) {
@@ -345,7 +350,7 @@ export default function LinkGeneratorPage() {
       }
     }
     return null;
-  }, [pageKind, locale, selectedResource]);
+  }, [pageKind, locale, selectedResource, autoLocale]);
 
   const path = useMemo(() => {
     if (!pageKind) return "";
@@ -364,7 +369,11 @@ export default function LinkGeneratorPage() {
       typeof window !== "undefined"
         ? window.location.origin
         : (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "") || "";
-    const base = `${origin}/${locale}${path === "/" ? "" : path}`;
+    // When `autoLocale` is on we omit the locale prefix from the URL so the
+    // middleware can resolve the visitor's locale from their country at
+    // request time. Otherwise the chosen locale is baked into the link.
+    const pathPart = path === "/" ? "" : path;
+    const base = autoLocale ? `${origin}${pathPart}` : `${origin}/${locale}${pathPart}`;
     const q = new URLSearchParams();
     q.set("currency", currency);
     if (refCode && refCode !== "__none__") q.set("ref", refCode.toLowerCase());
@@ -372,8 +381,11 @@ export default function LinkGeneratorPage() {
     if (pageKind === "campaigns" && campaignSearch.trim()) q.set("search", campaignSearch.trim());
     if (openCartPayment) q.set("openCartPayment", "1");
     const qs = q.toString();
-    return qs ? `${base}?${qs}` : base;
-  }, [path, locale, currency, refCode, profileTab, pageKind, campaignSearch, openCartPayment]);
+    const builtUrl = qs ? `${base}?${qs}` : base;
+    // `https://host` (no trailing slash) is the homepage with autoLocale on —
+    // normalize it so the copied link has a visible path segment.
+    return autoLocale && !pathPart ? `${builtUrl.replace(/^([^?#]+?)(\?|#|$)/, "$1/$2")}` : builtUrl;
+  }, [path, locale, currency, refCode, profileTab, pageKind, campaignSearch, openCartPayment, autoLocale]);
 
   const showDetailsBlock =
     !!pageKind &&
@@ -528,7 +540,7 @@ export default function LinkGeneratorPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <span className="text-xs text-muted-foreground">لغة الرابط</span>
-                    <Select value={locale} onValueChange={setLocale}>
+                    <Select value={locale} onValueChange={setLocale} disabled={autoLocale}>
                       <SelectTrigger className="h-10">
                         <SelectValue />
                       </SelectTrigger>
@@ -540,6 +552,19 @@ export default function LinkGeneratorPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                    <label className="flex items-start gap-2.5 cursor-pointer rounded-lg border border-border/80 bg-muted/30 px-3 py-2.5 hover:bg-muted/50 transition-colors">
+                      <Checkbox
+                        checked={autoLocale}
+                        onCheckedChange={(c) => setAutoLocale(c === true)}
+                        className="mt-0.5"
+                      />
+                      <span className="text-sm leading-snug">
+                        اكتشاف اللغة تلقائيًا حسب موقع الزائر
+                        <span className="block text-xs text-muted-foreground mt-0.5">
+                          يُنشئ الرابط بدون بادئة لغة، ويختار الموقع لغة الزائر تلقائيًا حسب الدولة.
+                        </span>
+                      </span>
+                    </label>
                   </div>
                   <div className="space-y-2">
                     <span className="text-xs text-muted-foreground">?currency=</span>
