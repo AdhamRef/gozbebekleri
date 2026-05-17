@@ -28,7 +28,7 @@ import { SUPPORTED_CURRENCY_OPTIONS } from "@/lib/supported-currencies";
 
 type Row = { id: string; currency: string; amountsStr: string };
 
-function makeRow(currency = "EGP", amountsStr = ""): Row {
+function makeRow(currency = "USD", amountsStr = ""): Row {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     currency,

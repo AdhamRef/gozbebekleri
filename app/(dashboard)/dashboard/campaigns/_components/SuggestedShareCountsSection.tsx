@@ -28,7 +28,7 @@ import { SUPPORTED_CURRENCY_OPTIONS } from "@/lib/supported-currencies";
 
 type PriceRow = { id: string; currency: string; priceStr: string };
 
-function makePriceRow(currency = "EGP", priceStr = ""): PriceRow {
+function makePriceRow(currency = "USD", priceStr = ""): PriceRow {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     currency,

@@ -76,15 +76,23 @@ const DonationSuccessPage = () => {
   // ─── Meta Donate fire (paired with server CAPI) ───────────────────────────
   // Conversion lifecycle, in order:
   //   1. Donor lands here from the payment provider redirect.
-  //   2. localStorage check (`donate_fired:<id>`) — if this browser already
+  //   2. Wait until BOTH the donation row AND the pixel config are loaded.
+  //      Without `facebookPixelId` the browser fbq call is a no-op, which
+  //      previously dropped the Donate event when the page beat the config
+  //      fetch (the bug Meta Pixel Helper surfaced as "no Donate event").
+  //   3. localStorage check (`donate_fired:<id>`) — if this browser already
   //      fired for this donation, skip the API call AND skip fbq.
-  //   3. POST /api/donations/:id/track-conversion — atomic claim on the DB
+  //   4. POST /api/donations/:id/track-conversion — atomic claim on the DB
   //      row; on a winning claim it fires Meta CAPI + GA4 MP "purchase".
   //      Returns { allowed, alreadyFired, eventId }.
-  //   4. If `allowed === true` AND fbq is initialised → fire the browser
-  //      Pixel "Donate" with the SAME event_id Meta will then dedupe the
-  //      browser↔server pair into one conversion.
-  //   5. Persist localStorage regardless of allowed, so refreshes never re-
+  //   5. If `allowed === true` AND fbq is initialised → fire the browser
+  //      Pixel "Donate" with the SAME event_id. Meta dedupes the
+  //      browser↔server pair into one conversion. We ALSO push a
+  //      `donation_paid` dataLayer event so a strictly-triggered GTM tag
+  //      (event = donation_paid) can fan out to any other ad pixels without
+  //      relying on the noisy PageView/first_click triggers GTM otherwise
+  //      latches onto.
+  //   6. Persist localStorage regardless of allowed, so refreshes never re-
   //      hit the API.
   //
   // Cross-browser link-share / past-Meta-48h-dedup-window safety: the server
@@ -96,6 +104,11 @@ const DonationSuccessPage = () => {
     if (!donation) return;
     if (donation.status !== 'PAID') return;
     if (typeof window === 'undefined') return;
+    // Wait for the pixel config before doing anything. The success page eagerly
+    // triggers config loading (see TrackingPixels.tsx isConversionPage branch),
+    // so this normally clears within a few hundred ms. Until it does, fbq is
+    // not initialised and `trackDonate` would silently bail.
+    if (!tracking?.config?.facebookPixelId) return;
 
     const storageKey = `donate_fired:${id}`;
     try {
@@ -130,26 +143,26 @@ const DonationSuccessPage = () => {
       }
       if (cancelled) return;
 
-      if (allowed && tracking?.trackDonate) {
-        const items =
-          (donation.items ?? []).map((it: { campaignId: string; amount: number; campaign?: { title?: string } }) => ({
-            id: it.campaignId,
-            quantity: 1,
-            item_price: it.amount,
-          })) ?? [];
-        const categoryContents =
-          (donation.categoryItems ?? []).map((ci: { categoryId: string; amount: number; category?: { name?: string } }) => ({
-            id: ci.categoryId,
-            quantity: 1,
-            item_price: ci.amount,
-          })) ?? [];
-        const contents = [...items, ...categoryContents];
-        const contentIds = contents.length ? contents.map((c) => c.id) : ['donation'];
-        const primaryName =
-          donation.items?.[0]?.campaign?.title ??
-          donation.categoryItems?.[0]?.category?.name ??
-          'Donation';
+      const items =
+        (donation.items ?? []).map((it: { campaignId: string; amount: number; campaign?: { title?: string } }) => ({
+          id: it.campaignId,
+          quantity: 1,
+          item_price: it.amount,
+        })) ?? [];
+      const categoryContents =
+        (donation.categoryItems ?? []).map((ci: { categoryId: string; amount: number; category?: { name?: string } }) => ({
+          id: ci.categoryId,
+          quantity: 1,
+          item_price: ci.amount,
+        })) ?? [];
+      const contents = [...items, ...categoryContents];
+      const contentIds = contents.length ? contents.map((c) => c.id) : ['donation'];
+      const primaryName =
+        donation.items?.[0]?.campaign?.title ??
+        donation.categoryItems?.[0]?.category?.name ??
+        'Donation';
 
+      if (allowed && tracking?.trackDonate) {
         tracking.trackDonate({
           donationId: donation.id,
           // value + currency from the DB row (server response), never from UI
@@ -165,6 +178,37 @@ const DonationSuccessPage = () => {
           donationType: donation.type === 'MONTHLY' ? 'MONTHLY' : 'ONE_TIME',
           paymentMethod: donation.paymentMethod ?? 'CARD',
         });
+
+        // Canonical dataLayer event for GTM. Wire ONE Meta Donate tag in GTM
+        // to `event equals donation_paid` and the noisy PageView /
+        // page_view_change / first_click triggers can stop firing Meta
+        // standard events on this page. Same event_id as the fbq + CAPI fires
+        // so Meta still collapses any duplicates into a single conversion.
+        try {
+          const w = window as unknown as { dataLayer?: unknown[] };
+          if (Array.isArray(w.dataLayer)) {
+            w.dataLayer.push({
+              event: 'donation_paid',
+              event_id: `donate_${donation.id}`,
+              transaction_id: donation.id,
+              value: Number(donation.amount ?? 0),
+              currency: donation.currency,
+              content_type: 'donation',
+              content_ids: contentIds,
+              content_name: primaryName,
+              content_category: donation.subscriptionId ? 'monthly' : 'donation',
+              contents,
+              num_items: contents.reduce((s, c) => s + (c.quantity ?? 1), 0),
+              status: 'paid',
+              success: true,
+              payment_info_available: true,
+              donation_type: donation.type === 'MONTHLY' ? 'monthly' : 'one_time',
+              payment_method: (donation.paymentMethod ?? 'card').toLowerCase(),
+            });
+          }
+        } catch {
+          /* dataLayer push is best-effort */
+        }
       }
 
       try {
@@ -177,8 +221,8 @@ const DonationSuccessPage = () => {
     return () => {
       cancelled = true;
     };
-    // tracking object identity changes when pixel config loads; re-running
-    // is harmless because the ref guard prevents a second fire.
+    // Re-runs when tracking.config arrives so the ref-guarded fire actually
+    // happens after the pixel script is initialised, not before.
   }, [id, donation, tracking]);
 
   // After the donor signs in (either inline via the dialog or via a Google

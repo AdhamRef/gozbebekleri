@@ -30,7 +30,8 @@ const DIRECT_MAP: Record<string, string> = {
   OM: "OMR",
   JO: "JOD",
   MA: "MAD",
-  EG: "EGP",
+  // Egypt → USD by policy (EGP intentionally removed from supported set).
+  EG: "USD",
   US: "USD",
 };
 

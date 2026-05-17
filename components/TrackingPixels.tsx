@@ -485,9 +485,28 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
   /**
    * Build a full CanonicalEvent from partial input, fire browser pixels,
    * then POST to /api/track for server-side CAPI + TikTok Events API.
+   *
+   * Conversion pages (/success, /donation-failed) are off-limits to every
+   * event except `donation_complete` (which is owned by `trackDonate` and
+   * does NOT route through here). Anything else firing on these paths is
+   * either a stray dialog mount or a misfired effect — both contaminate
+   * Meta's funnel with phantom events on the conversion landing.
    */
   const sendCanonical = useCallback(
     (partial: Omit<CanonicalEvent, "event_time"> & { event_time?: number }) => {
+      if (typeof window !== "undefined") {
+        const path = window.location.pathname;
+        if (/\/(success|donation-failed)(\/|$)/.test(path)) {
+          if (process.env.NODE_ENV !== "production") {
+            // eslint-disable-next-line no-console
+            console.debug("[tracking] suppressed canonical event on conversion page", {
+              event: partial.event,
+              path,
+            });
+          }
+          return;
+        }
+      }
       const ids = captureClickIds();
       const event: CanonicalEvent = {
         event_time: Math.floor(Date.now() / 1000),
@@ -809,8 +828,6 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
    */
   const trackDonate = useCallback((options: TrackDonateSuccessOptions) => {
     if (typeof window === "undefined") return;
-    const fbq = window.fbq;
-    if (!fbq || !configRef.current?.facebookPixelId) return;
 
     const eventId = metaDonationEventId(options.donationId, "success");
 
@@ -857,7 +874,37 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
       payment_method: (options.paymentMethod ?? "card").toLowerCase(),
     };
 
-    fbq("track", "Donate", data, { eventID: eventId });
+    // Robust fire: if fbq + pixelId are ready right now, send immediately.
+    // Otherwise poll briefly (the config fetch + script init takes a few
+    // hundred ms on cold loads) and fire as soon as both arrive. The earlier
+    // silent-bail behaviour was the root cause of "Donate event missing"
+    // when the donor's success page beat the deferred pixel config to ready.
+    const tryFire = (): boolean => {
+      const fbq = window.fbq;
+      if (!fbq) return false;
+      if (!configRef.current?.facebookPixelId) return false;
+      fbq("track", "Donate", data, { eventID: eventId });
+      return true;
+    };
+
+    if (tryFire()) return;
+
+    let attempts = 0;
+    const MAX_ATTEMPTS = 40; // ~6s at 150ms intervals — well past pixel init
+    const timer = setInterval(() => {
+      attempts += 1;
+      if (tryFire() || attempts >= MAX_ATTEMPTS) {
+        clearInterval(timer);
+        if (attempts >= MAX_ATTEMPTS && process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.warn("[Donate] fbq never became ready; CAPI fire is the only signal", {
+            eventId,
+            hasFbq: !!window.fbq,
+            hasPixelId: !!configRef.current?.facebookPixelId,
+          });
+        }
+      }
+    }, 150);
   }, []);
 
   const trackMissingEvent = useCallback((customEventName: string, data?: Record<string, unknown>) => {

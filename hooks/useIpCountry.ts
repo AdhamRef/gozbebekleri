@@ -32,10 +32,13 @@ function writeCache(code: string) {
 
 async function fetchCountryCode(fallback: string): Promise<string> {
   try {
-    const res = await fetch("https://ipapi.co/json/", { credentials: "omit" });
+    // Server-side geo lookup (Vercel headers → CF → ipapi). Replaces the old
+    // direct ipapi.co fetch, which was getting blocked by antivirus / CORS /
+    // ad-blockers in production (visible in the Meta Pixel diagnostic console).
+    const res = await fetch("/api/geo/client", { credentials: "omit" });
     if (!res.ok) return fallback;
-    const data = await res.json() as { country_code?: string; error?: boolean };
-    if (data.error) return fallback;
+    const data = await res.json() as { ok?: boolean; country_code?: string };
+    if (!data.ok) return fallback;
     const code = typeof data.country_code === "string" ? data.country_code.trim().toLowerCase() : "";
     return /^[a-z]{2}$/.test(code) ? code : fallback;
   } catch { return fallback; }

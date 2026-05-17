@@ -1572,11 +1572,24 @@ const DonationDialog = ({
             geoCity = cacheData.data.city;
             geoRegion = cacheData.data.region;
           } else {
-            const geo = await fetch("https://ipapi.co/json/").then((r) => r.json()) as { country_code?: string; city?: string; region?: string };
+            // Server-backed geo (Vercel/CF headers → ipapi fallback). Avoids
+            // the antivirus/CORS/ad-blocker failures the browser direct call
+            // was producing in production.
+            const geoRes = await fetch("/api/geo/client", { credentials: "omit" });
+            const geoJson = geoRes.ok
+              ? (await geoRes.json().catch(() => null)) as { ok?: boolean; country_code?: string; city?: string; region?: string } | null
+              : null;
+            const geo = geoJson && geoJson.ok
+              ? {
+                  country_code: geoJson.country_code,
+                  city: geoJson.city,
+                  region: geoJson.region,
+                }
+              : {};
             geoCountryCode = geo.country_code?.toLowerCase();
             geoCity = geo.city;
             geoRegion = geo.region;
-            if (typeof window !== "undefined") {
+            if (typeof window !== "undefined" && geo.country_code) {
               localStorage.setItem("ipapi_cache", JSON.stringify({ data: geo, ts: Date.now() }));
             }
           }

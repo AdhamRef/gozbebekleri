@@ -37,16 +37,20 @@ function CountryFromIpOnSession() {
 
         if (data.reason !== "no_geo") return;
 
-        const geoRes = await fetch("https://ipapi.co/json/", { credentials: "omit" });
+        // Server-side geo (Vercel headers → CF → ipapi). Browser direct fetch
+        // to ipapi.co was being blocked by antivirus / CORS / ad-blockers in
+        // production, which left donors with empty location fields and broke
+        // Meta CAPI matching (no `ct` / `st` / `country` hashes).
+        const geoRes = await fetch("/api/geo/client", { credentials: "omit" });
         if (!geoRes.ok || cancelled) return;
         const geo = (await geoRes.json().catch(() => null)) as {
+          ok?: boolean;
           country_code?: string;
           country_name?: string;
           region?: string;
           city?: string;
-          error?: boolean;
         } | null;
-        if (cancelled || !geo || geo.error) return;
+        if (cancelled || !geo || !geo.ok) return;
         const cc = typeof geo.country_code === "string" ? geo.country_code.trim().toUpperCase() : "";
         if (!/^[A-Z]{2}$/.test(cc) || cc === "XX") return;
 

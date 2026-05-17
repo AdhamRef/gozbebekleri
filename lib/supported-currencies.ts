@@ -23,7 +23,6 @@ export const SUPPORTED_CURRENCY_OPTIONS = [
   { code: "OMR", symbol: "ر.ع.‏", name: "Omani Rial" },
   { code: "JOD", symbol: "د.أ", name: "Jordanian Dinar" },
   { code: "MAD", symbol: "د.م.", name: "Moroccan Dirham" },
-  { code: "EGP", symbol: "EGP", name: "Egyptian Pound" },
 ] as const satisfies readonly SupportedCurrencyOption[];
 
 /** For admin selects (campaign suggested amounts / share prices, etc.) */

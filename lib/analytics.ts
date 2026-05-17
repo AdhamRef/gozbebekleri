@@ -58,9 +58,30 @@ export function clarityIdentify(
 }
 
 /**
+ * Pages where engagement events MUST NOT reach GTM. The Meta Pixel container
+ * picks dataLayer pushes up as custom-event triggers and was firing standard
+ * funnel events (PageView, AddPaymentInfo, SubscribedButtonClick, …) AGAIN on
+ * /success — polluting the conversion column. The /success path owns Donate
+ * exclusively (browser fbq + CAPI dedup'd by event_id); anything else fired
+ * here is noise. Clarity + GA4 still record these events.
+ */
+const DATALAYER_BLOCKED_PATH_RE = /\/(success|donation-failed)(\/|$)/;
+
+function isDataLayerBlockedPath(): boolean {
+  try {
+    return DATALAYER_BLOCKED_PATH_RE.test(window.location.pathname);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Single dispatch entry point used by `EngagementInstrumentation`. Fans out to
  * Clarity (as event + tag), GA4, and the GTM dataLayer. Safe to call even when
  * all three are absent.
+ *
+ * On conversion landing pages (/success, /donation-failed) the GTM dataLayer
+ * leg is suppressed — see `DATALAYER_BLOCKED_PATH_RE` for why.
  */
 export function trackEngagement(name: string, data?: AnyRecord): void {
   if (typeof window === "undefined") return;
@@ -83,13 +104,17 @@ export function trackEngagement(name: string, data?: AnyRecord): void {
   }
 
   // GTM dataLayer — anything bound to dataLayer in the user's GTM container
-  // (e.g. Ads conversion tags) gets these too.
-  try {
-    if (Array.isArray(window.dataLayer)) {
-      window.dataLayer.push({ event: name, ...(data ?? {}) });
+  // (e.g. Ads conversion tags) gets these too. Skipped on conversion pages so
+  // Meta Pixel tags inside GTM can't keep mis-firing standard events on top
+  // of the canonical Donate flow.
+  if (!isDataLayerBlockedPath()) {
+    try {
+      if (Array.isArray(window.dataLayer)) {
+        window.dataLayer.push({ event: name, ...(data ?? {}) });
+      }
+    } catch {
+      /* noop */
     }
-  } catch {
-    /* noop */
   }
 
   if (process.env.NODE_ENV !== "production") {

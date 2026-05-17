@@ -285,7 +285,6 @@ export default function RootLayout({
             so those preconnects were never used by the page (Lighthouse "unused preconnect"). */}
         <link rel="preconnect" href="https://res.cloudinary.com" />
         <link rel="dns-prefetch" href="https://i.ibb.co" />
-        <link rel="dns-prefetch" href="https://ipapi.co" />
         <link rel="preload" href="/bg.webp" as="image" type="image/webp" />
 
         {/* Contentsquare — UX behavior & feedback tracking */}
