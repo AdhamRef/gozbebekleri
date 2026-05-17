@@ -23,9 +23,37 @@ import { useEffect } from "react";
 const GTM_ID = "GTM-MMNBQQWB";
 const IDLE_DELAY_MS = 6000;
 
+/**
+ * Conversion landing pages have their own strict tracking path:
+ *   - /success/:id owns the Meta Donate browser event + dedicated CAPI sender.
+ *   - /donation-failed owns failure diagnostics/server-side failed events.
+ *
+ * Loading the full GTM container on these pages lets old broad triggers such as
+ * All Pages / History Change / first_click re-fire Meta standard events
+ * (PageView, AddPaymentInfo, CustomizeProduct, SubscribedButtonClick) on the
+ * conversion page. That is exactly what polluted Pixel Helper and the ad
+ * account. Keep GTM entirely off these pages; TrackingPixels and the dedicated
+ * conversion endpoints are the source of truth there.
+ */
+const GTM_BLOCKED_PATH_RE = /\/(success|donation-failed)(\/|$)/;
+
+function isGtmBlockedPath(): boolean {
+  try {
+    return GTM_BLOCKED_PATH_RE.test(window.location.pathname);
+  } catch {
+    return false;
+  }
+}
+
 export default function DeferredGTM() {
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    if (isGtmBlockedPath()) {
+      (window as Window & { __gtmBlockedOnConversionPage?: boolean }).__gtmBlockedOnConversionPage = true;
+      return;
+    }
+
     if ((window as Window & { __gtmLoaded?: boolean }).__gtmLoaded) return;
 
     let fired = false;
@@ -33,6 +61,7 @@ export default function DeferredGTM() {
 
     const loadGtm = () => {
       if (fired) return;
+      if (isGtmBlockedPath()) return;
       fired = true;
       (window as Window & { __gtmLoaded?: boolean }).__gtmLoaded = true;
 
