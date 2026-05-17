@@ -1,18 +1,21 @@
 /**
  * POST /api/track
  *
- * Server-side mirror for the browser canonical funnel events (PageView,
+ * Generic server-side mirror for the browser canonical funnel events (PageView,
  * ViewContent, AddToCart, InitiateCheckout, AddPaymentInfo, …). The Meta side
  * is sent via the shared CAPI sender so the hashing, payload shape, and creds
- * lookup match what the donation webhook uses.
+ * lookup match the dedicated donation paths.
  *
- * IMPORTANT: We skip donation_complete and payment_failed here — those are
- * owned by the payment-provider webhook in donation-conversion-server.ts so we
- * fire exactly one server-side hit per donation. The webhook uses donation.id
- * as the event_id and the browser-side fbq uses the same id, so Meta dedupes
- * the browser↔server pair into a single conversion. Mirroring those events
- * here too would re-introduce the duplicate-counting that drifts ad-account
- * totals from the dashboard.
+ * IMPORTANT: donation_complete and payment_failed are REFUSED here:
+ *   • donation_complete → owned by POST /api/donations/:id/track-conversion
+ *     (atomic claim on `conversionEventsSentAt`, paired with the browser fbq
+ *     fire from /success).
+ *   • payment_failed    → owned by `sendDonationFailedConversions` fired from
+ *     the payment-provider webhooks.
+ *
+ * Both dedicated paths use shared event_ids so Meta dedupes their browser/
+ * server pair into one conversion; mirroring them here would either
+ * double-count (Donate) or mint phantoms (DonateFailed without a donation row).
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -21,7 +24,7 @@ import { prisma } from "@/lib/prisma";
 import type { CanonicalEvent } from "@/lib/tracking/canonical";
 import {
   META_EVENT_MAP,
-  META_CAPI_WEBHOOK_OWNED,
+  META_CAPI_OFF_CHANNEL,
   TIKTOK_EVENT_MAP,
 } from "@/lib/tracking/canonical";
 import {
@@ -56,18 +59,18 @@ export async function POST(req: NextRequest) {
 
     // ── Meta CAPI ─────────────────────────────────────────────────────────────
     if (row?.facebookPixelId && row?.facebookAccessToken) {
-      if (META_CAPI_WEBHOOK_OWNED.has(event.event)) {
-        // donation_complete / payment_failed → webhook owns the server hit.
-        // If anyone re-introduces a browser-side sender for these (please
-        // don't), this guard prevents Meta from receiving a duplicate or
-        // phantom hit. Log loud so the regression is visible.
+      if (META_CAPI_OFF_CHANNEL.has(event.event)) {
+        // donation_complete and payment_failed have dedicated server paths
+        // (see file header). This guard catches accidental browser-side
+        // sends so Meta never sees a duplicate or phantom hit; the
+        // dedicated paths remain the only CAPI source.
         console.warn(
-          "[/api/track] refused webhook-owned event:",
+          "[/api/track] refused off-channel event:",
           event.event,
           "event_id=",
           event.event_id
         );
-        results.meta = { skipped: true, owner: "donation-conversion-server" };
+        results.meta = { skipped: true, owner: "dedicated-endpoint" };
       } else {
         results.meta = await mirrorMetaCanonical(event, row.facebookPixelId, row.facebookAccessToken, clientIp);
       }

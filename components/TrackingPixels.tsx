@@ -4,6 +4,7 @@ import React, { useEffect, useRef, createContext, useContext, useCallback, useSt
 import { track as vercelTrack } from "@vercel/analytics";
 import {
   generateEventId,
+  metaDonationEventId,
   META_EVENT_MAP,
   TIKTOK_EVENT_MAP,
   GA4_EVENT_MAP,
@@ -150,6 +151,30 @@ interface TrackPaymentFailedOptions {
   donationId?: string;
 }
 
+/** Single Meta-Pixel "Donate" fire from the /success page. The browser pixel
+ *  is paired with a server CAPI fire from POST /api/donations/:id/track-conversion
+ *  — Meta dedupes by the shared event_id. Don't call this from anywhere except
+ *  the /success page, and only after the donation is confirmed PAID in the DB
+ *  AND the track-conversion endpoint returned `allowed: true`. */
+interface TrackDonateSuccessOptions {
+  /** Donation row id. Used to build the dedup-stable event_id. */
+  donationId: string;
+  /** Amount as charged in the DB. Must match what the CAPI fire uses. */
+  value: number;
+  /** Currency as stored on the donation row. Must match the CAPI fire. */
+  currency: string;
+  /** Campaign / category IDs this donation funded. */
+  contentIds?: string[];
+  /** Per-item breakdown matching Meta's `contents` array. */
+  contents?: Array<{ id: string; quantity?: number; item_price?: number }>;
+  /** Human-readable cause for Events Manager. */
+  contentName?: string;
+  /** "donation" | "monthly" | "qurbani" | … */
+  contentCategory?: string;
+  donationType?: "ONE_TIME" | "MONTHLY";
+  paymentMethod?: string;
+}
+
 // ─── Context value ────────────────────────────────────────────────────────────
 
 interface TrackingContextValue {
@@ -164,6 +189,7 @@ interface TrackingContextValue {
   trackAddPaymentInfo: (options: TrackAddPaymentInfoOptions) => void;
   trackPaymentSubmit: (options: TrackDonateOptions) => void;
   trackPaymentFailed: (options: TrackPaymentFailedOptions) => void;
+  trackDonate: (options: TrackDonateSuccessOptions) => void;
   trackMissingEvent: (customEventName: string, data?: Record<string, unknown>) => void;
 }
 
@@ -261,6 +287,10 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
   // second; the interaction-or-long-idle gate moves all of that off the critical path
   // (Lighthouse never interacts so it never sees them) while still firing well before
   // any real user can convert.
+  //
+  // EXCEPTION: /success/[id] is a conversion page — we need fbq ready immediately so
+  // `trackDonate` can fire the Meta "Donate" event without waiting for scroll or 6 s
+  // idle. Donors often arrive there post-redirect and may close the tab quickly.
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -294,6 +324,14 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
       window.removeEventListener("keydown", load);
       window.removeEventListener("touchstart", load);
     };
+
+    // Fire-now path for conversion pages. The match is locale-agnostic — any
+    // pathname segment "/success/<id>" qualifies.
+    const isConversionPage = /\/success\/[^/]+/.test(window.location.pathname);
+    if (isConversionPage) {
+      load();
+      return cleanup;
+    }
 
     timeoutId = setTimeout(load, 6000);
     window.addEventListener("scroll", load, { passive: true, once: true });
@@ -720,7 +758,7 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
     // for funnel/diagnostics only. The Meta DonateFailed CAPI event is owned
     // by the SERVER (see donation-conversion-server.ts) — `payment_failed` is
     // deliberately absent from META_EVENT_MAP and listed in
-    // META_CAPI_WEBHOOK_OWNED, so fbq does not fire here and /api/track
+    // META_CAPI_OFF_CHANNEL, so fbq does not fire here and /api/track
     // refuses to forward it.
     //
     // If we don't have a donationId yet (e.g. POST /api/donations itself
@@ -731,7 +769,7 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
     sendCanonical({
       event:    "payment_failed",
       event_id: options.donationId
-        ? `${options.donationId}_failed`
+        ? metaDonationEventId(options.donationId, "failed")
         : `fail_no_donation_${Date.now()}`,
       donation: {
         amount:   options.value,
@@ -753,6 +791,74 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
       event_id: generateEventId("reg"),
     });
   }, [sendCanonical]);
+
+  /**
+   * Fire Meta Pixel "Donate" once for a confirmed-paid donation. Intentionally
+   * does NOT route through `sendCanonical`:
+   *   • No /api/track mirror — CAPI Donate is owned by
+   *     POST /api/donations/:id/track-conversion, which already fired by the
+   *     time the success page calls this. /api/track would refuse the event
+   *     anyway (donation_complete is in META_CAPI_OFF_CHANNEL), but skipping
+   *     the round trip is cleaner.
+   *   • No TikTok / GA4 / X / Vercel fan-out — GA4 MP purchase is also fired
+   *     server-side from the same endpoint; the other platforms don't have a
+   *     wired donation_complete leg yet (see project memory).
+   *
+   * event_id matches what the server CAPI fire used (`donate_<donationId>`),
+   * so Meta dedupes the browser↔server pair into a single conversion.
+   */
+  const trackDonate = useCallback((options: TrackDonateSuccessOptions) => {
+    if (typeof window === "undefined") return;
+    const fbq = window.fbq;
+    if (!fbq || !configRef.current?.facebookPixelId) return;
+
+    const eventId = metaDonationEventId(options.donationId, "success");
+
+    const contents =
+      options.contents?.length
+        ? options.contents.map((c) => ({
+            id: c.id,
+            quantity: c.quantity ?? 1,
+            item_price: c.item_price ?? 0,
+          }))
+        : options.contentIds?.length
+          ? options.contentIds.map((id) => ({
+              id,
+              quantity: 1,
+              item_price:
+                options.contentIds!.length === 1
+                  ? options.value
+                  : options.value / options.contentIds!.length,
+            }))
+          : [{ id: "donation", quantity: 1, item_price: options.value }];
+
+    const contentIds = options.contentIds?.length
+      ? options.contentIds
+      : contents.map((c) => c.id);
+
+    const data: Record<string, unknown> = {
+      value: options.value,
+      currency: options.currency,
+      content_type: "donation",
+      content_ids: contentIds,
+      contents,
+      num_items: contents.reduce((s, c) => s + (c.quantity ?? 1), 0),
+      content_name: options.contentName,
+      content_category:
+        options.contentCategory ??
+        (options.donationType === "MONTHLY" ? "monthly" : "donation"),
+      order_id: options.donationId,
+      transaction_id: options.donationId,
+      status: "paid",
+      success: true,
+      payment_info_available: true,
+      donation_type:
+        options.donationType === "MONTHLY" ? "monthly" : "one_time",
+      payment_method: (options.paymentMethod ?? "card").toLowerCase(),
+    };
+
+    fbq("track", "Donate", data, { eventID: eventId });
+  }, []);
 
   const trackMissingEvent = useCallback((customEventName: string, data?: Record<string, unknown>) => {
     sendCanonical({
@@ -778,6 +884,7 @@ export default function TrackingPixels({ children }: { children: React.ReactNode
     trackAddPaymentInfo,
     trackPaymentSubmit,
     trackPaymentFailed,
+    trackDonate,
     trackMissingEvent,
   };
 

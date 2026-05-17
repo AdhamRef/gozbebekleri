@@ -1,22 +1,26 @@
 /**
  * Server-side conversion senders for donations.
  *
- * SINGLE SOURCE OF TRUTH for Meta CAPI `Donate` / `DonateFailed` events.
- * Fired from the payment-provider callbacks (PayFor OK/Fail, Stripe webhook,
- * /api/donations/:id/fail PATCH) so the dashboard's PAID/FAILED rows and
- * Meta's reported conversions stay 1 : 1 — exactly one CAPI event per
- * donation, ever.
+ * Donate (success)
+ * ----------------
+ * Called by POST /api/donations/:id/track-conversion when the /success page
+ * loads for a PAID donation. The same donation.id-derived event_id is also
+ * used by the browser fbq fire in TrackingPixels.tsx `trackDonate` — Meta
+ * dedupes the browser↔server pair into a single conversion.
  *
- * There is NO browser-side fbq fire for these two events. Removing the
- * browser leg killed two long-running bugs:
- *   1. Phantom DonateFailed events with random event_ids from the catch-all
- *      browser failure handler that had no donation row to anchor against.
- *   2. /success and /donation-failed refreshes re-firing the pixel past
- *      Meta's 48 h event_id dedup window.
+ * DonateFailed (lookalike seed)
+ * -----------------------------
+ * Still fired from the payment-provider callbacks (PayFor fail, Stripe
+ * `payment_intent.payment_failed` + invoice/session failures,
+ * PATCH /api/donations/:id/fail). Failed donors typically never reach a
+ * /success-style landing page, so we cannot drive this from the browser
+ * without losing signal. The browser has NO fbq fire for DonateFailed —
+ * `payment_failed` is absent from META_EVENT_MAP and present in
+ * META_CAPI_OFF_CHANNEL, so /api/track refuses to mirror it.
  *
  * Idempotency
  * -----------
- * Each path atomically claims its idempotency timestamp BEFORE sending:
+ * Each path atomically claims its timestamp BEFORE sending:
  *
  *   const { count } = await prisma.donation.updateMany({
  *     where: { id, conversionEventsSentAt: null, status: "PAID" },
@@ -24,8 +28,9 @@
  *   });
  *   if (count === 0) return; // another concurrent firer already claimed
  *
- * This collapses the read-then-write race (two webhook retries both seeing
- * `conversionEventsSentAt: null` and both firing) into a single atomic write.
+ * This collapses the read-then-write race (multi-tab /success opens, webhook
+ * retries, cross-browser link-shares all hitting the same donation) into a
+ * single atomic write. Exactly one CAPI Donate per donation, ever.
  *
  * If the Graph POST then fails, we DO NOT release the claim. Meta might have
  * still received the event (network blip on the response leg); replaying it
@@ -141,11 +146,18 @@ function primaryContentName(row: LoadedDonation): string {
 
 /**
  * Fire Meta CAPI "Donate" + GA4 MP "purchase" for a successfully PAID donation.
- * Server-only — there is no matching browser pixel fire. event_id is
- * `donation.id` so this function is the canonical record of "this donation
- * was reported to Meta".
  *
- * Returns a result so callers can log it (e.g. webhook handler audit log).
+ * The browser fbq("track", "Donate", ...) fires from the /success page with
+ * the SAME event_id (`donate_<donationId>`) so Meta dedupes the browser↔server
+ * pair into one conversion. value/currency come from the donation row in the
+ * database — never from a cookie, URL param, or UI state — so what Meta
+ * records matches what the dashboard charged.
+ *
+ * Atomic claim semantics in the function body; if claim fails (another tab,
+ * concurrent retry, or already-fired re-visit) we bail out without sending.
+ *
+ * Returns a result so callers can log it (e.g. /api/donations/:id/track-conversion
+ * surfaces this in its JSON response so the browser knows whether to fire fbq).
  */
 export async function sendDonationServerConversions(donationId: string): Promise<MetaCapiResult> {
   try {
@@ -188,20 +200,26 @@ export async function sendDonationServerConversions(donationId: string): Promise
     const contentName = primaryContentName(row);
     const { ids, contents } = buildContents(row);
 
+    // Keep this payload shape in sync with the browser fbq fire in
+    // TrackingPixels.tsx `trackDonate` — same shape on both legs gives Meta
+    // the cleanest dedup signal. All values are sourced from the DB row.
     const custom_data: MetaCustomData = {
       value: amount,
       currency,
-      content_type: "product",
+      content_type: "donation",
       content_name: contentName,
       content_category: row.subscriptionId ? "monthly" : "donation",
       content_ids: ids,
       contents,
       num_items: contents.reduce((s, c) => s + (c.quantity ?? 1), 0),
       order_id: row.id,
-      status: "completed",
+      transaction_id: row.id,
+      status: "paid",
+      success: true,
+      payment_info_available: 1,
       donation_type: row.subscriptionId ? "MONTHLY" : "ONE_TIME",
       recurring: !!row.subscriptionId,
-      payment_info_available: 1,
+      payment_method: (row.paymentMethod ?? "CARD").toLowerCase(),
     };
 
     let metaResult: MetaCapiResult = { ok: false, skipped: true, reason: "no creds" };
@@ -212,6 +230,7 @@ export async function sendDonationServerConversions(donationId: string): Promise
           event_id: metaDonationEventId(row.id, "success"),
           event_time: eventTime,
           event_source_url: eventSourceUrl,
+          action_source: "website",
           user_data: buildUserDataFromDonation(row),
           custom_data,
         },

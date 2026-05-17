@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import Stripe from "stripe";
 import { getDonorCountryCodeForSnapshot } from "@/lib/donations/donor-country-code";
-import {
-  sendDonationServerConversions,
-  sendDonationFailedConversions,
-} from "@/lib/tracking/donation-conversion-server";
+// Donate (success) is no longer fired from this callback — it's owned by the
+// /success page via POST /api/donations/:id/track-conversion so the browser
+// Pixel and CAPI fire as a single dedup'd pair. DonateFailed remains here so
+// abandoned-card lookalike audiences still get the signal on bank rejects.
+import { sendDonationFailedConversions } from "@/lib/tracking/donation-conversion-server";
 import { dispatchDonationPaid, dispatchEvent } from "@/lib/events/dispatch";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -119,7 +120,6 @@ export async function POST(req: NextRequest) {
     });
 
     if (result.ok) {
-      void sendDonationServerConversions(donationId);
       void dispatchDonationPaid(donationId);
       return NextResponse.redirect(new URL(`/${locale}/success/${donationId}`, origin));
     }

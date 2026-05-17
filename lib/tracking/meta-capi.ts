@@ -10,12 +10,16 @@
  *   - /api/track       → mirrors browser-side canonical funnel events (PageView,
  *                        ViewContent, AddToCart, InitiateCheckout, AddPaymentInfo, …).
  *                        donation_complete / payment_failed are REFUSED here —
- *                        those are owned by the webhook below so we never
- *                        double-count or phantom-emit.
- *   - donation-conversion-server.ts → fires Donate (success) and DonateFailed
- *                        (lookalike-seed for abandoned card attempts) from the
- *                        payment-provider callbacks. Server-only — there is no
- *                        browser-side fbq fire for these two events.
+ *                        the dedicated paths below own those server legs.
+ *   - /api/donations/:id/track-conversion → fires Donate from the /success
+ *                        page request, gated by an atomic claim on
+ *                        `conversionEventsSentAt`. Browser fbq fires the same
+ *                        event_id; Meta dedups the pair.
+ *   - donation-conversion-server.ts → fires DonateFailed (custom event,
+ *                        lookalike-seed for abandoned card attempts) from the
+ *                        payment-provider callbacks. Failed donors typically
+ *                        never reach a /success-style page, so this leg has to
+ *                        stay server-only.
  */
 
 import crypto from "crypto";

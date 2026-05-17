@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import Stripe from "stripe";
 import { getDonorCountryCodeForSnapshot } from "@/lib/donations/donor-country-code";
-import {
-  sendDonationServerConversions,
-  sendDonationFailedConversions,
-} from "@/lib/tracking/donation-conversion-server";
+// Donate (success) is no longer fired from this webhook — it's owned by the
+// /success page via POST /api/donations/:id/track-conversion so the browser
+// Pixel and CAPI fire as a single dedup'd pair. DonateFailed remains here
+// because failed donors typically never reach a /success-style page.
+import { sendDonationFailedConversions } from "@/lib/tracking/donation-conversion-server";
 import { dispatchDonationPaid, dispatchEvent } from "@/lib/events/dispatch";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -91,7 +92,6 @@ export async function POST(req: NextRequest) {
               });
             }
           });
-          void sendDonationServerConversions(donationId);
           void dispatchDonationPaid(donationId);
           if (isMonthly && subscriptionDbId) {
             void dispatchEvent("SUBSCRIPTION_CREATED", { donationId });
@@ -250,7 +250,6 @@ export async function POST(req: NextRequest) {
           select: { id: true },
         });
         if (paidForInvoice) {
-          void sendDonationServerConversions(paidForInvoice.id);
           void dispatchEvent("SUBSCRIPTION_PAYMENT", { donationId: paidForInvoice.id });
         }
         break;
@@ -354,7 +353,6 @@ export async function POST(req: NextRequest) {
             });
           }
         });
-        void sendDonationServerConversions(donationId);
         void dispatchDonationPaid(donationId);
         break;
       }

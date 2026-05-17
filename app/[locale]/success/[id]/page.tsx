@@ -19,6 +19,7 @@ import Image from 'next/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSession } from 'next-auth/react';
 import SignInDialog from '@/components/SignInDialog';
+import { useTracking } from '@/components/TrackingPixels';
 
 const dateLocales: Record<string, Locale> = { ar, en: enUS, fr, tr, id, pt, es };
 
@@ -31,12 +32,14 @@ const DonationSuccessPage = () => {
   const locale = useLocale();
   const confetti = useConfettiStore();
   const { data: session, status: sessionStatus } = useSession();
+  const tracking = useTracking();
   const [donation, setDonation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
   const [signInOpen, setSignInOpen] = useState(false);
   const [linkState, setLinkState] = useState<'idle' | 'linking' | 'linked' | 'failed'>('idle');
   const linkAttemptedRef = useRef(false);
+  const donateFireAttemptedRef = useRef(false);
   const dateLocale = dateLocales[locale] ?? enUS;
   const isRtl = locale === 'ar';
   const isMonthly = donation?.type === 'MONTHLY';
@@ -69,6 +72,114 @@ const DonationSuccessPage = () => {
       setLoading(false);
     }
   };
+
+  // ─── Meta Donate fire (paired with server CAPI) ───────────────────────────
+  // Conversion lifecycle, in order:
+  //   1. Donor lands here from the payment provider redirect.
+  //   2. localStorage check (`donate_fired:<id>`) — if this browser already
+  //      fired for this donation, skip the API call AND skip fbq.
+  //   3. POST /api/donations/:id/track-conversion — atomic claim on the DB
+  //      row; on a winning claim it fires Meta CAPI + GA4 MP "purchase".
+  //      Returns { allowed, alreadyFired, eventId }.
+  //   4. If `allowed === true` AND fbq is initialised → fire the browser
+  //      Pixel "Donate" with the SAME event_id Meta will then dedupe the
+  //      browser↔server pair into one conversion.
+  //   5. Persist localStorage regardless of allowed, so refreshes never re-
+  //      hit the API.
+  //
+  // Cross-browser link-share / past-Meta-48h-dedup-window safety: the server
+  // is the authoritative dedup gate; the second browser's API call returns
+  // `allowed: false, alreadyFired: true` and the Pixel does NOT fire there.
+  useEffect(() => {
+    if (!id) return;
+    if (donateFireAttemptedRef.current) return;
+    if (!donation) return;
+    if (donation.status !== 'PAID') return;
+    if (typeof window === 'undefined') return;
+
+    const storageKey = `donate_fired:${id}`;
+    try {
+      if (window.localStorage.getItem(storageKey)) {
+        donateFireAttemptedRef.current = true;
+        return;
+      }
+    } catch {
+      // Storage access denied (Safari private mode etc.) — fall through and
+      // let the server claim be the dedup. Worst case: re-visiting in a
+      // sandboxed browser session re-hits the API, which then returns
+      // `allowed: false` and we still don't double-fire fbq.
+    }
+
+    donateFireAttemptedRef.current = true;
+
+    let cancelled = false;
+    (async () => {
+      let allowed = false;
+      try {
+        const res = await axios.post(`/api/donations/${id}/track-conversion`);
+        allowed = res.data?.allowed === true;
+      } catch (err) {
+        // Network failure on the claim endpoint. Don't fire the browser Pixel
+        // here — without the server claim we have no idea whether the CAPI
+        // event already went out from a previous attempt, and an un-deduped
+        // browser fire would risk a double-count. Reset the ref so a future
+        // mount (rare) can retry.
+        console.error('[Donate] track-conversion failed:', err);
+        donateFireAttemptedRef.current = false;
+        return;
+      }
+      if (cancelled) return;
+
+      if (allowed && tracking?.trackDonate) {
+        const items =
+          (donation.items ?? []).map((it: { campaignId: string; amount: number; campaign?: { title?: string } }) => ({
+            id: it.campaignId,
+            quantity: 1,
+            item_price: it.amount,
+          })) ?? [];
+        const categoryContents =
+          (donation.categoryItems ?? []).map((ci: { categoryId: string; amount: number; category?: { name?: string } }) => ({
+            id: ci.categoryId,
+            quantity: 1,
+            item_price: ci.amount,
+          })) ?? [];
+        const contents = [...items, ...categoryContents];
+        const contentIds = contents.length ? contents.map((c) => c.id) : ['donation'];
+        const primaryName =
+          donation.items?.[0]?.campaign?.title ??
+          donation.categoryItems?.[0]?.category?.name ??
+          'Donation';
+
+        tracking.trackDonate({
+          donationId: donation.id,
+          // value + currency from the DB row (server response), never from UI
+          // state or URL params. Keeps browser fire bit-identical to the
+          // CAPI fire and survives the currency-cookie issues called out in
+          // the project audit.
+          value: Number(donation.amount ?? 0),
+          currency: donation.currency,
+          contentIds,
+          contents: contents.length ? contents : undefined,
+          contentName: primaryName,
+          contentCategory: donation.subscriptionId ? 'monthly' : 'donation',
+          donationType: donation.type === 'MONTHLY' ? 'MONTHLY' : 'ONE_TIME',
+          paymentMethod: donation.paymentMethod ?? 'CARD',
+        });
+      }
+
+      try {
+        window.localStorage.setItem(storageKey, '1');
+      } catch {
+        // ignore — server claim is authoritative
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // tracking object identity changes when pixel config loads; re-running
+    // is harmless because the ref guard prevents a second fire.
+  }, [id, donation, tracking]);
 
   // After the donor signs in (either inline via the dialog or via a Google
   // redirect that drops them back here), automatically pull every donation
