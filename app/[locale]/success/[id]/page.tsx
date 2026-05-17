@@ -23,6 +23,32 @@ import { useTracking } from '@/components/TrackingPixels';
 
 const dateLocales: Record<string, Locale> = { ar, en: enUS, fr, tr, id, pt, es };
 
+type DonateTrackingPayload = {
+  ok: true;
+  eventName: 'Donate';
+  eventId: string;
+  transactionId: string;
+  orderId: string;
+  value: number;
+  currency: string;
+  contentType: 'donation';
+  contentIds: string[];
+  contentName: string;
+  contentCategory: string;
+  contents: Array<{ id: string; quantity: number; item_price: number }>;
+  numItems: number;
+  status: 'paid';
+  success: true;
+  paymentInfoAvailable: true;
+  donationType: 'ONE_TIME' | 'MONTHLY';
+  paymentMethod: string;
+};
+
+const DONATE_TRACKING_MAX_ATTEMPTS = 20;
+const DONATE_TRACKING_RETRY_MS = 750;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const DonationSuccessPage = () => {
   const params = useParams();
   const id = params?.id as string | undefined;
@@ -74,45 +100,17 @@ const DonationSuccessPage = () => {
   };
 
   // ─── Meta Donate fire (paired with server CAPI) ───────────────────────────
-  // Conversion lifecycle, in order:
-  //   1. Donor lands here from the payment provider redirect.
-  //   2. Wait until BOTH the donation row AND the pixel config are loaded.
-  //      Without `facebookPixelId` the browser fbq call is a no-op, which
-  //      previously dropped the Donate event when the page beat the config
-  //      fetch (the bug Meta Pixel Helper surfaced as "no Donate event").
-  //   3. GET /api/donations/:id/tracking — read-only fetch of the canonical
-  //      tracking payload, sourced from the DB. Returns ok=false on any row
-  //      that isn't truly PAID. We do NOT fire fbq if ok=false, period.
-  //   4. Multi-layer dedup gate:
-  //        a. sessionStorage `meta_donate_<eventId>` — kills duplicate fires
-  //           in the same browser tab.
-  //        b. localStorage `donate_fired:<id>` — survives tab refresh.
-  //        c. POST /api/donations/:id/track-conversion — atomic claim on the
-  //           DB row (`conversionEventsSentAt`); only one caller across the
-  //           whole world ever wins. Returns { allowed, alreadyFired }.
-  //   5. If we win the server claim → fire fbq "Donate" with the SAME
-  //      eventID Meta will use to dedupe browser↔server. Push `donation_paid`
-  //      to dataLayer so a strict-trigger GTM tag (event = donation_paid)
-  //      can wire any other ad pixels without the noisy PageView /
-  //      first_click triggers GTM otherwise latches onto.
-  //   6. Persist sessionStorage + localStorage regardless of allowed so
-  //      refreshes / re-renders never re-hit the API.
-  //
-  // Why both browser dedup AND server claim: the browser flags protect
-  // against same-tab re-renders and refreshes (fast path, no API call). The
-  // server claim is the authoritative gate for everything else — multi-tab
-  // opens, link-shares to a different browser, visits past Meta's 48 h
-  // event_id dedup window. Both must agree before fbq fires.
+  // The conversion source of truth is /api/donations/:id/tracking, not the
+  // success page donation object. The donation row can be visible here before
+  // paidAt is stamped by Stripe/PayFor callbacks, so we poll briefly until the
+  // canonical tracking endpoint returns ok=true. This prevents the old bug where
+  // a first ok=false (paidAt unset) marked the attempt as done and Donate never
+  // fired even though the payment became confirmed a moment later.
   useEffect(() => {
     if (!id) return;
     if (donateFireAttemptedRef.current) return;
     if (!donation) return;
-    if (donation.status !== 'PAID') return;
     if (typeof window === 'undefined') return;
-    // Wait for the pixel config before doing anything. The success page eagerly
-    // triggers config loading (see TrackingPixels.tsx isConversionPage branch),
-    // so this normally clears within a few hundred ms. Until it does, fbq is
-    // not initialised and `trackDonate` would silently bail.
     if (!tracking?.config?.facebookPixelId) return;
 
     const localKey = `donate_fired:${id}`;
@@ -122,67 +120,68 @@ const DonationSuccessPage = () => {
         return;
       }
     } catch {
-      // Storage access denied (Safari private mode etc.) — fall through and
-      // let the server claim be the dedup. Worst case: re-visiting in a
-      // sandboxed browser session re-hits the API, which then returns
-      // `allowed: false` and we still don't double-fire fbq.
+      // Storage access denied — server claim is still authoritative.
     }
 
     donateFireAttemptedRef.current = true;
 
     let cancelled = false;
     (async () => {
-      // ── 1. Read canonical tracking payload from DB ────────────────────
-      // ok=false means the row is not PAID (or amount<=0 etc.) — never fire.
-      let payload:
-        | {
-            ok: true;
-            eventName: 'Donate';
-            eventId: string;
-            transactionId: string;
-            orderId: string;
-            value: number;
-            currency: string;
-            contentType: 'donation';
-            contentIds: string[];
-            contentName: string;
-            contentCategory: string;
-            contents: Array<{ id: string; quantity: number; item_price: number }>;
-            numItems: number;
-            status: 'paid';
-            success: true;
-            paymentInfoAvailable: true;
-            donationType: 'ONE_TIME' | 'MONTHLY';
-            paymentMethod: string;
+      let payload: DonateTrackingPayload | null = null;
+
+      // The user can land on /success before payment webhooks/callbacks finish
+      // stamping paidAt. Retry the read-only DB payload endpoint for a short
+      // window; never fire unless it returns ok=true.
+      for (let attempt = 1; attempt <= DONATE_TRACKING_MAX_ATTEMPTS; attempt += 1) {
+        if (cancelled) return;
+        try {
+          const res = await axios.get(`/api/donations/${id}/tracking`, {
+            headers: { 'Cache-Control': 'no-store' },
+          });
+          if (res.data?.ok === true) {
+            payload = res.data;
+            break;
           }
-        | null = null;
-      try {
-        const res = await axios.get(`/api/donations/${id}/tracking`);
-        if (res.data?.ok === true) payload = res.data;
-      } catch (err) {
-        console.error('[Donate] tracking payload fetch failed:', err);
+
+          if (process.env.NODE_ENV !== 'production' && attempt === 1) {
+            console.debug('[Donate] tracking payload not ready yet:', res.data?.reason);
+          }
+        } catch (err) {
+          console.error('[Donate] tracking payload fetch failed:', err);
+          donateFireAttemptedRef.current = false;
+          return;
+        }
+
+        if (attempt < DONATE_TRACKING_MAX_ATTEMPTS) {
+          if (attempt === 4 || attempt === 10) void fetchDonation();
+          await sleep(DONATE_TRACKING_RETRY_MS);
+        }
+      }
+
+      if (cancelled) return;
+      if (!payload) {
+        // Do not set local/session storage. The visitor can refresh and the
+        // server endpoint still protects against duplicates if it later becomes paid.
         donateFireAttemptedRef.current = false;
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[Donate] tracking payload never became ready; Donate not fired', { id });
+        }
         return;
       }
-      if (cancelled || !payload) return;
 
-      // ── 2. Same-tab dedup (cheapest gate). ────────────────────────────
       const sessionKey = `meta_donate_${payload.eventId}`;
       try {
         if (window.sessionStorage.getItem(sessionKey)) return;
       } catch {
-        /* sessionStorage blocked — fall through to server claim */
+        // sessionStorage blocked — fall through to server claim.
       }
 
-      // ── 3. Server claim. Atomic stamp on `conversionEventsSentAt`;
-      //      losing the race means another caller (different tab, retry,
-      //      cross-browser visit) already fired CAPI for this donation. We
-      //      do NOT fire fbq if we lost the claim — Meta's 48 h dedup
-      //      window doesn't cover visits past that point. ──────────────
       let allowed = false;
+      let alreadyFired = false;
       try {
         const claim = await axios.post(`/api/donations/${id}/track-conversion`);
         allowed = claim.data?.allowed === true;
+        alreadyFired = claim.data?.alreadyFired === true;
       } catch (err) {
         console.error('[Donate] track-conversion failed:', err);
         donateFireAttemptedRef.current = false;
@@ -191,8 +190,6 @@ const DonationSuccessPage = () => {
       if (cancelled) return;
 
       if (allowed && tracking?.trackDonate) {
-        // ── 4. Browser fbq fire. Shape comes straight from the DB
-        //      payload — no UI/cookie/CurrencyProvider input. ─────────
         tracking.trackDonate({
           donationId: payload.transactionId,
           value: payload.value,
@@ -205,12 +202,6 @@ const DonationSuccessPage = () => {
           paymentMethod: payload.paymentMethod,
         });
 
-        // ── 5. Canonical dataLayer event for GTM. Wire ONE Meta Donate
-        //      tag in GTM to `event equals donation_paid` and the noisy
-        //      PageView / page_view_change / first_click triggers can
-        //      stop firing Meta standard events on this page. Same
-        //      eventId as the fbq + CAPI fires so Meta still collapses
-        //      any duplicates into a single conversion. ─────────────
         try {
           const w = window as unknown as { dataLayer?: unknown[] };
           if (Array.isArray(w.dataLayer)) {
@@ -235,28 +226,28 @@ const DonationSuccessPage = () => {
             });
           }
         } catch {
-          /* dataLayer push is best-effort */
+          // dataLayer push is best-effort.
         }
 
         try {
           window.sessionStorage.setItem(sessionKey, '1');
         } catch {
-          /* ignore */
+          // ignore
         }
       }
 
-      try {
-        window.localStorage.setItem(localKey, '1');
-      } catch {
-        // ignore — server claim is authoritative
+      if (allowed || alreadyFired) {
+        try {
+          window.localStorage.setItem(localKey, '1');
+        } catch {
+          // ignore — server claim is authoritative.
+        }
       }
     })();
 
     return () => {
       cancelled = true;
     };
-    // Re-runs when tracking.config arrives so the ref-guarded fire actually
-    // happens after the pixel script is initialised, not before.
   }, [id, donation, tracking]);
 
   // After the donor signs in (either inline via the dialog or via a Google
