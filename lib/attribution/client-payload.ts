@@ -42,13 +42,57 @@ export function captureAttributionFromUrl(): void {
   }
 }
 
-/** Read cookies into payload for POST /api/donations */
+/** Read raw cookie by name (not prefixed). Used to pick up _fbp / _fbc that
+ *  the Meta Pixel script writes — those are the values CAPI needs for
+ *  browser↔server match quality, and we won't have them unless we read the
+ *  real cookies. */
+function getRawCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const hit = document.cookie.split("; ").find((row) => row.startsWith(`${name}=`));
+  if (!hit) return undefined;
+  try {
+    return decodeURIComponent(hit.split("=").slice(1).join("="));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Build the attribution payload persisted onto the donation row at create
+ * time. Two sources are merged:
+ *   1. The `ala_attr_*` cookies populated by `captureAttributionFromUrl`
+ *      (UTM params, click IDs from the landing URL).
+ *   2. The real `_fbp` / `_fbc` cookies written by fbevents.js — these are
+ *      the SAME values Meta dedupes browser↔server CAPI on, and dropping
+ *      them tanks match quality (the user's CAPI sample explicitly lists
+ *      `fbp` + `fbc` in user_data). The browser pixel always knows them;
+ *      we just have to forward.
+ * Per-key precedence: explicit URL-captured value > Meta cookie value, so
+ * a fresh `?fbclid=` landing still wins.
+ */
 export function getDonationAttributionPayload(): Record<string, string> {
   if (typeof document === "undefined") return {};
   const out: Record<string, string> = {};
   for (const key of DONATION_ATTRIBUTION_KEYS) {
     const v = getCookie(PREFIX + key);
     if (v) out[key] = v;
+  }
+  if (!out.fbp) {
+    const fbp = getRawCookie("_fbp");
+    if (fbp) out.fbp = fbp;
+  }
+  if (!out.fbc) {
+    const fbc = getRawCookie("_fbc");
+    if (fbc) out.fbc = fbc;
+  }
+  if (!out.ga_client_id) {
+    // _ga cookie format: "GA1.1.<clientId.timestamp>" — the GA4 MP payload
+    // wants just the clientId.timestamp part.
+    const ga = getRawCookie("_ga");
+    if (ga) {
+      const m = ga.match(/^GA\d\.\d\.(.+)$/);
+      if (m) out.ga_client_id = m[1];
+    }
   }
   return out;
 }

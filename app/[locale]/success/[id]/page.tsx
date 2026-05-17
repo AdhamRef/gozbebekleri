@@ -80,24 +80,29 @@ const DonationSuccessPage = () => {
   //      Without `facebookPixelId` the browser fbq call is a no-op, which
   //      previously dropped the Donate event when the page beat the config
   //      fetch (the bug Meta Pixel Helper surfaced as "no Donate event").
-  //   3. localStorage check (`donate_fired:<id>`) — if this browser already
-  //      fired for this donation, skip the API call AND skip fbq.
-  //   4. POST /api/donations/:id/track-conversion — atomic claim on the DB
-  //      row; on a winning claim it fires Meta CAPI + GA4 MP "purchase".
-  //      Returns { allowed, alreadyFired, eventId }.
-  //   5. If `allowed === true` AND fbq is initialised → fire the browser
-  //      Pixel "Donate" with the SAME event_id. Meta dedupes the
-  //      browser↔server pair into one conversion. We ALSO push a
-  //      `donation_paid` dataLayer event so a strictly-triggered GTM tag
-  //      (event = donation_paid) can fan out to any other ad pixels without
-  //      relying on the noisy PageView/first_click triggers GTM otherwise
-  //      latches onto.
-  //   6. Persist localStorage regardless of allowed, so refreshes never re-
-  //      hit the API.
+  //   3. GET /api/donations/:id/tracking — read-only fetch of the canonical
+  //      tracking payload, sourced from the DB. Returns ok=false on any row
+  //      that isn't truly PAID. We do NOT fire fbq if ok=false, period.
+  //   4. Multi-layer dedup gate:
+  //        a. sessionStorage `meta_donate_<eventId>` — kills duplicate fires
+  //           in the same browser tab.
+  //        b. localStorage `donate_fired:<id>` — survives tab refresh.
+  //        c. POST /api/donations/:id/track-conversion — atomic claim on the
+  //           DB row (`conversionEventsSentAt`); only one caller across the
+  //           whole world ever wins. Returns { allowed, alreadyFired }.
+  //   5. If we win the server claim → fire fbq "Donate" with the SAME
+  //      eventID Meta will use to dedupe browser↔server. Push `donation_paid`
+  //      to dataLayer so a strict-trigger GTM tag (event = donation_paid)
+  //      can wire any other ad pixels without the noisy PageView /
+  //      first_click triggers GTM otherwise latches onto.
+  //   6. Persist sessionStorage + localStorage regardless of allowed so
+  //      refreshes / re-renders never re-hit the API.
   //
-  // Cross-browser link-share / past-Meta-48h-dedup-window safety: the server
-  // is the authoritative dedup gate; the second browser's API call returns
-  // `allowed: false, alreadyFired: true` and the Pixel does NOT fire there.
+  // Why both browser dedup AND server claim: the browser flags protect
+  // against same-tab re-renders and refreshes (fast path, no API call). The
+  // server claim is the authoritative gate for everything else — multi-tab
+  // opens, link-shares to a different browser, visits past Meta's 48 h
+  // event_id dedup window. Both must agree before fbq fires.
   useEffect(() => {
     if (!id) return;
     if (donateFireAttemptedRef.current) return;
@@ -110,9 +115,9 @@ const DonationSuccessPage = () => {
     // not initialised and `trackDonate` would silently bail.
     if (!tracking?.config?.facebookPixelId) return;
 
-    const storageKey = `donate_fired:${id}`;
+    const localKey = `donate_fired:${id}`;
     try {
-      if (window.localStorage.getItem(storageKey)) {
+      if (window.localStorage.getItem(localKey)) {
         donateFireAttemptedRef.current = true;
         return;
       }
@@ -127,92 +132,121 @@ const DonationSuccessPage = () => {
 
     let cancelled = false;
     (async () => {
+      // ── 1. Read canonical tracking payload from DB ────────────────────
+      // ok=false means the row is not PAID (or amount<=0 etc.) — never fire.
+      let payload:
+        | {
+            ok: true;
+            eventName: 'Donate';
+            eventId: string;
+            transactionId: string;
+            orderId: string;
+            value: number;
+            currency: string;
+            contentType: 'donation';
+            contentIds: string[];
+            contentName: string;
+            contentCategory: string;
+            contents: Array<{ id: string; quantity: number; item_price: number }>;
+            numItems: number;
+            status: 'paid';
+            success: true;
+            paymentInfoAvailable: true;
+            donationType: 'ONE_TIME' | 'MONTHLY';
+            paymentMethod: string;
+          }
+        | null = null;
+      try {
+        const res = await axios.get(`/api/donations/${id}/tracking`);
+        if (res.data?.ok === true) payload = res.data;
+      } catch (err) {
+        console.error('[Donate] tracking payload fetch failed:', err);
+        donateFireAttemptedRef.current = false;
+        return;
+      }
+      if (cancelled || !payload) return;
+
+      // ── 2. Same-tab dedup (cheapest gate). ────────────────────────────
+      const sessionKey = `meta_donate_${payload.eventId}`;
+      try {
+        if (window.sessionStorage.getItem(sessionKey)) return;
+      } catch {
+        /* sessionStorage blocked — fall through to server claim */
+      }
+
+      // ── 3. Server claim. Atomic stamp on `conversionEventsSentAt`;
+      //      losing the race means another caller (different tab, retry,
+      //      cross-browser visit) already fired CAPI for this donation. We
+      //      do NOT fire fbq if we lost the claim — Meta's 48 h dedup
+      //      window doesn't cover visits past that point. ──────────────
       let allowed = false;
       try {
-        const res = await axios.post(`/api/donations/${id}/track-conversion`);
-        allowed = res.data?.allowed === true;
+        const claim = await axios.post(`/api/donations/${id}/track-conversion`);
+        allowed = claim.data?.allowed === true;
       } catch (err) {
-        // Network failure on the claim endpoint. Don't fire the browser Pixel
-        // here — without the server claim we have no idea whether the CAPI
-        // event already went out from a previous attempt, and an un-deduped
-        // browser fire would risk a double-count. Reset the ref so a future
-        // mount (rare) can retry.
         console.error('[Donate] track-conversion failed:', err);
         donateFireAttemptedRef.current = false;
         return;
       }
       if (cancelled) return;
 
-      const items =
-        (donation.items ?? []).map((it: { campaignId: string; amount: number; campaign?: { title?: string } }) => ({
-          id: it.campaignId,
-          quantity: 1,
-          item_price: it.amount,
-        })) ?? [];
-      const categoryContents =
-        (donation.categoryItems ?? []).map((ci: { categoryId: string; amount: number; category?: { name?: string } }) => ({
-          id: ci.categoryId,
-          quantity: 1,
-          item_price: ci.amount,
-        })) ?? [];
-      const contents = [...items, ...categoryContents];
-      const contentIds = contents.length ? contents.map((c) => c.id) : ['donation'];
-      const primaryName =
-        donation.items?.[0]?.campaign?.title ??
-        donation.categoryItems?.[0]?.category?.name ??
-        'Donation';
-
       if (allowed && tracking?.trackDonate) {
+        // ── 4. Browser fbq fire. Shape comes straight from the DB
+        //      payload — no UI/cookie/CurrencyProvider input. ─────────
         tracking.trackDonate({
-          donationId: donation.id,
-          // value + currency from the DB row (server response), never from UI
-          // state or URL params. Keeps browser fire bit-identical to the
-          // CAPI fire and survives the currency-cookie issues called out in
-          // the project audit.
-          value: Number(donation.amount ?? 0),
-          currency: donation.currency,
-          contentIds,
-          contents: contents.length ? contents : undefined,
-          contentName: primaryName,
-          contentCategory: donation.subscriptionId ? 'monthly' : 'donation',
-          donationType: donation.type === 'MONTHLY' ? 'MONTHLY' : 'ONE_TIME',
-          paymentMethod: donation.paymentMethod ?? 'CARD',
+          donationId: payload.transactionId,
+          value: payload.value,
+          currency: payload.currency,
+          contentIds: payload.contentIds,
+          contents: payload.contents,
+          contentName: payload.contentName,
+          contentCategory: payload.contentCategory,
+          donationType: payload.donationType,
+          paymentMethod: payload.paymentMethod,
         });
 
-        // Canonical dataLayer event for GTM. Wire ONE Meta Donate tag in GTM
-        // to `event equals donation_paid` and the noisy PageView /
-        // page_view_change / first_click triggers can stop firing Meta
-        // standard events on this page. Same event_id as the fbq + CAPI fires
-        // so Meta still collapses any duplicates into a single conversion.
+        // ── 5. Canonical dataLayer event for GTM. Wire ONE Meta Donate
+        //      tag in GTM to `event equals donation_paid` and the noisy
+        //      PageView / page_view_change / first_click triggers can
+        //      stop firing Meta standard events on this page. Same
+        //      eventId as the fbq + CAPI fires so Meta still collapses
+        //      any duplicates into a single conversion. ─────────────
         try {
           const w = window as unknown as { dataLayer?: unknown[] };
           if (Array.isArray(w.dataLayer)) {
             w.dataLayer.push({
               event: 'donation_paid',
-              event_id: `donate_${donation.id}`,
-              transaction_id: donation.id,
-              value: Number(donation.amount ?? 0),
-              currency: donation.currency,
-              content_type: 'donation',
-              content_ids: contentIds,
-              content_name: primaryName,
-              content_category: donation.subscriptionId ? 'monthly' : 'donation',
-              contents,
-              num_items: contents.reduce((s, c) => s + (c.quantity ?? 1), 0),
-              status: 'paid',
-              success: true,
-              payment_info_available: true,
-              donation_type: donation.type === 'MONTHLY' ? 'monthly' : 'one_time',
-              payment_method: (donation.paymentMethod ?? 'card').toLowerCase(),
+              event_id: payload.eventId,
+              transaction_id: payload.transactionId,
+              order_id: payload.orderId,
+              value: payload.value,
+              currency: payload.currency,
+              content_type: payload.contentType,
+              content_ids: payload.contentIds,
+              content_name: payload.contentName,
+              content_category: payload.contentCategory,
+              contents: payload.contents,
+              num_items: payload.numItems,
+              status: payload.status,
+              success: payload.success,
+              payment_info_available: payload.paymentInfoAvailable,
+              donation_type: payload.donationType === 'MONTHLY' ? 'monthly' : 'one_time',
+              payment_method: payload.paymentMethod,
             });
           }
         } catch {
           /* dataLayer push is best-effort */
         }
+
+        try {
+          window.sessionStorage.setItem(sessionKey, '1');
+        } catch {
+          /* ignore */
+        }
       }
 
       try {
-        window.localStorage.setItem(storageKey, '1');
+        window.localStorage.setItem(localKey, '1');
       } catch {
         // ignore — server claim is authoritative
       }
