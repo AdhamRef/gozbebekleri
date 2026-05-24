@@ -90,7 +90,13 @@ export async function GET(request: NextRequest) {
         (await getDonorCountryCodeForSnapshot(prisma, sub.donorId)) ?? undefined;
 
       await prisma.$transaction(async (tx) => {
-        const donation = await tx.donation.create({
+        // Until PayFor recurring is wired up we have nothing to actually
+        // charge with, so the recurring "donation" is created already in
+        // FAILED state. NEVER store status=PAID here without also setting
+        // paidAt — that combo means "checkout started but unconfirmed" and
+        // historically caused monthly donations to be counted as paid in
+        // dashboards while never actually settling.
+        await tx.donation.create({
           data: {
             amount: totalAmount,
             amountUSD: donationAmountUsd,
@@ -99,7 +105,10 @@ export async function GET(request: NextRequest) {
             teamSupport: sub.teamSupport ?? 0,
             coverFees: sub.coverFees,
             fees,
-            status: "PAID",
+            status: "FAILED",
+            provider: "PAYFOR",
+            providerErrorMessage:
+              "Recurring charge not implemented: bank token/reference transaction spec is required.",
             donorCountryCode: donorCountrySnapshot,
             donorId: sub.donorId,
             referralId: sub.referralId ?? undefined,
@@ -110,17 +119,10 @@ export async function GET(request: NextRequest) {
             categoryItems: sub.categoryItems.length ? { create: categoryLineCreates } : undefined,
           },
         });
-        // TODO: Call PayFor 2D recurring charge using sub.payforToken.
-        // Only on success (ProcReturnCode=00) should we mark donation PAID and increment totals.
-        await tx.donation.update({
-          where: { id: donation.id },
-          data: {
-            status: "FAILED",
-            provider: "PAYFOR",
-            providerErrorMessage:
-              "Recurring charge not implemented: bank token/reference transaction spec is required.",
-          },
-        });
+        // NOTE: when the real PayFor recurring charge lands here, the success
+        // branch MUST set BOTH `status: "PAID"` AND `paidAt: new Date()` so
+        // reports/totals counters pick the charge up. status alone is treated
+        // as "checkout started, unsettled".
 
         const nextBilling = getNextBillingDate(transactionDate);
 

@@ -125,9 +125,18 @@ export async function POST(req: NextRequest) {
         });
         if (!dbSubscription) break;
 
-        // Idempotency: skip if we already recorded a donation for this invoice
+        // Idempotency: skip if we've already settled this invoice. The original
+        // "checkout started" donation for the first invoice also carries this
+        // `providerOrderId` (set by /api/stripe/subscribe) but with `paidAt: null`,
+        // so we MUST require `paidAt` to be set here — otherwise the webhook would
+        // bail out without ever marking the donation paid. That was the source of
+        // the long-standing "monthly donations stuck PAID/paidAt=null" bug.
         const existingForInvoice = await prisma.donation.findFirst({
-          where: { subscriptionId: dbSubscription.id, providerOrderId: invoice.id },
+          where: {
+            subscriptionId: dbSubscription.id,
+            providerOrderId: invoice.id,
+            paidAt: { not: null },
+          },
         });
         if (existingForInvoice) break;
 
@@ -162,16 +171,29 @@ export async function POST(req: NextRequest) {
           undefined;
 
         await prisma.$transaction(async (tx) => {
-          // Check if there is an existing PAID first donation for this invoice.
-          // This is the donation created by POST /api/donations before payment.
-          // We update it with provider details instead of creating a duplicate.
-          const existingPending = await tx.donation.findFirst({
-            where: {
-              subscriptionId: dbSubscription.id,
-              providerOrderId: invoice.id,
-              status: "PAID",
-            },
-          });
+          // Find the original "checkout started" donation for this subscription
+          // (status=PAID is the optimistic sentinel; paidAt=null means it never
+          // settled). For the FIRST invoice we update that row instead of
+          // creating a duplicate. Match by providerOrderId when it lines up,
+          // but fall back to the unpaid row for this subscription — different
+          // checkout flows (PaymentElement vs Checkout Session) store different
+          // ids in providerOrderId, so equality-by-invoice-id isn't reliable.
+          const existingPending =
+            (await tx.donation.findFirst({
+              where: {
+                subscriptionId: dbSubscription.id,
+                providerOrderId: invoice.id,
+                paidAt: null,
+              },
+            })) ??
+            (await tx.donation.findFirst({
+              where: {
+                subscriptionId: dbSubscription.id,
+                status: "PAID",
+                paidAt: null,
+              },
+              orderBy: { createdAt: "asc" },
+            }));
 
           if (existingPending) {
             // First invoice: update the existing donation with provider details
