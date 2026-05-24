@@ -10,17 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type BankOption = { id: string | null; code: string | null; nameAr: string; isActive?: boolean };
-
-const PROJECT_OPTIONS = [
-  "تبرع عام",
-  "زكاة",
-  "فلسطين / غزة",
-  "إفريقيا",
-  "الأضاحي / القربان",
-  "كفالة الأيتام",
-  "إطعام / وجبات",
-  "المشاريع الطبية",
-];
+const PROJECT_OPTIONS = ["تبرع عام", "زكاة", "فلسطين / غزة", "إفريقيا", "الأضاحي / القربان", "كفالة الأيتام", "إطعام / وجبات", "المشاريع الطبية"];
 
 function ensureToolsNode() {
   const h1 = document.querySelector("main h1");
@@ -36,9 +26,7 @@ function ensureToolsNode() {
     node.id = "bank-transfers-table-tools";
     node.dir = "rtl";
   }
-  if (node.parentElement !== host.parentElement || node.nextElementSibling !== host) {
-    host.insertAdjacentElement("beforebegin", node);
-  }
+  if (node.parentElement !== host.parentElement || node.nextElementSibling !== host) host.insertAdjacentElement("beforebegin", node);
   return node;
 }
 
@@ -50,6 +38,8 @@ export function BankTransfersTableTools() {
   const [q, setQ] = useState(searchParams.get("q") ?? "");
   const [banks, setBanks] = useState<BankOption[]>([]);
   const active = pathname === "/dashboard/bank-transfers" || pathname.startsWith("/dashboard/bank-transfers/");
+  const page = Math.max(1, Number(searchParams.get("page") || 1));
+  const limit = searchParams.get("limit") || "50";
 
   useEffect(() => {
     if (!active) { setNode(null); return; }
@@ -69,13 +59,13 @@ export function BankTransfersTableTools() {
     return () => { cancelled = true; };
   }, [active]);
 
-  function setParam(key: string, value: string) {
+  function setParam(key: string, value: string, resetPage = true) {
     const params = new URLSearchParams(searchParams.toString());
     if (!value || value === "all") params.delete(key); else params.set(key, value);
-    params.set("page", "1");
+    if (resetPage) params.set("page", "1");
     router.replace(`${pathname}?${params.toString()}`);
   }
-
+  function go(delta: number) { setParam("page", String(Math.max(1, page + delta)), false); }
   function applySearch() { setParam("q", q.trim()); }
   function clearFilters() { setQ(""); router.replace(pathname); }
 
@@ -83,10 +73,7 @@ export function BankTransfersTableTools() {
 
   return createPortal(
     <Card className="mb-4">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">فلترة و بحث العمليات البنكية</CardTitle>
-        <CardDescription>فلترة احترافية من قاعدة البيانات حسب البنك والمشروع والحالة والعملة واللغة والتاريخ والقيمة.</CardDescription>
-      </CardHeader>
+      <CardHeader className="pb-3"><CardTitle className="text-base">فلترة و بحث العمليات البنكية</CardTitle><CardDescription>فلترة احترافية من قاعدة البيانات حسب البنك والمشروع والحالة والعملة واللغة والتاريخ والقيمة.</CardDescription></CardHeader>
       <CardContent className="space-y-3">
         <div className="grid gap-3 md:grid-cols-4">
           <div className="space-y-1.5 md:col-span-2"><Label>بحث عام</Label><div className="flex gap-2"><Input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") applySearch(); }} placeholder="اسم، وصف، مشروع، مرجع..." /><Button onClick={applySearch}>بحث</Button></div></div>
@@ -101,10 +88,10 @@ export function BankTransfersTableTools() {
           <div className="space-y-1.5"><Label>قيمة إلى</Label><Input type="number" value={searchParams.get("amountMax") ?? ""} onChange={(e) => setParam("amountMax", e.target.value)} /></div>
           <div className="space-y-1.5"><Label>ترتيب حسب</Label><Select value={searchParams.get("sortBy") ?? "createdAt"} onValueChange={(v) => setParam("sortBy", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="createdAt">تاريخ الإدخال</SelectItem><SelectItem value="transactionDate">تاريخ العملية</SelectItem><SelectItem value="amount">القيمة</SelectItem><SelectItem value="donorName">الاسم</SelectItem><SelectItem value="bankId">البنك</SelectItem><SelectItem value="status">الحالة</SelectItem><SelectItem value="donorLocale">اللغة</SelectItem><SelectItem value="finalProject">المشروع</SelectItem></SelectContent></Select></div>
           <div className="space-y-1.5"><Label>الاتجاه</Label><Select value={searchParams.get("sortDir") ?? "desc"} onValueChange={(v) => setParam("sortDir", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="desc">تنازلي</SelectItem><SelectItem value="asc">تصاعدي</SelectItem></SelectContent></Select></div>
-          <div className="flex items-end"><Button variant="outline" onClick={clearFilters} className="w-full">مسح الفلاتر</Button></div>
+          <div className="space-y-1.5"><Label>عدد الصفوف</Label><Select value={limit} onValueChange={(v) => setParam("limit", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="25">25</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem><SelectItem value="200">200</SelectItem></SelectContent></Select></div>
+          <div className="flex items-end gap-2"><Button variant="outline" onClick={() => go(-1)} disabled={page <= 1}>السابق</Button><Button variant="outline" onClick={() => go(1)}>التالي</Button><Button variant="outline" onClick={clearFilters}>مسح</Button></div>
         </div>
       </CardContent>
-    </Card>,
-    node
+    </Card>, node
   );
 }
