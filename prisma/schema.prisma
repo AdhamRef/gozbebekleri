@@ -216,7 +216,12 @@ model Category {
   order         Int?
   currentAmount Float    @default(0)
 
-  campaigns              Campaign[]
+  /// Inverse side of the Campaign ↔ Category many-to-many relation. Prisma+MongoDB
+  /// models implicit m2m by mirroring scalar ObjectId[] arrays on each side. This
+  /// is maintained by Prisma whenever campaigns are connected/disconnected.
+  campaignIds   String[]  @db.ObjectId
+  campaigns     Campaign[] @relation(fields: [campaignIds], references: [id])
+
   donationItems          DonationCategoryItem[]
   subscriptionCategoryItems SubscriptionCategoryItem[]
   translations           CategoryTranslation[]
@@ -284,8 +289,6 @@ model Campaign {
   videoUrl      String?
   isActive         Boolean @default(true)
   priority         Int?
-  /// Priority within the campaign's category — controls ordering when listing the category's campaigns
-  categoryPriority Int?
 
   /// { "amounts": number[], "byCurrency"?: Record<string, number[]> } — quick-pick donation amounts; omit/null uses app defaults
   suggestedDonations Json?
@@ -309,8 +312,16 @@ model Campaign {
   /// per campaign without forking the translation files.
   shareLabels           Json?
 
-  categoryId    String   @db.ObjectId
-  category      Category @relation(fields: [categoryId], references: [id])
+  /// Implicit many-to-many — a campaign can belong to one or more categories.
+  /// Prisma+MongoDB stores the relation as mirrored ObjectId[] arrays on each side.
+  categoryIds   String[]   @db.ObjectId
+  categories    Category[] @relation(fields: [categoryIds], references: [id])
+
+  /// Per-category priorities for ordering on each category page.
+  /// Shape: { "<categoryId>": number } — lower number = higher priority; absent key = unprioritized.
+  /// Replaces the single `categoryPriority` field which only made sense when a
+  /// campaign belonged to exactly one category.
+  categoryPriorities Json?
 
   updates           Update[]
   comments          Comment[]

@@ -73,7 +73,7 @@ export async function GET(
     };
     if (categoryId && categoryId !== "all") {
       baseWhere.OR = [
-        { items: { some: { campaign: { categoryId } } } },
+        { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
         { categoryItems: { some: { categoryId } } },
       ];
     }

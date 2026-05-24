@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
+import { parseCategoryPriorities, getCategoryPriority } from "@/lib/campaign/categories";
 
 // GET /api/categories/[id]/prioritized-campaigns
-// Returns campaigns in this category that have a categoryPriority set, ordered asc.
+// Returns campaigns belonging to this category whose per-category priority
+// is set, ordered ascending by that priority.
+//
+// The per-category ordering lives in `Campaign.categoryPriorities` as a JSON
+// map keyed by categoryId — a campaign can have a different rank in each of
+// the categories it belongs to.
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -19,19 +26,27 @@ export async function GET(
 
     const campaigns = await prisma.campaign.findMany({
       where: {
-        categoryId: id,
-        categoryPriority: { not: null },
+        categoryIds: { has: id },
       },
-      orderBy: { categoryPriority: "asc" },
       select: {
         id: true,
         title: true,
-        categoryPriority: true,
+        categoryPriorities: true,
         isActive: true,
       },
     });
 
-    return NextResponse.json(campaigns);
+    const ranked = campaigns
+      .map((c) => ({
+        id: c.id,
+        title: c.title,
+        isActive: c.isActive,
+        categoryPriority: getCategoryPriority(c.categoryPriorities, id),
+      }))
+      .filter((c) => c.categoryPriority != null)
+      .sort((a, b) => (a.categoryPriority! - b.categoryPriority!));
+
+    return NextResponse.json(ranked);
   } catch (error) {
     console.error("Error fetching prioritized campaigns for category:", error);
     return NextResponse.json(
@@ -43,7 +58,11 @@ export async function GET(
 
 // POST /api/categories/[id]/prioritized-campaigns
 // Body: { campaigns: [{ id: string, order: number }] }
-// Clears categoryPriority for all campaigns in the category, then sets it for the provided list.
+//
+// Clears the per-category priority for every campaign currently ranked in
+// this category, then sets it for the provided list. Each campaign keeps any
+// rankings it has in OTHER categories untouched — we only touch this
+// category's key inside the JSON map.
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -65,20 +84,51 @@ export async function POST(
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    await prisma.$transaction([
-      // Clear existing priorities in this category
-      prisma.campaign.updateMany({
-        where: { categoryId: id, categoryPriority: { not: null } },
-        data: { categoryPriority: null },
-      }),
-      // Apply new priorities
-      ...campaigns.map(({ id: campaignId, order }) =>
-        prisma.campaign.update({
+    // 1. Find every campaign currently ranked in this category and unset that key.
+    const previouslyRanked = await prisma.campaign.findMany({
+      where: { categoryIds: { has: id } },
+      select: { id: true, categoryPriorities: true },
+    });
+
+    const clearOps = previouslyRanked
+      .map((c) => {
+        const map = parseCategoryPriorities(c.categoryPriorities);
+        if (!Object.prototype.hasOwnProperty.call(map, id)) return null;
+        delete map[id];
+        // Prisma's JSON null sentinel — clears the field when no other category
+        // ranks remain. Cast through `any` because the conditional union of
+        // InputJsonValue + JsonNull confuses TS's overload resolution here.
+        const next: Prisma.InputJsonValue =
+          Object.keys(map).length > 0
+            ? (map as unknown as Prisma.InputJsonValue)
+            : (Prisma.JsonNull as unknown as Prisma.InputJsonValue);
+        return prisma.campaign.update({
+          where: { id: c.id },
+          data: { categoryPriorities: next },
+        });
+      })
+      .filter((x): x is ReturnType<typeof prisma.campaign.update> => x !== null);
+
+    // 2. Apply the new rankings — merge into each campaign's existing map.
+    // Resolve each campaign's current map first (reads aren't part of the txn),
+    // then build the update operations to fold into the single $transaction
+    // alongside the clears.
+    const applyOps = await Promise.all(
+      campaigns.map(async ({ id: campaignId, order }) => {
+        const existing = await prisma.campaign.findUnique({
           where: { id: campaignId },
-          data: { categoryPriority: order },
-        })
-      ),
-    ]);
+          select: { categoryPriorities: true },
+        });
+        const map = parseCategoryPriorities(existing?.categoryPriorities);
+        map[id] = order;
+        return prisma.campaign.update({
+          where: { id: campaignId },
+          data: { categoryPriorities: map as unknown as Prisma.InputJsonValue },
+        });
+      })
+    );
+
+    await prisma.$transaction([...clearOps, ...applyOps] as Prisma.PrismaPromise<unknown>[]);
 
     const actor = auditActorFromDashboardSession(session!);
     await writeAuditLog({

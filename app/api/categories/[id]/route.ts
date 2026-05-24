@@ -246,7 +246,7 @@ export async function DELETE(
     }
     const id = cat.id;
 
-    const campaignCount = await prisma.campaign.count({ where: { categoryId: id } });
+    const campaignCount = await prisma.campaign.count({ where: { categoryIds: { has: id } } });
     if (campaignCount > 0) {
       return NextResponse.json({ error: 'Category has campaigns. Delete or move campaigns before deleting the category.' }, { status: 400 });
     }

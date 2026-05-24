@@ -32,7 +32,7 @@ async function main() {
     console.log(`ℹ️  Category "${TARGET_DELETE}" not found — nothing to delete`);
   } else {
     const campaignsToDelete = await prisma.campaign.findMany({
-      where: { categoryId: syria.id },
+      where: { categoryIds: { has: syria.id } },
       select: { id: true, title: true },
     });
     const campaignIds = campaignsToDelete.map((c) => c.id);
@@ -101,11 +101,11 @@ async function main() {
     );
   } else {
     const result = await prisma.campaign.updateMany({
-      where: { categoryId: gaza.id, isActive: true },
+      where: { categoryIds: { has: gaza.id }, isActive: true },
       data: { isActive: false },
     });
     const stillActive = await prisma.campaign.count({
-      where: { categoryId: gaza.id, isActive: true },
+      where: { categoryIds: { has: gaza.id }, isActive: true },
     });
     console.log(
       `✓ Deactivated ${result.count} campaign(s) in "${TARGET_DEACTIVATE}" (now: ${stillActive} active)`

@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       where.items = { some: { campaignId } };
     } else if (categoryId && categoryId !== "all") {
       where.OR = [
-        { items: { some: { campaign: { categoryId } } } },
+        { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
         { categoryItems: { some: { categoryId } } },
       ];
     }

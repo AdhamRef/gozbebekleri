@@ -176,7 +176,8 @@ async function main() {
           description: q.description,
           targetAmount: q.targetAmount ?? 50000,
           currentAmount: q.currentAmount ?? 0,
-          categoryId: cat.id,
+          // Many-to-many: connect to one category for seed data.
+          categories: { connect: [{ id: cat.id }] },
           isActive: false,
           goalType: "FIXED",
           fundraisingMode: "AMOUNT",

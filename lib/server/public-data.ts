@@ -23,7 +23,7 @@ export async function getInitialCampaignsForPage(locale: string) {
     // null FIRST, so we split into two queries — prioritized first, then non-prioritized
     // recency — and merge.
     const includeShape = {
-      category: {
+      categories: {
         select: {
           id: true,
           slug: true,
@@ -68,9 +68,24 @@ export async function getInitialCampaignsForPage(locale: string) {
         description?: string;
         slug?: string | null;
       }>)[0];
-      const tCat = (c.category?.translations as
-        | Array<{ name?: string; slug?: string | null }>
-        | undefined)?.[0];
+      const cats = ((c as any).categories as
+        | Array<{
+            id: string;
+            slug?: string | null;
+            name: string;
+            icon: string | null;
+            translations: Array<{ name?: string; slug?: string | null }>;
+          }>
+        | undefined) ?? [];
+      const localizedCats = cats.map((cat) => {
+        const tCat = cat.translations?.[0];
+        return {
+          id: cat.id,
+          slug: tCat?.slug || cat.slug || null,
+          name: tCat?.name || cat.name,
+          icon: cat.icon,
+        };
+      });
       return {
         id: c.id,
         // Locale-aware slug: per-locale translation slug → base slug → null.
@@ -84,15 +99,11 @@ export async function getInitialCampaignsForPage(locale: string) {
         currentAmount: c.currentAmount,
         isActive: c.isActive,
         priority: c.priority,
-        categoryId: c.categoryId,
-        category: c.category
-          ? {
-              id: c.category.id,
-              slug: tCat?.slug || (c.category as { slug?: string | null }).slug || null,
-              name: tCat?.name || c.category.name,
-              icon: c.category.icon,
-            }
-          : null,
+        // Many-to-many: surface all categories plus the first one as the legacy
+        // `category` alias for components that haven't migrated yet.
+        categoryIds: c.categoryIds ?? localizedCats.map((x) => x.id),
+        categories: localizedCats,
+        category: localizedCats[0] ?? null,
         donationCount: c._count.donations,
         progress: computeCampaignProgressPercent(
           c.currentAmount,

@@ -93,7 +93,9 @@ interface Category {
 interface CampaignOption {
   id: string;
   title: string;
-  categoryId: string;
+  // Many-to-many: a campaign can belong to multiple categories.
+  categoryId?: string;
+  categoryIds?: string[];
 }
 
 interface UserOption {
@@ -1525,12 +1527,12 @@ export default function MonthlySubscriptionsDashboardPage() {
         </div>
         <SelectItem value="all" className="text-xs">جميع المشاريع</SelectItem>
         {campaigns
-          .filter(
-            (c) =>
-              (selectedCategory === "all" || c.categoryId === selectedCategory) &&
-              (!searchCampaign ||
-                c.title.toLowerCase().includes(searchCampaign.toLowerCase()))
-          )
+          .filter((c) => {
+            const ids = c.categoryIds ?? (c.categoryId ? [c.categoryId] : []);
+            const inCategory = selectedCategory === "all" || ids.includes(selectedCategory);
+            return inCategory && (!searchCampaign ||
+              c.title.toLowerCase().includes(searchCampaign.toLowerCase()));
+          })
           .map((c) => (
             <SelectItem key={c.id} value={c.id} className="text-xs">
               {c.title}

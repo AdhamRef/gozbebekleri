@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     if (includeCampaigns && page.length > 0) {
       const campaignFetches = page.map(cat =>
         prisma.campaign.findMany({
-          where: { categoryId: cat.id },
+          where: { categoryIds: { has: cat.id } },
           take: campaignLimit,
           orderBy: { createdAt: 'desc' },
           select: {

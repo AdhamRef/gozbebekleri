@@ -51,7 +51,7 @@ function buildDonationChargeBase(
     base.items = { some: { campaignId } };
   } else if (categoryId && categoryId !== "all") {
     base.OR = [
-      { items: { some: { campaign: { categoryId } } } },
+      { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
       { categoryItems: { some: { categoryId } } },
     ];
   }
@@ -69,7 +69,7 @@ function buildDonationChargeAllTimeBase(
     base.items = { some: { campaignId } };
   } else if (categoryId && categoryId !== "all") {
     base.OR = [
-      { items: { some: { campaign: { categoryId } } } },
+      { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
       { categoryItems: { some: { categoryId } } },
     ];
   }
@@ -86,7 +86,7 @@ function buildSubscriptionWhere(
     campaignCat.items = { some: { campaignId } };
   } else if (categoryId && categoryId !== "all") {
     campaignCat.OR = [
-      { items: { some: { campaign: { categoryId } } } },
+      { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
       { categoryItems: { some: { categoryId } } },
     ];
   }
@@ -114,7 +114,7 @@ function buildDonationItemWhereSub(
     donation.items = { some: { campaignId } };
   } else if (categoryId && categoryId !== "all") {
     donation.OR = [
-      { items: { some: { campaign: { categoryId } } } },
+      { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
       { categoryItems: { some: { categoryId } } },
     ];
   }
@@ -122,7 +122,7 @@ function buildDonationItemWhereSub(
     return { donation, campaignId };
   }
   if (categoryId && categoryId !== "all") {
-    return { donation, campaign: { categoryId } };
+    return { donation, campaign: { categoryIds: { has: categoryId } } };
   }
   return { donation };
 }
@@ -141,7 +141,7 @@ function buildDonationCategoryItemWhereSub(
   if (referralId) donation.referralId = referralId;
   if (categoryId && categoryId !== "all") {
     donation.OR = [
-      { items: { some: { campaign: { categoryId } } } },
+      { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
       { categoryItems: { some: { categoryId } } },
     ];
     return { donation, categoryId };

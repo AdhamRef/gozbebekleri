@@ -31,6 +31,20 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { Badge } from '@/components/ui/badge';
+import {
   Loader2,
   ArrowLeft,
   X,
@@ -44,7 +58,9 @@ import {
   CheckCircle2,
   Globe,
   Star,
-  GripVertical
+  GripVertical,
+  Check,
+  ChevronsUpDown,
 } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -102,8 +118,8 @@ const formSchema = z
   goalType: z.enum(['FIXED', 'OPEN']),
   fundraisingMode: z.enum(['AMOUNT', 'SHARES']),
   sharePriceUSD: z.number().min(0).max(1000000).optional(),
-  categoryId: z.string()
-    .min(1, 'الحملة مطلوب'),
+  // Many-to-many: the campaign can belong to multiple categories simultaneously.
+  categoryIds: z.array(z.string().min(1)).min(1, 'حمله واحدة على الأقل مطلوبة'),
   isActive: z.boolean(),
   images: z.array(z.string())
     .min(1, 'صورة واحدة على الأقل مطلوبة')
@@ -317,7 +333,7 @@ export default function EditCampaignPage() {
       fundraisingMode: 'AMOUNT',
       sharePriceUSD: 0,
       currentAmount: 0,
-      categoryId: '',
+      categoryIds: [],
       isActive: true,
       images: [],
       videoUrl: '',
@@ -407,7 +423,11 @@ export default function EditCampaignPage() {
           fundraisingMode: safeMode,
           sharePriceUSD: Number(campaign.sharePriceUSD) || 0,
           currentAmount: Number(campaign.currentAmount) || 0,
-          categoryId: campaign.category?.id ?? '',
+          // Many-to-many: prefer the new `categoryIds` array; fall back to the
+          // legacy single `category` for campaigns whose backfill hasn't run.
+          categoryIds: Array.isArray(campaign.categoryIds) && campaign.categoryIds.length > 0
+            ? campaign.categoryIds
+            : (campaign.category?.id ? [campaign.category.id] : []),
           isActive: Boolean(campaign.isActive),
           images: imgs,
           videoUrl: campaign.videoUrl || '',
@@ -499,7 +519,7 @@ export default function EditCampaignPage() {
         targetAmount: values.goalType === 'OPEN' ? 0 : values.targetAmount,
         sharePriceUSD:
           values.fundraisingMode === 'SHARES' ? values.sharePriceUSD : null,
-        categoryId: values.categoryId,
+        categoryIds: values.categoryIds,
         isActive: values.isActive,
         images: values.images,
         videoUrl: values.videoUrl,
@@ -1052,27 +1072,98 @@ export default function EditCampaignPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
-                    name="categoryId"
-                    render={({ field }) => (
-                      <FormItem dir='rtl'>
-                        <FormLabel>الحملة *</FormLabel>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="اختر الحملة" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {categories.map((category) => (
-                              <SelectItem key={category.id} value={category.id}>
-                                {category.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    name="categoryIds"
+                    render={({ field }) => {
+                      const selected = field.value ?? [];
+                      const selectedCategories = categories.filter((c) =>
+                        selected.includes(c.id)
+                      );
+                      const toggle = (id: string) => {
+                        const next = selected.includes(id)
+                          ? selected.filter((x) => x !== id)
+                          : [...selected, id];
+                        field.onChange(next);
+                      };
+                      return (
+                        <FormItem dir="rtl">
+                          <FormLabel>الحملات *</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  role="combobox"
+                                  className="w-full justify-between font-normal"
+                                >
+                                  {selectedCategories.length > 0
+                                    ? `${selectedCategories.length} حملة مختارة`
+                                    : 'اختر حملة أو أكثر'}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-full p-0"
+                              align="start"
+                              style={{ width: 'var(--radix-popover-trigger-width)' }}
+                            >
+                              <Command>
+                                <CommandInput placeholder="ابحث عن حملة..." />
+                                <CommandList>
+                                  <CommandEmpty>لا توجد نتائج</CommandEmpty>
+                                  <CommandGroup>
+                                    {categories.map((category) => {
+                                      const isSel = selected.includes(category.id);
+                                      return (
+                                        <CommandItem
+                                          key={category.id}
+                                          value={category.name}
+                                          onSelect={() => toggle(category.id)}
+                                        >
+                                          <Check
+                                            className={`mr-2 h-4 w-4 ${
+                                              isSel ? 'opacity-100' : 'opacity-0'
+                                            }`}
+                                          />
+                                          {category.name}
+                                        </CommandItem>
+                                      );
+                                    })}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          {selectedCategories.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {selectedCategories.map((c) => (
+                                <Badge
+                                  key={c.id}
+                                  variant="secondary"
+                                  className="gap-1.5 pr-1"
+                                >
+                                  <span>{c.name}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggle(c.id)}
+                                    className="rounded-full hover:bg-black/10 p-0.5"
+                                    aria-label={`إزالة ${c.name}`}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          <FormDescription className="text-xs">
+                            يمكن للمشروع أن ينتمي لأكثر من حملة — سيظهر في صفحة كل
+                            حملة مختارة.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
 
                   <FormField

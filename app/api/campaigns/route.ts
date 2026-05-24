@@ -28,6 +28,7 @@ import {
   generateUniqueLocaleSlug,
   normalizeUserSlug,
 } from "@/lib/slug";
+import { normalizeCategoryIdsInput, parseCategoryPriorities } from "@/lib/campaign/categories";
 
 export async function GET(request: NextRequest) {
   try {
@@ -101,7 +102,7 @@ export async function GET(request: NextRequest) {
     }
 
     const includeShape = {
-      category: {
+      categories: {
         select: {
           id: true,
           slug: true,
@@ -256,7 +257,18 @@ export async function GET(request: NextRequest) {
       const goalType = normalizeGoalType(campaign.goalType);
       const fundraisingMode = normalizeFundraisingMode(campaign.fundraisingMode);
       const tC = pickTranslation(campaign.translations, locale);
-      const tCat = pickTranslation(campaign.category?.translations, locale);
+      const categories = (campaign.categories ?? []).map((cat) => {
+        const tCat = pickTranslation(cat.translations, locale);
+        return {
+          id: cat.id,
+          slug:
+            (tCat as { slug?: string | null } | undefined)?.slug ||
+            cat.slug ||
+            null,
+          name: tCat?.name || cat.name,
+          icon: cat.icon,
+        };
+      });
       return {
         id: campaign.id,
         // Locale-aware slug: per-locale translation slug → base slug → null. The base
@@ -274,17 +286,13 @@ export async function GET(request: NextRequest) {
         currentAmount: campaign.currentAmount,
         isActive: campaign.isActive,
         priority: campaign.priority,
-        category: campaign.category
-          ? {
-              id: campaign.category.id,
-              slug:
-                (tCat as { slug?: string | null } | undefined)?.slug ||
-                campaign.category.slug ||
-                null,
-              name: tCat?.name || campaign.category.name,
-              icon: campaign.category.icon,
-            }
-          : null,
+        // Many-to-many: all categories this campaign belongs to. The first entry
+        // is exposed as `category` for legacy single-category consumers that
+        // haven't been updated yet — new code should read `categories`.
+        categories,
+        category: categories[0] ?? null,
+        categoryIds: categories.map((c) => c.id),
+        categoryPriorities: parseCategoryPriorities(campaign.categoryPriorities),
         donationCount: campaign._count.donations,
         progress: computeCampaignProgressPercent(
           campaign.currentAmount,
@@ -351,9 +359,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!data.title || !data.description || !data.categoryId) {
+    const categoryIds = normalizeCategoryIdsInput(data);
+    if (!data.title || !data.description || !categoryIds || categoryIds.length === 0) {
       return NextResponse.json(
-        { error: "Missing required fields: title, description, categoryId" },
+        { error: "Missing required fields: title, description, categoryIds" },
         { status: 400 }
       );
     }
@@ -419,15 +428,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ✅ STEP 3: Validate category exists
-    const category = await prisma.category.findUnique({
-      where: { id: data.categoryId },
+    // ✅ STEP 3: Validate every category in the list actually exists.
+    const foundCategories = await prisma.category.findMany({
+      where: { id: { in: categoryIds } },
       select: { id: true },
     });
-
-    if (!category) {
+    if (foundCategories.length !== categoryIds.length) {
+      const found = new Set(foundCategories.map((c) => c.id));
+      const missing = categoryIds.filter((id) => !found.has(id));
       return NextResponse.json(
-        { error: "Invalid category ID" },
+        { error: `Invalid category ID(s): ${missing.join(", ")}` },
         { status: 400 }
       );
     }
@@ -511,7 +521,9 @@ export async function POST(request: NextRequest) {
           slug,
           targetAmount,
           currentAmount: seededCurrentAmount,
-          categoryId: data.categoryId,
+          // Connect the campaign to every selected category — Prisma maintains
+          // both sides of the m2m ObjectId[] arrays automatically.
+          categories: { connect: categoryIds.map((id) => ({ id })) },
           isActive: data.isActive ?? true,
           images: data.images,
           videoUrl: data.videoUrl || null,
@@ -570,7 +582,8 @@ export async function POST(request: NextRequest) {
         videoUrl: true,
         isActive: true,
         priority: true,
-        categoryId: true,
+        categoryIds: true,
+        categoryPriorities: true,
         createdAt: true,
         updatedAt: true,
         suggestedDonations: true,
@@ -587,7 +600,7 @@ export async function POST(request: NextRequest) {
             description: true,
           },
         },
-        category: {
+        categories: {
           select: {
             id: true,
             slug: true,

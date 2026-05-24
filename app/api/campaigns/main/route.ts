@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { priority: "asc" }, // Order by priority
       include: {
-        category: {
+        categories: {
           select: {
             id: true,
             slug: true,
@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Map to add donation count to each campaign using prisma.count
+    // Map to add donation count to each campaign using prisma.count and surface
+    // the first category in the legacy `category` slot for old consumers.
     const campaignsWithDonationCount = await Promise.all(prioritizedCampaigns.map(async (campaign) => {
       const donationCount = await prisma.donationItem.count({
         where: {
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
       });
       return {
         ...campaign,
+        category: campaign.categories?.[0] ?? null,
         donationCount, // Add the donation count
       };
     }));

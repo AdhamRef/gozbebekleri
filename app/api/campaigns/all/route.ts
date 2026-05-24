@@ -22,11 +22,19 @@ export async function GET(request: NextRequest) {
             createdAt: true,
           },
         },
-        category: true, // Include category if needed
+        categories: true, // Include all categories (m2m)
       },
     });
 
-    return NextResponse.json(campaigns);
+    // Preserve the legacy `category` field shape for callers that still expect
+    // a single category (e.g. the admin /dashboard/campaigns table). It points
+    // at the first selected category so the existing UI keeps rendering.
+    const out = campaigns.map((c) => ({
+      ...c,
+      category: c.categories?.[0] ?? null,
+    }));
+
+    return NextResponse.json(out);
   } catch (error) {
     console.error('Error fetching campaigns:', error);
     return NextResponse.json(

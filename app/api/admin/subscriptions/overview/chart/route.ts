@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       donorId?: string;
       items?: { some: { campaignId: string } };
       OR?: Array<
-        | { items: { some: { campaign: { categoryId: string } } } }
+        | { items: { some: { campaign: { categoryIds: { has: string } } } } }
         | { categoryItems: { some: { categoryId: string } } }
       >;
     } = {
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
       whereClause.items = { some: { campaignId } };
     } else if (categoryId && categoryId !== "all") {
       whereClause.OR = [
-        { items: { some: { campaign: { categoryId } } } },
+        { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
         { categoryItems: { some: { categoryId } } },
       ];
     }

@@ -35,6 +35,7 @@ import {
   whereByIdOrLocaleSlug,
 } from "@/lib/slug";
 import { EMPTY_TIPTAP_DOC_JSON } from "@/lib/tiptap-empty-doc";
+import { normalizeCategoryIdsInput, parseCategoryPriorities } from "@/lib/campaign/categories";
 
 // ✅ Prisma Singleton - Reuse connection across requests
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
@@ -92,19 +93,22 @@ export async function GET(
           take: 2,
         },
 
-        // Category with translation
-        category: {
+        // Categories (m2m) with translation
+        categories: {
           select: {
             id: true,
+            slug: true,
             name: true,
             icon: true,
             translations: {
               where: translationLocaleWhere(locale),
-              select: { locale: true, name: true },
+              select: { locale: true, name: true, slug: true },
               take: 2,
             },
           },
         },
+        categoryIds: true,
+        categoryPriorities: true,
 
         // Updates with translations (limit to 20)
         updates: {
@@ -177,7 +181,18 @@ export async function GET(
     const showProgress = showCampaignProgress(goalType);
 
     const tCampaign = pickTranslation(campaign.translations, locale);
-    const tCategory = pickTranslation(campaign.category?.translations, locale);
+    const localizedCategories = (campaign.categories ?? []).map((cat) => {
+      const tCat = pickTranslation(cat.translations, locale);
+      return {
+        id: cat.id,
+        slug:
+          (tCat as { slug?: string | null } | undefined)?.slug ||
+          cat.slug ||
+          null,
+        name: tCat?.name || cat.name,
+        icon: cat.icon,
+      };
+    });
 
     // ✅ STEP 3: Transform data to match frontend expectations
     const transformedCampaign = {
@@ -214,13 +229,14 @@ export async function GET(
       suggestedShareCounts: parseSuggestedShareCounts(campaign.suggestedShareCounts),
       shareLabels: parseShareLabels(campaign.shareLabels),
       isActive: campaign.isActive,
-      
-      // Category with translation
-      category: campaign.category ? {
-        id: campaign.category.id,
-        name: tCategory?.name || campaign.category.name,
-        icon: campaign.category.icon,
-      } : null,
+
+      // All categories this campaign belongs to. `category` is kept as a
+      // single-value alias (first entry) for legacy consumers that haven't
+      // migrated to the many-to-many list yet.
+      categories: localizedCategories,
+      category: localizedCategories[0] ?? null,
+      categoryIds: campaign.categoryIds ?? [],
+      categoryPriorities: parseCategoryPriorities(campaign.categoryPriorities),
 
       // Updates with translations
       updates: campaign.updates.map((update) => {
@@ -318,7 +334,52 @@ export async function PUT(
     if (body.videoUrl !== undefined) updateData.videoUrl = body.videoUrl;
     if (body.isActive !== undefined) updateData.isActive = body.isActive;
     if (body.priority !== undefined) updateData.priority = body.priority;
-    if (body.categoryId !== undefined) updateData.categoryId = body.categoryId;
+
+    // categoryIds / categoryId — accept either. The new client sends an array;
+    // older code paths (and the dashboard quick-toggle) still send a single id.
+    if (body.categoryIds !== undefined || body.categoryId !== undefined) {
+      const nextCategoryIds = normalizeCategoryIdsInput(body);
+      if (!nextCategoryIds || nextCategoryIds.length === 0) {
+        return NextResponse.json(
+          { error: "At least one category is required" },
+          { status: 400 }
+        );
+      }
+      // Verify every requested category still exists before mutating the relation.
+      const found = await prisma.category.findMany({
+        where: { id: { in: nextCategoryIds } },
+        select: { id: true },
+      });
+      if (found.length !== nextCategoryIds.length) {
+        const have = new Set(found.map((c) => c.id));
+        const missing = nextCategoryIds.filter((id) => !have.has(id));
+        return NextResponse.json(
+          { error: `Invalid category ID(s): ${missing.join(", ")}` },
+          { status: 400 }
+        );
+      }
+      // `set` replaces the relation list to exactly match the requested ids.
+      updateData.categories = { set: nextCategoryIds.map((id) => ({ id })) };
+
+      // Prune `categoryPriorities` entries that point at categories the
+      // campaign no longer belongs to, so the per-category ordering map stays
+      // in sync with the relation.
+      const existingCampaign = await prisma.campaign.findUnique({
+        where: { id },
+        select: { categoryPriorities: true },
+      });
+      const currentPriorities = parseCategoryPriorities(
+        existingCampaign?.categoryPriorities
+      );
+      const keptPriorities: Record<string, number> = {};
+      for (const [catId, order] of Object.entries(currentPriorities)) {
+        if (nextCategoryIds.includes(catId)) keptPriorities[catId] = order;
+      }
+      updateData.categoryPriorities =
+        Object.keys(keptPriorities).length > 0
+          ? (keptPriorities as unknown as Prisma.InputJsonValue)
+          : (Prisma.JsonNull as unknown as Prisma.InputJsonValue);
+    }
 
     if (body.goalType !== undefined) {
       updateData.goalType = normalizeGoalType(body.goalType);
@@ -571,7 +632,8 @@ export async function PUT(
         videoUrl: true,
         isActive: true,
         priority: true,
-        categoryId: true,
+        categoryIds: true,
+        categoryPriorities: true,
         createdAt: true,
         updatedAt: true,
         suggestedDonations: true,
@@ -587,6 +649,9 @@ export async function PUT(
             title: true,
             description: true,
           },
+        },
+        categories: {
+          select: { id: true, slug: true, name: true, icon: true },
         },
       },
     });

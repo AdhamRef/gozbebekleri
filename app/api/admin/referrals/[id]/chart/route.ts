@@ -50,7 +50,7 @@ export async function GET(
       donationWhere.items = { some: { campaignId } };
     } else if (categoryId && categoryId !== "all") {
       donationWhere.OR = [
-        { items: { some: { campaign: { categoryId } } } },
+        { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
         { categoryItems: { some: { categoryId } } },
       ];
     }

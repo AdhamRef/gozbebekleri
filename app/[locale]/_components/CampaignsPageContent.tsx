@@ -29,8 +29,12 @@ interface Campaign {
   suggestedShareCounts?: { counts: number[]; priceByCurrency?: Record<string, number> } | null;
   suggestedDonations?: import("@/lib/campaign/suggested-donations").SuggestedDonationsConfig | null;
   isActive?: boolean;
+  // Many-to-many: a campaign can belong to multiple categories. `categoryId`
+  // is kept as a single-value alias (first category) for legacy code paths.
   categoryId?: string;
+  categoryIds?: string[];
   category?: { id?: string; slug?: string | null; name?: string; icon?: string | null } | null;
+  categories?: { id?: string; slug?: string | null; name?: string; icon?: string | null }[];
   createdAt: string;
   updatedAt?: string;
   // Admin-set ordering fields. Lower number = higher priority. null = unprioritized.
@@ -116,14 +120,29 @@ const CampaignsPage = ({
       const [campaignsRes, categoriesRes] = await Promise.all([getCampaignsPage(pageToLoad), categoriesPromise]);
       if (requestId !== requestSeqRef.current) return;
       const campaignsItems = campaignsRes.data.items || campaignsRes.data;
-      const newCampaigns = (campaignsItems as Campaign[]).map((campaign) => ({
-        ...campaign,
-        categoryId: campaign.categoryId || campaign.category?.id || (selectedCategory !== "all" ? selectedCategory : undefined),
-        category: {
-          ...(campaign.category ?? {}),
-          id: campaign.category?.id || campaign.categoryId || (selectedCategory !== "all" ? selectedCategory : ""),
-        },
-      }));
+      const newCampaigns = (campaignsItems as Campaign[]).map((campaign) => {
+        // Many-to-many: collect all category ids the campaign belongs to.
+        // Old API responses may only have `categoryId` / `category` — preserve
+        // both shapes so the in-memory filter below works either way.
+        const ids = Array.isArray(campaign.categoryIds) && campaign.categoryIds.length > 0
+          ? campaign.categoryIds
+          : (campaign.categoryId
+              ? [campaign.categoryId]
+              : campaign.category?.id
+                ? [campaign.category.id]
+                : selectedCategory !== "all"
+                  ? [selectedCategory]
+                  : []);
+        return {
+          ...campaign,
+          categoryIds: ids,
+          categoryId: ids[0],
+          category: {
+            ...(campaign.category ?? {}),
+            id: campaign.category?.id || ids[0] || (selectedCategory !== "all" ? selectedCategory : ""),
+          },
+        };
+      });
       if (pageToLoad > 1) {
         setCampaigns((prev) => {
           const seen = new Set(prev.map((campaign) => campaign.id));
@@ -195,7 +214,9 @@ const CampaignsPage = ({
   const filteredCampaigns = useMemo(() => campaigns.filter((c) => {
     if (isRefreshingList) return c.isActive !== false;
     const matchesSearch = (c.title || "").toLowerCase().includes(searchQuery.toLowerCase()) || (c.description || "").toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === "all" || c.categoryId === selectedCategory;
+    // Many-to-many membership: any of the campaign's categories matches.
+    const ids = c.categoryIds ?? (c.categoryId ? [c.categoryId] : c.category?.id ? [c.category.id] : []);
+    const matchesCategory = selectedCategory === "all" || ids.includes(selectedCategory);
     const normalizedTarget = Number(c.targetAmount ?? 0);
     const matchesAmount = normalizedTarget >= filters.minAmount && normalizedTarget <= filters.maxAmount;
     return matchesSearch && matchesCategory && matchesAmount && c.isActive !== false;

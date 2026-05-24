@@ -82,11 +82,11 @@ export async function GET(
       baseAllTimeDonationWhere.items = { some: { campaignId } };
     } else if (categoryId && categoryId !== "all") {
       baseDonationWhere.OR = [
-        { items: { some: { campaign: { categoryId } } } },
+        { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
         { categoryItems: { some: { categoryId } } },
       ];
       baseAllTimeDonationWhere.OR = [
-        { items: { some: { campaign: { categoryId } } } },
+        { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
         { categoryItems: { some: { categoryId } } },
       ];
     }
@@ -107,7 +107,7 @@ export async function GET(
       subscriptionWhere.items = { some: { campaignId } };
     } else if (categoryId && categoryId !== "all") {
       subscriptionWhere.OR = [
-        { items: { some: { campaign: { categoryId } } } },
+        { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
         { categoryItems: { some: { categoryId } } },
       ];
     }
@@ -128,7 +128,7 @@ export async function GET(
       thisMonthBaseWhere.items = { some: { campaignId } };
     } else if (categoryId && categoryId !== "all") {
       thisMonthBaseWhere.OR = [
-        { items: { some: { campaign: { categoryId } } } },
+        { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
         { categoryItems: { some: { categoryId } } },
       ];
     }

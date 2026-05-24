@@ -46,7 +46,7 @@ function buildDonationWhere(
     base.items = { some: { campaignId } };
   } else if (categoryId && categoryId !== 'all') {
     base.OR = [
-      { items: { some: { campaign: { categoryId } } } },
+      { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
       { categoryItems: { some: { categoryId } } },
     ];
   }
@@ -60,7 +60,7 @@ function buildDonationWhereAllTime(categoryId: string | null, campaignId: string
     base.items = { some: { campaignId } };
   } else if (categoryId && categoryId !== 'all') {
     base.OR = [
-      { items: { some: { campaign: { categoryId } } } },
+      { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
       { categoryItems: { some: { categoryId } } },
     ];
   }
@@ -111,7 +111,7 @@ function buildDonationItemWhere(
   if (campaignId && campaignId !== 'all') {
     base.campaignId = campaignId;
   } else if (categoryId && categoryId !== 'all') {
-    base.campaign = { categoryId };
+    base.campaign = { categoryIds: { has: categoryId } };
   }
   return base;
 }
@@ -186,7 +186,7 @@ export async function GET(request: NextRequest) {
       subscriptionWhere.items = { some: { campaignId } };
     } else if (categoryId && categoryId !== 'all') {
       subscriptionWhere.OR = [
-        { items: { some: { campaign: { categoryId } } } },
+        { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
         { categoryItems: { some: { categoryId } } },
       ];
     }

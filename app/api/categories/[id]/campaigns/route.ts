@@ -12,6 +12,7 @@ import { parseSuggestedDonations } from "@/lib/campaign/suggested-donations";
 import { parseShareLabels } from "@/lib/campaign/share-labels";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 import { whereByIdOrLocaleSlug } from "@/lib/slug";
+import { parseCategoryPriorities, getCategoryPriority } from "@/lib/campaign/categories";
 
 export async function GET(
   request: NextRequest,
@@ -68,9 +69,10 @@ export async function GET(
           maxAmount < Infinity ? { targetAmount: { lte: maxAmount } } : {},
         ];
 
-    // Build where clause
+    // Build where clause. The category relation is now many-to-many, so we
+    // filter by `categoryIds` containing the category we're listing.
     const where: any = {
-      categoryId: id,
+      categoryIds: { has: id },
       AND: [
         ...amountConditions,
         activeOnly ? { isActive: true } : {},
@@ -90,28 +92,6 @@ export async function GET(
       });
     }
 
-    // Build orderBy based on sortBy parameter.
-    // Default ("newest") applies the per-category priority first (the dashboard reorder
-    // dialog sets `categoryPriority`), then the global priority as a tiebreaker, then
-    // newest. Explicit user sorts (amount-high/-low, progress) override priority entirely.
-    // Mongo's ascending sort places null FIRST, so a single multi-field orderBy would
-    // mostly return unprioritized rows in the page slice. We fan out into two queries on
-    // page 1 — prioritized first, then non-prioritized recency — and merge.
-    let orderBy: any = { createdAt: 'desc' };
-    const applyPriorityFallbackSort = sortBy === 'newest' || !sortBy || sortBy === 'priority';
-    switch (sortBy) {
-      case 'amount-high':
-        orderBy = { targetAmount: 'desc' };
-        break;
-      case 'amount-low':
-        orderBy = { targetAmount: 'asc' };
-        break;
-      case 'progress':
-        // We'll sort by progress in-memory after fetching the page
-        orderBy = { createdAt: 'desc' };
-        break;
-    }
-
     const selectShape = {
       id: true,
       slug: true,
@@ -123,7 +103,10 @@ export async function GET(
       currentAmount: true,
       isActive: true,
       priority: true,
-      categoryPriority: true,
+      // Per-category priorities now live in this JSON map ({ [categoryId]: order }).
+      // Mongo can't sort directly by JSON values, so we always sort in-memory below.
+      categoryPriorities: true,
+      categoryIds: true,
       createdAt: true,
       updatedAt: true,
       goalType: true,
@@ -134,7 +117,7 @@ export async function GET(
       suggestedDonations: true,
       translations: { where: translationLocaleWhere(locale), take: 2, select: { title: true, description: true, locale: true, slug: true } },
       _count: { select: { donations: true } },
-      category: {
+      categories: {
         select: {
           id: true,
           slug: true,
@@ -147,161 +130,89 @@ export async function GET(
 
     const total = await prisma.campaign.count({ where });
 
-    const campaigns = await (async () => {
-      if (usePagePagination && applyPriorityFallbackSort) {
-        const priorityWhere = {
-          ...where,
-          OR: [{ NOT: { categoryPriority: null } }, { NOT: { priority: null } }],
-        };
-        const recentWhere = { ...where, categoryPriority: null, priority: null };
-        const priorityCount = await prisma.campaign.count({ where: priorityWhere });
-        const rows: Prisma.CampaignGetPayload<{ select: typeof selectShape }>[] = [];
-        let remaining = limit + 1;
+    // Fetch + sort in-memory. We can't push the per-category priority into Mongo's
+    // sort because it's keyed inside a JSON object. To keep correctness on large
+    // categories we cap the fetch at MAX_IN_MEMORY rows; if a category grows past
+    // that we'll need a proper paginated query, but that's a future problem.
+    const MAX_IN_MEMORY = 1000;
+    const applyPriorityFallbackSort = sortBy === 'newest' || !sortBy || sortBy === 'priority';
+    const allInCategory = await prisma.campaign.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: MAX_IN_MEMORY,
+      select: selectShape,
+    });
 
-        if (offset < priorityCount) {
-          const priRows = await prisma.campaign.findMany({
-            where: priorityWhere,
-            orderBy: [
-              { categoryPriority: 'asc' },
-              { priority: 'asc' },
-              { createdAt: 'desc' },
-            ],
-            skip: offset,
-            take: remaining,
-            select: selectShape,
-          });
-          rows.push(...priRows);
-          remaining -= priRows.length;
-        }
-
-        if (remaining > 0) {
-          const recentRows = await prisma.campaign.findMany({
-            where: recentWhere,
-            orderBy: { createdAt: 'desc' },
-            skip: Math.max(0, offset - priorityCount),
-            take: remaining,
-            select: selectShape,
-          });
-          rows.push(...recentRows);
-        }
-
-        return rows;
-      }
-
-      if (usePagePagination) {
-        return prisma.campaign.findMany({
-          where,
-          skip: offset,
-          take: limit + 1,
-          orderBy,
-          select: selectShape,
-        });
-      }
-
-      if (applyPriorityFallbackSort && !cursor) {
-        // First page: prioritized rows (categoryPriority asc, then global priority asc),
-        // then non-prioritized rows by createdAt desc to fill the page.
-        const priRows = await prisma.campaign.findMany({
-          where: {
-            ...where,
-            OR: [{ NOT: { categoryPriority: null } }, { NOT: { priority: null } }],
-          },
-          orderBy: [
-            { categoryPriority: 'asc' },
-            { priority: 'asc' },
-            { createdAt: 'desc' },
-          ],
-          take: limit + 1,
-          select: selectShape,
-        });
-        const remaining = Math.max(0, limit + 1 - priRows.length);
-        const recentRows = remaining > 0
-          ? await prisma.campaign.findMany({
-              where: { ...where, categoryPriority: null, priority: null },
-              orderBy: { createdAt: 'desc' },
-              take: remaining,
-              select: selectShape,
-            })
-          : [];
-        return [...priRows, ...recentRows];
-      }
-      if (applyPriorityFallbackSort && cursor) {
-        const cursorRow = await prisma.campaign.findUnique({
-          where: { id: cursor },
-          select: { categoryPriority: true, priority: true },
-        });
-
-        if (cursorRow?.categoryPriority != null || cursorRow?.priority != null) {
-          const priRows = await prisma.campaign.findMany({
-            where: {
-              ...where,
-              OR: [{ NOT: { categoryPriority: null } }, { NOT: { priority: null } }],
-            },
-            take: limit + 1,
-            skip: 1,
-            cursor: { id: cursor },
-            orderBy: [
-              { categoryPriority: 'asc' },
-              { priority: 'asc' },
-              { createdAt: 'desc' },
-            ],
-            select: selectShape,
-          });
-          const remaining = Math.max(0, limit + 1 - priRows.length);
-          const recentRows = remaining > 0
-            ? await prisma.campaign.findMany({
-                where: { ...where, categoryPriority: null, priority: null },
-                orderBy: { createdAt: 'desc' },
-                take: remaining,
-                select: selectShape,
-              })
-            : [];
-          return [...priRows, ...recentRows];
-        }
-
-        // Subsequent pages: paginate non-prioritized rows by createdAt desc.
-        return prisma.campaign.findMany({
-          where: { ...where, categoryPriority: null, priority: null },
-          take: limit + 1,
-          skip: 1,
-          cursor: { id: cursor },
-          orderBy: { createdAt: 'desc' },
-          select: selectShape,
-        });
-      }
-      return prisma.campaign.findMany({
-        where,
-        take: limit + 1,
-        ...(cursor && { skip: 1, cursor: { id: cursor } }),
-        orderBy,
-        select: selectShape,
-      });
-    })();
-
-    // Sort by progress in-memory if requested. Other sorts (newest/priority/amount) are
-    // already in the desired order from the queries above.
-    const sorted = [...campaigns];
-    if (sortBy === 'progress') {
-      sorted.sort((a, b) => {
+    const sortedAll = [...allInCategory].sort((a, b) => {
+      if (sortBy === 'amount-high') return Number(b.targetAmount) - Number(a.targetAmount);
+      if (sortBy === 'amount-low') return Number(a.targetAmount) - Number(b.targetAmount);
+      if (sortBy === 'progress') {
         const ga = normalizeGoalType(a.goalType);
         const gb = normalizeGoalType(b.goalType);
-        const pa =
-          computeCampaignProgressPercent(a.currentAmount, a.targetAmount, ga) / 100;
-        const pb =
-          computeCampaignProgressPercent(b.currentAmount, b.targetAmount, gb) / 100;
+        const pa = computeCampaignProgressPercent(a.currentAmount, a.targetAmount, ga) / 100;
+        const pb = computeCampaignProgressPercent(b.currentAmount, b.targetAmount, gb) / 100;
         return pb - pa;
-      });
-    }
+      }
+      if (!applyPriorityFallbackSort) {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      // Default: per-category priority asc → global priority asc → createdAt desc.
+      // null/missing priorities are treated as "after" any explicit value.
+      const aCat = getCategoryPriority(a.categoryPriorities, id);
+      const bCat = getCategoryPriority(b.categoryPriorities, id);
+      if (aCat != null && bCat != null && aCat !== bCat) return aCat - bCat;
+      if (aCat != null && bCat == null) return -1;
+      if (aCat == null && bCat != null) return 1;
+      const ap = a.priority ?? null;
+      const bp = b.priority ?? null;
+      if (ap != null && bp != null && ap !== bp) return ap - bp;
+      if (ap != null && bp == null) return -1;
+      if (ap == null && bp != null) return 1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
-    const hasMore = sorted.length > limit;
-    const pageItems = hasMore ? sorted.slice(0, -1) : sorted;
-    const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.id : null;
+    // Slice the sorted list according to the requested pagination flavor.
+    let pageItems: Prisma.CampaignGetPayload<{ select: typeof selectShape }>[];
+    let hasMore: boolean;
+    let nextCursor: string | null = null;
+
+    if (usePagePagination) {
+      const slice = sortedAll.slice(offset, offset + limit + 1);
+      hasMore = slice.length > limit;
+      pageItems = hasMore ? slice.slice(0, -1) : slice;
+    } else if (cursor) {
+      const cursorIdx = sortedAll.findIndex((c) => c.id === cursor);
+      const start = cursorIdx >= 0 ? cursorIdx + 1 : 0;
+      const slice = sortedAll.slice(start, start + limit + 1);
+      hasMore = slice.length > limit;
+      pageItems = hasMore ? slice.slice(0, -1) : slice;
+      nextCursor = hasMore && pageItems.length > 0 ? pageItems[pageItems.length - 1].id : null;
+    } else {
+      const slice = sortedAll.slice(0, limit + 1);
+      hasMore = slice.length > limit;
+      pageItems = hasMore ? slice.slice(0, -1) : slice;
+      nextCursor = hasMore && pageItems.length > 0 ? pageItems[pageItems.length - 1].id : null;
+    }
 
     const transformed = pageItems.map((c) => {
       const goalType = normalizeGoalType(c.goalType);
       const fundraisingMode = normalizeFundraisingMode(c.fundraisingMode);
       const tC = pickTranslation(c.translations, locale);
-      const tCat = pickTranslation(c.category?.translations, locale);
+      const localizedCats = (c.categories ?? []).map((cat) => {
+        const tCat = pickTranslation(cat.translations, locale);
+        return {
+          id: cat.id,
+          slug:
+            (tCat as { slug?: string | null } | undefined)?.slug ||
+            cat.slug ||
+            null,
+          name: tCat?.name || cat.name,
+          icon: cat.icon,
+        };
+      });
+      // Prefer the page's own category for the legacy single-category fields so
+      // breadcrumbs/labels render the category the donor is browsing.
+      const primary = localizedCats.find((x) => x.id === id) ?? localizedCats[0] ?? null;
       return {
         id: c.id,
         // Locale-aware slug: per-locale translation slug → base slug → null.
@@ -315,8 +226,12 @@ export async function GET(
         targetAmount: c.targetAmount,
         currentAmount: c.currentAmount,
         isActive: c.isActive,
-        categoryId: c.category?.id ?? id,
-        categoryPriority: c.categoryPriority,
+        categoryId: primary?.id ?? id,
+        categoryIds: c.categoryIds ?? [],
+        // categoryPriority surfaces only the value for THIS category page —
+        // a campaign in many categories may have a different rank in each.
+        categoryPriority: getCategoryPriority(c.categoryPriorities, id),
+        categoryPriorities: parseCategoryPriorities(c.categoryPriorities),
         priority: c.priority,
         donationCount: c._count?.donations ?? 0,
         progress: computeCampaignProgressPercent(
@@ -333,17 +248,8 @@ export async function GET(
         suggestedDonations: parseSuggestedDonations(c.suggestedDonations),
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
-        category: c.category
-          ? {
-              id: c.category.id,
-              slug:
-                (tCat as { slug?: string | null } | undefined)?.slug ||
-                c.category.slug ||
-                null,
-              name: tCat?.name || c.category.name,
-              icon: c.category.icon,
-            }
-          : null,
+        categories: localizedCats,
+        category: primary,
       };
     });
 
@@ -373,4 +279,4 @@ export async function GET(
     console.error('Error fetching category campaigns:', error);
     return NextResponse.json({ error: 'Failed to fetch category campaigns' }, { status: 500 });
   }
-} 
+}

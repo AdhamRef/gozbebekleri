@@ -73,10 +73,10 @@ interface Campaign {
   currentAmount: number;
   isActive: boolean;
   createdAt: string;
-  category: {
-    id: string;
-    name: string;
-  };
+  // Many-to-many: a campaign can belong to multiple categories. `category`
+  // is kept as a single-value alias (first one) for compact table rendering.
+  category?: { id: string; name: string } | null;
+  categories?: { id: string; name: string }[];
 }
 
 interface Category {
@@ -186,9 +186,11 @@ export default function CampaignsPage() {
 
   const filteredCampaigns = activeCampaigns
     .filter(c => {
+      const cats = c.categories ?? (c.category ? [c.category] : []);
+      const catNamesJoined = cats.map((cat) => cat.name).join(' ').toLowerCase();
       const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.category.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = selectedCategory === 'all' || c.category.id === selectedCategory;
+        catNamesJoined.includes(searchQuery.toLowerCase());
+      const matchesCategory = selectedCategory === 'all' || cats.some((cat) => cat.id === selectedCategory);
       const progress = c.targetAmount > 0 ? (c.currentAmount / c.targetAmount) * 100 : 0;
       const matchesProgress = progressFilter === 'all' ||
         (progressFilter === 'completed' && progress >= 100) ||
@@ -196,24 +198,36 @@ export default function CampaignsPage() {
       return matchesSearch && matchesCategory && matchesProgress;
     })
     .sort((a, b) => {
-      const av = a[sortField], bv = b[sortField];
+      // Cast through `any` because `sortField` can in principle be any campaign
+      // key, including the now-optional `category`/`categories` relations whose
+      // values aren't directly comparable. In practice the table only sorts by
+      // scalar columns, so the runtime compare is fine.
+      const av = (a as any)[sortField];
+      const bv = (b as any)[sortField];
       return sortDirection === 'asc' ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
     });
 
   const paginatedCampaigns = filteredCampaigns.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
-  const filteredArchive = archivedCampaigns.filter(c =>
-    !archiveSearch || c.title.toLowerCase().includes(archiveSearch.toLowerCase()) ||
-    c.category.name.toLowerCase().includes(archiveSearch.toLowerCase())
-  );
+  const filteredArchive = archivedCampaigns.filter(c => {
+    if (!archiveSearch) return true;
+    const cats = c.categories ?? (c.category ? [c.category] : []);
+    const catNames = cats.map((cat) => cat.name).join(' ').toLowerCase();
+    return c.title.toLowerCase().includes(archiveSearch.toLowerCase()) ||
+      catNames.includes(archiveSearch.toLowerCase());
+  });
 
   const exportToCSV = () => {
-    const headers = ['Title', 'Category', 'Target Amount', 'Current Amount', 'Status', 'Created At'];
-    const rows = filteredCampaigns.map(c => [
-      c.title, c.category.name, c.targetAmount, c.currentAmount,
-      c.isActive ? 'Active' : 'Inactive',
-      format(new Date(c.createdAt), 'PPP', { locale: ar }),
-    ]);
+    const headers = ['Title', 'Categories', 'Target Amount', 'Current Amount', 'Status', 'Created At'];
+    const rows = filteredCampaigns.map(c => {
+      const cats = c.categories ?? (c.category ? [c.category] : []);
+      const names = cats.map((cat) => cat.name).join(' | ');
+      return [
+        c.title, names, c.targetAmount, c.currentAmount,
+        c.isActive ? 'Active' : 'Inactive',
+        format(new Date(c.createdAt), 'PPP', { locale: ar }),
+      ];
+    });
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
@@ -317,7 +331,7 @@ export default function CampaignsPage() {
               ) : paginatedCampaigns.map(campaign => (
                 <TableRow key={campaign.id}>
                   <TableCell className="font-medium">{campaign.title}</TableCell>
-                  <TableCell>{campaign.category.name}</TableCell>
+                  <TableCell>{(campaign.categories ?? (campaign.category ? [campaign.category] : [])).map((c) => c.name).join(' • ') || '—'}</TableCell>
                   <TableCell>${campaign.targetAmount.toLocaleString()}</TableCell>
                   <TableCell>${campaign.currentAmount.toLocaleString()}</TableCell>
                   <TableCell>
@@ -418,7 +432,7 @@ export default function CampaignsPage() {
                 ) : filteredArchive.map(campaign => (
                   <TableRow key={campaign.id}>
                     <TableCell className="font-medium">{campaign.title}</TableCell>
-                    <TableCell>{campaign.category.name}</TableCell>
+                    <TableCell>{(campaign.categories ?? (campaign.category ? [campaign.category] : [])).map((c) => c.name).join(' • ') || '—'}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {format(new Date(campaign.createdAt), 'PP', { locale: ar })}
                     </TableCell>
