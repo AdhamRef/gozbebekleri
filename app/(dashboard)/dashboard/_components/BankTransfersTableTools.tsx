@@ -9,6 +9,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+type BankOption = { id: string | null; code: string | null; nameAr: string; isActive?: boolean };
+
+const PROJECT_OPTIONS = [
+  "تبرع عام",
+  "زكاة",
+  "فلسطين / غزة",
+  "إفريقيا",
+  "الأضاحي / القربان",
+  "كفالة الأيتام",
+  "إطعام / وجبات",
+  "المشاريع الطبية",
+];
+
 function ensureToolsNode() {
   const h1 = document.querySelector("main h1");
   if (!h1 || !h1.textContent?.includes("التحويلات البنكية")) return null;
@@ -35,6 +48,7 @@ export function BankTransfersTableTools() {
   const searchParams = useSearchParams();
   const [node, setNode] = useState<HTMLElement | null>(null);
   const [q, setQ] = useState(searchParams.get("q") ?? "");
+  const [banks, setBanks] = useState<BankOption[]>([]);
   const active = pathname === "/dashboard/bank-transfers" || pathname.startsWith("/dashboard/bank-transfers/");
 
   useEffect(() => {
@@ -44,6 +58,16 @@ export function BankTransfersTableTools() {
     const timer = window.setInterval(refresh, 700);
     return () => window.clearInterval(timer);
   }, [active, pathname]);
+
+  useEffect(() => {
+    if (!active) return;
+    let cancelled = false;
+    fetch("/api/admin/bank-transfers/banks", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (!cancelled && Array.isArray(data?.banks)) setBanks(data.banks); })
+      .catch(() => { if (!cancelled) setBanks([]); });
+    return () => { cancelled = true; };
+  }, [active]);
 
   function setParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -61,11 +85,13 @@ export function BankTransfersTableTools() {
     <Card className="mb-4">
       <CardHeader className="pb-3">
         <CardTitle className="text-base">فلترة و بحث العمليات البنكية</CardTitle>
-        <CardDescription>فلترة احترافية من قاعدة البيانات حسب الحالة والبنك والعملة واللغة والتاريخ والقيمة.</CardDescription>
+        <CardDescription>فلترة احترافية من قاعدة البيانات حسب البنك والمشروع والحالة والعملة واللغة والتاريخ والقيمة.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="grid gap-3 md:grid-cols-4">
           <div className="space-y-1.5 md:col-span-2"><Label>بحث عام</Label><div className="flex gap-2"><Input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") applySearch(); }} placeholder="اسم، وصف، مشروع، مرجع..." /><Button onClick={applySearch}>بحث</Button></div></div>
+          <div className="space-y-1.5"><Label>البنك</Label><Select value={searchParams.get("bankId") ?? "all"} onValueChange={(v) => setParam("bankId", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">كل البنوك</SelectItem>{banks.filter((b) => b.isActive !== false).map((bank) => { const value = bank.id ?? bank.code ?? bank.nameAr; return <SelectItem key={value} value={value}>{bank.nameAr}</SelectItem>; })}</SelectContent></Select></div>
+          <div className="space-y-1.5"><Label>المشروع</Label><Select value={searchParams.get("project") ?? "all"} onValueChange={(v) => setParam("project", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">كل المشاريع</SelectItem>{PROJECT_OPTIONS.map((project) => <SelectItem key={project} value={project}>{project}</SelectItem>)}</SelectContent></Select></div>
           <div className="space-y-1.5"><Label>الحالة</Label><Select value={searchParams.get("status") ?? "all"} onValueChange={(v) => setParam("status", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">الكل</SelectItem><SelectItem value="PENDING_REVIEW">قيد المراجعة</SelectItem><SelectItem value="APPROVED">معتمد</SelectItem><SelectItem value="IGNORED">مستبعد</SelectItem></SelectContent></Select></div>
           <div className="space-y-1.5"><Label>العملة</Label><Select value={searchParams.get("currency") ?? "all"} onValueChange={(v) => setParam("currency", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">كل العملات</SelectItem><SelectItem value="USD">USD</SelectItem><SelectItem value="TRY">TRY</SelectItem><SelectItem value="EUR">EUR</SelectItem></SelectContent></Select></div>
           <div className="space-y-1.5"><Label>لغة المتبرع</Label><Select value={searchParams.get("donorLocale") ?? "all"} onValueChange={(v) => setParam("donorLocale", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">كل اللغات</SelectItem><SelectItem value="ar">عربي</SelectItem><SelectItem value="tr">تركي</SelectItem><SelectItem value="en">إنجليزي</SelectItem><SelectItem value="fr">فرنسي</SelectItem><SelectItem value="de">ألماني</SelectItem><SelectItem value="es">إسباني</SelectItem><SelectItem value="pt">برتغالي</SelectItem><SelectItem value="id">إندونيسي</SelectItem></SelectContent></Select></div>
