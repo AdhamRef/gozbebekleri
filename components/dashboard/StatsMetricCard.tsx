@@ -34,6 +34,11 @@ function formatSelectedCurrency(value: number, currency: string) {
   const sym = DASHBOARD_DISPLAY_SYMBOLS[currency] ?? `${currency} `;
   return sym + value.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
+function currencyBreakdown(totals?: Record<string, number>) {
+  const entries = Object.entries(totals ?? {}).filter(([, value]) => typeof value === "number" && value > 0);
+  if (!entries.length) return "لا توجد حوالات معتمدة بعد";
+  return entries.map(([currency, amount]) => formatCurrency(amount, currency)).join(" • ");
+}
 
 type BankTransfersSummary = { totals?: Record<string, number>; usdTotals?: Record<string, number>; totalUsd?: number; approvedCount?: number; pendingCount?: number };
 interface StatsMetricCardProps { title: string; value: number; icon: LucideIcon; accent?: Accent; format?: "money" | "number" | "percent"; subtitle?: string; compact?: boolean; variant?: "default" | "hero"; }
@@ -55,11 +60,9 @@ export function StatsMetricCard({ title, value, icon: Icon, accent = "slate", fo
   const selectedCurrency = getSelectedCurrency?.() ?? "DEFAULT";
   const selectedCode = selectedCurrency === "DEFAULT" ? "USD" : selectedCurrency;
   const bankUsd = bankSummary?.totalUsd ?? bankSummary?.totals?.USD ?? 0;
-  const bankTry = bankSummary?.totals?.TRY ?? 0;
   const bankDisplayValue = selectedCurrency === "DEFAULT" ? bankUsd : (convertToCurrency(bankUsd)?.convertedValue ?? bankUsd);
-  const siteDisplayValue = value;
-  const displayedValue = shouldShowBankTransfers && format === "money" ? siteDisplayValue + bankDisplayValue : value;
-  const displayedSubtitle = shouldShowBankTransfers ? "إجمالي الموقع + الحسابات البنكية حسب العملة المختارة" : subtitle;
+  const displayedValue = shouldShowBankTransfers && format === "money" ? value + bankDisplayValue : value;
+  const displayedSubtitle = shouldShowBankTransfers ? `الموقع: ${formatSelectedCurrency(value, selectedCode)} • البنوك: ${formatSelectedCurrency(bankDisplayValue, selectedCode)}` : subtitle;
 
   const mainCard = (
     <div className={cn("rounded-xl border border-border bg-white shadow-sm flex flex-col gap-1 transition-shadow hover:shadow-md", compact ? "p-3" : "p-4", isHero && "ring-2 ring-offset-1 ring-current ring-opacity-20")}>
@@ -69,5 +72,5 @@ export function StatsMetricCard({ title, value, icon: Icon, accent = "slate", fo
     </div>
   );
   if (!shouldShowBankTransfers) return mainCard;
-  return <>{mainCard}<div className="rounded-xl border border-border bg-white shadow-sm flex flex-col gap-1 transition-shadow hover:shadow-md p-3"><div className="flex items-start justify-between gap-2 min-w-0"><p className="font-medium leading-tight text-slate-700 text-right flex-1 min-w-0 text-[11px]">الحوالات البنكية</p><span className="rounded-lg p-1.5 shrink-0 mt-0.5 bg-blue-50 text-blue-600"><Icon className="w-3.5 h-3.5" /></span></div><p className="font-bold text-right tabular-nums text-slate-900 text-base">{formatSelectedCurrency(bankDisplayValue, selectedCode)}</p><p className="text-[10px] text-slate-400 text-right leading-tight truncate">محولة من: {formatCurrency(bankTry, "TRY")} • {formatCurrency(bankSummary?.totals?.USD ?? 0, "USD")} • معتمد: {bankSummary?.approvedCount ?? 0} • مراجعة: {bankSummary?.pendingCount ?? 0}</p></div></>;
+  return <>{mainCard}<div className="rounded-xl border border-border bg-white shadow-sm flex flex-col gap-1 transition-shadow hover:shadow-md p-3"><div className="flex items-start justify-between gap-2 min-w-0"><p className="font-medium leading-tight text-slate-700 text-right flex-1 min-w-0 text-[11px]">الحوالات البنكية</p><span className="rounded-lg p-1.5 shrink-0 mt-0.5 bg-blue-50 text-blue-600"><Icon className="w-3.5 h-3.5" /></span></div><p className="font-bold text-right tabular-nums text-slate-900 text-base">{formatSelectedCurrency(bankDisplayValue, selectedCode)}</p><p className="text-[10px] text-slate-400 text-right leading-tight truncate">الأصل: {currencyBreakdown(bankSummary?.totals)} • معتمد: {bankSummary?.approvedCount ?? 0} • مراجعة: {bankSummary?.pendingCount ?? 0}</p></div></>;
 }
