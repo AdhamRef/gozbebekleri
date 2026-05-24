@@ -28,13 +28,57 @@ function text(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function csvCell(value: unknown): string {
-  const v = text(value).replace(/\r?\n/g, " ").replace(/"/g, '""');
-  return `"${v}"`;
+function clean(value: string | null) {
+  return value && value.trim() && value !== "all" ? value.trim() : null;
 }
 
-function csvRow(values: unknown[]): string {
-  return values.map(csvCell).join(",");
+function num(value: string | null) {
+  const n = value ? Number(value) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+function buildFilter(url: URL) {
+  const status = url.searchParams.get("status") ?? "all";
+  const filter: Record<string, unknown> = {
+    direction: "CREDIT",
+    status: status === "all" ? { $nin: ["DUPLICATE", "DELETED"] } : status,
+  };
+  const bankId = clean(url.searchParams.get("bankId"));
+  const currency = clean(url.searchParams.get("currency"));
+  const donorLocale = clean(url.searchParams.get("donorLocale"));
+  const project = clean(url.searchParams.get("project"));
+  const q = clean(url.searchParams.get("q"));
+  const dateFrom = clean(url.searchParams.get("dateFrom"));
+  const dateTo = clean(url.searchParams.get("dateTo"));
+  const amountMin = num(url.searchParams.get("amountMin"));
+  const amountMax = num(url.searchParams.get("amountMax"));
+  if (bankId) filter.bankId = bankId;
+  if (currency) filter.currency = currency;
+  if (donorLocale) filter.donorLocale = donorLocale;
+  if (project) filter.finalProject = { $regex: project, $options: "i" };
+  if (dateFrom || dateTo) {
+    const range: Record<string, string> = {};
+    if (dateFrom) range.$gte = dateFrom;
+    if (dateTo) range.$lte = dateTo;
+    filter.transactionDate = range;
+  }
+  if (amountMin !== null || amountMax !== null) {
+    const range: Record<string, number> = {};
+    if (amountMin !== null) range.$gte = amountMin;
+    if (amountMax !== null) range.$lte = amountMax;
+    filter.amount = range;
+  }
+  if (q) {
+    filter.$or = [
+      { donorName: { $regex: q, $options: "i" } },
+      { description: { $regex: q, $options: "i" } },
+      { finalProject: { $regex: q, $options: "i" } },
+      { suggestedProject: { $regex: q, $options: "i" } },
+      { reference: { $regex: q, $options: "i" } },
+      { bankId: { $regex: q, $options: "i" } },
+    ];
+  }
+  return filter;
 }
 
 export async function GET(request: NextRequest) {
@@ -45,68 +89,49 @@ export async function GET(request: NextRequest) {
 
     const url = new URL(request.url);
     const status = url.searchParams.get("status") ?? "all";
-    const bankId = url.searchParams.get("bankId");
-    const donorLocale = url.searchParams.get("donorLocale");
-
     if (!ALLOWED_STATUSES.has(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    const filter: Record<string, unknown> = {
-      direction: "CREDIT",
-      status: status === "all" ? { $nin: ["DUPLICATE", "DELETED"] } : status,
-    };
-    if (bankId) filter.bankId = bankId;
-    if (donorLocale) filter.donorLocale = donorLocale;
-
     const result = await prisma.$runCommandRaw({
       find: COLLECTION,
-      filter,
+      filter: buildFilter(url),
       sort: { transactionDate: -1, createdAt: -1 },
-      limit: 5000,
+      limit: 10000,
     });
 
     const rows = isRecord(result) && isRecord(result.cursor) && Array.isArray(result.cursor.firstBatch)
       ? result.cursor.firstBatch as Record<string, unknown>[]
       : [];
 
-    const header = [
-      "transactionDate",
-      "donorName",
-      "amount",
-      "currency",
-      "donorLocale",
-      "bankId",
-      "bankIban",
-      "status",
-      "project",
-      "reference",
-      "description",
-      "createdAt",
+    const XLSX = await import("xlsx");
+    const sheetRows = rows.map((row) => ({
+      "تاريخ العملية": text(row.transactionDate),
+      "اسم المتبرع": text(row.donorName),
+      "القيمة": typeof row.amount === "number" ? row.amount : text(row.amount),
+      "العملة": text(row.currency),
+      "لغة المتبرع": text(row.donorLocale),
+      "البنك": text(row.bankId),
+      "IBAN": text(row.bankIban),
+      "الحالة": text(row.status),
+      "المشروع": text(row.finalProject ?? row.suggestedProject ?? "تبرع عام"),
+      "المرجع": text(row.reference),
+      "الوصف": text(row.description),
+      "تاريخ الإدخال": mongoDate(row.createdAt),
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(sheetRows);
+    worksheet["!cols"] = [
+      { wch: 14 }, { wch: 24 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 24 },
+      { wch: 28 }, { wch: 14 }, { wch: 22 }, { wch: 20 }, { wch: 55 }, { wch: 22 },
     ];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Bank Transfers");
+    const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }) as Buffer;
 
-    const csv = [
-      "\uFEFF" + csvRow(header),
-      ...rows.map((row) => csvRow([
-        text(row.transactionDate),
-        text(row.donorName),
-        text(row.amount),
-        text(row.currency),
-        text(row.donorLocale),
-        text(row.bankId),
-        text(row.bankIban),
-        text(row.status),
-        text(row.finalProject ?? row.suggestedProject ?? "تبرع عام"),
-        text(row.reference),
-        text(row.description),
-        mongoDate(row.createdAt),
-      ])),
-    ].join("\n");
-
-    const fileName = `bank-transfers-${status}-${new Date().toISOString().slice(0, 10)}.csv`;
-    return new NextResponse(csv, {
+    const fileName = `bank-transfers-${status}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    return new NextResponse(buffer, {
       headers: {
-        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": `attachment; filename="${fileName}"`,
         "Cache-Control": "no-store",
       },
