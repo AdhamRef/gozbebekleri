@@ -26,6 +26,7 @@ import TrackingPixels from "@/components/TrackingPixels";
 import { AttributionCapture } from "@/components/AttributionCapture";
 import { TrackingPixelBootstrap } from "@/components/TrackingPixelBootstrap";
 import { RoutePageViewTracker } from "@/components/RoutePageViewTracker";
+import { DirectTrackingScripts } from "@/components/DirectTrackingScripts";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 import { Analytics } from "@vercel/analytics/react"
 import { SpeedInsights } from "@vercel/speed-insights/next"
@@ -76,12 +77,6 @@ export default async function Rootlayout({
   children: React.ReactNode;
   params: Promise<{ locale: string }>;
 }) {
-  // NOTE: We deliberately do NOT call getServerSession() here. Calling it reads cookies,
-  // which opts the entire route (and every nested page) out of static rendering — that
-  // means PSI / Lighthouse re-runs full SSR on every audit, blowing TTFB. Instead we
-  // pass session={null} and let the client-side useSession() in Navbar fetch
-  // /api/auth/session asynchronously after first paint. This keeps the layout
-  // ISR-cacheable so PSI gets sub-100 ms TTFB from CDN.
   const { locale: rawLocale } = await params;
   const locale = VALID_LOCALES.includes(rawLocale as (typeof VALID_LOCALES)[number])
     ? rawLocale
@@ -93,6 +88,7 @@ export default async function Rootlayout({
     <IntlProviderClient locale={locale || "ar"} messages={messages}>
       <SyncHtmlDir locale={locale} />
       <TrackingPixels>
+        <DirectTrackingScripts />
         <TrackingPixelBootstrap />
         <RoutePageViewTracker />
         <AttributionCapture />
