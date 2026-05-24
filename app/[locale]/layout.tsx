@@ -24,6 +24,8 @@ import PreferredLangSync from "@/components/PreferredLangSync";
 import SyncHtmlDir from "@/components/SyncHtmlDir";
 import TrackingPixels from "@/components/TrackingPixels";
 import { AttributionCapture } from "@/components/AttributionCapture";
+import { TrackingPixelBootstrap } from "@/components/TrackingPixelBootstrap";
+import { RoutePageViewTracker } from "@/components/RoutePageViewTracker";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 import { Analytics } from "@vercel/analytics/react"
 import { SpeedInsights } from "@vercel/speed-insights/next"
@@ -91,6 +93,8 @@ export default async function Rootlayout({
     <IntlProviderClient locale={locale || "ar"} messages={messages}>
       <SyncHtmlDir locale={locale} />
       <TrackingPixels>
+        <TrackingPixelBootstrap />
+        <RoutePageViewTracker />
         <AttributionCapture />
         <ReferralTracker />
         <div dir={dir} lang={locale === "ar" ? "ar" : locale === "fr" ? "fr" : locale === "tr" ? "tr" : locale === "id" ? "id" : locale === "pt" ? "pt" : locale === "es" ? "es" : locale === "de" ? "de" : "en"}>
