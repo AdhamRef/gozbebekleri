@@ -40,10 +40,7 @@ export function BankTransfersExportPanel() {
   const active = pathname === "/dashboard/bank-transfers" || pathname.startsWith("/dashboard/bank-transfers/");
 
   useEffect(() => {
-    if (!active) {
-      setNode(null);
-      return;
-    }
+    if (!active) { setNode(null); return; }
     const refresh = () => setNode(ensureNode());
     refresh();
     const timer = window.setInterval(refresh, 700);
@@ -57,15 +54,15 @@ export function BankTransfersExportPanel() {
       {createPortal(
         <Card className="mb-4">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">تصدير التحويلات البنكية</CardTitle>
-            <CardDescription>تنزيل ملف CSV حسب الحالة والفلاتر الحالية قدر الإمكان.</CardDescription>
+            <CardTitle className="text-base">تصدير التحويلات البنكية Excel</CardTitle>
+            <CardDescription>تنزيل ملف Excel طبيعي بصيغة XLSX حسب الحالة والفلاتر الحالية.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              <Button asChild size="sm"><a href={exportLink("all", queryString)}>تصدير النتائج الحالية</a></Button>
-              <Button asChild size="sm" variant="outline"><a href={exportLink("APPROVED", queryString)}>المعتمد</a></Button>
-              <Button asChild size="sm" variant="outline"><a href={exportLink("PENDING_REVIEW", queryString)}>قيد المراجعة</a></Button>
-              <Button asChild size="sm" variant="outline"><a href={exportLink("IGNORED", queryString)}>المستبعد</a></Button>
+              <Button asChild size="sm"><a href={exportLink("all", queryString)}>تصدير Excel للنتائج الحالية</a></Button>
+              <Button asChild size="sm" variant="outline"><a href={exportLink("APPROVED", queryString)}>Excel المعتمد</a></Button>
+              <Button asChild size="sm" variant="outline"><a href={exportLink("PENDING_REVIEW", queryString)}>Excel قيد المراجعة</a></Button>
+              <Button asChild size="sm" variant="outline"><a href={exportLink("IGNORED", queryString)}>Excel المستبعد</a></Button>
             </div>
           </CardContent>
         </Card>,
