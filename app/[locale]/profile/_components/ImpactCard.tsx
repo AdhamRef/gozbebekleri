@@ -97,17 +97,17 @@ export default function ImpactCard(props: ImpactCardProps) {
       value: String(props.supportedCampaignsCount ?? 0),
       hint: t("distinctCampaigns"),
     },
-    {
-      Icon: Flame,
-      accent: "text-amber-600",
-      bg: "from-amber-50 to-white border-amber-200",
-      label: t("streak"),
-      value:
-        (props.streakMonths ?? 0) > 0
-          ? t("monthsStreak", { count: props.streakMonths ?? 0 })
-          : t("noStreak"),
-      hint: lastDonationLabel !== "—" ? `${t("lastDonation")}: ${lastDonationLabel}` : undefined,
-    },
+    // {
+    //   Icon: Flame,
+    //   accent: "text-amber-600",
+    //   bg: "from-amber-50 to-white border-amber-200",
+    //   label: t("streak"),
+    //   value:
+    //     (props.streakMonths ?? 0) > 0
+    //       ? t("monthsStreak", { count: props.streakMonths ?? 0 })
+    //       : t("noStreak"),
+    //   hint: lastDonationLabel !== "—" ? `${t("lastDonation")}: ${lastDonationLabel}` : undefined,
+    // },
   ];
 
   // Optional bottom row: badges
