@@ -27,6 +27,7 @@ import { AttributionCapture } from "@/components/AttributionCapture";
 import { TrackingPixelBootstrap } from "@/components/TrackingPixelBootstrap";
 import { RoutePageViewTracker } from "@/components/RoutePageViewTracker";
 import { DirectTrackingScripts } from "@/components/DirectTrackingScripts";
+import { SuccessFinalConversionTracker } from "@/components/SuccessFinalConversionTracker";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 import { Analytics } from "@vercel/analytics/react"
 import { SpeedInsights } from "@vercel/speed-insights/next"
@@ -91,6 +92,7 @@ export default async function Rootlayout({
         <DirectTrackingScripts />
         <TrackingPixelBootstrap />
         <RoutePageViewTracker />
+        <SuccessFinalConversionTracker />
         <AttributionCapture />
         <ReferralTracker />
         <div dir={dir} lang={locale === "ar" ? "ar" : locale === "fr" ? "fr" : locale === "tr" ? "tr" : locale === "id" ? "id" : locale === "pt" ? "pt" : locale === "es" ? "es" : locale === "de" ? "de" : "en"}>
