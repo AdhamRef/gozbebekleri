@@ -122,6 +122,7 @@ export function userCanExportReports(user: UserLike | undefined): boolean {
 
 /** Longer prefixes first — first match wins */
 const PATH_RULES: { prefix: string; key: DashboardPermissionKey }[] = [
+  { prefix: "/dashboard/marketing-intelligence", key: "ads" },
   { prefix: "/dashboard/monthly", key: "monthly" },
   { prefix: "/dashboard/link-generator", key: "referrals" },
   { prefix: "/dashboard/referrals", key: "referrals" },
@@ -179,21 +180,5 @@ export function sessionHasDashboardPermission(
 
 export function sanitizeDashboardPermissions(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
-  const out = new Set<string>();
-  for (const x of raw) {
-    if (typeof x === "string" && isDashboardPermissionKey(x)) out.add(x);
-  }
-  return [...out];
-}
-
-export function getFirstAllowedDashboardHref(
-  user: UserLike | undefined,
-  orderedHrefs: string[],
-  hrefToKey: (href: string) => DashboardPermissionKey | null
-): string | null {
-  for (const href of orderedHrefs) {
-    const key = hrefToKey(href);
-    if (key && userHasDashboardPermission(user, key)) return href;
-  }
-  return null;
+  return raw.filter((x): x is string => typeof x === "string" && isDashboardPermissionKey(x));
 }
