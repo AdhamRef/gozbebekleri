@@ -89,6 +89,11 @@ model User {
   /// Editable by admins only; never exposed to the donor themselves.
   clarityId    String?
 
+  /// Donor-controlled notification preferences. Defaults to email-on, SMS-off
+  /// (we keep transactional receipts opt-out only — these gate marketing/updates).
+  emailNotifications Boolean @default(true)
+  smsNotifications   Boolean @default(false)
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

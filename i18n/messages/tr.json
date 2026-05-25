@@ -586,7 +586,8 @@
       "receipts": "Makbuzlar",
       "support": "Destek",
       "supportDesc": "Yardım ve destek alın",
-      "logout": "Çıkış Yap"
+      "logout": "Çıkış Yap",
+      "settingsDesc": "Security, password and notification preferences"
     },
     "toast": {
       "accountDeleted": "Hesap silindi",
@@ -600,7 +601,8 @@
       "receiptDownloadFailed": "Makbuz indirilemedi",
       "allReceiptsDownloadSuccess": "Tüm makbuzlar başarıyla indirildi",
       "allReceiptsDownloadFailed": "Bazı makbuzlar indirilemedi",
-      "subscriptionCancelled": "Abonelik iptal edildi"
+      "subscriptionCancelled": "Abonelik iptal edildi",
+      "notificationsUpdated": "Notification preferences saved"
     },
     "account": {
       "name": "Ad",
@@ -616,7 +618,9 @@
       "verified": "Doğrulanmış",
       "personalInfo": "Kişisel Bilgiler",
       "security": "Güvenlik ve Tercihler",
-      "gender": "Cinsiyet"
+      "gender": "Cinsiyet",
+      "namePlaceholder": "Your name",
+      "addressTitle": "Address"
     },
     "editDialog": {
       "notSpecified": "Belirtilmemiş",
@@ -633,7 +637,8 @@
       "smsNotificationsDesc": "Güncellemeleri SMS ile alın",
       "deleteAccount": "Hesabı Sil",
       "deleteAccountWarning": "Hesabınızı silmek tüm verilerinizi kalıcı olarak kaldıracaktır. Bu işlem geri alınamaz.",
-      "deleteAccountButton": "Hesabı Sil"
+      "deleteAccountButton": "Hesabı Sil",
+      "securityTitle": "Security & password"
     },
     "deleteDialog": {
       "title": "Hesabınızı silmek istediğinizden emin misiniz?",
@@ -768,7 +773,28 @@
       "previousRequests": "Önceki Talepler",
       "requestLabel": "Talep #{id}",
       "closed": "Kapalı",
-      "requestDetailsPreview": "Talep detayları burada görünür..."
+      "requestDetailsPreview": "Talep detayları burada görünür...",
+      "newTitle": "Open a support request",
+      "newSubtitle": "Our team will get back to you by email.",
+      "subjectLabel": "Topic",
+      "bodyLabel": "Your message",
+      "bodyPlaceholder": "Tell us what's going on…",
+      "bodyHint": "{remaining} characters remaining",
+      "submit": "Send request",
+      "sent": "Your message was sent",
+      "failed": "Could not send your message",
+      "errorMin": "Message must be at least 3 characters",
+      "historyTitle": "Your previous requests",
+      "historySubtitle": "The last 50 messages you've sent through this form.",
+      "historyEmpty": "You haven't sent any support messages yet.",
+      "subjects": {
+        "COMPLAINT": "Complaint",
+        "DONATION_ISSUE": "Donation issue",
+        "CAMPAIGN_SUPPORT": "Project / campaign question",
+        "PARTNERSHIP": "Partnership",
+        "VOLUNTEERING": "Volunteering",
+        "GENERAL": "General"
+      }
     },
     "misc": {
       "comingSoon": "Yakında",
@@ -776,6 +802,57 @@
       "tryAgain": "Tekrar Dene",
       "openMenu": "Menüyü aç",
       "closeMenu": "Menüyü kapat"
+    },
+    "avatar": {
+      "change": "Change photo",
+      "remove": "Remove photo",
+      "updated": "Profile photo updated",
+      "removed": "Profile photo removed",
+      "failed": "Could not update your photo",
+      "notImage": "Please pick an image file",
+      "tooLarge": "Image must be smaller than 2 MB"
+    },
+    "countryPicker": {
+      "title": "Choose your country",
+      "search": "Search countries…",
+      "noResults": "No countries match your search",
+      "none": "Not specified"
+    },
+    "password": {
+      "label": "Password",
+      "descSet": "Your account is protected with a password. You can change it any time.",
+      "descUnset": "You signed in with a social provider. Set a password to also sign in with email.",
+      "change": "Change password",
+      "set": "Set a password",
+      "currentLabel": "Current password",
+      "newLabel": "New password",
+      "confirmLabel": "Confirm new password",
+      "hint": "At least 8 characters. Mix letters, numbers and a symbol for a strong password.",
+      "show": "Show password",
+      "hide": "Hide password",
+      "save": "Save password",
+      "cancel": "Cancel",
+      "success": "Password updated",
+      "failed": "Could not update your password",
+      "errorMinLength": "Password must be at least 8 characters",
+      "errorMismatch": "New passwords do not match",
+      "strengthWeak": "Weak",
+      "strengthOk": "OK",
+      "strengthStrong": "Strong"
+    },
+    "impact": {
+      "totalGiven": "Total given",
+      "monthlyMrr": "Monthly giving",
+      "supportedCampaigns": "Supported projects",
+      "streak": "Streak",
+      "acrossDonations": "across {count} donation(s)",
+      "acrossSubs": "across {count} subscription(s)",
+      "distinctCampaigns": "Distinct projects you've supported",
+      "monthsStreak": "{count} month(s) in a row",
+      "noStreak": "Start a streak",
+      "lastDonation": "Last donation",
+      "badgesEarned": "{count} badge(s) earned",
+      "badgesHint": "View your badges on the homepage donor board"
     }
   },
   "MessageSubjects": {

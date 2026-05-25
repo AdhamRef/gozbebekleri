@@ -375,10 +375,15 @@ export async function PUT(
       for (const [catId, order] of Object.entries(currentPriorities)) {
         if (nextCategoryIds.includes(catId)) keptPriorities[catId] = order;
       }
+      // For a nullable Json field, pass `null` (plain literal) to clear.
+      // The Prisma sentinels `Prisma.JsonNull` / `Prisma.DbNull` are only valid
+      // when typed as `NullableJsonNullValueInput`; casting through
+      // `InputJsonValue` drops that union and the runtime engine rejects the
+      // sentinel object as "Expected Json or Null, provided Enum".
       updateData.categoryPriorities =
         Object.keys(keptPriorities).length > 0
           ? (keptPriorities as unknown as Prisma.InputJsonValue)
-          : (Prisma.JsonNull as unknown as Prisma.InputJsonValue);
+          : null;
     }
 
     if (body.goalType !== undefined) {

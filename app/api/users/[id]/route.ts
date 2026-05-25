@@ -95,10 +95,17 @@ export async function GET(
       ...monthlyDonations.map((d) => withType(d, 'MONTHLY')),
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    const [totalsRows, allBadges] = await Promise.all([
+    const [totalsRows, allBadges, activeSubs] = await Promise.all([
       prisma.donation.groupBy({
         by: ['donorId'],
-        where: { donorId: id, status: 'PAID' },
+        where: {
+          donorId: id,
+          status: 'PAID',
+          // Mongo+Prisma quirk: `paidAt: null` only matches literal-null. Use
+          // `not: null` to require an actual settled timestamp (skipping rows
+          // where the field is unset entirely).
+          paidAt: { not: null },
+        },
         _sum: { totalAmount: true, amountUSD: true },
         _max: { createdAt: true },
         _count: { id: true },
@@ -107,10 +114,53 @@ export async function GET(
         select: { id: true, criteria: true },
         orderBy: { order: 'asc' },
       }),
+      prisma.subscription.findMany({
+        where: { donorId: id, status: 'ACTIVE' },
+        select: { id: true, amountUSD: true, amount: true, currency: true },
+      }),
     ]);
     const t = totalsRows[0];
     const badgeIdsByUser =
       allBadges.length > 0 ? await getBadgeIdsByUser([id], allBadges) : new Map<string, string[]>();
+
+    // Currently-active monthly recurring revenue from this donor (USD).
+    // Falls back to local-currency amount only when amountUSD wasn't captured
+    // at subscription create time.
+    const currentMonthlyMrrUSD = activeSubs.reduce(
+      (sum, s) => sum + (s.amountUSD ?? s.amount ?? 0),
+      0
+    );
+
+    // Distinct supported campaigns (only counting actually-paid donations).
+    const supportedCampaignIds = new Set<string>();
+    for (const donation of user.donations) {
+      if (donation.status !== 'PAID' || donation.paidAt == null) continue;
+      for (const item of donation.items) supportedCampaignIds.add(item.campaignId);
+    }
+
+    // Consecutive-month streak: count back from the current month, breaking
+    // as soon as we hit a month with no paid donation. Caps at 24 so a very
+    // long-tail donor doesn't blow up the loop.
+    const paidMonthKeys = new Set(
+      user.donations
+        .filter((d) => d.status === 'PAID' && d.paidAt != null)
+        .map((d) => {
+          const dt = d.paidAt ?? d.createdAt;
+          return `${dt.getUTCFullYear()}-${dt.getUTCMonth()}`;
+        })
+    );
+    let streakMonths = 0;
+    const cursor = new Date();
+    cursor.setUTCDate(1);
+    for (let i = 0; i < 24; i++) {
+      const key = `${cursor.getUTCFullYear()}-${cursor.getUTCMonth()}`;
+      if (paidMonthKeys.has(key)) {
+        streakMonths += 1;
+        cursor.setUTCMonth(cursor.getUTCMonth() - 1);
+      } else {
+        break;
+      }
+    }
 
     const profileCard = {
       totalDonationsCount: t?._count.id ?? 0,
@@ -118,10 +168,25 @@ export async function GET(
       totalDonatedAmountUSD: t?._sum.amountUSD ?? 0,
       lastDonationAt: t?._max.createdAt ?? null,
       badgeIds: badgeIdsByUser.get(id) ?? [],
+      currentMonthlyMrrUSD,
+      activeSubscriptionsCount: activeSubs.length,
+      supportedCampaignsCount: supportedCampaignIds.size,
+      streakMonths,
+    };
+
+    // Don't leak the password hash to the client. The profile UI only needs
+    // a boolean to know whether to show the "current password" field.
+    const { password: _omitPwd, ...userWithoutPwd } = user;
+    void _omitPwd;
+    const safeUser = {
+      ...userWithoutPwd,
+      hasPassword: Boolean(user.password),
+      donations: donationsForUser,
+      ...profileCard,
     };
 
     return NextResponse.json({
-      user: { ...user, donations: donationsForUser, ...profileCard },
+      user: safeUser,
       oneTimeDonations: oneTimeDonations.map((d) => withType(d, 'ONE_TIME')),
       monthlyDonations: monthlyDonations.map((d) => withType(d, 'MONTHLY')),
     });
@@ -161,6 +226,9 @@ export async function PUT(
       phone,
       birthdate,
       gender,
+      image,
+      emailNotifications,
+      smsNotifications,
       profileCompletionSeen,
       role,
       preferredLang,
@@ -320,6 +388,13 @@ export async function PUT(
         ...(phone !== undefined && { phone }),
         ...(birthdate !== undefined && { birthdate }),
         ...(gender !== undefined && { gender: gender === "" ? null : gender }),
+        ...(image !== undefined && { image: image === "" ? null : image }),
+        ...(emailNotifications !== undefined && {
+          emailNotifications: Boolean(emailNotifications),
+        }),
+        ...(smsNotifications !== undefined && {
+          smsNotifications: Boolean(smsNotifications),
+        }),
         ...(profileCompletionSeen !== undefined && { profileCompletionSeen }),
         ...(role !== undefined && { role }),
         ...(preferredLang !== undefined && {

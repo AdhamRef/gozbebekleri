@@ -95,16 +95,21 @@ export async function POST(
         const map = parseCategoryPriorities(c.categoryPriorities);
         if (!Object.prototype.hasOwnProperty.call(map, id)) return null;
         delete map[id];
-        // Prisma's JSON null sentinel — clears the field when no other category
-        // ranks remain. Cast through `any` because the conditional union of
-        // InputJsonValue + JsonNull confuses TS's overload resolution here.
-        const next: Prisma.InputJsonValue =
+        // For a nullable Json field, pass `null` (plain literal) to clear.
+        // The Prisma sentinels `Prisma.JsonNull` / `Prisma.DbNull` are only
+        // valid when typed as `NullableJsonNullValueInput`; casting through
+        // `InputJsonValue` drops that union and the runtime engine rejects
+        // the sentinel object as "Expected Json or Null, provided Enum".
+        const next: Prisma.InputJsonValue | null =
           Object.keys(map).length > 0
             ? (map as unknown as Prisma.InputJsonValue)
-            : (Prisma.JsonNull as unknown as Prisma.InputJsonValue);
+            : null;
         return prisma.campaign.update({
           where: { id: c.id },
-          data: { categoryPriorities: next },
+          // Cast through `any` because the `data` field's strict union doesn't
+          // accept a plain `null` for `Json?` even though the engine does.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          data: { categoryPriorities: next } as any,
         });
       })
       .filter((x): x is ReturnType<typeof prisma.campaign.update> => x !== null);
