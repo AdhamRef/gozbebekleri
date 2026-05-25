@@ -574,7 +574,7 @@ const ProfilePage = () => {
                   <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
                 )}
                 <Switch
-                  checked={u.smsNotifications ?? false}
+                  checked={u.smsNotifications ?? true}
                   onCheckedChange={(value) => handleNotificationToggle("sms", value)}
                   disabled={savingNotifications === "sms"}
                 />
@@ -1220,7 +1220,7 @@ const ProfilePage = () => {
     <>
       <Toaster position="top-center" />
       <div className="min-h-screen bg-gray-50">
-        {/* Mobile tabs */}
+        {/* Mobile tabs — label-first; icon only shows alongside on sm+ where there's room. */}
         <div className="lg:hidden sticky top-0 z-50 bg-gray-50 pt-4 pb-4 px-4 sm:px-6 shadow-sm">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="w-full grid grid-cols-4 h-12 p-1 bg-[#025EB8]/10 rounded-xl">
@@ -1230,10 +1230,10 @@ const ProfilePage = () => {
                   <TabsTrigger
                     key={item.id}
                     value={item.id}
-                    className="gap-1.5 text-xs data-[state=active]:bg-[#025EB8] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-lg"
+                    className="gap-1.5 text-xs sm:text-sm font-medium px-1 sm:px-3 data-[state=active]:bg-[#025EB8] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-lg"
                   >
-                    <Icon className="w-4 h-4 shrink-0" />
-                    <span className="truncate hidden sm:inline">{item.label}</span>
+                    <Icon className="w-4 h-4 shrink-0 hidden sm:inline-block" />
+                    <span className="truncate">{item.label}</span>
                   </TabsTrigger>
                 );
               })}
