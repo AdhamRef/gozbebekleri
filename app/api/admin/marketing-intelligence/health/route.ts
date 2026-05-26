@@ -28,20 +28,19 @@ async function getTrackingSettings() {
   return (batch[0] as Record<string, unknown> | undefined) ?? null;
 }
 
-async function countConversionEvents(filter: Record<string, unknown>) {
-  const result = await prisma.$runCommandRaw({ count: "ConversionEvent", query: filter });
-  return isRecord(result) && typeof result.n === "number" ? result.n : 0;
-}
-
 async function recentConversionEvents() {
   const result = await prisma.$runCommandRaw({
     find: "ConversionEvent",
-    sort: { createdAt: -1 },
-    limit: 12,
+    sort: { updatedAt: -1, createdAt: -1 },
+    limit: 50,
     projection: { request: 0, response: 0 },
   });
   const batch = isRecord(result) && isRecord(result.cursor) && Array.isArray(result.cursor.firstBatch) ? result.cursor.firstBatch : [];
-  return batch;
+  return batch as Record<string, unknown>[];
+}
+
+function eventStatus(event: Record<string, unknown>) {
+  return typeof event.status === "string" ? event.status : "UNKNOWN";
 }
 
 export async function GET() {
@@ -59,16 +58,28 @@ export async function GET() {
     platform("X", "X Pixel / Conversions", ["xPixelId", "xAccessToken"], settings),
   ];
 
-  const [paidLast7d, checkoutRowsLast7d, failedLast7d, missingServerConversions, sent, failed, skipped, recent] = await Promise.all([
+  const [paidLast7d, checkoutRowsLast7d, failedLast7d, recent] = await Promise.all([
     prisma.donation.count({ where: { status: "PAID", paidAt: { not: null, gte: since } } }),
     prisma.donation.count({ where: { createdAt: { gte: since } } }),
     prisma.donation.count({ where: { status: "FAILED", createdAt: { gte: since } } }),
-    prisma.donation.count({ where: { status: "PAID", paidAt: { not: null, gte: since }, conversionEventsSentAt: null } }),
-    countConversionEvents({ createdAt: { $gte: since }, status: "SENT" }),
-    countConversionEvents({ createdAt: { $gte: since }, status: "FAILED" }),
-    countConversionEvents({ createdAt: { $gte: since }, status: "SKIPPED" }),
     recentConversionEvents(),
   ]);
+
+  const sent = recent.filter((event) => eventStatus(event) === "SENT").length;
+  const failed = recent.filter((event) => eventStatus(event) === "FAILED").length;
+  const skipped = recent.filter((event) => eventStatus(event) === "SKIPPED").length;
+  const metaServerDonationIds = new Set(
+    recent
+      .filter((event) => event.platform === "META" && event.channel === "server" && typeof event.donationId === "string")
+      .map((event) => String(event.donationId))
+  );
+
+  const recentPaidRows = await prisma.donation.findMany({
+    where: { status: "PAID", paidAt: { not: null, gte: since } },
+    select: { id: true },
+    take: 500,
+  });
+  const missingServerConversions = recentPaidRows.filter((row) => !metaServerDonationIds.has(row.id)).length;
 
   const readiness = Math.round((platforms.filter((p) => p.ready).length / platforms.length) * 100);
   const delivery = paidLast7d === 0 ? 100 : Math.max(0, Math.round(((paidLast7d - missingServerConversions) / paidLast7d) * 100));
@@ -79,7 +90,7 @@ export async function GET() {
     scores: { readiness, delivery, overall: Math.round((readiness + delivery) / 2) },
     platforms,
     donations: { checkoutRowsLast7d, paidLast7d, failedLast7d, missingServerConversions },
-    conversionEvents: { sentLast7d: sent, failedLast7d: failed, skippedLast7d: skipped, recent },
+    conversionEvents: { sentLast7d: sent, failedLast7d: failed, skippedLast7d: skipped, recent: recent.slice(0, 12) },
     links: {
       campaignBuilder: "/dashboard/link-generator",
       ads: "/dashboard/ads",
