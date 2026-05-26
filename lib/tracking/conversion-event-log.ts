@@ -20,35 +20,40 @@ export interface RecordConversionEventInput {
   sentAt?: Date | null;
 }
 
-function oid(id: string | null | undefined) {
-  return id && /^[a-f0-9]{24}$/i.test(id) ? { $oid: id } : undefined;
+function addDefined(target: Record<string, unknown>, key: string, value: unknown) {
+  if (value === undefined || value === null) return;
+  if (typeof value === "string" && value.trim() === "") return;
+  target[key] = value;
 }
 
 export async function recordConversionEvent(input: RecordConversionEventInput): Promise<void> {
   try {
     const now = new Date();
     const sentAt = input.status === "SENT" ? input.sentAt ?? now : input.sentAt ?? null;
+    const setDoc: Record<string, unknown> = {
+      eventId: input.eventId,
+      eventName: input.eventName,
+      platform: input.platform,
+      channel: input.channel,
+      status: input.status,
+      dedupKey: input.dedupKey ?? input.eventId,
+      updatedAt: now,
+    };
+
+    addDefined(setDoc, "donationId", input.donationId ?? undefined);
+    if (typeof input.value === "number" && Number.isFinite(input.value)) setDoc.value = input.value;
+    addDefined(setDoc, "currency", input.currency ?? undefined);
+    addDefined(setDoc, "error", input.error ? String(input.error).slice(0, 800) : undefined);
+    addDefined(setDoc, "request", input.request);
+    addDefined(setDoc, "response", input.response);
+    addDefined(setDoc, "sentAt", sentAt ?? undefined);
+
     await prisma.$runCommandRaw({
       update: "ConversionEvent",
       updates: [{
         q: { platform: input.platform, eventId: input.eventId, channel: input.channel },
         u: {
-          $set: {
-            donationId: oid(input.donationId),
-            eventId: input.eventId,
-            eventName: input.eventName,
-            platform: input.platform,
-            channel: input.channel,
-            status: input.status,
-            dedupKey: input.dedupKey ?? input.eventId,
-            value: typeof input.value === "number" ? input.value : undefined,
-            currency: input.currency ?? undefined,
-            error: input.error ? String(input.error).slice(0, 800) : undefined,
-            request: input.request ?? undefined,
-            response: input.response ?? undefined,
-            sentAt: sentAt ?? undefined,
-            updatedAt: now,
-          },
+          $set: setDoc,
           $setOnInsert: { createdAt: now, attempts: 0 },
           $inc: { attempts: 1 },
         },
