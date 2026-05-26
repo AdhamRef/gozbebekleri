@@ -5,28 +5,12 @@
  *   1. Hash PII (SHA-256, lowercased+trimmed) per Meta's Advanced Matching spec.
  *   2. Build user_data + custom_data payloads.
  *   3. POST to the Graph events endpoint with strict pre-send validation.
- *
- * Used by:
- *   - /api/track       -> mirrors browser-side canonical funnel events (PageView,
- *                        ViewContent, AddToCart, InitiateCheckout, AddPaymentInfo, ...).
- *                        donation_complete / payment_failed are REFUSED here -
- *                        the dedicated paths below own those server legs.
- *   - /api/donations/:id/track-conversion -> fires Donate from the /success
- *                        page request. Browser fbq fires the same event_id; Meta
- *                        dedups the pair.
- *   - donation-conversion-server.ts -> fires Donate / DonateFailed from admin
- *                        retries and payment-provider callbacks.
  */
 
 import crypto from "crypto";
-import { prisma } from "@/lib/prisma";
+import { getMetaCapiCredentialsFromSettings, type MetaCapiCredentials } from "@/lib/tracking/tracking-settings";
 
 const FB_API_VERSION = "v21.0";
-
-/**
- * Meta rejects events older than 7 days from the Graph endpoint. We refuse
- * them client-side so a stale webhook retry can't quietly fail at Meta.
- */
 const MAX_EVENT_AGE_SECONDS = 7 * 24 * 60 * 60;
 
 export interface MetaUserData {
@@ -163,48 +147,9 @@ export function buildMetaUserData(u: MetaUserData): Record<string, unknown> {
   return out;
 }
 
-interface MetaCapiCredentials {
-  pixelId: string;
-  accessToken: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function getStr(row: Record<string, unknown> | null, key: string): string | null {
-  const value = row?.[key];
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-async function getRawTrackingSettings(): Promise<Record<string, unknown> | null> {
-  try {
-    const result = await prisma.$runCommandRaw({ find: "TrackingSettings", limit: 1, sort: { createdAt: 1 } });
-    const batch = isRecord(result) && isRecord(result.cursor) && Array.isArray(result.cursor.firstBatch)
-      ? result.cursor.firstBatch
-      : [];
-    return (batch[0] as Record<string, unknown> | undefined) ?? null;
-  } catch (error) {
-    console.error("[Meta CAPI] failed to read raw TrackingSettings", error);
-    return null;
-  }
-}
-
 /** Read Meta CAPI credentials from the same raw TrackingSettings document used by /dashboard/pixels. */
 export async function getMetaCapiCredentials(): Promise<MetaCapiCredentials | null> {
-  const raw = await getRawTrackingSettings();
-  const pixelId =
-    getStr(raw, "facebookPixelId") ||
-    getStr(raw, "metaPixelId") ||
-    process.env.META_PIXEL_ID ||
-    null;
-  const accessToken =
-    getStr(raw, "facebookAccessToken") ||
-    getStr(raw, "metaAccessToken") ||
-    process.env.META_ACCESS_TOKEN ||
-    null;
-  if (!pixelId || !accessToken) return null;
-  return { pixelId, accessToken };
+  return getMetaCapiCredentialsFromSettings();
 }
 
 function validateEvent(event: MetaCapiEvent): string | null {
