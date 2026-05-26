@@ -18,13 +18,11 @@ export type BrowserDonationPayload = {
   numItems?: number;
 };
 
-declare global {
-  interface Window {
-    gtag?: (...args: unknown[]) => void;
-    ttq?: { track?: (event: string, payload?: Record<string, unknown>) => void };
-    twq?: (action: string, ...args: unknown[]) => void;
-  }
-}
+type TrackingWindow = Window & {
+  gtag?: (...args: unknown[]) => void;
+  ttq?: { track?: (event: string, payload?: Record<string, unknown>) => void };
+  twq?: (action: string, ...args: unknown[]) => void;
+};
 
 async function logBrowser(donationId: string, body: Record<string, unknown>) {
   try {
@@ -38,8 +36,10 @@ async function logBrowser(donationId: string, body: Record<string, unknown>) {
 }
 
 export async function fireGoogleAdsDonationConversion(config: PublicTrackingConfig, payload: BrowserDonationPayload) {
-  if (!config.googleAdsConversionId || !config.googleAdsConversionLabel || typeof window === "undefined" || !window.gtag) return false;
-  window.gtag("event", "conversion", {
+  if (typeof window === "undefined") return false;
+  const w = window as TrackingWindow;
+  if (!config.googleAdsConversionId || !config.googleAdsConversionLabel || !w.gtag) return false;
+  w.gtag("event", "conversion", {
     send_to: `${config.googleAdsConversionId}/${config.googleAdsConversionLabel}`,
     value: payload.value,
     currency: payload.currency,
@@ -51,8 +51,10 @@ export async function fireGoogleAdsDonationConversion(config: PublicTrackingConf
 }
 
 export async function fireTikTokDonationConversion(config: PublicTrackingConfig, payload: BrowserDonationPayload) {
-  if (!config.tiktokPixelId || typeof window === "undefined" || !window.ttq?.track) return false;
-  window.ttq.track("CompletePayment", {
+  if (typeof window === "undefined") return false;
+  const w = window as TrackingWindow;
+  if (!config.tiktokPixelId || !w.ttq?.track) return false;
+  w.ttq.track("CompletePayment", {
     value: payload.value,
     currency: payload.currency,
     content_id: payload.contentIds?.[0] ?? "donation",
@@ -66,8 +68,10 @@ export async function fireTikTokDonationConversion(config: PublicTrackingConfig,
 }
 
 export async function fireXDonationConversion(config: PublicTrackingConfig, payload: BrowserDonationPayload) {
-  if (!config.xPixelId || typeof window === "undefined" || !window.twq) return false;
-  window.twq("event", config.xPixelId, {
+  if (typeof window === "undefined") return false;
+  const w = window as TrackingWindow;
+  if (!config.xPixelId || !w.twq) return false;
+  w.twq("event", config.xPixelId, {
     value: payload.value,
     currency: payload.currency,
     conversion_id: payload.eventId,
