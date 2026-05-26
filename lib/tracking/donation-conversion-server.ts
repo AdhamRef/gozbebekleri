@@ -8,18 +8,11 @@ import {
   type MetaCapiResult,
 } from "@/lib/tracking/meta-capi";
 import { metaDonationEventId } from "@/lib/tracking/canonical";
-import {
-  pickAttributionForAudit,
-  toTurkeyIso,
-  writeConversionAudit,
-} from "@/lib/tracking/conversion-audit";
+import { pickAttributionForAudit, toTurkeyIso, writeConversionAudit } from "@/lib/tracking/conversion-audit";
 import { recordConversionEvent, type ConversionEventStatus } from "@/lib/tracking/conversion-event-log";
+import { getGa4ServerCredentialsFromSettings } from "@/lib/tracking/tracking-settings";
 
 type Attribution = Record<string, string>;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function getStr(j: unknown, k: string): string | undefined {
   if (!j || typeof j !== "object") return undefined;
@@ -31,14 +24,6 @@ function normalizeCountryCode(value: string | null | undefined): string | null {
   const v = value?.trim();
   if (!v) return null;
   return v.length === 2 ? v.toUpperCase() : v;
-}
-
-async function getRawTrackingSettings(): Promise<Record<string, unknown> | null> {
-  const result = await prisma.$runCommandRaw({ find: "TrackingSettings", limit: 1, sort: { createdAt: 1 } });
-  const batch = isRecord(result) && isRecord(result.cursor) && Array.isArray(result.cursor.firstBatch)
-    ? result.cursor.firstBatch
-    : [];
-  return (batch[0] as Record<string, unknown> | undefined) ?? null;
 }
 
 async function loadDonationForConversion(donationId: string) {
@@ -95,13 +80,6 @@ function auditMetaPayload(row: LoadedDonation, eventId: string, customData: Meta
   return { event_name: "Donate", event_id: eventId, donation_id: row.id, amount: row.amount, amount_usd: row.amountUSD, total_amount: row.totalAmount, currency: row.currency, provider: row.provider, created_at_utc: row.createdAt.toISOString(), created_at_turkey: toTurkeyIso(row.createdAt), paid_at_utc: row.paidAt?.toISOString() ?? null, paid_at_turkey: toTurkeyIso(row.paidAt), reporting_timezone: "Europe/Istanbul", payment_provider_timezone: "America/Toronto", custom_data: customData, attribution: pickAttributionForAudit(row.attribution) };
 }
 
-async function getGa4Credentials() {
-  const settings = await getRawTrackingSettings();
-  const measurementId = getStr(settings, "gaMeasurementId") || process.env.GA4_MEASUREMENT_ID || null;
-  const apiSecret = getStr(settings, "gaApiSecret") || process.env.GA4_API_SECRET || null;
-  return { measurementId, apiSecret };
-}
-
 function metaStatus(result: MetaCapiResult): ConversionEventStatus {
   if (result.ok) return "SENT";
   if (result.skipped) return "SKIPPED";
@@ -119,8 +97,6 @@ export async function sendDonationServerConversions(donationId: string): Promise
     const amount = Number(row.amount ?? row.amountUSD ?? 0);
     if (!(amount > 0)) return { ok: false, skipped: true, reason: "amount <= 0" };
 
-    // We already verified the row state above. Keep the claim simple so admin retry
-    // can repair legacy rows whose Mongo null/undefined shape does not match strict filters.
     await prisma.donation.update({ where: { id: row.id }, data: { conversionEventsSentAt: new Date() } });
 
     const creds = await getMetaCapiCredentials();
@@ -131,16 +107,13 @@ export async function sendDonationServerConversions(donationId: string): Promise
     const contentName = primaryContentName(row);
     const { ids, contents } = buildContents(row);
     const eventId = metaDonationEventId(row.id, "success");
-
     const custom_data: MetaCustomData = { value: amount, currency, content_type: "donation", content_name: contentName, content_category: row.subscriptionId ? "monthly" : "donation", content_ids: ids, contents, num_items: contents.reduce((s, c) => s + (c.quantity ?? 1), 0), order_id: row.id, transaction_id: row.id, status: "paid", success: true, payment_info_available: 1, donation_type: row.subscriptionId ? "MONTHLY" : "ONE_TIME", recurring: !!row.subscriptionId, payment_method: (row.paymentMethod ?? "CARD").toLowerCase() };
 
     await writeConversionAudit({ donationId: row.id, eventId, stage: "meta_capi_attempt", message: "Meta CAPI Donate send attempted", metadata: auditMetaPayload(row, eventId, custom_data) });
-
     let metaResult: MetaCapiResult = { ok: false, skipped: true, reason: "no creds" };
     if (creds) metaResult = await sendMetaCapiEvent({ event_name: "Donate", event_id: eventId, event_time: eventTime, event_source_url: eventSourceUrl, action_source: "website", user_data: buildUserDataFromDonation(row), custom_data }, creds);
 
     await recordConversionEvent({ donationId: row.id, eventId, eventName: "Donate", platform: "META", channel: "server", status: metaStatus(metaResult), dedupKey: eventId, value: amount, currency, error: metaResult.error ?? metaResult.reason ?? null, request: auditMetaPayload(row, eventId, custom_data), response: metaResult, sentAt: metaResult.ok ? new Date(eventTime * 1000) : null });
-
     await writeConversionAudit({ donationId: row.id, eventId, stage: "meta_capi_result", message: metaResult.ok ? "Meta CAPI Donate send succeeded" : "Meta CAPI Donate send did not succeed", metadata: { ...auditMetaPayload(row, eventId, custom_data), meta_result: metaResult } });
     await sendGa4Purchase(row, amount, currency, contentName, eventTime, eventId);
 
@@ -198,7 +171,7 @@ export async function syncDonationConversion(donationId: string): Promise<MetaCa
 }
 
 async function sendGa4Purchase(row: LoadedDonation, amount: number, currency: string, contentName: string, eventTime: number, eventId: string): Promise<void> {
-  const { measurementId: gaMeasurementId, apiSecret: gaApiSecret } = await getGa4Credentials();
+  const { measurementId: gaMeasurementId, apiSecret: gaApiSecret } = await getGa4ServerCredentialsFromSettings();
   if (!gaMeasurementId || !gaApiSecret) {
     await recordConversionEvent({ donationId: row.id, eventId, eventName: "purchase", platform: "GA4", channel: "server", status: "SKIPPED", dedupKey: eventId, value: amount, currency, error: "missing GA4 measurement id or API secret" });
     return;
