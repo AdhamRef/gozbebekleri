@@ -7,7 +7,7 @@ import { syncDonationConversion } from "@/lib/tracking/donation-conversion-serve
 
 export const dynamic = "force-dynamic";
 
-function oid(id: string) {
+function legacyOid(id: string) {
   return /^[a-f0-9]{24}$/i.test(id) ? { $oid: id } : id;
 }
 
@@ -20,9 +20,13 @@ async function hasMetaServerLedger(donationId: string): Promise<boolean> {
     const result = await prisma.$runCommandRaw({
       count: "ConversionEvent",
       query: {
-        donationId: oid(donationId),
         platform: "META",
         channel: "server",
+        $or: [
+          { donationId },
+          { donationId: legacyOid(donationId) },
+          { eventId: `donate_${donationId}` },
+        ],
       },
     });
     return isRecord(result) && typeof result.n === "number" && result.n > 0;
@@ -38,7 +42,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}));
   const limit = Math.max(1, Math.min(Number(body?.limit ?? 25) || 25, 100));
-  const days = Math.max(1, Math.min(Number(body?.days ?? 7) || 7, 7));
+  const days = Math.max(1, Math.min(Number(body?.days ?? 7) || 7, 30));
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
   const recentPaid = await prisma.donation.findMany({
@@ -50,31 +54,18 @@ export async function POST(request: NextRequest) {
 
   const rows = [];
   for (const row of recentPaid) {
-    if (row.conversionEventsSentAt == null) {
-      rows.push(row);
-    } else if (!(await hasMetaServerLedger(row.id))) {
-      rows.push(row);
-    }
+    if (row.conversionEventsSentAt == null) rows.push(row);
+    else if (!(await hasMetaServerLedger(row.id))) rows.push(row);
     if (rows.length >= limit) break;
   }
 
   const results = [];
   for (const row of rows) {
     if (row.conversionEventsSentAt != null) {
-      await prisma.donation.update({
-        where: { id: row.id },
-        data: { conversionEventsSentAt: null },
-      });
+      await prisma.donation.update({ where: { id: row.id }, data: { conversionEventsSentAt: null } });
     }
     const result = await syncDonationConversion(row.id);
-    results.push({
-      donationId: row.id,
-      paidAt: row.paidAt?.toISOString() ?? null,
-      amount: row.amount,
-      currency: row.currency,
-      wasAlreadyMarkedSent: row.conversionEventsSentAt != null,
-      result,
-    });
+    results.push({ donationId: row.id, paidAt: row.paidAt?.toISOString() ?? null, amount: row.amount, currency: row.currency, wasAlreadyMarkedSent: row.conversionEventsSentAt != null, result });
   }
 
   return NextResponse.json({ ok: true, scanned: rows.length, considered: recentPaid.length, limit, days, results });
