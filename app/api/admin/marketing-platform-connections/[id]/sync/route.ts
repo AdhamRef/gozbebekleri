@@ -2,23 +2,28 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { auditActorFromDashboardSession } from "@/lib/audit-log";
 import { prisma } from "@/lib/prisma";
-import { auditActorFromDashboardSession, writeAuditLog } from "@/lib/audit-log";
-import {
-  evaluateReadiness,
-  isPlatformKey,
-  type PlatformKey,
-} from "@/lib/marketing/platform-connection-requirements";
-import { redactSecretsFromMetadata } from "@/lib/marketing/secrets";
+import { runSyncJob, type PlatformSelector } from "@/lib/marketing/sync";
 
-/**
- * Trigger a sync. This phase does NOT implement actual platform-API
- * fetching — see future Platform API Sync work. We:
- *   - validate config and return `missing_config` if incomplete
- *   - return `not_implemented` for everything else (no sync client built yet)
- *   - never crash
- *   - record the attempt via AuditLog so the operator can see they pressed it
- */
+const PLATFORM_TO_SELECTOR: Record<string, PlatformSelector> = {
+  META: "meta",
+  GOOGLE_ADS: "google_ads",
+  TIKTOK: "tiktok",
+  X: "x",
+  GA4: "ga4",
+  TWILIO: "twilio",
+};
+
+function defaultDateRange() {
+  const to = new Date();
+  to.setHours(23, 59, 59, 999);
+  const from = new Date(to);
+  from.setDate(from.getDate() - 7);
+  from.setHours(0, 0, 0, 0);
+  return { from, to };
+}
+
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -30,75 +35,40 @@ export async function POST(
   const { id } = await params;
   const row = await prisma.marketingPlatformConnection.findUnique({ where: { id } });
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!isPlatformKey(row.platform)) {
-    return NextResponse.json({ error: "Stored platform unknown" }, { status: 500 });
-  }
-  const platform = row.platform as PlatformKey;
-  const readiness = evaluateReadiness(platform, row as unknown as Record<string, unknown>, {
-    enabled: row.enabled,
-  });
 
-  const actor = auditActorFromDashboardSession(session!);
-
-  if (readiness.missingRequiredFields.length > 0) {
-    await writeAuditLog({
-      ...actor,
-      action: "MARKETING_PLATFORM_CONNECTION_SYNC_FAILED",
-      messageAr: `طلب مزامنة فشل قبل البدء — إعدادات ناقصة (${row.name})`,
-      entityType: "MarketingPlatformConnection",
-      entityId: row.id,
-      metadata: redactSecretsFromMetadata({
-        connectionId: row.id,
-        platform: row.platform,
-        category: row.category,
-        outcome: "missing_config",
-        missingRequiredFields: readiness.missingRequiredFields,
-        completionPercent: readiness.completionPercent,
-      }),
-      stream: "TEAM",
-    });
+  const selector = PLATFORM_TO_SELECTOR[row.platform];
+  if (!selector) {
     return NextResponse.json({
       ok: false,
-      status: "missing_config",
-      message: readiness.nextStepMessage,
-      missingRequiredFields: readiness.missingRequiredFields,
-      missingOptionalFields: readiness.missingOptionalFields,
-      completionPercent: readiness.completionPercent,
-      guidance: readiness.guidance,
+      status: "not_implemented",
+      message: `لا يوجد محرك مزامنة لمنصة ${row.platform} بعد.`,
+      results: [],
     });
   }
 
-  // Phase 1: no live sync client yet — record the attempt + report
-  // `not_implemented`. A future PlatformSyncRun table can persist the attempt.
-  await writeAuditLog({
-    ...actor,
-    action: "MARKETING_PLATFORM_CONNECTION_SYNC_REQUESTED",
-    messageAr: `طلب مزامنة منصة (placeholder): ${row.name} — لم يُفعّل العميل بعد`,
-    entityType: "MarketingPlatformConnection",
-    entityId: row.id,
-    metadata: redactSecretsFromMetadata({
-      connectionId: row.id,
-      platform: row.platform,
-      category: row.category,
-      outcome: "not_implemented",
-    }),
-    stream: "TEAM",
-  });
-
-  await prisma.marketingPlatformConnection.update({
-    where: { id },
-    data: {
-      lastSyncAt: new Date(),
-      // Don't overwrite status with NOT_IMPLEMENTED if it's currently ACTIVE
-      // — the connection itself is fine, only the sync client is pending.
-    },
+  const { from, to } = defaultDateRange();
+  const actor = auditActorFromDashboardSession(session!);
+  const outcome = await runSyncJob({
+    platform: selector,
+    connectionId: row.id,
+    dateFrom: from,
+    dateTo: to,
+    triggeredBy: actor.actorId,
   });
 
   return NextResponse.json({
-    ok: true,
-    status: "not_implemented",
-    message:
-      "تم استلام طلب المزامنة. تنفيذ المزامنة الفعلي مع المنصة سيُفعَّل في مرحلة لاحقة.",
-    completionPercent: readiness.completionPercent,
+    ok: outcome.ok,
+    status: outcome.status,
+    message: outcome.results[0]?.message ?? "تم تشغيل المزامنة.",
+    results: outcome.results.map((r) => ({
+      runId: r.runId,
+      connectionId: r.connectionId,
+      platform: r.platform,
+      status: r.status,
+      rowsFetched: r.rowsFetched,
+      missingRequiredFields: r.missingRequiredFields,
+      message: r.message,
+      error: r.error ?? null,
+    })),
   });
 }
