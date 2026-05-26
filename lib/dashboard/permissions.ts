@@ -57,8 +57,8 @@ function legacyUsersGrants(key: DashboardPermissionKey): boolean {
 
 export function isDashboardRoutePermissionKey(
   key: string
-): boolean {
-  return key !== "donationsEdit" && key !== "reportsExport";
+): key is DashboardPermissionKey {
+  return isDashboardPermissionKey(key) && key !== "donationsEdit" && key !== "reportsExport";
 }
 
 export function hasAnyDashboardRoutePermission(user: UserLike | undefined): boolean {
@@ -178,7 +178,7 @@ export function sessionHasDashboardPermission(
   return userHasDashboardPermission(session?.user, key);
 }
 
-export function sanitizeDashboardPermissions(raw: unknown): string[] {
+export function sanitizeDashboardPermissions(raw: unknown): DashboardPermissionKey[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter((x): x is string => typeof x === "string" && isDashboardPermissionKey(x));
+  return raw.filter((x): x is DashboardPermissionKey => typeof x === "string" && isDashboardPermissionKey(x));
 }
