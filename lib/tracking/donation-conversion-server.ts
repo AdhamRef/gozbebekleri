@@ -13,8 +13,13 @@ import {
   toTurkeyIso,
   writeConversionAudit,
 } from "@/lib/tracking/conversion-audit";
+import { recordConversionEvent, type ConversionEventStatus } from "@/lib/tracking/conversion-event-log";
 
 type Attribution = Record<string, string>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 function getStr(j: unknown, k: string): string | undefined {
   if (!j || typeof j !== "object") return undefined;
@@ -26,6 +31,14 @@ function normalizeCountryCode(value: string | null | undefined): string | null {
   const v = value?.trim();
   if (!v) return null;
   return v.length === 2 ? v.toUpperCase() : v;
+}
+
+async function getRawTrackingSettings(): Promise<Record<string, unknown> | null> {
+  const result = await prisma.$runCommandRaw({ find: "TrackingSettings", limit: 1, sort: { createdAt: 1 } });
+  const batch = isRecord(result) && isRecord(result.cursor) && Array.isArray(result.cursor.firstBatch)
+    ? result.cursor.firstBatch
+    : [];
+  return (batch[0] as Record<string, unknown> | undefined) ?? null;
 }
 
 async function loadDonationForConversion(donationId: string) {
@@ -127,13 +140,16 @@ function auditMetaPayload(row: LoadedDonation, eventId: string, customData: Meta
 }
 
 async function getGa4Credentials() {
-  const settings = await prisma.trackingSettings.findFirst({
-    select: { gaMeasurementId: true, gaApiSecret: true },
-  });
-  return {
-    measurementId: settings?.gaMeasurementId || process.env.GA4_MEASUREMENT_ID || null,
-    apiSecret: settings?.gaApiSecret || process.env.GA4_API_SECRET || null,
-  };
+  const settings = await getRawTrackingSettings();
+  const measurementId = getStr(settings, "gaMeasurementId") || process.env.GA4_MEASUREMENT_ID || null;
+  const apiSecret = getStr(settings, "gaApiSecret") || process.env.GA4_API_SECRET || null;
+  return { measurementId, apiSecret };
+}
+
+function metaStatus(result: MetaCapiResult): ConversionEventStatus {
+  if (result.ok) return "SENT";
+  if (result.skipped) return "SKIPPED";
+  return "FAILED";
 }
 
 export async function sendDonationServerConversions(donationId: string): Promise<MetaCapiResult> {
@@ -193,9 +209,25 @@ export async function sendDonationServerConversions(donationId: string): Promise
       metaResult = await sendMetaCapiEvent({ event_name: "Donate", event_id: eventId, event_time: eventTime, event_source_url: eventSourceUrl, action_source: "website", user_data: buildUserDataFromDonation(row), custom_data }, creds);
     }
 
+    await recordConversionEvent({
+      donationId: row.id,
+      eventId,
+      eventName: "Donate",
+      platform: "META",
+      channel: "server",
+      status: metaStatus(metaResult),
+      dedupKey: eventId,
+      value: amount,
+      currency,
+      error: metaResult.error ?? metaResult.reason ?? null,
+      request: auditMetaPayload(row, eventId, custom_data),
+      response: metaResult,
+      sentAt: metaResult.ok ? new Date(eventTime * 1000) : null,
+    });
+
     await writeConversionAudit({ donationId: row.id, eventId, stage: "meta_capi_result", message: metaResult.ok ? "Meta CAPI Donate send succeeded" : "Meta CAPI Donate send did not succeed", metadata: { ...auditMetaPayload(row, eventId, custom_data), meta_result: metaResult } });
 
-    await sendGa4Purchase(row, amount, currency, contentName, eventTime);
+    await sendGa4Purchase(row, amount, currency, contentName, eventTime, eventId);
 
     if (!metaResult.ok && !metaResult.skipped) console.error("[conversion] Donate send failed but claim retained:", row.id, metaResult.error, metaResult.fbtrace_id);
     return metaResult;
@@ -216,14 +248,18 @@ export async function sendDonationFailedConversions(donationId: string): Promise
     const claim = await prisma.donation.updateMany({ where: { id: row.id, status: "FAILED", paidAt: null, conversionFailedEventsSentAt: null }, data: { conversionFailedEventsSentAt: new Date() } });
     if (claim.count === 0) return { ok: false, skipped: true, reason: "lost idempotency claim" };
 
+    const amount = Number(row.amount ?? row.amountUSD ?? 0);
+    const currency = row.currency || "USD";
+    const failedEventId = metaDonationEventId(row.id, "failed");
     const creds = await getMetaCapiCredentials();
-    if (!creds) return { ok: false, skipped: true, reason: "no credentials" };
+    if (!creds) {
+      await recordConversionEvent({ donationId: row.id, eventId: failedEventId, eventName: "DonateFailed", platform: "META", channel: "server", status: "SKIPPED", dedupKey: failedEventId, value: amount, currency, error: "no credentials" });
+      return { ok: false, skipped: true, reason: "no credentials" };
+    }
 
     const attribution = (row.attribution ?? undefined) as Attribution | undefined;
     const eventSourceUrl = getStr(attribution, "landing_page");
     const eventTime = Math.floor(((row as { updatedAt?: Date }).updatedAt ?? row.createdAt ?? new Date()).getTime() / 1000);
-    const amount = Number(row.amount ?? row.amountUSD ?? 0);
-    const currency = row.currency || "USD";
     const contentName = primaryContentName(row);
     const { ids, contents } = buildContents(row);
 
@@ -245,7 +281,8 @@ export async function sendDonationFailedConversions(donationId: string): Promise
       provider: row.provider ?? undefined,
     };
 
-    const metaResult = await sendMetaCapiEvent({ event_name: "DonateFailed", event_id: metaDonationEventId(row.id, "failed"), event_time: eventTime, event_source_url: eventSourceUrl, user_data: buildUserDataFromDonation(row), custom_data }, creds);
+    const metaResult = await sendMetaCapiEvent({ event_name: "DonateFailed", event_id: failedEventId, event_time: eventTime, event_source_url: eventSourceUrl, user_data: buildUserDataFromDonation(row), custom_data }, creds);
+    await recordConversionEvent({ donationId: row.id, eventId: failedEventId, eventName: "DonateFailed", platform: "META", channel: "server", status: metaStatus(metaResult), dedupKey: failedEventId, value: amount, currency, error: metaResult.error ?? metaResult.reason ?? null, request: { event_name: "DonateFailed", event_id: failedEventId, custom_data }, response: metaResult, sentAt: metaResult.ok ? new Date(eventTime * 1000) : null });
     if (!metaResult.ok && !metaResult.skipped) console.error("[conversion] DonateFailed send failed but claim retained:", row.id, metaResult.error, metaResult.fbtrace_id);
     return metaResult;
   } catch (e) {
@@ -262,9 +299,12 @@ export async function syncDonationConversion(donationId: string): Promise<MetaCa
   return { ok: false, skipped: true, reason: `no terminal state (status=${row.status})` };
 }
 
-async function sendGa4Purchase(row: LoadedDonation, amount: number, currency: string, contentName: string, eventTime: number): Promise<void> {
+async function sendGa4Purchase(row: LoadedDonation, amount: number, currency: string, contentName: string, eventTime: number, eventId: string): Promise<void> {
   const { measurementId: gaMeasurementId, apiSecret: gaApiSecret } = await getGa4Credentials();
-  if (!gaMeasurementId || !gaApiSecret) return;
+  if (!gaMeasurementId || !gaApiSecret) {
+    await recordConversionEvent({ donationId: row.id, eventId, eventName: "purchase", platform: "GA4", channel: "server", status: "SKIPPED", dedupKey: eventId, value: amount, currency, error: "missing GA4 measurement id or API secret" });
+    return;
+  }
 
   const attribution = (row.attribution ?? undefined) as Attribution | undefined;
   const gaClientId = getStr(attribution, "ga_client_id") || `${Date.now()}.${Math.floor(Math.random() * 1e9)}`;
@@ -275,13 +315,17 @@ async function sendGa4Purchase(row: LoadedDonation, amount: number, currency: st
   for (const ci of row.categoryItems) items.push({ item_id: ci.categoryId, item_name: ci.category?.name ?? "Category", item_category: "donation", price: ci.amount, quantity: 1 });
   if (items.length === 0) items.push({ item_id: "donation", item_name: contentName, item_category: "donation", price: amount, quantity: 1 });
 
-  const gaPayload = { client_id: gaClientId, events: [{ name: "purchase", params: { transaction_id: row.id, value: amount, currency, engagement_time_msec: 100, affiliation: "Donation Website", event_time: eventTime, ...(sessionNum != null && !Number.isNaN(sessionNum) ? { session_id: sessionNum } : {}), items } }] };
+  const gaPayload = { client_id: gaClientId, events: [{ name: "purchase", params: { transaction_id: row.id, value: amount, currency, engagement_time_msec: 100, affiliation: "Donation Website", event_time: eventTime, event_id: eventId, ...(sessionNum != null && !Number.isNaN(sessionNum) ? { session_id: sessionNum } : {}), items } }] };
 
   try {
     const gaUrl = `https://www.google-analytics.com/mp/collect?measurement_id=${encodeURIComponent(gaMeasurementId)}&api_secret=${encodeURIComponent(gaApiSecret)}`;
     const res = await fetch(gaUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(gaPayload) });
-    if (!res.ok) console.error("[conversion] GA4 MP error", await res.text());
+    const errorText = res.ok ? "" : await res.text();
+    await recordConversionEvent({ donationId: row.id, eventId, eventName: "purchase", platform: "GA4", channel: "server", status: res.ok ? "SENT" : "FAILED", dedupKey: eventId, value: amount, currency, error: res.ok ? null : errorText, request: gaPayload, response: { status: res.status, ok: res.ok, body: errorText.slice(0, 500) }, sentAt: res.ok ? new Date(eventTime * 1000) : null });
+    if (!res.ok) console.error("[conversion] GA4 MP error", errorText);
   } catch (e) {
+    const message = e instanceof Error ? e.message : "unknown";
+    await recordConversionEvent({ donationId: row.id, eventId, eventName: "purchase", platform: "GA4", channel: "server", status: "FAILED", dedupKey: eventId, value: amount, currency, error: message, request: gaPayload });
     console.error("[conversion] GA4 MP fetch failed", e);
   }
 }
