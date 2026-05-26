@@ -7,6 +7,30 @@ import { syncDonationConversion } from "@/lib/tracking/donation-conversion-serve
 
 export const dynamic = "force-dynamic";
 
+function oid(id: string) {
+  return /^[a-f0-9]{24}$/i.test(id) ? { $oid: id } : id;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+async function hasMetaServerLedger(donationId: string): Promise<boolean> {
+  try {
+    const result = await prisma.$runCommandRaw({
+      count: "ConversionEvent",
+      query: {
+        donationId: oid(donationId),
+        platform: "META",
+        channel: "server",
+      },
+    });
+    return isRecord(result) && typeof result.n === "number" && result.n > 0;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
   const denied = requireAdminOrDashboardPermission(session, "ads");
@@ -17,24 +41,41 @@ export async function POST(request: NextRequest) {
   const days = Math.max(1, Math.min(Number(body?.days ?? 7) || 7, 7));
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-  const rows = await prisma.donation.findMany({
-    where: { status: "PAID", paidAt: { not: null, gte: since }, conversionEventsSentAt: null },
+  const recentPaid = await prisma.donation.findMany({
+    where: { status: "PAID", paidAt: { not: null, gte: since } },
     orderBy: { paidAt: "desc" },
-    take: limit,
-    select: { id: true, paidAt: true, amount: true, currency: true },
+    take: Math.max(limit * 3, limit),
+    select: { id: true, paidAt: true, amount: true, currency: true, conversionEventsSentAt: true },
   });
+
+  const rows = [];
+  for (const row of recentPaid) {
+    if (row.conversionEventsSentAt == null) {
+      rows.push(row);
+    } else if (!(await hasMetaServerLedger(row.id))) {
+      rows.push(row);
+    }
+    if (rows.length >= limit) break;
+  }
 
   const results = [];
   for (const row of rows) {
+    if (row.conversionEventsSentAt != null) {
+      await prisma.donation.update({
+        where: { id: row.id },
+        data: { conversionEventsSentAt: null },
+      });
+    }
     const result = await syncDonationConversion(row.id);
     results.push({
       donationId: row.id,
       paidAt: row.paidAt?.toISOString() ?? null,
       amount: row.amount,
       currency: row.currency,
+      wasAlreadyMarkedSent: row.conversionEventsSentAt != null,
       result,
     });
   }
 
-  return NextResponse.json({ ok: true, scanned: rows.length, limit, days, results });
+  return NextResponse.json({ ok: true, scanned: rows.length, considered: recentPaid.length, limit, days, results });
 }
