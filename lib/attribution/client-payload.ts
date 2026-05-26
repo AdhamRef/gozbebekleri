@@ -5,6 +5,7 @@ import { DONATION_ATTRIBUTION_KEYS, type DonationAttributionKey } from "./saniti
 const PREFIX = "ala_attr_";
 const MAX_AGE_DAYS = 30;
 const SESSION_KEY = "ala_tracking_session_id";
+const FBCLID_SESSION_KEY = "ala_fbclid";
 
 function setCookie(name: string, value: string) {
   const expires = new Date(Date.now() + MAX_AGE_DAYS * 864e5).toUTCString();
@@ -20,22 +21,14 @@ function setRawCookie(name: string, value: string, overwrite = true) {
 function getCookie(name: string): string | undefined {
   const hit = document.cookie.split("; ").find((row) => row.startsWith(`${encodeURIComponent(name)}=`));
   if (!hit) return undefined;
-  try {
-    return decodeURIComponent(hit.split("=").slice(1).join("="));
-  } catch {
-    return undefined;
-  }
+  try { return decodeURIComponent(hit.split("=").slice(1).join("=")); } catch { return undefined; }
 }
 
 function getRawCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined;
   const hit = document.cookie.split("; ").find((row) => row.startsWith(`${name}=`));
   if (!hit) return undefined;
-  try {
-    return decodeURIComponent(hit.split("=").slice(1).join("="));
-  } catch {
-    return undefined;
-  }
+  try { return decodeURIComponent(hit.split("=").slice(1).join("=")); } catch { return undefined; }
 }
 
 function getOrCreateSessionId(): string | undefined {
@@ -47,9 +40,15 @@ function getOrCreateSessionId(): string | undefined {
       sessionStorage.setItem(SESSION_KEY, id);
     }
     return id;
-  } catch {
-    return undefined;
-  }
+  } catch { return undefined; }
+}
+
+function sessionGet(key: string): string | undefined {
+  try { return sessionStorage.getItem(key) || undefined; } catch { return undefined; }
+}
+
+function sessionSet(key: string, value: string) {
+  try { sessionStorage.setItem(key, value); } catch {}
 }
 
 function hasMacro(value: string): boolean {
@@ -75,10 +74,19 @@ function getOrCreateFbp(): string | undefined {
   return generated;
 }
 
+function buildFbc(fbclid: string): string {
+  return `fb.1.${Date.now()}.${fbclid}`;
+}
+
 function persistMetaClickIds(params: URLSearchParams) {
-  const fbclid = params.get("fbclid");
+  const fromUrl = params.get("fbclid");
+  const storedFbclid = sessionGet(FBCLID_SESSION_KEY) || getCookie(PREFIX + "fbclid");
+  const fbclid = fromUrl && !hasMacro(fromUrl) ? fromUrl : storedFbclid;
+
   if (fbclid && !hasMacro(fbclid)) {
-    const fbc = getRawCookie("_fbc") || getCookie(PREFIX + "fbc") || `fb.1.${Date.now()}.${fbclid}`;
+    sessionSet(FBCLID_SESSION_KEY, fbclid);
+    setIfClean("fbclid", fbclid, false);
+    const fbc = getRawCookie("_fbc") || getCookie(PREFIX + "fbc") || buildFbc(fbclid);
     setRawCookie("_fbc", fbc, false);
     setIfClean("fbc", fbc, false);
   }
@@ -142,13 +150,21 @@ export function getDonationAttributionPayload(): Record<string, string> {
   const sessionId = getOrCreateSessionId();
   if (sessionId) out.session_id = out.session_id || sessionId;
 
+  if (!out.fbclid) {
+    const fbclid = sessionGet(FBCLID_SESSION_KEY);
+    if (fbclid) out.fbclid = fbclid;
+  }
   if (!out.fbp) {
     const fbp = getRawCookie("_fbp") || getOrCreateFbp();
     if (fbp) out.fbp = fbp;
   }
   if (!out.fbc) {
-    const fbc = getRawCookie("_fbc");
-    if (fbc) out.fbc = fbc;
+    const fbc = getRawCookie("_fbc") || (out.fbclid ? buildFbc(out.fbclid) : undefined);
+    if (fbc) {
+      out.fbc = fbc;
+      setRawCookie("_fbc", fbc, false);
+      setIfClean("fbc", fbc, false);
+    }
   }
   if (!out.ga_client_id) {
     const ga = getRawCookie("_ga");
