@@ -7,19 +7,15 @@
  *   3. POST to the Graph events endpoint with strict pre-send validation.
  *
  * Used by:
- *   - /api/track       → mirrors browser-side canonical funnel events (PageView,
- *                        ViewContent, AddToCart, InitiateCheckout, AddPaymentInfo, …).
- *                        donation_complete / payment_failed are REFUSED here —
+ *   - /api/track       -> mirrors browser-side canonical funnel events (PageView,
+ *                        ViewContent, AddToCart, InitiateCheckout, AddPaymentInfo, ...).
+ *                        donation_complete / payment_failed are REFUSED here -
  *                        the dedicated paths below own those server legs.
- *   - /api/donations/:id/track-conversion → fires Donate from the /success
- *                        page request, gated by an atomic claim on
- *                        `conversionEventsSentAt`. Browser fbq fires the same
- *                        event_id; Meta dedups the pair.
- *   - donation-conversion-server.ts → fires DonateFailed (custom event,
- *                        lookalike-seed for abandoned card attempts) from the
- *                        payment-provider callbacks. Failed donors typically
- *                        never reach a /success-style page, so this leg has to
- *                        stay server-only.
+ *   - /api/donations/:id/track-conversion -> fires Donate from the /success
+ *                        page request. Browser fbq fires the same event_id; Meta
+ *                        dedups the pair.
+ *   - donation-conversion-server.ts -> fires Donate / DonateFailed from admin
+ *                        retries and payment-provider callbacks.
  */
 
 import crypto from "crypto";
@@ -43,9 +39,8 @@ export interface MetaUserData {
   zip?: string | null;
   country_code?: string | null;
   external_id?: string | null;
-  gender?: string | null;          // "male" | "female" | "m" | "f"
-  date_of_birth?: string | null;   // YYYY-MM-DD or YYYYMMDD
-  // Non-hashed identifiers
+  gender?: string | null;
+  date_of_birth?: string | null;
   fbp?: string | null;
   fbc?: string | null;
   client_ip?: string | null;
@@ -72,18 +67,17 @@ export interface MetaCustomData {
   order_id?: string;
   status?: string;
   predicted_ltv?: number;
-  // Free-form pass-through (e.g. donation_type, recurring, failure_reason)
   [key: string]: unknown;
 }
 
 export interface MetaCapiEvent {
   event_name: string;
   event_id: string;
-  event_time?: number;            // unix seconds; defaults to now
+  event_time?: number;
   event_source_url?: string;
   user_data: MetaUserData;
   custom_data?: MetaCustomData;
-  test_event_code?: string;       // for Events Manager → Test Events tab
+  test_event_code?: string;
   action_source?: "website" | "email" | "app" | "phone_call" | "chat" | "physical_store" | "system_generated" | "other";
 }
 
@@ -98,8 +92,6 @@ export interface MetaCapiResult {
   reason?: string;
 }
 
-// ─── Hashing ──────────────────────────────────────────────────────────────────
-
 function sha256(value: string | null | undefined): string | undefined {
   if (!value) return undefined;
   const normalised = String(value).trim().toLowerCase();
@@ -107,7 +99,6 @@ function sha256(value: string | null | undefined): string | undefined {
   return crypto.createHash("sha256").update(normalised).digest("hex");
 }
 
-/** Phone → digits only, sha256. Meta wants E.164 digits without "+". */
 function hashPhone(phone: string | null | undefined): string | undefined {
   if (!phone) return undefined;
   const digits = String(phone).replace(/\D/g, "");
@@ -115,7 +106,6 @@ function hashPhone(phone: string | null | undefined): string | undefined {
   return crypto.createHash("sha256").update(digits).digest("hex");
 }
 
-/** Gender → "m" / "f" → sha256. */
 function hashGender(gender: string | null | undefined): string | undefined {
   if (!gender) return undefined;
   const g = String(gender).trim().toLowerCase();
@@ -124,7 +114,6 @@ function hashGender(gender: string | null | undefined): string | undefined {
   return crypto.createHash("sha256").update(norm).digest("hex");
 }
 
-/** DOB → "YYYYMMDD" → sha256. */
 function hashDob(dob: string | null | undefined): string | undefined {
   if (!dob) return undefined;
   const digits = String(dob).replace(/\D/g, "");
@@ -132,7 +121,6 @@ function hashDob(dob: string | null | undefined): string | undefined {
   return crypto.createHash("sha256").update(digits.slice(0, 8)).digest("hex");
 }
 
-/** Lowercase country code → 2 chars → sha256. */
 function hashCountry(cc: string | null | undefined): string | undefined {
   if (!cc) return undefined;
   const norm = String(cc).trim().toLowerCase();
@@ -140,7 +128,6 @@ function hashCountry(cc: string | null | undefined): string | undefined {
   return crypto.createHash("sha256").update(norm).digest("hex");
 }
 
-/** Build the hashed `user_data` block from a MetaUserData input. */
 export function buildMetaUserData(u: MetaUserData): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const em = sha256(u.email);
@@ -165,61 +152,74 @@ export function buildMetaUserData(u: MetaUserData): Record<string, unknown> {
   if (ge) out.ge = [ge];
   const db = hashDob(u.date_of_birth);
   if (db) out.db = [db];
-
-  // Non-hashed identifiers
   if (u.fbp) out.fbp = u.fbp;
   if (u.fbc) out.fbc = u.fbc;
   if (u.user_agent) out.client_user_agent = String(u.user_agent).slice(0, 512);
   if (u.client_ip) {
-    // Strip anything that isn't valid IPv4/IPv6 characters
     const ip = String(u.client_ip).replace(/[^0-9a-fA-F.:]/g, "").slice(0, 45);
     if (ip) out.client_ip_address = ip;
   }
   if (u.subscription_id) out.subscription_id = u.subscription_id;
-
   return out;
 }
-
-// ─── Sender ───────────────────────────────────────────────────────────────────
 
 interface MetaCapiCredentials {
   pixelId: string;
   accessToken: string;
 }
 
-/** Read Meta CAPI credentials from the dashboard TrackingSettings row.
- *  Falls back to env vars (legacy) when the row is missing. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getStr(row: Record<string, unknown> | null, key: string): string | null {
+  const value = row?.[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+async function getRawTrackingSettings(): Promise<Record<string, unknown> | null> {
+  try {
+    const result = await prisma.$runCommandRaw({ find: "TrackingSettings", limit: 1, sort: { createdAt: 1 } });
+    const batch = isRecord(result) && isRecord(result.cursor) && Array.isArray(result.cursor.firstBatch)
+      ? result.cursor.firstBatch
+      : [];
+    return (batch[0] as Record<string, unknown> | undefined) ?? null;
+  } catch (error) {
+    console.error("[Meta CAPI] failed to read raw TrackingSettings", error);
+    return null;
+  }
+}
+
+/** Read Meta CAPI credentials from the same raw TrackingSettings document used by /dashboard/pixels. */
 export async function getMetaCapiCredentials(): Promise<MetaCapiCredentials | null> {
-  const row = await prisma.trackingSettings.findFirst();
-  const pixelId = row?.facebookPixelId || process.env.META_PIXEL_ID || null;
-  const accessToken = row?.facebookAccessToken || process.env.META_ACCESS_TOKEN || null;
+  const raw = await getRawTrackingSettings();
+  const pixelId =
+    getStr(raw, "facebookPixelId") ||
+    getStr(raw, "metaPixelId") ||
+    process.env.META_PIXEL_ID ||
+    null;
+  const accessToken =
+    getStr(raw, "facebookAccessToken") ||
+    getStr(raw, "metaAccessToken") ||
+    process.env.META_ACCESS_TOKEN ||
+    null;
   if (!pixelId || !accessToken) return null;
   return { pixelId, accessToken };
 }
 
-/** Validate an event before sending. Returns reason for rejection or null. */
 function validateEvent(event: MetaCapiEvent): string | null {
   if (!event.event_name) return "missing event_name";
   if (!event.event_id) return "missing event_id";
-
   const eventTime = event.event_time ?? Math.floor(Date.now() / 1000);
   const ageSeconds = Math.floor(Date.now() / 1000) - eventTime;
-  if (ageSeconds > MAX_EVENT_AGE_SECONDS) {
-    return `event too old (${Math.floor(ageSeconds / 86400)}d) — Meta rejects > 7d`;
-  }
-  if (eventTime > Math.floor(Date.now() / 1000) + 60) {
-    // small clock-skew tolerance
-    return "event_time is in the future";
-  }
+  if (ageSeconds > MAX_EVENT_AGE_SECONDS) return `event too old (${Math.floor(ageSeconds / 86400)}d) - Meta rejects > 7d`;
+  if (eventTime > Math.floor(Date.now() / 1000) + 60) return "event_time is in the future";
   return null;
 }
 
-export async function sendMetaCapiEvent(
-  event: MetaCapiEvent,
-  creds?: MetaCapiCredentials
-): Promise<MetaCapiResult> {
+export async function sendMetaCapiEvent(event: MetaCapiEvent, creds?: MetaCapiCredentials): Promise<MetaCapiResult> {
   const c = creds ?? (await getMetaCapiCredentials());
-  if (!c) return { skipped: true, ok: false, reason: "no credentials" };
+  if (!c) return { skipped: true, ok: false, reason: "no credentials", event_name: event.event_name, event_id: event.event_id };
 
   const validationError = validateEvent(event);
   if (validationError) {
@@ -229,15 +229,7 @@ export async function sendMetaCapiEvent(
 
   const user_data = buildMetaUserData(event.user_data);
   if (Object.keys(user_data).length === 0) {
-    // Meta rejects events without at least one user identifier. Refuse here
-    // so we don't waste a Graph round-trip and don't spam the error log.
-    return {
-      ok: false,
-      skipped: true,
-      reason: "no user identifiers",
-      event_name: event.event_name,
-      event_id: event.event_id,
-    };
+    return { ok: false, skipped: true, reason: "no user identifiers", event_name: event.event_name, event_id: event.event_id };
   }
 
   const eventBlock: Record<string, unknown> = {
@@ -248,60 +240,25 @@ export async function sendMetaCapiEvent(
     user_data,
   };
   if (event.event_source_url) eventBlock.event_source_url = event.event_source_url;
-  if (event.custom_data && Object.keys(event.custom_data).length > 0) {
-    eventBlock.custom_data = event.custom_data;
-  }
+  if (event.custom_data && Object.keys(event.custom_data).length > 0) eventBlock.custom_data = event.custom_data;
 
   const payload: Record<string, unknown> = { data: [eventBlock] };
   if (event.test_event_code) payload.test_event_code = event.test_event_code;
 
   try {
-    const res = await fetch(
-      `https://graph.facebook.com/${FB_API_VERSION}/${c.pixelId}/events?access_token=${encodeURIComponent(c.accessToken)}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }
-    );
-    const data = (await res.json().catch(() => ({}))) as {
-      events_received?: number;
-      fbtrace_id?: string;
-      error?: { message?: string; type?: string; code?: number };
-    };
+    const res = await fetch(`https://graph.facebook.com/${FB_API_VERSION}/${c.pixelId}/events?access_token=${encodeURIComponent(c.accessToken)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = (await res.json().catch(() => ({}))) as { events_received?: number; fbtrace_id?: string; error?: { message?: string; type?: string; code?: number } };
     if (!res.ok) {
-      console.error(
-        "[Meta CAPI]",
-        event.event_name,
-        event.event_id,
-        `status=${res.status}`,
-        "error:",
-        data?.error?.message ?? "unknown",
-        "fbtrace_id:",
-        data?.fbtrace_id ?? "n/a"
-      );
-      return {
-        ok: false,
-        error: data?.error?.message,
-        fbtrace_id: data?.fbtrace_id,
-        event_name: event.event_name,
-        event_id: event.event_id,
-      };
+      console.error("[Meta CAPI]", event.event_name, event.event_id, `status=${res.status}`, "error:", data?.error?.message ?? "unknown", "fbtrace_id:", data?.fbtrace_id);
+      return { ok: false, error: data?.error?.message ?? `HTTP ${res.status}`, fbtrace_id: data?.fbtrace_id, event_name: event.event_name, event_id: event.event_id };
     }
-    return {
-      ok: true,
-      events_received: data?.events_received,
-      fbtrace_id: data?.fbtrace_id,
-      event_name: event.event_name,
-      event_id: event.event_id,
-    };
-  } catch (e) {
-    console.error("[Meta CAPI]", event.event_name, event.event_id, "fetch failed:", e);
-    return {
-      ok: false,
-      error: "fetch failed",
-      event_name: event.event_name,
-      event_id: event.event_id,
-    };
+    return { ok: true, events_received: data.events_received, fbtrace_id: data.fbtrace_id, event_name: event.event_name, event_id: event.event_id };
+  } catch (error) {
+    console.error("[Meta CAPI] network error", event.event_name, event.event_id, error);
+    return { ok: false, error: error instanceof Error ? error.message : "unknown", event_name: event.event_name, event_id: event.event_id };
   }
 }
