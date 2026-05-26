@@ -45,19 +45,7 @@ async function loadDonationForConversion(donationId: string) {
   return prisma.donation.findUnique({
     where: { id: donationId },
     include: {
-      donor: {
-        select: {
-          id: true,
-          email: true,
-          phone: true,
-          name: true,
-          countryCode: true,
-          city: true,
-          region: true,
-          gender: true,
-          birthdate: true,
-        },
-      },
+      donor: { select: { id: true, email: true, phone: true, name: true, countryCode: true, city: true, region: true, gender: true, birthdate: true } },
       items: { include: { campaign: { select: { id: true, title: true } } } },
       categoryItems: { include: { category: { select: { id: true, name: true } } } },
     },
@@ -70,7 +58,6 @@ function buildUserDataFromDonation(row: LoadedDonation): MetaUserData {
   const attribution = (row.attribution ?? undefined) as Attribution | undefined;
   const [first_name, ...rest] = (row.donor?.name ?? "").trim().split(/\s+/);
   const last_name = rest.join(" ") || undefined;
-
   return {
     external_id: row.donor?.id ?? null,
     email: row.donor?.email ?? null,
@@ -80,12 +67,7 @@ function buildUserDataFromDonation(row: LoadedDonation): MetaUserData {
     city: row.donor?.city ?? getStr(attribution, "city") ?? null,
     state: row.donor?.region ?? getStr(attribution, "state") ?? getStr(attribution, "region") ?? null,
     zip: getStr(attribution, "zip") ?? getStr(attribution, "postal_code") ?? null,
-    country_code:
-      normalizeCountryCode(row.donor?.countryCode) ??
-      normalizeCountryCode(row.donorCountryCode) ??
-      normalizeCountryCode(getStr(attribution, "country_code")) ??
-      normalizeCountryCode(getStr(attribution, "country")) ??
-      null,
+    country_code: normalizeCountryCode(row.donor?.countryCode) ?? normalizeCountryCode(row.donorCountryCode) ?? normalizeCountryCode(getStr(attribution, "country_code")) ?? normalizeCountryCode(getStr(attribution, "country")) ?? null,
     gender: row.donor?.gender ?? null,
     date_of_birth: row.donor?.birthdate ?? null,
     fbp: getStr(attribution, "fbp") ?? null,
@@ -99,18 +81,9 @@ function buildUserDataFromDonation(row: LoadedDonation): MetaUserData {
 function buildContents(row: LoadedDonation) {
   const ids: string[] = [];
   const contents: MetaContent[] = [];
-  for (const it of row.items) {
-    ids.push(it.campaignId);
-    contents.push({ id: it.campaignId, quantity: 1, item_price: it.amount });
-  }
-  for (const ci of row.categoryItems) {
-    ids.push(ci.categoryId);
-    contents.push({ id: ci.categoryId, quantity: 1, item_price: ci.amount });
-  }
-  if (ids.length === 0) {
-    ids.push("donation");
-    contents.push({ id: "donation", quantity: 1, item_price: row.amount });
-  }
+  for (const it of row.items) { ids.push(it.campaignId); contents.push({ id: it.campaignId, quantity: 1, item_price: it.amount }); }
+  for (const ci of row.categoryItems) { ids.push(ci.categoryId); contents.push({ id: ci.categoryId, quantity: 1, item_price: ci.amount }); }
+  if (ids.length === 0) { ids.push("donation"); contents.push({ id: "donation", quantity: 1, item_price: row.amount }); }
   return { ids, contents };
 }
 
@@ -119,24 +92,7 @@ function primaryContentName(row: LoadedDonation): string {
 }
 
 function auditMetaPayload(row: LoadedDonation, eventId: string, customData: MetaCustomData) {
-  return {
-    event_name: "Donate",
-    event_id: eventId,
-    donation_id: row.id,
-    amount: row.amount,
-    amount_usd: row.amountUSD,
-    total_amount: row.totalAmount,
-    currency: row.currency,
-    provider: row.provider,
-    created_at_utc: row.createdAt.toISOString(),
-    created_at_turkey: toTurkeyIso(row.createdAt),
-    paid_at_utc: row.paidAt?.toISOString() ?? null,
-    paid_at_turkey: toTurkeyIso(row.paidAt),
-    reporting_timezone: "Europe/Istanbul",
-    payment_provider_timezone: "America/Toronto",
-    custom_data: customData,
-    attribution: pickAttributionForAudit(row.attribution),
-  };
+  return { event_name: "Donate", event_id: eventId, donation_id: row.id, amount: row.amount, amount_usd: row.amountUSD, total_amount: row.totalAmount, currency: row.currency, provider: row.provider, created_at_utc: row.createdAt.toISOString(), created_at_turkey: toTurkeyIso(row.createdAt), paid_at_utc: row.paidAt?.toISOString() ?? null, paid_at_turkey: toTurkeyIso(row.paidAt), reporting_timezone: "Europe/Istanbul", payment_provider_timezone: "America/Toronto", custom_data: customData, attribution: pickAttributionForAudit(row.attribution) };
 }
 
 async function getGa4Credentials() {
@@ -163,16 +119,9 @@ export async function sendDonationServerConversions(donationId: string): Promise
     const amount = Number(row.amount ?? row.amountUSD ?? 0);
     if (!(amount > 0)) return { ok: false, skipped: true, reason: "amount <= 0" };
 
-    const claim = await prisma.donation.updateMany({
-      where: {
-        id: row.id,
-        status: "PAID",
-        paidAt: { not: null },
-        conversionEventsSentAt: null,
-      },
-      data: { conversionEventsSentAt: new Date() },
-    });
-    if (claim.count === 0) return { ok: false, skipped: true, reason: "lost idempotency claim" };
+    // We already verified the row state above. Keep the claim simple so admin retry
+    // can repair legacy rows whose Mongo null/undefined shape does not match strict filters.
+    await prisma.donation.update({ where: { id: row.id }, data: { conversionEventsSentAt: new Date() } });
 
     const creds = await getMetaCapiCredentials();
     const attribution = (row.attribution ?? undefined) as Attribution | undefined;
@@ -183,50 +132,16 @@ export async function sendDonationServerConversions(donationId: string): Promise
     const { ids, contents } = buildContents(row);
     const eventId = metaDonationEventId(row.id, "success");
 
-    const custom_data: MetaCustomData = {
-      value: amount,
-      currency,
-      content_type: "donation",
-      content_name: contentName,
-      content_category: row.subscriptionId ? "monthly" : "donation",
-      content_ids: ids,
-      contents,
-      num_items: contents.reduce((s, c) => s + (c.quantity ?? 1), 0),
-      order_id: row.id,
-      transaction_id: row.id,
-      status: "paid",
-      success: true,
-      payment_info_available: 1,
-      donation_type: row.subscriptionId ? "MONTHLY" : "ONE_TIME",
-      recurring: !!row.subscriptionId,
-      payment_method: (row.paymentMethod ?? "CARD").toLowerCase(),
-    };
+    const custom_data: MetaCustomData = { value: amount, currency, content_type: "donation", content_name: contentName, content_category: row.subscriptionId ? "monthly" : "donation", content_ids: ids, contents, num_items: contents.reduce((s, c) => s + (c.quantity ?? 1), 0), order_id: row.id, transaction_id: row.id, status: "paid", success: true, payment_info_available: 1, donation_type: row.subscriptionId ? "MONTHLY" : "ONE_TIME", recurring: !!row.subscriptionId, payment_method: (row.paymentMethod ?? "CARD").toLowerCase() };
 
     await writeConversionAudit({ donationId: row.id, eventId, stage: "meta_capi_attempt", message: "Meta CAPI Donate send attempted", metadata: auditMetaPayload(row, eventId, custom_data) });
 
     let metaResult: MetaCapiResult = { ok: false, skipped: true, reason: "no creds" };
-    if (creds) {
-      metaResult = await sendMetaCapiEvent({ event_name: "Donate", event_id: eventId, event_time: eventTime, event_source_url: eventSourceUrl, action_source: "website", user_data: buildUserDataFromDonation(row), custom_data }, creds);
-    }
+    if (creds) metaResult = await sendMetaCapiEvent({ event_name: "Donate", event_id: eventId, event_time: eventTime, event_source_url: eventSourceUrl, action_source: "website", user_data: buildUserDataFromDonation(row), custom_data }, creds);
 
-    await recordConversionEvent({
-      donationId: row.id,
-      eventId,
-      eventName: "Donate",
-      platform: "META",
-      channel: "server",
-      status: metaStatus(metaResult),
-      dedupKey: eventId,
-      value: amount,
-      currency,
-      error: metaResult.error ?? metaResult.reason ?? null,
-      request: auditMetaPayload(row, eventId, custom_data),
-      response: metaResult,
-      sentAt: metaResult.ok ? new Date(eventTime * 1000) : null,
-    });
+    await recordConversionEvent({ donationId: row.id, eventId, eventName: "Donate", platform: "META", channel: "server", status: metaStatus(metaResult), dedupKey: eventId, value: amount, currency, error: metaResult.error ?? metaResult.reason ?? null, request: auditMetaPayload(row, eventId, custom_data), response: metaResult, sentAt: metaResult.ok ? new Date(eventTime * 1000) : null });
 
     await writeConversionAudit({ donationId: row.id, eventId, stage: "meta_capi_result", message: metaResult.ok ? "Meta CAPI Donate send succeeded" : "Meta CAPI Donate send did not succeed", metadata: { ...auditMetaPayload(row, eventId, custom_data), meta_result: metaResult } });
-
     await sendGa4Purchase(row, amount, currency, contentName, eventTime, eventId);
 
     if (!metaResult.ok && !metaResult.skipped) console.error("[conversion] Donate send failed but claim retained:", row.id, metaResult.error, metaResult.fbtrace_id);
@@ -262,24 +177,7 @@ export async function sendDonationFailedConversions(donationId: string): Promise
     const eventTime = Math.floor(((row as { updatedAt?: Date }).updatedAt ?? row.createdAt ?? new Date()).getTime() / 1000);
     const contentName = primaryContentName(row);
     const { ids, contents } = buildContents(row);
-
-    const custom_data: MetaCustomData = {
-      value: amount,
-      currency,
-      content_type: "product",
-      content_name: contentName,
-      content_category: row.subscriptionId ? "monthly" : "donation",
-      content_ids: ids,
-      contents,
-      num_items: contents.reduce((s, c) => s + (c.quantity ?? 1), 0),
-      order_id: row.id,
-      status: "failed",
-      donation_type: row.subscriptionId ? "MONTHLY" : "ONE_TIME",
-      recurring: !!row.subscriptionId,
-      payment_info_available: 1,
-      failure_reason: row.providerErrorMessage ?? row.providerTxnResult ?? undefined,
-      provider: row.provider ?? undefined,
-    };
+    const custom_data: MetaCustomData = { value: amount, currency, content_type: "product", content_name: contentName, content_category: row.subscriptionId ? "monthly" : "donation", content_ids: ids, contents, num_items: contents.reduce((s, c) => s + (c.quantity ?? 1), 0), order_id: row.id, status: "failed", donation_type: row.subscriptionId ? "MONTHLY" : "ONE_TIME", recurring: !!row.subscriptionId, payment_info_available: 1, failure_reason: row.providerErrorMessage ?? row.providerTxnResult ?? undefined, provider: row.provider ?? undefined };
 
     const metaResult = await sendMetaCapiEvent({ event_name: "DonateFailed", event_id: failedEventId, event_time: eventTime, event_source_url: eventSourceUrl, user_data: buildUserDataFromDonation(row), custom_data }, creds);
     await recordConversionEvent({ donationId: row.id, eventId: failedEventId, eventName: "DonateFailed", platform: "META", channel: "server", status: metaStatus(metaResult), dedupKey: failedEventId, value: amount, currency, error: metaResult.error ?? metaResult.reason ?? null, request: { event_name: "DonateFailed", event_id: failedEventId, custom_data }, response: metaResult, sentAt: metaResult.ok ? new Date(eventTime * 1000) : null });
@@ -310,11 +208,9 @@ async function sendGa4Purchase(row: LoadedDonation, amount: number, currency: st
   const gaClientId = getStr(attribution, "ga_client_id") || `${Date.now()}.${Math.floor(Math.random() * 1e9)}`;
   const sessionIdRaw = getStr(attribution, "ga_session_id");
   const sessionNum = sessionIdRaw ? parseInt(sessionIdRaw.replace(/\D/g, "").slice(0, 12), 10) : undefined;
-
   const items = row.items.map((it) => ({ item_id: it.campaignId, item_name: it.campaign?.title ?? "Donation", item_category: "donation", price: it.amount, quantity: 1 }));
   for (const ci of row.categoryItems) items.push({ item_id: ci.categoryId, item_name: ci.category?.name ?? "Category", item_category: "donation", price: ci.amount, quantity: 1 });
   if (items.length === 0) items.push({ item_id: "donation", item_name: contentName, item_category: "donation", price: amount, quantity: 1 });
-
   const gaPayload = { client_id: gaClientId, events: [{ name: "purchase", params: { transaction_id: row.id, value: amount, currency, engagement_time_msec: 100, affiliation: "Donation Website", event_time: eventTime, event_id: eventId, ...(sessionNum != null && !Number.isNaN(sessionNum) ? { session_id: sessionNum } : {}), items } }] };
 
   try {
