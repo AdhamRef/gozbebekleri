@@ -7,12 +7,55 @@ import { syncDonationConversion } from "@/lib/tracking/donation-conversion-serve
 
 export const dynamic = "force-dynamic";
 
+type AttributionSignals = {
+  fbclid: boolean;
+  fbc: boolean;
+  fbp: boolean;
+  utm: boolean;
+  campaign: boolean;
+  ad: boolean;
+  adset: boolean;
+  quality: "strong" | "medium" | "weak";
+  warnings: string[];
+};
+
 function legacyOid(id: string) {
   return /^[a-f0-9]{24}$/i.test(id) ? { $oid: id } : id;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function str(row: Record<string, unknown> | null, key: string): string | null {
+  const value = row?.[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function has(row: Record<string, unknown> | null, key: string): boolean {
+  return Boolean(str(row, key));
+}
+
+function attributionSignals(raw: unknown): AttributionSignals {
+  const a = isRecord(raw) ? raw : null;
+  const fbclid = has(a, "fbclid");
+  const fbc = has(a, "fbc");
+  const fbp = has(a, "fbp");
+  const utm = has(a, "utm_campaign") || has(a, "utm_source") || has(a, "utm_medium");
+  const campaign = has(a, "campaign_id") || has(a, "utm_id") || has(a, "campaign_name");
+  const ad = has(a, "ad_id") || has(a, "ad_name") || has(a, "creative_id");
+  const adset = has(a, "adset_id") || has(a, "adset_name") || has(a, "ad_group_id");
+  const warnings = (str(a, "tracking_quality_warnings") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  let score = 0;
+  if (fbclid) score += 4;
+  if (fbc) score += 4;
+  if (fbp) score += 2;
+  if (utm) score += 1;
+  if (campaign) score += 2;
+  if (ad) score += 2;
+  if (adset) score += 1;
+  const quality = score >= 6 ? "strong" : score >= 3 ? "medium" : "weak";
+  return { fbclid, fbc, fbp, utm, campaign, ad, adset, quality, warnings };
 }
 
 async function hasMetaServerLedger(donationId: string): Promise<boolean> {
@@ -49,7 +92,7 @@ export async function POST(request: NextRequest) {
     where: { status: "PAID", paidAt: { not: null, gte: since } },
     orderBy: { paidAt: "desc" },
     take: Math.max(limit * 3, limit),
-    select: { id: true, paidAt: true, amount: true, currency: true, conversionEventsSentAt: true },
+    select: { id: true, paidAt: true, amount: true, currency: true, conversionEventsSentAt: true, attribution: true },
   });
 
   const rows = [];
@@ -65,7 +108,15 @@ export async function POST(request: NextRequest) {
       await prisma.donation.update({ where: { id: row.id }, data: { conversionEventsSentAt: null } });
     }
     const result = await syncDonationConversion(row.id);
-    results.push({ donationId: row.id, paidAt: row.paidAt?.toISOString() ?? null, amount: row.amount, currency: row.currency, wasAlreadyMarkedSent: row.conversionEventsSentAt != null, result });
+    results.push({
+      donationId: row.id,
+      paidAt: row.paidAt?.toISOString() ?? null,
+      amount: row.amount,
+      currency: row.currency,
+      wasAlreadyMarkedSent: row.conversionEventsSentAt != null,
+      attribution: attributionSignals(row.attribution),
+      result,
+    });
   }
 
   return NextResponse.json({ ok: true, scanned: rows.length, considered: recentPaid.length, limit, days, results });
