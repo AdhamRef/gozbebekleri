@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 type PlatformHealth = { platform: string; label: string; ready: boolean; missing: string[] };
-type RecentEvent = { _id?: { $oid?: string }; id?: string; platform?: string; eventName?: string; channel?: string; status?: string; attempts?: number; error?: string | null };
+type RecentEvent = { _id?: { $oid?: string }; id?: string; platform?: string; eventName?: string; channel?: string; status?: string; attempts?: number; error?: string | null; donationId?: string; value?: number; currency?: string };
+type RetryResult = { donationId: string; paidAt: string | null; amount: number; currency: string; wasAlreadyMarkedSent?: boolean; result?: { ok?: boolean; skipped?: boolean; reason?: string; error?: string; fbtrace_id?: string } };
+type RetrySummary = { ok?: boolean; scanned?: number; considered?: number; limit?: number; days?: number; results?: RetryResult[] };
 type Health = {
   scores: { readiness: number; delivery: number; overall: number };
   platforms: PlatformHealth[];
@@ -27,10 +29,18 @@ function NavButton({ href, children, primary = false }: { href: string; children
   return <Link href={href} className={`block rounded-md border px-3 py-2 text-sm font-medium transition ${primary ? "border-[#025EB8] bg-[#025EB8] text-white hover:bg-[#024a91]" : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"}`}>{children}</Link>;
 }
 
+function resultLabel(result?: RetryResult["result"]) {
+  if (!result) return "لا توجد نتيجة";
+  if (result.ok) return "تم الإرسال";
+  if (result.skipped) return `تم التخطي: ${result.reason ?? "غير محدد"}`;
+  return `فشل: ${result.error ?? result.reason ?? "غير محدد"}`;
+}
+
 export default function MarketingIntelligencePage() {
   const [health, setHealth] = React.useState<Health | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [retrying, setRetrying] = React.useState(false);
+  const [lastRetry, setLastRetry] = React.useState<RetrySummary | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -52,8 +62,9 @@ export default function MarketingIntelligencePage() {
     setRetrying(true);
     try {
       const res = await fetch("/api/admin/marketing-intelligence/retry-missing-conversions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ limit: 25, days: 7 }) });
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; scanned?: number };
+      const data = (await res.json().catch(() => ({}))) as RetrySummary;
       if (!res.ok || data.ok === false) throw new Error("retry");
+      setLastRetry(data);
       toast.success(`تمت مراجعة ${data.scanned ?? 0} تبرع`);
       await load();
     } catch {
@@ -70,7 +81,8 @@ export default function MarketingIntelligencePage() {
     <div className="flex flex-wrap items-start justify-between gap-4"><div className="flex items-start gap-3"><span className="rounded-2xl bg-[#025EB8]/10 p-3 text-[#025EB8]"><Activity className="h-6 w-6" /></span><div><h1 className="text-xl font-black text-slate-950">ذكاء التسويق</h1><p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">مركز موحد للتتبع، البكسلات، الإعلانات، التحويلات، وجودة روابط الحملات.</p></div></div><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={load} className="gap-2"><RefreshCw className="h-4 w-4" />تحديث</Button><Button onClick={retryMissing} disabled={retrying} className="gap-2 bg-[#025EB8] hover:bg-[#024a91]">{retrying ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}مراجعة التحويلات المفقودة</Button></div></div>
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3"><ScoreCard label="صحة المنظومة" value={health.scores.overall} /><ScoreCard label="جاهزية المنصات" value={health.scores.readiness} /><ScoreCard label="تسليم التحويلات" value={health.scores.delivery} /></div>
     <div className="grid grid-cols-1 gap-3 md:grid-cols-4"><Card><CardContent className="p-4"><div className="text-xs text-slate-500">تبرعات مدفوعة / 7 أيام</div><div className="mt-1 text-2xl font-black">{health.donations.paidLast7d}</div></CardContent></Card><Card><CardContent className="p-4"><div className="text-xs text-slate-500">صفوف checkout / 7 أيام</div><div className="mt-1 text-2xl font-black">{health.donations.checkoutRowsLast7d}</div></CardContent></Card><Card><CardContent className="p-4"><div className="text-xs text-slate-500">تحويلات ناقصة</div><div className="mt-1 text-2xl font-black text-rose-700">{health.donations.missingServerConversions}</div></CardContent></Card><Card><CardContent className="p-4"><div className="text-xs text-slate-500">ConversionEvent مرسلة</div><div className="mt-1 text-2xl font-black text-emerald-700">{health.conversionEvents.sentLast7d}</div></CardContent></Card></div>
+    {lastRetry ? <Card className="border-blue-200 bg-blue-50/40"><CardHeader><CardTitle>نتيجة آخر مراجعة للتحويلات</CardTitle><CardDescription>تم فحص {lastRetry.considered ?? 0} تبرع، وتمت محاولة معالجة {lastRetry.scanned ?? 0} تبرع.</CardDescription></CardHeader><CardContent><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b text-xs text-slate-500"><tr><th className="py-2 text-right">التبرع</th><th className="py-2 text-right">المبلغ</th><th className="py-2 text-right">كان معلّمًا كمرسل</th><th className="py-2 text-right">النتيجة</th><th className="py-2 text-right">fbtrace</th></tr></thead><tbody>{(lastRetry.results ?? []).length === 0 ? <tr><td colSpan={5} className="py-6 text-center text-slate-500">لا توجد تبرعات احتاجت إعادة معالجة.</td></tr> : (lastRetry.results ?? []).map((row) => <tr key={row.donationId} className="border-b last:border-0"><td className="py-2 font-mono text-xs">{row.donationId}</td><td className="py-2">{row.amount} {row.currency}</td><td className="py-2">{row.wasAlreadyMarkedSent ? "نعم" : "لا"}</td><td className="py-2">{resultLabel(row.result)}</td><td className="py-2 font-mono text-xs">{row.result?.fbtrace_id ?? "—"}</td></tr>)}</tbody></table></div></CardContent></Card> : null}
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3"><Card className="lg:col-span-2"><CardHeader><CardTitle>حالة المنصات</CardTitle><CardDescription>الجاهزية تقيس وجود الإعدادات المطلوبة للتسجيل والتحويلات.</CardDescription></CardHeader><CardContent className="space-y-3">{health.platforms.map((p) => <div key={p.platform} className="flex items-center justify-between rounded-xl border p-3"><div><div className="font-semibold text-slate-900">{p.label}</div><div className="mt-1 text-xs text-slate-500">{p.ready ? "جاهز" : `ناقص: ${p.missing.join(", ")}`}</div></div>{p.ready ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <AlertTriangle className="h-5 w-5 text-amber-600" />}</div>)}</CardContent></Card><Card><CardHeader><CardTitle>Campaign Builder</CardTitle><CardDescription>منشئ الروابط هو نقطة دخول الحملات التسويقية.</CardDescription></CardHeader><CardContent className="space-y-2"><NavButton href={health.links.campaignBuilder} primary>فتح منشئ الحملات والروابط</NavButton><NavButton href={health.links.ads}>إدارة الإعلانات</NavButton><NavButton href={health.links.pixels}>البكسلات والتتبع</NavButton><NavButton href={health.links.connections}>ربط المنصات</NavButton></CardContent></Card></div>
-    <Card><CardHeader><CardTitle>آخر أحداث التحويل</CardTitle><CardDescription>سجل موحد يوضح كل منصة والقناة والحالة.</CardDescription></CardHeader><CardContent><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b text-xs text-slate-500"><tr><th className="py-2 text-right">المنصة</th><th className="py-2 text-right">الحدث</th><th className="py-2 text-right">القناة</th><th className="py-2 text-right">الحالة</th><th className="py-2 text-right">محاولات</th><th className="py-2 text-right">خطأ</th></tr></thead><tbody>{health.conversionEvents.recent.length === 0 ? <tr><td colSpan={6} className="py-8 text-center text-slate-500">لا توجد أحداث تحويل مسجلة بعد.</td></tr> : health.conversionEvents.recent.map((event, idx) => <tr key={event._id?.$oid ?? event.id ?? idx} className="border-b last:border-0"><td className="py-3 font-semibold">{event.platform ?? "—"}</td><td className="py-3">{event.eventName ?? "—"}</td><td className="py-3">{event.channel ?? "—"}</td><td className="py-3">{event.status ?? "—"}</td><td className="py-3">{event.attempts ?? 1}</td><td className="max-w-[20rem] truncate py-3 text-xs text-rose-700">{event.error ?? "—"}</td></tr>)}</tbody></table></div></CardContent></Card>
+    <Card><CardHeader><CardTitle>آخر أحداث التحويل</CardTitle><CardDescription>سجل موحد يوضح كل منصة والقناة والحالة.</CardDescription></CardHeader><CardContent><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b text-xs text-slate-500"><tr><th className="py-2 text-right">المنصة</th><th className="py-2 text-right">الحدث</th><th className="py-2 text-right">القناة</th><th className="py-2 text-right">الحالة</th><th className="py-2 text-right">المبلغ</th><th className="py-2 text-right">محاولات</th><th className="py-2 text-right">خطأ</th></tr></thead><tbody>{health.conversionEvents.recent.length === 0 ? <tr><td colSpan={7} className="py-8 text-center text-slate-500">لا توجد أحداث تحويل مسجلة بعد.</td></tr> : health.conversionEvents.recent.map((event, idx) => <tr key={event._id?.$oid ?? event.id ?? idx} className="border-b last:border-0"><td className="py-3 font-semibold">{event.platform ?? "—"}</td><td className="py-3">{event.eventName ?? "—"}</td><td className="py-3">{event.channel ?? "—"}</td><td className="py-3">{event.status ?? "—"}</td><td className="py-3">{typeof event.value === "number" ? `${event.value} ${event.currency ?? ""}` : "—"}</td><td className="py-3">{event.attempts ?? 1}</td><td className="max-w-[20rem] truncate py-3 text-xs text-rose-700">{event.error ?? "—"}</td></tr>)}</tbody></table></div></CardContent></Card>
   </div>;
 }
