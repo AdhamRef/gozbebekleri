@@ -57,8 +57,8 @@ function legacyUsersGrants(key: DashboardPermissionKey): boolean {
 
 export function isDashboardRoutePermissionKey(
   key: string
-): boolean {
-  return key !== "donationsEdit" && key !== "reportsExport";
+): key is DashboardPermissionKey {
+  return isDashboardPermissionKey(key) && key !== "donationsEdit" && key !== "reportsExport";
 }
 
 export function hasAnyDashboardRoutePermission(user: UserLike | undefined): boolean {
@@ -122,6 +122,7 @@ export function userCanExportReports(user: UserLike | undefined): boolean {
 
 /** Longer prefixes first — first match wins */
 const PATH_RULES: { prefix: string; key: DashboardPermissionKey }[] = [
+  { prefix: "/dashboard/marketing-intelligence", key: "ads" },
   { prefix: "/dashboard/monthly", key: "monthly" },
   { prefix: "/dashboard/link-generator", key: "referrals" },
   { prefix: "/dashboard/referrals", key: "referrals" },
@@ -177,9 +178,9 @@ export function sessionHasDashboardPermission(
   return userHasDashboardPermission(session?.user, key);
 }
 
-export function sanitizeDashboardPermissions(raw: unknown): string[] {
+export function sanitizeDashboardPermissions(raw: unknown): DashboardPermissionKey[] {
   if (!Array.isArray(raw)) return [];
-  const out = new Set<string>();
+  const out = new Set<DashboardPermissionKey>();
   for (const x of raw) {
     if (typeof x === "string" && isDashboardPermissionKey(x)) out.add(x);
   }

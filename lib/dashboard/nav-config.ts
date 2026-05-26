@@ -48,7 +48,9 @@ export const DASHBOARD_NAV_GROUPS: {
   {
     group: "التتبع والإعلانات",
     items: [
+      { key: "ads", title: "ذكاء التسويق", href: "/dashboard/marketing-intelligence" },
       { key: "ads", title: "إدارة الإعلانات", href: "/dashboard/ads" },
+      { key: "referrals", title: "منشئ الحملات والروابط", href: "/dashboard/link-generator" },
       { key: "pixels", title: "البكسلات والتتبع", href: "/dashboard/pixels" },
       {
         key: "platformConnections",
