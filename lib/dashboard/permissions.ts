@@ -180,5 +180,21 @@ export function sessionHasDashboardPermission(
 
 export function sanitizeDashboardPermissions(raw: unknown): DashboardPermissionKey[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter((x): x is DashboardPermissionKey => typeof x === "string" && isDashboardPermissionKey(x));
+  const out = new Set<DashboardPermissionKey>();
+  for (const x of raw) {
+    if (typeof x === "string" && isDashboardPermissionKey(x)) out.add(x);
+  }
+  return [...out];
+}
+
+export function getFirstAllowedDashboardHref(
+  user: UserLike | undefined,
+  orderedHrefs: string[],
+  hrefToKey: (href: string) => DashboardPermissionKey | null
+): string | null {
+  for (const href of orderedHrefs) {
+    const key = hrefToKey(href);
+    if (key && userHasDashboardPermission(user, key)) return href;
+  }
+  return null;
 }
