@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { ensureConversionEventIndexes } from "@/lib/tracking/conversion-event-indexes";
 
 export type ConversionPlatform = "META" | "GA4" | "GOOGLE_ADS" | "TIKTOK" | "X" | "VERCEL";
 export type ConversionChannel = "server" | "browser";
@@ -28,6 +29,8 @@ function addDefined(target: Record<string, unknown>, key: string, value: unknown
 
 export async function recordConversionEvent(input: RecordConversionEventInput): Promise<void> {
   try {
+    await ensureConversionEventIndexes();
+
     const now = new Date();
     const sentAt = input.status === "SENT" ? input.sentAt ?? now : input.sentAt ?? null;
     const setDoc: Record<string, unknown> = {
