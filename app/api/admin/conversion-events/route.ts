@@ -48,25 +48,36 @@ export async function GET(request: NextRequest) {
   const from = parseDate(request.nextUrl.searchParams.get("from")) ?? new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   const to = parseDate(request.nextUrl.searchParams.get("to")) ?? new Date();
 
-  const filter: Query = { createdAt: { $gte: from, $lte: to } };
-  if (platform && platform !== "all") filter.platform = platform;
-  if (channel && channel !== "all") filter.channel = channel;
-  if (status && status !== "all") filter.status = status;
-  if (eventName && eventName !== "all") filter.eventName = eventName;
-  if (donationId) filter.donationId = donationId;
+  const clauses: Query[] = [
+    {
+      $or: [
+        { createdAt: { $gte: from, $lte: to } },
+        { updatedAt: { $gte: from, $lte: to } },
+        { createdAt: { $exists: false } },
+      ],
+    },
+  ];
+  if (platform && platform !== "all") clauses.push({ platform });
+  if (channel && channel !== "all") clauses.push({ channel });
+  if (status && status !== "all") clauses.push({ status });
+  if (eventName && eventName !== "all") clauses.push({ eventName });
+  if (donationId) clauses.push({ donationId });
   if (search) {
-    filter.$or = [
-      { eventId: { $regex: search, $options: "i" } },
-      { eventName: { $regex: search, $options: "i" } },
-      { donationId: { $regex: search, $options: "i" } },
-      { error: { $regex: search, $options: "i" } },
-    ];
+    clauses.push({
+      $or: [
+        { eventId: { $regex: search, $options: "i" } },
+        { eventName: { $regex: search, $options: "i" } },
+        { donationId: { $regex: search, $options: "i" } },
+        { error: { $regex: search, $options: "i" } },
+      ],
+    });
   }
+  const filter: Query = clauses.length === 1 ? clauses[0] : { $and: clauses };
 
   const result = await prisma.$runCommandRaw({
     find: "ConversionEvent",
     filter,
-    sort: { createdAt: -1 },
+    sort: { updatedAt: -1, createdAt: -1 },
     limit,
     projection: {
       eventId: 1,
