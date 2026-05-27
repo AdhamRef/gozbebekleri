@@ -97,8 +97,6 @@ export async function sendDonationServerConversions(donationId: string): Promise
     const amount = Number(row.amount ?? row.amountUSD ?? 0);
     if (!(amount > 0)) return { ok: false, skipped: true, reason: "amount <= 0" };
 
-    await prisma.donation.update({ where: { id: row.id }, data: { conversionEventsSentAt: new Date() } });
-
     const creds = await getMetaCapiCredentials();
     const attribution = (row.attribution ?? undefined) as Attribution | undefined;
     const eventSourceUrl = getStr(attribution, "landing_page");
@@ -115,9 +113,12 @@ export async function sendDonationServerConversions(donationId: string): Promise
 
     await recordConversionEvent({ donationId: row.id, eventId, eventName: "Donate", platform: "META", channel: "server", status: metaStatus(metaResult), dedupKey: eventId, value: amount, currency, error: metaResult.error ?? metaResult.reason ?? null, request: auditMetaPayload(row, eventId, custom_data), response: metaResult, sentAt: metaResult.ok ? new Date(eventTime * 1000) : null });
     await writeConversionAudit({ donationId: row.id, eventId, stage: "meta_capi_result", message: metaResult.ok ? "Meta CAPI Donate send succeeded" : "Meta CAPI Donate send did not succeed", metadata: { ...auditMetaPayload(row, eventId, custom_data), meta_result: metaResult } });
+    if (metaResult.ok) {
+      await prisma.donation.update({ where: { id: row.id }, data: { conversionEventsSentAt: new Date() } });
+    }
     await sendGa4Purchase(row, amount, currency, contentName, eventTime, eventId);
 
-    if (!metaResult.ok && !metaResult.skipped) console.error("[conversion] Donate send failed but claim retained:", row.id, metaResult.error, metaResult.fbtrace_id);
+    if (!metaResult.ok && !metaResult.skipped) console.error("[conversion] Donate send failed and donation was not marked sent:", row.id, metaResult.error, metaResult.fbtrace_id);
     return metaResult;
   } catch (e) {
     console.error("[conversion] sendDonationServerConversions", donationId, e);
