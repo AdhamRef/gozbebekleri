@@ -1,6 +1,5 @@
 import type { DashboardPermissionKey } from "./permissions";
 
-/** Sidebar structure (icons applied in DashboardLayoutClient) */
 export const DASHBOARD_NAV_GROUPS: {
   group: string;
   items: { key: DashboardPermissionKey; title: string; href: string }[];
@@ -45,33 +44,21 @@ export const DASHBOARD_NAV_GROUPS: {
     items: [
       { key: "ads", title: "ذكاء التسويق", href: "/dashboard/marketing-intelligence" },
       { key: "ads", title: "إدارة الإعلانات", href: "/dashboard/ads" },
+      { key: "ads", title: "أحداث التحويل", href: "/dashboard/conversion-events" },
       { key: "referrals", title: "منشئ الحملات والروابط", href: "/dashboard/link-generator" },
       { key: "pixels", title: "البكسلات والتتبع", href: "/dashboard/pixels" },
-      {
-        key: "platformConnections",
-        title: "ربط المنصات والحسابات",
-        href: "/dashboard/marketing/connections",
-      },
+      { key: "platformConnections", title: "ربط المنصات والحسابات", href: "/dashboard/marketing/connections" },
     ],
   },
   {
     group: "اعدادات عامة",
     items: [
-      {
-        key: "generalSettings",
-        title: "بوابات الدفع",
-        href: "/dashboard/general/payment-gateways",
-      },
-      {
-        key: "campaigns",
-        title: "افتراضي دعم الفريق",
-        href: "/dashboard/campaigns/team-support-defaults",
-      },
+      { key: "generalSettings", title: "بوابات الدفع", href: "/dashboard/general/payment-gateways" },
+      { key: "campaigns", title: "افتراضي دعم الفريق", href: "/dashboard/campaigns/team-support-defaults" },
     ],
   },
 ];
 
-/** Flat iteration order for “first allowed” redirectt */
 export const DASHBOARD_NAV_HREFS_ORDERED: string[] =
   DASHBOARD_NAV_GROUPS.flatMap((g) => g.items.map((i) => i.href));
 
@@ -85,7 +72,6 @@ export function dashboardHrefToPermissionKey(
   return null;
 }
 
-/** Flat list for permission checkboxes in admin user dialog */
 export const DASHBOARD_PERMISSION_ROWS = DASHBOARD_NAV_GROUPS.flatMap((g) =>
   g.items.map((item) => ({
     key: item.key,
@@ -94,10 +80,6 @@ export const DASHBOARD_PERMISSION_ROWS = DASHBOARD_NAV_GROUPS.flatMap((g) =>
   })),
 );
 
-/**
- * Action permissions — NOT tied to a sidebar route. These let staff perform
- * specific actions inside pages they can already access.
- */
 export const ACTION_PERMISSION_ROWS: {
   key: DashboardPermissionKey;
   title: string;
@@ -106,13 +88,11 @@ export const ACTION_PERMISSION_ROWS: {
   {
     key: "reportsExport",
     title: "تصدير التقارير",
-    description:
-      "إظهار زر تصدير التقرير والسماح بتنزيل تقارير التبرعات، الإحالات، والاشتراكات الشهرية.",
+    description: "إظهار زر تصدير التقارير والسماح بتنزيل ملفات التقارير من لوحة التحكم.",
   },
   {
     key: "donationsEdit",
-    title: "تعديل وحذف التبرعات",
-    description:
-      "السماح بالنقر بزر الفأرة الأيمن على أي تبرع في الجداول لتعديل قيمته/حالته أو حذفه. كل تعديل أو حذف يُحدّث تلقائيًا إجماليات المشاريع والحملات.",
+    title: "تعديل وإدارة التبرعات",
+    description: "السماح بإدارة بيانات التبرعات من الجداول مع تحديث إجماليات المشاريع والحملات تلقائيًا.",
   },
 ];
