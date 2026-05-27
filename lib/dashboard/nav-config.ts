@@ -43,6 +43,7 @@ export const DASHBOARD_NAV_GROUPS: {
     group: "التتبع والإعلانات",
     items: [
       { key: "ads", title: "ذكاء التسويق", href: "/dashboard/marketing-intelligence" },
+      { key: "ads", title: "مزامنة Meta", href: "/dashboard/marketing-intelligence/meta-sync" },
       { key: "ads", title: "إدارة الإعلانات", href: "/dashboard/ads" },
       { key: "ads", title: "أحداث التحويل", href: "/dashboard/conversion-events" },
       { key: "referrals", title: "منشئ الحملات والروابط", href: "/dashboard/link-generator" },
