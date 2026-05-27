@@ -19,6 +19,12 @@ type AttributionSignals = {
   warnings: string[];
 };
 
+type LedgerState = {
+  hasLedger: boolean;
+  hasSent: boolean;
+  statuses: string[];
+};
+
 function legacyOid(id: string) {
   return /^[a-f0-9]{24}$/i.test(id) ? { $oid: id } : id;
 }
@@ -58,23 +64,32 @@ function attributionSignals(raw: unknown): AttributionSignals {
   return { fbclid, fbc, fbp, utm, campaign, ad, adset, quality, warnings };
 }
 
-async function hasMetaServerLedger(donationId: string): Promise<boolean> {
+async function metaServerLedgerState(donationId: string): Promise<LedgerState> {
   try {
     const result = await prisma.$runCommandRaw({
-      count: "ConversionEvent",
-      query: {
+      find: "ConversionEvent",
+      filter: {
         platform: "META",
         channel: "server",
+        eventName: "Donate",
         $or: [
           { donationId },
           { donationId: legacyOid(donationId) },
           { eventId: `donate_${donationId}` },
         ],
       },
+      projection: { status: 1 },
+      limit: 20,
     });
-    return isRecord(result) && typeof result.n === "number" && result.n > 0;
+    const batch = isRecord(result) && isRecord(result.cursor) && Array.isArray(result.cursor.firstBatch)
+      ? result.cursor.firstBatch
+      : [];
+    const statuses = batch
+      .map((item) => (isRecord(item) && typeof item.status === "string" ? item.status : "UNKNOWN"))
+      .filter(Boolean);
+    return { hasLedger: statuses.length > 0, hasSent: statuses.includes("SENT"), statuses };
   } catch {
-    return false;
+    return { hasLedger: false, hasSent: false, statuses: [] };
   }
 }
 
@@ -95,10 +110,10 @@ export async function POST(request: NextRequest) {
     select: { id: true, paidAt: true, amount: true, currency: true, conversionEventsSentAt: true, attribution: true },
   });
 
-  const rows = [];
+  const rows: Array<typeof recentPaid[number] & { ledger: LedgerState }> = [];
   for (const row of recentPaid) {
-    if (row.conversionEventsSentAt == null) rows.push(row);
-    else if (!(await hasMetaServerLedger(row.id))) rows.push(row);
+    const ledger = await metaServerLedgerState(row.id);
+    if (!ledger.hasSent) rows.push({ ...row, ledger });
     if (rows.length >= limit) break;
   }
 
@@ -114,6 +129,7 @@ export async function POST(request: NextRequest) {
       amount: row.amount,
       currency: row.currency,
       wasAlreadyMarkedSent: row.conversionEventsSentAt != null,
+      previousLedger: row.ledger,
       attribution: attributionSignals(row.attribution),
       result,
     });
