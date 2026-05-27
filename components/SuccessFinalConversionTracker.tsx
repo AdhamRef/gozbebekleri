@@ -21,6 +21,12 @@ type DonateTrackingPayload = {
   numItems?: number;
 };
 
+type FbqFn = (command: string, eventName: string, params?: Record<string, unknown>, options?: Record<string, unknown>) => void;
+
+declare global {
+  interface Window { fbq?: FbqFn; }
+}
+
 const MAX_ATTEMPTS = 20;
 const RETRY_MS = 750;
 
@@ -35,7 +41,7 @@ function donationIdFromPath(pathname: string | null) {
   return index >= 0 ? parts[index + 1] ?? null : null;
 }
 
-async function logMetaBrowser(payload: DonateTrackingPayload) {
+async function logMetaBrowser(payload: DonateTrackingPayload, status: "SENT" | "FAILED" | "SKIPPED", error?: string) {
   try {
     await fetch(`/api/donations/${encodeURIComponent(payload.transactionId)}/track-browser-conversion`, {
       method: "POST",
@@ -47,10 +53,36 @@ async function logMetaBrowser(payload: DonateTrackingPayload) {
         eventId: payload.eventId,
         value: payload.value,
         currency: payload.currency,
-        status: "SENT",
+        status,
+        error,
       }),
     });
   } catch {}
+}
+
+function fireMetaBrowserDonate(payload: DonateTrackingPayload): { ok: boolean; error?: string } {
+  if (typeof window === "undefined") return { ok: false, error: "window unavailable" };
+  if (typeof window.fbq !== "function") return { ok: false, error: "fbq unavailable" };
+  try {
+    window.fbq("track", "Donate", {
+      value: payload.value,
+      currency: payload.currency,
+      content_type: "donation",
+      content_name: payload.contentName,
+      content_ids: payload.contentIds,
+      contents: payload.contents,
+      num_items: payload.numItems,
+      order_id: payload.transactionId,
+      transaction_id: payload.transactionId,
+      status: "paid",
+      success: true,
+      donation_type: "one_time",
+      payment_method: "card",
+    }, { eventID: payload.eventId });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "fbq failed" };
+  }
 }
 
 export function SuccessFinalConversionTracker() {
@@ -90,8 +122,9 @@ export function SuccessFinalConversionTracker() {
       try {
         const cfgRes = await fetch("/api/tracking/config", { cache: "no-store" });
         const config = (await cfgRes.json().catch(() => ({}))) as PublicTrackingConfig;
+        const metaResult = fireMetaBrowserDonate(payload);
         await Promise.allSettled([
-          logMetaBrowser(payload),
+          logMetaBrowser(payload, metaResult.ok ? "SENT" : "SKIPPED", metaResult.error),
           fireGoogleAdsDonationConversion(config, payload),
           fireTikTokDonationConversion(config, payload),
           fireXDonationConversion(config, payload),
