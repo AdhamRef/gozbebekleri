@@ -9,6 +9,14 @@ export const dynamic = "force-dynamic";
 
 type Query = Record<string, unknown>;
 
+type AuditFallbackRow = {
+  id: string;
+  createdAt: Date;
+  entityId: string | null;
+  messageAr: string | null;
+  metadata: unknown;
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -28,6 +36,51 @@ function numberParam(request: NextRequest, key: string, fallback: number, max: n
   const raw = Number(request.nextUrl.searchParams.get(key));
   if (!Number.isFinite(raw) || raw <= 0) return fallback;
   return Math.min(Math.floor(raw), max);
+}
+
+function metaString(metadata: unknown, key: string): string | null {
+  if (!isRecord(metadata)) return null;
+  const value = metadata[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function metaNumber(metadata: unknown, key: string): number | null {
+  if (!isRecord(metadata)) return null;
+  const value = metadata[key];
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && Number.isFinite(Number(value))) return Number(value);
+  return null;
+}
+
+function metaNested(metadata: unknown, key: string): unknown {
+  return isRecord(metadata) ? metadata[key] : undefined;
+}
+
+function auditToEvent(row: AuditFallbackRow) {
+  const metadata = row.metadata;
+  const stage = metaString(metadata, "stage") ?? "conversion_audit";
+  const eventId = metaString(metadata, "event_id") ?? metaString(metadata, "eventId") ?? row.entityId ?? row.id;
+  const donationId = metaString(metadata, "donation_id") ?? metaString(metadata, "donationId") ?? row.entityId ?? undefined;
+  const metaResult = metaNested(metadata, "meta_result");
+  const status = isRecord(metaResult)
+    ? (metaResult.ok === true ? "SENT" : metaResult.skipped === true ? "SKIPPED" : "FAILED")
+    : stage.includes("result") ? "SENT" : "PENDING";
+  return {
+    _id: row.id,
+    eventId,
+    eventName: stage.includes("ga4") ? "purchase" : "Donate",
+    platform: stage.includes("ga4") ? "GA4" : "META",
+    channel: "server",
+    status,
+    donationId,
+    value: metaNumber(metadata, "amount") ?? metaNumber(metadata, "value"),
+    currency: metaString(metadata, "currency"),
+    attempts: 1,
+    error: isRecord(metaResult) && typeof metaResult.error === "string" ? metaResult.error : null,
+    createdAt: row.createdAt,
+    updatedAt: row.createdAt,
+    response: metaResult ?? { source: "auditLog", stage, message: row.messageAr },
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -98,15 +151,42 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  const batch = isRecord(result) && isRecord(result.cursor) && Array.isArray(result.cursor.firstBatch)
+  let batch = isRecord(result) && isRecord(result.cursor) && Array.isArray(result.cursor.firstBatch)
     ? result.cursor.firstBatch
     : [];
+  let source = "ConversionEvent";
+
+  if (batch.length === 0) {
+    const audits = await prisma.auditLog.findMany({
+      where: {
+        action: "CONVERSION_TRACKING_AUDIT",
+        createdAt: { gte: from, lte: to },
+        ...(donationId ? { entityId: donationId } : {}),
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      select: { id: true, createdAt: true, entityId: true, messageAr: true, metadata: true },
+    });
+    batch = audits.map(auditToEvent).filter((event) => {
+      if (platform && platform !== "all" && event.platform !== platform) return false;
+      if (channel && channel !== "all" && event.channel !== channel) return false;
+      if (status && status !== "all" && event.status !== status) return false;
+      if (eventName && eventName !== "all" && event.eventName !== eventName) return false;
+      if (search) {
+        const haystack = `${event.eventId} ${event.eventName} ${event.donationId ?? ""} ${event.error ?? ""}`.toLowerCase();
+        if (!haystack.includes(search.toLowerCase())) return false;
+      }
+      return true;
+    });
+    source = "auditLogFallback";
+  }
 
   const countResult = await prisma.$runCommandRaw({ count: "ConversionEvent", query: filter }).catch(() => ({ n: batch.length }));
-  const total = isRecord(countResult) && typeof countResult.n === "number" ? countResult.n : batch.length;
+  const total = isRecord(countResult) && typeof countResult.n === "number" && source === "ConversionEvent" ? countResult.n : batch.length;
 
   return NextResponse.json({
     ok: true,
+    source,
     total,
     limit,
     from: from.toISOString(),
