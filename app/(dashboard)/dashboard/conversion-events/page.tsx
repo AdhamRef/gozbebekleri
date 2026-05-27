@@ -26,7 +26,9 @@ type ConversionEventRow = {
 
 type ApiResponse = {
   ok: boolean;
+  source?: "ConversionEvent" | "auditLogFallback" | string;
   total: number;
+  rawTotal?: number;
   events: ConversionEventRow[];
 };
 
@@ -44,9 +46,17 @@ function rowKey(row: ConversionEventRow, index: number) {
   return row._id?.$oid ?? row.eventId ?? String(index);
 }
 
+function sourceLabel(source: string | null) {
+  if (source === "ConversionEvent") return "المصدر الأساسي: ConversionEvent";
+  if (source === "auditLogFallback") return "المصدر الاحتياطي: auditLog";
+  return "المصدر: غير محدد";
+}
+
 export default function ConversionEventsPage() {
   const [events, setEvents] = React.useState<ConversionEventRow[]>([]);
   const [total, setTotal] = React.useState(0);
+  const [rawTotal, setRawTotal] = React.useState(0);
+  const [source, setSource] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [platform, setPlatform] = React.useState("all");
   const [channel, setChannel] = React.useState("all");
@@ -64,10 +74,14 @@ export default function ConversionEventsPage() {
       if (!res.ok || !data?.ok) throw new Error("failed");
       setEvents(data.events || []);
       setTotal(data.total || 0);
+      setRawTotal(data.rawTotal || data.total || 0);
+      setSource(data.source || null);
     } catch {
       toast.error("تعذر تحميل أحداث التحويل");
       setEvents([]);
       setTotal(0);
+      setRawTotal(0);
+      setSource(null);
     } finally {
       setLoading(false);
     }
@@ -101,9 +115,15 @@ export default function ConversionEventsPage() {
     <Card>
       <CardHeader>
         <CardTitle>السجل</CardTitle>
-        <CardDescription>إجمالي مطابق للفلاتر: {total}</CardDescription>
+        <CardDescription>
+          إجمالي مطابق للفلاتر: {total}
+          {rawTotal > total ? ` من أصل ${rawTotal} سجل خام بعد الدمج` : ""}
+          {source ? ` — ${sourceLabel(source)}` : ""}
+        </CardDescription>
       </CardHeader>
       <CardContent>
+        {source === "auditLogFallback" ? <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">هذه النتائج من سجل التدقيق الاحتياطي. الأحداث الجديدة بعد آخر تحديث يجب أن تظهر من المصدر الأساسي ConversionEvent.</div> : null}
+        {source === "ConversionEvent" ? <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">النتائج الحالية من المصدر الأساسي ConversionEvent.</div> : null}
         {loading ? <div className="flex min-h-[18rem] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#025EB8]" /></div> : <div className="overflow-x-auto rounded-xl border">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-xs text-slate-500">
