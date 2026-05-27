@@ -17,6 +17,23 @@ type AuditFallbackRow = {
   metadata: unknown;
 };
 
+type ConversionEventLike = {
+  _id?: unknown;
+  eventId?: string;
+  eventName?: string;
+  platform?: string;
+  channel?: string;
+  status?: string;
+  donationId?: string;
+  value?: number | null;
+  currency?: string | null;
+  attempts?: number;
+  error?: string | null;
+  createdAt?: Date | string | { $date?: string };
+  updatedAt?: Date | string | { $date?: string };
+  response?: unknown;
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -56,7 +73,64 @@ function metaNested(metadata: unknown, key: string): unknown {
   return isRecord(metadata) ? metadata[key] : undefined;
 }
 
-function auditToEvent(row: AuditFallbackRow) {
+function toDate(value: ConversionEventLike["createdAt"]): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === "string") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  if (isRecord(value) && typeof value.$date === "string") {
+    const date = new Date(value.$date);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+}
+
+function statusRank(status?: string) {
+  if (status === "SENT") return 4;
+  if (status === "FAILED") return 3;
+  if (status === "SKIPPED") return 2;
+  if (status === "PENDING") return 1;
+  return 0;
+}
+
+function collapseEvents(rows: ConversionEventLike[]): ConversionEventLike[] {
+  const map = new Map<string, ConversionEventLike>();
+  for (const row of rows) {
+    const key = [
+      row.platform ?? "UNKNOWN",
+      row.channel ?? "server",
+      row.eventName ?? "Donate",
+      row.eventId ?? row.donationId ?? "unknown",
+    ].join("|");
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, { ...row, attempts: Math.max(1, Number(row.attempts ?? 1)) });
+      continue;
+    }
+    const existingDate = toDate(existing.updatedAt) ?? toDate(existing.createdAt) ?? new Date(0);
+    const rowDate = toDate(row.updatedAt) ?? toDate(row.createdAt) ?? new Date(0);
+    const betterStatus = statusRank(row.status) > statusRank(existing.status) ? row.status : existing.status;
+    const newest = rowDate >= existingDate ? row : existing;
+    map.set(key, {
+      ...existing,
+      ...newest,
+      status: betterStatus,
+      attempts: Math.max(1, Number(existing.attempts ?? 1)) + Math.max(1, Number(row.attempts ?? 1)),
+      error: newest.error ?? existing.error ?? null,
+      value: newest.value ?? existing.value,
+      currency: newest.currency ?? existing.currency,
+    });
+  }
+  return [...map.values()].sort((a, b) => {
+    const da = toDate(a.updatedAt) ?? toDate(a.createdAt) ?? new Date(0);
+    const db = toDate(b.updatedAt) ?? toDate(b.createdAt) ?? new Date(0);
+    return db.getTime() - da.getTime();
+  });
+}
+
+function auditToEvent(row: AuditFallbackRow): ConversionEventLike {
   const metadata = row.metadata;
   const stage = metaString(metadata, "stage") ?? "conversion_audit";
   const eventId = metaString(metadata, "event_id") ?? metaString(metadata, "eventId") ?? row.entityId ?? row.id;
@@ -131,7 +205,7 @@ export async function GET(request: NextRequest) {
     find: "ConversionEvent",
     filter,
     sort: { updatedAt: -1, createdAt: -1 },
-    limit,
+    limit: limit * 5,
     projection: {
       eventId: 1,
       eventName: 1,
@@ -151,8 +225,8 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  let batch = isRecord(result) && isRecord(result.cursor) && Array.isArray(result.cursor.firstBatch)
-    ? result.cursor.firstBatch
+  let batch: ConversionEventLike[] = isRecord(result) && isRecord(result.cursor) && Array.isArray(result.cursor.firstBatch)
+    ? result.cursor.firstBatch as ConversionEventLike[]
     : [];
   let source = "ConversionEvent";
 
@@ -164,13 +238,12 @@ export async function GET(request: NextRequest) {
         ...(donationId ? { entityId: donationId } : {}),
       },
       orderBy: { createdAt: "desc" },
-      take: limit,
+      take: limit * 5,
       select: { id: true, createdAt: true, entityId: true, messageAr: true, metadata: true },
     });
     batch = audits.map(auditToEvent).filter((event) => {
       if (platform && platform !== "all" && event.platform !== platform) return false;
       if (channel && channel !== "all" && event.channel !== channel) return false;
-      if (status && status !== "all" && event.status !== status) return false;
       if (eventName && eventName !== "all" && event.eventName !== eventName) return false;
       if (search) {
         const haystack = `${event.eventId} ${event.eventName} ${event.donationId ?? ""} ${event.error ?? ""}`.toLowerCase();
@@ -181,17 +254,19 @@ export async function GET(request: NextRequest) {
     source = "auditLogFallback";
   }
 
-  const countResult = await prisma.$runCommandRaw({ count: "ConversionEvent", query: filter }).catch(() => ({ n: batch.length }));
-  const total = isRecord(countResult) && typeof countResult.n === "number" && source === "ConversionEvent" ? countResult.n : batch.length;
+  let collapsed = collapseEvents(batch);
+  if (status && status !== "all") collapsed = collapsed.filter((event) => event.status === status);
+  collapsed = collapsed.slice(0, limit);
 
   return NextResponse.json({
     ok: true,
     source,
-    total,
+    total: collapsed.length,
+    rawTotal: batch.length,
     limit,
     from: from.toISOString(),
     to: to.toISOString(),
     filters: { platform, channel, status, eventName, donationId, search },
-    events: batch,
+    events: collapsed,
   });
 }
