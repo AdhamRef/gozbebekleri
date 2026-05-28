@@ -1,3 +1,4 @@
+import { createHmac } from "crypto";
 import type {
   SyncAdGroupSnapshot,
   SyncAdSnapshot,
@@ -38,6 +39,12 @@ function cleanAccountId(accountId: string): string {
   return id.startsWith("act_") ? id : `act_${id}`;
 }
 
+function proofForServerCalls(token: string, secret?: string | null): string | null {
+  const clean = secret?.trim();
+  if (!clean) return null;
+  return createHmac("sha256", clean).update(token).digest("hex");
+}
+
 function metricFromActions(row: MetaInsightRow, keys: string[]): number {
   const actions = row.actions;
   if (!Array.isArray(actions)) return 0;
@@ -76,15 +83,18 @@ function reportedConversionValue(row: MetaInsightRow): number {
   return valueFromActionValues(row, CONVERSION_KEYS);
 }
 
-async function graphGetAll(path: string, accessToken: string, params: Record<string, string>): Promise<MetaInsightRow[]> {
+async function graphGetAll(path: string, token: string, proof: string | null, params: Record<string, string>): Promise<MetaInsightRow[]> {
   const rows: MetaInsightRow[] = [];
   const url = new URL(`${BASE}/${path}`);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
-  url.searchParams.set("access_token", accessToken);
+  url.searchParams.set("access_token", token);
+  if (proof) url.searchParams.set("appsecret_proof", proof);
 
   let next: string | null = url.toString();
   while (next) {
-    const res = await fetch(next, { cache: "no-store" });
+    const pageUrl = new URL(next);
+    if (proof && !pageUrl.searchParams.get("appsecret_proof")) pageUrl.searchParams.set("appsecret_proof", proof);
+    const res = await fetch(pageUrl.toString(), { cache: "no-store" });
     const data = (await res.json().catch(() => ({}))) as { data?: MetaInsightRow[]; paging?: { next?: string }; error?: { message?: string; code?: number; type?: string } };
     if (!res.ok) {
       const msg = data.error?.message || `Meta API HTTP ${res.status}`;
@@ -204,13 +214,14 @@ export const syncMeta: SyncClient = async ({ connection, dateFrom, dateTo }): Pr
 
   try {
     const account = cleanAccountId(connection.accountId!);
-    const accessToken = connection.accessToken!;
-    const campaignRows = await graphGetAll(`${account}/insights`, accessToken, baseParams(dateFrom, dateTo, "campaign"));
-    const adsetRows = await graphGetAll(`${account}/insights`, accessToken, {
+    const token = connection.accessToken!;
+    const proof = proofForServerCalls(token, connection.appSecret);
+    const campaignRows = await graphGetAll(`${account}/insights`, token, proof, baseParams(dateFrom, dateTo, "campaign"));
+    const adsetRows = await graphGetAll(`${account}/insights`, token, proof, {
       ...baseParams(dateFrom, dateTo, "adset"),
       breakdowns: "country,publisher_platform",
     });
-    const adRows = await graphGetAll(`${account}/insights`, accessToken, {
+    const adRows = await graphGetAll(`${account}/insights`, token, proof, {
       ...baseParams(dateFrom, dateTo, "ad"),
       breakdowns: "country,publisher_platform",
     });
