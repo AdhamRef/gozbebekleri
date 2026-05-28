@@ -20,37 +20,50 @@ function friendlyMetaError(message: string): { message: string; error: string; m
   return { message: "فشلت مزامنة Meta Insights API.", error: message.slice(0, 240) };
 }
 
-function metricFromActions(row: MetaInsightRow, keys: string[]): number {
+function isDonationActionType(type: string | null): boolean {
+  if (!type) return false;
+  const t = type.toLowerCase();
+  return (
+    t === "purchase" ||
+    t.endsWith(".purchase") ||
+    t.includes("pixel_purchase") ||
+    t.includes("onsite_conversion.purchase") ||
+    t.includes("offsite_conversion.fb_pixel_purchase") ||
+    t.includes("donate") ||
+    t.includes("donation") ||
+    t.includes("completepayment") ||
+    t.includes("complete_payment")
+  );
+}
+
+function metricFromDonationActions(row: MetaInsightRow): number {
   const actions = row.actions;
   if (!Array.isArray(actions)) return 0;
   let total = 0;
   for (const action of actions) {
     if (!action || typeof action !== "object") continue;
     const record = action as Record<string, unknown>;
-    const type = asString(record.action_type)?.toLowerCase();
-    if (!type || !keys.some((key) => type === key || type.includes(key))) continue;
+    if (!isDonationActionType(asString(record.action_type))) continue;
     total += asNumber(record.value);
   }
   return total;
 }
 
-function valueFromActionValues(row: MetaInsightRow, keys: string[]): number {
+function valueFromDonationActions(row: MetaInsightRow): number {
   const values = row.action_values;
   if (!Array.isArray(values)) return 0;
   let total = 0;
   for (const action of values) {
     if (!action || typeof action !== "object") continue;
     const record = action as Record<string, unknown>;
-    const type = asString(record.action_type)?.toLowerCase();
-    if (!type || !keys.some((key) => type === key || type.includes(key))) continue;
+    if (!isDonationActionType(asString(record.action_type))) continue;
     total += asNumber(record.value);
   }
   return total;
 }
 
-const CONVERSION_KEYS = ["donate", "purchase", "offsite_conversion", "complete_registration"];
-function reportedConversions(row: MetaInsightRow): number { return metricFromActions(row, CONVERSION_KEYS); }
-function reportedConversionValue(row: MetaInsightRow): number { return valueFromActionValues(row, CONVERSION_KEYS); }
+function reportedConversions(row: MetaInsightRow): number { return metricFromDonationActions(row); }
+function reportedConversionValue(row: MetaInsightRow): number { return valueFromDonationActions(row); }
 
 async function graphGetAll(path: string, token: string, proof: string | null, params: Record<string, string>): Promise<MetaInsightRow[]> {
   const rows: MetaInsightRow[] = [];
