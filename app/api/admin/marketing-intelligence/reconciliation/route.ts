@@ -24,6 +24,9 @@ type Bucket = {
   matchedStrong: number;
   matchedMedium: number;
   matchedWeak: number;
+  siteTouched: boolean;
+  platformTouched: boolean;
+  matchReason?: string | null;
 };
 
 function isRecord(value: unknown): value is Attribution {
@@ -52,6 +55,37 @@ function numberParam(request: NextRequest, key: string, fallback: number, min: n
 
 function dateKey(date: Date) {
   return date.toISOString().slice(0, 10);
+}
+
+function normalizeName(value: string | null | undefined): string | null {
+  const normalized = value
+    ?.normalize("NFKC")
+    .toLowerCase()
+    .replace(/[|_\-–—/\\]+/g, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+  return normalized || null;
+}
+
+function tokenScore(a: string | null, b: string | null): number {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  if (a.includes(b) || b.includes(a)) return 0.82;
+  const at = new Set(a.split(" ").filter((x) => x.length > 1));
+  const bt = new Set(b.split(" ").filter((x) => x.length > 1));
+  if (at.size === 0 || bt.size === 0) return 0;
+  let shared = 0;
+  for (const t of at) if (bt.has(t)) shared += 1;
+  return shared / Math.max(at.size, bt.size);
+}
+
+function indexName(index: Map<string, string>, bucket: Bucket, ...names: Array<string | null | undefined>) {
+  for (const name of names) {
+    const n = normalizeName(name);
+    if (!n) continue;
+    if (!index.has(n)) index.set(n, bucket.key);
+  }
 }
 
 function attributionQuality(attribution: unknown) {
@@ -117,10 +151,56 @@ function ensureBucket(map: Map<string, Bucket>, key: string, label: string): Buc
       matchedStrong: 0,
       matchedMedium: 0,
       matchedWeak: 0,
+      siteTouched: false,
+      platformTouched: false,
+      matchReason: null,
     };
     map.set(key, row);
   }
   return row;
+}
+
+function findBestBucketByName(buckets: Map<string, Bucket>, nameIndex: Map<string, string>, ...names: Array<string | null | undefined>): { bucket: Bucket | null; reason: string | null } {
+  for (const name of names) {
+    const n = normalizeName(name);
+    if (!n) continue;
+    const exactKey = nameIndex.get(n);
+    if (exactKey) return { bucket: buckets.get(exactKey) ?? null, reason: "name_exact" };
+  }
+
+  let best: { bucket: Bucket; score: number } | null = null;
+  const normalizedCandidates = names.map(normalizeName).filter(Boolean) as string[];
+  for (const bucket of buckets.values()) {
+    if (!bucket.siteTouched) continue;
+    const bucketNames = [bucket.label, bucket.campaignName, bucket.campaignId, bucket.adId].map(normalizeName).filter(Boolean) as string[];
+    for (const a of normalizedCandidates) {
+      for (const b of bucketNames) {
+        const score = tokenScore(a, b);
+        if (score >= 0.72 && (!best || score > best.score)) best = { bucket, score };
+      }
+    }
+  }
+  return best ? { bucket: best.bucket, reason: `name_similarity_${best.score.toFixed(2)}` } : { bucket: null, reason: null };
+}
+
+function findBucketForPlatformSnapshot(
+  buckets: Map<string, Bucket>,
+  nameIndex: Map<string, string>,
+  snapshot: { adId?: string | null; campaignId?: string | null; campaignName?: string | null; adName?: string | null },
+  fallbackKey: string,
+  fallbackLabel: string,
+): { bucket: Bucket; reason: string } {
+  if (snapshot.adId) {
+    const directAd = buckets.get(`ad:${snapshot.adId}`);
+    if (directAd) return { bucket: directAd, reason: "ad_id" };
+  }
+  if (snapshot.campaignId) {
+    const directCampaign = buckets.get(`campaign:${snapshot.campaignId}`);
+    if (directCampaign) return { bucket: directCampaign, reason: "campaign_id" };
+  }
+  const byName = findBestBucketByName(buckets, nameIndex, snapshot.adName, snapshot.campaignName);
+  if (byName.bucket) return { bucket: byName.bucket, reason: byName.reason ?? "name" };
+  return { bucket: ensureBucket(buckets, fallbackKey, fallbackLabel), reason: "platform_only" };
 }
 
 export async function GET(request: NextRequest) {
@@ -138,16 +218,7 @@ export async function GET(request: NextRequest) {
 
   const donations = await prisma.donation.findMany({
     where: { status: "PAID", paidAt: { gte: from, lte: to } },
-    select: {
-      id: true,
-      amount: true,
-      amountUSD: true,
-      currency: true,
-      paidAt: true,
-      donorCountryCode: true,
-      attribution: true,
-      conversionEventsSentAt: true,
-    },
+    select: { id: true, amount: true, amountUSD: true, currency: true, paidAt: true, donorCountryCode: true, attribution: true, conversionEventsSentAt: true },
     orderBy: { paidAt: "desc" },
     take: 2000,
   });
@@ -164,6 +235,7 @@ export async function GET(request: NextRequest) {
   });
 
   const buckets = new Map<string, Bucket>();
+  const nameIndex = new Map<string, string>();
   const countryMismatches: Array<Record<string, unknown>> = [];
   let paidRevenue = 0;
   let platformAttributedDonations = 0;
@@ -181,6 +253,7 @@ export async function GET(request: NextRequest) {
 
     const key = bucketKey(attribution);
     const bucket = ensureBucket(buckets, key, labelForAttribution(attribution));
+    bucket.siteTouched = true;
     bucket.siteDonations += 1;
     bucket.siteRevenue += amount;
     bucket.source ||= stringValue(attribution, "utm_source") || stringValue(attribution, "channel");
@@ -188,6 +261,7 @@ export async function GET(request: NextRequest) {
     bucket.campaignName ||= stringValue(attribution, "utm_campaign") || stringValue(attribution, "campaign_name");
     bucket.adsetId ||= stringValue(attribution, "adset_id") || stringValue(attribution, "ad_group_id");
     bucket.adId ||= stringValue(attribution, "ad_id");
+    indexName(nameIndex, bucket, bucket.label, bucket.campaignName, bucket.campaignId, bucket.adId);
 
     const quality = attributionQuality(attribution);
     if (quality === "strong") { strongAttribution += 1; bucket.matchedStrong += 1; }
@@ -197,16 +271,7 @@ export async function GET(request: NextRequest) {
     const adCountry = normalizedCountry(stringValue(attribution, "target_country") || stringValue(attribution, "ad_country") || stringValue(attribution, "country"));
     const donorCountry = normalizedCountry(donation.donorCountryCode || stringValue(attribution, "donor_country") || stringValue(attribution, "billing_country"));
     if (adCountry && donorCountry && adCountry !== donorCountry) {
-      countryMismatches.push({
-        donationId: donation.id,
-        amount,
-        currency: donation.currency,
-        adCountry,
-        donorCountry,
-        source: bucket.source,
-        campaign: bucket.campaignName ?? bucket.campaignId,
-        adId: bucket.adId,
-      });
+      countryMismatches.push({ donationId: donation.id, amount, currency: donation.currency, adCountry, donorCountry, source: bucket.source, campaign: bucket.campaignName ?? bucket.campaignId, adId: bucket.adId });
     }
   }
 
@@ -217,17 +282,33 @@ export async function GET(request: NextRequest) {
     platformSpend += snap.spend || 0;
     platformConversions += snap.reportedConversions || 0;
     platformValue += snap.reportedConversionValue || 0;
-    const key = `campaign:${snap.campaignId}`;
-    const bucket = ensureBucket(buckets, key, snap.campaignName || snap.campaignId);
+    const { bucket, reason } = findBucketForPlatformSnapshot(
+      buckets,
+      nameIndex,
+      { campaignId: snap.campaignId, campaignName: snap.campaignName },
+      `campaign:${snap.campaignId}`,
+      snap.campaignName || snap.campaignId,
+    );
+    bucket.platformTouched = true;
+    bucket.matchReason ||= reason;
     bucket.campaignId ||= snap.campaignId;
     bucket.campaignName ||= snap.campaignName;
     bucket.platformSpend += snap.spend || 0;
     bucket.platformReportedConversions += snap.reportedConversions || 0;
     bucket.platformReportedValue += snap.reportedConversionValue || 0;
+    indexName(nameIndex, bucket, bucket.label, bucket.campaignName, snap.campaignName);
   }
+
   for (const snap of adSnapshots) {
-    const key = `ad:${snap.adId}`;
-    const bucket = ensureBucket(buckets, key, snap.adName || snap.adId);
+    const { bucket, reason } = findBucketForPlatformSnapshot(
+      buckets,
+      nameIndex,
+      { adId: snap.adId, adName: snap.adName, campaignId: snap.campaignId, campaignName: snap.campaignName },
+      `ad:${snap.adId}`,
+      snap.adName || snap.adId,
+    );
+    bucket.platformTouched = true;
+    bucket.matchReason ||= reason;
     bucket.adId ||= snap.adId;
     bucket.campaignId ||= snap.campaignId;
     bucket.campaignName ||= snap.campaignName;
@@ -235,19 +316,24 @@ export async function GET(request: NextRequest) {
     bucket.platformSpend += snap.spend || 0;
     bucket.platformReportedConversions += snap.reportedConversions || 0;
     bucket.platformReportedValue += snap.reportedConversionValue || 0;
+    indexName(nameIndex, bucket, bucket.label, bucket.campaignName, snap.campaignName, snap.adName);
   }
 
   const rows = [...buckets.values()].map((row) => ({
     ...row,
+    matchStatus: row.siteTouched && row.platformTouched ? "matched" : row.platformTouched ? "platform_only" : row.siteTouched ? "site_only" : "unknown",
     actualRoas: row.platformSpend > 0 ? row.siteRevenue / row.platformSpend : null,
     platformRoas: row.platformSpend > 0 ? row.platformReportedValue / row.platformSpend : null,
     conversionGap: row.siteDonations - row.platformReportedConversions,
     valueGap: row.siteRevenue - row.platformReportedValue,
-  })).sort((a, b) => Math.max(b.siteRevenue, b.platformReportedValue) - Math.max(a.siteRevenue, a.platformReportedValue)).slice(0, 100);
+  })).sort((a, b) => Math.max(b.siteRevenue, b.platformReportedValue, b.platformSpend) - Math.max(a.siteRevenue, a.platformReportedValue, a.platformSpend)).slice(0, 100);
 
+  const unmatchedSiteRows = rows.filter((r) => r.matchStatus === "site_only").length;
+  const unmatchedPlatformRows = rows.filter((r) => r.matchStatus === "platform_only").length;
   const recommendations: string[] = [];
   if (platformSpend > 0 && paidRevenue === 0) recommendations.push("يوجد إنفاق منصات بدون تبرعات فعلية في الموقع خلال الفترة؛ راجع الحملات/الدول الأعلى إنفاقًا.");
   if (weakAttribution > 0) recommendations.push(`يوجد ${weakAttribution} تبرع بإسناد ضعيف؛ راجع روابط UTM و fbclid/fbc.`);
+  if (unmatchedSiteRows > 0 || unmatchedPlatformRows > 0) recommendations.push(`توجد صفوف غير مطابقة: ${unmatchedSiteRows} من الموقع فقط و ${unmatchedPlatformRows} من المنصة فقط؛ راجع أسماء الحملات و UTM/IDs.`);
   if (countryMismatches.length > 0) recommendations.push(`يوجد ${countryMismatches.length} اختلاف دولة بين الإعلان/الرابط ودولة المتبرع؛ لا تعتبره خطأ مباشرًا لكن راجعه في الاستهداف والدفع.`);
   if (platformConversions > donations.length * 1.4 && donations.length > 0) recommendations.push("نتائج المنصة أعلى بكثير من التبرعات الفعلية؛ راجع attribution window و view-through conversions.");
   if (cApiMarkedSent < donations.length) recommendations.push("بعض التبرعات المدفوعة ليست موسومة كمرسلة CAPI؛ شغّل مراجعة التحويلات المفقودة.");
@@ -268,6 +354,9 @@ export async function GET(request: NextRequest) {
       platformRoas: platformSpend > 0 ? platformValue / platformSpend : null,
       attribution: { strong: strongAttribution, medium: mediumAttribution, weak: weakAttribution },
       countryMismatchCount: countryMismatches.length,
+      unmatchedSiteRows,
+      unmatchedPlatformRows,
+      matchedRows: rows.filter((r) => r.matchStatus === "matched").length,
     },
     rows,
     countryMismatches: countryMismatches.slice(0, 100),
