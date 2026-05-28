@@ -45,6 +45,25 @@ function proofForServerCalls(token: string, secret?: string | null): string | nu
   return createHmac("sha256", clean).update(token).digest("hex");
 }
 
+function friendlyMetaError(message: string): { message: string; error: string; missing?: string[] } {
+  const lower = message.toLowerCase();
+  if (lower.includes("invalid appsecret_proof")) {
+    return {
+      message: "فشلت مزامنة Meta لأن App Secret غير مطابق للـ Access Token.",
+      error: "Invalid appsecret_proof: حدّث App Secret الصحيح لنفس Meta App الذي صدر منه Access Token، أو أعد توليد Token من نفس التطبيق.",
+      missing: ["validAppSecret"],
+    };
+  }
+  if (lower.includes("appsecret_proof") && lower.includes("require")) {
+    return {
+      message: "فشلت مزامنة Meta لأن الحساب يتطلب App Secret Proof.",
+      error: "Meta requires appsecret_proof: أضف App Secret الصحيح في اتصال Meta ثم أعد المزامنة.",
+      missing: ["appSecret"],
+    };
+  }
+  return { message: "فشلت مزامنة Meta Insights API.", error: message.slice(0, 240) };
+}
+
 function metricFromActions(row: MetaInsightRow, keys: string[]): number {
   const actions = row.actions;
   if (!Array.isArray(actions)) return 0;
@@ -238,12 +257,14 @@ export const syncMeta: SyncClient = async ({ connection, dateFrom, dateTo }): Pr
       snapshots: { campaigns, adGroups, ads },
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Meta API sync failed";
+    const raw = error instanceof Error ? error.message : "Meta API sync failed";
+    const friendly = friendlyMetaError(raw);
     return {
-      status: "FAILED",
+      status: friendly.missing?.length ? "MISSING_CONFIG" : "FAILED",
       rowsFetched: 0,
-      message: "فشلت مزامنة Meta Insights API.",
-      error: message.slice(0, 240),
+      message: friendly.message,
+      error: friendly.error,
+      missingRequiredFields: friendly.missing,
     };
   }
 };
