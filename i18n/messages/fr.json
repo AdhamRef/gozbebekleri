@@ -50,7 +50,117 @@
     "title": "Désolé, votre don n'a pas pu être effectué",
     "description": "Nous n'avons pas pu finaliser votre paiement. Cela peut être dû à un refus de carte, à un problème réseau ou à une interruption chez le prestataire de paiement. Aucun montant n'a été débité.",
     "tryAgain": "Réessayer le don",
-    "manualFallback": "Si vous préférez ne pas réessayer par carte, vous pouvez finaliser votre don par virement bancaire vers l'un des comptes ci-dessous."
+    "manualFallback": "Si vous préférez ne pas réessayer par carte, vous pouvez finaliser votre don par virement bancaire vers l'un des comptes ci-dessous.",
+    "reassurance": "You haven't been charged for the attempt. Let's get this fixed.",
+    "loading": "Looking up your donation…",
+    "severitySoft": "Card issue",
+    "severityHard": "Bank declined",
+    "howToFixTitle": "How to fix it",
+    "rawMessageToggle": "Technical details from the bank",
+    "rawCodeLabel": "Code",
+    "retry": {
+      "title": "Try this donation again",
+      "description": "One tap retries the exact same donation through our secure checkout — no need to re-enter the details.",
+      "cta": "Retry donation now",
+      "ctaMonthly": "Continue to monthly checkout",
+      "amountLabel": "Amount",
+      "perMonth": "/ month",
+      "moreItems": "+{count} more project(s)",
+      "monthly": "Monthly",
+      "oneTime": "One-time",
+      "securedBy": "Secure checkout powered by Stripe.",
+      "failed": "We couldn't restart your donation. Please try again or use the bank transfer below.",
+      "payforHint": "Please re-enter your card on the campaign page to complete the donation."
+    },
+    "noDonation": {
+      "title": "Pick a project to support",
+      "description": "We couldn't find the failed donation. You can start a new donation from any of our projects.",
+      "cta": "Browse projects"
+    },
+    "errors": {
+      "commonTips": {
+        "tipRetry": "Try the same card again — temporary errors usually clear within a few minutes.",
+        "tipCheckBalance": "Make sure your card has enough balance for the donation amount.",
+        "tipUseAnotherCard": "Try a different card or payment method.",
+        "tipContactBank": "Call your bank to ask why the payment was blocked.",
+        "tipUseTransfer": "Use the bank transfer option below — it always works."
+      },
+      "insufficientFunds": {
+        "title": "Insufficient funds",
+        "reason": "Your bank reported that the card doesn't have enough balance to complete this donation.",
+        "fix": "Top up your card, lower the donation amount, or try a different card."
+      },
+      "cardDeclined": {
+        "title": "Your bank declined the card",
+        "reason": "Your card issuer refused this transaction. This is the bank's call, not ours — they don't always share the exact reason.",
+        "fix": "Try another card, or contact your bank to find out why it was blocked."
+      },
+      "expiredCard": {
+        "title": "The card has expired",
+        "reason": "The card you used is past its expiry date. Banks won't process payments on expired cards.",
+        "fix": "Switch to a valid card. Your bank can issue a replacement if needed."
+      },
+      "invalidCvc": {
+        "title": "The security code (CVV) was wrong",
+        "reason": "The 3- or 4-digit CVV/CVC didn't match what your bank has on file.",
+        "fix": "Double-check the security code on the back of your card and try again."
+      },
+      "incorrectNumber": {
+        "title": "The card number looks wrong",
+        "reason": "The card number we sent didn't match a valid card at your bank.",
+        "fix": "Re-enter the 16-digit card number carefully and try again."
+      },
+      "lostOrStolen": {
+        "title": "Card reported lost or stolen",
+        "reason": "Your bank flagged this card as lost or stolen and won't allow new payments on it.",
+        "fix": "Contact your bank for a replacement, then try a different card here."
+      },
+      "doNotHonor": {
+        "title": "Generic decline by your bank",
+        "reason": "Your bank refused the transaction without telling us exactly why. This is often a fraud-prevention block on cross-border donations.",
+        "fix": "Call the number on the back of your card and ask them to approve this charity donation, then retry."
+      },
+      "limitExceeded": {
+        "title": "Daily or monthly limit reached",
+        "reason": "Your card's daily spend limit or transaction count for the month has been exceeded.",
+        "fix": "Lower the donation amount, wait until tomorrow, or try a different card."
+      },
+      "currencyNotSupported": {
+        "title": "Currency not supported by your card",
+        "reason": "Your card can't process payments in the donation currency.",
+        "fix": "Switch the currency from the top-right of the site, or use a card that supports international payments."
+      },
+      "authenticationFailed": {
+        "title": "3-D Secure check failed",
+        "reason": "Your bank's 3-D Secure verification didn't go through. This usually means the SMS/app code was wrong or timed out.",
+        "fix": "Make sure your phone is reachable, then retry. Have the bank's 3DS app ready before you tap retry."
+      },
+      "processingError": {
+        "title": "Temporary processing error",
+        "reason": "The payment didn't go through, but it's not a problem with your card — something on the bank's side glitched.",
+        "fix": "Wait a minute and retry. Most processing errors clear by themselves."
+      },
+      "networkError": {
+        "title": "Connection problem",
+        "reason": "We couldn't reach the bank to process the payment. This is almost always a transient network issue.",
+        "fix": "Check your internet connection, then retry. The exact same card will most likely succeed."
+      },
+      "issuerUnavailable": {
+        "title": "Your bank's system is unavailable",
+        "reason": "Your card issuer's payment system is temporarily down or unreachable.",
+        "fix": "Wait a few minutes and try again, or use a different card from another bank."
+      },
+      "fraudSuspected": {
+        "title": "Blocked as suspected fraud",
+        "reason": "Your bank's fraud system flagged the donation. Charity donations from a new merchant can trigger this — it's a false positive most of the time.",
+        "fix": "Call the number on the back of your card, confirm it's really you, and ask them to whitelist this merchant."
+      },
+      "generic": {
+        "title": "Payment didn't go through",
+        "reason": "Something stopped the payment from completing. We weren't given a specific reason.",
+        "fix": "Try again, switch to a different card, or use the bank transfer option below."
+      }
+    }
   },
   "HomePage": {
     "donationCategories": "Domaines de don",
