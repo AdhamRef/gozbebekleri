@@ -78,7 +78,9 @@ function fields(includeActions: boolean) {
 }
 
 function baseParams(dateFrom: Date, dateTo: Date, level: "campaign" | "adset" | "ad", includeActions: boolean) {
-  return { time_increment: "1", time_range: JSON.stringify({ since: dateKey(dateFrom), until: dateKey(dateTo) }), level, limit: "500", action_report_time: "conversion", fields: fields(includeActions) };
+  const params: Record<string, string> = { time_increment: "1", time_range: JSON.stringify({ since: dateKey(dateFrom), until: dateKey(dateTo) }), level, limit: "500", fields: fields(includeActions) };
+  if (includeActions) params.action_report_time = "conversion";
+  return params;
 }
 
 function toCampaign(row: MetaInsightRow): SyncCampaignSnapshot | null {
