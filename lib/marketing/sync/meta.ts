@@ -90,12 +90,12 @@ function toCampaign(row: MetaInsightRow): SyncCampaignSnapshot | null {
 
 function toAdGroup(row: MetaInsightRow): SyncAdGroupSnapshot | null {
   const adGroupId = asString(row.adset_id); const date = asString(row.date_start); if (!adGroupId || !date) return null;
-  return { date: dayStart(date), campaignId: asString(row.campaign_id), campaignName: asString(row.campaign_name), adGroupId, adGroupName: asString(row.adset_name), country: asString(row.country), placement: asString(row.publisher_platform), spend: asNumber(row.spend), impressions: Math.round(asNumber(row.impressions)), clicks: Math.round(asNumber(row.clicks)), reportedConversions: 0, reportedConversionValue: 0, currency: asString(row.account_currency), raw: row };
+  return { date: dayStart(date), campaignId: asString(row.campaign_id), campaignName: asString(row.campaign_name), adGroupId, adGroupName: asString(row.adset_name), country: null, placement: null, spend: asNumber(row.spend), impressions: Math.round(asNumber(row.impressions)), clicks: Math.round(asNumber(row.clicks)), reportedConversions: 0, reportedConversionValue: 0, currency: asString(row.account_currency), raw: row };
 }
 
 function toAd(row: MetaInsightRow): SyncAdSnapshot | null {
   const adId = asString(row.ad_id); const date = asString(row.date_start); if (!adId || !date) return null;
-  return { date: dayStart(date), campaignId: asString(row.campaign_id), campaignName: asString(row.campaign_name), adGroupId: asString(row.adset_id), adGroupName: asString(row.adset_name), adId, adName: asString(row.ad_name), country: asString(row.country), placement: asString(row.publisher_platform), spend: asNumber(row.spend), impressions: Math.round(asNumber(row.impressions)), clicks: Math.round(asNumber(row.clicks)), reportedConversions: 0, reportedConversionValue: 0, currency: asString(row.account_currency), raw: row };
+  return { date: dayStart(date), campaignId: asString(row.campaign_id), campaignName: asString(row.campaign_name), adGroupId: asString(row.adset_id), adGroupName: asString(row.adset_name), adId, adName: asString(row.ad_name), country: null, placement: null, spend: asNumber(row.spend), impressions: Math.round(asNumber(row.impressions)), clicks: Math.round(asNumber(row.clicks)), reportedConversions: 0, reportedConversionValue: 0, currency: asString(row.account_currency), raw: row };
 }
 
 export const syncMeta: SyncClient = async ({ connection, dateFrom, dateTo }): Promise<SyncClientResult> => {
@@ -108,8 +108,8 @@ export const syncMeta: SyncClient = async ({ connection, dateFrom, dateTo }): Pr
     const token = connection.accessToken!;
     const proof = proofForServerCalls(token, connection.appSecret);
     const campaignRows = await graphGetAll(`${account}/insights`, token, proof, baseParams(dateFrom, dateTo, "campaign", true));
-    const adsetRows = await graphGetAll(`${account}/insights`, token, proof, { ...baseParams(dateFrom, dateTo, "adset", false), breakdowns: "country,publisher_platform" });
-    const adRows = await graphGetAll(`${account}/insights`, token, proof, { ...baseParams(dateFrom, dateTo, "ad", false), breakdowns: "country,publisher_platform" });
+    const adsetRows = await graphGetAll(`${account}/insights`, token, proof, baseParams(dateFrom, dateTo, "adset", false));
+    const adRows = await graphGetAll(`${account}/insights`, token, proof, baseParams(dateFrom, dateTo, "ad", false));
     const campaigns = campaignRows.map(toCampaign).filter(Boolean) as SyncCampaignSnapshot[];
     const adGroups = adsetRows.map(toAdGroup).filter(Boolean) as SyncAdGroupSnapshot[];
     const ads = adRows.map(toAd).filter(Boolean) as SyncAdSnapshot[];
