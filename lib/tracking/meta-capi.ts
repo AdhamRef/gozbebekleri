@@ -28,6 +28,7 @@ export interface MetaUserData {
   fbp?: string | null;
   fbc?: string | null;
   client_ip?: string | null;
+  client_ip_address?: string | null;
   user_agent?: string | null;
   subscription_id?: string | null;
 }
@@ -112,6 +113,14 @@ function hashCountry(cc: string | null | undefined): string | undefined {
   return crypto.createHash("sha256").update(norm).digest("hex");
 }
 
+function normalizeClientIp(value: string | null | undefined): string | undefined {
+  if (!value) return undefined;
+  const first = String(value).split(",")[0]?.trim();
+  if (!first) return undefined;
+  const clean = first.replace(/[^0-9a-fA-F.:]/g, "").slice(0, 45);
+  return clean || undefined;
+}
+
 export function buildMetaUserData(u: MetaUserData): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const em = sha256(u.email);
@@ -139,10 +148,8 @@ export function buildMetaUserData(u: MetaUserData): Record<string, unknown> {
   if (u.fbp) out.fbp = u.fbp;
   if (u.fbc) out.fbc = u.fbc;
   if (u.user_agent) out.client_user_agent = String(u.user_agent).slice(0, 512);
-  if (u.client_ip) {
-    const ip = String(u.client_ip).replace(/[^0-9a-fA-F.:]/g, "").slice(0, 45);
-    if (ip) out.client_ip_address = ip;
-  }
+  const ip = normalizeClientIp(u.client_ip_address ?? u.client_ip);
+  if (ip) out.client_ip_address = ip;
   if (u.subscription_id) out.subscription_id = u.subscription_id;
   return out;
 }
