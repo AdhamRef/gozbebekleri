@@ -78,12 +78,12 @@ const META_GUIDE: PlatformRequirements = {
     },
     {
       field: "appSecret",
-      labelAr: "Test Event Code",
+      labelAr: "Meta App Secret",
       secret: true,
-      guidanceAr: "Test Event Code اختياري. هذا الحقل مؤقتًا يستخدم خانة سرية محفوظة ولا يمثل App Secret حقيقيًا.",
+      guidanceAr: "مطلوب إذا كان Meta App يفرض appsecret_proof. استخدم App Secret الحقيقي من Meta Developers لنفس التطبيق الذي صدر منه Access Token. لا تستخدم Test Event Code هنا.",
     },
   ],
-  setupGuideAr: "اربط حساب إعلانات Meta + Pixel/Dataset لتجهيز مزامنة الحملات لاحقًا. التتبع التشغيلي الفعلي يبقى في قسم البكسلات والتتبع.",
+  setupGuideAr: "اربط حساب إعلانات Meta + Pixel/Dataset لتجهيز مزامنة الحملات. إذا ظهر خطأ appsecret_proof فأضف Meta App Secret الصحيح لنفس التطبيق.",
 };
 
 const GOOGLE_ADS_GUIDE: PlatformRequirements = {
@@ -178,9 +178,9 @@ const TIKTOK_GUIDE: PlatformRequirements = {
     },
     {
       field: "appSecret",
-      labelAr: "Test Event Code",
+      labelAr: "App Secret",
       secret: true,
-      guidanceAr: "Test Event Code اختياري لاختبار أحداث TikTok لاحقًا. هذا الحقل مؤقتًا يستخدم خانة سرية محفوظة.",
+      guidanceAr: "App Secret اختياري لتطبيق TikTok Marketing API عند الحاجة.",
     },
   ],
   setupGuideAr: "اربط TikTok Ads + Pixel Code لتجهيز مزامنة الحملات وEvents API لاحقًا.",
@@ -219,24 +219,14 @@ const GA4_GUIDE: PlatformRequirements = {
   category: "ANALYTICS",
   labelAr: "Google Analytics 4",
   required: [
-    {
-      field: "accountId",
-      labelAr: "Measurement ID (G-XXXXXXXXXX)",
-      secret: false,
-      guidanceAr: "ناقص Measurement ID. ستجده داخل GA4 Data Stream ويبدأ غالبًا بـ G-.",
-    },
-    {
-      field: "apiSecret",
-      labelAr: "API Secret",
-      secret: true,
-      guidanceAr: "ناقص API Secret. من GA4 Admin > Data Streams > Measurement Protocol API secrets.",
-    },
+    { field: "propertyId", labelAr: "Property ID", secret: false, guidanceAr: "ناقص Property ID. ستجده في GA4 Admin > Property Settings." },
+    { field: "streamId", labelAr: "Stream ID", secret: false, guidanceAr: "ناقص Stream ID. ستجده في GA4 Data Streams." },
+    { field: "apiSecret", labelAr: "Measurement Protocol API Secret", secret: true, guidanceAr: "ناقص API Secret. أنشئه من GA4 > Data Streams > Measurement Protocol API secrets." },
   ],
   optional: [
-    { field: "propertyId", labelAr: "Property ID", secret: false, guidanceAr: "Property ID اختياري — لاستعلامات Reporting API." },
-    { field: "streamId", labelAr: "Stream ID", secret: false, guidanceAr: "Stream ID اختياري — لتخصيص Data Streams." },
+    { field: "appId", labelAr: "Measurement ID", secret: false, guidanceAr: "Measurement ID اختياري لكنه مفيد للمطابقة مع البكسل." },
   ],
-  setupGuideAr: "اربط GA4 لتجهيز Reporting API وMeasurement Protocol. أحداث التتبع المباشر تدار من قسم البكسلات والتتبع.",
+  setupGuideAr: "اربط GA4 Data API / Measurement Protocol لتحليل الزيارات والتحويلات.",
 };
 
 const TWILIO_GUIDE: PlatformRequirements = {
@@ -244,129 +234,86 @@ const TWILIO_GUIDE: PlatformRequirements = {
   category: "MESSAGING",
   labelAr: "Twilio",
   required: [
-    { field: "accountId", labelAr: "Account SID", secret: false, guidanceAr: "ناقص Account SID. ستجده في Twilio Console > Account Info." },
-    { field: "authToken", labelAr: "Auth Token", secret: true, guidanceAr: "ناقص Auth Token. ستجده في Twilio Console > Account Info." },
+    { field: "accountId", labelAr: "Account SID", secret: false, guidanceAr: "ناقص Account SID من Twilio Console." },
+    { field: "authToken", labelAr: "Auth Token", secret: true, guidanceAr: "ناقص Auth Token من Twilio Console." },
   ],
   optional: [
-    { field: "messagingServiceSid", labelAr: "Messaging Service SID", secret: false, guidanceAr: "Messaging Service SID اختياري لكنه مفضل لإدارة الإرسال والـ callbacks." },
-    { field: "whatsappSender", labelAr: "WhatsApp Sender", secret: false, guidanceAr: "WhatsApp Sender اختياري — مثلاً whatsapp:+14155238886." },
-    { field: "smsSender", labelAr: "SMS Sender", secret: false, guidanceAr: "SMS Sender اختياري — رقم E.164 معتمد لدى Twilio." },
-    { field: "emailSender", labelAr: "Email Sender", secret: false, guidanceAr: "Email Sender اختياري — مع تكامل SendGrid عبر Twilio." },
+    { field: "messagingServiceSid", labelAr: "Messaging Service SID", secret: false, guidanceAr: "مفيد لإرسال SMS/WhatsApp عبر Messaging Service." },
+    { field: "whatsappSender", labelAr: "WhatsApp Sender", secret: false, guidanceAr: "مثال: whatsapp:+14155238886" },
+    { field: "smsSender", labelAr: "SMS Sender", secret: false, guidanceAr: "رقم SMS أو Sender ID." },
   ],
-  setupGuideAr: "اربط Twilio لإدارة WhatsApp وSMS والبريد. الإرسال الفعلي الحالي لا يتأثر بهذه الإعدادات حتى تفعيل المزامنة.",
+  setupGuideAr: "اربط Twilio لتتبع حملات الرسائل والواتساب لاحقًا.",
 };
 
-const EMAIL_PROVIDER_GUIDE: PlatformRequirements = {
+const EMAIL_GUIDE: PlatformRequirements = {
   platform: "EMAIL_PROVIDER",
   category: "EMAIL",
   labelAr: "موفر البريد الإلكتروني",
   required: [
-    { field: "name", labelAr: "اسم الموفر", secret: false, guidanceAr: "حدّد اسم الموفر (SendGrid / Mailgun / SES …)." },
-    { field: "apiSecret", labelAr: "API Key", secret: true, guidanceAr: "ناقص API Key. أنشئه من لوحة الموفر." },
-    { field: "emailSender", labelAr: "بريد المرسل / النطاق المعتمد", secret: false, guidanceAr: "ناقص بريد المرسل أو النطاق المعتمد." },
+    { field: "accountId", labelAr: "Account ID", secret: false, guidanceAr: "معرّف الحساب لدى موفر البريد الإلكتروني." },
+    { field: "apiSecret", labelAr: "API Key / Secret", secret: true, guidanceAr: "مفتاح API الخاص بموفر البريد الإلكتروني." },
   ],
   optional: [
-    { field: "appSecret", labelAr: "Webhook Secret", secret: true, guidanceAr: "Webhook Secret اختياري — للتحقق من الـ events." },
-    { field: "senderId", labelAr: "اسم المرسل الافتراضي", secret: false, guidanceAr: "اسم المرسل الافتراضي اختياري." },
+    { field: "emailSender", labelAr: "Default Sender Email", secret: false, guidanceAr: "بريد الإرسال الافتراضي." },
   ],
-  setupGuideAr: "أضف API Key والنطاق المعتمد لإرسال البريد الإلكتروني عبر الموفر المختار لاحقًا.",
+  setupGuideAr: "اربط موفر البريد لتحليل حملات البريد الإلكتروني لاحقًا.",
 };
 
-const WHATSAPP_PROVIDER_GUIDE: PlatformRequirements = { ...TWILIO_GUIDE, platform: "WHATSAPP_PROVIDER", category: "MESSAGING", labelAr: "موفر WhatsApp" };
-const SMS_PROVIDER_GUIDE: PlatformRequirements = { ...TWILIO_GUIDE, platform: "SMS_PROVIDER", category: "MESSAGING", labelAr: "موفر SMS" };
+const WHATSAPP_GUIDE: PlatformRequirements = {
+  platform: "WHATSAPP_PROVIDER",
+  category: "MESSAGING",
+  labelAr: "موفر WhatsApp",
+  required: [
+    { field: "accountId", labelAr: "Business / Account ID", secret: false, guidanceAr: "معرّف حساب WhatsApp Business أو الموفر." },
+    { field: "accessToken", labelAr: "Access Token", secret: true, guidanceAr: "مفتاح الوصول الخاص بموفر WhatsApp." },
+  ],
+  optional: [
+    { field: "whatsappSender", labelAr: "WhatsApp Sender", secret: false, guidanceAr: "رقم أو قناة الإرسال." },
+  ],
+  setupGuideAr: "اربط موفر WhatsApp لتحليل حملات الرسائل لاحقًا.",
+};
+
+const SMS_GUIDE: PlatformRequirements = {
+  platform: "SMS_PROVIDER",
+  category: "MESSAGING",
+  labelAr: "موفر SMS",
+  required: [
+    { field: "accountId", labelAr: "Account ID", secret: false, guidanceAr: "معرّف الحساب لدى موفر SMS." },
+    { field: "apiSecret", labelAr: "API Key / Secret", secret: true, guidanceAr: "مفتاح API الخاص بموفر SMS." },
+  ],
+  optional: [
+    { field: "smsSender", labelAr: "SMS Sender", secret: false, guidanceAr: "اسم أو رقم المرسل." },
+  ],
+  setupGuideAr: "اربط موفر SMS لتحليل حملات الرسائل لاحقًا.",
+};
 
 const CUSTOM_GUIDE: PlatformRequirements = {
   platform: "CUSTOM",
   category: "CUSTOM",
   labelAr: "موفر مخصص",
   required: [
-    { field: "name", labelAr: "الاسم", secret: false, guidanceAr: "ناقص الاسم." },
-    { field: "accountId", labelAr: "Account ID أو API Key", secret: false, guidanceAr: "ناقص Account ID أو API Key." },
+    { field: "name", labelAr: "اسم الاتصال", secret: false, guidanceAr: "اكتب اسمًا واضحًا للاتصال المخصص." },
   ],
   optional: [
-    { field: "apiSecret", labelAr: "API Secret", secret: true, guidanceAr: "API Secret اختياري." },
-    { field: "accessToken", labelAr: "Access Token", secret: true, guidanceAr: "Access Token اختياري." },
+    { field: "accountId", labelAr: "Account ID", secret: false, guidanceAr: "معرّف اختياري للموفر." },
+    { field: "apiSecret", labelAr: "API Secret", secret: true, guidanceAr: "مفتاح سري اختياري للموفر." },
   ],
-  setupGuideAr: "موفر مخصص — أضف الحقول التي يحتاجها مزودك.",
+  setupGuideAr: "استخدم الاتصال المخصص لتوثيق أي مصدر تسويق غير مدعوم بعد.",
 };
 
-const REGISTRY: Record<PlatformKey, PlatformRequirements> = {
+export const ALL_PLATFORM_REQUIREMENTS: Record<PlatformKey, PlatformRequirements> = {
   META: META_GUIDE,
   GOOGLE_ADS: GOOGLE_ADS_GUIDE,
   TIKTOK: TIKTOK_GUIDE,
   X: X_GUIDE,
   GA4: GA4_GUIDE,
   TWILIO: TWILIO_GUIDE,
-  EMAIL_PROVIDER: EMAIL_PROVIDER_GUIDE,
-  WHATSAPP_PROVIDER: WHATSAPP_PROVIDER_GUIDE,
-  SMS_PROVIDER: SMS_PROVIDER_GUIDE,
+  EMAIL_PROVIDER: EMAIL_GUIDE,
+  WHATSAPP_PROVIDER: WHATSAPP_GUIDE,
+  SMS_PROVIDER: SMS_GUIDE,
   CUSTOM: CUSTOM_GUIDE,
 };
 
-export function getPlatformRequirements(p: PlatformKey): PlatformRequirements { return REGISTRY[p] ?? CUSTOM_GUIDE; }
-export const ALL_PLATFORM_REQUIREMENTS: PlatformRequirements[] = Object.values(REGISTRY);
-
-const ALL_PLATFORM_KEYS = Object.keys(REGISTRY) as PlatformKey[];
-const ALL_CATEGORIES: PlatformCategory[] = ["ADS", "ANALYTICS", "MESSAGING", "EMAIL", "CUSTOM"];
-
-export function isPlatformKey(v: unknown): v is PlatformKey { return typeof v === "string" && (ALL_PLATFORM_KEYS as string[]).includes(v); }
-export function isCategoryKey(v: unknown): v is PlatformCategory { return typeof v === "string" && (ALL_CATEGORIES as string[]).includes(v); }
-
-export interface ReadinessResult {
-  completionPercent: number;
-  missingRequiredFields: string[];
-  missingOptionalFields: string[];
-  status: ConnectionStatus;
-  nextStepMessage: string;
-  setupGuideItems: { label: string; ok: boolean; guidance: string }[];
-  guidance: string[];
-}
-
-function fieldPresent(row: Record<string, unknown>, field: string): boolean {
-  if (field.includes("|")) return field.split("|").some((f) => fieldPresent(row, f));
-  const v = row[field];
-  if (typeof v === "string") return v.trim().length > 0;
-  if (typeof v === "number") return Number.isFinite(v);
-  return false;
-}
-
-export function evaluateReadiness(platform: PlatformKey, row: Record<string, unknown>, opts: { enabled?: boolean; existingStatus?: ConnectionStatus } = {}): ReadinessResult {
-  const reqs = getPlatformRequirements(platform);
-  const missingRequired: string[] = [];
-  const missingOptional: string[] = [];
-  const guidance: string[] = [];
-  const items: ReadinessResult["setupGuideItems"] = [];
-
-  for (const f of reqs.required) {
-    const ok = fieldPresent(row, f.field);
-    items.push({ label: f.labelAr, ok, guidance: f.guidanceAr });
-    if (!ok) { missingRequired.push(f.field); guidance.push(f.guidanceAr); }
-  }
-  for (const f of reqs.optional) {
-    const ok = fieldPresent(row, f.field);
-    items.push({ label: f.labelAr, ok, guidance: f.guidanceAr });
-    if (!ok) missingOptional.push(f.field);
-  }
-
-  const totalSlots = reqs.required.length + reqs.optional.length;
-  const filledSlots = reqs.required.filter((f) => fieldPresent(row, f.field)).length + reqs.optional.filter((f) => fieldPresent(row, f.field)).length;
-  const completionPercent = totalSlots === 0 ? 0 : Math.round((filledSlots / totalSlots) * 100);
-
-  let status: ConnectionStatus;
-  if (opts.enabled === false) status = "DISABLED";
-  else if (missingRequired.length > 0) status = "MISSING_CONFIG";
-  else if (["AUTH_ERROR", "PERMISSION_ERROR", "SYNC_ERROR", "NOT_IMPLEMENTED"].includes(String(opts.existingStatus))) status = opts.existingStatus as ConnectionStatus;
-  else status = "ACTIVE";
-
-  let nextStepMessage = "";
-  if (missingRequired.length > 0) nextStepMessage = `أكمل ${missingRequired.length} حقل مطلوب لتفعيل الاتصال.`;
-  else if (missingOptional.length > 0) nextStepMessage = `الحقول المطلوبة مكتملة — أكمل ${missingOptional.length} حقل اختياري لتحسين القياس.`;
-  else if (status === "AUTH_ERROR") nextStepMessage = "ثمة خطأ في المصادقة — جدّد المفاتيح وأعد الاختبار.";
-  else if (status === "PERMISSION_ERROR") nextStepMessage = "تأكد من صلاحيات الحساب لدى المنصة.";
-  else if (status === "SYNC_ERROR") nextStepMessage = "آخر مزامنة فشلت — راجع آخر خطأ.";
-  else if (status === "NOT_IMPLEMENTED") nextStepMessage = "مزامنة هذه المنصة ستُفعَّل في مرحلة لاحقة.";
-  else if (status === "DISABLED") nextStepMessage = "الاتصال موقوف — فعّله لإعادة المزامنة.";
-  else nextStepMessage = "كل شيء جاهز — يمكنك الاختبار والمزامنة عند تفعيل عميل المنصة.";
-
-  return { completionPercent, missingRequiredFields: missingRequired, missingOptionalFields: missingOptional, status, nextStepMessage, setupGuideItems: items, guidance };
+export function getPlatformRequirements(platform: PlatformKey): PlatformRequirements {
+  return ALL_PLATFORM_REQUIREMENTS[platform] ?? CUSTOM_GUIDE;
 }
