@@ -69,6 +69,20 @@ function normalizeName(value: string | null | undefined): string | null {
   return normalized || null;
 }
 
+function isMostlyNumericId(value: string | null | undefined): boolean {
+  const clean = value?.trim();
+  if (!clean) return false;
+  return /^\d{8,}$/.test(clean) || /^[a-f0-9]{16,}$/i.test(clean);
+}
+
+function displayAdLabel(label: string | null | undefined, adId?: string | null) {
+  const clean = label?.trim();
+  if (!clean) return "إعلان بدون اسم";
+  if (adId && clean === adId) return "إعلان بدون اسم";
+  if (isMostlyNumericId(clean)) return "إعلان بدون اسم";
+  return clean;
+}
+
 function tokenScore(a: string | null, b: string | null): number {
   if (!a || !b) return 0;
   if (a === b) return 1;
@@ -309,28 +323,32 @@ export async function GET(request: NextRequest) {
   }
 
   for (const snap of adSnapshots) {
+    const adName = displayAdLabel(snap.adName, snap.adId);
     const { bucket, reason } = findBucketForPlatformSnapshot(
       buckets,
       nameIndex,
-      { adId: snap.adId, adName: snap.adName, campaignId: snap.campaignId, campaignName: snap.campaignName },
+      { adId: snap.adId, adName, campaignId: snap.campaignId, campaignName: snap.campaignName },
       `ad:${snap.adId}`,
-      snap.adName || snap.adId,
+      adName,
     );
     bucket.platformTouched = true;
     bucket.matchReason ||= reason;
+    bucket.label = displayAdLabel(bucket.label, bucket.adId || snap.adId);
     bucket.adId ||= snap.adId;
     bucket.campaignId ||= snap.campaignId;
     bucket.campaignName ||= snap.campaignName;
-    bucket.adsetId ||= snap.adGroupId;
-    bucket.adsetName ||= snap.adGroupName;
+    bucket.adsetId ||= snap.adGroupName ? null : snap.adGroupId;
+    bucket.adsetName ||= snap.adGroupName || snap.adGroupId;
     bucket.platformSpend += snap.spend || 0;
     bucket.platformReportedConversions += snap.reportedConversions || 0;
     bucket.platformReportedValue += snap.reportedConversionValue || 0;
-    indexName(nameIndex, bucket, bucket.label, bucket.campaignName, snap.campaignName, snap.adName, snap.adGroupName);
+    indexName(nameIndex, bucket, bucket.label, bucket.campaignName, snap.campaignName, adName, snap.adGroupName);
   }
 
   const rows = [...buckets.values()].map((row) => ({
     ...row,
+    label: displayAdLabel(row.label, row.adId),
+    adsetId: row.adsetName ? null : row.adsetId,
     matchStatus: row.siteTouched && row.platformTouched ? "matched" : row.platformTouched ? "platform_only" : row.siteTouched ? "site_only" : "unknown",
     actualRoas: row.platformSpend > 0 ? row.siteRevenue / row.platformSpend : null,
     platformRoas: row.platformSpend > 0 ? row.platformReportedValue / row.platformSpend : null,
