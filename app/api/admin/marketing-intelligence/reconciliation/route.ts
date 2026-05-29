@@ -15,6 +15,7 @@ type Bucket = {
   campaignId?: string | null;
   campaignName?: string | null;
   adsetId?: string | null;
+  adsetName?: string | null;
   adId?: string | null;
   siteDonations: number;
   siteRevenue: number;
@@ -132,6 +133,12 @@ function labelForAttribution(attribution: unknown) {
     || "غير منسوب";
 }
 
+function adsetNameFromAttribution(attribution: unknown) {
+  return stringValue(attribution, "adset_name")
+    || stringValue(attribution, "ad_group_name")
+    || stringValue(attribution, "utm_term");
+}
+
 function ensureBucket(map: Map<string, Bucket>, key: string, label: string): Bucket {
   let row = map.get(key);
   if (!row) {
@@ -142,6 +149,7 @@ function ensureBucket(map: Map<string, Bucket>, key: string, label: string): Buc
       campaignId: null,
       campaignName: null,
       adsetId: null,
+      adsetName: null,
       adId: null,
       siteDonations: 0,
       siteRevenue: 0,
@@ -230,7 +238,7 @@ export async function GET(request: NextRequest) {
   });
   const adSnapshots = await prisma.adSnapshot.findMany({
     where: { platform, date: { gte: from, lte: to } },
-    select: { adId: true, adName: true, campaignId: true, campaignName: true, adGroupId: true, spend: true, reportedConversions: true, reportedConversionValue: true, country: true, currency: true },
+    select: { adId: true, adName: true, campaignId: true, campaignName: true, adGroupId: true, adGroupName: true, spend: true, reportedConversions: true, reportedConversionValue: true, country: true, currency: true },
     take: 5000,
   });
 
@@ -260,6 +268,7 @@ export async function GET(request: NextRequest) {
     bucket.campaignId ||= stringValue(attribution, "campaign_id") || stringValue(attribution, "utm_id");
     bucket.campaignName ||= stringValue(attribution, "utm_campaign") || stringValue(attribution, "campaign_name");
     bucket.adsetId ||= stringValue(attribution, "adset_id") || stringValue(attribution, "ad_group_id");
+    bucket.adsetName ||= adsetNameFromAttribution(attribution);
     bucket.adId ||= stringValue(attribution, "ad_id");
     indexName(nameIndex, bucket, bucket.label, bucket.campaignName, bucket.campaignId, bucket.adId);
 
@@ -313,10 +322,11 @@ export async function GET(request: NextRequest) {
     bucket.campaignId ||= snap.campaignId;
     bucket.campaignName ||= snap.campaignName;
     bucket.adsetId ||= snap.adGroupId;
+    bucket.adsetName ||= snap.adGroupName;
     bucket.platformSpend += snap.spend || 0;
     bucket.platformReportedConversions += snap.reportedConversions || 0;
     bucket.platformReportedValue += snap.reportedConversionValue || 0;
-    indexName(nameIndex, bucket, bucket.label, bucket.campaignName, snap.campaignName, snap.adName);
+    indexName(nameIndex, bucket, bucket.label, bucket.campaignName, snap.campaignName, snap.adName, snap.adGroupName);
   }
 
   const rows = [...buckets.values()].map((row) => ({
