@@ -13,6 +13,7 @@ import { recordConversionEvent, type ConversionEventStatus } from "@/lib/trackin
 import { getGa4ServerCredentialsFromSettings } from "@/lib/tracking/tracking-settings";
 
 type Attribution = Record<string, string>;
+export type DonationConversionSyncOptions = { force?: boolean };
 
 function getStr(j: unknown, k: string): string | undefined {
   if (!j || typeof j !== "object") return undefined;
@@ -57,7 +58,7 @@ function buildUserDataFromDonation(row: LoadedDonation): MetaUserData {
     date_of_birth: row.donor?.birthdate ?? null,
     fbp: getStr(attribution, "fbp") ?? null,
     fbc: getStr(attribution, "fbc") ?? null,
-    client_ip: getStr(attribution, "client_ip") ?? null,
+    client_ip: getStr(attribution, "client_ip") ?? getStr(attribution, "client_ip_address") ?? null,
     user_agent: getStr(attribution, "user_agent") ?? null,
     subscription_id: row.subscriptionId ?? null,
   };
@@ -86,13 +87,13 @@ function metaStatus(result: MetaCapiResult): ConversionEventStatus {
   return "FAILED";
 }
 
-export async function sendDonationServerConversions(donationId: string): Promise<MetaCapiResult> {
+export async function sendDonationServerConversions(donationId: string, options: DonationConversionSyncOptions = {}): Promise<MetaCapiResult> {
   try {
     const row = await loadDonationForConversion(donationId);
     if (!row) return { ok: false, skipped: true, reason: "donation not found" };
     if (row.status !== "PAID") return { ok: false, skipped: true, reason: `status=${row.status}` };
     if (row.paidAt == null) return { ok: false, skipped: true, reason: "paidAt unset" };
-    if (row.conversionEventsSentAt != null) return { ok: false, skipped: true, reason: "already sent" };
+    if (!options.force && row.conversionEventsSentAt != null) return { ok: false, skipped: true, reason: "already sent" };
 
     const amount = Number(row.amount ?? row.amountUSD ?? 0);
     if (!(amount > 0)) return { ok: false, skipped: true, reason: "amount <= 0" };
@@ -107,12 +108,12 @@ export async function sendDonationServerConversions(donationId: string): Promise
     const eventId = metaDonationEventId(row.id, "success");
     const custom_data: MetaCustomData = { value: amount, currency, content_type: "donation", content_name: contentName, content_category: row.subscriptionId ? "monthly" : "donation", content_ids: ids, contents, num_items: contents.reduce((s, c) => s + (c.quantity ?? 1), 0), order_id: row.id, transaction_id: row.id, status: "paid", success: true, payment_info_available: 1, donation_type: row.subscriptionId ? "MONTHLY" : "ONE_TIME", recurring: !!row.subscriptionId, payment_method: (row.paymentMethod ?? "CARD").toLowerCase() };
 
-    await writeConversionAudit({ donationId: row.id, eventId, stage: "meta_capi_attempt", message: "Meta CAPI Donate send attempted", metadata: auditMetaPayload(row, eventId, custom_data) });
+    await writeConversionAudit({ donationId: row.id, eventId, stage: options.force ? "meta_capi_retry_attempt" : "meta_capi_attempt", message: options.force ? "Meta CAPI Donate retry attempted" : "Meta CAPI Donate send attempted", metadata: auditMetaPayload(row, eventId, custom_data) });
     let metaResult: MetaCapiResult = { ok: false, skipped: true, reason: "no creds" };
     if (creds) metaResult = await sendMetaCapiEvent({ event_name: "Donate", event_id: eventId, event_time: eventTime, event_source_url: eventSourceUrl, action_source: "website", user_data: buildUserDataFromDonation(row), custom_data }, creds);
 
     await recordConversionEvent({ donationId: row.id, eventId, eventName: "Donate", platform: "META", channel: "server", status: metaStatus(metaResult), dedupKey: eventId, value: amount, currency, error: metaResult.error ?? metaResult.reason ?? null, request: auditMetaPayload(row, eventId, custom_data), response: metaResult, sentAt: metaResult.ok ? new Date(eventTime * 1000) : null });
-    await writeConversionAudit({ donationId: row.id, eventId, stage: "meta_capi_result", message: metaResult.ok ? "Meta CAPI Donate send succeeded" : "Meta CAPI Donate send did not succeed", metadata: { ...auditMetaPayload(row, eventId, custom_data), meta_result: metaResult } });
+    await writeConversionAudit({ donationId: row.id, eventId, stage: options.force ? "meta_capi_retry_result" : "meta_capi_result", message: metaResult.ok ? "Meta CAPI Donate send succeeded" : "Meta CAPI Donate send did not succeed", metadata: { ...auditMetaPayload(row, eventId, custom_data), meta_result: metaResult } });
     if (metaResult.ok) {
       await prisma.donation.update({ where: { id: row.id }, data: { conversionEventsSentAt: new Date() } });
     }
@@ -126,16 +127,18 @@ export async function sendDonationServerConversions(donationId: string): Promise
   }
 }
 
-export async function sendDonationFailedConversions(donationId: string): Promise<MetaCapiResult> {
+export async function sendDonationFailedConversions(donationId: string, options: DonationConversionSyncOptions = {}): Promise<MetaCapiResult> {
   try {
     const row = await loadDonationForConversion(donationId);
     if (!row) return { ok: false, skipped: true, reason: "donation not found" };
     if (row.status !== "FAILED") return { ok: false, skipped: true, reason: `status=${row.status}` };
     if (row.paidAt != null) return { ok: false, skipped: true, reason: "donation later succeeded" };
-    if (row.conversionFailedEventsSentAt != null) return { ok: false, skipped: true, reason: "already sent" };
+    if (!options.force && row.conversionFailedEventsSentAt != null) return { ok: false, skipped: true, reason: "already sent" };
 
-    const claim = await prisma.donation.updateMany({ where: { id: row.id, status: "FAILED", paidAt: null, conversionFailedEventsSentAt: null }, data: { conversionFailedEventsSentAt: new Date() } });
-    if (claim.count === 0) return { ok: false, skipped: true, reason: "lost idempotency claim" };
+    if (!options.force) {
+      const claim = await prisma.donation.updateMany({ where: { id: row.id, status: "FAILED", paidAt: null, conversionFailedEventsSentAt: null }, data: { conversionFailedEventsSentAt: new Date() } });
+      if (claim.count === 0) return { ok: false, skipped: true, reason: "lost idempotency claim" };
+    }
 
     const amount = Number(row.amount ?? row.amountUSD ?? 0);
     const currency = row.currency || "USD";
@@ -155,6 +158,7 @@ export async function sendDonationFailedConversions(donationId: string): Promise
 
     const metaResult = await sendMetaCapiEvent({ event_name: "DonateFailed", event_id: failedEventId, event_time: eventTime, event_source_url: eventSourceUrl, user_data: buildUserDataFromDonation(row), custom_data }, creds);
     await recordConversionEvent({ donationId: row.id, eventId: failedEventId, eventName: "DonateFailed", platform: "META", channel: "server", status: metaStatus(metaResult), dedupKey: failedEventId, value: amount, currency, error: metaResult.error ?? metaResult.reason ?? null, request: { event_name: "DonateFailed", event_id: failedEventId, custom_data }, response: metaResult, sentAt: metaResult.ok ? new Date(eventTime * 1000) : null });
+    if (metaResult.ok) await prisma.donation.update({ where: { id: row.id }, data: { conversionFailedEventsSentAt: new Date() } });
     if (!metaResult.ok && !metaResult.skipped) console.error("[conversion] DonateFailed send failed but claim retained:", row.id, metaResult.error, metaResult.fbtrace_id);
     return metaResult;
   } catch (e) {
@@ -163,11 +167,11 @@ export async function sendDonationFailedConversions(donationId: string): Promise
   }
 }
 
-export async function syncDonationConversion(donationId: string): Promise<MetaCapiResult> {
+export async function syncDonationConversion(donationId: string, options: DonationConversionSyncOptions = {}): Promise<MetaCapiResult> {
   const row = await prisma.donation.findUnique({ where: { id: donationId }, select: { id: true, status: true, paidAt: true } });
   if (!row) return { ok: false, skipped: true, reason: "donation not found" };
-  if (row.status === "PAID" && row.paidAt != null) return sendDonationServerConversions(donationId);
-  if (row.status === "FAILED" && row.paidAt == null) return sendDonationFailedConversions(donationId);
+  if (row.status === "PAID" && row.paidAt != null) return sendDonationServerConversions(donationId, options);
+  if (row.status === "FAILED" && row.paidAt == null) return sendDonationFailedConversions(donationId, options);
   return { ok: false, skipped: true, reason: `no terminal state (status=${row.status})` };
 }
 
