@@ -40,6 +40,7 @@ type DonationTimeline = {
   platforms: string[];
   latestAt: number;
   amountLabel: string;
+  canRetry: boolean;
 };
 
 function rawDate(value: ConversionEventRow["createdAt"] | ConversionEventRow["sentAt"]) {
@@ -120,6 +121,7 @@ function groupByDonation(events: ConversionEventRow[]): DonationTimeline[] {
       platforms: [...platforms].sort(),
       latestAt,
       amountLabel,
+      canRetry: !key.startsWith("بدون تبرع") && sorted.some((event) => event.channel === "server" && event.status !== "SENT"),
     };
   }).sort((a, b) => b.latestAt - a.latestAt);
 }
@@ -141,6 +143,7 @@ export default function ConversionEventsPage() {
   const [days, setDays] = React.useState("7");
   const [q, setQ] = React.useState("");
   const [view, setView] = React.useState<"timeline" | "table">("timeline");
+  const [retryingDonationId, setRetryingDonationId] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -166,6 +169,28 @@ export default function ConversionEventsPage() {
   }, [platform, channel, status, days, q]);
 
   React.useEffect(() => { void load(); }, [load]);
+
+  async function retryDonation(donationId: string) {
+    if (!donationId || donationId === "—") return;
+    setRetryingDonationId(donationId);
+    try {
+      const res = await fetch("/api/admin/conversion-events/retry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ donationId }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; result?: { ok?: boolean; skipped?: boolean; reason?: string; error?: string } };
+      if (!res.ok || data.ok === false) throw new Error(data.result?.error || "retry failed");
+      if (data.result?.ok) toast.success("تمت إعادة إرسال التحويل بنجاح");
+      else if (data.result?.skipped) toast(`تمت المحاولة لكن تم التخطي: ${data.result.reason ?? "غير محدد"}`);
+      else toast.error(`فشلت إعادة المحاولة: ${data.result?.error ?? data.result?.reason ?? "غير محدد"}`);
+      await load();
+    } catch {
+      toast.error("فشلت إعادة محاولة التحويل");
+    } finally {
+      setRetryingDonationId(null);
+    }
+  }
 
   const timelines = React.useMemo(() => groupByDonation(events), [events]);
   const statusCounts = React.useMemo(() => events.reduce<Record<string, number>>((acc, row) => {
@@ -227,6 +252,10 @@ export default function ConversionEventsPage() {
               <div className="text-sm text-slate-600">{timeline.amountLabel}</div>
               <div className="text-sm text-slate-600">{timeline.platforms.length ? timeline.platforms.join(" · ") : "—"}</div>
               <div className="text-xs text-slate-500">{statusSummary(timeline.statuses)}</div>
+              <Button size="sm" variant="outline" disabled={!timeline.canRetry || retryingDonationId === timeline.donationId} onClick={() => retryDonation(timeline.donationId)} className="gap-2">
+                {retryingDonationId === timeline.donationId ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                إعادة المحاولة
+              </Button>
             </div>
             <div className="mt-3 space-y-2">
               {timeline.events.map((row, index) => <div key={rowKey(row, index)} className="grid grid-cols-1 gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm md:grid-cols-[9rem_7rem_7rem_1fr_8rem_1fr]">
