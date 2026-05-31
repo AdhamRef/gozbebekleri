@@ -30,6 +30,28 @@ type Bucket = {
   matchReason?: string | null;
 };
 
+type ReconciliationRow = Bucket & {
+  matchStatus: "matched" | "platform_only" | "site_only" | "unknown";
+  actualRoas: number | null;
+  platformRoas: number | null;
+  conversionGap: number;
+  valueGap: number;
+};
+
+type MarketingRecommendation = {
+  id: string;
+  priority: "HIGH" | "MEDIUM" | "LOW";
+  type: "SCALE" | "PAUSE_OR_REVIEW" | "FIX_TRACKING" | "FIX_ATTRIBUTION" | "INVESTIGATE";
+  title: string;
+  details: string;
+  action: string;
+  rowKey?: string;
+  campaignName?: string | null;
+  adsetName?: string | null;
+  adName?: string | null;
+  metrics?: Record<string, number | string | null>;
+};
+
 function isRecord(value: unknown): value is Attribution {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -225,6 +247,136 @@ function findBucketForPlatformSnapshot(
   return { bucket: ensureBucket(buckets, fallbackKey, fallbackLabel), reason: "platform_only" };
 }
 
+function buildStructuredRecommendations(rows: ReconciliationRow[], summary: { platformSpend: number; siteRevenue: number; weakAttribution: number; unmatchedSiteRows: number; unmatchedPlatformRows: number; cApiMarkedSent: number; paidDonations: number; countryMismatchCount: number }): MarketingRecommendation[] {
+  const recs: MarketingRecommendation[] = [];
+  const spendRows = rows.filter((row) => row.platformSpend > 0);
+  const matchedRows = spendRows.filter((row) => row.matchStatus === "matched");
+  const platformOnly = spendRows.filter((row) => row.matchStatus === "platform_only");
+  const siteOnly = rows.filter((row) => row.matchStatus === "site_only" && row.siteRevenue > 0);
+
+  const bestScale = matchedRows
+    .filter((row) => (row.actualRoas ?? 0) >= 3 && row.siteDonations >= 2)
+    .sort((a, b) => (b.actualRoas ?? 0) - (a.actualRoas ?? 0))[0];
+  if (bestScale) {
+    recs.push({
+      id: `scale:${bestScale.key}`,
+      priority: "HIGH",
+      type: "SCALE",
+      title: `زد الميزانية تدريجيًا: ${bestScale.campaignName || bestScale.label}`,
+      details: `ROAS الحقيقي ${bestScale.actualRoas?.toFixed(2)} مع ${bestScale.siteDonations} تبرعات فعلية. هذا قرار مبني على الموقع لا على أرقام المنصة فقط.`,
+      action: "ارفع الميزانية 15% إلى 25% لمدة يومين ثم راقب ROAS الحقيقي والتبرعات الفعلية.",
+      rowKey: bestScale.key,
+      campaignName: bestScale.campaignName,
+      adsetName: bestScale.adsetName,
+      adName: bestScale.label,
+      metrics: { actualRoas: bestScale.actualRoas, siteDonations: bestScale.siteDonations, siteRevenue: bestScale.siteRevenue, platformSpend: bestScale.platformSpend },
+    });
+  }
+
+  const waste = spendRows
+    .filter((row) => row.platformSpend >= 10 && row.siteDonations === 0)
+    .sort((a, b) => b.platformSpend - a.platformSpend)[0];
+  if (waste) {
+    recs.push({
+      id: `waste:${waste.key}`,
+      priority: "HIGH",
+      type: "PAUSE_OR_REVIEW",
+      title: `راجع أو أوقف مؤقتًا: ${waste.campaignName || waste.label}`,
+      details: `يوجد صرف ${waste.platformSpend.toFixed(2)} بدون أي تبرعات فعلية من الموقع في الفترة المختارة.`,
+      action: "راجع الاستهداف، الإعلان، صفحة الهبوط، والرابط. إن لم يظهر تحسن خلال 24 ساعة أوقف المجموعة أو خفّض الميزانية.",
+      rowKey: waste.key,
+      campaignName: waste.campaignName,
+      adsetName: waste.adsetName,
+      adName: waste.label,
+      metrics: { platformSpend: waste.platformSpend, siteDonations: waste.siteDonations, siteRevenue: waste.siteRevenue },
+    });
+  }
+
+  if (platformOnly.length > 0) {
+    const top = platformOnly.sort((a, b) => b.platformSpend - a.platformSpend)[0];
+    recs.push({
+      id: `platform-only:${top.key}`,
+      priority: "MEDIUM",
+      type: "FIX_ATTRIBUTION",
+      title: "بيانات منصة بدون ربط واضح بتبرعات الموقع",
+      details: `${platformOnly.length} صفوف من المنصة لا تقابلها تبرعات موقع. أعلى صف: ${top.campaignName || top.label}.`,
+      action: "استخدم روابط Campaign Builder وتأكد من utm_campaign وcampaign_id وad_id في روابط الإعلانات القادمة.",
+      rowKey: top.key,
+      campaignName: top.campaignName,
+      adsetName: top.adsetName,
+      adName: top.label,
+      metrics: { rows: platformOnly.length, topSpend: top.platformSpend },
+    });
+  }
+
+  if (siteOnly.length > 0) {
+    const top = siteOnly.sort((a, b) => b.siteRevenue - a.siteRevenue)[0];
+    recs.push({
+      id: `site-only:${top.key}`,
+      priority: "MEDIUM",
+      type: "FIX_ATTRIBUTION",
+      title: "تبرعات فعلية غير مربوطة بصرف المنصة",
+      details: `${siteOnly.length} صفوف من الموقع لا تقابلها بيانات صرف. أعلى صف حقق ${top.siteRevenue.toFixed(2)} إيراد.`,
+      action: "راجع مصدر هذه التبرعات: إن كانت من إعلانات، اربط الروابط بـ UTM/IDs. وإن كانت عضوية فصنّفها ك Organic/Direct بوضوح.",
+      rowKey: top.key,
+      campaignName: top.campaignName,
+      adsetName: top.adsetName,
+      adName: top.label,
+      metrics: { rows: siteOnly.length, topRevenue: top.siteRevenue },
+    });
+  }
+
+  if (summary.weakAttribution > 0) {
+    recs.push({
+      id: "weak-attribution",
+      priority: summary.weakAttribution >= 5 ? "HIGH" : "MEDIUM",
+      type: "FIX_ATTRIBUTION",
+      title: "إسناد ضعيف في روابط التبرع",
+      details: `يوجد ${summary.weakAttribution} تبرع بإسناد ضعيف خلال الفترة. هذا يقلل دقة معرفة مصدر التبرع.`,
+      action: "اجعل كل روابط الإعلانات تمر من Campaign Builder وتحتوي على utm_source/utm_campaign/campaign_id/ad_id قدر الإمكان.",
+      metrics: { weakAttribution: summary.weakAttribution },
+    });
+  }
+
+  if (summary.cApiMarkedSent < summary.paidDonations) {
+    recs.push({
+      id: "missing-capi",
+      priority: "HIGH",
+      type: "FIX_TRACKING",
+      title: "بعض التبرعات لم تُوسم كمرسلة CAPI",
+      details: `الموسوم كمرسل: ${summary.cApiMarkedSent} من أصل ${summary.paidDonations} تبرع مدفوع.`,
+      action: "افتح أحداث التحويل واستخدم Timeline التبرع لمعرفة التبرعات الفاشلة ثم أعد المحاولة بعد إصلاح سبب الخطأ.",
+      metrics: { sent: summary.cApiMarkedSent, paid: summary.paidDonations },
+    });
+  }
+
+  if (summary.countryMismatchCount > 0) {
+    recs.push({
+      id: "country-mismatch",
+      priority: "LOW",
+      type: "INVESTIGATE",
+      title: "اختلاف بين دولة الرابط/الإعلان ودولة المتبرع",
+      details: `يوجد ${summary.countryMismatchCount} حالات اختلاف دولة. هذا ليس خطأ دائمًا، لكنه مهم عند تقييم الاستهداف.`,
+      action: "لا تعتمد على دولة وسيلة الدفع وحدها. قارن الدولة المستهدفة، IP، بلد المتبرع، وبلد البطاقة قبل تغيير الاستهداف.",
+      metrics: { countryMismatchCount: summary.countryMismatchCount },
+    });
+  }
+
+  if (summary.platformSpend > 0 && summary.siteRevenue / summary.platformSpend < 1) {
+    recs.push({
+      id: "low-overall-roas",
+      priority: "HIGH",
+      type: "PAUSE_OR_REVIEW",
+      title: "ROAS الحقيقي العام أقل من 1",
+      details: `الإيراد الفعلي أقل من الصرف خلال الفترة المختارة.`,
+      action: "خفض الميزانيات ذات ROAS ضعيف، ووجّه الاختبار نحو الحملات ذات تبرعات فعلية مثبتة.",
+      metrics: { actualRoas: summary.siteRevenue / summary.platformSpend, platformSpend: summary.platformSpend, siteRevenue: summary.siteRevenue },
+    });
+  }
+
+  return recs.slice(0, 8);
+}
+
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   const denied = requireAdminOrDashboardPermission(session, "ads");
@@ -345,7 +497,7 @@ export async function GET(request: NextRequest) {
     indexName(nameIndex, bucket, bucket.label, bucket.campaignName, snap.campaignName, adName, snap.adGroupName);
   }
 
-  const rows = [...buckets.values()].map((row) => ({
+  const rows = [...buckets.values()].map((row): ReconciliationRow => ({
     ...row,
     label: displayAdLabel(row.label, row.adId),
     adsetId: row.adsetName ? null : row.adsetId,
@@ -365,6 +517,7 @@ export async function GET(request: NextRequest) {
   if (countryMismatches.length > 0) recommendations.push(`يوجد ${countryMismatches.length} اختلاف دولة بين الإعلان/الرابط ودولة المتبرع؛ لا تعتبره خطأ مباشرًا لكن راجعه في الاستهداف والدفع.`);
   if (platformConversions > donations.length * 1.4 && donations.length > 0) recommendations.push("نتائج المنصة أعلى بكثير من التبرعات الفعلية؛ راجع attribution window و view-through conversions.");
   if (cApiMarkedSent < donations.length) recommendations.push("بعض التبرعات المدفوعة ليست موسومة كمرسلة CAPI؛ شغّل مراجعة التحويلات المفقودة.");
+  const structuredRecommendations = buildStructuredRecommendations(rows, { platformSpend, siteRevenue: paidRevenue, weakAttribution, unmatchedSiteRows, unmatchedPlatformRows, cApiMarkedSent, paidDonations: donations.length, countryMismatchCount: countryMismatches.length });
 
   return NextResponse.json({
     ok: true,
@@ -389,5 +542,6 @@ export async function GET(request: NextRequest) {
     rows,
     countryMismatches: countryMismatches.slice(0, 100),
     recommendations,
+    structuredRecommendations,
   });
 }
