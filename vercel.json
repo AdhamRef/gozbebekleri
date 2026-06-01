@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/exchange-rates",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/marketing-meta-sync",
+      "schedule": "15 */3 * * *"
     }
   ]
 }
