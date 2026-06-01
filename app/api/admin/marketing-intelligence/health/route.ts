@@ -127,6 +127,7 @@ export async function GET() {
     conversionEvents: { sentLast7d: sent, failedLast7d: failed, skippedLast7d: skipped, recent: recent.slice(0, 12) },
     links: {
       campaignBuilder: "/dashboard/link-generator",
+      campaignLinksPerformance: "/dashboard/marketing-intelligence/campaign-links",
       ads: "/dashboard/ads",
       pixels: "/dashboard/pixels",
       connections: "/dashboard/marketing/connections",
