@@ -1,3 +1,4 @@
-import { GET, dynamic } from "../../../../../lib/marketing/reconciliation";
+import { GET as handler } from "../../../../../lib/marketing/reconciliation-stable";
 
-export { GET, dynamic };
+export const dynamic = "force-dynamic";
+export const GET = handler;
