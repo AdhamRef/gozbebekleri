@@ -43,6 +43,38 @@ function eventStatus(event: Record<string, unknown>) {
   return typeof event.status === "string" ? event.status : "UNKNOWN";
 }
 
+async function latestMetaSync() {
+  const run = await prisma.platformSyncRun.findFirst({
+    where: { platform: "META" },
+    orderBy: { startedAt: "desc" },
+    select: {
+      id: true,
+      connectionId: true,
+      accountId: true,
+      dateFrom: true,
+      dateTo: true,
+      status: true,
+      startedAt: true,
+      finishedAt: true,
+      rowsFetched: true,
+      error: true,
+    },
+  });
+  if (!run) return null;
+  return {
+    id: run.id,
+    connectionId: run.connectionId,
+    accountId: run.accountId,
+    dateFrom: run.dateFrom.toISOString(),
+    dateTo: run.dateTo.toISOString(),
+    status: run.status,
+    startedAt: run.startedAt.toISOString(),
+    finishedAt: run.finishedAt?.toISOString() ?? null,
+    rowsFetched: run.rowsFetched,
+    error: run.error,
+  };
+}
+
 export async function GET() {
   const session = await getServerSession(authOptions);
   const denied = requireAdminOrDashboardPermission(session, "ads");
@@ -58,11 +90,12 @@ export async function GET() {
     platform("X", "X Pixel / Conversions", ["xPixelId", "xAccessToken"], settings),
   ];
 
-  const [paidLast7d, checkoutRowsLast7d, failedLast7d, recent] = await Promise.all([
+  const [paidLast7d, checkoutRowsLast7d, failedLast7d, recent, metaSync] = await Promise.all([
     prisma.donation.count({ where: { status: "PAID", paidAt: { not: null, gte: since } } }),
     prisma.donation.count({ where: { createdAt: { gte: since } } }),
     prisma.donation.count({ where: { status: "FAILED", createdAt: { gte: since } } }),
     recentConversionEvents(),
+    latestMetaSync(),
   ]);
 
   const sent = recent.filter((event) => eventStatus(event) === "SENT").length;
@@ -89,6 +122,7 @@ export async function GET() {
     window: { days: 7, since: since.toISOString() },
     scores: { readiness, delivery, overall: Math.round((readiness + delivery) / 2) },
     platforms,
+    sync: { meta: metaSync },
     donations: { checkoutRowsLast7d, paidLast7d, failedLast7d, missingServerConversions },
     conversionEvents: { sentLast7d: sent, failedLast7d: failed, skippedLast7d: skipped, recent: recent.slice(0, 12) },
     links: {
