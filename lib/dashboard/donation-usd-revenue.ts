@@ -3,11 +3,36 @@ import { prisma } from "@/lib/prisma";
 
 /**
  * Donations are inserted with status='PAID' *before* the gateway confirms,
- * so an abandoned checkout leaves a row with status=PAID and paidAt=null
- * that never increments campaign.currentAmount. Dashboard "actually paid"
- * = status PAID AND paidAt set, matching what real money moved.
+ * so an abandoned checkout leaves a row with status=PAID and paidAt=null.
+ * For one-time donations that combo means "checkout started, never settled" —
+ * filter them out of revenue/dashboards.
+ *
+ * Subscription-linked donations get the lenient treatment: status='PAID' alone
+ * is enough. Recurring charges fire automatically with no donor click, so
+ * there's no abandonment moment to guard against, and the legacy strict rule
+ * left every monthly donation stuck on قيد التأكيد when webhook settlement
+ * lagged or PayFor recurring wasn't wired up.
+ *
+ * IMPORTANT: this filter governs dashboard/list semantics, NOT campaign
+ * currentAmount math. Campaign totals are still recomputed under the strict
+ * `PAID_CONTRIBUTING_FILTER` below so the webhook stays the single source of
+ * truth for incrementing campaign.currentAmount.
  */
 export const PAID_DONATION_FILTER: Prisma.DonationWhereInput = {
+  status: "PAID",
+  OR: [
+    { paidAt: { not: null } },
+    { subscriptionId: { not: null } },
+  ],
+};
+
+/**
+ * Strict version — only donations that actually moved money into a campaign.
+ * Used by the campaign/category `currentAmount` recompute helpers so we never
+ * double-count an optimistic subscription sentinel against totals the webhook
+ * will still increment when it lands.
+ */
+export const PAID_CONTRIBUTING_FILTER: Prisma.DonationWhereInput = {
   status: "PAID",
   paidAt: { not: null },
 };

@@ -101,10 +101,13 @@ export async function GET(
         where: {
           donorId: id,
           status: 'PAID',
-          // Mongo+Prisma quirk: `paidAt: null` only matches literal-null. Use
-          // `not: null` to require an actual settled timestamp (skipping rows
-          // where the field is unset entirely).
-          paidAt: { not: null },
+          // One-time donations need a settled paidAt to count; subscription
+          // donations count on status=PAID alone since recurring charges fire
+          // without a donor click (no abandonment moment to guard against).
+          OR: [
+            { paidAt: { not: null } },
+            { subscriptionId: { not: null } },
+          ],
         },
         _sum: { totalAmount: true, amountUSD: true },
         _max: { createdAt: true },
@@ -131,10 +134,12 @@ export async function GET(
       0
     );
 
-    // Distinct supported campaigns (only counting actually-paid donations).
+    // Distinct supported campaigns. Subscription donations count even without
+    // paidAt — they're treated as ناجح across dashboards/UI.
     const supportedCampaignIds = new Set<string>();
     for (const donation of user.donations) {
-      if (donation.status !== 'PAID' || donation.paidAt == null) continue;
+      if (donation.status !== 'PAID') continue;
+      if (donation.paidAt == null && donation.subscriptionId == null) continue;
       for (const item of donation.items) supportedCampaignIds.add(item.campaignId);
     }
 
@@ -143,7 +148,10 @@ export async function GET(
     // long-tail donor doesn't blow up the loop.
     const paidMonthKeys = new Set(
       user.donations
-        .filter((d) => d.status === 'PAID' && d.paidAt != null)
+        .filter(
+          (d) =>
+            d.status === 'PAID' && (d.paidAt != null || d.subscriptionId != null)
+        )
         .map((d) => {
           const dt = d.paidAt ?? d.createdAt;
           return `${dt.getUTCFullYear()}-${dt.getUTCMonth()}`;

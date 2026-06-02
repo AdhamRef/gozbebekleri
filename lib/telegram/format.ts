@@ -21,7 +21,7 @@ export interface FormattableDonation {
   paymentMethod: string | null;
   donorCountryCode: string | null;
   attribution: Record<string, unknown> | null;
-  donor: { name: string | null; email: string } | null;
+  donor: { name: string | null; email: string; phone: string | null } | null;
   items: Array<{ campaign: { title: string } }>;
   categoryItems: Array<{ category: { name: string } }>;
   referral: { code: string; name: string | null } | null;
@@ -82,10 +82,20 @@ function providerLabel(d: { provider: string | null; paymentMethod: string | nul
   return m ? `${p} · ${m}` : p;
 }
 
-function donorLine(donor: { name: string | null; email: string } | null): string {
+/** wa.me only accepts digits — strip "+", spaces, dashes, parens. */
+function whatsappDigits(phone: string): string {
+  return phone.replace(/\D+/g, "");
+}
+
+function donorLine(donor: { name: string | null; email: string; phone: string | null } | null): string {
   if (!donor) return "—";
   const name = donor.name?.trim() || "Guest";
-  return `${htmlEscape(name)} (${htmlEscape(donor.email)})`;
+  const rawPhone = donor.phone?.trim() ?? "";
+  if (!rawPhone) return htmlEscape(name);
+  const digits = whatsappDigits(rawPhone);
+  // No usable digits — show the raw value so the admin still sees something.
+  if (!digits) return `${htmlEscape(name)} (${htmlEscape(rawPhone)})`;
+  return `${htmlEscape(name)} (<a href="https://wa.me/${digits}">${htmlEscape(rawPhone)}</a>)`;
 }
 
 function countryLine(code: string | null): string {
@@ -150,10 +160,6 @@ export function formatDonationNotification(d: FormattableDonation): string {
     lines.push("");
     lines.push(`⚠️ <b>سبب الفشل:</b> <i>${htmlEscape(d.providerErrorMessage)}</i>`);
   }
-
-  lines.push("");
-  lines.push(`🕒 <i>${htmlEscape(formatIstanbulDateTime(d.createdAt))}</i>`);
-  lines.push(`<code>ID: ${htmlEscape(d.id)}</code>`);
 
   return lines.join("\n");
 }

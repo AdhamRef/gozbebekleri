@@ -32,6 +32,10 @@ interface DonationDetail {
   currency: string;
   status: "PAID" | "FAILED";
   paidAt: string | null;
+  // null on one-time donations; set for monthly subscription rows. Monthly
+  // donations are treated as ناجح in the UI even with paidAt=null, so the
+  // edit dialog skips the قيد التأكيد option for them.
+  subscriptionId?: string | null;
   donor?: { name: string | null; email: string | null } | null;
   items: { campaignId: string; amount: number; campaign: { title: string } }[];
   categoryItems: { categoryId: string; amount: number; category: { name: string } }[];
@@ -63,7 +67,10 @@ export function EditDonationDialog({ donationId, onClose, onSaved }: Props) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmTyped, setConfirmTyped] = useState("");
 
-  const [status, setStatus] = useState<"PAID" | "FAILED">("PAID");
+  // قيد التأكيد = PAID with paidAt=null. We expose it as a distinct dropdown
+  // option so admins can either leave it pending or confirm it (stamp paidAt
+  // and let the server roll the amount into campaign/category totals).
+  const [statusChoice, setStatusChoice] = useState<"PAID" | "PAID_PENDING" | "FAILED">("PAID");
   const [editableItems, setEditableItems] = useState<EditableItem[]>([]);
 
   // Picker datasets — fetched once when dialog opens.
@@ -84,7 +91,17 @@ export function EditDonationDialog({ donationId, onClose, onSaved }: Props) {
 
         const d = donRes.data as DonationDetail;
         setDonation(d);
-        setStatus(d.status === "FAILED" ? "FAILED" : "PAID");
+        // Monthly donations are surfaced as ناجح everywhere — default the
+        // edit dialog to "PAID" so saving stamps paidAt and contributes the
+        // amount to campaign currentAmount (no قيد التأكيد middle option).
+        const isMonthly = d.subscriptionId != null;
+        setStatusChoice(
+          d.status === "FAILED"
+            ? "FAILED"
+            : d.paidAt === null && !isMonthly
+              ? "PAID_PENDING"
+              : "PAID"
+        );
 
         const rows: EditableItem[] = [];
         for (const it of d.items ?? []) {
@@ -171,7 +188,14 @@ export function EditDonationDialog({ donationId, onClose, onSaved }: Props) {
 
   const dirty = useMemo(() => {
     if (!donation) return false;
-    if ((donation.status === "FAILED" ? "FAILED" : "PAID") !== status) return true;
+    const isMonthly = donation.subscriptionId != null;
+    const originalChoice: "PAID" | "PAID_PENDING" | "FAILED" =
+      donation.status === "FAILED"
+        ? "FAILED"
+        : donation.paidAt === null && !isMonthly
+          ? "PAID_PENDING"
+          : "PAID";
+    if (originalChoice !== statusChoice) return true;
     const old: EditableItem[] = [
       ...donation.items.map((i) => ({
         key: "",
@@ -195,7 +219,7 @@ export function EditDonationDialog({ donationId, onClose, onSaved }: Props) {
         .sort()
         .join("|");
     return sig(old) !== sig(editableItems);
-  }, [donation, editableItems, status]);
+  }, [donation, editableItems, statusChoice]);
 
   const setLineAmount = (idx: number, val: string) => {
     setEditableItems((prev) => prev.map((it, i) => (i === idx ? { ...it, amount: val } : it)));
@@ -237,8 +261,13 @@ export function EditDonationDialog({ donationId, onClose, onSaved }: Props) {
         .filter((it) => it.kind === "category")
         .map((it) => ({ categoryId: it.refId, amount: Number(it.amount) }));
 
+      const status = statusChoice === "FAILED" ? "FAILED" : "PAID";
+      // "PAID" (vs "PAID_PENDING") is admin's explicit confirmation that the
+      // donation actually settled — server stamps paidAt when it was null.
+      const confirmPaidAt = statusChoice === "PAID";
       await axios.patch(`/api/donations/${donationId}`, {
         status,
+        confirmPaidAt,
         items,
         categoryItems,
       });
@@ -256,10 +285,18 @@ export function EditDonationDialog({ donationId, onClose, onSaved }: Props) {
   };
 
   const donor = donation?.donor?.name?.trim() || donation?.donor?.email || "—";
-  const statusWillRemoveContribution =
-    !!donation && donation.status === "PAID" && donation.paidAt !== null && status === "FAILED";
+  const isMonthly = !!donation && donation.subscriptionId != null;
+  const wasContributing = !!donation && donation.status === "PAID" && donation.paidAt !== null;
+  // Pending toggle only applies to one-time donations. Monthly donations are
+  // treated as ناجح in dashboards regardless of paidAt, so the dialog hides
+  // the قيد التأكيد middle option for them.
+  const wasPending =
+    !!donation && donation.status === "PAID" && donation.paidAt === null && !isMonthly;
+  const statusWillRemoveContribution = wasContributing && statusChoice === "FAILED";
   const statusWillAddContribution =
-    !!donation && donation.status === "FAILED" && status === "PAID";
+    !!donation &&
+    !wasContributing &&
+    statusChoice === "PAID";
 
   return (
     <Dialog open onOpenChange={(open) => (!open && !submitting ? onClose() : null)}>
@@ -299,12 +336,22 @@ export function EditDonationDialog({ donationId, onClose, onSaved }: Props) {
             {/* Status */}
             <div className="space-y-1">
               <label className="text-xs font-medium text-slate-700">الحالة</label>
-              <Select value={status} onValueChange={(v) => setStatus(v as "PAID" | "FAILED")}>
+              <Select
+                value={statusChoice}
+                onValueChange={(v) =>
+                  setStatusChoice(v as "PAID" | "PAID_PENDING" | "FAILED")
+                }
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="PAID">ناجح (PAID)</SelectItem>
+                  <SelectItem value="PAID">
+                    {wasPending ? "ناجح — تأكيد الدفع الآن (PAID)" : "ناجح (PAID)"}
+                  </SelectItem>
+                  {wasPending && (
+                    <SelectItem value="PAID_PENDING">قيد التأكيد (PAID — بدون paidAt)</SelectItem>
+                  )}
                   <SelectItem value="FAILED">فاشل (FAILED)</SelectItem>
                 </SelectContent>
               </Select>
@@ -318,7 +365,7 @@ export function EditDonationDialog({ donationId, onClose, onSaved }: Props) {
                   تحويل التبرع إلى «ناجح» سيُسجّل تاريخ الدفع الآن ويُضيف قيمته إلى إجمالي المشاريع/الحملات المرتبطة.
                 </p>
               )}
-              {donation.status === "PAID" && donation.paidAt === null && status === "PAID" && (
+              {wasPending && statusChoice === "PAID_PENDING" && (
                 <p className="text-[11px] text-amber-600 leading-relaxed">
                   هذا التبرع لم يُسجّل بـ paidAt — لن يُضاف إلى الإجماليات حتى يُؤكد الدفع.
                 </p>

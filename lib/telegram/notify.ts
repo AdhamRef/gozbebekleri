@@ -21,7 +21,7 @@ export const DONATION_NOTIFY_SELECT = {
   paymentMethod: true,
   donorCountryCode: true,
   attribution: true,
-  donor: { select: { name: true, email: true } },
+  donor: { select: { name: true, email: true, phone: true } },
   items: { select: { campaign: { select: { title: true } } } },
   categoryItems: { select: { category: { select: { name: true } } } },
   referral: { select: { code: true, name: true } },
@@ -55,7 +55,11 @@ export async function notifyDonationEvent(
 
     // FIRST_DONATION fires alongside DONATION_PAID — emit only a banner so we don't double-post.
     if (event === "FIRST_DONATION") {
-      const donorName = donation.donor?.name?.trim() || donation.donor?.email || "متبرع";
+      const donorName =
+        donation.donor?.name?.trim() ||
+        donation.donor?.phone?.trim() ||
+        donation.donor?.email ||
+        "متبرع";
       const banner =
         `🌟 <b>أول تبرع لهذا المتبرع</b>\n` +
         `${donorName} — شكراً لانضمامه إلى عائلة المتبرعين`;

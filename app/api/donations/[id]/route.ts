@@ -372,6 +372,10 @@ async function recomputeCampaignCurrentAmount(
   tx: Prisma.TransactionClient,
   campaignId: string
 ) {
+  // Strict filter: only count donations that actually settled with paidAt.
+  // Subscription pending rows show up as ناجح in dashboards but don't
+  // contribute here — the webhook still owns incrementing currentAmount when
+  // the gateway confirms, so double-counting them would corrupt the total.
   const rows = await tx.donationItem.findMany({
     where: {
       campaignId,
@@ -512,6 +516,7 @@ export async function PATCH(
 
     const body = (await request.json()) as {
       status?: 'PAID' | 'FAILED';
+      confirmPaidAt?: boolean;
       items?: { campaignId: string; amount: number }[];
       categoryItems?: { categoryId: string; amount: number }[];
     };
@@ -635,8 +640,15 @@ export async function PATCH(
     const newAmountUSD = (newItems || newCatItems)
       ? await convertAmountInCurrencyToUsd(newTotalAmount, currencyCode)
       : existing.amountUSD;
+    // Stamp paidAt when:
+    //  - FAILED → PAID with no paidAt (legacy auto-stamp), OR
+    //  - donation was PAID but قيد التأكيد (paidAt=null) and admin explicitly
+    //    confirms via `confirmPaidAt`. Without the explicit flag, leave it as
+    //    قيد التأكيد so webhooks remain the source of truth.
     const shouldStampPaidAt =
-      existing.status !== 'PAID' && nextStatus === 'PAID' && existing.paidAt === null;
+      nextStatus === 'PAID' &&
+      existing.paidAt === null &&
+      (existing.status !== 'PAID' || body.confirmPaidAt === true);
     const nextPaidAt = shouldStampPaidAt ? new Date() : existing.paidAt;
 
     // Build OLD vs NEW contribution maps. A donation only contributes to

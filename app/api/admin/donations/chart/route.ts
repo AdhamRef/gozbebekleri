@@ -51,8 +51,16 @@ export async function GET(request: NextRequest) {
     // donation paid at 00:30 Istanbul May 20 lands in May 20's bar even if its
     // checkout row was inserted at 23:55 May 19. Window is the Istanbul day
     // boundary expressed in UTC.
+    // Subscription-linked donations stuck on PAID/paidAt=null still count —
+    // bucket them by `createdAt` since that's the only date we have for them.
     const dateWindowOr = [
       { status: 'PAID', paidAt: { gte: startDate, lte: endDate } },
+      {
+        status: 'PAID',
+        paidAt: null,
+        subscriptionId: { not: null },
+        createdAt: { gte: startDate, lte: endDate },
+      },
       { status: 'FAILED', createdAt: { gte: startDate, lte: endDate } },
     ];
 
@@ -110,16 +118,16 @@ export async function GET(request: NextRequest) {
     const byDate = new Map<string, Bucket>();
 
     for (const d of donations) {
-      // status=PAID is set at creation, before the gateway confirms; only rows
-      // with paidAt set actually settled and were counted into campaign.currentAmount.
-      const isPaid = d.status === 'PAID' && d.paidAt != null;
+      // status=PAID is set at creation, before the gateway confirms. For
+      // one-time donations only paidAt-stamped rows count; for subscription
+      // donations we trust status=PAID alone (recurring charges fire without
+      // a donor click — there's no abandonment moment to guard against).
+      const isPaid =
+        d.status === 'PAID' && (d.paidAt != null || d.subscriptionId != null);
       const isFailed = d.status === 'FAILED';
-      // PAID rows pulled via the paidAt OR-branch may also have a NULL paidAt
-      // if status was flipped before settlement — skip those, they are not yet
-      // revenue.
       if (!isPaid && !isFailed) continue;
 
-      const bucketDate = isPaid ? (d.paidAt as Date) : d.createdAt;
+      const bucketDate = isPaid ? ((d.paidAt as Date | null) ?? d.createdAt) : d.createdAt;
       const dateStr = formatIstanbulDateKey(bucketDate);
       const bucket = byDate.get(dateStr) ?? {
         amountOneTime: 0,
