@@ -19,18 +19,12 @@ import { Toaster } from "react-hot-toast";
 import SessionProvider from "@/components/providers/SessionProvider";
 import { ConfettiProvider } from "../../components/providers/confetti-provider";
 import Footer from "@/components/Footer";
-import ReferralTracker from "@/components/ReferralTracker";
 import PreferredLangSync from "@/components/PreferredLangSync";
 import SyncHtmlDir from "@/components/SyncHtmlDir";
-import TrackingPixels from "@/components/TrackingPixels";
-import { AttributionCapture } from "@/components/AttributionCapture";
-import { TrackingPixelBootstrap } from "@/components/TrackingPixelBootstrap";
-import { RoutePageViewTracker } from "@/components/RoutePageViewTracker";
-import { DirectTrackingScripts } from "@/components/DirectTrackingScripts";
-import { SuccessFinalConversionTracker } from "@/components/SuccessFinalConversionTracker";
+import { MarketingRuntime } from "@/components/MarketingRuntime";
 import { CurrencyProvider } from "@/context/CurrencyContext";
-import { Analytics } from "@vercel/analytics/react"
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const rawLocaleMessages: Record<string, Record<string, unknown>> = { ar, en, fr, tr, id, pt, es, de };
 const localeMessages = buildNormalizedMessages(rawLocaleMessages, "en") as Record<string, Record<string, unknown>>;
@@ -88,13 +82,7 @@ export default async function Rootlayout({
   return (
     <IntlProviderClient locale={locale || "ar"} messages={messages}>
       <SyncHtmlDir locale={locale} />
-      <TrackingPixels>
-        <DirectTrackingScripts />
-        <TrackingPixelBootstrap />
-        <RoutePageViewTracker />
-        <SuccessFinalConversionTracker />
-        <AttributionCapture />
-        <ReferralTracker />
+      <MarketingRuntime>
         <div dir={dir} lang={locale === "ar" ? "ar" : locale === "fr" ? "fr" : locale === "tr" ? "tr" : locale === "id" ? "id" : locale === "pt" ? "pt" : locale === "es" ? "es" : locale === "de" ? "de" : "en"}>
           <CurrencyProvider>
             <Suspense fallback={null}>
@@ -103,19 +91,19 @@ export default async function Rootlayout({
             <SessionProvider>
               <PreferredLangSync />
               <Navbar />
-            <main className="pt-16 lg:pt-[104px]">
-              {children}
-            </main>
-            <Footer />
-            <CartReminder />
-            <ConfettiProvider />
-            <Toaster position="top-center" />
-          </SessionProvider>
-        </CurrencyProvider>
-        <Analytics />
-        <SpeedInsights />
-      </div>
-      </TrackingPixels>
+              <main className="pt-16 lg:pt-[104px]">
+                {children}
+              </main>
+              <Footer />
+              <CartReminder />
+              <ConfettiProvider />
+              <Toaster position="top-center" />
+            </SessionProvider>
+          </CurrencyProvider>
+          <Analytics />
+          <SpeedInsights />
+        </div>
+      </MarketingRuntime>
     </IntlProviderClient>
   );
 }
