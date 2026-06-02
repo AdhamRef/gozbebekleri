@@ -42,12 +42,12 @@ export const DASHBOARD_NAV_GROUPS: {
   {
     group: "التتبع والإعلانات",
     items: [
-      { key: "ads", title: "ذكاء التسويق", href: "/dashboard/marketing-intelligence" },
-      { key: "ads", title: "إدارة الإعلانات", href: "/dashboard/ads" },
-      { key: "ads", title: "أحداث التحويل", href: "/dashboard/conversion-events" },
-      { key: "referrals", title: "منشئ الحملات والروابط", href: "/dashboard/link-generator" },
-      { key: "pixels", title: "البكسلات والتتبع", href: "/dashboard/pixels" },
-      { key: "platformConnections", title: "ربط المنصات والحسابات", href: "/dashboard/marketing/connections" },
+      { key: "ads", title: "مركز التسويق", href: "/dashboard/marketing-intelligence" },
+      { key: "ads", title: "الحملات والإعلانات", href: "/dashboard/ads" },
+      { key: "ads", title: "سجل التحويلات", href: "/dashboard/conversion-events" },
+      { key: "referrals", title: "الروابط التسويقية", href: "/dashboard/link-generator" },
+      { key: "pixels", title: "إعدادات التتبع", href: "/dashboard/pixels" },
+      { key: "platformConnections", title: "ربط المنصات", href: "/dashboard/marketing/connections" },
     ],
   },
   {
