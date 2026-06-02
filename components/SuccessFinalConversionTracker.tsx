@@ -85,6 +85,15 @@ function fireMetaBrowserDonate(payload: DonateTrackingPayload): { ok: boolean; e
   }
 }
 
+function markFinalBrowserDone(payload: DonateTrackingPayload) {
+  try { window.localStorage.setItem(`marketing_final_browser:${payload.eventId}`, "1"); } catch {}
+  // Legacy keys still read by app/[locale]/success/[id]/page.tsx. Setting them
+  // here prevents the older page-level Meta Donate effect from firing again
+  // after this unified runtime has already sent/logged the final browser leg.
+  try { window.localStorage.setItem(`donate_fired:${payload.transactionId}`, "1"); } catch {}
+  try { window.sessionStorage.setItem(`meta_donate_${payload.eventId}`, "1"); } catch {}
+}
+
 export function SuccessFinalConversionTracker() {
   const pathname = usePathname();
   const activeRef = useRef<string | null>(null);
@@ -114,9 +123,18 @@ export function SuccessFinalConversionTracker() {
       }
       if (cancelled || !payload) return;
 
-      const key = `marketing_final_browser:${payload.eventId}`;
+      const finalKey = `marketing_final_browser:${payload.eventId}`;
+      const legacyDonationKey = `donate_fired:${payload.transactionId}`;
+      const legacyMetaKey = `meta_donate_${payload.eventId}`;
       try {
-        if (window.localStorage.getItem(key)) return;
+        if (
+          window.localStorage.getItem(finalKey) ||
+          window.localStorage.getItem(legacyDonationKey) ||
+          window.sessionStorage.getItem(legacyMetaKey)
+        ) {
+          markFinalBrowserDone(payload);
+          return;
+        }
       } catch {}
 
       try {
@@ -129,7 +147,7 @@ export function SuccessFinalConversionTracker() {
           fireTikTokDonationConversion(config, payload),
           fireXDonationConversion(config, payload),
         ]);
-        try { window.localStorage.setItem(key, "1"); } catch {}
+        markFinalBrowserDone(payload);
       } catch {}
     })();
 
