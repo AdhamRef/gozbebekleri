@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, Download, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,6 +66,10 @@ export default function ConversionValueAuditPage() {
 
   React.useEffect(() => { void load(); }, [load]);
 
+  function exportCsv() {
+    window.open(`/api/admin/marketing-intelligence/conversion-value-audit/export?days=${days}&limit=300`, "_blank");
+  }
+
   return <div className="space-y-6 p-4 sm:p-6" dir="rtl">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -81,6 +85,7 @@ export default function ConversionValueAuditPage() {
           <option value={90}>آخر 90 يوم</option>
         </select>
         <Button variant="outline" onClick={load} className="gap-2"><RefreshCw className="h-4 w-4" />تحديث</Button>
+        <Button variant="outline" onClick={exportCsv} className="gap-2"><Download className="h-4 w-4" />تصدير CSV</Button>
       </div>
     </div>
 
