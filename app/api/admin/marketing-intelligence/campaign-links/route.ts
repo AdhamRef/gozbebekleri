@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { createHash } from "crypto";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { prisma } from "@/lib/prisma";
@@ -34,6 +35,10 @@ function readString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function urlHash(url: string) {
+  return createHash("sha256").update(url).digest("hex");
+}
+
 function readPayload(body: JsonMap): CampaignLinkPayload {
   return {
     name: readString(body.name) ?? undefined,
@@ -52,7 +57,7 @@ function readPayload(body: JsonMap): CampaignLinkPayload {
     adId: readString(body.adId) ?? readString(body.ad_id) ?? undefined,
     audienceSegment: readString(body.audienceSegment) ?? readString(body.audience_segment) ?? undefined,
     messageVariant: readString(body.messageVariant) ?? readString(body.message_variant) ?? undefined,
-    targetCountry: readString(body.targetCountry) ?? readString(body.target_country) ?? undefined,
+    targetCountry: readString(body.targetCountry)?.toUpperCase() ?? readString(body.target_country)?.toUpperCase() ?? undefined,
     objective: readString(body.objective) ?? undefined,
     raw: typeof body.raw === "object" && body.raw !== null && !Array.isArray(body.raw) ? body.raw as JsonMap : undefined,
   };
@@ -65,6 +70,7 @@ async function ensureIndexes() {
     { key: { campaignId: 1 }, name: "campaignId" },
     { key: { adId: 1 }, name: "adId" },
     { key: { utmCampaign: 1 }, name: "utmCampaign" },
+    { key: { urlHash: 1 }, name: "urlHash_unique", unique: true },
   ] }).catch(() => null);
 }
 
@@ -86,7 +92,7 @@ export async function GET(request: NextRequest) {
   const result = await prisma.$runCommandRaw({
     find: "MarketingCampaignLink",
     filter,
-    sort: { createdAt: -1 },
+    sort: { updatedAt: -1, createdAt: -1 },
     limit,
   }) as JsonMap;
 
@@ -110,11 +116,13 @@ export async function POST(request: NextRequest) {
   if (!payload.platform) return NextResponse.json({ ok: false, error: "missing platform" }, { status: 400 });
 
   const now = new Date();
+  const hash = urlHash(payload.url);
   const document = {
     name: payload.name ?? payload.utmCampaign ?? payload.campaignId ?? "Marketing link",
     platform: payload.platform,
     channel: payload.channel ?? payload.platform,
     url: payload.url,
+    urlHash: hash,
     basePath: payload.basePath ?? null,
     utmSource: payload.utmSource ?? null,
     utmMedium: payload.utmMedium ?? null,
@@ -131,10 +139,22 @@ export async function POST(request: NextRequest) {
     objective: payload.objective ?? null,
     createdBy: session?.user?.id ?? null,
     raw: payload.raw ?? body,
-    createdAt: now,
     updatedAt: now,
   };
 
-  const result = await prisma.$runCommandRaw({ insert: "MarketingCampaignLink", documents: [document] }) as JsonMap;
-  return NextResponse.json({ ok: true, inserted: result.n ?? 1, link: document });
+  const result = await prisma.$runCommandRaw({
+    update: "MarketingCampaignLink",
+    updates: [{
+      q: { urlHash: hash },
+      u: {
+        $set: document,
+        $setOnInsert: { createdAt: now },
+        $inc: { saveCount: 1 },
+      },
+      upsert: true,
+    }],
+  }) as JsonMap;
+
+  const upserted = Array.isArray(result.upserted) && result.upserted.length > 0;
+  return NextResponse.json({ ok: true, upserted, matched: result.n ?? 1, link: { ...document, createdAt: now } });
 }
