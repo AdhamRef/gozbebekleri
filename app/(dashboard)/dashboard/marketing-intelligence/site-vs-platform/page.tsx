@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, Download, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,6 +54,11 @@ export default function SiteVsPlatformPage() {
 
   React.useEffect(() => { void load(); }, [load]);
 
+  function exportCsv() {
+    const params = new URLSearchParams({ platform, days: String(days) });
+    window.open(`/api/admin/marketing-intelligence/site-vs-platform/export?${params.toString()}`, "_blank");
+  }
+
   return <div className="space-y-6 p-4 sm:p-6" dir="rtl">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -65,6 +70,7 @@ export default function SiteVsPlatformPage() {
         <select value={platform} onChange={(event) => setPlatform(event.target.value)} className="rounded-md border bg-white px-3 py-2 text-sm"><option value="ALL">كل المنصات</option><option value="META">Meta</option><option value="GOOGLE_ADS">Google Ads</option><option value="TIKTOK">TikTok</option><option value="X">X</option><option value="GA4">GA4</option></select>
         <select value={days} onChange={(event) => setDays(Number(event.target.value))} className="rounded-md border bg-white px-3 py-2 text-sm"><option value={1}>اليوم</option><option value={7}>آخر 7 أيام</option><option value={30}>آخر 30 يوم</option><option value={90}>آخر 90 يوم</option></select>
         <Button variant="outline" onClick={load} className="gap-2"><RefreshCw className="h-4 w-4" />تحديث</Button>
+        <Button variant="outline" onClick={exportCsv} className="gap-2"><Download className="h-4 w-4" />تصدير CSV</Button>
       </div>
     </div>
 
