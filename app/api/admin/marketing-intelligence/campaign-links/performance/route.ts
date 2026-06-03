@@ -31,6 +31,7 @@ type CampaignLink = {
   messageVariant?: string | null;
   targetCountry?: string | null;
   objective?: string | null;
+  internalNotes?: string | null;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 };
@@ -235,6 +236,12 @@ export async function GET(request: NextRequest) {
         adsetId: link.adsetId || link.adGroupId || null,
         adId: link.adId || null,
         targetCountry: link.targetCountry || null,
+      },
+      metadata: {
+        objective: link.objective || null,
+        audienceSegment: link.audienceSegment || null,
+        messageVariant: link.messageVariant || null,
+        internalNotes: link.internalNotes || null,
       },
       performance: {
         donations: donationsCount,
