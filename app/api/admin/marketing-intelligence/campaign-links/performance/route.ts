@@ -8,6 +8,7 @@ import { PAID_DONATION_FILTER, donationRowUsdApprox } from "@/lib/dashboard/dona
 export const dynamic = "force-dynamic";
 
 type JsonMap = Record<string, unknown>;
+type LinkStatus = "ACTIVE" | "ARCHIVED" | "DELETED" | "ALL";
 
 type CampaignLink = {
   _id?: unknown;
@@ -15,6 +16,8 @@ type CampaignLink = {
   platform?: string;
   channel?: string;
   url?: string;
+  status?: string | null;
+  saveCount?: number | null;
   utmSource?: string | null;
   utmMedium?: string | null;
   utmCampaign?: string | null;
@@ -29,6 +32,7 @@ type CampaignLink = {
   targetCountry?: string | null;
   objective?: string | null;
   createdAt?: Date | string;
+  updatedAt?: Date | string;
 };
 
 function isMap(value: unknown): value is JsonMap {
@@ -53,6 +57,12 @@ function numberParam(request: NextRequest, key: string, fallback: number, min: n
   return Number.isFinite(raw) ? Math.max(min, Math.min(max, Math.floor(raw))) : fallback;
 }
 
+function statusParam(request: NextRequest): LinkStatus {
+  const status = stringValue(request.nextUrl.searchParams.get("status"))?.toUpperCase();
+  if (status === "ARCHIVED" || status === "DELETED" || status === "ALL") return status;
+  return "ACTIVE";
+}
+
 function dateKey(date: Date) {
   return date.toISOString().slice(0, 10);
 }
@@ -66,6 +76,12 @@ function objectIdString(value: unknown) {
 
 function linkId(link: CampaignLink, index: number) {
   return objectIdString(link._id) || `${link.platform || "UNKNOWN"}:${link.campaignId || link.utmCampaign || link.url || index}`;
+}
+
+function linkStatus(link: CampaignLink) {
+  const status = typeof link.status === "string" ? link.status.toUpperCase() : "ACTIVE";
+  if (status === "ARCHIVED" || status === "DELETED") return status;
+  return "ACTIVE";
 }
 
 function scoreMatch(link: CampaignLink, attribution: unknown) {
@@ -131,12 +147,17 @@ function qualityFromScore(score: number) {
   return "none";
 }
 
-async function getCampaignLinks(limit: number, platform?: string | null): Promise<CampaignLink[]> {
-  const filter: JsonMap = platform ? { platform: platform.toUpperCase() } : {};
+async function getCampaignLinks(limit: number, platform?: string | null, status: LinkStatus = "ACTIVE"): Promise<CampaignLink[]> {
+  const filter: JsonMap = {};
+  if (platform) filter.platform = platform.toUpperCase();
+  if (status !== "ALL") {
+    if (status === "ACTIVE") filter.$or = [{ status: "ACTIVE" }, { status: { $exists: false } }, { status: null }];
+    else filter.status = status;
+  }
   const result = await prisma.$runCommandRaw({
     find: "MarketingCampaignLink",
     filter,
-    sort: { createdAt: -1 },
+    sort: { updatedAt: -1, createdAt: -1 },
     limit,
   }) as JsonMap;
 
@@ -154,6 +175,7 @@ export async function GET(request: NextRequest) {
   const days = numberParam(request, "days", 7, 1, 90);
   const limit = numberParam(request, "limit", 100, 1, 500);
   const platform = stringValue(request.nextUrl.searchParams.get("platform"));
+  const status = statusParam(request);
 
   const to = new Date();
   to.setHours(23, 59, 59, 999);
@@ -162,7 +184,7 @@ export async function GET(request: NextRequest) {
   from.setHours(0, 0, 0, 0);
 
   const [links, donations] = await Promise.all([
-    getCampaignLinks(limit, platform),
+    getCampaignLinks(limit, platform, status),
     prisma.donation.findMany({
       where: { createdAt: { gte: from, lte: to }, ...PAID_DONATION_FILTER },
       select: { id: true, amount: true, amountUSD: true, currency: true, createdAt: true, paidAt: true, attribution: true },
@@ -180,18 +202,20 @@ export async function GET(request: NextRequest) {
     const matchReasons = new Map<string, number>();
     const sampleDonations: Array<{ id: string; revenue: number; score: number; reasons: string[]; createdAt: string }> = [];
 
-    for (const donation of donations) {
-      const match = scoreMatch(link, donation.attribution);
-      if (match.score < 2) continue;
-      const value = donationRowUsdApprox(donation);
-      donationsCount += 1;
-      revenue += value;
-      const quality = qualityFromScore(match.score);
-      if (quality === "strong") strongMatches += 1;
-      else if (quality === "medium") mediumMatches += 1;
-      else weakMatches += 1;
-      for (const reason of match.reasons) matchReasons.set(reason, (matchReasons.get(reason) || 0) + 1);
-      if (sampleDonations.length < 10) sampleDonations.push({ id: donation.id, revenue: value, score: match.score, reasons: match.reasons, createdAt: donation.createdAt.toISOString() });
+    if (linkStatus(link) !== "DELETED") {
+      for (const donation of donations) {
+        const match = scoreMatch(link, donation.attribution);
+        if (match.score < 2) continue;
+        const value = donationRowUsdApprox(donation);
+        donationsCount += 1;
+        revenue += value;
+        const quality = qualityFromScore(match.score);
+        if (quality === "strong") strongMatches += 1;
+        else if (quality === "medium") mediumMatches += 1;
+        else weakMatches += 1;
+        for (const reason of match.reasons) matchReasons.set(reason, (matchReasons.get(reason) || 0) + 1);
+        if (sampleDonations.length < 10) sampleDonations.push({ id: donation.id, revenue: value, score: match.score, reasons: match.reasons, createdAt: donation.createdAt.toISOString() });
+      }
     }
 
     return {
@@ -200,7 +224,10 @@ export async function GET(request: NextRequest) {
       platform: link.platform || null,
       channel: link.channel || null,
       url: link.url || null,
+      status: linkStatus(link),
+      saveCount: typeof link.saveCount === "number" ? link.saveCount : 0,
       createdAt: link.createdAt || null,
+      updatedAt: link.updatedAt || null,
       identifiers: {
         utmCampaign: link.utmCampaign || null,
         utmId: link.utmId || null,
@@ -223,9 +250,13 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     range: { from: dateKey(from), to: dateKey(to), days, dateBasis: "createdAt" },
+    status,
     links: rows,
     summary: {
       links: rows.length,
+      activeLinks: rows.filter((row) => row.status === "ACTIVE").length,
+      archivedLinks: rows.filter((row) => row.status === "ARCHIVED").length,
+      deletedLinks: rows.filter((row) => row.status === "DELETED").length,
       linksWithDonations: rows.filter((row) => row.performance.donations > 0).length,
       donationsConsidered: donations.length,
       revenueMatched: rows.reduce((sum, row) => sum + row.performance.revenue, 0),
