@@ -27,6 +27,10 @@ function text(value: unknown) {
   return typeof value === "string" ? value : "";
 }
 
+function numeric(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
 function status(value: unknown) {
   return typeof value === "string" ? value.toUpperCase() : "ACTIVE";
 }
@@ -57,6 +61,16 @@ async function recentConversionEvents() {
   return isMap(result.cursor) && Array.isArray(result.cursor.firstBatch) ? result.cursor.firstBatch.filter(isMap) : [];
 }
 
+async function recentPaidDonations() {
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  return prisma.donation.findMany({
+    where: { status: "PAID", paidAt: { not: null, gte: since } },
+    orderBy: { paidAt: "desc" },
+    take: 50,
+    select: { id: true, amount: true, teamSupport: true, fees: true, totalAmount: true, currency: true },
+  });
+}
+
 async function trackingSettings() {
   const result = await prisma.$runCommandRaw({ find: "TrackingSettings", limit: 1, sort: { createdAt: 1 } }) as JsonMap;
   const rows = isMap(result.cursor) && Array.isArray(result.cursor.firstBatch) ? result.cursor.firstBatch : [];
@@ -68,18 +82,79 @@ function has(settings: JsonMap | null, key: string) {
   return typeof value === "string" ? value.trim().length > 0 : Boolean(value);
 }
 
+function paidTotal(row: { amount: number; teamSupport: number; fees: number; totalAmount: number }) {
+  const total = Number(row.totalAmount ?? 0);
+  if (Number.isFinite(total) && total > 0) return total;
+  return Number(row.amount || 0) + Number(row.teamSupport || 0) + Number(row.fees || 0);
+}
+
+function legacyOid(id: string) {
+  return /^[a-f0-9]{24}$/i.test(id) ? { $oid: id } : id;
+}
+
+async function conversionEventValues(donationId: string) {
+  const result = await prisma.$runCommandRaw({
+    find: "ConversionEvent",
+    filter: {
+      eventName: { $in: ["Donate", "purchase"] },
+      $or: [
+        { donationId },
+        { donationId: legacyOid(donationId) },
+        { eventId: `donate_${donationId}` },
+        { dedupKey: `donate_${donationId}` },
+      ],
+    },
+    projection: { platform: 1, status: 1, value: 1, currency: 1 },
+    sort: { createdAt: -1 },
+    limit: 20,
+  }) as JsonMap;
+  return isMap(result.cursor) && Array.isArray(result.cursor.firstBatch) ? result.cursor.firstBatch.filter(isMap) : [];
+}
+
 export async function GET() {
   const session = await getServerSession(authOptions);
   const denied = requireAdminOrDashboardPermission(session, "ads");
   if (denied) return denied;
 
-  const [links, events, settings] = await Promise.all([
+  const [links, events, settings, donations] = await Promise.all([
     recentCampaignLinks(),
     recentConversionEvents(),
     trackingSettings(),
+    recentPaidDonations(),
   ]);
 
   const items: ActionItem[] = [];
+
+  for (const donation of donations) {
+    const expected = paidTotal(donation);
+    const base = donation.amount;
+    const delta = expected - base;
+    if (delta <= 0.01) continue;
+    const eventValues = await conversionEventValues(donation.id);
+    const hasOldUndercount = eventValues.some((event) => Math.abs(numeric(event.value) - base) < 0.01);
+    const hasCorrect = eventValues.some((event) => Math.abs(numeric(event.value) - expected) < 0.01);
+    if (hasOldUndercount && !hasCorrect) {
+      items.push({
+        id: `conversion-value-undercount-${donation.id}`,
+        priority: "HIGH",
+        type: "CONVERSION",
+        title: `قيمة تحويل ناقصة: ${donation.id}`,
+        description: `يوجد تبرع إجماليه ${expected} ${donation.currency} لكن حدث التحويل القديم يبدو أنه أرسل ${base} فقط، والفرق ${delta}.`,
+        action: "افتح تدقيق قيمة التحويلات وراجع هل الحدث قديم فقط أم يحتاج متابعة مع المنصة.",
+        href: "/dashboard/marketing-intelligence/conversion-value-audit",
+      });
+    } else if (!hasCorrect) {
+      items.push({
+        id: `conversion-value-recheck-${donation.id}`,
+        priority: "MEDIUM",
+        type: "CONVERSION",
+        title: `تحقق من قيمة التحويل: ${donation.id}`,
+        description: `التبرع يحتوي دعم/رسوم إضافية بقيمة ${delta} ${donation.currency} ولا يوجد حدث واضح بالقيمة الإجمالية بعد.`,
+        action: "افتح تدقيق قيمة التحويلات وتأكد من أن التحويلات الجديدة ترسل totalAmount.",
+        href: "/dashboard/marketing-intelligence/conversion-value-audit",
+      });
+    }
+  }
 
   for (const [index, link] of links.entries()) {
     const id = idOf(link._id, `link-${index}`);
@@ -89,39 +164,15 @@ export async function GET() {
     const platform = text(link.platform) || "UNKNOWN";
 
     if (!campaignId) {
-      items.push({
-        id: `link-missing-campaign-${id}`,
-        priority: "HIGH",
-        type: "LINK",
-        title: `رابط بدون Campaign ID: ${name}`,
-        description: `الرابط على منصة ${platform} لا يحتوي Campaign ID أو UTM Campaign كافٍ، وهذا يضعف ربط التبرعات بالحملة.`,
-        action: "افتح الرابط واضغط تعديل، ثم أضف Campaign ID أو UTM Campaign.",
-        href: "/dashboard/marketing-intelligence/campaign-links",
-      });
+      items.push({ id: `link-missing-campaign-${id}`, priority: "HIGH", type: "LINK", title: `رابط بدون Campaign ID: ${name}`, description: `الرابط على منصة ${platform} لا يحتوي Campaign ID أو UTM Campaign كافٍ، وهذا يضعف ربط التبرعات بالحملة.`, action: "افتح الرابط واضغط تعديل، ثم أضف Campaign ID أو UTM Campaign.", href: "/dashboard/marketing-intelligence/campaign-links" });
     } else if (!adId && ["META", "GOOGLE_ADS", "TIKTOK", "X"].includes(platform.toUpperCase())) {
-      items.push({
-        id: `link-missing-ad-${id}`,
-        priority: "MEDIUM",
-        type: "LINK",
-        title: `رابط يحتاج Ad ID: ${name}`,
-        description: "الرابط يحتوي بيانات حملة لكنه لا يحتوي Ad ID، لذلك قد تكون المطابقة على مستوى الإعلان ضعيفة.",
-        action: "أضف Ad ID أو استخدم متغيرات المنصة الديناميكية عند إنشاء الرابط.",
-        href: "/dashboard/marketing-intelligence/campaign-links",
-      });
+      items.push({ id: `link-missing-ad-${id}`, priority: "MEDIUM", type: "LINK", title: `رابط يحتاج Ad ID: ${name}`, description: "الرابط يحتوي بيانات حملة لكنه لا يحتوي Ad ID، لذلك قد تكون المطابقة على مستوى الإعلان ضعيفة.", action: "أضف Ad ID أو استخدم متغيرات المنصة الديناميكية عند إنشاء الرابط.", href: "/dashboard/marketing-intelligence/campaign-links" });
     }
   }
 
   const failedEvents = events.filter((event) => status(event.status) === "FAILED").slice(0, 8);
   for (const [index, event] of failedEvents.entries()) {
-    items.push({
-      id: `failed-conversion-${idOf(event._id, String(index))}`,
-      priority: "HIGH",
-      type: "CONVERSION",
-      title: `فشل تحويل ${text(event.platform) || "منصة"}`,
-      description: `يوجد تحويل بحالة FAILED للحدث ${text(event.eventName) || "conversion"}.`,
-      action: "افتح سجل التحويلات أو مركز إصلاح التحويلات لمعرفة السبب وإعادة المحاولة.",
-      href: "/dashboard/conversion-events",
-    });
+    items.push({ id: `failed-conversion-${idOf(event._id, String(index))}`, priority: "HIGH", type: "CONVERSION", title: `فشل تحويل ${text(event.platform) || "منصة"}`, description: `يوجد تحويل بحالة FAILED للحدث ${text(event.eventName) || "conversion"}.`, action: "افتح سجل التحويلات أو مركز إصلاح التحويلات لمعرفة السبب وإعادة المحاولة.", href: "/dashboard/conversion-events" });
   }
 
   const platforms = [
@@ -134,43 +185,13 @@ export async function GET() {
 
   for (const platform of platforms) {
     const missing = platform.fields.filter((field) => !has(settings, field));
-    if (missing.length) {
-      items.push({
-        id: `platform-missing-${platform.key}`,
-        priority: platform.key === "META" ? "HIGH" : "MEDIUM",
-        type: "PLATFORM",
-        title: `${platform.label} غير مكتمل`,
-        description: `ناقص: ${missing.join(", ")}`,
-        action: "افتح إعدادات التتبع أو ربط المنصات وأكمل الإعدادات المطلوبة.",
-        href: "/dashboard/marketing-intelligence/platform-status",
-      });
-    }
+    if (missing.length) items.push({ id: `platform-missing-${platform.key}`, priority: platform.key === "META" ? "HIGH" : "MEDIUM", type: "PLATFORM", title: `${platform.label} غير مكتمل`, description: `ناقص: ${missing.join(", ")}`, action: "افتح إعدادات التتبع أو ربط المنصات وأكمل الإعدادات المطلوبة.", href: "/dashboard/marketing-intelligence/platform-status" });
   }
 
-  if (items.length === 0) {
-    items.push({
-      id: "system-ok",
-      priority: "LOW",
-      type: "SYSTEM",
-      title: "لا توجد إجراءات عاجلة الآن",
-      description: "الروابط الأساسية والتحويلات والمنصات لا تظهر مشاكل واضحة في آخر فحص.",
-      action: "استمر في مراقبة الأداء بعد إطلاق الحملات الجديدة.",
-      href: "/dashboard/marketing-intelligence",
-    });
-  }
+  if (items.length === 0) items.push({ id: "system-ok", priority: "LOW", type: "SYSTEM", title: "لا توجد إجراءات عاجلة الآن", description: "الروابط الأساسية والتحويلات والمنصات لا تظهر مشاكل واضحة في آخر فحص.", action: "استمر في مراقبة الأداء بعد إطلاق الحملات الجديدة.", href: "/dashboard/marketing-intelligence" });
 
   const weight: Record<Priority, number> = { HIGH: 3, MEDIUM: 2, LOW: 1 };
   items.sort((a, b) => weight[b.priority] - weight[a.priority]);
 
-  return NextResponse.json({
-    ok: true,
-    generatedAt: new Date().toISOString(),
-    summary: {
-      total: items.length,
-      high: items.filter((item) => item.priority === "HIGH").length,
-      medium: items.filter((item) => item.priority === "MEDIUM").length,
-      low: items.filter((item) => item.priority === "LOW").length,
-    },
-    items: items.slice(0, 50),
-  }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ok: true, generatedAt: new Date().toISOString(), summary: { total: items.length, high: items.filter((item) => item.priority === "HIGH").length, medium: items.filter((item) => item.priority === "MEDIUM").length, low: items.filter((item) => item.priority === "LOW").length }, items: items.slice(0, 50) }, { headers: { "Cache-Control": "no-store" } });
 }
