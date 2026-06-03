@@ -2,12 +2,12 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Archive, ArrowRight, Copy, Loader2, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, ArrowRight, Copy, Edit3, Loader2, RefreshCw, RotateCcw, Save, Trash2, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-type LinkStatus = "ACTIVE" | "ARCHIVED" | "DELETED" | "ALL";
+ type LinkStatus = "ACTIVE" | "ARCHIVED" | "DELETED" | "ALL";
 
 type CampaignLinkPerformanceRow = {
   id: string;
@@ -52,6 +52,21 @@ type ApiResponse = {
   };
 };
 
+type EditState = {
+  id: string;
+  name: string;
+  platform: string;
+  campaignId: string;
+  adsetId: string;
+  adId: string;
+  utmCampaign: string;
+  targetCountry: string;
+  objective: string;
+  internalNotes: string;
+};
+
+const PLATFORMS = ["META", "GOOGLE_ADS", "TIKTOK", "X", "EMAIL", "WHATSAPP", "SMS", "ORGANIC"];
+
 function money(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value)
     ? `$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
@@ -91,6 +106,21 @@ const STATUS_TABS: { value: LinkStatus; label: string }[] = [
   { value: "ALL", label: "الكل" },
 ];
 
+function editFromRow(row: CampaignLinkPerformanceRow): EditState {
+  return {
+    id: row.id,
+    name: row.name || "",
+    platform: row.platform || "META",
+    campaignId: row.identifiers.campaignId || "",
+    adsetId: row.identifiers.adsetId || "",
+    adId: row.identifiers.adId || "",
+    utmCampaign: row.identifiers.utmCampaign || "",
+    targetCountry: row.identifiers.targetCountry || "",
+    objective: "donations",
+    internalNotes: "",
+  };
+}
+
 export default function CampaignLinksPerformancePage() {
   const [data, setData] = React.useState<ApiResponse | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -98,6 +128,7 @@ export default function CampaignLinksPerformancePage() {
   const [days, setDays] = React.useState(7);
   const [platform, setPlatform] = React.useState("META");
   const [status, setStatus] = React.useState<LinkStatus>("ACTIVE");
+  const [editing, setEditing] = React.useState<EditState | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -149,6 +180,41 @@ export default function CampaignLinksPerformancePage() {
     }
   }
 
+  async function saveEdit() {
+    if (!editing) return;
+    setActionId(editing.id);
+    try {
+      const res = await fetch("/api/admin/marketing-intelligence/campaign-links", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editing.id,
+          action: "UPDATE",
+          name: editing.name,
+          platform: editing.platform,
+          channel: editing.platform,
+          campaignId: editing.campaignId,
+          adsetId: editing.platform === "GOOGLE_ADS" ? "" : editing.adsetId,
+          adGroupId: editing.platform === "GOOGLE_ADS" ? editing.adsetId : "",
+          adId: editing.adId,
+          utmCampaign: editing.utmCampaign,
+          targetCountry: editing.targetCountry,
+          objective: editing.objective,
+          internalNotes: editing.internalNotes,
+        }),
+      });
+      const json = await res.json().catch(() => null) as { ok?: boolean; matched?: number; error?: string } | null;
+      if (!res.ok || !json?.ok || json.matched === 0) throw new Error(json?.error || "update failed");
+      toast.success("تم تحديث بيانات الرابط");
+      setEditing(null);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر تحديث الرابط");
+    } finally {
+      setActionId(null);
+    }
+  }
+
   return <div className="space-y-5 p-4 sm:p-6" dir="rtl">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -157,7 +223,7 @@ export default function CampaignLinksPerformancePage() {
         </Link>
         <h1 className="text-2xl font-black text-slate-950">أداء وإدارة روابط الحملات</h1>
         <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-          إدارة احترافية للروابط المحفوظة: متابعة الأداء، نسخ الرابط، أرشفة الروابط القديمة، حذف ناعم، واستعادة عند الحاجة.
+          إدارة احترافية للروابط المحفوظة: متابعة الأداء، نسخ الرابط، تعديل البيانات، أرشفة الروابط القديمة، حذف ناعم، واستعادة عند الحاجة.
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -194,6 +260,38 @@ export default function CampaignLinksPerformancePage() {
       ))}
     </div>
 
+    {editing ? <Card className="border-blue-200 bg-blue-50/40">
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle>تعديل بيانات الرابط</CardTitle>
+            <CardDescription>التعديل لا يغير URL نفسه، لكنه يحسن التصنيف والمطابقة والتقارير.</CardDescription>
+          </div>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(null)}><X className="h-4 w-4" /></Button>
+        </div>
+      </CardHeader>
+      <CardContent className="grid gap-3 md:grid-cols-3">
+        <EditField label="اسم الرابط" value={editing.name} onChange={(value) => setEditing({ ...editing, name: value })} />
+        <div className="space-y-1">
+          <label className="text-xs text-slate-500">المنصة</label>
+          <select value={editing.platform} onChange={(event) => setEditing({ ...editing, platform: event.target.value })} className="w-full rounded-md border bg-white px-3 py-2 text-sm">
+            {PLATFORMS.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+        <EditField label="Campaign ID" value={editing.campaignId} onChange={(value) => setEditing({ ...editing, campaignId: value })} dir="ltr" />
+        <EditField label="Ad Set / Ad Group ID" value={editing.adsetId} onChange={(value) => setEditing({ ...editing, adsetId: value })} dir="ltr" />
+        <EditField label="Ad ID" value={editing.adId} onChange={(value) => setEditing({ ...editing, adId: value })} dir="ltr" />
+        <EditField label="UTM Campaign" value={editing.utmCampaign} onChange={(value) => setEditing({ ...editing, utmCampaign: value })} dir="ltr" />
+        <EditField label="Target Country" value={editing.targetCountry} onChange={(value) => setEditing({ ...editing, targetCountry: value.toUpperCase() })} dir="ltr" />
+        <EditField label="Objective" value={editing.objective} onChange={(value) => setEditing({ ...editing, objective: value })} />
+        <EditField label="ملاحظات داخلية" value={editing.internalNotes} onChange={(value) => setEditing({ ...editing, internalNotes: value })} />
+        <div className="md:col-span-3 flex flex-wrap gap-2">
+          <Button type="button" onClick={saveEdit} disabled={actionId === editing.id} className="gap-2"><Save className="h-4 w-4" />حفظ التعديلات</Button>
+          <Button type="button" variant="outline" onClick={() => setEditing(null)}>إلغاء</Button>
+        </div>
+      </CardContent>
+    </Card> : null}
+
     {loading ? <div className="flex min-h-[20rem] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#025EB8]" /></div> : !data ? <Card><CardContent className="p-8 text-center text-slate-500">لا توجد بيانات متاحة.</CardContent></Card> : <>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
         <Card><CardContent className="p-4"><div className="text-xs text-slate-500">روابط هذا القسم</div><div className="mt-1 text-2xl font-black">{data.summary.links}</div></CardContent></Card>
@@ -205,7 +303,7 @@ export default function CampaignLinksPerformancePage() {
       <Card>
         <CardHeader>
           <CardTitle>روابط الحملات</CardTitle>
-          <CardDescription>الفترة: {data.range.from} — {data.range.to}. استخدم الأرشفة للروابط القديمة، والحذف الناعم للروابط التي لا تريد ظهورها في النشط.</CardDescription>
+          <CardDescription>الفترة: {data.range.from} — {data.range.to}. استخدم التعديل لتحسين التصنيف، والأرشفة للروابط القديمة، والحذف الناعم للروابط التي لا تريد ظهورها في النشط.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto rounded-xl border">
@@ -238,8 +336,9 @@ export default function CampaignLinksPerformancePage() {
                   <td className="px-3 py-2">{money(row.performance.revenue)}</td>
                   <td className="px-3 py-2 text-xs">قوي: {row.performance.matchQuality.strong} · متوسط: {row.performance.matchQuality.medium} · ضعيف: {row.performance.matchQuality.weak}</td>
                   <td className="px-3 py-2">
-                    <div className="flex min-w-[15rem] flex-wrap gap-1.5">
+                    <div className="flex min-w-[18rem] flex-wrap gap-1.5">
                       <Button type="button" size="sm" variant="outline" onClick={() => copyLink(row.url)} className="gap-1"><Copy className="h-3.5 w-3.5" />نسخ</Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => setEditing(editFromRow(row))} className="gap-1"><Edit3 className="h-3.5 w-3.5" />تعديل</Button>
                       {row.status !== "ARCHIVED" && row.status !== "DELETED" ? <Button type="button" size="sm" variant="outline" disabled={actionId === row.id} onClick={() => runAction(row.id, "ARCHIVE")} className="gap-1"><Archive className="h-3.5 w-3.5" />أرشفة</Button> : null}
                       {row.status === "ARCHIVED" || row.status === "DELETED" ? <Button type="button" size="sm" variant="outline" disabled={actionId === row.id} onClick={() => runAction(row.id, "RESTORE")} className="gap-1"><RotateCcw className="h-3.5 w-3.5" />استعادة</Button> : null}
                       {row.status !== "DELETED" ? <Button type="button" size="sm" variant="outline" disabled={actionId === row.id} onClick={() => runAction(row.id, "DELETE")} className="gap-1 text-rose-700 hover:text-rose-800"><Trash2 className="h-3.5 w-3.5" />حذف</Button> : null}
@@ -253,4 +352,8 @@ export default function CampaignLinksPerformancePage() {
       </Card>
     </>}
   </div>;
+}
+
+function EditField({ label, value, onChange, dir }: { label: string; value: string; onChange: (value: string) => void; dir?: "ltr" | "rtl" }) {
+  return <div className="space-y-1"><label className="text-xs text-slate-500">{label}</label><input value={value} onChange={(event) => onChange(event.target.value)} dir={dir || "rtl"} className="w-full rounded-md border bg-white px-3 py-2 text-sm" /></div>;
 }
