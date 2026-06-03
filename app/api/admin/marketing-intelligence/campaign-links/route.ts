@@ -29,11 +29,16 @@ type CampaignLinkPayload = {
   messageVariant?: string;
   targetCountry?: string;
   objective?: string;
+  internalNotes?: string;
   raw?: JsonMap;
 };
 
 function readString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function readOptionalString(value: unknown): string | null {
+  return typeof value === "string" ? value.trim().slice(0, 1000) || null : null;
 }
 
 function urlHash(url: string) {
@@ -60,6 +65,7 @@ function readPayload(body: JsonMap): CampaignLinkPayload {
     messageVariant: readString(body.messageVariant) ?? readString(body.message_variant) ?? undefined,
     targetCountry: readString(body.targetCountry)?.toUpperCase() ?? readString(body.target_country)?.toUpperCase() ?? undefined,
     objective: readString(body.objective) ?? undefined,
+    internalNotes: readOptionalString(body.internalNotes) ?? readOptionalString(body.internal_notes) ?? undefined,
     raw: typeof body.raw === "object" && body.raw !== null && !Array.isArray(body.raw) ? body.raw as JsonMap : undefined,
   };
 }
@@ -155,6 +161,7 @@ export async function POST(request: NextRequest) {
     messageVariant: payload.messageVariant ?? null,
     targetCountry: payload.targetCountry ?? null,
     objective: payload.objective ?? null,
+    internalNotes: payload.internalNotes ?? null,
     status: "ACTIVE",
     createdBy: session?.user?.id ?? null,
     raw: payload.raw ?? body,
@@ -191,6 +198,37 @@ export async function PATCH(request: NextRequest) {
   const filter = objectIdFilter(id) ?? { urlHash: id };
 
   const now = new Date();
+  if (action === "UPDATE") {
+    const payload = readPayload(body);
+    const editable: JsonMap = {
+      updatedAt: now,
+      editedAt: now,
+      editedBy: session?.user?.id ?? null,
+      editedByName: readString(session?.user?.name),
+    };
+    if (payload.name !== undefined) editable.name = payload.name || "Marketing link";
+    if (payload.platform !== undefined) editable.platform = payload.platform;
+    if (payload.channel !== undefined) editable.channel = payload.channel;
+    if (payload.utmCampaign !== undefined) editable.utmCampaign = payload.utmCampaign ?? null;
+    if (payload.utmId !== undefined) editable.utmId = payload.utmId ?? null;
+    if (payload.utmContent !== undefined) editable.utmContent = payload.utmContent ?? null;
+    if (payload.campaignId !== undefined) editable.campaignId = payload.campaignId ?? null;
+    if (payload.adGroupId !== undefined) editable.adGroupId = payload.adGroupId ?? null;
+    if (payload.adsetId !== undefined) editable.adsetId = payload.adsetId ?? null;
+    if (payload.adId !== undefined) editable.adId = payload.adId ?? null;
+    if (payload.audienceSegment !== undefined) editable.audienceSegment = payload.audienceSegment ?? null;
+    if (payload.messageVariant !== undefined) editable.messageVariant = payload.messageVariant ?? null;
+    if (payload.targetCountry !== undefined) editable.targetCountry = payload.targetCountry ?? null;
+    if (payload.objective !== undefined) editable.objective = payload.objective ?? null;
+    if (payload.internalNotes !== undefined) editable.internalNotes = payload.internalNotes ?? null;
+
+    const result = await prisma.$runCommandRaw({
+      update: "MarketingCampaignLink",
+      updates: [{ q: filter, u: { $set: editable }, multi: false }],
+    }) as JsonMap;
+    return NextResponse.json({ ok: true, matched: result.n ?? 0, action: "UPDATE" });
+  }
+
   let status: LinkStatus;
   if (action === "ARCHIVE") status = "ARCHIVED";
   else if (action === "DELETE") status = "DELETED";
