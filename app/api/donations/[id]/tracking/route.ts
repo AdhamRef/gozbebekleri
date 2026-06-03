@@ -45,6 +45,16 @@ function firstString(value: unknown): string | undefined {
   return undefined;
 }
 
+function paidDonationValue(row: NonNullable<Awaited<ReturnType<typeof prisma.donation.findUnique>>>) {
+  const total = Number(row.totalAmount ?? 0);
+  if (Number.isFinite(total) && total > 0) return total;
+  const amount = Number(row.amount ?? 0);
+  const teamSupport = Number(row.teamSupport ?? 0);
+  const fees = Number(row.fees ?? 0);
+  const fallback = amount + teamSupport + fees;
+  return Number.isFinite(fallback) ? fallback : 0;
+}
+
 function buildBrowserAdvancedMatching(row: NonNullable<Awaited<ReturnType<typeof prisma.donation.findUnique>>>) {
   const donor = row.donor;
   const [firstName, ...rest] = (donor?.name ?? "").trim().split(/\s+/);
@@ -110,7 +120,7 @@ export async function GET(
     return NextResponse.json<TrackingResponseFail>({ ok: false, reason: "paidAt unset" }, { status: 200 });
   }
 
-  const value = Number(row.amount ?? 0);
+  const value = paidDonationValue(row);
   if (!(value > 0)) {
     return NextResponse.json<TrackingResponseFail>({ ok: false, reason: "amount <= 0" }, { status: 200 });
   }
@@ -128,6 +138,14 @@ export async function GET(
     contents.push({ id: ci.categoryId, quantity: 1, item_price: ci.amount });
     contentIds.push(ci.categoryId);
     if (!primaryName && ci.category?.name) primaryName = ci.category.name;
+  }
+  if (row.teamSupport > 0) {
+    contents.push({ id: "team_support", quantity: 1, item_price: row.teamSupport });
+    contentIds.push("team_support");
+  }
+  if (row.fees > 0) {
+    contents.push({ id: "covered_fees", quantity: 1, item_price: row.fees });
+    contentIds.push("covered_fees");
   }
   if (contents.length === 0) {
     contents.push({ id: "donation", quantity: 1, item_price: value });
