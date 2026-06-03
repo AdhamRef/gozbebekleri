@@ -47,6 +47,7 @@ export const DASHBOARD_NAV_GROUPS: {
       { key: "ads", title: "مركز التسويق", href: "/dashboard/marketing-intelligence" },
       { key: "ads", title: "مركز الإجراءات", href: "/dashboard/marketing-intelligence/action-items" },
       { key: "ads", title: "بيانات المنصات", href: "/dashboard/marketing-intelligence/platform-metrics" },
+      { key: "ads", title: "استيراد بيانات المنصات", href: "/dashboard/marketing-intelligence/platform-metrics/import" },
       { key: "ads", title: "تدقيق قيمة التحويلات", href: "/dashboard/marketing-intelligence/conversion-value-audit" },
       { key: "ads", title: "اختبار النظام", href: "/dashboard/marketing-intelligence/test-checklist" },
       { key: "ads", title: "إصلاح التحويلات", href: "/dashboard/marketing-intelligence/repair-center" },
