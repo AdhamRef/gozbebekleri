@@ -47,6 +47,7 @@ export const DASHBOARD_NAV_GROUPS: {
       { key: "ads", title: "اختبار النظام", href: "/dashboard/marketing-intelligence/test-checklist" },
       { key: "ads", title: "إصلاح التحويلات", href: "/dashboard/marketing-intelligence/repair-center" },
       { key: "ads", title: "حالة المنصات", href: "/dashboard/marketing-intelligence/platform-status" },
+      { key: "ads", title: "أداء الروابط", href: "/dashboard/marketing-intelligence/campaign-links" },
       { key: "ads", title: "الحملات والإعلانات", href: "/dashboard/ads" },
       { key: "ads", title: "سجل التحويلات", href: "/dashboard/conversion-events" },
       { key: "referrals", title: "الروابط التسويقية", href: "/dashboard/link-generator" },
