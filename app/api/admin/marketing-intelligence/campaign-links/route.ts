@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 type JsonMap = Record<string, unknown>;
+type LinkStatus = "ACTIVE" | "ARCHIVED" | "DELETED";
 
 type CampaignLinkPayload = {
   name?: string;
@@ -63,10 +64,15 @@ function readPayload(body: JsonMap): CampaignLinkPayload {
   };
 }
 
+function objectIdFilter(id: string) {
+  return /^[a-f\d]{24}$/i.test(id) ? { _id: { $oid: id } } : null;
+}
+
 async function ensureIndexes() {
   await prisma.$runCommandRaw({ createIndexes: "MarketingCampaignLink", indexes: [
     { key: { createdAt: -1 }, name: "createdAt_desc" },
     { key: { platform: 1, createdAt: -1 }, name: "platform_createdAt" },
+    { key: { status: 1, updatedAt: -1 }, name: "status_updatedAt" },
     { key: { campaignId: 1 }, name: "campaignId" },
     { key: { adId: 1 }, name: "adId" },
     { key: { utmCampaign: 1 }, name: "utmCampaign" },
@@ -79,6 +85,12 @@ function numberParam(request: NextRequest, key: string, fallback: number, min: n
   return Number.isFinite(raw) ? Math.max(min, Math.min(max, Math.floor(raw))) : fallback;
 }
 
+function statusParam(request: NextRequest): LinkStatus | "ALL" {
+  const status = readString(request.nextUrl.searchParams.get("status"))?.toUpperCase();
+  if (status === "ARCHIVED" || status === "DELETED" || status === "ALL") return status;
+  return "ACTIVE";
+}
+
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   const denied = requireAdminOrDashboardPermission(session, "ads");
@@ -87,7 +99,13 @@ export async function GET(request: NextRequest) {
   await ensureIndexes();
   const limit = numberParam(request, "limit", 50, 1, 200);
   const platform = readString(request.nextUrl.searchParams.get("platform"))?.toUpperCase();
-  const filter: JsonMap = platform ? { platform } : {};
+  const status = statusParam(request);
+  const filter: JsonMap = {};
+  if (platform) filter.platform = platform;
+  if (status !== "ALL") {
+    if (status === "ACTIVE") filter.$or = [{ status: "ACTIVE" }, { status: { $exists: false } }, { status: null }];
+    else filter.status = status;
+  }
 
   const result = await prisma.$runCommandRaw({
     find: "MarketingCampaignLink",
@@ -100,7 +118,7 @@ export async function GET(request: NextRequest) {
     ? (result.cursor as JsonMap).firstBatch
     : [];
 
-  return NextResponse.json({ ok: true, links: rows }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ok: true, status, links: rows }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: NextRequest) {
@@ -137,6 +155,7 @@ export async function POST(request: NextRequest) {
     messageVariant: payload.messageVariant ?? null,
     targetCountry: payload.targetCountry ?? null,
     objective: payload.objective ?? null,
+    status: "ACTIVE",
     createdBy: session?.user?.id ?? null,
     raw: payload.raw ?? body,
     updatedAt: now,
@@ -157,4 +176,45 @@ export async function POST(request: NextRequest) {
 
   const upserted = Array.isArray(result.upserted) && result.upserted.length > 0;
   return NextResponse.json({ ok: true, upserted, matched: result.n ?? 1, link: { ...document, createdAt: now } });
+}
+
+export async function PATCH(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  const denied = requireAdminOrDashboardPermission(session, "ads");
+  if (denied) return denied;
+
+  await ensureIndexes();
+  const body = (await request.json().catch(() => ({}))) as JsonMap;
+  const id = readString(body.id);
+  const action = readString(body.action)?.toUpperCase();
+  if (!id) return NextResponse.json({ ok: false, error: "missing id" }, { status: 400 });
+  const filter = objectIdFilter(id) ?? { urlHash: id };
+
+  const now = new Date();
+  let status: LinkStatus;
+  if (action === "ARCHIVE") status = "ARCHIVED";
+  else if (action === "DELETE") status = "DELETED";
+  else if (action === "RESTORE") status = "ACTIVE";
+  else return NextResponse.json({ ok: false, error: "invalid action" }, { status: 400 });
+
+  const update: JsonMap = {
+    status,
+    updatedAt: now,
+    reviewedBy: session?.user?.id ?? null,
+    reviewedByName: readString(session?.user?.name),
+  };
+  if (status === "ARCHIVED") update.archivedAt = now;
+  if (status === "DELETED") update.deletedAt = now;
+  if (status === "ACTIVE") {
+    update.restoredAt = now;
+    update.archivedAt = null;
+    update.deletedAt = null;
+  }
+
+  const result = await prisma.$runCommandRaw({
+    update: "MarketingCampaignLink",
+    updates: [{ q: filter, u: { $set: update }, multi: false }],
+  }) as JsonMap;
+
+  return NextResponse.json({ ok: true, matched: result.n ?? 0, status });
 }
