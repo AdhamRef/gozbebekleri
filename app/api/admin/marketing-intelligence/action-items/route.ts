@@ -23,52 +23,24 @@ function isMap(value: unknown): value is JsonMap {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function text(value: unknown) {
-  return typeof value === "string" ? value : "";
-}
-
-function numeric(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function status(value: unknown) {
-  return typeof value === "string" ? value.toUpperCase() : "ACTIVE";
-}
-
-function idOf(value: unknown, fallback: string) {
-  if (typeof value === "string") return value;
-  if (isMap(value) && typeof value.$oid === "string") return value.$oid;
-  return fallback;
-}
+function text(value: unknown) { return typeof value === "string" ? value : ""; }
+function numeric(value: unknown) { return typeof value === "number" && Number.isFinite(value) ? value : 0; }
+function status(value: unknown) { return typeof value === "string" ? value.toUpperCase() : "ACTIVE"; }
+function idOf(value: unknown, fallback: string) { if (typeof value === "string") return value; if (isMap(value) && typeof value.$oid === "string") return value.$oid; return fallback; }
 
 async function recentCampaignLinks() {
-  const result = await prisma.$runCommandRaw({
-    find: "MarketingCampaignLink",
-    filter: { $or: [{ status: "ACTIVE" }, { status: { $exists: false } }, { status: null }] },
-    sort: { updatedAt: -1, createdAt: -1 },
-    limit: 100,
-  }) as JsonMap;
+  const result = await prisma.$runCommandRaw({ find: "MarketingCampaignLink", filter: { $or: [{ status: "ACTIVE" }, { status: { $exists: false } }, { status: null }] }, sort: { updatedAt: -1, createdAt: -1 }, limit: 100 }) as JsonMap;
   return isMap(result.cursor) && Array.isArray(result.cursor.firstBatch) ? result.cursor.firstBatch.filter(isMap) : [];
 }
 
 async function recentConversionEvents() {
-  const result = await prisma.$runCommandRaw({
-    find: "ConversionEvent",
-    sort: { updatedAt: -1, createdAt: -1 },
-    limit: 100,
-    projection: { request: 0, response: 0 },
-  }) as JsonMap;
+  const result = await prisma.$runCommandRaw({ find: "ConversionEvent", sort: { updatedAt: -1, createdAt: -1 }, limit: 100, projection: { request: 0, response: 0 } }) as JsonMap;
   return isMap(result.cursor) && Array.isArray(result.cursor.firstBatch) ? result.cursor.firstBatch.filter(isMap) : [];
 }
 
 async function recentPaidDonations() {
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  return prisma.donation.findMany({
-    where: { status: "PAID", paidAt: { not: null, gte: since } },
-    orderBy: { paidAt: "desc" },
-    take: 50,
-    select: { id: true, amount: true, teamSupport: true, fees: true, totalAmount: true, currency: true },
-  });
+  return prisma.donation.findMany({ where: { status: "PAID", paidAt: { not: null, gte: since } }, orderBy: { paidAt: "desc" }, take: 50, select: { id: true, amount: true, teamSupport: true, fees: true, totalAmount: true, currency: true } });
 }
 
 async function trackingSettings() {
@@ -77,38 +49,19 @@ async function trackingSettings() {
   return isMap(rows[0]) ? rows[0] : null;
 }
 
-function has(settings: JsonMap | null, key: string) {
-  const value = settings?.[key];
-  return typeof value === "string" ? value.trim().length > 0 : Boolean(value);
-}
-
-function paidTotal(row: { amount: number; teamSupport: number; fees: number; totalAmount: number }) {
-  const total = Number(row.totalAmount ?? 0);
-  if (Number.isFinite(total) && total > 0) return total;
-  return Number(row.amount || 0) + Number(row.teamSupport || 0) + Number(row.fees || 0);
-}
-
-function legacyOid(id: string) {
-  return /^[a-f0-9]{24}$/i.test(id) ? { $oid: id } : id;
-}
+function has(settings: JsonMap | null, key: string) { const value = settings?.[key]; return typeof value === "string" ? value.trim().length > 0 : Boolean(value); }
+function paidTotal(row: { amount: number; teamSupport: number; fees: number; totalAmount: number }) { const total = Number(row.totalAmount ?? 0); if (Number.isFinite(total) && total > 0) return total; return Number(row.amount || 0) + Number(row.teamSupport || 0) + Number(row.fees || 0); }
+function legacyOid(id: string) { return /^[a-f0-9]{24}$/i.test(id) ? { $oid: id } : id; }
 
 async function conversionEventValues(donationId: string) {
-  const result = await prisma.$runCommandRaw({
-    find: "ConversionEvent",
-    filter: {
-      eventName: { $in: ["Donate", "purchase"] },
-      $or: [
-        { donationId },
-        { donationId: legacyOid(donationId) },
-        { eventId: `donate_${donationId}` },
-        { dedupKey: `donate_${donationId}` },
-      ],
-    },
-    projection: { platform: 1, status: 1, value: 1, currency: 1 },
-    sort: { createdAt: -1 },
-    limit: 20,
-  }) as JsonMap;
+  const result = await prisma.$runCommandRaw({ find: "ConversionEvent", filter: { eventName: { $in: ["Donate", "purchase"] }, $or: [{ donationId }, { donationId: legacyOid(donationId) }, { eventId: `donate_${donationId}` }, { dedupKey: `donate_${donationId}` }] }, projection: { platform: 1, status: 1, value: 1, currency: 1 }, sort: { createdAt: -1 }, limit: 20 }) as JsonMap;
   return isMap(result.cursor) && Array.isArray(result.cursor.firstBatch) ? result.cursor.firstBatch.filter(isMap) : [];
+}
+
+async function comparisonRows() {
+  const result = await prisma.$runCommandRaw({ find: "MarketingPlatformDailyMetric", filter: {}, sort: { date: -1, spend: -1 }, limit: 50 }) as JsonMap;
+  const rows = isMap(result.cursor) && Array.isArray(result.cursor.firstBatch) ? result.cursor.firstBatch.filter(isMap) : [];
+  return rows;
 }
 
 export async function GET() {
@@ -116,14 +69,22 @@ export async function GET() {
   const denied = requireAdminOrDashboardPermission(session, "ads");
   if (denied) return denied;
 
-  const [links, events, settings, donations] = await Promise.all([
-    recentCampaignLinks(),
-    recentConversionEvents(),
-    trackingSettings(),
-    recentPaidDonations(),
-  ]);
-
+  const [links, events, settings, donations, metrics] = await Promise.all([recentCampaignLinks(), recentConversionEvents(), trackingSettings(), recentPaidDonations(), comparisonRows()]);
   const items: ActionItem[] = [];
+
+  for (const metric of metrics.slice(0, 15)) {
+    const spend = numeric(metric.spend);
+    const conversions = numeric(metric.conversions);
+    const revenue = numeric(metric.revenue);
+    const roas = spend > 0 ? revenue / spend : 0;
+    const campaignName = text(metric.campaignName) || text(metric.campaignId) || "حملة بدون اسم";
+    const platform = text(metric.platform) || "منصة";
+    if (spend > 0 && conversions === 0 && revenue === 0) {
+      items.push({ id: `platform-spend-no-conv-${text(metric.metricKey) || campaignName}`, priority: "HIGH", type: "PLATFORM", title: `إنفاق بدون تحويلات: ${campaignName}`, description: `${platform}: يوجد إنفاق ${spend} بدون تحويلات أو إيراد في بيانات المنصة.`, action: "افتح مقارنة الموقع والمنصات وتأكد هل الموقع سجل تبرعات لهذه الحملة أم يجب إيقافها/مراجعتها.", href: "/dashboard/marketing-intelligence/site-vs-platform" });
+    } else if (spend > 0 && roas > 0 && roas < 1) {
+      items.push({ id: `platform-low-roas-${text(metric.metricKey) || campaignName}`, priority: "MEDIUM", type: "PLATFORM", title: `ROAS منخفض: ${campaignName}`, description: `${platform}: ROAS المنصة ${roas.toFixed(2)}x أقل من 1.`, action: "راجع الرسالة والاستهداف وصفحة الهبوط قبل زيادة الميزانية.", href: "/dashboard/marketing-intelligence/site-vs-platform" });
+    }
+  }
 
   for (const donation of donations) {
     const expected = paidTotal(donation);
@@ -133,27 +94,8 @@ export async function GET() {
     const eventValues = await conversionEventValues(donation.id);
     const hasOldUndercount = eventValues.some((event) => Math.abs(numeric(event.value) - base) < 0.01);
     const hasCorrect = eventValues.some((event) => Math.abs(numeric(event.value) - expected) < 0.01);
-    if (hasOldUndercount && !hasCorrect) {
-      items.push({
-        id: `conversion-value-undercount-${donation.id}`,
-        priority: "HIGH",
-        type: "CONVERSION",
-        title: `قيمة تحويل ناقصة: ${donation.id}`,
-        description: `يوجد تبرع إجماليه ${expected} ${donation.currency} لكن حدث التحويل القديم يبدو أنه أرسل ${base} فقط، والفرق ${delta}.`,
-        action: "افتح تدقيق قيمة التحويلات وراجع هل الحدث قديم فقط أم يحتاج متابعة مع المنصة.",
-        href: "/dashboard/marketing-intelligence/conversion-value-audit",
-      });
-    } else if (!hasCorrect) {
-      items.push({
-        id: `conversion-value-recheck-${donation.id}`,
-        priority: "MEDIUM",
-        type: "CONVERSION",
-        title: `تحقق من قيمة التحويل: ${donation.id}`,
-        description: `التبرع يحتوي دعم/رسوم إضافية بقيمة ${delta} ${donation.currency} ولا يوجد حدث واضح بالقيمة الإجمالية بعد.`,
-        action: "افتح تدقيق قيمة التحويلات وتأكد من أن التحويلات الجديدة ترسل totalAmount.",
-        href: "/dashboard/marketing-intelligence/conversion-value-audit",
-      });
-    }
+    if (hasOldUndercount && !hasCorrect) items.push({ id: `conversion-value-undercount-${donation.id}`, priority: "HIGH", type: "CONVERSION", title: `قيمة تحويل ناقصة: ${donation.id}`, description: `يوجد تبرع إجماليه ${expected} ${donation.currency} لكن حدث التحويل القديم يبدو أنه أرسل ${base} فقط، والفرق ${delta}.`, action: "افتح تدقيق قيمة التحويلات وراجع هل الحدث قديم فقط أم يحتاج متابعة مع المنصة.", href: "/dashboard/marketing-intelligence/conversion-value-audit" });
+    else if (!hasCorrect) items.push({ id: `conversion-value-recheck-${donation.id}`, priority: "MEDIUM", type: "CONVERSION", title: `تحقق من قيمة التحويل: ${donation.id}`, description: `التبرع يحتوي دعم/رسوم إضافية بقيمة ${delta} ${donation.currency} ولا يوجد حدث واضح بالقيمة الإجمالية بعد.`, action: "افتح تدقيق قيمة التحويلات وتأكد من أن التحويلات الجديدة ترسل totalAmount.", href: "/dashboard/marketing-intelligence/conversion-value-audit" });
   }
 
   for (const [index, link] of links.entries()) {
@@ -162,27 +104,14 @@ export async function GET() {
     const campaignId = text(link.campaignId) || text(link.utmId) || text(link.utmCampaign);
     const adId = text(link.adId);
     const platform = text(link.platform) || "UNKNOWN";
-
-    if (!campaignId) {
-      items.push({ id: `link-missing-campaign-${id}`, priority: "HIGH", type: "LINK", title: `رابط بدون Campaign ID: ${name}`, description: `الرابط على منصة ${platform} لا يحتوي Campaign ID أو UTM Campaign كافٍ، وهذا يضعف ربط التبرعات بالحملة.`, action: "افتح الرابط واضغط تعديل، ثم أضف Campaign ID أو UTM Campaign.", href: "/dashboard/marketing-intelligence/campaign-links" });
-    } else if (!adId && ["META", "GOOGLE_ADS", "TIKTOK", "X"].includes(platform.toUpperCase())) {
-      items.push({ id: `link-missing-ad-${id}`, priority: "MEDIUM", type: "LINK", title: `رابط يحتاج Ad ID: ${name}`, description: "الرابط يحتوي بيانات حملة لكنه لا يحتوي Ad ID، لذلك قد تكون المطابقة على مستوى الإعلان ضعيفة.", action: "أضف Ad ID أو استخدم متغيرات المنصة الديناميكية عند إنشاء الرابط.", href: "/dashboard/marketing-intelligence/campaign-links" });
-    }
+    if (!campaignId) items.push({ id: `link-missing-campaign-${id}`, priority: "HIGH", type: "LINK", title: `رابط بدون Campaign ID: ${name}`, description: `الرابط على منصة ${platform} لا يحتوي Campaign ID أو UTM Campaign كافٍ، وهذا يضعف ربط التبرعات بالحملة.`, action: "افتح الرابط واضغط تعديل، ثم أضف Campaign ID أو UTM Campaign.", href: "/dashboard/marketing-intelligence/campaign-links" });
+    else if (!adId && ["META", "GOOGLE_ADS", "TIKTOK", "X"].includes(platform.toUpperCase())) items.push({ id: `link-missing-ad-${id}`, priority: "MEDIUM", type: "LINK", title: `رابط يحتاج Ad ID: ${name}`, description: "الرابط يحتوي بيانات حملة لكنه لا يحتوي Ad ID، لذلك قد تكون المطابقة على مستوى الإعلان ضعيفة.", action: "أضف Ad ID أو استخدم متغيرات المنصة الديناميكية عند إنشاء الرابط.", href: "/dashboard/marketing-intelligence/campaign-links" });
   }
 
   const failedEvents = events.filter((event) => status(event.status) === "FAILED").slice(0, 8);
-  for (const [index, event] of failedEvents.entries()) {
-    items.push({ id: `failed-conversion-${idOf(event._id, String(index))}`, priority: "HIGH", type: "CONVERSION", title: `فشل تحويل ${text(event.platform) || "منصة"}`, description: `يوجد تحويل بحالة FAILED للحدث ${text(event.eventName) || "conversion"}.`, action: "افتح سجل التحويلات أو مركز إصلاح التحويلات لمعرفة السبب وإعادة المحاولة.", href: "/dashboard/conversion-events" });
-  }
+  for (const [index, event] of failedEvents.entries()) items.push({ id: `failed-conversion-${idOf(event._id, String(index))}`, priority: "HIGH", type: "CONVERSION", title: `فشل تحويل ${text(event.platform) || "منصة"}`, description: `يوجد تحويل بحالة FAILED للحدث ${text(event.eventName) || "conversion"}.`, action: "افتح سجل التحويلات أو مركز إصلاح التحويلات لمعرفة السبب وإعادة المحاولة.", href: "/dashboard/conversion-events" });
 
-  const platforms = [
-    { key: "META", label: "Meta", fields: ["facebookPixelId", "facebookAccessToken"] },
-    { key: "GA4", label: "GA4", fields: ["gaMeasurementId", "gaApiSecret"] },
-    { key: "GOOGLE_ADS", label: "Google Ads", fields: ["googleAdsConversionId", "googleAdsConversionLabel"] },
-    { key: "TIKTOK", label: "TikTok", fields: ["tiktokPixelId"] },
-    { key: "X", label: "X", fields: ["xPixelId"] },
-  ];
-
+  const platforms = [{ key: "META", label: "Meta", fields: ["facebookPixelId", "facebookAccessToken"] }, { key: "GA4", label: "GA4", fields: ["gaMeasurementId", "gaApiSecret"] }, { key: "GOOGLE_ADS", label: "Google Ads", fields: ["googleAdsConversionId", "googleAdsConversionLabel"] }, { key: "TIKTOK", label: "TikTok", fields: ["tiktokPixelId"] }, { key: "X", label: "X", fields: ["xPixelId"] }];
   for (const platform of platforms) {
     const missing = platform.fields.filter((field) => !has(settings, field));
     if (missing.length) items.push({ id: `platform-missing-${platform.key}`, priority: platform.key === "META" ? "HIGH" : "MEDIUM", type: "PLATFORM", title: `${platform.label} غير مكتمل`, description: `ناقص: ${missing.join(", ")}`, action: "افتح إعدادات التتبع أو ربط المنصات وأكمل الإعدادات المطلوبة.", href: "/dashboard/marketing-intelligence/platform-status" });
@@ -192,6 +121,5 @@ export async function GET() {
 
   const weight: Record<Priority, number> = { HIGH: 3, MEDIUM: 2, LOW: 1 };
   items.sort((a, b) => weight[b.priority] - weight[a.priority]);
-
   return NextResponse.json({ ok: true, generatedAt: new Date().toISOString(), summary: { total: items.length, high: items.filter((item) => item.priority === "HIGH").length, medium: items.filter((item) => item.priority === "MEDIUM").length, low: items.filter((item) => item.priority === "LOW").length }, items: items.slice(0, 50) }, { headers: { "Cache-Control": "no-store" } });
 }
