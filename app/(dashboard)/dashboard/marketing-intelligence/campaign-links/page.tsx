@@ -2,12 +2,12 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Archive, ArrowRight, Copy, Download, Edit3, Loader2, RefreshCw, RotateCcw, Save, Trash2, X } from "lucide-react";
+import { Archive, ArrowRight, Copy, Download, Edit3, Loader2, RefreshCw, RotateCcw, Save, Search, Trash2, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
- type LinkStatus = "ACTIVE" | "ARCHIVED" | "DELETED" | "ALL";
+type LinkStatus = "ACTIVE" | "ARCHIVED" | "DELETED" | "ALL";
 
 type CampaignLinkPerformanceRow = {
   id: string;
@@ -26,6 +26,12 @@ type CampaignLinkPerformanceRow = {
     adsetId?: string | null;
     adId?: string | null;
     targetCountry?: string | null;
+  };
+  metadata?: {
+    objective?: string | null;
+    audienceSegment?: string | null;
+    messageVariant?: string | null;
+    internalNotes?: string | null;
   };
   performance: {
     donations: number;
@@ -116,9 +122,29 @@ function editFromRow(row: CampaignLinkPerformanceRow): EditState {
     adId: row.identifiers.adId || "",
     utmCampaign: row.identifiers.utmCampaign || "",
     targetCountry: row.identifiers.targetCountry || "",
-    objective: "donations",
-    internalNotes: "",
+    objective: row.metadata?.objective || "donations",
+    internalNotes: row.metadata?.internalNotes || "",
   };
+}
+
+function linkMatches(row: CampaignLinkPerformanceRow, query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const text = [
+    row.name,
+    row.platform,
+    row.channel,
+    row.url,
+    row.status,
+    row.identifiers.campaignId,
+    row.identifiers.adsetId,
+    row.identifiers.adId,
+    row.identifiers.utmCampaign,
+    row.identifiers.targetCountry,
+    row.metadata?.objective,
+    row.metadata?.internalNotes,
+  ].filter(Boolean).join(" ").toLowerCase();
+  return text.includes(q);
 }
 
 export default function CampaignLinksPerformancePage() {
@@ -129,6 +155,7 @@ export default function CampaignLinksPerformancePage() {
   const [platform, setPlatform] = React.useState("META");
   const [status, setStatus] = React.useState<LinkStatus>("ACTIVE");
   const [editing, setEditing] = React.useState<EditState | null>(null);
+  const [search, setSearch] = React.useState("");
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -149,9 +176,14 @@ export default function CampaignLinksPerformancePage() {
 
   React.useEffect(() => { void load(); }, [load]);
 
+  const visibleLinks = React.useMemo(() => (data?.links ?? []).filter((row) => linkMatches(row, search)), [data?.links, search]);
+  const visibleRevenue = visibleLinks.reduce((sum, row) => sum + row.performance.revenue, 0);
+  const visibleDonations = visibleLinks.reduce((sum, row) => sum + row.performance.donations, 0);
+
   function exportCsv() {
     const params = new URLSearchParams({ status });
     if (platform !== "ALL") params.set("platform", platform);
+    if (search.trim()) params.set("q", search.trim());
     window.open(`/api/admin/marketing-intelligence/campaign-links/export?${params.toString()}`, "_blank");
   }
 
@@ -224,139 +256,33 @@ export default function CampaignLinksPerformancePage() {
   return <div className="space-y-5 p-4 sm:p-6" dir="rtl">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <Link href="/dashboard/marketing-intelligence" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900">
-          <ArrowRight className="h-4 w-4" /> العودة إلى ذكاء التسويق
-        </Link>
+        <Link href="/dashboard/marketing-intelligence" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900"><ArrowRight className="h-4 w-4" /> العودة إلى ذكاء التسويق</Link>
         <h1 className="text-2xl font-black text-slate-950">أداء وإدارة روابط الحملات</h1>
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-          إدارة احترافية للروابط المحفوظة: متابعة الأداء، نسخ الرابط، تعديل البيانات، أرشفة الروابط القديمة، حذف ناعم، واستعادة عند الحاجة.
-        </p>
+        <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">إدارة احترافية للروابط المحفوظة: بحث، متابعة الأداء، نسخ الرابط، تعديل البيانات، أرشفة، حذف ناعم، واستعادة.</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Link href="/dashboard/link-generator" className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50">إنشاء رابط جديد</Link>
-        <select value={platform} onChange={(event) => setPlatform(event.target.value)} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">
-          <option value="META">Meta</option>
-          <option value="GOOGLE_ADS">Google Ads</option>
-          <option value="TIKTOK">TikTok</option>
-          <option value="X">X</option>
-          <option value="ALL">كل المنصات</option>
-        </select>
-        <select value={days} onChange={(event) => setDays(Number(event.target.value))} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">
-          <option value={1}>اليوم</option>
-          <option value={7}>آخر 7 أيام</option>
-          <option value={14}>آخر 14 يوم</option>
-          <option value={30}>آخر 30 يوم</option>
-          <option value={60}>آخر 60 يوم</option>
-          <option value={90}>آخر 90 يوم</option>
-        </select>
+        <select value={platform} onChange={(event) => setPlatform(event.target.value)} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"><option value="META">Meta</option><option value="GOOGLE_ADS">Google Ads</option><option value="TIKTOK">TikTok</option><option value="X">X</option><option value="ALL">كل المنصات</option></select>
+        <select value={days} onChange={(event) => setDays(Number(event.target.value))} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"><option value={1}>اليوم</option><option value={7}>آخر 7 أيام</option><option value={14}>آخر 14 يوم</option><option value={30}>آخر 30 يوم</option><option value={60}>آخر 60 يوم</option><option value={90}>آخر 90 يوم</option></select>
         <Button variant="outline" onClick={load} className="gap-2"><RefreshCw className="h-4 w-4" />تحديث</Button>
         <Button variant="outline" onClick={exportCsv} className="gap-2"><Download className="h-4 w-4" />تصدير CSV</Button>
       </div>
     </div>
 
-    <div className="flex flex-wrap gap-2 rounded-xl border bg-white p-2">
-      {STATUS_TABS.map((tab) => (
-        <button
-          key={tab.value}
-          type="button"
-          onClick={() => setStatus(tab.value)}
-          className={`rounded-lg px-3 py-2 text-sm font-medium transition ${status === tab.value ? "bg-[#025EB8] text-white" : "text-slate-600 hover:bg-slate-50"}`}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </div>
+    <div className="flex flex-wrap gap-2 rounded-xl border bg-white p-2">{STATUS_TABS.map((tab) => <button key={tab.value} type="button" onClick={() => setStatus(tab.value)} className={`rounded-lg px-3 py-2 text-sm font-medium transition ${status === tab.value ? "bg-[#025EB8] text-white" : "text-slate-600 hover:bg-slate-50"}`}>{tab.label}</button>)}</div>
 
-    {editing ? <Card className="border-blue-200 bg-blue-50/40">
-      <CardHeader>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle>تعديل بيانات الرابط</CardTitle>
-            <CardDescription>التعديل لا يغير URL نفسه، لكنه يحسن التصنيف والمطابقة والتقارير.</CardDescription>
-          </div>
-          <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(null)}><X className="h-4 w-4" /></Button>
-        </div>
-      </CardHeader>
-      <CardContent className="grid gap-3 md:grid-cols-3">
-        <EditField label="اسم الرابط" value={editing.name} onChange={(value) => setEditing({ ...editing, name: value })} />
-        <div className="space-y-1">
-          <label className="text-xs text-slate-500">المنصة</label>
-          <select value={editing.platform} onChange={(event) => setEditing({ ...editing, platform: event.target.value })} className="w-full rounded-md border bg-white px-3 py-2 text-sm">
-            {PLATFORMS.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
-        </div>
-        <EditField label="Campaign ID" value={editing.campaignId} onChange={(value) => setEditing({ ...editing, campaignId: value })} dir="ltr" />
-        <EditField label="Ad Set / Ad Group ID" value={editing.adsetId} onChange={(value) => setEditing({ ...editing, adsetId: value })} dir="ltr" />
-        <EditField label="Ad ID" value={editing.adId} onChange={(value) => setEditing({ ...editing, adId: value })} dir="ltr" />
-        <EditField label="UTM Campaign" value={editing.utmCampaign} onChange={(value) => setEditing({ ...editing, utmCampaign: value })} dir="ltr" />
-        <EditField label="Target Country" value={editing.targetCountry} onChange={(value) => setEditing({ ...editing, targetCountry: value.toUpperCase() })} dir="ltr" />
-        <EditField label="Objective" value={editing.objective} onChange={(value) => setEditing({ ...editing, objective: value })} />
-        <EditField label="ملاحظات داخلية" value={editing.internalNotes} onChange={(value) => setEditing({ ...editing, internalNotes: value })} />
-        <div className="md:col-span-3 flex flex-wrap gap-2">
-          <Button type="button" onClick={saveEdit} disabled={actionId === editing.id} className="gap-2"><Save className="h-4 w-4" />حفظ التعديلات</Button>
-          <Button type="button" variant="outline" onClick={() => setEditing(null)}>إلغاء</Button>
-        </div>
-      </CardContent>
-    </Card> : null}
+    <Card><CardContent className="p-4"><div className="relative"><Search className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث باسم الرابط، المنصة، Campaign ID، Ad ID، الدولة، أو الرابط..." className="w-full rounded-md border bg-white py-2 pl-3 pr-9 text-sm" /></div></CardContent></Card>
+
+    {editing ? <Card className="border-blue-200 bg-blue-50/40"><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle>تعديل بيانات الرابط</CardTitle><CardDescription>التعديل لا يغير URL نفسه، لكنه يحسن التصنيف والمطابقة والتقارير.</CardDescription></div><Button type="button" variant="ghost" size="sm" onClick={() => setEditing(null)}><X className="h-4 w-4" /></Button></div></CardHeader><CardContent className="grid gap-3 md:grid-cols-3">
+      <EditField label="اسم الرابط" value={editing.name} onChange={(value) => setEditing({ ...editing, name: value })} />
+      <div className="space-y-1"><label className="text-xs text-slate-500">المنصة</label><select value={editing.platform} onChange={(event) => setEditing({ ...editing, platform: event.target.value })} className="w-full rounded-md border bg-white px-3 py-2 text-sm">{PLATFORMS.map((p) => <option key={p} value={p}>{p}</option>)}</select></div>
+      <EditField label="Campaign ID" value={editing.campaignId} onChange={(value) => setEditing({ ...editing, campaignId: value })} dir="ltr" /><EditField label="Ad Set / Ad Group ID" value={editing.adsetId} onChange={(value) => setEditing({ ...editing, adsetId: value })} dir="ltr" /><EditField label="Ad ID" value={editing.adId} onChange={(value) => setEditing({ ...editing, adId: value })} dir="ltr" /><EditField label="UTM Campaign" value={editing.utmCampaign} onChange={(value) => setEditing({ ...editing, utmCampaign: value })} dir="ltr" /><EditField label="Target Country" value={editing.targetCountry} onChange={(value) => setEditing({ ...editing, targetCountry: value.toUpperCase() })} dir="ltr" /><EditField label="Objective" value={editing.objective} onChange={(value) => setEditing({ ...editing, objective: value })} /><EditField label="ملاحظات داخلية" value={editing.internalNotes} onChange={(value) => setEditing({ ...editing, internalNotes: value })} />
+      <div className="md:col-span-3 flex flex-wrap gap-2"><Button type="button" onClick={saveEdit} disabled={actionId === editing.id} className="gap-2"><Save className="h-4 w-4" />حفظ التعديلات</Button><Button type="button" variant="outline" onClick={() => setEditing(null)}>إلغاء</Button></div>
+    </CardContent></Card> : null}
 
     {loading ? <div className="flex min-h-[20rem] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#025EB8]" /></div> : !data ? <Card><CardContent className="p-8 text-center text-slate-500">لا توجد بيانات متاحة.</CardContent></Card> : <>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">روابط هذا القسم</div><div className="mt-1 text-2xl font-black">{data.summary.links}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">روابط جلبت تبرعات</div><div className="mt-1 text-2xl font-black text-emerald-700">{data.summary.linksWithDonations}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">تبرعات تمت مراجعتها</div><div className="mt-1 text-2xl font-black">{data.summary.donationsConsidered}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">إيراد مطابق</div><div className="mt-1 text-2xl font-black">{money(data.summary.revenueMatched)}</div></CardContent></Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>روابط الحملات</CardTitle>
-          <CardDescription>الفترة: {data.range.from} — {data.range.to}. استخدم التعديل لتحسين التصنيف، والأرشفة للروابط القديمة، والحذف الناعم للروابط التي لا تريد ظهورها في النشط.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto rounded-xl border">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs text-slate-500">
-                <tr>
-                  <th className="px-3 py-2 text-right">الرابط</th>
-                  <th className="px-3 py-2 text-right">الحالة</th>
-                  <th className="px-3 py-2 text-right">المنصة</th>
-                  <th className="px-3 py-2 text-right">المعرّف</th>
-                  <th className="px-3 py-2 text-right">الحفظ</th>
-                  <th className="px-3 py-2 text-right">التبرعات</th>
-                  <th className="px-3 py-2 text-right">الإيراد</th>
-                  <th className="px-3 py-2 text-right">جودة المطابقة</th>
-                  <th className="px-3 py-2 text-right">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.links.length === 0 ? <tr><td colSpan={9} className="px-3 py-10 text-center text-slate-500">لا توجد روابط في هذا القسم.</td></tr> : data.links.map((row) => <tr key={row.id} className="border-t align-top">
-                  <td className="max-w-[24rem] px-3 py-2">
-                    <div className="font-semibold text-slate-900">{row.name}</div>
-                    <div className="mt-1 truncate text-xs text-slate-400" title={row.url || ""}>{row.url || "—"}</div>
-                    <div className="mt-1 text-xs text-slate-400">أسباب المطابقة: {reasonsLabel(row)}</div>
-                  </td>
-                  <td className="px-3 py-2"><span className={`inline-flex rounded-full border px-2 py-1 text-xs ${statusClass(row.status)}`}>{statusLabel(row.status)}</span></td>
-                  <td className="px-3 py-2">{row.platform || "—"}</td>
-                  <td className="max-w-[12rem] truncate px-3 py-2 font-mono text-xs">{firstIdentifier(row)}</td>
-                  <td className="px-3 py-2">{row.saveCount || 0}</td>
-                  <td className="px-3 py-2 font-bold">{row.performance.donations}</td>
-                  <td className="px-3 py-2">{money(row.performance.revenue)}</td>
-                  <td className="px-3 py-2 text-xs">قوي: {row.performance.matchQuality.strong} · متوسط: {row.performance.matchQuality.medium} · ضعيف: {row.performance.matchQuality.weak}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex min-w-[18rem] flex-wrap gap-1.5">
-                      <Button type="button" size="sm" variant="outline" onClick={() => copyLink(row.url)} className="gap-1"><Copy className="h-3.5 w-3.5" />نسخ</Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => setEditing(editFromRow(row))} className="gap-1"><Edit3 className="h-3.5 w-3.5" />تعديل</Button>
-                      {row.status !== "ARCHIVED" && row.status !== "DELETED" ? <Button type="button" size="sm" variant="outline" disabled={actionId === row.id} onClick={() => runAction(row.id, "ARCHIVE")} className="gap-1"><Archive className="h-3.5 w-3.5" />أرشفة</Button> : null}
-                      {row.status === "ARCHIVED" || row.status === "DELETED" ? <Button type="button" size="sm" variant="outline" disabled={actionId === row.id} onClick={() => runAction(row.id, "RESTORE")} className="gap-1"><RotateCcw className="h-3.5 w-3.5" />استعادة</Button> : null}
-                      {row.status !== "DELETED" ? <Button type="button" size="sm" variant="outline" disabled={actionId === row.id} onClick={() => runAction(row.id, "DELETE")} className="gap-1 text-rose-700 hover:text-rose-800"><Trash2 className="h-3.5 w-3.5" />حذف</Button> : null}
-                    </div>
-                  </td>
-                </tr>)}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-5"><Card><CardContent className="p-4"><div className="text-xs text-slate-500">روابط هذا القسم</div><div className="mt-1 text-2xl font-black">{data.summary.links}</div></CardContent></Card><Card><CardContent className="p-4"><div className="text-xs text-slate-500">بعد البحث</div><div className="mt-1 text-2xl font-black text-[#025EB8]">{visibleLinks.length}</div></CardContent></Card><Card><CardContent className="p-4"><div className="text-xs text-slate-500">تبرعات ظاهرة</div><div className="mt-1 text-2xl font-black text-emerald-700">{visibleDonations}</div></CardContent></Card><Card><CardContent className="p-4"><div className="text-xs text-slate-500">تبرعات تمت مراجعتها</div><div className="mt-1 text-2xl font-black">{data.summary.donationsConsidered}</div></CardContent></Card><Card><CardContent className="p-4"><div className="text-xs text-slate-500">إيراد ظاهر</div><div className="mt-1 text-2xl font-black">{money(visibleRevenue)}</div></CardContent></Card></div>
+      <Card><CardHeader><CardTitle>روابط الحملات</CardTitle><CardDescription>الفترة: {data.range.from} — {data.range.to}. البحث يؤثر على الجدول والعدادات والتصدير.</CardDescription></CardHeader><CardContent><div className="overflow-x-auto rounded-xl border"><table className="w-full text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="px-3 py-2 text-right">الرابط</th><th className="px-3 py-2 text-right">الحالة</th><th className="px-3 py-2 text-right">المنصة</th><th className="px-3 py-2 text-right">المعرّف</th><th className="px-3 py-2 text-right">الحفظ</th><th className="px-3 py-2 text-right">التبرعات</th><th className="px-3 py-2 text-right">الإيراد</th><th className="px-3 py-2 text-right">جودة المطابقة</th><th className="px-3 py-2 text-right">إجراءات</th></tr></thead><tbody>{visibleLinks.length === 0 ? <tr><td colSpan={9} className="px-3 py-10 text-center text-slate-500">لا توجد روابط مطابقة للبحث الحالي.</td></tr> : visibleLinks.map((row) => <tr key={row.id} className="border-t align-top"><td className="max-w-[24rem] px-3 py-2"><div className="font-semibold text-slate-900">{row.name}</div><div className="mt-1 truncate text-xs text-slate-400" title={row.url || ""}>{row.url || "—"}</div><div className="mt-1 text-xs text-slate-400">أسباب المطابقة: {reasonsLabel(row)}</div>{row.metadata?.internalNotes ? <div className="mt-1 rounded bg-slate-50 p-1 text-xs text-slate-500">{row.metadata.internalNotes}</div> : null}</td><td className="px-3 py-2"><span className={`inline-flex rounded-full border px-2 py-1 text-xs ${statusClass(row.status)}`}>{statusLabel(row.status)}</span></td><td className="px-3 py-2">{row.platform || "—"}</td><td className="max-w-[12rem] truncate px-3 py-2 font-mono text-xs">{firstIdentifier(row)}</td><td className="px-3 py-2">{row.saveCount || 0}</td><td className="px-3 py-2 font-bold">{row.performance.donations}</td><td className="px-3 py-2">{money(row.performance.revenue)}</td><td className="px-3 py-2 text-xs">قوي: {row.performance.matchQuality.strong} · متوسط: {row.performance.matchQuality.medium} · ضعيف: {row.performance.matchQuality.weak}</td><td className="px-3 py-2"><div className="flex min-w-[18rem] flex-wrap gap-1.5"><Button type="button" size="sm" variant="outline" onClick={() => copyLink(row.url)} className="gap-1"><Copy className="h-3.5 w-3.5" />نسخ</Button><Button type="button" size="sm" variant="outline" onClick={() => setEditing(editFromRow(row))} className="gap-1"><Edit3 className="h-3.5 w-3.5" />تعديل</Button>{row.status !== "ARCHIVED" && row.status !== "DELETED" ? <Button type="button" size="sm" variant="outline" disabled={actionId === row.id} onClick={() => runAction(row.id, "ARCHIVE")} className="gap-1"><Archive className="h-3.5 w-3.5" />أرشفة</Button> : null}{row.status === "ARCHIVED" || row.status === "DELETED" ? <Button type="button" size="sm" variant="outline" disabled={actionId === row.id} onClick={() => runAction(row.id, "RESTORE")} className="gap-1"><RotateCcw className="h-3.5 w-3.5" />استعادة</Button> : null}{row.status !== "DELETED" ? <Button type="button" size="sm" variant="outline" disabled={actionId === row.id} onClick={() => runAction(row.id, "DELETE")} className="gap-1 text-rose-700 hover:text-rose-800"><Trash2 className="h-3.5 w-3.5" />حذف</Button> : null}</div></td></tr>)}</tbody></table></div></CardContent></Card>
     </>}
   </div>;
 }
