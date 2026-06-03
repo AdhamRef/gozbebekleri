@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Archive, ArrowRight, Copy, Edit3, Loader2, RefreshCw, RotateCcw, Save, Trash2, X } from "lucide-react";
+import { Archive, ArrowRight, Copy, Download, Edit3, Loader2, RefreshCw, RotateCcw, Save, Trash2, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -149,6 +149,12 @@ export default function CampaignLinksPerformancePage() {
 
   React.useEffect(() => { void load(); }, [load]);
 
+  function exportCsv() {
+    const params = new URLSearchParams({ status });
+    if (platform !== "ALL") params.set("platform", platform);
+    window.open(`/api/admin/marketing-intelligence/campaign-links/export?${params.toString()}`, "_blank");
+  }
+
   async function copyLink(url: string | null) {
     if (!url) return;
     try {
@@ -244,6 +250,7 @@ export default function CampaignLinksPerformancePage() {
           <option value={90}>آخر 90 يوم</option>
         </select>
         <Button variant="outline" onClick={load} className="gap-2"><RefreshCw className="h-4 w-4" />تحديث</Button>
+        <Button variant="outline" onClick={exportCsv} className="gap-2"><Download className="h-4 w-4" />تصدير CSV</Button>
       </div>
     </div>
 
