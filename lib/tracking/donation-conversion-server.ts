@@ -40,6 +40,16 @@ async function loadDonationForConversion(donationId: string) {
 
 type LoadedDonation = NonNullable<Awaited<ReturnType<typeof loadDonationForConversion>>>;
 
+function paidDonationValue(row: LoadedDonation): number {
+  const total = Number(row.totalAmount ?? 0);
+  if (Number.isFinite(total) && total > 0) return total;
+  const amount = Number(row.amount ?? 0);
+  const teamSupport = Number(row.teamSupport ?? 0);
+  const fees = Number(row.fees ?? 0);
+  const fallback = amount + teamSupport + fees;
+  return Number.isFinite(fallback) ? fallback : 0;
+}
+
 function buildUserDataFromDonation(row: LoadedDonation): MetaUserData {
   const attribution = (row.attribution ?? undefined) as Attribution | undefined;
   const [first_name, ...rest] = (row.donor?.name ?? "").trim().split(/\s+/);
@@ -69,7 +79,9 @@ function buildContents(row: LoadedDonation) {
   const contents: MetaContent[] = [];
   for (const it of row.items) { ids.push(it.campaignId); contents.push({ id: it.campaignId, quantity: 1, item_price: it.amount }); }
   for (const ci of row.categoryItems) { ids.push(ci.categoryId); contents.push({ id: ci.categoryId, quantity: 1, item_price: ci.amount }); }
-  if (ids.length === 0) { ids.push("donation"); contents.push({ id: "donation", quantity: 1, item_price: row.amount }); }
+  if (row.teamSupport > 0) { ids.push("team_support"); contents.push({ id: "team_support", quantity: 1, item_price: row.teamSupport }); }
+  if (row.fees > 0) { ids.push("covered_fees"); contents.push({ id: "covered_fees", quantity: 1, item_price: row.fees }); }
+  if (ids.length === 0) { ids.push("donation"); contents.push({ id: "donation", quantity: 1, item_price: paidDonationValue(row) }); }
   return { ids, contents };
 }
 
@@ -78,7 +90,7 @@ function primaryContentName(row: LoadedDonation): string {
 }
 
 function auditMetaPayload(row: LoadedDonation, eventId: string, customData: MetaCustomData) {
-  return { event_name: "Donate", event_id: eventId, donation_id: row.id, amount: row.amount, amount_usd: row.amountUSD, total_amount: row.totalAmount, currency: row.currency, provider: row.provider, created_at_utc: row.createdAt.toISOString(), created_at_turkey: toTurkeyIso(row.createdAt), paid_at_utc: row.paidAt?.toISOString() ?? null, paid_at_turkey: toTurkeyIso(row.paidAt), reporting_timezone: "Europe/Istanbul", payment_provider_timezone: "America/Toronto", custom_data: customData, attribution: pickAttributionForAudit(row.attribution) };
+  return { event_name: "Donate", event_id: eventId, donation_id: row.id, amount: row.amount, team_support: row.teamSupport, fees: row.fees, amount_usd: row.amountUSD, total_amount: row.totalAmount, currency: row.currency, provider: row.provider, created_at_utc: row.createdAt.toISOString(), created_at_turkey: toTurkeyIso(row.createdAt), paid_at_utc: row.paidAt?.toISOString() ?? null, paid_at_turkey: toTurkeyIso(row.paidAt), reporting_timezone: "Europe/Istanbul", payment_provider_timezone: "America/Toronto", custom_data: customData, attribution: pickAttributionForAudit(row.attribution) };
 }
 
 function metaStatus(result: MetaCapiResult): ConversionEventStatus {
@@ -95,7 +107,7 @@ export async function sendDonationServerConversions(donationId: string, options:
     if (row.paidAt == null) return { ok: false, skipped: true, reason: "paidAt unset" };
     if (!options.force && row.conversionEventsSentAt != null) return { ok: false, skipped: true, reason: "already sent" };
 
-    const amount = Number(row.amount ?? row.amountUSD ?? 0);
+    const amount = paidDonationValue(row);
     if (!(amount > 0)) return { ok: false, skipped: true, reason: "amount <= 0" };
 
     const creds = await getMetaCapiCredentials();
@@ -140,7 +152,7 @@ export async function sendDonationFailedConversions(donationId: string, options:
       if (claim.count === 0) return { ok: false, skipped: true, reason: "lost idempotency claim" };
     }
 
-    const amount = Number(row.amount ?? row.amountUSD ?? 0);
+    const amount = paidDonationValue(row);
     const currency = row.currency || "USD";
     const failedEventId = metaDonationEventId(row.id, "failed");
     const creds = await getMetaCapiCredentials();
@@ -188,6 +200,8 @@ async function sendGa4Purchase(row: LoadedDonation, amount: number, currency: st
   const sessionNum = sessionIdRaw ? parseInt(sessionIdRaw.replace(/\D/g, "").slice(0, 12), 10) : undefined;
   const items = row.items.map((it) => ({ item_id: it.campaignId, item_name: it.campaign?.title ?? "Donation", item_category: "donation", price: it.amount, quantity: 1 }));
   for (const ci of row.categoryItems) items.push({ item_id: ci.categoryId, item_name: ci.category?.name ?? "Category", item_category: "donation", price: ci.amount, quantity: 1 });
+  if (row.teamSupport > 0) items.push({ item_id: "team_support", item_name: "Team Support", item_category: "team_support", price: row.teamSupport, quantity: 1 });
+  if (row.fees > 0) items.push({ item_id: "covered_fees", item_name: "Covered Fees", item_category: "fees", price: row.fees, quantity: 1 });
   if (items.length === 0) items.push({ item_id: "donation", item_name: contentName, item_category: "donation", price: amount, quantity: 1 });
   const gaPayload = { client_id: gaClientId, events: [{ name: "purchase", params: { transaction_id: row.id, value: amount, currency, engagement_time_msec: 100, affiliation: "Donation Website", event_time: eventTime, event_id: eventId, ...(sessionNum != null && !Number.isNaN(sessionNum) ? { session_id: sessionNum } : {}), items } }] };
 
