@@ -42,6 +42,13 @@ function has(row: Record<string, unknown> | null, key: string): boolean {
   return Boolean(str(row, key));
 }
 
+function paidDonationValue(row: { amount: number; teamSupport: number; fees: number; totalAmount: number }) {
+  const total = Number(row.totalAmount ?? 0);
+  if (Number.isFinite(total) && total > 0) return total;
+  const fallback = Number(row.amount || 0) + Number(row.teamSupport || 0) + Number(row.fees || 0);
+  return Number.isFinite(fallback) ? fallback : 0;
+}
+
 function attributionSignals(raw: unknown): AttributionSignals {
   const a = isRecord(raw) ? raw : null;
   const fbclid = has(a, "fbclid");
@@ -107,7 +114,7 @@ export async function POST(request: NextRequest) {
     where: { status: "PAID", paidAt: { not: null, gte: since } },
     orderBy: { paidAt: "desc" },
     take: Math.max(limit * 3, limit),
-    select: { id: true, paidAt: true, amount: true, currency: true, conversionEventsSentAt: true, attribution: true },
+    select: { id: true, paidAt: true, amount: true, teamSupport: true, fees: true, totalAmount: true, currency: true, conversionEventsSentAt: true, attribution: true },
   });
 
   const rows: Array<typeof recentPaid[number] & { ledger: LedgerState }> = [];
@@ -126,7 +133,11 @@ export async function POST(request: NextRequest) {
     results.push({
       donationId: row.id,
       paidAt: row.paidAt?.toISOString() ?? null,
-      amount: row.amount,
+      amount: paidDonationValue(row),
+      originalAmount: row.amount,
+      teamSupport: row.teamSupport,
+      fees: row.fees,
+      totalAmount: row.totalAmount,
       currency: row.currency,
       wasAlreadyMarkedSent: row.conversionEventsSentAt != null,
       previousLedger: row.ledger,
