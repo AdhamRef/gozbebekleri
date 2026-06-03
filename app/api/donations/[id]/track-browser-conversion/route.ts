@@ -19,6 +19,13 @@ function num(value: unknown): number | null {
   return null;
 }
 
+function paidDonationValue(donation: { amount: number; totalAmount: number; teamSupport?: number | null; fees?: number | null }) {
+  const total = Number(donation.totalAmount ?? 0);
+  if (Number.isFinite(total) && total > 0) return total;
+  const fallback = Number(donation.amount || 0) + Number(donation.teamSupport || 0) + Number(donation.fees || 0);
+  return Number.isFinite(fallback) ? fallback : 0;
+}
+
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!id) return NextResponse.json({ ok: false, error: "missing donation id" }, { status: 400 });
@@ -39,12 +46,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const donation = await prisma.donation.findUnique({
     where: { id },
-    select: { id: true, status: true, paidAt: true, amount: true, amountUSD: true, totalAmount: true, currency: true },
+    select: { id: true, status: true, paidAt: true, amount: true, amountUSD: true, totalAmount: true, teamSupport: true, fees: true, currency: true },
   });
   if (!donation) return NextResponse.json({ ok: false, error: "donation not found" }, { status: 404 });
 
-  const value = num((body as Record<string, unknown>).value) ?? Number(donation.amount ?? donation.amountUSD ?? donation.totalAmount ?? 0);
+  const receivedValue = num((body as Record<string, unknown>).value);
+  const expectedValue = paidDonationValue(donation);
+  const value = expectedValue > 0 ? expectedValue : (receivedValue ?? Number(donation.amountUSD ?? donation.amount ?? 0));
   const currency = str((body as Record<string, unknown>).currency) ?? donation.currency ?? "USD";
+  const valueWasNormalized = receivedValue != null && Math.abs(receivedValue - value) > 0.01;
 
   if (donation.status !== "PAID" || donation.paidAt == null) {
     await recordConversionEvent({
@@ -58,7 +68,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       value,
       currency,
       error: `not paid (status=${donation.status})`,
-      request: { source: "success_page", platform, eventName, eventId },
+      request: { source: "success_page", platform, eventName, eventId, received_value: receivedValue, normalized_value: value, value_was_normalized: valueWasNormalized },
     });
     return NextResponse.json({ ok: false, skipped: true, reason: "donation not paid" });
   }
@@ -73,17 +83,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     dedupKey: expectedEventId,
     value,
     currency,
-    error: str((body as Record<string, unknown>).error),
+    error: str((body as Record<string, unknown>).error) ?? (valueWasNormalized ? `browser value normalized from ${receivedValue} to ${value}` : null),
     request: {
       source: "success_page",
       platform,
       eventName,
       eventId,
+      received_value: receivedValue,
+      normalized_value: value,
+      expected_total_amount: expectedValue,
+      base_amount: donation.amount,
+      team_support: donation.teamSupport,
+      fees: donation.fees,
+      value_was_normalized: valueWasNormalized,
       user_agent: request.headers.get("user-agent")?.slice(0, 300) ?? null,
     },
     response: { accepted: true, recorded_at: new Date().toISOString() },
     sentAt: status === "SENT" ? new Date() : null,
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, value, valueWasNormalized });
 }
