@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, CheckCircle2, Loader2, RefreshCw, Zap } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, Download, Loader2, RefreshCw, Zap } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,7 +76,10 @@ export default function MarketingActionItemsPage() {
           قائمة تنفيذ سريعة تجمع مشاكل الروابط، التحويلات، والمنصات في مكان واحد حتى يعرف الفريق ما يجب إصلاحه أولًا.
         </p>
       </div>
-      <Button variant="outline" onClick={load} className="gap-2"><RefreshCw className="h-4 w-4" />تحديث</Button>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" onClick={load} className="gap-2"><RefreshCw className="h-4 w-4" />تحديث</Button>
+        <Button variant="outline" onClick={() => window.open("/api/admin/marketing-intelligence/action-items/export", "_blank")} className="gap-2"><Download className="h-4 w-4" />تصدير CSV</Button>
+      </div>
     </div>
 
     {loading ? <div className="flex min-h-[20rem] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#025EB8]" /></div> : !data ? <Card><CardContent className="p-8 text-center text-slate-500">لا توجد بيانات متاحة.</CardContent></Card> : <>
