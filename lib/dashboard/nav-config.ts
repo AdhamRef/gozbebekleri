@@ -46,6 +46,7 @@ export const DASHBOARD_NAV_GROUPS: {
       { key: "ads", title: "خريطة النظام", href: "/dashboard/marketing-intelligence/system-map" },
       { key: "ads", title: "مركز التسويق", href: "/dashboard/marketing-intelligence" },
       { key: "ads", title: "مركز الإجراءات", href: "/dashboard/marketing-intelligence/action-items" },
+      { key: "ads", title: "مقارنة الموقع والمنصات", href: "/dashboard/marketing-intelligence/site-vs-platform" },
       { key: "ads", title: "بيانات المنصات", href: "/dashboard/marketing-intelligence/platform-metrics" },
       { key: "ads", title: "استيراد بيانات المنصات", href: "/dashboard/marketing-intelligence/platform-metrics/import" },
       { key: "ads", title: "تدقيق قيمة التحويلات", href: "/dashboard/marketing-intelligence/conversion-value-audit" },
