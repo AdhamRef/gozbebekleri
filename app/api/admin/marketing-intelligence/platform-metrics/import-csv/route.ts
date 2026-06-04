@@ -56,6 +56,12 @@ function num(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function spendValue(input: Record<string, string>) {
+  const costMicros = pick(input, ["cost micros", "cost_micros", "metrics.cost_micros"]);
+  if (costMicros) return num(costMicros) / 1_000_000;
+  return num(pick(input, ["spend", "cost", "amount spent", "amount spent (usd)"]));
+}
+
 function dateValue(value: string) {
   if (!value) return new Date().toISOString().slice(0, 10);
   const parsed = new Date(value);
@@ -81,7 +87,7 @@ function mapRow(input: Record<string, string>, defaults: JsonMap) {
     source: pick(input, ["source", "session source", "utm_source"]),
     medium: pick(input, ["medium", "session medium", "utm_medium"]),
     currency: String(defaults.currency || pick(input, ["currency", "account currency"]) || "USD").toUpperCase(),
-    spend: num(pick(input, ["spend", "cost", "amount spent", "amount spent (usd)", "cost micros"])),
+    spend: spendValue(input),
     impressions: num(pick(input, ["impressions", "impr."])),
     clicks: num(pick(input, ["clicks", "link clicks"])),
     conversions: num(pick(input, ["conversions", "purchases", "results", "website purchases", "purchase"])),
