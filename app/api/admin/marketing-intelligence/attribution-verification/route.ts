@@ -21,7 +21,6 @@ function hasAdAttribution(attribution: unknown) {
   if (!isMap(attribution)) return false;
   return Boolean(str(attribution.fbclid) || str(attribution.fbc) || str(attribution.fbp) || str(attribution.campaign_id) || str(attribution.campaignId) || str(attribution.ad_id) || str(attribution.adId) || str(attribution.utm_source));
 }
-
 function campaignId(attribution: unknown) { return isMap(attribution) ? str(attribution.campaign_id) || str(attribution.campaignId) || str(attribution.utm_id) || str(attribution.utm_campaign) : ""; }
 function adId(attribution: unknown) { return isMap(attribution) ? str(attribution.ad_id) || str(attribution.adId) || str(attribution.utm_content) : ""; }
 function platform(attribution: unknown) {
@@ -42,12 +41,7 @@ async function ensureIndexes() {
 }
 
 async function getConversionEvents(donationId: string, eventId: string) {
-  const result = await prisma.$runCommandRaw({
-    find: "ConversionEvent",
-    filter: { $or: [{ donationId }, { donationId: oidFilter(donationId) }, { eventId }] },
-    sort: { updatedAt: -1 },
-    limit: 50,
-  }) as JsonMap;
+  const result = await prisma.$runCommandRaw({ find: "ConversionEvent", filter: { $or: [{ donationId }, { donationId: oidFilter(donationId) }, { eventId }] }, sort: { updatedAt: -1 }, limit: 50 }) as JsonMap;
   return isMap(result.cursor) && Array.isArray(result.cursor.firstBatch) ? result.cursor.firstBatch.filter(isMap) : [];
 }
 
@@ -58,61 +52,24 @@ async function hasPlatformCredit(row: { platform: string; campaignId: string; ad
   const or: JsonMap[] = [];
   if (row.campaignId) or.push({ campaignId: row.campaignId }, { campaignName: row.campaignId });
   if (row.adId) or.push({ adId: row.adId });
-  const result = await prisma.$runCommandRaw({
-    find: "MarketingPlatformDailyMetric",
-    filter: { platform: row.platform, date: { $gte: date }, $or: or, $or: or },
-    sort: { date: -1, updatedAt: -1 },
-    limit: 20,
-  }).catch(() => null) as JsonMap | null;
+  const result = await prisma.$runCommandRaw({ find: "MarketingPlatformDailyMetric", filter: { platform: row.platform, date: { $gte: date }, ...(or.length ? { $or: or } : {}) }, sort: { date: -1, updatedAt: -1 }, limit: 20 }).catch(() => null) as JsonMap | null;
   const rows = isMap(result?.cursor) && Array.isArray(result.cursor.firstBatch) ? result.cursor.firstBatch.filter(isMap) : [];
   return rows.some((m) => num(m.conversions) > 0 || num(m.revenue) > 0);
 }
 
-async function upsertVerification(input: {
-  donationId: string;
-  platform: string;
-  eventId: string;
-  value: number;
-  currency: string;
-  paidAt: Date | null;
-  campaignId: string;
-  adId: string;
-  attribution: unknown;
-}) {
+async function upsertVerification(input: { donationId: string; platform: string; eventId: string; value: number; currency: string; paidAt: Date | null; campaignId: string; adId: string; attribution: unknown; }) {
   const now = new Date();
   const nextCheckAt = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-  await prisma.$runCommandRaw({ update: "MarketingAttributionVerification", updates: [{
-    q: { donationId: input.donationId, platform: input.platform },
-    u: {
-      $set: { ...input, updatedAt: now },
-      $setOnInsert: { createdAt: now, status: "PENDING", attempts: 0, nextCheckAt, history: [] },
-    },
-    upsert: true,
-  }] });
+  await prisma.$runCommandRaw({ update: "MarketingAttributionVerification", updates: [{ q: { donationId: input.donationId, platform: input.platform }, u: { $set: { ...input, updatedAt: now }, $setOnInsert: { createdAt: now, status: "PENDING", attempts: 0, nextCheckAt, history: [] } }, upsert: true }] });
 }
 
 async function seedRecent() {
   const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
-  const donations = await prisma.donation.findMany({
-    where: { status: "PAID", paidAt: { not: null, gte: since } },
-    orderBy: { paidAt: "desc" },
-    take: 100,
-    select: { id: true, amount: true, totalAmount: true, teamSupport: true, fees: true, currency: true, paidAt: true, attribution: true },
-  });
+  const donations = await prisma.donation.findMany({ where: { status: "PAID", paidAt: { not: null, gte: since } }, orderBy: { paidAt: "desc" }, take: 100, select: { id: true, amount: true, totalAmount: true, teamSupport: true, fees: true, currency: true, paidAt: true, attribution: true } });
   for (const d of donations) {
     if (!hasAdAttribution(d.attribution)) continue;
     const value = Number(d.totalAmount || 0) > 0 ? Number(d.totalAmount) : Number(d.amount || 0) + Number(d.teamSupport || 0) + Number(d.fees || 0);
-    await upsertVerification({
-      donationId: d.id,
-      platform: platform(d.attribution),
-      eventId: metaDonationEventId(d.id, "success"),
-      value,
-      currency: d.currency || "USD",
-      paidAt: d.paidAt,
-      campaignId: campaignId(d.attribution),
-      adId: adId(d.attribution),
-      attribution: d.attribution,
-    });
+    await upsertVerification({ donationId: d.id, platform: platform(d.attribution), eventId: metaDonationEventId(d.id, "success"), value, currency: d.currency || "USD", paidAt: d.paidAt, campaignId: campaignId(d.attribution), adId: adId(d.attribution), attribution: d.attribution });
   }
 }
 
@@ -149,27 +106,10 @@ async function processOne(row: JsonMap, retry: boolean) {
   const ageMs = paidAt ? Date.now() - paidAt.getTime() : 0;
   const canRetry = retry && rowPlatform === "META" && attempts < 3 && ageMs < 7 * 24 * 60 * 60 * 1000 && status !== "LIKELY_COUNTED";
   let retryResult: unknown = null;
-  if (canRetry) {
-    retryResult = await syncDonationConversion(donationId, { force: true });
-    status = "RETRIED";
-    reason = `${reason} — تمت إعادة إرسال CAPI بنفس event_id`;
-  } else if (attempts >= 3 && status !== "LIKELY_COUNTED") {
-    status = "NEEDS_REVIEW";
-    reason = `${reason} — وصل للحد الأقصى من المحاولات`;
-  }
+  if (canRetry) { retryResult = await syncDonationConversion(donationId, { force: true }); status = "RETRIED"; reason = `${reason} — تمت إعادة إرسال CAPI بنفس event_id`; }
+  else if (attempts >= 3 && status !== "LIKELY_COUNTED") { status = "NEEDS_REVIEW"; reason = `${reason} — وصل للحد الأقصى من المحاولات`; }
 
-  await updateVerification(donationId, rowPlatform, {
-    status,
-    reason,
-    metaServerSent,
-    metaBrowserSent,
-    metaBrowserSkipped,
-    platformCredit,
-    lastCheckedAt: new Date(),
-    nextCheckAt: status === "LIKELY_COUNTED" || status === "NEEDS_REVIEW" ? null : new Date(Date.now() + 2 * 60 * 60 * 1000),
-    attempts: canRetry ? attempts + 1 : attempts,
-    lastRetryResult: retryResult,
-  });
+  await updateVerification(donationId, rowPlatform, { status, reason, metaServerSent, metaBrowserSent, metaBrowserSkipped, platformCredit, lastCheckedAt: new Date(), nextCheckAt: status === "LIKELY_COUNTED" || status === "NEEDS_REVIEW" ? null : new Date(Date.now() + 2 * 60 * 60 * 1000), attempts: canRetry ? attempts + 1 : attempts, lastRetryResult: retryResult });
   return { ok: true, donationId, status, reason, metaServerSent, metaBrowserSent, platformCredit, retried: canRetry };
 }
 
