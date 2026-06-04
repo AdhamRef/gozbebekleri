@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, ArrowLeft, BarChart3, CheckCircle2, ClipboardList, Database, GitCompareArrows, Map, Settings, ShieldCheck, TrendingUp } from "lucide-react";
+import { Activity, ArrowLeft, BarChart3, CheckCircle2, ClipboardList, Database, GitCompareArrows, Map, Rocket, Settings, ShieldCheck, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const mainSections = [
@@ -9,6 +9,13 @@ const mainSections = [
     icon: Activity,
     desc: "ابدأ من هنا: ملخص صحة النظام، أهم الإجراءات، فجوات المنصات، وتوصيات الميزانية.",
     badge: "الأهم يوميًا",
+  },
+  {
+    title: "جاهزية الإطلاق",
+    href: "/dashboard/marketing-intelligence/launch-readiness",
+    icon: Rocket,
+    desc: "Checklist نهائية قبل إطلاق أو توسيع حملات إعلانية كبيرة.",
+    badge: "قبل الإطلاق",
   },
   {
     title: "مركز الإجراءات",
@@ -48,6 +55,7 @@ const mainSections = [
 ];
 
 const quickLinks = [
+  { title: "جاهزية الإطلاق", href: "/dashboard/marketing-intelligence/launch-readiness", icon: Rocket },
   { title: "استيراد بيانات المنصات", href: "/dashboard/marketing-intelligence/platform-metrics/import", icon: Database },
   { title: "مقارنة الموقع والمنصات", href: "/dashboard/marketing-intelligence/site-vs-platform", icon: GitCompareArrows },
   { title: "توصيات الميزانية", href: "/dashboard/marketing-intelligence/budget-recommendations", icon: TrendingUp },
