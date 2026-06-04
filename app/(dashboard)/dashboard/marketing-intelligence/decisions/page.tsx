@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BarChart3, GitCompareArrows, Settings, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MarketingWorkflowHeader } from "../_components/MarketingWorkflowHeader";
+import { MarketingQuickGuide } from "../_components/MarketingQuickGuide";
 
 const items = [
   { title: "توصيات الميزانية", href: "/dashboard/marketing-intelligence/budget-recommendations", icon: TrendingUp, desc: "قرارات زود، أوقف، خفّض، أصلح التتبع، أو راجع." },
@@ -17,6 +18,12 @@ export default function MarketingDecisionsHubPage() {
       title="القرارات والتوصيات"
       description="مركز اتخاذ القرار: مقارنة المنصات، توصيات الميزانية، وإعدادات الربط والتتبع."
     />
+    <MarketingQuickGuide steps={[
+      "افتح مقارنة الموقع والمنصات لمعرفة هل المنصة ترى نفس نتائج الموقع.",
+      "راجع توصيات الميزانية لمعرفة الحملات التي يجب زيادتها أو إيقافها أو تخفيضها.",
+      "لو ظهرت فجوة إسناد، أصلح التتبع قبل اتخاذ قرار ميزانية نهائي.",
+      "راجع إعدادات التتبع وربط المنصات عند أي نقص في البيانات.",
+    ]} />
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {items.map((item) => <Link key={item.href} href={item.href} className="block">
         <Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-md">
