@@ -43,6 +43,7 @@ export const DASHBOARD_NAV_GROUPS: {
     group: "التتبع والإعلانات",
     items: [
       { key: "ads", title: "لوحة التشغيل", href: "/dashboard/marketing-intelligence/executive-overview" },
+      { key: "ads", title: "متابعة احتساب التبرعات", href: "/dashboard/marketing-intelligence/attribution-verification" },
       { key: "ads", title: "الفحص النهائي", href: "/dashboard/marketing-intelligence/final-readiness" },
       { key: "ads", title: "جاهزية الإطلاق", href: "/dashboard/marketing-intelligence/launch-readiness" },
       { key: "ads", title: "مركز الإجراءات", href: "/dashboard/marketing-intelligence/action-items" },
