@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BarChart3, FileUp, Link2, Megaphone, TableProperties } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MarketingWorkflowHeader } from "../_components/MarketingWorkflowHeader";
+import { MarketingQuickGuide } from "../_components/MarketingQuickGuide";
 
 const items = [
   { title: "بيانات المنصات", href: "/dashboard/marketing-intelligence/platform-metrics", icon: TableProperties, desc: "عرض الإنفاق والنقرات والتحويلات والإيراد من المنصات." },
@@ -18,6 +19,12 @@ export default function MarketingDataHubPage() {
       title="البيانات والروابط"
       description="كل ما يخص إدخال بيانات المنصات، استيراد التقارير، إنشاء الروابط، وتحليل أداء روابط الحملات."
     />
+    <MarketingQuickGuide steps={[
+      "ابدأ باستيراد CSV من منصة الإعلان أو أدخل البيانات يدويًا.",
+      "راجع بيانات المنصات للتأكد من ظهور الإنفاق والنقرات والتحويلات.",
+      "أنشئ روابط تسويقية واضحة لكل حملة وإعلان قبل الإطلاق.",
+      "افتح أداء الروابط لمعرفة الروابط التي جلبت تبرعات فعلية.",
+    ]} />
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {items.map((item) => <Link key={item.href} href={item.href} className="block">
         <Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-md">
