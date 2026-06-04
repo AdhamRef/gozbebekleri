@@ -40,41 +40,14 @@ export const DASHBOARD_NAV_GROUPS: {
     ],
   },
   {
-    group: "التتبع والإعلانات - لوحة التشغيل",
+    group: "التتبع والإعلانات",
     items: [
-      { key: "ads", title: "ابدأ من هنا", href: "/dashboard/marketing-intelligence/executive-overview" },
-      { key: "ads", title: "مركز التسويق", href: "/dashboard/marketing-intelligence" },
-      { key: "ads", title: "خريطة النظام", href: "/dashboard/marketing-intelligence/system-map" },
+      { key: "ads", title: "لوحة التشغيل", href: "/dashboard/marketing-intelligence/executive-overview" },
       { key: "ads", title: "مركز الإجراءات", href: "/dashboard/marketing-intelligence/action-items" },
-    ],
-  },
-  {
-    group: "التتبع والإعلانات - البيانات والاستيراد",
-    items: [
-      { key: "ads", title: "بيانات المنصات", href: "/dashboard/marketing-intelligence/platform-metrics" },
-      { key: "ads", title: "استيراد بيانات المنصات", href: "/dashboard/marketing-intelligence/platform-metrics/import" },
-      { key: "ads", title: "أداء الروابط", href: "/dashboard/marketing-intelligence/campaign-links" },
-      { key: "referrals", title: "إنشاء روابط تسويقية", href: "/dashboard/link-generator" },
-      { key: "ads", title: "الحملات والإعلانات", href: "/dashboard/ads" },
-    ],
-  },
-  {
-    group: "التتبع والإعلانات - التدقيق والإصلاح",
-    items: [
-      { key: "ads", title: "تدقيق قيمة التحويلات", href: "/dashboard/marketing-intelligence/conversion-value-audit" },
-      { key: "ads", title: "إصلاح التحويلات", href: "/dashboard/marketing-intelligence/repair-center" },
-      { key: "ads", title: "سجل التحويلات", href: "/dashboard/conversion-events" },
-      { key: "ads", title: "اختبار النظام", href: "/dashboard/marketing-intelligence/test-checklist" },
-      { key: "ads", title: "حالة المنصات", href: "/dashboard/marketing-intelligence/platform-status" },
-    ],
-  },
-  {
-    group: "التتبع والإعلانات - القرارات والإعدادات",
-    items: [
-      { key: "ads", title: "توصيات الميزانية", href: "/dashboard/marketing-intelligence/budget-recommendations" },
-      { key: "ads", title: "مقارنة الموقع والمنصات", href: "/dashboard/marketing-intelligence/site-vs-platform" },
-      { key: "pixels", title: "إعدادات التتبع", href: "/dashboard/pixels" },
-      { key: "platformConnections", title: "ربط المنصات", href: "/dashboard/marketing/connections" },
+      { key: "ads", title: "البيانات والروابط", href: "/dashboard/marketing-intelligence/data" },
+      { key: "ads", title: "التدقيق والإصلاح", href: "/dashboard/marketing-intelligence/audit" },
+      { key: "ads", title: "القرارات والتوصيات", href: "/dashboard/marketing-intelligence/decisions" },
+      { key: "ads", title: "خريطة النظام", href: "/dashboard/marketing-intelligence/system-map" },
     ],
   },
   {
