@@ -123,6 +123,8 @@ export function userCanExportReports(user: UserLike | undefined): boolean {
 /** Longer prefixes first — first match wins */
 const PATH_RULES: { prefix: string; key: DashboardPermissionKey }[] = [
   { prefix: "/dashboard/marketing-intelligence", key: "ads" },
+  { prefix: "/dashboard/conversion-events", key: "ads" },
+  { prefix: "/dashboard/ads", key: "ads" },
   { prefix: "/dashboard/monthly", key: "monthly" },
   { prefix: "/dashboard/link-generator", key: "referrals" },
   { prefix: "/dashboard/referrals", key: "referrals" },
