@@ -1,10 +1,19 @@
 /** Matches dashboard chart period select + custom range inputs */
-export type DashboardChartPeriod = "day" | "week" | "month" | "all" | "custom";
+export type DashboardChartPeriod =
+  | "day"
+  | "yesterday"
+  | "week"
+  | "month"
+  | "year"
+  | "all"
+  | "custom";
 
 const LABELS_AR: Record<DashboardChartPeriod, string> = {
-  day: "يوم",
+  day: "اليوم",
+  yesterday: "أمس",
   week: "أسبوع",
   month: "شهر",
+  year: "سنة",
   all: "كل الوقت",
   custom: "مخصص",
 };

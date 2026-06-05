@@ -10,13 +10,13 @@ import {
   donationRowUsdApprox,
   donationUsdSumFallback,
 } from "@/lib/dashboard/donation-usd-revenue";
+import { istanbulDateKeysToUtcRange } from "@/lib/admin/istanbul-calendar";
 
 function getDateRange(period: string, startParam?: string | null, endParam?: string | null) {
   let endDate: Date;
   let startDate: Date;
   if (startParam && endParam) {
-    startDate = new Date(startParam + "T00:00:00.000Z");
-    endDate = new Date(endParam + "T23:59:59.999Z");
+    ({ startDate, endDate } = istanbulDateKeysToUtcRange(startParam, endParam));
   } else if (period === "all") {
     endDate = new Date();
     startDate = new Date(endDate);

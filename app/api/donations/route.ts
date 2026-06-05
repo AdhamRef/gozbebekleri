@@ -17,6 +17,7 @@ import {
 import { sanitizeDonationAttribution } from "@/lib/attribution/sanitize";
 import { inferLocaleFromRequest } from "@/lib/preferred-lang";
 import { resolveGuestDonor } from "@/lib/users/resolve-guest-donor";
+import { istanbulDateKeysToUtcRange } from "@/lib/admin/istanbul-calendar";
 
 // GET /api/donations - Get all donations (admin) or user's donations
 export async function GET(request: NextRequest) {
@@ -40,9 +41,19 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get("limit") || "10") || 10, 100);
     const skip = (page - 1) * limit;
 
+    // Dashboard sends YYYY-MM-DD keys in the Istanbul calendar — interpret
+    // both ends as Istanbul day boundaries so the donations list agrees with
+    // the chart/stats (UTC midnight was clipping 3 hours off every day).
     const dateFilter: { gte?: Date; lte?: Date } = {};
-    if (startParam) dateFilter.gte = new Date(startParam + "T00:00:00.000Z");
-    if (endParam) dateFilter.lte = new Date(endParam + "T23:59:59.999Z");
+    if (startParam && endParam) {
+      const r = istanbulDateKeysToUtcRange(startParam, endParam);
+      dateFilter.gte = r.startDate;
+      dateFilter.lte = r.endDate;
+    } else if (startParam) {
+      dateFilter.gte = istanbulDateKeysToUtcRange(startParam, startParam).startDate;
+    } else if (endParam) {
+      dateFilter.lte = istanbulDateKeysToUtcRange(endParam, endParam).endDate;
+    }
 
     const isAdmin = isRevenueDashboardUser(session);
     const subscriptionOnly =

@@ -31,6 +31,7 @@ import {
   type ExportFilterDescriptor,
   type ExportFormat,
 } from "@/lib/dashboard/donation-export";
+import { istanbulDateKeysToUtcRange } from "@/lib/admin/istanbul-calendar";
 
 export async function GET(request: NextRequest) {
   try {
@@ -58,8 +59,15 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(sp.get("limit") || "20000", 10) || 20000, 50000);
 
     const dateFilter: { gte?: Date; lte?: Date } = {};
-    if (startParam) dateFilter.gte = new Date(startParam + "T00:00:00.000Z");
-    if (endParam) dateFilter.lte = new Date(endParam + "T23:59:59.999Z");
+    if (startParam && endParam) {
+      const r = istanbulDateKeysToUtcRange(startParam, endParam);
+      dateFilter.gte = r.startDate;
+      dateFilter.lte = r.endDate;
+    } else if (startParam) {
+      dateFilter.gte = istanbulDateKeysToUtcRange(startParam, startParam).startDate;
+    } else if (endParam) {
+      dateFilter.lte = istanbulDateKeysToUtcRange(endParam, endParam).endDate;
+    }
 
     const baseWhere: Prisma.DonationWhereInput = {
       ...(campaignId && campaignId !== "all" && { items: { some: { campaignId } } }),

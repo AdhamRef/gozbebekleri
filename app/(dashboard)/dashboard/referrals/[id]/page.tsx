@@ -55,6 +55,7 @@ import {
 import { formatUtcCalendarMonthLong } from "@/lib/admin/current-calendar-month-utc";
 import { StatsMetricCard } from "@/components/dashboard/StatsMetricCard";
 import { getDashboardChartPeriodLabelAr } from "@/lib/dashboard/chart-period-label-ar";
+import { getPeriodDateKeys } from "@/lib/dashboard/period-date-range";
 import {
   istanbulTodayKey,
   istanbulAddCalendarDaysKey,
@@ -162,14 +163,16 @@ interface ReferralStats {
 }
 
 type ChartViewType = "bar" | "line" | "area";
-type ChartPeriod = "day" | "week" | "month" | "all" | "custom";
+type ChartPeriod = "day" | "yesterday" | "week" | "month" | "year" | "all" | "custom";
 type ChartMetric = "amount" | "teamSupport" | "fees";
 type StatCardSet = "revenue" | "overview" | "breakdown";
 
 const PERIOD_LABELS: Record<ChartPeriod, string> = {
-  day: "يوم",
+  day: "اليوم",
+  yesterday: "أمس",
   week: "أسبوع",
   month: "شهر",
+  year: "سنة",
   all: "كل الوقت",
   custom: "مخصص",
 };
@@ -203,13 +206,7 @@ function getDonationsDateRange(
   dateFrom: string,
   dateTo: string
 ): { start: string | null; end: string | null } {
-  if (period === "all") return { start: null, end: null };
-  if (dateFrom && dateTo) return { start: dateFrom, end: dateTo };
-  // Istanbul calendar so "today" flips at 00:00 in Turkey, not 03:00.
-  const endKey = istanbulTodayKey();
-  const days = period === "day" ? 1 : period === "week" ? 7 : 30;
-  const startKey = istanbulAddCalendarDaysKey(endKey, -days);
-  return { start: startKey, end: endKey };
+  return getPeriodDateKeys(period, dateFrom, dateTo);
 }
 
 export default function ReferralAnalyticsPage() {
@@ -321,9 +318,10 @@ export default function ReferralAnalyticsPage() {
     try {
       const searchParams = new URLSearchParams();
       searchParams.set("period", chartPeriod);
-      if (dateFrom && dateTo) {
-        searchParams.set("start", dateFrom);
-        searchParams.set("end", dateTo);
+      const { start, end } = getDonationsDateRange(chartPeriod, dateFrom, dateTo);
+      if (start && end) {
+        searchParams.set("start", start);
+        searchParams.set("end", end);
       }
       if (selectedCategory !== "all") searchParams.set("categoryId", selectedCategory);
       if (selectedCampaign !== "all") searchParams.set("campaignId", selectedCampaign);
@@ -357,9 +355,10 @@ export default function ReferralAnalyticsPage() {
     try {
       const searchParams = new URLSearchParams();
       searchParams.set("period", chartPeriod);
-      if (dateFrom && dateTo) {
-        searchParams.set("start", dateFrom);
-        searchParams.set("end", dateTo);
+      const { start, end } = getDonationsDateRange(chartPeriod, dateFrom, dateTo);
+      if (start && end) {
+        searchParams.set("start", start);
+        searchParams.set("end", end);
       }
       if (selectedCategory !== "all") searchParams.set("categoryId", selectedCategory);
       if (selectedCampaign !== "all") searchParams.set("campaignId", selectedCampaign);
@@ -1120,19 +1119,22 @@ export default function ReferralAnalyticsPage() {
           endpoint={`/api/admin/referrals/${id}/export`}
           title={`تصدير تقرير الإحالة${stats?.referral?.code ? ` — ${stats.referral.code}` : ""}`}
           description="يشمل التقرير كل التبرعات والاشتراكات المرتبطة بهذه الإحالة، مع ملخص شامل وتفصيل لكل حملة."
-          defaults={{
-            ...EXPORT_DEFAULTS,
-            period: chartPeriod === "custom" || (dateFrom && dateTo) ? "custom" : chartPeriod,
-            start: dateFrom || "",
-            end: dateTo || "",
-            categoryId: selectedCategory,
-            campaignId: selectedCampaign,
-            status: donationsStatusFilter,
-            type: donationsTypeFilter,
-            country: donationCountryFilter,
-            sortBy: donationsSortBy,
-            sortOrder: donationsSortOrder,
-          }}
+          defaults={(() => {
+            const { start, end } = getDonationsDateRange(chartPeriod, dateFrom, dateTo);
+            return {
+              ...EXPORT_DEFAULTS,
+              period: chartPeriod === "all" ? "all" : "custom",
+              start: start ?? "",
+              end: end ?? "",
+              categoryId: selectedCategory,
+              campaignId: selectedCampaign,
+              status: donationsStatusFilter,
+              type: donationsTypeFilter,
+              country: donationCountryFilter,
+              sortBy: donationsSortBy,
+              sortOrder: donationsSortOrder,
+            };
+          })()}
           options={{
             categories: categories.map((c) => ({ value: c.id, label: c.name })),
             campaigns: campaigns.map((c) => ({ value: c.id, label: c.title })),

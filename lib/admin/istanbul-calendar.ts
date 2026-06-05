@@ -84,6 +84,26 @@ export function addIstanbulCalendarDays(dateKey: string, days: number) {
   return formatUtcDateKey(new Date(Date.UTC(year, month - 1, day + days)));
 }
 
+/**
+ * Convert a YYYY-MM-DD start/end pair in the Istanbul calendar to a UTC
+ * `Date` range usable in Prisma `createdAt: { gte, lte }` filters.
+ *
+ * The dashboard filter UI emits Istanbul date keys ("the day flips at 00:00
+ * in Turkey"), but legacy endpoints used to append `T00:00:00.000Z` and feed
+ * the result to Prisma — that interprets the same string as UTC midnight, so
+ * the first 3 hours of every Istanbul day landed in the previous day's bucket
+ * and the last donations of yesterday landed in today's. This helper closes
+ * that gap so stats/list/export endpoints agree with the chart.
+ */
+export function istanbulDateKeysToUtcRange(startKey: string, endKey: string) {
+  return {
+    startDate: istanbulDateTimeToUtc(startKey),
+    endDate: new Date(
+      istanbulDateTimeToUtc(addIstanbulCalendarDays(endKey, 1)).getTime() - 1
+    ),
+  };
+}
+
 function addIstanbulCalendarYears(dateKey: string, years: number) {
   const { year, month, day } = parseDateKey(dateKey);
   return formatUtcDateKey(new Date(Date.UTC(year + years, month - 1, day)));

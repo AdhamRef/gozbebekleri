@@ -57,6 +57,7 @@ import {
 import { formatUtcCalendarMonthLong } from "@/lib/admin/current-calendar-month-utc";
 import { StatsMetricCard } from "@/components/dashboard/StatsMetricCard";
 import { getDashboardChartPeriodLabelAr } from "@/lib/dashboard/chart-period-label-ar";
+import { getPeriodDateKeys } from "@/lib/dashboard/period-date-range";
 import {
   istanbulTodayKey,
   istanbulAddCalendarDaysKey,
@@ -196,14 +197,16 @@ interface DashboardStats {
 }
 
 type ChartViewType = "bar" | "line" | "area";
-type ChartPeriod = "day" | "week" | "month" | "all" | "custom";
+type ChartPeriod = "day" | "yesterday" | "week" | "month" | "year" | "all" | "custom";
 type ChartMetric = "amount" | "teamSupport" | "fees";
 type StatCardSet = "revenue" | "overview" | "breakdown";
 
 const PERIOD_LABELS: Record<ChartPeriod, string> = {
-  day: "يوم",
+  day: "اليوم",
+  yesterday: "أمس",
   week: "أسبوع",
   month: "شهر",
+  year: "سنة",
   all: "كل الوقت",
   custom: "مخصص",
 };
@@ -224,13 +227,7 @@ function getDonationsDateRange(
   dateFrom: string,
   dateTo: string
 ): { start: string | null; end: string | null } {
-  if (period === "all") return { start: null, end: null };
-  if (dateFrom && dateTo) return { start: dateFrom, end: dateTo };
-  // Istanbul calendar so "today" flips at 00:00 in Turkey, not 03:00.
-  const endKey = istanbulTodayKey();
-  const days = period === "day" ? 1 : period === "week" ? 7 : 30; // month = 30 days
-  const startKey = istanbulAddCalendarDaysKey(endKey, -days);
-  return { start: startKey, end: endKey };
+  return getPeriodDateKeys(period, dateFrom, dateTo);
 }
 
 export default function MonthlySubscriptionsDashboardPage() {
@@ -431,9 +428,10 @@ export default function MonthlySubscriptionsDashboardPage() {
     try {
       const params = new URLSearchParams();
       params.set("period", chartPeriod);
-      if (dateFrom && dateTo) {
-        params.set("start", dateFrom);
-        params.set("end", dateTo);
+      const { start, end } = getDonationsDateRange(chartPeriod, dateFrom, dateTo);
+      if (start && end) {
+        params.set("start", start);
+        params.set("end", end);
       }
       if (selectedCategory !== "all") params.append("categoryId", selectedCategory);
       if (selectedCampaign !== "all") params.append("campaignId", selectedCampaign);
@@ -458,9 +456,10 @@ export default function MonthlySubscriptionsDashboardPage() {
     try {
       const params = new URLSearchParams();
       params.set("period", chartPeriod);
-      if (dateFrom && dateTo) {
-        params.set("start", dateFrom);
-        params.set("end", dateTo);
+      const { start, end } = getDonationsDateRange(chartPeriod, dateFrom, dateTo);
+      if (start && end) {
+        params.set("start", start);
+        params.set("end", end);
       }
       if (selectedCategory !== "all") params.set("categoryId", selectedCategory);
       if (selectedCampaign !== "all") params.set("campaignId", selectedCampaign);
@@ -2312,19 +2311,24 @@ export default function MonthlySubscriptionsDashboardPage() {
         endpoint="/api/admin/monthly/export"
         title="تصدير تقرير الاشتراكات الشهرية"
         description="يشمل التقرير الاشتراكات والدفعات الشهرية مع ملخص كامل وتفصيل لكل حملة من الأعلى إلى الأدنى."
-        defaults={{
-          ...EXPORT_DEFAULTS,
-          period: chartPeriod === "custom" || (dateFrom && dateTo) ? "custom" : chartPeriod,
-          start: dateFrom || "",
-          end: dateTo || "",
-          categoryId: selectedCategory,
-          campaignId: selectedCampaign,
-          status: donationsStatusFilter,
-          subStatus: subStatusFilter === "all" ? "all" : subStatusFilter,
-          country: donationCountryFilter,
-          sortBy: donationsSortBy,
-          sortOrder: donationsSortOrder,
-        } as ExportFormState}
+        defaults={(() => {
+          const { start, end } = getDonationsDateRange(chartPeriod, dateFrom, dateTo);
+          return {
+            ...EXPORT_DEFAULTS,
+            // Coerce every preset to "custom" so the export uses the Istanbul
+            // range we computed (matches اليوم / أمس / شهر / سنة on screen).
+            period: chartPeriod === "all" ? "all" : "custom",
+            start: start ?? "",
+            end: end ?? "",
+            categoryId: selectedCategory,
+            campaignId: selectedCampaign,
+            status: donationsStatusFilter,
+            subStatus: subStatusFilter === "all" ? "all" : subStatusFilter,
+            country: donationCountryFilter,
+            sortBy: donationsSortBy,
+            sortOrder: donationsSortOrder,
+          } as ExportFormState;
+        })()}
         options={{
           categories: categories.map((c) => ({ value: c.id, label: c.name })),
           campaigns: campaigns.map((c) => ({ value: c.id, label: c.title })),

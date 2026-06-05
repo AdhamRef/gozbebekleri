@@ -62,6 +62,7 @@ import {
 import { formatUtcCalendarMonthLong } from "@/lib/admin/current-calendar-month-utc";
 import { StatsMetricCard } from "@/components/dashboard/StatsMetricCard";
 import { getDashboardChartPeriodLabelAr } from "@/lib/dashboard/chart-period-label-ar";
+import { getPeriodDateKeys } from "@/lib/dashboard/period-date-range";
 import {
   istanbulTodayKey,
   istanbulAddCalendarDaysKey,
@@ -186,14 +187,16 @@ interface DashboardStats {
 }
 
 type ChartViewType = "bar" | "line" | "area";
-type ChartPeriod = "day" | "week" | "month" | "all" | "custom";
+type ChartPeriod = "day" | "yesterday" | "week" | "month" | "year" | "all" | "custom";
 type ChartMetric = "amount" | "teamSupport" | "fees";
 type StatCardSet = "revenue" | "overview" | "breakdown";
 
 const PERIOD_LABELS: Record<ChartPeriod, string> = {
-  day: "يوم",
+  day: "اليوم",
+  yesterday: "أمس",
   week: "أسبوع",
   month: "شهر",
+  year: "سنة",
   all: "كل الوقت",
   custom: "مخصص",
 };
@@ -214,16 +217,9 @@ function getDonationsDateRange(
   dateFrom: string,
   dateTo: string
 ): { start: string | null; end: string | null } {
-  if (period === "all") return { start: null, end: null };
-  if (dateFrom && dateTo) return { start: dateFrom, end: dateTo };
-  // Dates use the Istanbul calendar so the chart endpoint (which interprets
-  // start/end as Istanbul keys) bins the latest donation into "today" the
-  // moment 00:00 ticks over in Turkey — not 3 hours later when UTC midnight
-  // arrives.
-  const endKey = istanbulTodayKey();
-  const days = period === "day" ? 1 : period === "week" ? 7 : 30; // month = 30 days
-  const startKey = istanbulAddCalendarDaysKey(endKey, -days);
-  return { start: startKey, end: endKey };
+  // Calendar-aware semantics live in the shared helper — keep the in-file
+  // adapter so existing callers don't have to thread the period type.
+  return getPeriodDateKeys(period, dateFrom, dateTo);
 }
 
 export default function DashboardPage() {
@@ -461,9 +457,14 @@ export default function DashboardPage() {
     try {
       const params = new URLSearchParams();
       params.set("period", chartPeriod);
-      if (dateFrom && dateTo) {
-        params.set("start", dateFrom);
-        params.set("end", dateTo);
+      // Compute the explicit Istanbul date range for every preset (not just
+      // custom) so the chart endpoint uses the same calendar semantics as the
+      // donations table — اليوم = today only, أمس = yesterday, شهر = first of
+      // the month → today, سنة = Jan 1 → today.
+      const { start, end } = getDonationsDateRange(chartPeriod, dateFrom, dateTo);
+      if (start && end) {
+        params.set("start", start);
+        params.set("end", end);
       }
       if (selectedCategory !== "all") params.append("categoryId", selectedCategory);
       if (selectedCampaign !== "all") params.append("campaignId", selectedCampaign);
@@ -491,9 +492,10 @@ export default function DashboardPage() {
     try {
       const params = new URLSearchParams();
       params.set("period", chartPeriod);
-      if (dateFrom && dateTo) {
-        params.set("start", dateFrom);
-        params.set("end", dateTo);
+      const { start, end } = getDonationsDateRange(chartPeriod, dateFrom, dateTo);
+      if (start && end) {
+        params.set("start", start);
+        params.set("end", end);
       }
       if (selectedCategory !== "all") params.set("categoryId", selectedCategory);
       if (selectedCampaign !== "all") params.set("campaignId", selectedCampaign);
@@ -622,9 +624,14 @@ export default function DashboardPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const exportDefaults: ExportFormState = useMemo(() => {
     const { start, end } = getDonationsDateRange(chartPeriod, dateFrom, dateTo);
+    // Send "custom" with the Istanbul range we already computed for every
+    // preset other than "all". The export dialog's built-in day/week/month
+    // computation runs in the browser's local timezone and assumes "last N
+    // days", which now disagrees with the calendar-day semantics on screen
+    // (اليوم = today only, شهر = from the 1st, etc.).
     return {
       ...EXPORT_DEFAULTS,
-      period: chartPeriod === "custom" || (dateFrom && dateTo) ? "custom" : chartPeriod,
+      period: chartPeriod === "all" ? "all" : "custom",
       start: start ?? "",
       end: end ?? "",
       categoryId: selectedCategory,
