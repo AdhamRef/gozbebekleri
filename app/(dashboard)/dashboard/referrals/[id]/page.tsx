@@ -20,6 +20,7 @@ import {
   Search,
   ChevronDown,
   Download,
+  Plus,
 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 import {
@@ -738,16 +739,28 @@ export default function ReferralAnalyticsPage() {
                 <Search className="w-4 h-4 shrink-0" />
                 <span>تصفية النتائج</span>
               </CardTitle>
-              {canExportReports && (
-                <button
-                  type="button"
-                  onClick={() => setExportOpen(true)}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 shrink-0"
-                >
-                  <Download className="w-4 h-4" />
-                  تصدير التقرير
-                </button>
-              )}
+              <div className="flex items-center gap-2 shrink-0">
+                {canEditDonations && (
+                  <button
+                    type="button"
+                    onClick={() => donationActions.openCreate()}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                  >
+                    <Plus className="w-4 h-4" />
+                    تبرع جديد
+                  </button>
+                )}
+                {canExportReports && (
+                  <button
+                    type="button"
+                    onClick={() => setExportOpen(true)}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                  >
+                    <Download className="w-4 h-4" />
+                    تصدير التقرير
+                  </button>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="pt-0 space-y-4" dir="rtl">

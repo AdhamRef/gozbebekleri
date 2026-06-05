@@ -5,6 +5,7 @@ import { ReactNode, useCallback, useState } from "react";
 import { DonationActionsMenu } from "./DonationActionsMenu";
 import { EditDonationDialog } from "./EditDonationDialog";
 import { DeleteDonationDialog, type DeleteDonationRow } from "./DeleteDonationDialog";
+import { CreateDonationDialog } from "./CreateDonationDialog";
 
 /**
  * Minimum row shape needed for the right-click menu + delete confirmation.
@@ -29,16 +30,20 @@ interface MenuState {
 }
 
 /**
- * Bundled state + portals for right-click "edit/delete donation" UX. Each
- * donation table wires `onContextMenu` on its <tr> and renders `portals` once.
+ * Bundled state + portals for the donation actions UX: right-click edit/delete
+ * on a row, plus an `openCreate` trigger for the "manual add donation" dialog.
+ * Each donation table wires `onContextMenu` on its <tr>, renders `portals`
+ * once, and (optionally) calls `openCreate` from a header button.
  */
 export function useDonationActions({ enabled, onChange }: Options): {
   onContextMenu: (e: React.MouseEvent, row: DonationActionRow) => void;
+  openCreate: () => void;
   portals: ReactNode;
 } {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<DonationActionRow | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const onContextMenu = useCallback(
     (e: React.MouseEvent, row: DonationActionRow) => {
@@ -48,6 +53,11 @@ export function useDonationActions({ enabled, onChange }: Options): {
     },
     [enabled]
   );
+
+  const openCreate = useCallback(() => {
+    if (!enabled) return;
+    setCreating(true);
+  }, [enabled]);
 
   const portals = (
     <>
@@ -74,8 +84,11 @@ export function useDonationActions({ enabled, onChange }: Options): {
           onDeleted={onChange}
         />
       )}
+      {creating && (
+        <CreateDonationDialog onClose={() => setCreating(false)} onCreated={onChange} />
+      )}
     </>
   );
 
-  return { onContextMenu, portals };
+  return { onContextMenu, openCreate, portals };
 }
