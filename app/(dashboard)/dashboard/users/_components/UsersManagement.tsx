@@ -45,6 +45,7 @@ import { userHasDashboardPermission } from "@/lib/dashboard/permissions";
 import { DASHBOARD_PERMISSION_ROWS, ACTION_PERMISSION_ROWS } from "@/lib/dashboard/nav-config";
 import { useViewUserProfile } from "@/context/ViewUserProfileContext";
 import type { UserProfileCardData } from "@/lib/dashboard/user-profile-card";
+import { resolveUserCountry } from "@/lib/dashboard/resolve-user-country";
 
 const PAGE_SIZE = 10;
 
@@ -534,23 +535,26 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                           <td className="py-3 px-4 text-slate-600">
                             {LOCALE_LABELS[u.preferredLang as keyof typeof LOCALE_LABELS] ?? "—"}
                           </td>
-                          {scope === "donors" && (
-                          <td className="py-3 px-4 text-slate-700 max-w-[160px]">
-                            <span className="inline-flex items-center gap-1.5 min-w-0">
-                              {u.countryCode && /^[A-Za-z]{2}$/.test(u.countryCode) ? (
-                                <ReactCountryFlag
-                                  countryCode={u.countryCode.toUpperCase()}
-                                  svg
-                                  style={{ width: "1.1em", height: "1.1em" }}
-                                  title={u.countryCode}
-                                />
-                              ) : null}
-                              <span className="truncate" title={[u.city, u.region].filter(Boolean).join(" · ") || undefined}>
-                                {u.countryName ?? u.country ?? "—"}
-                              </span>
-                            </span>
-                          </td>
-                          )}
+                          {scope === "donors" && (() => {
+                            const country = resolveUserCountry(u);
+                            return (
+                              <td className="py-3 px-4 text-slate-700 max-w-[160px]">
+                                <span className="inline-flex items-center gap-1.5 min-w-0">
+                                  {country.code ? (
+                                    <ReactCountryFlag
+                                      countryCode={country.code}
+                                      svg
+                                      style={{ width: "1.1em", height: "1.1em" }}
+                                      title={country.code}
+                                    />
+                                  ) : null}
+                                  <span className="truncate" title={[u.city, u.region].filter(Boolean).join(" · ") || undefined}>
+                                    {country.name}
+                                  </span>
+                                </span>
+                              </td>
+                            );
+                          })()}
                           {scope === "donors" && (
                           <td className="py-3 px-4">
                             <div className="flex flex-wrap gap-1">

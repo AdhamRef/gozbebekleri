@@ -42,6 +42,7 @@ import { useCurrency } from "@/context/CurrencyContext";
 import { cn } from "@/lib/utils";
 import { ACTION_PERMISSION_ROWS, DASHBOARD_PERMISSION_ROWS } from "@/lib/dashboard/nav-config";
 import type { UserProfileCardData } from "@/lib/dashboard/user-profile-card";
+import { resolveUserCountry } from "@/lib/dashboard/resolve-user-country";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SendTemplateDialog } from "@/components/dashboard/SendTemplateDialog";
@@ -308,8 +309,12 @@ export function ViewUserProfileDialog({
     return `$${(typeof n === "number" ? n : 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
   };
 
+  // Flag + name share one resolver so they can never disagree (the legacy
+  // `country` text field used to drift from `countryCode`, producing a flag of
+  // one country next to the name of another).
+  const resolvedCountry = user ? resolveUserCountry(user) : null;
   const mapsUrl = user
-    ? buildGoogleMapsUrl([user.city, user.region, user.countryName ?? user.country])
+    ? buildGoogleMapsUrl([user.city, user.region, resolvedCountry?.name])
     : null;
 
   const copyUserId = async () => {
@@ -424,15 +429,16 @@ export function ViewUserProfileDialog({
                     </InfoRow>
                     <InfoRow icon={Globe} label="الدولة">
                       <span className="inline-flex items-center gap-1.5 min-w-0">
-                        {user.countryCode && /^[A-Za-z]{2}$/.test(user.countryCode) ? (
+                        {resolvedCountry?.code ? (
                           <ReactCountryFlag
-                            countryCode={user.countryCode.toUpperCase()}
+                            countryCode={resolvedCountry.code}
                             svg
                             style={{ width: "1.05em", height: "1.05em" }}
+                            title={resolvedCountry.code}
                           />
                         ) : null}
                         <span className="truncate">
-                          {user.countryName ?? user.country ?? "—"}
+                          {resolvedCountry?.name ?? "—"}
                         </span>
                       </span>
                     </InfoRow>

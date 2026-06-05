@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import { countryCodeFromPhone } from "@/lib/donations/donor-country-code";
 
 export interface GuestPayload {
   firstName?: string | null;
@@ -49,7 +50,12 @@ export async function resolveGuestDonor(
   const email = guest.email?.trim().toLowerCase() || null;
   const phone = guest.phone?.trim() || null;
   const name = [guest.firstName, guest.lastName].filter(Boolean).join(" ").trim() || null;
-  const countryCode = guest.countryCode?.trim().toUpperCase() || null;
+  // Phone-derived country is a stronger signal than IP geo and lets us avoid
+  // leaving brand-new donors with an empty `countryCode` (which then defaults
+  // to whatever Meta CAPI infers from the request IP — often wrong on mobile
+  // carriers and VPNs).
+  const countryCode =
+    guest.countryCode?.trim().toUpperCase() || countryCodeFromPhone(phone) || null;
   const city = guest.city?.trim() || null;
   const region = guest.region?.trim() || null;
   const birthdate = normalizeBirthdate(guest.birthdate);

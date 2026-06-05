@@ -7,6 +7,7 @@ import {
   type ResolvedUserGeo,
 } from "@/lib/geo/country-from-request";
 import { countryNameFromIsoCode } from "@/lib/geo/intl-country-name";
+import { resolveBestCountryCode } from "@/lib/geo/resolve-best-country-code";
 
 function hasNonEmptyString(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
@@ -55,8 +56,10 @@ function mergeGeo(
 
 /**
  * Fills `countryCode`, `countryName`, `region`, `city` (+ legacy `country` = countryName)
- * from edge / IP geo when structured country fields are still empty.
- * Optional JSON body with the same fields (used from the browser after ipapi.co/json).
+ * from the best available signal — phone-derived country first, then edge
+ * headers / ipapi, then a client-supplied geo body. Also self-heals a stored
+ * `countryCode` that disagrees with the phone (was a Meta CAPI sore spot for
+ * donors whose mobile carriers proxied through a third country at signup).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -83,18 +86,37 @@ export async function POST(request: NextRequest) {
         countryName: true,
         region: true,
         city: true,
+        phone: true,
       },
     });
     if (!existing) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    // Resolve the best country code from all available signals up front. Phone
+    // wins over the stored value because Meta CAPI was shipping the wrong
+    // country for donors whose carriers proxied through a third country at
+    // signup time, leaving a wrong `countryCode` cached on the user. The phone
+    // number itself is a far stronger signal — see `resolveBestCountryCode`.
+    const phoneOnly = resolveBestCountryCode({
+      existing: existing.countryCode,
+      phone: existing.phone,
+    });
+    const storedCode =
+      typeof existing.countryCode === "string"
+        ? existing.countryCode.trim().toUpperCase()
+        : "";
+    const needsCountryRewrite =
+      phoneOnly.source === "PHONE" &&
+      phoneOnly.code != null &&
+      phoneOnly.code !== storedCode;
+
     const allLocationFilled =
       hasNonEmptyString(existing.countryCode) &&
       hasNonEmptyString(existing.countryName) &&
       hasNonEmptyString(existing.city) &&
       hasNonEmptyString(existing.region);
-    if (allLocationFilled) {
+    if (allLocationFilled && !needsCountryRewrite) {
       return NextResponse.json({
         updated: false,
         countryCode: existing.countryCode,
@@ -107,24 +129,44 @@ export async function POST(request: NextRequest) {
     const serverGeo = await resolveGeoFromRequest(request);
     const mergedRaw = mergeGeo(serverGeo, clientGeo);
 
-    if (!mergedRaw) {
+    const best = resolveBestCountryCode({
+      existing: existing.countryCode,
+      phone: existing.phone,
+      serverGeo: serverGeo?.countryCode ?? null,
+      clientGeo: clientGeo?.countryCode ?? null,
+    });
+    if (best.conflict) {
+      console.warn(
+        `[country-from-ip] conflicting signals for user ${userId}: chose ${best.code} via ${best.source}; existing=${existing.countryCode ?? "null"} phone=${existing.phone ?? "null"} serverGeo=${serverGeo?.countryCode ?? "null"} clientGeo=${clientGeo?.countryCode ?? "null"}`
+      );
+    }
+
+    const finalCode = best.code;
+    if (!finalCode && !mergedRaw) {
       return NextResponse.json({ updated: false, reason: "no_geo" }, { status: 200 });
     }
 
-    const merged: ResolvedUserGeo = {
-      countryCode: hasNonEmptyString(existing.countryCode)
-        ? String(existing.countryCode).trim().toUpperCase()
-        : mergedRaw.countryCode,
-      countryName: hasNonEmptyString(existing.countryName)
+    // countryName: derive from the chosen code unless we're keeping the
+    // stored value (in which case preserve whatever the user/admin saved).
+    const finalName = finalCode
+      ? best.source === "EXISTING" && hasNonEmptyString(existing.countryName)
         ? String(existing.countryName).trim()
-        : mergedRaw.countryName,
+        : countryNameFromIsoCode(finalCode)
+      : mergedRaw?.countryName ?? "";
+
+    const merged: ResolvedUserGeo = {
+      countryCode: finalCode ?? "",
+      countryName: finalName,
       region: hasNonEmptyString(existing.region)
         ? String(existing.region).trim()
-        : mergedRaw.region,
+        : mergedRaw?.region ?? null,
       city: hasNonEmptyString(existing.city)
         ? String(existing.city).trim()
-        : mergedRaw.city,
+        : mergedRaw?.city ?? null,
     };
+    if (!merged.countryCode) {
+      return NextResponse.json({ updated: false, reason: "no_geo" }, { status: 200 });
+    }
 
     await prisma.user.update({
       where: { id: userId },
