@@ -10,8 +10,6 @@ export const DASHBOARD_NAV_GROUPS: {
       { key: "revenue", title: "تحليل الإيرادات", href: "/dashboard" },
       { key: "monthly", title: "التبرعات الشهرية", href: "/dashboard/monthly" },
       { key: "bankTransfers", title: "التحويلات البنكية", href: "/dashboard/bank-transfers" },
-      { key: "bankTransfers", title: "فحص التحويلات البنكية", href: "/dashboard/bank-transfers/readiness" },
-      { key: "bankTransfers", title: "ربط التحويلات بتبرعات", href: "/dashboard/bank-transfers/official-donations" },
       { key: "referrals", title: "روابط التتبع", href: "/dashboard/referrals" },
       { key: "logs", title: "سجل النشاط", href: "/dashboard/logs" },
     ],
