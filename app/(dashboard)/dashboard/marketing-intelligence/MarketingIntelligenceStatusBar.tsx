@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 
 type Run = { status?: string | null; startedAt?: string | null; finishedAt?: string | null; rowsFetched?: number | null; error?: string | null };
@@ -22,9 +23,13 @@ function cls(status?: string | null) {
 }
 
 export function MarketingIntelligenceStatusBar() {
+  const pathname = usePathname();
+  const isOverview = pathname === "/dashboard/marketing-intelligence";
   const [data, setData] = React.useState<Payload | null>(null);
   const [loading, setLoading] = React.useState(false);
+
   const load = React.useCallback(async () => {
+    if (isOverview) return;
     setLoading(true);
     try {
       const res = await fetch("/api/admin/marketing-intelligence/sync-status?platform=META", { cache: "no-store" });
@@ -33,8 +38,11 @@ export function MarketingIntelligenceStatusBar() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isOverview]);
+
   React.useEffect(() => { void load(); }, [load]);
+  if (isOverview) return null;
+
   const latest = data?.latest ?? null;
   const success = data?.lastSuccess ?? null;
   return <div className="border-b bg-white px-4 py-3 sm:px-6" dir="rtl">
