@@ -40,17 +40,11 @@ export const DASHBOARD_NAV_GROUPS: {
     ],
   },
   {
-    group: "التتبع والإعلانات",
+    group: "التسويق",
     items: [
-      { key: "ads", title: "لوحة التشغيل", href: "/dashboard/marketing-intelligence/executive-overview" },
-      { key: "ads", title: "متابعة احتساب التبرعات", href: "/dashboard/marketing-intelligence/attribution-verification" },
-      { key: "ads", title: "الفحص النهائي", href: "/dashboard/marketing-intelligence/final-readiness" },
-      { key: "ads", title: "جاهزية الإطلاق", href: "/dashboard/marketing-intelligence/launch-readiness" },
-      { key: "ads", title: "مركز الإجراءات", href: "/dashboard/marketing-intelligence/action-items" },
-      { key: "ads", title: "البيانات والروابط", href: "/dashboard/marketing-intelligence/data" },
-      { key: "ads", title: "التدقيق والإصلاح", href: "/dashboard/marketing-intelligence/audit" },
-      { key: "ads", title: "القرارات والتوصيات", href: "/dashboard/marketing-intelligence/decisions" },
-      { key: "ads", title: "خريطة النظام", href: "/dashboard/marketing-intelligence/system-map" },
+      { key: "ads", title: "خريطة النظام", href: "/dashboard/marketing-intelligence" },
+      { key: "ads", title: "الإعلانات", href: "/dashboard/ads" },
+      { key: "referrals", title: "إنشاء الروابط", href: "/dashboard/link-generator" },
     ],
   },
   {
