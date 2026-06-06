@@ -222,6 +222,12 @@ model Category {
   order         Int?
   currentAmount Float    @default(0)
 
+  /// Archive flag. Toggling this from the dashboard cascades to every
+  /// member Campaign — archiving the category archives all its campaigns,
+  /// re-activating reverses it. Pre-existing categories may have this
+  /// field unset; treat unset as active when filtering.
+  isActive      Boolean? @default(true)
+
   /// Inverse side of the Campaign ↔ Category many-to-many relation. Prisma+MongoDB
   /// models implicit m2m by mirroring scalar ObjectId[] arrays on each side. This
   /// is maintained by Prisma whenever campaigns are connected/disconnected.
@@ -294,6 +300,13 @@ model Campaign {
   images        String[]
   videoUrl      String?
   isActive         Boolean @default(true)
+  /// Soft-delete flag. The dashboard "delete" action sets this to true and
+  /// flips isActive to false; listing endpoints filter it out so the campaign
+  /// disappears from public + dashboard surfaces. We keep the row (and all
+  /// DonationItem / SubscriptionItem relations) so historical donation totals,
+  /// receipts, and audit trails stay intact. Pre-existing rows may have the
+  /// field unset entirely — treat unset as not deleted when filtering.
+  isDeleted        Boolean? @default(false)
   priority         Int?
 
   /// { "amounts": number[], "byCurrency"?: Record<string, number[]> } — quick-pick donation amounts; omit/null uses app defaults

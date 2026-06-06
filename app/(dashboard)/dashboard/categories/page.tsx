@@ -5,7 +5,13 @@ import { useLocale } from 'next-intl';
 import {useRouter} from 'next/navigation';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
-import { Plus, Pencil, Trash2, Loader2, ArrowUpDown, Search, Crown } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, ArrowUpDown, Search, Crown, Archive, PowerOff, RotateCcw } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -46,6 +52,7 @@ interface Category {
     id: string;
   }[];
   order: number;
+  isActive: boolean;
 }
 
 export default function CategoriesPage() {
@@ -63,6 +70,24 @@ export default function CategoriesPage() {
   const [itemsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [priorityDialog, setPriorityDialog] = useState<{ id: string; name: string } | null>(null);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archiveSearch, setArchiveSearch] = useState('');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    actionLabel: string;
+    actionClassName: string;
+    onConfirm: () => void;
+  }>({
+    open: false,
+    title: '',
+    description: '',
+    actionLabel: '',
+    actionClassName: '',
+    onConfirm: () => undefined,
+  });
 
   useEffect(() => {
     fetchCategories();
@@ -70,9 +95,17 @@ export default function CategoriesPage() {
 
   const fetchCategories = async () => {
     try {
-      // Request localized categories and counts only for performance
+      // Request localized categories and counts only for performance.
+      // isActiveFalse=true returns archived categories too — the dashboard
+      // needs both the active table and the archive viewer.
       const response = await axios.get('/api/categories/detailed', {
-        params: { locale: locale || 'ar', counts: true, includeCampaigns: false, limit: 200 }
+        params: {
+          locale: locale || 'ar',
+          counts: true,
+          includeCampaigns: false,
+          limit: 200,
+          isActiveFalse: true,
+        }
       });
 
       const payload = response.data?.items || response.data || [];
@@ -84,6 +117,7 @@ export default function CategoriesPage() {
         description: c.description ?? null,
         image: c.image ?? null,
         order: c.order ?? 0,
+        isActive: c.isActive !== false,
         // If full campaigns were not returned, keep an empty array and preserve `campaignCount` via type cast when needed
         campaigns: Array.isArray(c.campaigns) ? c.campaigns : [],
         // attach a readable campaignCount for display when available
@@ -97,6 +131,54 @@ export default function CategoriesPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const setActive = async (category: Category, nextActive: boolean) => {
+    if (actionLoading) return;
+    setActionLoading(category.id);
+    try {
+      const res = await axios.patch(`/api/categories/${category.id}`, { isActive: nextActive });
+      const cascaded = res.data?.cascadedCampaigns ?? 0;
+      setCategories(prev => prev.map(c => c.id === category.id ? { ...c, isActive: nextActive } : c));
+      toast.success(
+        nextActive
+          ? `تم تفعيل الحملة وتفعيل ${cascaded} مشروع تابع`
+          : `تم تعطيل الحملة وتعطيل ${cascaded} مشروع تابع`
+      );
+    } catch (err: any) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.error || err.message : 'تعذّر تحديث حالة الحملة';
+      toast.error(typeof msg === 'string' ? msg : 'تعذّر تحديث حالة الحملة');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeactivate = (category: Category) => {
+    const count = (category as any).campaignCount ?? category.campaigns.length;
+    setConfirmDialog({
+      open: true,
+      title: 'تعطيل الحملة',
+      description: count > 0
+        ? `سيتم إخفاء حملة "${category.name}" من الموقع، وسيتم تعطيل جميع المشاريع التابعة لها (${count} مشروع). يمكنك إعادة التفعيل لاحقاً.`
+        : `سيتم إخفاء حملة "${category.name}" من الموقع. يمكنك إعادة تفعيلها في أي وقت.`,
+      actionLabel: 'تعطيل',
+      actionClassName: 'bg-amber-600 hover:bg-amber-700 text-white',
+      onConfirm: () => setActive(category, false),
+    });
+  };
+
+  const handleReactivate = (category: Category) => {
+    const count = (category as any).campaignCount ?? category.campaigns.length;
+    setConfirmDialog({
+      open: true,
+      title: 'إعادة تفعيل الحملة',
+      description: count > 0
+        ? `سيتم نشر حملة "${category.name}" على الموقع، وسيتم إعادة تفعيل جميع المشاريع التابعة لها (${count} مشروع).`
+        : `سيتم نشر حملة "${category.name}" على الموقع مجدداً.`,
+      actionLabel: 'تفعيل',
+      actionClassName: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+      onConfirm: () => setActive(category, true),
+    });
   };
 
   const handleSort = (field: keyof Category) => {
@@ -171,19 +253,32 @@ export default function CategoriesPage() {
     }
   };
 
-  // Filter categories based on search and filters
-  const filteredCategories = categories.filter(category => {
-    const matchesSearch = 
+  // Main table shows active only; archived live in the archive dialog (matches
+  // the campaigns page convention).
+  const activeCategories = categories.filter(c => c.isActive);
+  const archivedCategories = categories.filter(c => !c.isActive);
+
+  const filteredCategories = activeCategories.filter(category => {
+    const matchesSearch =
       category.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (category.description?.toLowerCase() || '').includes(searchQuery.toLowerCase());
 
     const count = (category as any).campaignCount ?? category.campaigns.length;
-    const matchesCampaignsFilter = 
+    const matchesCampaignsFilter =
       campaignsFilter === 'all' ||
       (campaignsFilter === 'with' && count > 0) ||
       (campaignsFilter === 'without' && count === 0);
 
     return matchesSearch && matchesCampaignsFilter;
+  });
+
+  const filteredArchive = archivedCategories.filter(c => {
+    if (!archiveSearch) return true;
+    const q = archiveSearch.toLowerCase();
+    return (
+      c.name.toLowerCase().includes(q) ||
+      (c.description?.toLowerCase() || '').includes(q)
+    );
   });
 
   // Sort categories
@@ -227,6 +322,19 @@ export default function CategoriesPage() {
             </Button>
           )}
           <ReorderDialog categories={categories} onReorder={fetchCategories} />
+          <Button
+            variant="outline"
+            className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+            onClick={() => setArchiveOpen(true)}
+          >
+            <Archive className="w-4 h-4" />
+            أرشيف الحملات
+            {archivedCategories.length > 0 && (
+              <span className="bg-amber-100 text-amber-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
+                {archivedCategories.length}
+              </span>
+            )}
+          </Button>
           <Button
             onClick={() => router.push('/dashboard/categories/new')}
             className="bg-[#025EB8] hover:bg-[#014fa0] gap-2"
@@ -340,6 +448,18 @@ export default function CategoriesPage() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={() => handleDeactivate(category)}
+                      className="text-amber-600 hover:bg-amber-50"
+                      disabled={actionLoading === category.id}
+                      title="تعطيل الحملة وأرشفتها"
+                    >
+                      {actionLoading === category.id
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <PowerOff className="w-4 h-4" />}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => handleDelete(category)}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
                       disabled={((category as any).campaignCount ?? category.campaigns.length) > 0}
@@ -407,6 +527,93 @@ export default function CategoriesPage() {
           categoryName={priorityDialog.name}
         />
       )}
+
+      {/* ── Archive viewer ── */}
+      <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+        <DialogContent className="max-w-3xl w-full max-h-[80vh] flex flex-col" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700">
+              <Archive className="w-5 h-5" />
+              أرشيف الحملات المعطّلة ({archivedCategories.length})
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="relative mb-3">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              placeholder="بحث في الأرشيف..."
+              value={archiveSearch}
+              onChange={e => setArchiveSearch(e.target.value)}
+              className="pr-10"
+            />
+          </div>
+
+          <div className="overflow-y-auto flex-1 rounded-lg border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-right">اسم الحملة</TableHead>
+                  <TableHead className="text-right">عدد المشاريع</TableHead>
+                  <TableHead className="text-center w-40">إجراء</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredArchive.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center py-10 text-muted-foreground">
+                      لا توجد حملات في الأرشيف
+                    </TableCell>
+                  </TableRow>
+                ) : filteredArchive.map(category => (
+                  <TableRow key={category.id}>
+                    <TableCell className="font-medium">{category.name}</TableCell>
+                    <TableCell>{(category as any).campaignCount ?? 0}</TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50 h-8"
+                        disabled={actionLoading === category.id}
+                        onClick={() => handleReactivate(category)}
+                      >
+                        {actionLoading === category.id
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <RotateCcw className="w-3.5 h-3.5" />}
+                        إعادة تفعيل
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Activate/deactivate confirm ── */}
+      <AlertDialog
+        open={confirmDialog.open}
+        onOpenChange={open => setConfirmDialog(d => ({ ...d, open }))}
+      >
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmDialog.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row-reverse gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              className={confirmDialog.actionClassName}
+              onClick={() => {
+                setConfirmDialog(d => ({ ...d, open: false }));
+                confirmDialog.onConfirm();
+              }}
+            >
+              {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : confirmDialog.actionLabel}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={!!categoryToDelete}

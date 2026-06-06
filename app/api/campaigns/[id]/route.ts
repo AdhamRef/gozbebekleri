@@ -56,8 +56,15 @@ export async function GET(
 
     // ✅ STEP 1: Fetch campaign with ONLY current locale translations
     // Accept either an ObjectId, the base slug, or a per-locale translation slug.
+    // Soft-deleted campaigns 404 here so public detail pages and the edit form
+    // can't surface them — historical donation joins go through other queries.
     const campaign = await prisma.campaign.findFirst({
-      where: whereByIdOrLocaleSlug(id, locale),
+      where: {
+        AND: [
+          whereByIdOrLocaleSlug(id, locale),
+          { OR: [{ isDeleted: false }, { isDeleted: null }] },
+        ],
+      },
       select: {
         // Basic fields
         id: true,
@@ -698,7 +705,12 @@ export async function PUT(
   }
 }
 
-// ✅ DELETE - Delete campaign (admin only) - refuses if donations exist
+// DELETE - Soft-delete only. We flip isDeleted=true and isActive=false so the
+// row disappears from every listing + checkout flow (existing endpoints already
+// gate on isActive), but DonationItem / SubscriptionItem rows keep referencing
+// the same campaignId — totals, receipts, and historical reports stay valid.
+// CartItem rows are removed because they're transient and would otherwise let
+// a stale cart re-surface a deleted campaign at payment time.
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions);
@@ -707,45 +719,23 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     const { id: idOrSlug } = await params;
 
-    // Ensure campaign exists (param may be id, base slug, or per-locale slug)
     const camp = await prisma.campaign.findFirst({
       where: whereByIdOrLocaleSlug(idOrSlug, "ar"),
-      select: { id: true, title: true },
+      select: { id: true, title: true, isDeleted: true },
     });
     if (!camp) {
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
+    if (camp.isDeleted) {
+      return NextResponse.json({ message: 'تم مسح المشروع' }, { status: 200 });
+    }
     const id = camp.id;
 
-    // Check for donations
-    const donationCount = await prisma.donationItem.count({ where: { campaignId: id } });
-    const force = request.nextUrl.searchParams.get('force') === 'true';
-    if (donationCount > 0 && !force) {
-      return NextResponse.json({ error: 'Campaign has donations. Use force=true to remove donation items and delete the campaign.' }, { status: 400 });
-    }
-
-    // Safe delete: run each cleanup step outside a single transaction to avoid
-    // the 5 s interactive-transaction timeout on large datasets.
-    if (donationCount > 0 && force) {
-      await prisma.donationItem.deleteMany({ where: { campaignId: id } });
-
-      // Remove donations that now have no items at all
-      const orphanDonations = await prisma.donation.findMany({
-        where: { items: { none: {} }, categoryItems: { none: {} } },
-        select: { id: true },
-      });
-      if (orphanDonations.length > 0) {
-        await prisma.donation.deleteMany({
-          where: { id: { in: orphanDonations.map((d) => d.id) } },
-        });
-      }
-    }
-
-    await prisma.update.deleteMany({ where: { campaignId: id } });
-    await prisma.campaignTranslation.deleteMany({ where: { campaignId: id } });
-    await prisma.comment.deleteMany({ where: { campaignId: id } });
+    await prisma.campaign.update({
+      where: { id },
+      data: { isDeleted: true, isActive: false },
+    });
     await prisma.cartItem.deleteMany({ where: { campaignId: id } });
-    await prisma.campaign.delete({ where: { id } });
 
     const actor = session!.user;
     await writeAuditLog({
@@ -753,14 +743,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       actorName: actor.name,
       actorRole: actor.role ?? "ADMIN",
       action: "CAMPAIGN_DELETE",
-      messageAr: `${actor.name ?? "مسؤول"} حذف المشروع: ${camp.title}`,
+      messageAr: `${actor.name ?? "مسؤول"} حذف المشروع (حذف ناعم): ${camp.title}`,
       entityType: "Campaign",
       entityId: id,
     });
 
     return NextResponse.json({ message: 'تم مسح المشروع' }, { status: 200 });
   } catch (error) {
-    console.error('Error deleting campaign:', error);
+    console.error('Error soft-deleting campaign:', error);
     return NextResponse.json({ error: 'Failed to delete campaign' }, { status: 500 });
   }
 }

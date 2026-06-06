@@ -35,6 +35,7 @@ export async function GET(
         image: true,
         icon: true,
         order: true,
+        isActive: true,
         translations: allTranslations
           ? { select: { locale: true, name: true, description: true, slug: true } }
           : {
@@ -50,9 +51,12 @@ export async function GET(
       return NextResponse.json({ error: 'Category not found' }, { status: 404 });
     }
 
+    const isActive = category.isActive ?? true;
+
     if (allTranslations) {
       return NextResponse.json({
         ...category,
+        isActive,
         campaignCount: (category as any)._count?.campaigns ?? undefined
       });
     }
@@ -67,6 +71,7 @@ export async function GET(
       image: category.image,
       icon: category.icon,
       order: category.order,
+      isActive,
       campaignCount: (category as any)._count?.campaigns ?? undefined
     });
   } catch (error) {
@@ -223,6 +228,71 @@ export async function PUT(
       { error: message ? `Failed to update category: ${message.slice(0, 180)}` : 'Failed to update category' },
       { status: 500 }
     );
+  }
+}
+
+// PATCH: admin-only; toggle the category's archive state. When isActive flips,
+// cascade the same value to every campaign in the category — archiving the
+// category archives every campaign, re-activating brings them all back.
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: idOrSlug } = await params;
+    const session = await getServerSession(authOptions);
+    const denied = requireAdminOrDashboardPermission(session, 'categories');
+    if (denied) return denied;
+
+    const body = await request.json();
+    if (typeof body?.isActive !== 'boolean') {
+      return NextResponse.json({ error: 'isActive (boolean) is required' }, { status: 400 });
+    }
+    const nextActive: boolean = body.isActive;
+
+    const existing = await prisma.category.findFirst({
+      where: whereByIdOrSlug(idOrSlug),
+      select: { id: true, name: true, isActive: true },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+    }
+    const id = existing.id;
+
+    await prisma.category.update({
+      where: { id },
+      data: { isActive: nextActive },
+    });
+
+    // Cascade to every non-deleted member campaign. updateMany on the m2m
+    // mirror is safe — categoryIds is just an ObjectId[] on the Campaign side.
+    // Soft-deleted campaigns are skipped so re-activating a category doesn't
+    // resurrect them.
+    const cascade = await prisma.campaign.updateMany({
+      where: {
+        categoryIds: { has: id },
+        OR: [{ isDeleted: false }, { isDeleted: null }],
+      },
+      data: { isActive: nextActive },
+    });
+
+    const actor = auditActorFromDashboardSession(session!);
+    await writeAuditLog({
+      ...actor,
+      action: nextActive ? 'CATEGORY_ACTIVATE' : 'CATEGORY_ARCHIVE',
+      messageAr: `${actor.actorName ?? 'مسؤول'} ${nextActive ? 'فعّل' : 'أرشف'} الحملة "${existing.name}" (${cascade.count} مشروع تابع)`,
+      entityType: 'Category',
+      entityId: id,
+    });
+
+    return NextResponse.json({
+      id,
+      isActive: nextActive,
+      cascadedCampaigns: cascade.count,
+    });
+  } catch (error) {
+    console.error('Error toggling category isActive:', error);
+    return NextResponse.json({ error: 'Failed to update category status' }, { status: 500 });
   }
 }
 

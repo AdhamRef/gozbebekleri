@@ -18,12 +18,20 @@ export async function GET(request: NextRequest) {
     const includeCampaigns = searchParams.get('includeCampaigns') === 'true';
     const campaignLimit = Math.min(Number(searchParams.get('campaignLimit')) || 3, 20);
     const includeCounts = searchParams.get('counts') === 'true';
+    const includeInactive =
+      searchParams.get('isActiveFalse') === 'true' ||
+      searchParams.get('includeInactive') === 'true';
 
-    // Fetch categories (no heavy nested relations by default)
+    // Fetch categories (no heavy nested relations by default).
+    // Default = active categories; legacy rows with unset `isActive` are
+    // treated as active (Prisma+MongoDB doesn't backfill defaults on read).
     const categories = await prisma.category.findMany({
       take: limit + 1,
       ...(cursor && { skip: 1, cursor: { id: cursor } }),
       orderBy: { order: 'asc' },
+      where: includeInactive
+        ? undefined
+        : { OR: [{ isActive: true }, { isActive: null }] },
       select: {
         id: true,
         slug: true,
@@ -32,6 +40,7 @@ export async function GET(request: NextRequest) {
         image: true,
         icon: true,
         order: true,
+        isActive: true,
         translations: { where: translationLocaleWhere(locale), take: 2, select: { locale: true, name: true, description: true } },
         ...(includeCounts ? { _count: { select: { campaigns: true } } } : {})
       }
@@ -46,7 +55,10 @@ export async function GET(request: NextRequest) {
     if (includeCampaigns && page.length > 0) {
       const campaignFetches = page.map(cat =>
         prisma.campaign.findMany({
-          where: { categoryIds: { has: cat.id } },
+          where: {
+            categoryIds: { has: cat.id },
+            OR: [{ isDeleted: false }, { isDeleted: null }],
+          },
           take: campaignLimit,
           orderBy: { createdAt: 'desc' },
           select: {
@@ -84,6 +96,7 @@ export async function GET(request: NextRequest) {
         image: cat.image,
         icon: cat.icon,
         order: cat.order,
+        isActive: cat.isActive ?? true,
         campaignCount: cat._count?.campaigns ?? undefined,
         campaigns: includeCampaigns ? (campaignsByCategory[cat.id] || []).map(c => {
           const tC = pickTranslation(c.translations, locale);

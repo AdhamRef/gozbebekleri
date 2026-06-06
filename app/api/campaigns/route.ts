@@ -55,6 +55,9 @@ export async function GET(request: NextRequest) {
       AND: [
         ...amountConditions,
         includeInactive ? {} : { isActive: true },
+        // Soft-deleted campaigns never appear in any listing. Legacy rows
+        // (isDeleted unset entirely) are treated as not deleted.
+        { OR: [{ isDeleted: false }, { isDeleted: null }] },
         hasPriority ? { NOT: { priority: null } } : {},
       ].filter((condition) => Object.keys(condition).length > 0),
     };

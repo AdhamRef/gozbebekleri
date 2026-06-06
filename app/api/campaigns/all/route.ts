@@ -14,7 +14,14 @@ export async function GET(request: NextRequest) {
     const includeInactive = parseIncludeInactive(request.nextUrl.searchParams);
 
     const campaigns = await prisma.campaign.findMany({
-      where: includeInactive ? undefined : { isActive: true },
+      where: {
+        // Soft-deleted campaigns are never returned, even when the caller
+        // asks for inactive ones (the dashboard archive view).
+        AND: [
+          includeInactive ? {} : { isActive: true },
+          { OR: [{ isDeleted: false }, { isDeleted: null }] },
+        ].filter((c) => Object.keys(c).length > 0),
+      },
       include: {
         donations: {
           select: {

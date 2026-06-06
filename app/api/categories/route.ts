@@ -22,6 +22,11 @@ export async function GET(request: NextRequest) {
     const includeCounts = params.get('counts') === 'true';
     const activeCounts = params.get('activeCounts') === 'true';
     const sortBy = params.get('sortBy') || 'order';
+    // Mirrors the campaigns pattern: default = active categories only; opt in
+    // to archived rows with isActiveFalse=true (or includeInactive=true).
+    const includeInactive =
+      params.get('isActiveFalse') === 'true' ||
+      params.get('includeInactive') === 'true';
 
     // Build order
     const orderBy: any = sortBy === 'name' ? { name: 'asc' } : { order: 'asc' };
@@ -33,6 +38,12 @@ export async function GET(request: NextRequest) {
         cursor: { id: cursor },
       }),
       orderBy,
+      // Pre-existing categories may have `isActive` unset entirely (Prisma+MongoDB
+      // doesn't backfill defaults on read); treat unset as active so default
+      // filtering doesn't make every legacy row vanish.
+      where: includeInactive
+        ? undefined
+        : { OR: [{ isActive: true }, { isActive: null }] },
       select: {
         id: true,
         slug: true,
@@ -41,6 +52,7 @@ export async function GET(request: NextRequest) {
         image: true,
         icon: true,
         order: true,
+        isActive: true,
         translations: {
           where: translationLocaleWhere(locale),
           take: 2,
@@ -82,6 +94,7 @@ export async function GET(request: NextRequest) {
         image: cat.image,
         icon: cat.icon,
         order: cat.order,
+        isActive: cat.isActive ?? true,
         campaignCount: cat._count?.campaigns ?? undefined,
       };
     });
@@ -90,7 +103,7 @@ export async function GET(request: NextRequest) {
       items: transformed,
       nextCursor,
       hasMore,
-      filters: { search, locale, includeCounts, activeCounts, sortBy, limit }
+      filters: { search, locale, includeCounts, activeCounts, includeInactive, sortBy, limit }
     });
 
   } catch (error) {

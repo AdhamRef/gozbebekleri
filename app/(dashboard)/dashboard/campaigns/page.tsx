@@ -57,6 +57,7 @@ import {
   Archive,
   RotateCcw,
   PowerOff,
+  Trash2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -177,6 +178,35 @@ export default function CampaignsPage() {
       actionLabel: 'تفعيل',
       actionClassName: 'bg-emerald-600 hover:bg-emerald-700 text-white',
       onConfirm: () => setActive(campaign.id, true),
+    });
+  };
+
+  // Soft delete: the server flips isDeleted + isActive but keeps every
+  // DonationItem / SubscriptionItem row pointing at the campaign so the
+  // donor history, receipts, and campaign totals stay intact.
+  const softDelete = async (id: string) => {
+    if (actionLoading) return;
+    setActionLoading(id);
+    try {
+      await axios.delete(`/api/campaigns/${id}`);
+      setCampaigns(prev => prev.filter(c => c.id !== id));
+      toast.success('تم حذف المشروع (مع الحفاظ على بيانات التبرعات)');
+    } catch (err: any) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.error || err.message : 'تعذّر حذف المشروع';
+      toast.error(typeof msg === 'string' ? msg : 'تعذّر حذف المشروع');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDelete = (campaign: Campaign) => {
+    setConfirmDialog({
+      open: true,
+      title: 'حذف المشروع',
+      description: `سيتم حذف مشروع "${campaign.title}" من الموقع ولن يظهر في أي قائمة. ستبقى تبرعاته السابقة وسجلاتها كما هي للمراجعة، لكن لن يمكن استعادة المشروع من الواجهة لاحقاً.`,
+      actionLabel: 'حذف نهائي',
+      actionClassName: 'bg-red-600 hover:bg-red-700 text-white',
+      onConfirm: () => softDelete(campaign.id),
     });
   };
 
@@ -375,6 +405,16 @@ export default function CampaignsPage() {
                               : <PowerOff className="w-4 h-4 ml-2" />}
                             تعطيل
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                            disabled={actionLoading === campaign.id}
+                            onClick={() => handleDelete(campaign)}
+                          >
+                            {actionLoading === campaign.id
+                              ? <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                              : <Trash2 className="w-4 h-4 ml-2" />}
+                            حذف
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -437,18 +477,31 @@ export default function CampaignsPage() {
                       {format(new Date(campaign.createdAt), 'PP', { locale: ar })}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50 h-8"
-                        disabled={actionLoading === campaign.id}
-                        onClick={() => handleReactivate(campaign)}
-                      >
-                        {actionLoading === campaign.id
-                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          : <RotateCcw className="w-3.5 h-3.5" />}
-                        إعادة تفعيل
-                      </Button>
+                      <div className="flex items-center gap-1.5 justify-center">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50 h-8"
+                          disabled={actionLoading === campaign.id}
+                          onClick={() => handleReactivate(campaign)}
+                        >
+                          {actionLoading === campaign.id
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <RotateCcw className="w-3.5 h-3.5" />}
+                          إعادة تفعيل
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5 border-red-300 text-red-700 hover:bg-red-50 h-8"
+                          disabled={actionLoading === campaign.id}
+                          onClick={() => handleDelete(campaign)}
+                          title="حذف نهائي مع الاحتفاظ بسجل التبرعات"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          حذف
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
