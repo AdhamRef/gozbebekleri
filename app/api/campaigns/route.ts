@@ -55,10 +55,11 @@ export async function GET(request: NextRequest) {
       AND: [
         ...amountConditions,
         includeInactive ? {} : { isActive: true },
-        // Soft-deleted campaigns never appear in any listing. `NOT eq true`
-        // matches false, null, AND unset — important because legacy rows have
-        // isDeleted unset entirely (Prisma+MongoDB doesn't backfill defaults).
-        { NOT: { isDeleted: true } },
+        // Soft-deleted campaigns never appear in any listing. Field-level
+        // `not` compiles to `$ne` in MongoDB which matches false, null, AND
+        // unset in one shot — important because legacy rows have isDeleted
+        // unset entirely (Prisma+MongoDB doesn't backfill defaults on read).
+        { isDeleted: { not: true } },
         hasPriority ? { NOT: { priority: null } } : {},
       ].filter((condition) => Object.keys(condition).length > 0),
     };

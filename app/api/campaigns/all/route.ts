@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
         // matches false/null/unset (Prisma+MongoDB never backfills defaults).
         AND: [
           includeInactive ? {} : { isActive: true },
-          { NOT: { isDeleted: true } },
+          { isDeleted: { not: true } },
         ].filter((c) => Object.keys(c).length > 0),
       },
       include: {

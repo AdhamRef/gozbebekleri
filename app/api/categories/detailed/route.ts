@@ -24,14 +24,15 @@ export async function GET(request: NextRequest) {
 
     // Fetch categories (no heavy nested relations by default).
     // Default = active categories; legacy rows with unset `isActive` are
-    // treated as active (`NOT eq false` covers true/null/unset).
+    // treated as active (field-level `not` compiles to `$ne` and matches
+    // true/null/unset).
     const categories = await prisma.category.findMany({
       take: limit + 1,
       ...(cursor && { skip: 1, cursor: { id: cursor } }),
       orderBy: { order: 'asc' },
       where: includeInactive
         ? undefined
-        : { NOT: { isActive: false } },
+        : { isActive: { not: false } },
       select: {
         id: true,
         slug: true,
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
         prisma.campaign.findMany({
           where: {
             categoryIds: { has: cat.id },
-            NOT: { isDeleted: true },
+            isDeleted: { not: true },
           },
           take: campaignLimit,
           orderBy: { createdAt: 'desc' },

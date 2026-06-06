@@ -39,11 +39,11 @@ export async function GET(request: NextRequest) {
       }),
       orderBy,
       // Pre-existing categories may have `isActive` unset entirely (Prisma+MongoDB
-      // doesn't backfill defaults on read); `NOT eq false` matches true/null/unset
-      // so legacy rows still surface as active.
+      // doesn't backfill defaults on read); field-level `not` compiles to `$ne`
+      // and matches true/null/unset so legacy rows still surface as active.
       where: includeInactive
         ? undefined
-        : { NOT: { isActive: false } },
+        : { isActive: { not: false } },
       select: {
         id: true,
         slug: true,

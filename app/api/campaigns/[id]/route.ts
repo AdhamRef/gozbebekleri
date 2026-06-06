@@ -62,7 +62,7 @@ export async function GET(
       where: {
         AND: [
           whereByIdOrLocaleSlug(id, locale),
-          { NOT: { isDeleted: true } },
+          { isDeleted: { not: true } },
         ],
       },
       select: {

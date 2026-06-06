@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
           not: null,
         },
         ...(includeInactive ? {} : { isActive: true }),
-        NOT: { isDeleted: true },
+        isDeleted: { not: true },
       },
       orderBy: { priority: "asc" }, // Order by priority
       include: {
