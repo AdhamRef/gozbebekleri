@@ -42,7 +42,10 @@ export const DASHBOARD_NAV_GROUPS: {
   {
     group: "التسويق",
     items: [
-      { key: "ads", title: "التتبع والإعلانات", href: "/dashboard/marketing-intelligence" },
+      { key: "ads", title: "خريطة النظام", href: "/dashboard/marketing-intelligence" },
+      { key: "platformConnections", title: "ربط المنصات", href: "/dashboard/marketing/connections" },
+      { key: "ads", title: "الإعلانات والتوصيات", href: "/dashboard/marketing-intelligence/ads-recommendations" },
+      { key: "referrals", title: "إنشاء الروابط", href: "/dashboard/link-generator" },
     ],
   },
   {
