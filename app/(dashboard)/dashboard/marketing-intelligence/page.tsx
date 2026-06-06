@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, GitCompareArrows, Link2, PlugZap, Settings2, ShieldCheck, Wrench } from "lucide-react";
+import { BarChart3, GitCompareArrows, PlugZap, Settings2, ShieldCheck, Wrench } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const mainSections = [
@@ -17,13 +17,6 @@ const mainSections = [
     description: "صفحة تشغيلية خفيفة تعرض الصرف، التبرعات، ROAS، الحسابات، آخر مزامنة، وأهم التنبيهات.",
     useFor: "استخدمها يوميًا لمعرفة هل الإعلانات رابحة وما الذي يحتاج انتباه.",
   },
-  {
-    title: "إنشاء الروابط",
-    href: "/dashboard/link-generator",
-    icon: Link2,
-    description: "إنشاء روابط حملات صحيحة تحفظ UTM وplatform/campaign/ad identifiers لتقوية التتبع.",
-    useFor: "استخدمها قبل إطلاق أي حملة أو إعلان أو رسالة تسويقية.",
-  },
 ];
 
 const technicalLinks = [
@@ -32,7 +25,6 @@ const technicalLinks = [
   { title: "مقارنة الموقع والمنصات", href: "/dashboard/marketing-intelligence/site-vs-platform", icon: GitCompareArrows, desc: "مقارنة تبرعات الموقع مع أرقام المنصات." },
   { title: "استيراد بيانات المنصات", href: "/dashboard/marketing-intelligence/platform-metrics/import", icon: PlugZap, desc: "إدخال بيانات الصرف والنتائج يدويًا عند الحاجة." },
   { title: "إعدادات التتبع والبكسلات", href: "/dashboard/pixels", icon: Settings2, desc: "إعداد Pixel IDs وTokens وقياسات التتبع." },
-  { title: "تحليل الإعلانات التفصيلي", href: "/dashboard/ads", icon: BarChart3, desc: "تفاصيل الحملات والمجموعات والإعلانات عند الحاجة." },
 ];
 
 export default function MarketingIntelligencePage() {
@@ -40,16 +32,19 @@ export default function MarketingIntelligencePage() {
     <div className="rounded-3xl border bg-gradient-to-l from-[#025EB8] to-[#01396f] p-6 text-white shadow-sm">
       <p className="text-sm text-white/75">التتبع والإعلانات</p>
       <h1 className="mt-2 text-3xl font-black">خريطة النظام</h1>
-      <p className="mt-3 max-w-3xl text-sm leading-7 text-white/85">مدخل بسيط يشرح النظام ويقسمه إلى أربع مناطق فقط: خريطة النظام، ربط المنصات، الإعلانات والتوصيات، وإنشاء الروابط. التفاصيل الفنية موجودة هنا كروابط داخلية عند الحاجة فقط.</p>
+      <p className="mt-3 max-w-3xl text-sm leading-7 text-white/85">مدخل مبسط يشرح الصفحات الداخلية غير اليومية. الصفحات الظاهرة خارج الخريطة مثل الإعلانات وإنشاء الروابط لا نكررها هنا حتى تبقى القائمة واضحة.</p>
     </div>
 
-    <div className="grid gap-4 lg:grid-cols-3">
+    <div className="grid gap-4 lg:grid-cols-2">
       {mainSections.map((section) => {
         const Icon = section.icon;
         return <Link key={section.href} href={section.href} className="block">
           <Card className="h-full transition hover:border-blue-200 hover:shadow-sm">
             <CardHeader>
-              <div className="flex items-start gap-3"><span className="rounded-2xl bg-blue-50 p-3 text-[#025EB8]"><Icon className="h-5 w-5" /></span><div><CardTitle>{section.title}</CardTitle><CardDescription className="mt-1 leading-6">{section.description}</CardDescription></div></div>
+              <div className="flex items-start gap-3">
+                <span className="rounded-2xl bg-blue-50 p-3 text-[#025EB8]"><Icon className="h-5 w-5" /></span>
+                <div><CardTitle>{section.title}</CardTitle><CardDescription className="mt-1 leading-6">{section.description}</CardDescription></div>
+              </div>
             </CardHeader>
             <CardContent><div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700"><b>متى تستخدمها؟</b> {section.useFor}</div></CardContent>
           </Card>
@@ -58,7 +53,10 @@ export default function MarketingIntelligencePage() {
     </div>
 
     <Card>
-      <CardHeader><CardTitle>روابط داخلية للإصلاح والتفاصيل</CardTitle><CardDescription>هذه ليست صفحات يومية. استخدمها فقط عند وجود مشكلة أو حاجة لتشخيص أعمق.</CardDescription></CardHeader>
+      <CardHeader>
+        <CardTitle>روابط داخلية للإصلاح والتفاصيل</CardTitle>
+        <CardDescription>هذه ليست صفحات يومية. استخدمها فقط عند وجود مشكلة أو حاجة لتشخيص أعمق.</CardDescription>
+      </CardHeader>
       <CardContent><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {technicalLinks.map((link) => {
           const Icon = link.icon;
