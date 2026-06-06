@@ -39,6 +39,7 @@ import {
 } from "@/lib/dashboard/nav-config";
 import { DashboardAutoEnhancements } from "./_components/DashboardAutoEnhancements";
 import { ProjectEditorSectionsEnhancer } from "./_components/ProjectEditorSectionsEnhancer";
+import { BankTransfersExportPanel } from "./_components/BankTransfersExportPanel";
 
 function DashboardContent({
   children,
@@ -172,6 +173,7 @@ function DashboardContent({
     <div className="min-h-screen flex bg-gray-50" dir={dir}>
       <DashboardAutoEnhancements />
       <ProjectEditorSectionsEnhancer />
+      <BankTransfersExportPanel />
       {isSidebarOpen && <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 lg:hidden" onClick={() => setIsSidebarOpen(false)} aria-hidden />}
 
       <aside className={cn("fixed top-0 z-40 h-full w-[260px] lg:w-[260px] flex flex-col transition-transform duration-300 ease-out", "bg-[#025EB8]", dir === "rtl" ? "right-0 border-l border-white/10" : "left-0 border-r border-white/10", "lg:translate-x-0", isSidebarOpen ? "translate-x-0" : dir === "rtl" ? "translate-x-full" : "-translate-x-full")}>
@@ -219,24 +221,20 @@ export default function DashboardLayoutClient({
   locale?: string;
 }) {
   return (
-    <SessionProvider session={session}>
-      <NextIntlClientProvider locale={locale} messages={messages}>
-        <CurrencyProvider>
-          <CurrencyFromUrlSync />
-          <DashboardThemeProvider>
-            <ViewUserProfileProvider>
-              <ConfettiProvider>
-                <Suspense fallback={<LoadingSkeleton />}>
-                  <DashboardContent locale={locale}>{children}</DashboardContent>
-                </Suspense>
-                <Toaster position="top-center" />
-                <Analytics />
-                <SpeedInsights />
-              </ConfettiProvider>
-            </ViewUserProfileProvider>
-          </DashboardThemeProvider>
-        </CurrencyProvider>
-      </NextIntlClientProvider>
-    </SessionProvider>
+    <NextIntlClientProvider messages={messages} locale={locale}>
+      <CurrencyProvider>
+        <Suspense fallback={null}><CurrencyFromUrlSync /></Suspense>
+        <SessionProvider session={session}>
+          <ViewUserProfileProvider><DashboardThemeProvider><DashboardContent locale={locale}>{children}</DashboardContent></DashboardThemeProvider></ViewUserProfileProvider>
+          <ConfettiProvider />
+          <Toaster position="top-center" toastOptions={{
+            style: { fontFamily: 'inherit', fontSize: '14px' },
+            success: { iconTheme: { primary: '#025EB8', secondary: '#fff' } },
+          }} />
+        </SessionProvider>
+      </CurrencyProvider>
+      <Analytics />
+      <SpeedInsights />
+    </NextIntlClientProvider>
   );
 }
