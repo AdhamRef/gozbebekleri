@@ -6,6 +6,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 import { parseCategoryPriorities, getCategoryPriority } from "@/lib/campaign/categories";
+import { NOT_SOFT_DELETED } from "@/lib/campaign/soft-delete-filter";
 
 // GET /api/categories/[id]/prioritized-campaigns
 // Returns campaigns belonging to this category whose per-category priority
@@ -26,8 +27,10 @@ export async function GET(
 
     const campaigns = await prisma.campaign.findMany({
       where: {
-        categoryIds: { has: id },
-        isDeleted: { not: true },
+        AND: [
+          { categoryIds: { has: id } },
+          NOT_SOFT_DELETED,
+        ],
       },
       select: {
         id: true,

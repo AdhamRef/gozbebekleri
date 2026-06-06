@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/options';
 import { requireAdminOrDashboardPermission } from '@/lib/dashboard/api-auth';
 import { parseIncludeInactive } from '@/lib/campaign/include-inactive-query';
+import { NOT_SOFT_DELETED } from '@/lib/campaign/soft-delete-filter';
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,11 +17,10 @@ export async function GET(request: NextRequest) {
     const campaigns = await prisma.campaign.findMany({
       where: {
         // Soft-deleted campaigns are never returned, even when the caller
-        // asks for inactive ones (the dashboard archive view). `NOT eq true`
-        // matches false/null/unset (Prisma+MongoDB never backfills defaults).
+        // asks for inactive ones (the dashboard archive view).
         AND: [
           includeInactive ? {} : { isActive: true },
-          { isDeleted: { not: true } },
+          NOT_SOFT_DELETED,
         ].filter((c) => Object.keys(c).length > 0),
       },
       include: {

@@ -7,6 +7,7 @@ import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 import { parseSuggestedDonations } from "@/lib/campaign/suggested-donations";
 import { generateUniqueSlug, normalizeUserSlug } from "@/lib/slug";
+import { NOT_SOFT_DELETED, CATEGORY_ACTIVE_OR_UNSET } from "@/lib/campaign/soft-delete-filter";
 
 // GET: localized categories with optional campaigns (limited per-category), cursor pagination
 export async function GET(request: NextRequest) {
@@ -23,16 +24,13 @@ export async function GET(request: NextRequest) {
       searchParams.get('includeInactive') === 'true';
 
     // Fetch categories (no heavy nested relations by default).
-    // Default = active categories; legacy rows with unset `isActive` are
-    // treated as active (field-level `not` compiles to `$ne` and matches
-    // true/null/unset).
+    // Default = active categories; CATEGORY_ACTIVE_OR_UNSET treats legacy
+    // rows with unset isActive as active so they don't silently disappear.
     const categories = await prisma.category.findMany({
       take: limit + 1,
       ...(cursor && { skip: 1, cursor: { id: cursor } }),
       orderBy: { order: 'asc' },
-      where: includeInactive
-        ? undefined
-        : { isActive: { not: false } },
+      where: includeInactive ? undefined : CATEGORY_ACTIVE_OR_UNSET,
       select: {
         id: true,
         slug: true,
@@ -57,8 +55,10 @@ export async function GET(request: NextRequest) {
       const campaignFetches = page.map(cat =>
         prisma.campaign.findMany({
           where: {
-            categoryIds: { has: cat.id },
-            isDeleted: { not: true },
+            AND: [
+              { categoryIds: { has: cat.id } },
+              NOT_SOFT_DELETED,
+            ],
           },
           take: campaignLimit,
           orderBy: { createdAt: 'desc' },

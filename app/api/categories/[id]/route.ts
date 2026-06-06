@@ -12,6 +12,7 @@ import {
   whereByIdOrSlug,
   whereByIdOrLocaleSlug,
 } from "@/lib/slug";
+import { NOT_SOFT_DELETED } from "@/lib/campaign/soft-delete-filter";
 
 // GET: return a single category (localized) with optional counts
 export async function GET(
@@ -270,8 +271,10 @@ export async function PATCH(
     // resurrect them.
     const cascade = await prisma.campaign.updateMany({
       where: {
-        categoryIds: { has: id },
-        isDeleted: { not: true },
+        AND: [
+          { categoryIds: { has: id } },
+          NOT_SOFT_DELETED,
+        ],
       },
       data: { isActive: nextActive },
     });

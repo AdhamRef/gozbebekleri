@@ -13,6 +13,7 @@ import { parseShareLabels } from "@/lib/campaign/share-labels";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 import { whereByIdOrLocaleSlug } from "@/lib/slug";
 import { parseCategoryPriorities, getCategoryPriority } from "@/lib/campaign/categories";
+import { NOT_SOFT_DELETED } from "@/lib/campaign/soft-delete-filter";
 
 export async function GET(
   request: NextRequest,
@@ -76,10 +77,7 @@ export async function GET(
       AND: [
         ...amountConditions,
         activeOnly ? { isActive: true } : {},
-        // Soft-deleted campaigns are never returned, even when the caller
-        // explicitly opted into inactive ones. Field-level `not` compiles to
-        // `$ne` and covers false/null/unset in one shot.
-        { isDeleted: { not: true } },
+        NOT_SOFT_DELETED,
         hasPriority ? { NOT: { priority: null } } : {}
       ].filter(Boolean)
     };

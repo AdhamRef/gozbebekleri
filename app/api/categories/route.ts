@@ -10,6 +10,7 @@ import {
   generateUniqueLocaleSlug,
   normalizeUserSlug,
 } from "@/lib/slug";
+import { CATEGORY_ACTIVE_OR_UNSET } from "@/lib/campaign/soft-delete-filter";
 
 // GET: supports locale-aware translations, search, cursor pagination, optional counts, and sorting
 export async function GET(request: NextRequest) {
@@ -39,11 +40,9 @@ export async function GET(request: NextRequest) {
       }),
       orderBy,
       // Pre-existing categories may have `isActive` unset entirely (Prisma+MongoDB
-      // doesn't backfill defaults on read); field-level `not` compiles to `$ne`
-      // and matches true/null/unset so legacy rows still surface as active.
-      where: includeInactive
-        ? undefined
-        : { isActive: { not: false } },
+      // doesn't backfill defaults on read). CATEGORY_ACTIVE_OR_UNSET is the
+      // OR-of-(true/null/isSet:false) form proven to match legacy rows.
+      where: includeInactive ? undefined : CATEGORY_ACTIVE_OR_UNSET,
       select: {
         id: true,
         slug: true,

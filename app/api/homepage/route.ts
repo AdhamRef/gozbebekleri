@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
+import { NOT_SOFT_DELETED, CATEGORY_ACTIVE_OR_UNSET } from "@/lib/campaign/soft-delete-filter";
 
 export async function GET() {
   try {
-    // Fetch all categories with the first 5 campaigns for each category
+    // Fetch active categories with the first 5 non-soft-deleted campaigns each.
+    // Both filters use the comprehensive OR helpers so legacy rows where the
+    // boolean field was never written still match.
     const categories = await prisma.category.findMany({
       orderBy: { order: 'asc' },
+      where: CATEGORY_ACTIVE_OR_UNSET,
       include: {
         campaigns: {
-          take: 5, // Get the first 5 campaigns
+          where: { AND: [{ isActive: true }, NOT_SOFT_DELETED] },
+          take: 5,
           select: {
             id: true,
             title: true,
@@ -19,7 +24,7 @@ export async function GET() {
             isActive: true,
           },
           orderBy: {
-            createdAt: 'desc', // Optional: Get the most recent campaigns
+            createdAt: 'desc',
           },
         },
       },

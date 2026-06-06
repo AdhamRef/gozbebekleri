@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { parseIncludeInactive } from "@/lib/campaign/include-inactive-query";
+import { NOT_SOFT_DELETED } from "@/lib/campaign/soft-delete-filter";
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,11 +9,11 @@ export async function GET(request: NextRequest) {
 
     const prioritizedCampaigns = await prisma.campaign.findMany({
       where: {
-        priority: {
-          not: null,
-        },
-        ...(includeInactive ? {} : { isActive: true }),
-        isDeleted: { not: true },
+        AND: [
+          { priority: { not: null } },
+          includeInactive ? {} : { isActive: true },
+          NOT_SOFT_DELETED,
+        ].filter((c) => Object.keys(c).length > 0),
       },
       orderBy: { priority: "asc" }, // Order by priority
       include: {

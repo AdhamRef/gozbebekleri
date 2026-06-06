@@ -36,6 +36,7 @@ import {
 } from "@/lib/slug";
 import { EMPTY_TIPTAP_DOC_JSON } from "@/lib/tiptap-empty-doc";
 import { normalizeCategoryIdsInput, parseCategoryPriorities } from "@/lib/campaign/categories";
+import { NOT_SOFT_DELETED } from "@/lib/campaign/soft-delete-filter";
 
 // ✅ Prisma Singleton - Reuse connection across requests
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
@@ -62,7 +63,7 @@ export async function GET(
       where: {
         AND: [
           whereByIdOrLocaleSlug(id, locale),
-          { isDeleted: { not: true } },
+          NOT_SOFT_DELETED,
         ],
       },
       select: {

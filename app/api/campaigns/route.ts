@@ -21,6 +21,7 @@ import {
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog } from "@/lib/audit-log";
 import { parseIncludeInactive } from "@/lib/campaign/include-inactive-query";
+import { NOT_SOFT_DELETED } from "@/lib/campaign/soft-delete-filter";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 import {
   generateUniqueSlug,
@@ -55,11 +56,7 @@ export async function GET(request: NextRequest) {
       AND: [
         ...amountConditions,
         includeInactive ? {} : { isActive: true },
-        // Soft-deleted campaigns never appear in any listing. Field-level
-        // `not` compiles to `$ne` in MongoDB which matches false, null, AND
-        // unset in one shot — important because legacy rows have isDeleted
-        // unset entirely (Prisma+MongoDB doesn't backfill defaults on read).
-        { isDeleted: { not: true } },
+        NOT_SOFT_DELETED,
         hasPriority ? { NOT: { priority: null } } : {},
       ].filter((condition) => Object.keys(condition).length > 0),
     };
