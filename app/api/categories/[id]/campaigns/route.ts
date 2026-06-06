@@ -77,8 +77,9 @@ export async function GET(
         ...amountConditions,
         activeOnly ? { isActive: true } : {},
         // Soft-deleted campaigns are never returned, even when the caller
-        // explicitly opted into inactive ones.
-        { OR: [{ isDeleted: false }, { isDeleted: null }] },
+        // explicitly opted into inactive ones. `NOT eq true` covers
+        // false/null/unset in one shot.
+        { NOT: { isDeleted: true } },
         hasPriority ? { NOT: { priority: null } } : {}
       ].filter(Boolean)
     };

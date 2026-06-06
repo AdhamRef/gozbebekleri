@@ -16,10 +16,11 @@ export async function GET(request: NextRequest) {
     const campaigns = await prisma.campaign.findMany({
       where: {
         // Soft-deleted campaigns are never returned, even when the caller
-        // asks for inactive ones (the dashboard archive view).
+        // asks for inactive ones (the dashboard archive view). `NOT eq true`
+        // matches false/null/unset (Prisma+MongoDB never backfills defaults).
         AND: [
           includeInactive ? {} : { isActive: true },
-          { OR: [{ isDeleted: false }, { isDeleted: null }] },
+          { NOT: { isDeleted: true } },
         ].filter((c) => Object.keys(c).length > 0),
       },
       include: {

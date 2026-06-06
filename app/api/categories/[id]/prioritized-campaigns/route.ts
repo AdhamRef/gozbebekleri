@@ -27,7 +27,7 @@ export async function GET(
     const campaigns = await prisma.campaign.findMany({
       where: {
         categoryIds: { has: id },
-        OR: [{ isDeleted: false }, { isDeleted: null }],
+        NOT: { isDeleted: true },
       },
       select: {
         id: true,

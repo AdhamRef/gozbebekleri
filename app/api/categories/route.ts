@@ -39,11 +39,11 @@ export async function GET(request: NextRequest) {
       }),
       orderBy,
       // Pre-existing categories may have `isActive` unset entirely (Prisma+MongoDB
-      // doesn't backfill defaults on read); treat unset as active so default
-      // filtering doesn't make every legacy row vanish.
+      // doesn't backfill defaults on read); `NOT eq false` matches true/null/unset
+      // so legacy rows still surface as active.
       where: includeInactive
         ? undefined
-        : { OR: [{ isActive: true }, { isActive: null }] },
+        : { NOT: { isActive: false } },
       select: {
         id: true,
         slug: true,

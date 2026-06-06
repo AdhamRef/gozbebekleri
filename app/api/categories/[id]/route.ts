@@ -271,7 +271,7 @@ export async function PATCH(
     const cascade = await prisma.campaign.updateMany({
       where: {
         categoryIds: { has: id },
-        OR: [{ isDeleted: false }, { isDeleted: null }],
+        NOT: { isDeleted: true },
       },
       data: { isActive: nextActive },
     });

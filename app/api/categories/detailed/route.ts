@@ -24,14 +24,14 @@ export async function GET(request: NextRequest) {
 
     // Fetch categories (no heavy nested relations by default).
     // Default = active categories; legacy rows with unset `isActive` are
-    // treated as active (Prisma+MongoDB doesn't backfill defaults on read).
+    // treated as active (`NOT eq false` covers true/null/unset).
     const categories = await prisma.category.findMany({
       take: limit + 1,
       ...(cursor && { skip: 1, cursor: { id: cursor } }),
       orderBy: { order: 'asc' },
       where: includeInactive
         ? undefined
-        : { OR: [{ isActive: true }, { isActive: null }] },
+        : { NOT: { isActive: false } },
       select: {
         id: true,
         slug: true,
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
         prisma.campaign.findMany({
           where: {
             categoryIds: { has: cat.id },
-            OR: [{ isDeleted: false }, { isDeleted: null }],
+            NOT: { isDeleted: true },
           },
           take: campaignLimit,
           orderBy: { createdAt: 'desc' },
