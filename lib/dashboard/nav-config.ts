@@ -42,10 +42,7 @@ export const DASHBOARD_NAV_GROUPS: {
   {
     group: "التسويق",
     items: [
-      { key: "ads", title: "الربط والتتبع", href: "/dashboard/marketing/tracking-hub" },
-      { key: "ads", title: "سحب البيانات", href: "/dashboard/marketing/data-sync" },
-      { key: "ads", title: "التحليل والتوصيات AI", href: "/dashboard/marketing/insights" },
-      { key: "ads", title: "جودة التتبع والإصلاح", href: "/dashboard/marketing/quality" },
+      { key: "ads", title: "نظام التسويق", href: "/dashboard/marketing" },
     ],
   },
   {
