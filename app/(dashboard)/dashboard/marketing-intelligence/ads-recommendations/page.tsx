@@ -129,6 +129,29 @@ function rangeForDays(days: number) {
   return { dateFrom: dateKey(from), dateTo: dateKey(to) };
 }
 
+function platformFallbackFromCampaigns(campaigns: CampaignRow[]): PlatformRow[] {
+  const map = new Map<string, PlatformRow>();
+  for (const row of campaigns) {
+    const key = `${row.platform}:${row.currency ?? "USD"}`;
+    const current = map.get(key) ?? {
+      platform: row.platform || "UNKNOWN",
+      currency: row.currency ?? "USD",
+      spend: 0,
+      impressions: 0,
+      clicks: 0,
+      conversions: 0,
+      revenue: 0,
+    };
+    current.spend += Number(row.spend || 0);
+    current.impressions += Number(row.impressions || 0);
+    current.clicks += Number(row.clicks || 0);
+    current.conversions += Number(row.conversions || 0);
+    current.revenue += Number(row.revenue || 0);
+    map.set(key, current);
+  }
+  return [...map.values()].sort((a, b) => b.spend - a.spend);
+}
+
 export default function AdsRecommendationsPage() {
   const [data, setData] = React.useState<Overview | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -178,6 +201,12 @@ export default function AdsRecommendationsPage() {
   const topCampaigns = [...(data?.campaigns ?? [])].sort((a, b) => b.spend - a.spend).slice(0, 8);
   const wasteCampaigns = topCampaigns.filter((row) => row.spend > 0 && row.conversions === 0).slice(0, 5);
   const lastSync = data?.syncRuns?.[0] ?? null;
+  const platformDisplayRows = React.useMemo(() => {
+    if (!data) return [];
+    if (data.platforms.length > 0) return data.platforms;
+    return platformFallbackFromCampaigns(data.campaigns);
+  }, [data]);
+  const usingCampaignFallback = Boolean(data && data.platforms.length === 0 && platformDisplayRows.length > 0);
 
   return <div className="space-y-5 p-4 sm:p-6" dir="rtl">
     <div className="rounded-3xl border bg-gradient-to-l from-[#025EB8] to-[#01396f] p-6 text-white shadow-sm">
@@ -207,9 +236,12 @@ export default function AdsRecommendationsPage() {
 
       <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
         <Card>
-          <CardHeader><CardTitle>الحسابات الإعلانية والصرف</CardTitle><CardDescription>ملخص المنصات المتصلة وما تم سحبه من بيانات الإنفاق والتحويلات.</CardDescription></CardHeader>
+          <CardHeader>
+            <CardTitle>الحسابات الإعلانية والصرف</CardTitle>
+            <CardDescription>{usingCampaignFallback ? "تم عرض الصرف مجمعًا من بيانات الحملات لأن تجميع المنصات لم يرجع صفوفًا مستقلة." : "ملخص المنصات المتصلة وما تم سحبه من بيانات الإنفاق والتحويلات."}</CardDescription>
+          </CardHeader>
           <CardContent className="space-y-3">
-            {data.platforms.length === 0 ? <Empty text="لا توجد بيانات صرف مسحوبة بعد. شغّل مزامنة المنصات أو راجع ربط المنصات من خريطة النظام." /> : data.platforms.map((row) => <div key={`${row.platform}-${row.currency ?? ""}`} className="rounded-xl border p-3">
+            {platformDisplayRows.length === 0 ? <Empty text="لا توجد بيانات صرف مسحوبة بعد. شغّل مزامنة المنصات أو راجع ربط المنصات من خريطة النظام." /> : platformDisplayRows.map((row) => <div key={`${row.platform}-${row.currency ?? ""}`} className="rounded-xl border p-3">
               <div className="flex flex-wrap items-center justify-between gap-2"><div className="font-bold text-slate-950">{row.platform}</div><div className="font-mono text-sm font-bold text-[#025EB8]">{money(row.spend, row.currency ?? "USD")}</div></div>
               <div className="mt-2 grid gap-2 text-xs text-slate-500 md:grid-cols-4"><span>ظهور: {number(row.impressions)}</span><span>نقرات: {number(row.clicks)}</span><span>تحويلات: {number(row.conversions)}</span><span>قيمة: {money(row.revenue, row.currency ?? "USD")}</span></div>
             </div>)}
