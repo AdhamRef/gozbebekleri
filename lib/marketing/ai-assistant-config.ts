@@ -16,81 +16,18 @@ export type AiAssistantCapability = {
 };
 
 export const AI_ASSISTANT_FIELDS: AiAssistantField[] = [
-  {
-    key: "provider",
-    label: "AI Provider",
-    required: true,
-    placeholder: "OpenAI / Azure / Custom",
-    help: "اختر مزود الذكاء الاصطناعي المستخدم داخل الموقع. هذا يحدد طريقة الاتصال والـ endpoint المستخدم لاحقًا.",
-  },
-  {
-    key: "apiKey",
-    label: "API Key",
-    required: true,
-    secret: true,
-    placeholder: "sk-...",
-    help: "يُستخرج من لوحة تحكم مزود الذكاء الاصطناعي. يتم حفظه كقيمة سرية ولا يظهر للمستخدمين. يستخدم لتوليد التحليلات والتوصيات.",
-  },
-  {
-    key: "model",
-    label: "Model",
-    required: true,
-    placeholder: "gpt-4.1 / gpt-4o / custom",
-    help: "اسم النموذج الذي سيستخدمه النظام لتحليل بيانات التسويق وإخراج توصيات واضحة.",
-  },
-  {
-    key: "baseUrl",
-    label: "Base URL",
-    placeholder: "https://api.openai.com/v1",
-    help: "اختياري إذا كنت تستخدم Azure أو gateway مخصص أو مزود OpenAI-compatible.",
-  },
-  {
-    key: "assistantId",
-    label: "Assistant ID",
-    placeholder: "asst_...",
-    help: "اختياري إذا كان لديك Assistant جاهز بتعليمات ثابتة. يمكن استخدامه لاحقًا بدل بناء prompt كامل في كل مرة.",
-  },
-  {
-    key: "systemInstruction",
-    label: "System Instruction",
-    help: "تعليمات ثابتة للمساعد: أسلوب التوصيات، اللغة، طريقة حساب الأولويات، وحدود ما يسمح له بقوله للفريق.",
-  },
+  { key: "provider", label: "AI Provider", required: true, placeholder: "OpenAI / Azure / OpenAI-compatible", help: "اختر مزود الذكاء الاصطناعي المستخدم داخل الموقع. هذا يحدد طريقة الاتصال والـ endpoint." },
+  { key: "apiKey", label: "API Key", required: true, secret: true, help: "يتم إنشاؤه من لوحة تحكم مزود الذكاء الاصطناعي. يجب حفظه كقيمة سرية في Environment Variables أو إعدادات آمنة." },
+  { key: "model", label: "Model", required: true, placeholder: "gpt-4.1 / gpt-4o / custom-model", help: "اسم الموديل الذي سيحلل بيانات التسويق ويولّد التوصيات. يمكن تغييره لاحقًا حسب التكلفة والجودة." },
+  { key: "baseUrl", label: "Base URL", placeholder: "https://api.openai.com/v1 أو endpoint مخصص", help: "اختياري. استخدمه إذا كان لديك Azure OpenAI أو بوابة OpenAI-compatible أو proxy داخلي." },
+  { key: "assistantId", label: "Assistant ID", placeholder: "asst_...", help: "اختياري. يستخدم إذا كان لديك Assistant جاهز بتعليمات وأدوات محفوظة مسبقًا." },
+  { key: "dailyBudgetLimit", label: "Daily AI Budget Limit", placeholder: "مثال: 10 USD/day", help: "اختياري. يساعد لاحقًا في التحكم في تكلفة التحليلات اليومية والتشغيل التلقائي." },
 ];
 
 export const AI_ASSISTANT_CAPABILITIES: AiAssistantCapability[] = [
-  {
-    key: "performance_summary",
-    title: "ملخص الأداء",
-    description: "يلخص الصرف، التبرعات، ROAS، الحملات الأفضل والأسوأ بلغة تنفيذية واضحة.",
-    inputs: ["spend", "site revenue", "platform conversions", "campaign snapshots", "donations"],
-    outputs: ["ملخص يومي", "أهم فرص النمو", "أهم المخاطر"],
-  },
-  {
-    key: "budget_recommendations",
-    title: "توصيات الميزانية",
-    description: "يقترح زيادة أو تقليل أو إيقاف الميزانية حسب ROAS الحقيقي وجودة التتبع.",
-    inputs: ["site ROAS", "platform ROAS", "spend", "conversion quality", "tracking confidence"],
-    outputs: ["زود", "قلل", "أوقف", "اختبر"],
-  },
-  {
-    key: "google_ads_diagnosis",
-    title: "تحليل Google Ads",
-    description: "يحلل الكلمات وSearch Terms والعناوين والأوصاف والأصول عند توفر بيانات GAQL.",
-    inputs: ["keywords", "search terms", "headlines", "descriptions", "assets", "final URLs"],
-    outputs: ["negative keywords", "تحسين عناوين", "تحسين صفحات هبوط", "تقليل التشتيت"],
-  },
-  {
-    key: "tracking_diagnosis",
-    title: "تشخيص التتبع",
-    description: "يفسر مشاكل ConversionEvent والفروقات بين الموقع والمنصات.",
-    inputs: ["conversion events", "failed/skipped events", "click IDs", "UTM", "platform snapshots"],
-    outputs: ["سبب المشكلة", "خطوة الإصلاح", "أولوية الإصلاح"],
-  },
-  {
-    key: "campaign_action_queue",
-    title: "قائمة إجراءات يومية",
-    description: "يحوّل التحليل إلى قائمة مهام قابلة للتنفيذ للفريق.",
-    inputs: ["recommendations", "health", "sync runs", "campaign performance"],
-    outputs: ["إجراءات اليوم", "الأولوية", "الثقة", "الأثر المتوقع"],
-  },
+  { key: "performance_summary", title: "ملخص الأداء اليومي", description: "يقرأ الصرف والتبرعات وROAS وحالة التتبع ويخرج ملخصًا واضحًا للإدارة.", inputs: ["Platform snapshots", "Donation revenue", "Conversion events", "Sync health"], outputs: ["ملخص تنفيذي", "أهم فرص", "أهم مشاكل", "أولويات اليوم"] },
+  { key: "budget_recommendations", title: "توصيات الميزانية", description: "يقترح زيادة أو إيقاف أو تقليل ميزانية الحملات بناءً على site ROAS وplatform ROAS وجودة التتبع.", inputs: ["Spend", "Site revenue", "Platform conversions", "Tracking confidence"], outputs: ["زود", "قلل", "أوقف", "اختبر", "راجع التتبع"] },
+  { key: "google_ads_diagnosis", title: "تحليل Google Ads", description: "يحلل الكلمات وSearch Terms والعناوين والأوصاف والأصول لاكتشاف التشتيت وفرص التحسين.", inputs: ["Keywords", "Search terms", "Headlines", "Descriptions", "Assets", "Final URLs"], outputs: ["Negative keyword candidates", "أفضل كلمات", "عناوين ضعيفة", "رسائل تحتاج تعديل"] },
+  { key: "tracking_diagnosis", title: "تشخيص التتبع", description: "يفسر أسباب عدم ظهور التبرعات في المنصات ويقترح خطوات إصلاح عملية.", inputs: ["ConversionEvent", "Click IDs", "UTM", "Pixel/CAPI readiness", "Platform sync status"], outputs: ["سبب محتمل", "ثقة", "خطوة إصلاح", "أولوية"] },
+  { key: "creative_insights", title: "تحليل الرسائل والإعلانات", description: "يساعد الفريق على فهم أي رسالة أو عنوان أو وصف يجلب تبرعات حقيقية وأيها يجلب نقرات فقط.", inputs: ["Ad copy", "Clicks", "Donations", "Average donation", "Campaign objective"], outputs: ["رسائل رابحة", "رسائل مشتتة", "اقتراحات نصوص", "اختبارات A/B"] },
 ];
