@@ -60,6 +60,8 @@ export default function MarketingTrackingHubPage() {
               <MiniStat label="نقاط السحب" value={String(platform.canPull.length)} />
             </div>
 
+            {platform.key === "ai_assistant" ? <Link className="inline-flex rounded-md border px-3 py-2 text-sm hover:bg-slate-50" href="/dashboard/marketing/ai-assistant">فتح إعدادات AI Assistant</Link> : null}
+
             <details className="rounded-xl border bg-white p-3" open={isPriorityPlatform(platform.key)}>
               <summary className="cursor-pointer list-none text-sm font-bold text-slate-900">حقول الربط وشرح الحصول عليها</summary>
               <div className="mt-3 space-y-2">
@@ -101,6 +103,7 @@ export default function MarketingTrackingHubPage() {
       <CardContent className="flex flex-wrap gap-2">
         <Link className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50" href="/dashboard/marketing/connections">إدارة ربط المنصات الحالية</Link>
         <Link className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50" href="/dashboard/pixels">إعدادات البكسلات الحالية</Link>
+        <Link className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50" href="/dashboard/marketing/ai-assistant">AI Assistant</Link>
         <Link className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50" href="/dashboard/marketing/data-sync">سحب البيانات</Link>
         <Link className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50" href="/dashboard/marketing/insights">التحليل والتوصيات</Link>
       </CardContent>
