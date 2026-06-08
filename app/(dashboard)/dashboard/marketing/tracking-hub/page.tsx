@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Bot, Megaphone, MousePointerClick, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MarketingPageHeader } from "../_components/MarketingPageHeader";
+import { MarketingQuickNav } from "../_components/MarketingQuickNav";
 
 const setupLinks = [
   {
@@ -27,12 +29,13 @@ const setupLinks = [
 ];
 
 export default function MarketingTrackingHubPage() {
-  return <div className="space-y-6 p-4 sm:p-6" dir="rtl">
-    <div className="rounded-3xl border bg-gradient-to-l from-[#025EB8] to-[#01396f] p-6 text-white shadow-sm">
-      <p className="text-sm text-white/75">Marketing Operating System</p>
-      <h1 className="mt-2 text-3xl font-black">الربط والـ APIs</h1>
-      <p className="mt-3 max-w-3xl text-sm leading-7 text-white/85">ثلاث مداخل فقط: البكسل، إعدادات الإعلان، وAI. كل التفاصيل داخل مكانها الصحيح.</p>
-    </div>
+  return <div className="space-y-5 p-4 sm:p-6" dir="rtl">
+    <MarketingPageHeader
+      title="الربط والـ APIs"
+      description="ثلاث مداخل فقط: البكسل، إعدادات الإعلان، وAI. كل التفاصيل داخل مكانها الصحيح حتى لا تتكرر إعدادات الربط."
+    />
+
+    <MarketingQuickNav />
 
     <div className="grid gap-4 md:grid-cols-3">
       {setupLinks.map((item) => {
@@ -60,8 +63,6 @@ export default function MarketingTrackingHubPage() {
         <Step title="3. فعّل AI" desc="أضف مفتاح الذكاء الاصطناعي للتوصيات." />
       </CardContent>
     </Card>
-
-    <Card><CardHeader><CardTitle>روابط سريعة</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2"><Link className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50" href="/dashboard/marketing">نظام التسويق</Link><Link className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50" href="/dashboard/marketing/data-sync">سحب البيانات</Link><Link className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50" href="/dashboard/marketing/insights">التحليل والتوصيات</Link></CardContent></Card>
   </div>;
 }
 
