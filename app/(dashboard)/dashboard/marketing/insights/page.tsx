@@ -6,6 +6,8 @@ import { AlertTriangle, BarChart3, Brain, Loader2, RefreshCw, TrendingUp } from 
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MarketingPageHeader } from "../_components/MarketingPageHeader";
+import { MarketingQuickNav } from "../_components/MarketingQuickNav";
 
 type CampaignRow = { platform: string; campaignId: string | null; campaignName: string | null; spend: number; clicks: number; conversions: number; revenue: number; currency: string | null };
 type Overview = { ok: boolean; summary: { spend: number; siteRevenue: number; siteDonations: number; siteRoas: number; activeConnections: number; totalConnections: number; failedSyncs: number }; campaigns: CampaignRow[] };
@@ -49,13 +51,14 @@ export default function MarketingInsightsPage() {
   const topCampaigns = [...(data?.campaigns ?? [])].sort((a, b) => b.spend - a.spend).slice(0, 5);
   const hasSpend = (data?.summary.spend ?? 0) > 0;
 
-  return <div className="space-y-6 p-4 sm:p-6" dir="rtl">
-    <div className="rounded-3xl border bg-gradient-to-l from-[#025EB8] to-[#01396f] p-6 text-white shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div><p className="text-sm text-white/75">Marketing Operating System</p><h1 className="mt-2 text-3xl font-black">التحليل والتوصيات</h1><p className="mt-3 max-w-3xl text-sm leading-7 text-white/85">صفحة قرار مختصرة: الصرف، التبرعات، العائد، وأهم ما يجب فعله.</p></div>
-        <div className="flex flex-wrap gap-2">{[1, 7, 14, 30].map((d) => <Button key={d} variant={days === d ? "secondary" : "outline"} className={days === d ? "" : "border-white/30 bg-white/10 text-white hover:bg-white/20"} onClick={() => { setDays(d); void load(d); }}>{d === 1 ? "اليوم" : `${d} يوم`}</Button>)}<Button variant="secondary" onClick={() => load(days)} disabled={loading} className="gap-2"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />تحديث</Button></div>
-      </div>
-    </div>
+  return <div className="space-y-5 p-4 sm:p-6" dir="rtl">
+    <MarketingPageHeader
+      title="التحليل والتوصيات"
+      description="صفحة قرار مختصرة: الصرف، التبرعات، العائد، وأهم ما يجب فعله. لا يتم عرض ROAS كرقم حقيقي إلا عند وجود بيانات صرف صالحة."
+      actions={<>{[1, 7, 14, 30].map((d) => <Button key={d} variant={days === d ? "secondary" : "outline"} className={days === d ? "" : "border-white/30 bg-white/10 text-white hover:bg-white/20"} onClick={() => { setDays(d); void load(d); }}>{d === 1 ? "اليوم" : `${d} يوم`}</Button>)}<Button variant="secondary" onClick={() => load(days)} disabled={loading} className="gap-2"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />تحديث</Button></>}
+    />
+
+    <MarketingQuickNav />
 
     {loading ? <div className="flex min-h-[18rem] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#025EB8]" /></div> : !data ? <Card><CardContent className="p-8 text-center text-sm text-slate-500">لا توجد بيانات.</CardContent></Card> : <>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5"><Kpi title="الصرف" value={money(data.summary.spend)} icon={<BarChart3 className="h-4 w-4" />} /><Kpi title="التبرعات" value={money(data.summary.siteRevenue)} hint={`${data.summary.siteDonations} تبرع`} icon={<TrendingUp className="h-4 w-4" />} /><Kpi title="ROAS" value={roas(data.summary.siteRoas, data.summary.spend)} hint={hasSpend ? undefined : "لا يوجد صرف مسحوب"} icon={<Brain className="h-4 w-4" />} /><Kpi title="الحسابات" value={`${data.summary.activeConnections}/${data.summary.totalConnections}`} /><Kpi title="أخطاء السحب" value={n(data.summary.failedSyncs)} icon={<AlertTriangle className="h-4 w-4" />} /></div>
@@ -71,8 +74,6 @@ export default function MarketingInsightsPage() {
         <Card><CardHeader><CardTitle>أعلى الحملات صرفًا</CardTitle><CardDescription>ابدأ مراجعتك من هنا.</CardDescription></CardHeader><CardContent className="space-y-2">{topCampaigns.length === 0 ? <div className="rounded-xl bg-slate-50 p-6 text-center text-sm text-slate-500">لا توجد حملات مسحوبة.</div> : topCampaigns.map((c) => <div key={`${c.platform}-${c.campaignId || c.campaignName}`} className="rounded-xl border p-3 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><b>{c.campaignName || c.campaignId || "حملة بدون اسم"}</b><span className="font-mono text-[#025EB8]">{money(c.spend, c.currency || "USD")}</span></div><div className="mt-1 text-xs text-slate-500">{c.platform} • نقرات {n(c.clicks)} • تحويلات {n(c.conversions)}</div></div>)}</CardContent></Card>
       </div>
     </>}
-
-    <Card><CardHeader><CardTitle>روابط مرتبطة</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2"><Link href="/dashboard/marketing" className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50">نظام التسويق</Link><Link href="/dashboard/marketing/data-sync" className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50">سحب البيانات</Link><Link href="/dashboard/marketing/quality" className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50">جودة التتبع</Link><Link href="/dashboard/marketing/google-ads" className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50">Google Deep Data</Link></CardContent></Card>
   </div>;
 }
 
