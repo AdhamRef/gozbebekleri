@@ -11,14 +11,14 @@ type CampaignRow = { platform: string; campaignId: string | null; campaignName: 
 type Overview = { ok: boolean; summary: { spend: number; siteRevenue: number; siteDonations: number; siteRoas: number; activeConnections: number; totalConnections: number; failedSyncs: number }; campaigns: CampaignRow[] };
 
 function money(value: number | null | undefined, currency = "USD") { return typeof value === "number" && Number.isFinite(value) ? `${currency} ${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "—"; }
-function roas(value: number | null | undefined) { return typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(2)}x` : "—"; }
+function roas(value: number | null | undefined, spend: number | null | undefined) { return typeof spend === "number" && spend > 0 && typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(2)}x` : "غير متاح"; }
 function n(value: number | null | undefined) { return typeof value === "number" && Number.isFinite(value) ? value.toLocaleString() : "—"; }
 
 function recommendations(data: Overview) {
   const out: { tone: "good" | "warn" | "bad"; title: string; body: string }[] = [];
   if (data.summary.failedSyncs > 0) out.push({ tone: "bad", title: "يوجد فشل في السحب", body: "ابدأ من جودة التتبع والإصلاح قبل اتخاذ قرارات ميزانية." });
   if (data.summary.totalConnections === 0) out.push({ tone: "warn", title: "اربط المنصات أولًا", body: "لا يمكن تحليل الصرف بدقة قبل ربط الحسابات وسحب البيانات." });
-  if (data.summary.spend === 0) out.push({ tone: "warn", title: "لا يوجد صرف ظاهر", body: "شغّل سحب البيانات أو راجع الحسابات المتصلة." });
+  if (data.summary.spend === 0) out.push({ tone: "warn", title: "لا يوجد صرف ظاهر", body: "ROAS غير متاح الآن لأن بيانات الصرف غير مسحوبة أو غير مرتبطة. شغّل سحب البيانات أو راجع الحسابات المتصلة." });
   if (data.summary.spend > 0 && data.summary.siteRoas >= 2) out.push({ tone: "good", title: "الأداء جيد", body: "راجع أفضل الحملات ثم زِد الميزانية تدريجيًا." });
   if (data.summary.spend > 0 && data.summary.siteRoas > 0 && data.summary.siteRoas < 1) out.push({ tone: "bad", title: "العائد ضعيف", body: "راجع الروابط والحملات الأعلى صرفًا قبل الاستمرار." });
   if (!out.length) out.push({ tone: "good", title: "الوضع مستقر", body: "لا توجد مشكلة حرجة في البيانات الحالية." });
@@ -47,6 +47,7 @@ export default function MarketingInsightsPage() {
 
   React.useEffect(() => { void load(7); }, []);
   const topCampaigns = [...(data?.campaigns ?? [])].sort((a, b) => b.spend - a.spend).slice(0, 5);
+  const hasSpend = (data?.summary.spend ?? 0) > 0;
 
   return <div className="space-y-6 p-4 sm:p-6" dir="rtl">
     <div className="rounded-3xl border bg-gradient-to-l from-[#025EB8] to-[#01396f] p-6 text-white shadow-sm">
@@ -57,7 +58,13 @@ export default function MarketingInsightsPage() {
     </div>
 
     {loading ? <div className="flex min-h-[18rem] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#025EB8]" /></div> : !data ? <Card><CardContent className="p-8 text-center text-sm text-slate-500">لا توجد بيانات.</CardContent></Card> : <>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5"><Kpi title="الصرف" value={money(data.summary.spend)} icon={<BarChart3 className="h-4 w-4" />} /><Kpi title="التبرعات" value={money(data.summary.siteRevenue)} hint={`${data.summary.siteDonations} تبرع`} icon={<TrendingUp className="h-4 w-4" />} /><Kpi title="ROAS" value={roas(data.summary.siteRoas)} icon={<Brain className="h-4 w-4" />} /><Kpi title="الحسابات" value={`${data.summary.activeConnections}/${data.summary.totalConnections}`} /><Kpi title="أخطاء السحب" value={n(data.summary.failedSyncs)} icon={<AlertTriangle className="h-4 w-4" />} /></div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5"><Kpi title="الصرف" value={money(data.summary.spend)} icon={<BarChart3 className="h-4 w-4" />} /><Kpi title="التبرعات" value={money(data.summary.siteRevenue)} hint={`${data.summary.siteDonations} تبرع`} icon={<TrendingUp className="h-4 w-4" />} /><Kpi title="ROAS" value={roas(data.summary.siteRoas, data.summary.spend)} hint={hasSpend ? undefined : "لا يوجد صرف مسحوب"} icon={<Brain className="h-4 w-4" />} /><Kpi title="الحسابات" value={`${data.summary.activeConnections}/${data.summary.totalConnections}`} /><Kpi title="أخطاء السحب" value={n(data.summary.failedSyncs)} icon={<AlertTriangle className="h-4 w-4" />} /></div>
+
+      {!hasSpend ? <Card className="border-amber-200 bg-amber-50">
+        <CardContent className="p-4 text-sm leading-6 text-amber-900">
+          <b>تنبيه أداء:</b> توجد تبرعات، لكن لا توجد بيانات صرف مسحوبة لهذه الفترة. لذلك لا يتم حساب ROAS كرقم حقيقي الآن. ابدأ من سحب البيانات أو راجع الحسابات المتصلة.
+        </CardContent>
+      </Card> : null}
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card><CardHeader><CardTitle>التوصيات</CardTitle><CardDescription>قرارات مختصرة مبنية على البيانات الحالية.</CardDescription></CardHeader><CardContent className="space-y-3">{recommendations(data).map((item) => <Notice key={item.title} {...item} />)}<Link href="/dashboard/marketing/ai-assistant" className="inline-flex rounded-md border px-3 py-2 text-sm hover:bg-slate-50">إعداد AI Assistant</Link></CardContent></Card>
