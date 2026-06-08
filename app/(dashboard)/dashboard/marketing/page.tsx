@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BarChart3, Bot, CheckCircle2, Database, Link2, PlugZap, ShieldCheck, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MARKETING_OPERATING_FLOW, MARKETING_TRUTH_SOURCES } from "@/lib/marketing/operating-flow";
+import { MarketingHealthSummary } from "./_components/MarketingHealthSummary";
 
 const toolIcons = [PlugZap, Link2, ShieldCheck, BarChart3, Sparkles] as const;
 
@@ -49,6 +50,8 @@ export default function MarketingHomePage() {
       <h1 className="mt-2 text-3xl font-black">مركز التسويق والنمو</h1>
       <p className="mt-3 max-w-4xl text-sm leading-7 text-white/85">رحلة واحدة لإدارة الربط، الروابط، التحويلات، الأداء، والتوصيات. الهدف هنا ترتيب الأدوات الحالية حتى يعرف الفريق من أين يبدأ وماذا يفعل بعد ذلك.</p>
     </div>
+
+    <MarketingHealthSummary />
 
     <Card>
       <CardHeader>
