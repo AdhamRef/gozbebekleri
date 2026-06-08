@@ -2,10 +2,12 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, Loader2, RefreshCw, ShieldCheck, Wrench } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, RefreshCw, Wrench } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MarketingPageHeader } from "../_components/MarketingPageHeader";
+import { MarketingQuickNav } from "../_components/MarketingQuickNav";
 
 type PlatformHealth = { platform: string; label: string; ready: boolean; missing: string[] };
 type RecentEvent = { platform?: string; channel?: string; eventName?: string; status?: string; error?: string };
@@ -53,17 +55,14 @@ export default function MarketingQualityPage() {
   const missingPlatforms = data?.platforms.filter((platform) => !platform.ready) ?? [];
   const failedEvents = data?.conversionEvents.recent.filter((event) => event.status === "FAILED").slice(0, 4) ?? [];
 
-  return <div className="space-y-6 p-4 sm:p-6" dir="rtl">
-    <div className="rounded-3xl border bg-gradient-to-l from-[#025EB8] to-[#01396f] p-6 text-white shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm text-white/75">Marketing Operating System</p>
-          <h1 className="mt-2 text-3xl font-black">جودة التتبع والإصلاح</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-white/85">اعرف بسرعة هل التتبع سليم، وما الذي يحتاج إصلاحًا الآن.</p>
-        </div>
-        <Button variant="secondary" onClick={load} disabled={loading} className="gap-2"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />تحديث</Button>
-      </div>
-    </div>
+  return <div className="space-y-5 p-4 sm:p-6" dir="rtl">
+    <MarketingPageHeader
+      title="جودة التتبع والإصلاح"
+      description="اعرف بسرعة هل التتبع سليم، وما الذي يحتاج إصلاحًا الآن قبل اتخاذ قرارات ميزانية أو تقييم أداء."
+      actions={<Button variant="secondary" onClick={load} disabled={loading} className="gap-2"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />تحديث</Button>}
+    />
+
+    <MarketingQuickNav />
 
     {loading ? <div className="flex min-h-[18rem] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#025EB8]" /></div> : !data ? <Card><CardContent className="p-8 text-center text-sm text-slate-500">لا توجد بيانات جودة متاحة.</CardContent></Card> : <>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
@@ -107,8 +106,6 @@ export default function MarketingQualityPage() {
         {tools.map((tool) => <Link key={tool.href} href={tool.href} className="rounded-xl border bg-white p-4 transition hover:border-blue-200 hover:shadow-sm"><div className="font-bold text-slate-900">{tool.title}</div><p className="mt-2 text-sm leading-6 text-slate-600">{tool.desc}</p><span className="mt-3 inline-flex rounded-md border px-3 py-2 text-sm hover:bg-slate-50">فتح</span></Link>)}
       </CardContent>
     </Card>
-
-    <Card><CardHeader><CardTitle>روابط مرتبطة</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2"><Link href="/dashboard/marketing" className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50">نظام التسويق</Link><Link href="/dashboard/marketing/tracking-hub" className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50">الربط والـ APIs</Link><Link href="/dashboard/marketing/data-sync" className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50">سحب البيانات</Link></CardContent></Card>
   </div>;
 }
 
