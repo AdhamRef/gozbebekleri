@@ -1,12 +1,13 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { CalendarDays, Database, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { MarketingPageHeader } from "../_components/MarketingPageHeader";
+import { MarketingQuickNav } from "../_components/MarketingQuickNav";
 
 type PlatformKey = "all" | "meta" | "google_ads" | "ga4" | "tiktok" | "twilio";
 type PeriodKey = "today" | "7" | "14" | "30" | "custom";
@@ -87,12 +88,13 @@ export default function MarketingDataSyncPage() {
 
   const rows = lastResult?.results ?? [];
 
-  return <div className="space-y-6 p-4 sm:p-6" dir="rtl">
-    <div className="rounded-3xl border bg-gradient-to-l from-[#025EB8] to-[#01396f] p-6 text-white shadow-sm">
-      <p className="text-sm text-white/75">Marketing Operating System</p>
-      <h1 className="mt-2 text-3xl font-black">سحب البيانات</h1>
-      <p className="mt-3 max-w-3xl text-sm leading-7 text-white/85">شاشة تشغيل فقط: اختر الفترة والمنصة ثم اسحب النتائج.</p>
-    </div>
+  return <div className="space-y-5 p-4 sm:p-6" dir="rtl">
+    <MarketingPageHeader
+      title="سحب البيانات"
+      description="شاشة تشغيل فقط: اختر الفترة والمنصة ثم اسحب النتائج. تظهر التفاصيل الفنية فقط عند وجود خطأ أو حقول ناقصة."
+    />
+
+    <MarketingQuickNav />
 
     <Card>
       <CardHeader><CardTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-[#025EB8]" />تشغيل المزامنة</CardTitle><CardDescription>كل شيء في خطوة واحدة.</CardDescription></CardHeader>
@@ -117,8 +119,6 @@ export default function MarketingDataSyncPage() {
         </div>}
       </CardContent>
     </Card>
-
-    <Card><CardHeader><CardTitle>روابط مرتبطة</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2"><Link href="/dashboard/marketing" className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50">نظام التسويق</Link><Link href="/dashboard/marketing/google-ads" className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50">Google Deep Data</Link><Link href="/dashboard/marketing/insights" className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50">التحليل والتوصيات</Link></CardContent></Card>
   </div>;
 }
 
