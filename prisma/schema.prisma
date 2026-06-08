@@ -456,7 +456,12 @@ model Donation {
   subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
 
   comment       String?
-  paymentMethod PaymentMethod
+  /// Optional only to tolerate legacy / pre-enforcement rows that exist in
+  /// MongoDB without the field set (Prisma+MongoDB doesn't error on read for
+  /// unset enums on optional fields — but it DOES error if a required enum
+  /// is missing). Every NEW write goes through paths that always set CARD or
+  /// PAYPAL, so this should only ever be null for historical donations.
+  paymentMethod PaymentMethod?
   cardDetails   CardDetails?
 
   /// UTM/ads/GA/Meta snapshot from client at checkout (JSON). Server conversions use the same donation id as event_id.

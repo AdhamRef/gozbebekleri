@@ -131,6 +131,10 @@ export async function GET(request: NextRequest) {
       type: donation.subscriptionId ? ("MONTHLY" as const) : ("ONE_TIME" as const),
       fees: donation.fees,
       teamSupport: donation.teamSupport,
+      // Legacy rows can have paymentMethod unset in MongoDB even though every
+      // current create path sets CARD or PAYPAL. Default to CARD on read so
+      // table cells / receipts never render blank.
+      paymentMethod: donation.paymentMethod ?? "CARD",
       donor: donation.donor,
       campaigns: donation.items.map((item) => ({ id: item.campaign.id, title: item.campaign.title, images: item.campaign.images })),
       categories: (donation.categoryItems ?? []).map((ci) => ({ id: ci.category.id, name: ci.category.name })),

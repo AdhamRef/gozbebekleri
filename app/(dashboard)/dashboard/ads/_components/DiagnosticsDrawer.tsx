@@ -289,7 +289,7 @@ export function DiagnosticsDrawer({ donationId, open, onOpenChange }: Props) {
                 }
               />
               <KV label="مزود الدفع" value={data.donation.provider} />
-              <KV label="طريقة الدفع" value={data.donation.paymentMethod} />
+              <KV label="طريقة الدفع" value={data.donation.paymentMethod || '—'} />
               <KV
                 label="اشتراك شهري"
                 value={data.donation.subscriptionId ? "نعم" : "لا"}

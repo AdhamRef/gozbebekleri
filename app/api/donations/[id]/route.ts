@@ -177,6 +177,10 @@ export async function GET(
     const response = {
       ...donation,
       type: donation.subscriptionId ? ('MONTHLY' as const) : ('ONE_TIME' as const),
+      // Default to CARD on read for legacy rows where the field was never
+      // written. Every current create path sets CARD or PAYPAL explicitly,
+      // so this only kicks in for historical donations.
+      paymentMethod: donation.paymentMethod ?? 'CARD',
       paymentStatus: donation.status,
       subscriptionStatus: sub?.status ?? null,
       nextBillingDate: sub?.nextBillingDate ?? null,
@@ -740,6 +744,10 @@ export async function PATCH(
           totalAmount: newTotalAmount,
           status: nextStatus,
           ...(shouldStampPaidAt && { paidAt: nextPaidAt }),
+          // Self-heal legacy rows: any admin edit stamps paymentMethod=CARD
+          // if it was never written. New donations always have it set, so
+          // this is a one-shot backfill triggered organically by edits.
+          ...(existing.paymentMethod == null && { paymentMethod: 'CARD' }),
         },
       });
 

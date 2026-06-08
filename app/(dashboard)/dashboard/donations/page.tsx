@@ -65,7 +65,7 @@ interface Donation {
   };
   type: 'ONE_TIME' | 'MONTHLY';
   status: 'ACTIVE' | 'INACTIVE';
-  paymentMethod: string;
+  paymentMethod: string | null;
   createdAt: string;
   items: {
     campaign: {
@@ -317,7 +317,7 @@ export default function DonationsPage() {
                 <TableCell>{donation.totalAmount.toLocaleString()}</TableCell>
                 <TableCell>{donation.currency}</TableCell>
                 <TableCell>{donation.type === 'ONE_TIME' ? 'مرة واحدة' : 'شهري'}</TableCell>
-                <TableCell>{donation.paymentMethod}</TableCell>
+                <TableCell>{donation.paymentMethod || '—'}</TableCell>
                 <TableCell>
                   {format(new Date(donation.createdAt), 'PPP', { locale: ar })}
                 </TableCell>
