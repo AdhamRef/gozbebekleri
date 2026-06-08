@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, Bot, Database, Link2, PlugZap, ShieldCheck, Sparkles } from "lucide-react";
+import { BarChart3, Bot, CheckCircle2, Database, Link2, PlugZap, ShieldCheck, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MARKETING_OPERATING_FLOW, MARKETING_TRUTH_SOURCES } from "@/lib/marketing/operating-flow";
 
@@ -28,6 +28,19 @@ const secondaryTools = [
     action: "فتح Google Deep Data",
   },
 ];
+
+const nextActions = [
+  ["راجع الجاهزية", "ابدأ من الربط والتتبع إذا كانت المنصات أو البكسلات ناقصة."],
+  ["أنشئ رابط حملة", "استخدم Link Generator كـ Campaign Builder الرسمي ولا تنشئ روابط عشوائية."],
+  ["افحص التحويلات", "افتح Quality قبل قرارات الميزانية إذا ظهرت أخطاء أو تحويلات ناقصة."],
+  ["حلل الأداء", "استخدم Insights لمعرفة الصرف، التبرعات، ROAS، وأهم توصية اليوم."],
+] as const;
+
+const marketingBoundaries = [
+  ["يبقى داخل Marketing", "الربط، التتبع، الروابط، سحب البيانات، جودة التحويلات، الأداء والتوصيات الأولية."],
+  ["ينتقل لاحقًا إلى Operations", "خطة المحتوى، مهام الفريق، التقويم، النشر، الرسائل، وربط المحتوى بالأداء."],
+  ["ينتقل لاحقًا إلى Archive", "Google Drive، تحليل الصور والفيديو، مراجعة الأصول، واختيار مواد تصلح للتسويق."],
+] as const;
 
 export default function MarketingHomePage() {
   return <div className="space-y-6 p-4 sm:p-6" dir="rtl">
@@ -64,6 +77,34 @@ export default function MarketingHomePage() {
         })}
       </CardContent>
     </Card>
+
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle>ماذا أفعل الآن؟</CardTitle>
+          <CardDescription>خطوات تشغيل مختصرة تمنع الانتقال بين الصفحات بشكل عشوائي.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {nextActions.map(([title, body]) => <div key={title} className="rounded-xl border bg-slate-50 p-4">
+            <div className="flex items-center gap-2 font-bold text-slate-900"><CheckCircle2 className="h-4 w-4 text-[#025EB8]" />{title}</div>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
+          </div>)}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>حدود نظام التسويق</CardTitle>
+          <CardDescription>هذه الحدود تمنع تضخم Marketing عند بناء Operations وArchive لاحقًا.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {marketingBoundaries.map(([title, body]) => <div key={title} className="rounded-xl border bg-slate-50 p-4">
+            <p className="text-sm font-bold text-slate-900">{title}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
+          </div>)}
+        </CardContent>
+      </Card>
+    </div>
 
     <div className="grid gap-4 lg:grid-cols-3">
       {secondaryTools.map((tool) => {
