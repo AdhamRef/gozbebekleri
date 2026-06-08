@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { MARKETING_OPERATING_FLOW, MARKETING_TRUTH_SOURCES } from "@/lib/marketing/operating-flow";
 import { MarketingHealthSummary } from "./_components/MarketingHealthSummary";
 import { MarketingPageHeader } from "./_components/MarketingPageHeader";
+import { MarketingQuickNav } from "./_components/MarketingQuickNav";
 
 const toolIcons = [PlugZap, Link2, ShieldCheck, BarChart3, Sparkles] as const;
 
@@ -50,6 +51,8 @@ export default function MarketingHomePage() {
       title="مركز التسويق والنمو"
       description="رحلة واحدة لإدارة الربط، الروابط، التحويلات، الأداء، والتوصيات. الهدف هنا ترتيب الأدوات الحالية حتى يعرف الفريق من أين يبدأ وماذا يفعل بعد ذلك."
     />
+
+    <MarketingQuickNav />
 
     <MarketingHealthSummary />
 
