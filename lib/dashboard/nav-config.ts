@@ -11,6 +11,7 @@ export const DASHBOARD_NAV_GROUPS: {
       { key: "monthly", title: "التبرعات الشهرية", href: "/dashboard/monthly" },
       { key: "bankTransfers", title: "التحويلات البنكية", href: "/dashboard/bank-transfers" },
       { key: "referrals", title: "روابط التتبع", href: "/dashboard/referrals" },
+      { key: "referrals", title: "منشئ روابط الحملات", href: "/dashboard/link-generator" },
       { key: "logs", title: "سجل النشاط", href: "/dashboard/logs" },
     ],
   },
