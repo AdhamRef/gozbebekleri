@@ -3,6 +3,7 @@ import { BarChart3, Bot, CheckCircle2, Database, Link2, PlugZap, ShieldCheck, Sp
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MARKETING_OPERATING_FLOW, MARKETING_TRUTH_SOURCES } from "@/lib/marketing/operating-flow";
 import { MarketingHealthSummary } from "./_components/MarketingHealthSummary";
+import { MarketingPageHeader } from "./_components/MarketingPageHeader";
 
 const toolIcons = [PlugZap, Link2, ShieldCheck, BarChart3, Sparkles] as const;
 
@@ -44,12 +45,11 @@ const marketingBoundaries = [
 ] as const;
 
 export default function MarketingHomePage() {
-  return <div className="space-y-6 p-4 sm:p-6" dir="rtl">
-    <div className="rounded-3xl border bg-gradient-to-l from-[#025EB8] to-[#01396f] p-6 text-white shadow-sm">
-      <p className="text-sm text-white/75">Marketing Operating System</p>
-      <h1 className="mt-2 text-3xl font-black">مركز التسويق والنمو</h1>
-      <p className="mt-3 max-w-4xl text-sm leading-7 text-white/85">رحلة واحدة لإدارة الربط، الروابط، التحويلات، الأداء، والتوصيات. الهدف هنا ترتيب الأدوات الحالية حتى يعرف الفريق من أين يبدأ وماذا يفعل بعد ذلك.</p>
-    </div>
+  return <div className="space-y-5 p-4 sm:p-6" dir="rtl">
+    <MarketingPageHeader
+      title="مركز التسويق والنمو"
+      description="رحلة واحدة لإدارة الربط، الروابط، التحويلات، الأداء، والتوصيات. الهدف هنا ترتيب الأدوات الحالية حتى يعرف الفريق من أين يبدأ وماذا يفعل بعد ذلك."
+    />
 
     <MarketingHealthSummary />
 
