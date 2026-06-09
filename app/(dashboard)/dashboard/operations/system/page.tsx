@@ -34,10 +34,19 @@ const next = [
 
 const progress = [
   ["UI Shell", 100, "مكتمل"],
-  ["Data Foundation", 0, "التالي"],
+  ["Data Foundation", 10, "مفتوح"],
   ["CRUD", 0, "لاحقًا"],
   ["Automation", 0, "لاحقًا"],
   ["AI", 0, "لاحقًا"],
+] as const;
+
+const packages = [
+  ["Package 3A-3D", "واجهة النظام", "مكتمل", "تم بناء مركز العمليات، لوحة المحتوى، المواسم، المهام، وKanban."],
+  ["Package 4A", "نماذج البيانات", "مفتوح", "Issue #21 جاهز لتنفيذ نماذج Prisma بشكل آمن ومنفصل."],
+  ["Package 4B", "Read APIs", "التالي", "قراءة المواسم والخطط والعناصر والمهام من قاعدة البيانات."],
+  ["Package 4C", "ربط الواجهة بالبيانات", "التالي", "استبدال البيانات الثابتة داخل اللوحة ببيانات حقيقية."],
+  ["Package 4D", "CRUD", "لاحقًا", "إضافة وتعديل الخطط والعناصر والمهام من داخل لوحة التحكم."],
+  ["Package 4E", "Marketing Handoff", "لاحقًا", "تسليم المحتوى المعتمد للتسويق وربطه بروابط الحملات ونتائج الإعلانات."],
 ] as const;
 
 export default function OperationsSystemPage() {
@@ -69,6 +78,39 @@ export default function OperationsSystemPage() {
           </Card>
         ))}
       </div>
+
+      <Card className="border-[#025EB8]/20 bg-blue-50/50">
+        <CardHeader className="gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-[#025EB8]" /> Package 4A مفتوح الآن</CardTitle>
+            <CardDescription className="mt-2 leading-6">تم توثيق نماذج البيانات المطلوبة في Issue #21، والهدف التالي هو تنفيذها في Prisma ثم التحقق والبناء.</CardDescription>
+          </div>
+          <Link href="https://github.com/AdhamRef/gozbebekleri/issues/21" target="_blank" className="inline-flex rounded-md bg-[#025EB8] px-4 py-2 text-sm font-bold text-white hover:bg-[#024f99]">
+            فتح Issue #21
+          </Link>
+        </CardHeader>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>خارطة الحزم التنفيذية</CardTitle>
+          <CardDescription>تسلسل العمل من الواجهة الحالية إلى نظام بيانات وتشغيل كامل.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {packages.map(([code, title, state, description]) => (
+            <div key={code} className="rounded-2xl border bg-slate-50 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold text-[#025EB8]">{code}</p>
+                  <h3 className="mt-1 font-black text-slate-900">{title}</h3>
+                </div>
+                <Badge variant="outline">{state}</Badge>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 xl:grid-cols-3">
         <Card>
