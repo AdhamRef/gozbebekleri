@@ -107,6 +107,7 @@ export function detectDonationSource(input: DetectSourceInput): DonationSourceRe
   const fbclid = pickString(attr, "fbclid");
   const gclid = pickString(attr, "gclid");
   const ttclid = pickString(attr, "ttclid");
+  const snapClickId = pickString(attr, "snap_click_id") ?? pickString(attr, "scid");
   const fbp = pickString(attr, "fbp");
   const fbc = pickString(attr, "fbc");
   const campaignName = pickString(attr, "utm_campaign");
@@ -121,6 +122,7 @@ export function detectDonationSource(input: DetectSourceInput): DonationSourceRe
     if (fbclid) platform = "meta";
     else if (gclid) platform = "google";
     else if (ttclid) platform = "tiktok";
+    else if (snapClickId) platform = "snapchat";
   }
 
   // utm_medium of cpc/ppc/paid_social on an unknown source still means paid traffic.
@@ -148,6 +150,8 @@ export function detectDonationSource(input: DetectSourceInput): DonationSourceRe
       ? gclid
       : platform === "tiktok"
       ? ttclid
+      : platform === "snapchat"
+      ? snapClickId
       : null;
   const hasPlatformClickId = !!platformClickId;
   const conversionSent = !!input.conversionEventsSentAt;
@@ -238,8 +242,15 @@ export const PLATFORM_LABEL_AR: Record<AdPlatform, string> = {
 };
 
 export const STATUS_LABEL_AR: Record<DonationSourceStatus, string> = {
-  verified: "إعلان مؤكد",
-  "utm-only": "إعلان من الرابط فقط",
-  "tracking-error": "خطأ تتبع",
-  organic: "غير إعلاني / مباشر",
+  verified: "موثّق",
+  "utm-only": "UTM فقط",
+  "tracking-error": "مشكلة تتبع",
+  organic: "غير إعلاني",
+};
+
+export const STATUS_COLOR_CLASS: Record<DonationSourceStatus, string> = {
+  verified: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  "utm-only": "bg-amber-100 text-amber-700 border-amber-200",
+  "tracking-error": "bg-red-100 text-red-700 border-red-200",
+  organic: "bg-slate-100 text-slate-600 border-slate-200",
 };
