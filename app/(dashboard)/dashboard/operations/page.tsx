@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays, CheckCircle2, ClipboardList, FileText, Megaphone } from "lucide-react";
+import { ArrowLeft, CalendarDays, CheckCircle2, ClipboardList, FileText, Megaphone } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const pillars = [
@@ -23,6 +23,19 @@ export default function OperationsHomePage() {
       <h1 className="mt-1.5 text-2xl font-black">مركز العمليات والمحتوى</h1>
       <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">هذه بداية نظام العمليات. الهدف تنظيم التقويم، المحتوى، المهام، وتسليم العمل الجاهز إلى نظام التسويق بدون خلط المسؤوليات.</p>
     </div>
+
+    <Card className="border-[#025EB8]/20 bg-blue-50/60">
+      <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <CardTitle>لوحة خطط المحتوى أصبحت جاهزة</CardTitle>
+          <CardDescription className="mt-2 leading-6">ادخل من هنا لمراجعة أول واجهة فعلية لإدارة خطط وعناصر المحتوى داخل Operations.</CardDescription>
+        </div>
+        <Link href="/dashboard/operations/content" className="inline-flex items-center justify-center gap-2 rounded-md bg-[#025EB8] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#024f99]">
+          فتح لوحة المحتوى
+          <ArrowLeft className="h-4 w-4" />
+        </Link>
+      </CardHeader>
+    </Card>
 
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {pillars.map(([title, description, Icon]) => <Card key={title} className="h-full">
@@ -52,7 +65,10 @@ export default function OperationsHomePage() {
         </CardHeader>
         <CardContent className="space-y-3 text-sm leading-6 text-slate-700">
           <p>الحزمة القادمة ستضيف نماذج البيانات مثل ContentItem وContentTask وContentPlan بدون بناء واجهة كبيرة في نفس الخطوة.</p>
-          <Link href="/dashboard/marketing" className="inline-flex rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50">العودة إلى نظام التسويق</Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/dashboard/operations/content" className="inline-flex rounded-md bg-[#025EB8] px-3 py-2 text-sm font-semibold text-white hover:bg-[#024f99]">فتح لوحة المحتوى</Link>
+            <Link href="/dashboard/marketing" className="inline-flex rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50">العودة إلى نظام التسويق</Link>
+          </div>
         </CardContent>
       </Card>
     </div>
