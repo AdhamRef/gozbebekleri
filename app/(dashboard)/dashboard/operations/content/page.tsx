@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarClock, CheckCircle2, Clock3, FileText, Filter, Megaphone, PlusCircle, Search } from "lucide-react";
+import { CalendarClock, CheckCircle2, Clock3, FileText, Filter, Megaphone, PlusCircle, Search, UserRoundCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,13 @@ const items = [
   { title: "رسالة واتساب للجمعة", type: "WHATSAPP", status: "APPROVED", channel: "WhatsApp", due: "الجمعة" },
 ] as const;
 
+const tasks = [
+  { title: "كتابة نص فيديو الوقف", owner: "فريق المحتوى", status: "IN_PROGRESS", due: "12 يونيو", item: "فيديو تعريفي عن الوقف" },
+  { title: "تصميم كاروسيل الزكاة", owner: "فريق التصميم", status: "REVIEW", due: "13 يونيو", item: "كاروسيل: كيف تحسب زكاتك؟" },
+  { title: "مونتاج فيديو غزة", owner: "فريق الميديا", status: "DESIGN", due: "14 يونيو", item: "تصميم حملة غزة العاجلة" },
+  { title: "تجهيز رسالة واتساب الجمعة", owner: "التسويق", status: "APPROVED", due: "الجمعة", item: "رسالة واتساب للجمعة" },
+] as const;
+
 const boardColumns = [
   ["IDEA", "أفكار", "مواد تحتاج اعتماد الفكرة"],
   ["WRITING", "كتابة", "النصوص والسكريبتات"],
@@ -53,6 +60,7 @@ const statusClass: Record<string, string> = {
   PLANNING: "bg-amber-50 text-amber-700 border-amber-200",
   ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-200",
   IDEA: "bg-slate-50 text-slate-700 border-slate-200",
+  IN_PROGRESS: "bg-blue-50 text-blue-700 border-blue-200",
   REVIEW: "bg-purple-50 text-purple-700 border-purple-200",
   WRITING: "bg-sky-50 text-sky-700 border-sky-200",
   APPROVED: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -97,14 +105,14 @@ export default function OperationsContentPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardDescription>جاهز للتسويق</CardDescription>
+            <CardDescription>مهام إنتاج مفتوحة</CardDescription>
             <CardTitle className="text-3xl">4</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader>
-            <CardDescription>مواعيد قادمة</CardDescription>
-            <CardTitle className="text-3xl">7</CardTitle>
+            <CardDescription>جاهز للتسويق</CardDescription>
+            <CardTitle className="text-3xl">4</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -164,6 +172,37 @@ export default function OperationsContentPage() {
                 </div>
               );
             })}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2"><UserRoundCheck className="h-5 w-5 text-[#025EB8]" /> مهام الإنتاج</CardTitle>
+            <CardDescription className="mt-2">تصور أولي لتوزيع المسؤوليات والمواعيد قبل ربط المهام بقاعدة البيانات.</CardDescription>
+          </div>
+          <Button variant="outline" disabled className="gap-2 font-bold opacity-80">
+            <PlusCircle className="h-4 w-4" /> إضافة مهمة قريبًا
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {tasks.map((task) => (
+              <div key={task.title} className="rounded-2xl border bg-slate-50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-black text-slate-900">{task.title}</h3>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">مرتبط بـ: {task.item}</p>
+                  </div>
+                  <Badge variant="outline" className={statusClass[task.status]}>{task.status}</Badge>
+                </div>
+                <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
+                  <span>المسؤول: <b>{task.owner}</b></span>
+                  <span>موعد التسليم: <b>{task.due}</b></span>
+                </div>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
