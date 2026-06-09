@@ -1,6 +1,7 @@
 "use client";
 
 import { DONATION_ATTRIBUTION_KEYS, type DonationAttributionKey } from "./sanitize";
+import { captureStoredClickIds } from "@/lib/tracking/click-id-storage";
 
 const PREFIX = "ala_attr_";
 const MAX_AGE_DAYS = 30;
@@ -98,10 +99,11 @@ function persistMetaClickIds(params: URLSearchParams) {
 /** Capture URL params + click IDs into cookies (call once on app load / route change). */
 export function captureAttributionFromUrl(): void {
   if (typeof window === "undefined") return;
+  const storedClickIds = captureStoredClickIds();
   const params = new URLSearchParams(window.location.search);
   const keys: DonationAttributionKey[] = [...DONATION_ATTRIBUTION_KEYS];
   for (const key of keys) {
-    const fromUrl = params.get(key);
+    const fromUrl = params.get(key) || storedClickIds[key as keyof typeof storedClickIds];
     if (fromUrl) setIfClean(key, fromUrl, true);
   }
 
