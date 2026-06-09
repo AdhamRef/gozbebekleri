@@ -1,0 +1,45 @@
+/* ===================== OPERATIONS PACKAGE 2B ===================== */
+
+model ContentPlan {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  status      String   @default("DRAFT")
+  startDate   DateTime?
+  endDate     DateTime?
+  theme       String?
+  ownerId     String?  @db.ObjectId
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([startDate])
+  @@index([ownerId])
+}
+
+model ContentItem {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  planId         String?  @db.ObjectId
+  title          String
+  brief          String?
+  type           String
+  status         String   @default("IDEA")
+  channel        String?
+  language       String?
+  publishAt      DateTime?
+  assetUrl       String?
+  campaignLinkId String?  @db.ObjectId
+  marketingNotes String?
+  createdById    String?  @db.ObjectId
+  assignedToId   String?  @db.ObjectId
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([planId])
+  @@index([status])
+  @@index([type])
+  @@index([publishAt])
+  @@index([assignedToId])
+}
