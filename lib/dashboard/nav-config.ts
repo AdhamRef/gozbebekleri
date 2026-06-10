@@ -11,7 +11,6 @@ export const DASHBOARD_NAV_GROUPS: {
       { key: "monthly", title: "التبرعات الشهرية", href: "/dashboard/monthly" },
       { key: "bankTransfers", title: "التحويلات البنكية", href: "/dashboard/bank-transfers" },
       { key: "referrals", title: "روابط التتبع", href: "/dashboard/referrals" },
-      { key: "referrals", title: "منشئ روابط الحملات", href: "/dashboard/link-generator" },
       { key: "logs", title: "سجل النشاط", href: "/dashboard/logs" },
     ],
   },
@@ -34,16 +33,28 @@ export const DASHBOARD_NAV_GROUPS: {
     ],
   },
   {
+    group: "التسويق والنمو",
+    items: [
+      { key: "ads", title: "نظرة عامة", href: "/dashboard/marketing" },
+      { key: "platformConnections", title: "ربط المنصات", href: "/dashboard/marketing/connections" },
+      { key: "ads", title: "مركز التتبع", href: "/dashboard/marketing/tracking-hub" },
+      { key: "ads", title: "التحليلات والرؤى", href: "/dashboard/marketing/insights" },
+      { key: "ads", title: "حالة المنصات", href: "/dashboard/marketing-intelligence/platform-status" },
+      { key: "ads", title: "قرارات التسويق", href: "/dashboard/marketing-intelligence/decisions" },
+      { key: "ads", title: "Google Ads", href: "/dashboard/marketing/google-ads" },
+      { key: "ads", title: "سجل المزامنة", href: "/dashboard/marketing/sync-log" },
+      { key: "ads", title: "مساعد التسويق AI", href: "/dashboard/marketing/ai-assistant" },
+      { key: "referrals", title: "منشئ الحملات والروابط", href: "/dashboard/link-generator" },
+      { key: "pixels", title: "البكسلات والتتبع", href: "/dashboard/pixels" },
+      { key: "ads", title: "أحداث التحويل", href: "/dashboard/conversion-events" },
+      { key: "ads", title: "إدارة الإعلانات", href: "/dashboard/ads" },
+    ],
+  },
+  {
     group: "إعدادات الهوية",
     items: [
       { key: "slides", title: "شرائح الهيرو", href: "/dashboard/slides" },
       { key: "ticker", title: "إعدادات التيكر", href: "/dashboard/ticker" },
-    ],
-  },
-  {
-    group: "التسويق",
-    items: [
-      { key: "ads", title: "نظام التسويق", href: "/dashboard/marketing" },
     ],
   },
   {
