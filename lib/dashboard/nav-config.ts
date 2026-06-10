@@ -33,6 +33,14 @@ export const DASHBOARD_NAV_GROUPS: {
     ],
   },
   {
+    group: "المحتوى والتشغيل",
+    items: [
+      { key: "campaigns", title: "نظرة عامة", href: "/dashboard/operations" },
+      { key: "campaigns", title: "لوحة المحتوى", href: "/dashboard/operations/content" },
+      { key: "campaigns", title: "خريطة النظام", href: "/dashboard/operations/system" },
+    ],
+  },
+  {
     group: "التسويق والنمو",
     items: [
       { key: "ads", title: "نظرة عامة", href: "/dashboard/marketing" },
