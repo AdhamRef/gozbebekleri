@@ -1,0 +1,133 @@
+import Link from "next/link";
+import { AlertTriangle, ArrowLeft, BellRing, CalendarDays, CheckCircle2, Clock3, FileText, Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getOperationsCalendarOverview } from "@/lib/operations/calendar-service";
+
+const categoryLabel: Record<string, string> = {
+  RELIGIOUS: "مناسبة دينية",
+  CAMPAIGN: "حملة",
+  CONTENT: "محتوى",
+  OPERATIONS: "تشغيل",
+};
+
+const priorityClass: Record<string, string> = {
+  HIGH: "border-rose-200 bg-rose-50 text-rose-700",
+  MEDIUM: "border-amber-200 bg-amber-50 text-amber-700",
+  LOW: "border-slate-200 bg-slate-50 text-slate-700",
+};
+
+export default function OperationsCalendarPage() {
+  const overview = getOperationsCalendarOverview();
+  const { events, alertRules, kpis } = overview;
+
+  return (
+    <div className="space-y-5 p-4 sm:p-6" dir="rtl">
+      <div className="flex flex-col gap-4 rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-xs text-white/70">Operations / Calendar & Alerts</p>
+          <h1 className="mt-1.5 text-2xl font-black">التقويم والتنبيهات</h1>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
+            مركز أولي لتجهيز المواسم الدينية والحملات قبل موعدها، وربط كل مناسبة بما تحتاجه من فيديوهات وتصاميم ورسائل. مصدر البيانات: {overview.source}.
+          </p>
+        </div>
+        <Link href="/dashboard/operations/content" className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-bold text-[#025EB8] shadow-sm hover:bg-white/90">
+          فتح لوحة المحتوى
+          <ArrowLeft className="h-4 w-4" />
+        </Link>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardDescription>أحداث تشغيلية</CardDescription>
+            <CardTitle className="text-3xl">{kpis.totalEvents}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardDescription>أولوية عالية</CardDescription>
+            <CardTitle className="text-3xl">{kpis.highPriority}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardDescription>مواد مطلوبة مبدئيًا</CardDescription>
+            <CardTitle className="text-3xl">{kpis.totalAssets}</CardTitle>
+          </CardHeader>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.4fr_0.6fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-[#025EB8]" /> خريطة المواسم والتنبيهات
+            </CardTitle>
+            <CardDescription>نسخة تأسيسية ثابتة. لاحقًا سيتم ربطها بقاعدة البيانات، التقويم الهجري، والتنبيهات الفعلية.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {events.map((event) => (
+              <div key={event.id} className="rounded-2xl border bg-slate-50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="font-black text-slate-900">{event.title}</h2>
+                      <Badge variant="outline" className="bg-white text-slate-600">{categoryLabel[event.category]}</Badge>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{event.focus}</p>
+                  </div>
+                  <Badge variant="outline" className={priorityClass[event.priority]}>{event.priority}</Badge>
+                </div>
+
+                <div className="mt-4 grid gap-3 text-sm text-slate-600 md:grid-cols-3">
+                  <span className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-[#025EB8]" /> {event.dateLabel}</span>
+                  <span className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-[#025EB8]" /> {event.hijriLabel || "غير محدد"}</span>
+                  <span className="flex items-center gap-2"><BellRing className="h-4 w-4 text-[#025EB8]" /> قبل {event.leadTimeDays} يوم</span>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {event.requiredAssets.map((asset) => (
+                    <Badge key={asset} variant="outline" className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                      {asset}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <Card className="border-[#025EB8]/20 bg-blue-50/60">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-[#025EB8]" /> دور AI لاحقًا</CardTitle>
+              <CardDescription className="leading-6">سيحوّل الموسم إلى قائمة محتوى مقترحة، لكن كل اقتراح يبقى Draft يحتاج مراجعة بشرية.</CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-amber-600" /> قواعد التنبيه</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {alertRules.map((rule) => (
+                <div key={rule} className="flex gap-2 rounded-xl border bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#025EB8]" />
+                  {rule}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-[#025EB8]" /> القادم</CardTitle>
+              <CardDescription className="leading-6">الخطوة القادمة ستكون API للتقويم، ثم نماذج قاعدة البيانات والتنبيهات الحقيقية.</CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
