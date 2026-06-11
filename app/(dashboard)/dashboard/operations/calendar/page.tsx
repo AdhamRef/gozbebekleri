@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AlertTriangle, ArrowLeft, BellRing, CalendarDays, CheckCircle2, Clock3, FileText, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { operationsAlertRules, operationsCalendarEvents } from "@/lib/operations/calendar-data";
+import { getOperationsCalendarOverview } from "@/lib/operations/calendar-service";
 
 const categoryLabel: Record<string, string> = {
   RELIGIOUS: "مناسبة دينية",
@@ -18,8 +18,8 @@ const priorityClass: Record<string, string> = {
 };
 
 export default function OperationsCalendarPage() {
-  const highPriority = operationsCalendarEvents.filter((event) => event.priority === "HIGH").length;
-  const totalAssets = operationsCalendarEvents.reduce((total, event) => total + event.requiredAssets.length, 0);
+  const overview = getOperationsCalendarOverview();
+  const { events, alertRules, kpis } = overview;
 
   return (
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
@@ -28,7 +28,7 @@ export default function OperationsCalendarPage() {
           <p className="text-xs text-white/70">Operations / Calendar & Alerts</p>
           <h1 className="mt-1.5 text-2xl font-black">التقويم والتنبيهات</h1>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
-            مركز أولي لتجهيز المواسم الدينية والحملات قبل موعدها، وربط كل مناسبة بما تحتاجه من فيديوهات وتصاميم ورسائل.
+            مركز أولي لتجهيز المواسم الدينية والحملات قبل موعدها، وربط كل مناسبة بما تحتاجه من فيديوهات وتصاميم ورسائل. مصدر البيانات: {overview.source}.
           </p>
         </div>
         <Link href="/dashboard/operations/content" className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-bold text-[#025EB8] shadow-sm hover:bg-white/90">
@@ -41,19 +41,19 @@ export default function OperationsCalendarPage() {
         <Card>
           <CardHeader>
             <CardDescription>أحداث تشغيلية</CardDescription>
-            <CardTitle className="text-3xl">{operationsCalendarEvents.length}</CardTitle>
+            <CardTitle className="text-3xl">{kpis.totalEvents}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader>
             <CardDescription>أولوية عالية</CardDescription>
-            <CardTitle className="text-3xl">{highPriority}</CardTitle>
+            <CardTitle className="text-3xl">{kpis.highPriority}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader>
             <CardDescription>مواد مطلوبة مبدئيًا</CardDescription>
-            <CardTitle className="text-3xl">{totalAssets}</CardTitle>
+            <CardTitle className="text-3xl">{kpis.totalAssets}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -67,7 +67,7 @@ export default function OperationsCalendarPage() {
             <CardDescription>نسخة تأسيسية ثابتة. لاحقًا سيتم ربطها بقاعدة البيانات، التقويم الهجري، والتنبيهات الفعلية.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {operationsCalendarEvents.map((event) => (
+            {events.map((event) => (
               <div key={event.id} className="rounded-2xl border bg-slate-50 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -111,7 +111,7 @@ export default function OperationsCalendarPage() {
               <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-amber-600" /> قواعد التنبيه</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {operationsAlertRules.map((rule) => (
+              {alertRules.map((rule) => (
                 <div key={rule} className="flex gap-2 rounded-xl border bg-slate-50 p-3 text-sm leading-6 text-slate-700">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#025EB8]" />
                   {rule}
@@ -123,7 +123,7 @@ export default function OperationsCalendarPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-[#025EB8]" /> القادم</CardTitle>
-              <CardDescription className="leading-6">الخطوة القادمة ستكون تحويل هذه البيانات إلى Service وAPI ثم إضافة نماذج قاعدة البيانات والتنبيهات الحقيقية.</CardDescription>
+              <CardDescription className="leading-6">الخطوة القادمة ستكون API للتقويم، ثم نماذج قاعدة البيانات والتنبيهات الحقيقية.</CardDescription>
             </CardHeader>
           </Card>
         </div>
