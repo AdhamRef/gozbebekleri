@@ -3,79 +3,7 @@ import { CalendarClock, CheckCircle2, Clock3, FileText, Filter, Megaphone, PlusC
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-type Season = { id?: string; title: string; focus: string; status: string; period: string; required: number; ready: number; progress: number };
-type WeeklyTheme = { id?: string; week: string; theme: string; description: string };
-type ContentPlan = { id?: string; title: string; theme: string; status: string; items: number; published: number; date: string };
-type ContentItem = { id?: string; title: string; type: string; status: string; channel: string; due: string };
-type ContentTask = { id?: string; title: string; owner: string; status: string; due: string; item: string };
-
-type OperationsOverview = {
-  source: string;
-  version: string;
-  generatedAt: string;
-  kpis: {
-    openSeasons: number;
-    activePlans: number;
-    contentItems: number;
-    openProductionTasks: number;
-    readyForMarketing: number;
-  };
-  seasons: Season[];
-  weeklyThemes: WeeklyTheme[];
-  plans: ContentPlan[];
-  items: ContentItem[];
-  tasks: ContentTask[];
-};
-
-const fallbackOverview: OperationsOverview = {
-  source: "fallback",
-  version: "operations-overview-fallback",
-  generatedAt: new Date().toISOString(),
-  kpis: { openSeasons: 5, activePlans: 3, contentItems: 39, openProductionTasks: 4, readyForMarketing: 1 },
-  seasons: [
-    { id: "ramadan", title: "رمضان", focus: "زكاة، إفطار، صدقة يومية", status: "PLANNING", period: "مارس 2027", required: 30, ready: 8, progress: 27 },
-    { id: "dhul-hijjah", title: "عشر ذي الحجة", focus: "أضاحي، وقف، تذكير يومي", status: "PLANNING", period: "يونيو 2027", required: 18, ready: 4, progress: 22 },
-    { id: "aqsa-waqf", title: "القدس والوقف", focus: "وقف، حماية المقدسات، تقارير أثر", status: "ACTIVE", period: "مستمرة", required: 16, ready: 7, progress: 44 },
-    { id: "gaza", title: "غزة العاجلة", focus: "إغاثة، غذاء، فيديوهات ميدانية", status: "ACTIVE", period: "هذا الشهر", required: 12, ready: 5, progress: 42 },
-    { id: "winter", title: "الشتاء", focus: "دفء، بطانيات، سلال غذائية", status: "UPCOMING", period: "نوفمبر", required: 10, ready: 1, progress: 10 },
-  ],
-  weeklyThemes: [
-    { id: "week-1", week: "الأسبوع 1", theme: "القدس", description: "محتوى وقف وتوعية" },
-    { id: "week-2", week: "الأسبوع 2", theme: "غزة", description: "إغاثة وتقارير ميدانية" },
-    { id: "week-3", week: "الأسبوع 3", theme: "الوقف", description: "شرح الأثر والاستدامة" },
-    { id: "week-4", week: "الأسبوع 4", theme: "الزكاة", description: "تثقيف وتحويل للتبرع" },
-  ],
-  plans: [
-    { id: "ramadan-2027", title: "رمضان 2027", theme: "زكاة، إفطار، وصدقة يومية", status: "PLANNING", items: 18, published: 0, date: "مارس 2027" },
-    { id: "dhul-hijjah", title: "عشر ذي الحجة", theme: "أضاحي، وقف، ورسائل تذكير", status: "PLANNING", items: 12, published: 0, date: "يونيو 2027" },
-    { id: "aqsa-waqf", title: "حملة الوقف للقدس", theme: "محتوى توعوي + شهادات وقف", status: "ACTIVE", items: 9, published: 3, date: "مستمرة" },
-  ],
-  items: [
-    { id: "daily-ramadan", title: "فكرة سلسلة رمضان اليومية", type: "IDEA", status: "IDEA", channel: "All Channels", due: "هذا الشهر" },
-    { id: "zakat-carousel", title: "كاروسيل: كيف تحسب زكاتك؟", type: "CAROUSEL", status: "WRITING", channel: "Instagram", due: "هذا الأسبوع" },
-    { id: "gaza-design", title: "تصميم حملة غزة العاجلة", type: "DESIGN", status: "DESIGN", channel: "Meta Ads", due: "غدًا" },
-    { id: "waqf-video", title: "فيديو تعريفي عن الوقف", type: "VIDEO", status: "REVIEW", channel: "YouTube / Reels", due: "الأسبوع القادم" },
-    { id: "friday-whatsapp", title: "رسالة واتساب للجمعة", type: "WHATSAPP", status: "APPROVED", channel: "WhatsApp", due: "الجمعة" },
-  ],
-  tasks: [
-    { id: "task-waqf-script", title: "كتابة نص فيديو الوقف", owner: "فريق المحتوى", status: "IN_PROGRESS", due: "12 يونيو", item: "فيديو تعريفي عن الوقف" },
-    { id: "task-zakat-design", title: "تصميم كاروسيل الزكاة", owner: "فريق التصميم", status: "REVIEW", due: "13 يونيو", item: "كاروسيل: كيف تحسب زكاتك؟" },
-    { id: "task-gaza-edit", title: "مونتاج فيديو غزة", owner: "فريق الميديا", status: "DESIGN", due: "14 يونيو", item: "تصميم حملة غزة العاجلة" },
-    { id: "task-friday-whatsapp", title: "تجهيز رسالة واتساب الجمعة", owner: "التسويق", status: "APPROVED", due: "الجمعة", item: "رسالة واتساب للجمعة" },
-  ],
-};
-
-async function getOperationsOverview(): Promise<OperationsOverview> {
-  try {
-    const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
-    const response = await fetch(`${baseUrl}/api/dashboard/operations/overview`, { cache: "no-store" });
-    if (!response.ok) return fallbackOverview;
-    return (await response.json()) as OperationsOverview;
-  } catch {
-    return fallbackOverview;
-  }
-}
+import { getOperationsOverview } from "@/lib/operations/service";
 
 const boardColumns = [
   ["IDEA", "أفكار", "مواد تحتاج اعتماد الفكرة"],
@@ -204,8 +132,8 @@ export default async function OperationsContentPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card><CardHeader><CardTitle className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-emerald-600" /> حدود الحزمة</CardTitle></CardHeader><CardContent className="text-sm leading-6 text-slate-700">لا توجد كتابة في قاعدة البيانات. الصفحة تقرأ من API mock آمن فقط.</CardContent></Card>
-        <Card><CardHeader><CardTitle className="flex items-center gap-2"><Megaphone className="h-5 w-5 text-[#025EB8]" /> التسليم للتسويق</CardTitle></CardHeader><CardContent className="text-sm leading-6 text-slate-700">لاحقًا سيتم ربط العناصر المعتمدة بمنشئ الروابط والإعلانات بدون تكرار نظام Marketing.</CardContent></Card>
-        <Card><CardHeader><CardTitle className="flex items-center gap-2"><Clock3 className="h-5 w-5 text-amber-600" /> القادم</CardTitle></CardHeader><CardContent className="text-sm leading-6 text-slate-700">بعد تفعيل Prisma، نغير مصدر API overview من mock إلى MongoDB دون إعادة بناء الواجهة.</CardContent></Card>
+        <Card><CardHeader><CardTitle className="flex items-center gap-2"><Megaphone className="h-5 w-5 text-[#025EB8]" /> التسليم للتسويق</CardTitle></CardHeader><CardContent className="text-sm leading-6 text-slate-700">لاحقًا سيتم ربط العناصر المعتمدة بروابط الحملات ونتائج الأداء داخل Marketing.</CardContent></Card>
+        <Card><CardHeader><CardTitle className="flex items-center gap-2"><Clock3 className="h-5 w-5 text-amber-600" /> القادم</CardTitle></CardHeader><CardContent className="text-sm leading-6 text-slate-700">CRUD، صلاحيات التشغيل، سجل التغييرات، وجدولة النشر.</CardContent></Card>
       </div>
     </div>
   );
