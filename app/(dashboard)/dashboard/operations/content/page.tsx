@@ -1,8 +1,13 @@
 import Link from "next/link";
-import { CalendarClock, CheckCircle2, Clock3, FileText, Filter, Megaphone, PlusCircle, Search, UserRoundCheck } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { OperationsContentKanban } from "@/components/operations/OperationsContentKanban";
+import { OperationsContentPlans } from "@/components/operations/OperationsContentPlans";
+import { OperationsFilters } from "@/components/operations/OperationsFilters";
+import { OperationsInfoCards } from "@/components/operations/OperationsInfoCards";
+import { OperationsKpis } from "@/components/operations/OperationsKpis";
+import { OperationsProductionTasks } from "@/components/operations/OperationsProductionTasks";
+import { OperationsSeasonsBoard } from "@/components/operations/OperationsSeasonsBoard";
 import { getOperationsOverview } from "@/lib/operations/service";
 
 const boardColumns = [
@@ -45,96 +50,19 @@ export default async function OperationsContentPage() {
           <Button asChild variant="secondary" className="gap-2 font-bold">
             <Link href="/dashboard/operations"><PlusCircle className="h-4 w-4" /> العودة لمركز العمليات</Link>
           </Button>
-          <Button variant="secondary" disabled className="gap-2 font-bold opacity-80"><PlusCircle className="h-4 w-4" /> إضافة عنصر قريبًا</Button>
+          <Button variant="secondary" disabled className="gap-2 font-bold opacity-80">
+            <PlusCircle className="h-4 w-4" /> إضافة عنصر قريبًا
+          </Button>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <Card><CardHeader><CardDescription>المواسم المفتوحة</CardDescription><CardTitle className="text-3xl">{kpis.openSeasons}</CardTitle></CardHeader></Card>
-        <Card><CardHeader><CardDescription>الخطط النشطة</CardDescription><CardTitle className="text-3xl">{kpis.activePlans}</CardTitle></CardHeader></Card>
-        <Card><CardHeader><CardDescription>عناصر المحتوى</CardDescription><CardTitle className="text-3xl">{kpis.contentItems}</CardTitle></CardHeader></Card>
-        <Card><CardHeader><CardDescription>مهام إنتاج مفتوحة</CardDescription><CardTitle className="text-3xl">{kpis.openProductionTasks}</CardTitle></CardHeader></Card>
-        <Card><CardHeader><CardDescription>جاهز للتسويق</CardDescription><CardTitle className="text-3xl">{kpis.readyForMarketing}</CardTitle></CardHeader></Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><CalendarClock className="h-5 w-5 text-[#025EB8]" /> التقويم التشغيلي والمواسم</CardTitle>
-          <CardDescription>نظرة واحدة على المواسم والمحاور التي تقود إنتاج المحتوى خلال الشهر أو الموسم.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 xl:grid-cols-5">
-            {seasons.map((season) => (
-              <div key={season.id || season.title} className="rounded-2xl border bg-slate-50 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div><h3 className="font-black text-slate-900">{season.title}</h3><p className="mt-1 text-xs leading-5 text-slate-500">{season.focus}</p></div>
-                  <Badge variant="outline" className={statusClass[season.status]}>{season.status}</Badge>
-                </div>
-                <div className="mt-4 space-y-2 text-xs text-slate-600">
-                  <p>الفترة: <b>{season.period}</b></p><p>المواد: <b>{season.ready}</b> جاهزة من <b>{season.required}</b></p>
-                  <div className="h-2 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-[#025EB8]" style={{ width: `${season.progress}%` }} /></div>
-                  <p className="text-left font-bold text-slate-700">{season.progress}%</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="rounded-2xl border bg-white p-4">
-            <h3 className="font-black text-slate-900">خطة المحاور الشهرية</h3>
-            <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {weeklyThemes.map((theme) => (
-                <div key={theme.id || theme.week} className="rounded-xl border bg-slate-50 p-3">
-                  <p className="text-xs font-bold text-[#025EB8]">{theme.week}</p><h4 className="mt-1 font-black text-slate-900">{theme.theme}</h4><p className="mt-1 text-xs leading-5 text-slate-500">{theme.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div><CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5 text-[#025EB8]" /> فلاتر التشغيل</CardTitle><CardDescription className="mt-2">فلاتر شكلية الآن، وسيتم تفعيلها عند ربط CRUD.</CardDescription></div>
-          <div className="flex flex-wrap gap-2">{filters.map((filter) => <Badge key={filter} variant="outline" className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">{filter}</Badge>)}</div>
-        </CardHeader>
-        <CardContent><div className="flex items-center gap-2 rounded-xl border bg-slate-50 px-3 py-2 text-sm text-slate-500"><Search className="h-4 w-4" /> البحث في العناصر والخطط سيتم تفعيله بعد CRUD.</div></CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle>مراحل إنتاج المحتوى</CardTitle><CardDescription>Kanban يقرأ الآن من API overview، وسيتم استبدال مصدره لاحقًا بقاعدة البيانات.</CardDescription></CardHeader>
-        <CardContent>
-          <div className="grid gap-3 xl:grid-cols-5">
-            {boardColumns.map(([status, label, description]) => {
-              const columnItems = items.filter((item) => item.status === status);
-              return (
-                <div key={status} className="rounded-2xl border bg-slate-50 p-3">
-                  <div className="mb-3 flex items-start justify-between gap-2"><div><h3 className="font-black text-slate-900">{label}</h3><p className="mt-1 text-xs leading-5 text-slate-500">{description}</p></div><Badge variant="outline" className={statusClass[status]}>{columnItems.length}</Badge></div>
-                  <div className="space-y-2">
-                    {columnItems.map((item) => <div key={item.id || item.title} className="rounded-xl border bg-white p-3 shadow-sm"><div className="flex items-start justify-between gap-2"><h4 className="text-sm font-bold leading-6 text-slate-900">{item.title}</h4><Badge variant="outline" className={statusClass[item.status]}>{item.type}</Badge></div><div className="mt-3 space-y-1 text-xs text-slate-500"><p>القناة: <b>{item.channel}</b></p><p>الموعد: <b>{item.due}</b></p></div></div>)}
-                    {columnItems.length === 0 ? <p className="rounded-xl border border-dashed bg-white p-3 text-center text-xs text-slate-400">لا توجد عناصر حالية</p> : null}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="gap-3 lg:flex-row lg:items-center lg:justify-between"><div><CardTitle className="flex items-center gap-2"><UserRoundCheck className="h-5 w-5 text-[#025EB8]" /> مهام الإنتاج</CardTitle><CardDescription className="mt-2">تصور أولي لتوزيع المسؤوليات والمواعيد قبل ربط المهام بقاعدة البيانات.</CardDescription></div><Button variant="outline" disabled className="gap-2 font-bold opacity-80"><PlusCircle className="h-4 w-4" /> إضافة مهمة قريبًا</Button></CardHeader>
-        <CardContent><div className="grid gap-3 lg:grid-cols-2">{tasks.map((task) => <div key={task.id || task.title} className="rounded-2xl border bg-slate-50 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-black text-slate-900">{task.title}</h3><p className="mt-1 text-sm leading-6 text-slate-600">مرتبط بـ: {task.item}</p></div><Badge variant="outline" className={statusClass[task.status]}>{task.status}</Badge></div><div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2"><span>المسؤول: <b>{task.owner}</b></span><span>موعد التسليم: <b>{task.due}</b></span></div></div>)}</div></CardContent>
-      </Card>
-
-      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card><CardHeader><CardTitle className="flex items-center gap-2"><CalendarClock className="h-5 w-5 text-[#025EB8]" /> خطط المحتوى</CardTitle><CardDescription>نماذج تقرأ الآن من API overview.</CardDescription></CardHeader><CardContent className="space-y-3">{plans.map((plan) => <div key={plan.id || plan.title} className="rounded-2xl border bg-slate-50 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-black text-slate-900">{plan.title}</h2><p className="mt-1 text-sm leading-6 text-slate-600">{plan.theme}</p></div><Badge variant="outline" className={statusClass[plan.status]}>{plan.status}</Badge></div><div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-3"><span>العناصر: <b>{plan.items}</b></span><span>منشور: <b>{plan.published}</b></span><span>الفترة: <b>{plan.date}</b></span></div></div>)}</CardContent></Card>
-        <Card><CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-[#025EB8]" /> عناصر المحتوى</CardTitle><CardDescription>قائمة مختصرة بجانب Kanban لتوضيح تفاصيل العناصر.</CardDescription></CardHeader><CardContent className="space-y-3">{items.map((item) => <div key={item.id || item.title} className="rounded-2xl border p-4"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold text-slate-900">{item.title}</h3><Badge variant="outline" className={statusClass[item.status]}>{item.status}</Badge></div><div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2"><span>النوع: <b>{item.type}</b></span><span>القناة: <b>{item.channel}</b></span><span className="sm:col-span-2">الموعد: <b>{item.due}</b></span></div></div>)}</CardContent></Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card><CardHeader><CardTitle className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-emerald-600" /> حدود الحزمة</CardTitle></CardHeader><CardContent className="text-sm leading-6 text-slate-700">لا توجد كتابة في قاعدة البيانات. الصفحة تقرأ من API mock آمن فقط.</CardContent></Card>
-        <Card><CardHeader><CardTitle className="flex items-center gap-2"><Megaphone className="h-5 w-5 text-[#025EB8]" /> التسليم للتسويق</CardTitle></CardHeader><CardContent className="text-sm leading-6 text-slate-700">لاحقًا سيتم ربط العناصر المعتمدة بروابط الحملات ونتائج الأداء داخل Marketing.</CardContent></Card>
-        <Card><CardHeader><CardTitle className="flex items-center gap-2"><Clock3 className="h-5 w-5 text-amber-600" /> القادم</CardTitle></CardHeader><CardContent className="text-sm leading-6 text-slate-700">CRUD، صلاحيات التشغيل، سجل التغييرات، وجدولة النشر.</CardContent></Card>
-      </div>
+      <OperationsKpis kpis={kpis} />
+      <OperationsSeasonsBoard seasons={seasons} weeklyThemes={weeklyThemes} statusClass={statusClass} />
+      <OperationsFilters filters={filters} />
+      <OperationsContentKanban items={items} boardColumns={boardColumns} statusClass={statusClass} />
+      <OperationsProductionTasks tasks={tasks} statusClass={statusClass} />
+      <OperationsContentPlans plans={plans} items={items} statusClass={statusClass} />
+      <OperationsInfoCards />
     </div>
   );
 }
