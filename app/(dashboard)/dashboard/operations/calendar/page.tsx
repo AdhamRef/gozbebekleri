@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowLeft, BellRing, CalendarDays, CheckCircle2, Clock3,
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getOperationsCalendarOverview } from "@/lib/operations/calendar-service";
+import { getPlanningOverview } from "@/lib/operations/planning/planning-service";
 import { getSeasonReadinessOverview } from "@/lib/operations/seasons/season-service";
 
 const categoryLabel: Record<string, string> = {
@@ -27,6 +28,7 @@ const statusClass: Record<string, string> = {
 export default function OperationsCalendarPage() {
   const overview = getOperationsCalendarOverview();
   const seasonOverview = getSeasonReadinessOverview();
+  const planningOverview = getPlanningOverview();
   const { events, alertRules, kpis } = overview;
 
   return (
@@ -51,8 +53,33 @@ export default function OperationsCalendarPage() {
         <Card><CardHeader><CardDescription>مواد مطلوبة مبدئيًا</CardDescription><CardTitle className="text-3xl">{kpis.totalAssets}</CardTitle></CardHeader></Card>
         <Card><CardHeader><CardDescription>مواسم متابعة</CardDescription><CardTitle className="text-3xl">{seasonOverview.summary.totalSeasons}</CardTitle></CardHeader></Card>
         <Card><CardHeader><CardDescription>متأخر</CardDescription><CardTitle className="text-3xl">{seasonOverview.summary.late}</CardTitle></CardHeader></Card>
-        <Card><CardHeader><CardDescription>يحتاج متابعة</CardDescription><CardTitle className="text-3xl">{seasonOverview.summary.needsAttention}</CardTitle></CardHeader></Card>
+        <Card><CardHeader><CardDescription>إجراءات مقترحة</CardDescription><CardTitle className="text-3xl">{planningOverview.summary.totalActions}</CardTitle></CardHeader></Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-[#025EB8]" /> الخطة المقترحة</CardTitle>
+          <CardDescription>إجراءات إنتاجية محسوبة من Planning Engine بناءً على نقص المواد في Season Engine.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 lg:grid-cols-2">
+          {planningOverview.actions.map((action) => (
+            <div key={action.id} className="rounded-2xl border bg-slate-50 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="font-black text-slate-900">{action.title}</h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">{action.reason}</p>
+                </div>
+                <Badge variant="outline" className={priorityClass[action.priority]}>{action.priority}</Badge>
+              </div>
+              <div className="mt-4 grid gap-2 text-sm text-slate-600 md:grid-cols-3">
+                <span>النوع: <b>{action.type}</b></span>
+                <span>المسؤول: <b>{action.suggestedOwner}</b></span>
+                <span>الموعد: <b>{action.dueLabel}</b></span>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -94,9 +121,7 @@ export default function OperationsCalendarPage() {
       <div className="grid gap-4 xl:grid-cols-[1.4fr_0.6fr]">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-[#025EB8]" /> خريطة المواسم والتنبيهات
-            </CardTitle>
+            <CardTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-[#025EB8]" /> خريطة المواسم والتنبيهات</CardTitle>
             <CardDescription>نسخة تأسيسية ثابتة. لاحقًا سيتم ربطها بقاعدة البيانات، التقويم الهجري، والتنبيهات الفعلية.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -127,9 +152,9 @@ export default function OperationsCalendarPage() {
           </CardContent>
         </Card>
         <div className="space-y-4">
-          <Card className="border-[#025EB8]/20 bg-blue-50/60"><CardHeader><CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-[#025EB8]" /> دور AI لاحقًا</CardTitle><CardDescription className="leading-6">سيحوّل الموسم إلى قائمة محتوى مقترحة، لكن كل اقتراح يبقى Draft يحتاج مراجعة بشرية.</CardDescription></CardHeader></Card>
+          <Card className="border-[#025EB8]/20 bg-blue-50/60"><CardHeader><CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-[#025EB8]" /> دور AI لاحقًا</CardTitle><CardDescription className="leading-6">سيقرأ AI لاحقًا الخطة المقترحة، ويحوّلها إلى مسودات محتوى وجدول أولويات قابل للمراجعة البشرية.</CardDescription></CardHeader></Card>
           <Card><CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-amber-600" /> قواعد التنبيه</CardTitle></CardHeader><CardContent className="space-y-3">{alertRules.map((rule) => <div key={rule} className="flex gap-2 rounded-xl border bg-slate-50 p-3 text-sm leading-6 text-slate-700"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#025EB8]" />{rule}</div>)}</CardContent></Card>
-          <Card><CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-[#025EB8]" /> القادم</CardTitle><CardDescription className="leading-6">الخطوة القادمة ستكون تحويل Season Engine إلى API ثم ربطه بخطط المحتوى والمهام.</CardDescription></CardHeader></Card>
+          <Card><CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-[#025EB8]" /> القادم</CardTitle><CardDescription className="leading-6">الخطوة القادمة ستكون تحويل هذه الإجراءات إلى مهام إنتاج فعلية مرتبطة بلوحة المحتوى.</CardDescription></CardHeader></Card>
         </div>
       </div>
     </div>
