@@ -23,6 +23,43 @@ interface CategoryLineInput {
   amount: number;
 }
 
+// Discriminated union describing how the admin picked the donor for this manual
+// donation. EXISTING reuses an existing User; NEW creates a fresh User from the
+// supplied name (and optional contact info); UNKNOWN routes to the shared
+// "متبرع غير معروف" singleton so cash donations without donor info still settle
+// without polluting the user list with a row per untracked donor.
+type DonorInput =
+  | { mode: "EXISTING"; id: string }
+  | { mode: "NEW"; name: string; phone?: string | null; email?: string | null }
+  | { mode: "UNKNOWN" };
+
+const UNKNOWN_DONOR_EMAIL = "unknown-donor@internal.alafiya.local";
+const UNKNOWN_DONOR_NAME = "متبرع غير معروف";
+
+/**
+ * Singleton "unknown" donor record used by manual donations where the admin
+ * doesn't want to track who paid (typical for street/cash donations). All
+ * unknown donations share this one User row so the donor list stays clean.
+ * Identified by a reserved internal email so we can `findUnique` reliably.
+ */
+async function getOrCreateUnknownDonor(): Promise<{ id: string; name: string | null }> {
+  const existing = await prisma.user.findUnique({
+    where: { email: UNKNOWN_DONOR_EMAIL },
+    select: { id: true, name: true },
+  });
+  if (existing) return existing;
+  return prisma.user.create({
+    data: {
+      name: UNKNOWN_DONOR_NAME,
+      email: UNKNOWN_DONOR_EMAIL,
+      role: "DONOR",
+      emailNotifications: false,
+      smsNotifications: false,
+    },
+    select: { id: true, name: true },
+  });
+}
+
 /**
  * POST /api/admin/donations — admin manually adds a donation (cash, bank
  * transfer, reconciled offline payment, etc.).
@@ -46,6 +83,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = (await request.json()) as {
+      donor?: DonorInput;
+      /** @deprecated use `donor: { mode: "EXISTING", id }` */
       donorId?: string;
       items?: CampaignLineInput[];
       categoryItems?: CategoryLineInput[];
@@ -57,7 +96,14 @@ export async function POST(request: NextRequest) {
       notes?: string | null;
     };
 
-    const donorId = body.donorId?.trim();
+    // Resolve the donor input into a discriminated union. Keeps backward compat
+    // with the original `donorId` shape so older clients keep working.
+    const donorInput: DonorInput | null = (() => {
+      if (body.donor && typeof body.donor === "object") return body.donor;
+      const legacyId = body.donorId?.trim();
+      if (legacyId) return { mode: "EXISTING", id: legacyId };
+      return null;
+    })();
     const currency = body.currency?.trim().toUpperCase();
     const paymentMethod = body.paymentMethod ?? "CARD";
     const teamSupport = Math.max(0, Number(body.teamSupport ?? 0)) || 0;
@@ -65,8 +111,27 @@ export async function POST(request: NextRequest) {
     const items = Array.isArray(body.items) ? body.items : [];
     const categoryItems = Array.isArray(body.categoryItems) ? body.categoryItems : [];
 
-    if (!donorId) {
-      return NextResponse.json({ error: "donorId is required" }, { status: 400 });
+    if (!donorInput) {
+      return NextResponse.json({ error: "donor is required" }, { status: 400 });
+    }
+    if (
+      donorInput.mode !== "EXISTING" &&
+      donorInput.mode !== "NEW" &&
+      donorInput.mode !== "UNKNOWN"
+    ) {
+      return NextResponse.json(
+        { error: "donor.mode must be EXISTING, NEW, or UNKNOWN" },
+        { status: 400 }
+      );
+    }
+    if (donorInput.mode === "EXISTING" && !donorInput.id?.trim()) {
+      return NextResponse.json({ error: "donor.id is required for EXISTING" }, { status: 400 });
+    }
+    if (donorInput.mode === "NEW" && !donorInput.name?.trim()) {
+      return NextResponse.json(
+        { error: "donor.name is required for NEW" },
+        { status: 400 }
+      );
     }
     if (!currency) {
       return NextResponse.json({ error: "currency is required" }, { status: 400 });
@@ -122,13 +187,61 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const donor = await prisma.user.findUnique({
-      where: { id: donorId },
-      select: { id: true, name: true },
-    });
-    if (!donor) {
-      return NextResponse.json({ error: "Donor not found" }, { status: 404 });
+    // Resolve the donor input into an actual User row. EXISTING fetches;
+    // NEW creates a fresh DONOR with whatever contact info the admin supplied;
+    // UNKNOWN routes to the shared singleton.
+    let donor: { id: string; name: string | null };
+    let donorCreated = false;
+    if (donorInput.mode === "EXISTING") {
+      const found = await prisma.user.findUnique({
+        where: { id: donorInput.id.trim() },
+        select: { id: true, name: true },
+      });
+      if (!found) {
+        return NextResponse.json({ error: "Donor not found" }, { status: 404 });
+      }
+      donor = found;
+    } else if (donorInput.mode === "NEW") {
+      const trimmedName = donorInput.name.trim();
+      const trimmedEmail = donorInput.email?.trim() || null;
+      const trimmedPhone = donorInput.phone?.trim() || null;
+      // If admin supplied an email, reuse a matching existing row instead of
+      // erroring on the unique constraint — this is the same lenient behavior
+      // resolveGuestDonor uses on the public donation flow.
+      if (trimmedEmail) {
+        const existing = await prisma.user.findUnique({
+          where: { email: trimmedEmail },
+          select: { id: true, name: true },
+        });
+        if (existing) {
+          donor = existing;
+        } else {
+          donor = await prisma.user.create({
+            data: {
+              name: trimmedName,
+              email: trimmedEmail,
+              phone: trimmedPhone ?? undefined,
+              role: "DONOR",
+            },
+            select: { id: true, name: true },
+          });
+          donorCreated = true;
+        }
+      } else {
+        donor = await prisma.user.create({
+          data: {
+            name: trimmedName,
+            phone: trimmedPhone ?? undefined,
+            role: "DONOR",
+          },
+          select: { id: true, name: true },
+        });
+        donorCreated = true;
+      }
+    } else {
+      donor = await getOrCreateUnknownDonor();
     }
+    const donorId = donor.id;
 
     if (items.length > 0) {
       const ids = [...new Set(items.map((it) => it.campaignId))];
@@ -228,15 +341,23 @@ export async function POST(request: NextRequest) {
       return d;
     });
 
+    const donorLabel =
+      donorInput.mode === "UNKNOWN"
+        ? "متبرع غير معروف"
+        : donorInput.mode === "NEW"
+          ? `${donor.name ?? donorId} (متبرع جديد)`
+          : donor.name ?? donorId;
     const actor = auditActorFromDashboardSession(session);
     await writeAuditLog({
       ...actor,
       action: "DONATION_MANUAL_CREATE",
-      messageAr: `${actor.actorName ?? "مسؤول"} أضاف تبرعًا يدويًا (${amount} ${currency}) للمتبرع ${donor.name ?? donorId}`,
+      messageAr: `${actor.actorName ?? "مسؤول"} أضاف تبرعًا يدويًا (${amount} ${currency}) للمتبرع ${donorLabel}`,
       entityType: "Donation",
       entityId: created.id,
       metadata: {
         donorId,
+        donorMode: donorInput.mode,
+        donorCreated,
         amount,
         amountUSD,
         currency,
@@ -248,7 +369,15 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ donationId: created.id }, { status: 201 });
+    return NextResponse.json(
+      {
+        donationId: created.id,
+        donor: { id: donor.id, name: donor.name },
+        donorCreated,
+        donorMode: donorInput.mode,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("[admin manual donation] failed:", error);
     return NextResponse.json(

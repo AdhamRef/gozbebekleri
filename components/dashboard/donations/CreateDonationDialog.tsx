@@ -38,6 +38,8 @@ interface DonorOption {
   phone: string | null;
 }
 
+type DonorMode = "EXISTING" | "NEW" | "UNKNOWN";
+
 interface EditableItem {
   key: string;
   kind: "campaign" | "category";
@@ -67,10 +69,14 @@ export function CreateDonationDialog({ onClose, onCreated }: Props) {
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [loadingFilters, setLoadingFilters] = useState(true);
 
+  const [donorMode, setDonorMode] = useState<DonorMode>("EXISTING");
   const [donorSearch, setDonorSearch] = useState("");
   const [donorResults, setDonorResults] = useState<DonorOption[]>([]);
   const [donorSearching, setDonorSearching] = useState(false);
   const [donor, setDonor] = useState<DonorOption | null>(null);
+  const [newDonorName, setNewDonorName] = useState("");
+  const [newDonorPhone, setNewDonorPhone] = useState("");
+  const [newDonorEmail, setNewDonorEmail] = useState("");
 
   const [currency, setCurrency] = useState("USD");
   const [paymentMethod, setPaymentMethod] = useState<"CARD" | "PAYPAL">("CARD");
@@ -164,9 +170,13 @@ export function CreateDonationDialog({ onClose, onCreated }: Props) {
     return false;
   })();
   const teamSupportNumber = Math.max(0, Number(teamSupport) || 0);
+  const donorPickerValid =
+    (donorMode === "EXISTING" && donor != null) ||
+    (donorMode === "NEW" && newDonorName.trim().length > 0) ||
+    donorMode === "UNKNOWN";
   const canSave =
     !submitting &&
-    donor != null &&
+    donorPickerValid &&
     editableItems.length > 0 &&
     amountSum > 0 &&
     !hasInvalidLine &&
@@ -202,7 +212,7 @@ export function CreateDonationDialog({ onClose, onCreated }: Props) {
     ]);
 
   const submit = async () => {
-    if (!canSave || !donor) return;
+    if (!canSave) return;
     setSubmitting(true);
     try {
       const items = editableItems
@@ -212,8 +222,20 @@ export function CreateDonationDialog({ onClose, onCreated }: Props) {
         .filter((it) => it.kind === "category")
         .map((it) => ({ categoryId: it.refId, amount: Number(it.amount) }));
 
-      await axios.post(`/api/admin/donations`, {
-        donorId: donor.id,
+      const donorPayload =
+        donorMode === "EXISTING" && donor
+          ? { mode: "EXISTING" as const, id: donor.id }
+          : donorMode === "NEW"
+            ? {
+                mode: "NEW" as const,
+                name: newDonorName.trim(),
+                phone: newDonorPhone.trim() || null,
+                email: newDonorEmail.trim() || null,
+              }
+            : { mode: "UNKNOWN" as const };
+
+      const res = await axios.post(`/api/admin/donations`, {
+        donor: donorPayload,
         items,
         categoryItems,
         currency,
@@ -221,7 +243,14 @@ export function CreateDonationDialog({ onClose, onCreated }: Props) {
         paymentMethod,
         notes: notes.trim() || null,
       });
-      toast.success("تم إضافة التبرع وتحديث الإجماليات");
+      const created = res.data?.donorCreated === true;
+      toast.success(
+        created
+          ? "تم إنشاء المتبرع وتسجيل التبرع"
+          : donorMode === "UNKNOWN"
+            ? "تم تسجيل تبرع متبرع غير معروف"
+            : "تم إضافة التبرع وتحديث الإجماليات"
+      );
       onCreated();
       onClose();
     } catch (err) {
@@ -250,75 +279,154 @@ export function CreateDonationDialog({ onClose, onCreated }: Props) {
           {/* Donor */}
           <div className="space-y-2">
             <label className="text-xs font-medium text-slate-700">المتبرع</label>
-            {donor ? (
-              <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                <div className="text-right">
-                  <p className="font-medium text-slate-800">{donor.name || "—"}</p>
-                  <p className="text-[11px] text-slate-500">
-                    {donor.email || donor.phone || donor.id}
-                  </p>
-                </div>
-                <Button
+            <div className="inline-flex w-full rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[11px]">
+              {[
+                { value: "EXISTING" as const, label: "متبرع موجود" },
+                { value: "NEW" as const, label: "متبرع جديد" },
+                { value: "UNKNOWN" as const, label: "غير معروف" },
+              ].map((opt) => (
+                <button
                   type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setDonor(null)}
-                  className="h-7 text-xs"
+                  key={opt.value}
+                  onClick={() => setDonorMode(opt.value)}
+                  className={`flex-1 rounded-md px-2 py-1.5 font-medium transition ${
+                    donorMode === opt.value
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
                 >
-                  تغيير
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <Input
-                    value={donorSearch}
-                    onChange={(e) => setDonorSearch(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void runDonorSearch();
-                      }
-                    }}
-                    placeholder="ابحث بالاسم أو البريد أو الهاتف"
-                    className="h-8 text-xs"
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={runDonorSearch}
-                    disabled={donorSearching || !donorSearch.trim()}
-                    className="h-8 gap-1.5"
-                  >
-                    {donorSearching ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Search className="w-3.5 h-3.5" />
-                    )}
-                    بحث
-                  </Button>
-                </div>
-                {donorResults.length > 0 && (
-                  <div className="max-h-44 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
-                    {donorResults.map((u) => (
-                      <button
-                        type="button"
-                        key={u.id}
-                        onClick={() => {
-                          setDonor(u);
-                          setDonorResults([]);
-                          setDonorSearch("");
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {donorMode === "EXISTING" && (
+              <>
+                {donor ? (
+                  <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <div className="text-right">
+                      <p className="font-medium text-slate-800">{donor.name || "—"}</p>
+                      <p className="text-[11px] text-slate-500">
+                        {donor.email || donor.phone || donor.id}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setDonor(null)}
+                      className="h-7 text-xs"
+                    >
+                      تغيير
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        value={donorSearch}
+                        onChange={(e) => setDonorSearch(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void runDonorSearch();
+                          }
                         }}
-                        className="w-full text-right px-3 py-2 text-xs hover:bg-slate-50"
+                        placeholder="ابحث بالاسم أو البريد أو الهاتف"
+                        className="h-8 text-xs"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={runDonorSearch}
+                        disabled={donorSearching || !donorSearch.trim()}
+                        className="h-8 gap-1.5"
                       >
-                        <div className="font-medium text-slate-800">{u.name || "—"}</div>
-                        <div className="text-[11px] text-slate-500">
-                          {u.email || u.phone || u.id}
-                        </div>
-                      </button>
-                    ))}
+                        {donorSearching ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Search className="w-3.5 h-3.5" />
+                        )}
+                        بحث
+                      </Button>
+                    </div>
+                    {donorResults.length > 0 && (
+                      <div className="max-h-44 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
+                        {donorResults.map((u) => (
+                          <button
+                            type="button"
+                            key={u.id}
+                            onClick={() => {
+                              setDonor(u);
+                              setDonorResults([]);
+                              setDonorSearch("");
+                            }}
+                            className="w-full text-right px-3 py-2 text-xs hover:bg-slate-50"
+                          >
+                            <div className="font-medium text-slate-800">{u.name || "—"}</div>
+                            <div className="text-[11px] text-slate-500">
+                              {u.email || u.phone || u.id}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
+              </>
+            )}
+
+            {donorMode === "NEW" && (
+              <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
+                <p className="text-[11px] text-slate-500">
+                  سيتم إنشاء حساب متبرع جديد. الاسم مطلوب — البريد والهاتف اختياريان.
+                  إذا أدخلت بريدًا موجودًا، سيُربط التبرع بالمتبرع الحالي تلقائيًا.
+                </p>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-slate-600">الاسم *</label>
+                  <Input
+                    value={newDonorName}
+                    onChange={(e) => setNewDonorName(e.target.value)}
+                    placeholder="مثال: أحمد محمد"
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-slate-600">الهاتف</label>
+                    <Input
+                      value={newDonorPhone}
+                      onChange={(e) => setNewDonorPhone(e.target.value)}
+                      placeholder="+90..."
+                      dir="ltr"
+                      className="h-8 text-xs text-right"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-medium text-slate-600">البريد</label>
+                    <Input
+                      value={newDonorEmail}
+                      onChange={(e) => setNewDonorEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      dir="ltr"
+                      className="h-8 text-xs text-right"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {donorMode === "UNKNOWN" && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-medium">سيتم تسجيل التبرع باسم "متبرع غير معروف".</p>
+                  <p>
+                    جميع التبرعات غير المعروفة تُسجَّل تحت نفس الحساب الموحد، فلا
+                    يمكن تخصيصها لشخص لاحقًا. استخدم هذا الخيار للتبرعات النقدية
+                    التي لا توجد لها معلومات متبرع.
+                  </p>
+                </div>
               </div>
             )}
           </div>
