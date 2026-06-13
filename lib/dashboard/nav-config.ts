@@ -51,6 +51,7 @@ export const DASHBOARD_NAV_GROUPS: {
       { key: "platformConnections", title: "ربط المنصات", href: "/dashboard/marketing/connections" },
       { key: "ads", title: "مركز التتبع", href: "/dashboard/marketing/tracking-hub" },
       { key: "ads", title: "التحليلات والرؤى", href: "/dashboard/marketing/insights" },
+      { key: "ads", title: "نتائج التسويق", href: "/dashboard/marketing/results" },
       { key: "ads", title: "حالة المنصات", href: "/dashboard/marketing-intelligence/platform-status" },
       { key: "ads", title: "قرارات التسويق", href: "/dashboard/marketing-intelligence/decisions" },
       { key: "ads", title: "Google Ads", href: "/dashboard/marketing/google-ads" },
