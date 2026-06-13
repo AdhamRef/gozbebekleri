@@ -33,18 +33,41 @@ export const DASHBOARD_NAV_GROUPS: {
     ],
   },
   {
+    group: "المحتوى والتشغيل",
+    items: [
+      { key: "campaigns", title: "نظرة عامة", href: "/dashboard/operations" },
+      { key: "campaigns", title: "التقويم والتنبيهات", href: "/dashboard/operations/calendar" },
+      { key: "campaigns", title: "مهام الإنتاج", href: "/dashboard/operations/tasks" },
+      { key: "campaigns", title: "لوحة الإنتاج", href: "/dashboard/operations/production" },
+      { key: "campaigns", title: "الأرشيف", href: "/dashboard/operations/archive" },
+      { key: "campaigns", title: "لوحة المحتوى", href: "/dashboard/operations/content" },
+      { key: "campaigns", title: "خريطة النظام", href: "/dashboard/operations/system" },
+    ],
+  },
+  {
+    group: "التسويق والنمو",
+    items: [
+      { key: "ads", title: "نظرة عامة", href: "/dashboard/marketing" },
+      { key: "platformConnections", title: "ربط المنصات", href: "/dashboard/marketing/connections" },
+      { key: "ads", title: "مركز التتبع", href: "/dashboard/marketing/tracking-hub" },
+      { key: "ads", title: "التحليلات والرؤى", href: "/dashboard/marketing/insights" },
+      { key: "ads", title: "نتائج التسويق", href: "/dashboard/marketing/results" },
+      { key: "ads", title: "حالة المنصات", href: "/dashboard/marketing-intelligence/platform-status" },
+      { key: "ads", title: "قرارات التسويق", href: "/dashboard/marketing-intelligence/decisions" },
+      { key: "ads", title: "Google Ads", href: "/dashboard/marketing/google-ads" },
+      { key: "ads", title: "سجل المزامنة", href: "/dashboard/marketing/sync-log" },
+      { key: "ads", title: "مساعد التسويق AI", href: "/dashboard/marketing/ai-assistant" },
+      { key: "referrals", title: "منشئ الحملات والروابط", href: "/dashboard/link-generator" },
+      { key: "pixels", title: "البكسلات والتتبع", href: "/dashboard/pixels" },
+      { key: "ads", title: "أحداث التحويل", href: "/dashboard/conversion-events" },
+      { key: "ads", title: "إدارة الإعلانات", href: "/dashboard/ads" },
+    ],
+  },
+  {
     group: "إعدادات الهوية",
     items: [
       { key: "slides", title: "شرائح الهيرو", href: "/dashboard/slides" },
       { key: "ticker", title: "إعدادات التيكر", href: "/dashboard/ticker" },
-    ],
-  },
-  {
-    group: "التسويق",
-    items: [
-      { key: "ads", title: "خريطة النظام", href: "/dashboard/marketing-intelligence" },
-      { key: "ads", title: "الإعلانات", href: "/dashboard/ads" },
-      { key: "referrals", title: "إنشاء الروابط", href: "/dashboard/link-generator" },
     ],
   },
   {

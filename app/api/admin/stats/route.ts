@@ -293,6 +293,9 @@ export async function GET(request: NextRequest) {
           provider: true,
           paymentMethod: true,
           providerErrorMessage: true,
+          attribution: true,
+          conversionEventsSentAt: true,
+          conversionFailedEventsSentAt: true,
           donor: { select: { name: true } },
           items: {
             select: {
@@ -395,6 +398,9 @@ export async function GET(request: NextRequest) {
       provider: d.provider ?? null,
       paymentMethod: d.paymentMethod ?? null,
       providerErrorMessage: d.providerErrorMessage ?? null,
+      attribution: d.attribution ?? null,
+      conversionEventsSentAt: d.conversionEventsSentAt ?? null,
+      conversionFailedEventsSentAt: d.conversionFailedEventsSentAt ?? null,
       campaignTitle: d.items[0]?.campaign?.title ?? null,
       categoryName: d.categoryItems[0]?.category?.name ?? null,
       createdAt: d.createdAt,

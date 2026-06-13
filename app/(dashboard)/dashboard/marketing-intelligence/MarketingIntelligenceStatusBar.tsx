@@ -22,14 +22,18 @@ function cls(status?: string | null) {
   return "border-slate-200 bg-slate-50 text-slate-600";
 }
 
+function shouldHideStatusBar(pathname: string) {
+  return pathname === "/dashboard/marketing-intelligence" || pathname === "/dashboard/marketing-intelligence/ads-recommendations";
+}
+
 export function MarketingIntelligenceStatusBar() {
   const pathname = usePathname();
-  const isOverview = pathname === "/dashboard/marketing-intelligence";
+  const hideStatusBar = shouldHideStatusBar(pathname);
   const [data, setData] = React.useState<Payload | null>(null);
   const [loading, setLoading] = React.useState(false);
 
   const load = React.useCallback(async () => {
-    if (isOverview) return;
+    if (hideStatusBar) return;
     setLoading(true);
     try {
       const res = await fetch("/api/admin/marketing-intelligence/sync-status?platform=META", { cache: "no-store" });
@@ -38,10 +42,10 @@ export function MarketingIntelligenceStatusBar() {
     } finally {
       setLoading(false);
     }
-  }, [isOverview]);
+  }, [hideStatusBar]);
 
   React.useEffect(() => { void load(); }, [load]);
-  if (isOverview) return null;
+  if (hideStatusBar) return null;
 
   const latest = data?.latest ?? null;
   const success = data?.lastSuccess ?? null;

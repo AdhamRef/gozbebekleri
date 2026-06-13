@@ -588,7 +588,7 @@ enum PaymentMethod {
   CARD
   PAYPAL
 }
-
+//asd
 type CardDetails {
   cardNumber     String
   expiryDate     String
