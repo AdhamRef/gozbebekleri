@@ -79,7 +79,10 @@ export function CreateDonationDialog({ onClose, onCreated }: Props) {
   const [newDonorEmail, setNewDonorEmail] = useState("");
 
   const [currency, setCurrency] = useState("USD");
-  const [paymentMethod, setPaymentMethod] = useState<"CARD" | "PAYPAL">("CARD");
+  // `provider` is the gateway/rail label stored on Donation.provider
+  // ("BANK" / "PAYFOR" / "STRIPE"). All three are card-style rails, so
+  // Donation.paymentMethod is always CARD here.
+  const [provider, setProvider] = useState<"BANK" | "PAYFOR" | "STRIPE">("BANK");
   const [teamSupport, setTeamSupport] = useState("0");
   const [notes, setNotes] = useState("");
   const [editableItems, setEditableItems] = useState<EditableItem[]>([
@@ -240,7 +243,10 @@ export function CreateDonationDialog({ onClose, onCreated }: Props) {
         categoryItems,
         currency,
         teamSupport: teamSupportNumber,
-        paymentMethod,
+        // All three rails (BANK / PAYFOR / STRIPE) are card-style for the
+        // donation schema; the `provider` field is what distinguishes them.
+        paymentMethod: "CARD",
+        provider,
         notes: notes.trim() || null,
       });
       const created = res.data?.donorCreated === true;
@@ -451,15 +457,16 @@ export function CreateDonationDialog({ onClose, onCreated }: Props) {
             <div className="space-y-1">
               <label className="text-xs font-medium text-slate-700">طريقة الدفع</label>
               <Select
-                value={paymentMethod}
-                onValueChange={(v) => setPaymentMethod(v as "CARD" | "PAYPAL")}
+                value={provider}
+                onValueChange={(v) => setProvider(v as "BANK" | "PAYFOR" | "STRIPE")}
               >
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="CARD" className="text-xs">بطاقة / تحويل</SelectItem>
-                  <SelectItem value="PAYPAL" className="text-xs">PayPal</SelectItem>
+                  <SelectItem value="BANK" className="text-xs">حساب بنكي</SelectItem>
+                  <SelectItem value="PAYFOR" className="text-xs">Ziraat Payfor</SelectItem>
+                  <SelectItem value="STRIPE" className="text-xs">Stripe</SelectItem>
                 </SelectContent>
               </Select>
             </div>
