@@ -1,23 +1,30 @@
 export type ProviderCategory =
   | "PIXELS_AND_APIS"
-  | "AD_ACCOUNTS"
-  | "ANALYTICS"
-  | "MESSAGING"
-  | "AI"
-  | "INTERNAL";
+  | "AD_ACCOUNT"
+  | "ANALYTICS_ACCOUNT"
+  | "MESSAGING_PROVIDER"
+  | "EMAIL_PROVIDER"
+  | "AI_PROVIDER"
+  | "INTERNAL_API";
 
 export type ProviderCapability =
   | "BROWSER_PIXEL"
   | "SERVER_CONVERSIONS"
-  | "REPORTING_API"
-  | "AD_ACCOUNT_SYNC"
-  | "ANALYTICS_REPORTING"
-  | "MESSAGE_SENDING"
-  | "DELIVERY_STATUS"
-  | "AI_ASSISTANT"
-  | "WEBHOOKS";
+  | "REPORTING_SYNC"
+  | "CAMPAIGN_SYNC"
+  | "MESSAGE_DELIVERY"
+  | "MESSAGE_STATUS"
+  | "EMAIL_DELIVERY"
+  | "AI_COMPLETION"
+  | "AI_ANALYSIS"
+  | "WEBHOOKS"
+  | "INTERNAL_EVENTS";
 
-export type ReadinessLayer = "BROWSER" | "SERVER" | "REPORTING";
+export type ProviderEnvironment = "SERVER" | "BROWSER" | "BOTH";
+
+export type ProviderReadinessLayer = "BROWSER" | "SERVER" | "REPORTING";
+
+export type ProviderImplementationStatus = "PLANNED" | "PARTIAL" | "READY";
 
 export type ProviderKey =
   | "meta"
@@ -32,18 +39,28 @@ export type ProviderKey =
   | "whatsapp"
   | "internal_webhooks";
 
-export interface OfficialDocReference {
+export type ProviderDocLink = {
   label: string;
   url: string;
-}
+};
 
-export interface IntegrationProviderDefinition {
+export type ProviderCredentialField = {
+  key: string;
+  label: string;
+  secret: boolean;
+  required: boolean;
+  environment: ProviderEnvironment;
+};
+
+export type ProviderCatalogEntry = {
   key: ProviderKey;
-  name: string;
+  displayName: string;
   category: ProviderCategory;
   capabilities: ProviderCapability[];
-  readinessLayers: ReadinessLayer[];
-  officialDocs: OfficialDocReference[];
-  notes: string;
-  implementationStatus: "PLANNED" | "PARTIAL" | "READY";
-}
+  officialDocs: ProviderDocLink[];
+  credentialFields: ProviderCredentialField[];
+  readinessLayers: ProviderReadinessLayer[];
+  supportedEnvironments: ProviderEnvironment[];
+  notes: string[];
+  implementationStatus: ProviderImplementationStatus;
+};
