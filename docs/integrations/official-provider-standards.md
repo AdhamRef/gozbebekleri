@@ -1,6 +1,8 @@
 # Official Provider Integration Standards
 
-This document is the required checklist before adding any external provider integration.
+This document is the required foundation and checklist before adding any external provider integration.
+
+The goal is to keep Marketing, Content Scheduling, Archive, Brand Center, and AI features connected through one safe shared provider layer instead of scattered one-off integrations.
 
 ## Purpose
 
@@ -15,6 +17,26 @@ This protects the project from:
 - fake sync implementations,
 - and UI states that claim a platform is connected when it is not ready.
 
+## Core rule
+
+Every provider integration must start with official documentation and a small internal contract before implementation.
+
+```text
+Official docs first
+↓
+Required permissions and APIs
+↓
+Provider schema
+↓
+Connection health
+↓
+Sync, events, and webhooks
+↓
+Safe implementation
+↓
+Repository documentation
+```
+
 ## Required implementation order
 
 1. Read the official provider documentation.
@@ -27,6 +49,8 @@ This protects the project from:
 8. Add short internal comments explaining why the structure exists.
 
 ## Provider categories
+
+Providers must be classified before they are displayed or implemented.
 
 ### Pixels and APIs
 
@@ -63,6 +87,36 @@ Routing rule:
 - International SMS should use Twilio.
 - WhatsApp and email providers must be represented as separate capabilities.
 
+### Email providers
+
+Used for newsletters, donor journeys, transactional messages, and campaign email delivery.
+
+### AI providers
+
+Used for shared assistant infrastructure, analysis, content support, and recommendations.
+
+### Internal APIs
+
+Used for internal webhooks, server events, dashboard automation, and trusted backend-to-backend actions.
+
+## Required provider contract
+
+Each provider entry must define:
+
+- Stable provider key
+- Display name
+- Category
+- Supported capabilities
+- Required official docs
+- Required credentials shape
+- Public browser fields, if any
+- Secret server fields, if any
+- Readiness checks
+- Supported environments
+- Sync lifecycle
+- Webhook or event lifecycle
+- Security notes
+
 ## Readiness model
 
 Every provider should expose readiness in three layers when applicable:
@@ -75,10 +129,43 @@ A provider can be configured but not ready. UI must show the difference.
 
 ## Security rules
 
-- Never expose access tokens, refresh tokens, client secrets, developer tokens, or API secrets in client components.
+- Never expose access tokens, refresh tokens, client secrets, developer tokens, private keys, or API secrets in client components.
 - Store secrets only in server-side models, environment variables, or encrypted storage.
 - Public runtime config may include only safe ids, such as pixel ids or public measurement ids.
 - UI should show masked credentials and health states, not raw secrets.
+- OAuth scopes and permissions must be documented before implementation.
+- Provider health must be separated from account performance.
+- Do not mark conversions or sync as successful before the real provider call succeeds.
+
+## Data ownership
+
+The dashboard must keep separate layers for:
+
+- Site truth: donations and payment state.
+- Tracking truth: conversion events and delivery status.
+- Platform truth: synced ad platform reports.
+- Campaign truth: generated links, campaign IDs, ad IDs, and UTM parameters.
+- Content truth: archive assets and production state.
+
+Recommendations and AI assistants must read from these contracts instead of guessing from raw UI state.
+
+## Foundation providers
+
+Initial provider coverage should include:
+
+- Meta
+- Google Ads
+- GA4
+- TikTok
+- X
+- Twilio
+- Netgsm
+- Email provider
+- WhatsApp provider
+- OpenAI
+- Internal API
+
+Adding a provider to the catalog does not mean that a runtime integration exists. The catalog describes intended support, required docs, and capability boundaries.
 
 ## Coding rules
 
@@ -99,3 +186,16 @@ The project should use one shared AI core API layer, with separate assistant con
 - brand.
 
 The UI may show different assistants, but the infrastructure should not duplicate AI provider logic.
+
+## Implementation rule
+
+Runtime implementation must be added in small PRs:
+
+1. Provider contract and docs.
+2. Connection UI.
+3. Health checks.
+4. Read-only sync.
+5. Event or webhook handling.
+6. Write actions, only when needed.
+
+Avoid large PRs that mix UI, credentials, sync, events, recommendations, and AI prompts at once.
