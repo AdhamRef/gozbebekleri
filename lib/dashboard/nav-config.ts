@@ -7,6 +7,7 @@ export const DASHBOARD_NAV_GROUPS: {
   {
     group: "الإدارة العامة",
     items: [
+      { key: "revenue", title: "النظرة التنفيذية", href: "/dashboard/system-overview" },
       { key: "revenue", title: "تحليل الإيرادات", href: "/dashboard" },
       { key: "monthly", title: "التبرعات الشهرية", href: "/dashboard/monthly" },
       { key: "bankTransfers", title: "التحويلات البنكية", href: "/dashboard/bank-transfers" },

@@ -1,0 +1,103 @@
+import { buildMarketingCommandCenterOverview } from "@/lib/marketing/command-center/command-center-service";
+import { buildProviderHealthOverview } from "@/lib/marketing/integrations/provider-health-service";
+import { getOperationsOverview } from "@/lib/operations/service";
+import { buildOperationsCommandCenterOverview } from "@/lib/operations/command-center/command-center-service";
+import type { MarketingPlatformConnection } from "@prisma/client";
+import { serializeConnection } from "@/lib/marketing/connection-serializer";
+
+export type ExecutiveRiskLevel = "HIGH" | "MEDIUM" | "LOW";
+
+export type ExecutiveSystemOverview = {
+  source: string;
+  generatedAt: string;
+  summary: {
+    marketingActions: number;
+    operationsActions: number;
+    providerReady: number;
+    providerNeedsWork: number;
+    blockedTasks: number;
+    productionReady: number;
+    totalRevenue: number;
+    averageRoas: number;
+  };
+  risks: {
+    id: string;
+    level: ExecutiveRiskLevel;
+    title: string;
+    reason: string;
+    href: string;
+  }[];
+};
+
+export async function buildExecutiveSystemOverview(
+  connections: MarketingPlatformConnection[],
+): Promise<ExecutiveSystemOverview> {
+  const operations = await getOperationsOverview();
+  const providerHealth = buildProviderHealthOverview(connections.map(serializeConnection));
+  const marketing = buildMarketingCommandCenterOverview(providerHealth);
+  const operationsCommand = buildOperationsCommandCenterOverview(operations);
+
+  const risks: ExecutiveSystemOverview["risks"] = [];
+
+  if (marketing.summary.providerNeedsWork > 0) {
+    risks.push({
+      id: "provider-readiness",
+      level: marketing.summary.providerNeedsWork >= 5 ? "HIGH" : "MEDIUM",
+      title: "تكاملات تحتاج استكمال",
+      reason: `يوجد ${marketing.summary.providerNeedsWork} مزود أو اتصال يحتاج مراجعة قبل الاعتماد التشغيلي الكامل.`,
+      href: "/dashboard/marketing/connections/catalog",
+    });
+  }
+
+  if (operationsCommand.summary.blockedTasks > 0) {
+    risks.push({
+      id: "blocked-production-tasks",
+      level: "HIGH",
+      title: "مهام إنتاج محجوبة",
+      reason: `يوجد ${operationsCommand.summary.blockedTasks} مهمة محجوبة قد تعطل خطة المحتوى أو التسليم للتسويق.`,
+      href: "/dashboard/operations/tasks",
+    });
+  }
+
+  if (marketing.summary.highPriorityRecommendations > 0) {
+    risks.push({
+      id: "high-priority-recommendations",
+      level: "HIGH",
+      title: "توصيات تسويق عاجلة",
+      reason: `يوجد ${marketing.summary.highPriorityRecommendations} توصية عالية الأولوية تحتاج قرارًا سريعًا.`,
+      href: "/dashboard/marketing/recommendations",
+    });
+  }
+
+  if (operationsCommand.summary.productionReady > 0) {
+    risks.push({
+      id: "ready-content-handoff",
+      level: "LOW",
+      title: "مواد جاهزة للتسويق",
+      reason: `يوجد ${operationsCommand.summary.productionReady} مادة جاهزة يمكن تسليمها للحملات أو النشر.`,
+      href: "/dashboard/operations/production",
+    });
+  }
+
+  return {
+    source: "executive-system-overview-v1",
+    generatedAt: new Date().toISOString(),
+    summary: {
+      marketingActions: marketing.actions.length,
+      operationsActions: operationsCommand.actions.length,
+      providerReady: marketing.summary.providerReady,
+      providerNeedsWork: marketing.summary.providerNeedsWork,
+      blockedTasks: operationsCommand.summary.blockedTasks,
+      productionReady: operationsCommand.summary.productionReady,
+      totalRevenue: marketing.summary.totalRevenue,
+      averageRoas: marketing.summary.averageRoas,
+    },
+    risks: risks.sort((a, b) => riskRank(a.level) - riskRank(b.level)).slice(0, 8),
+  };
+}
+
+function riskRank(level: ExecutiveRiskLevel) {
+  if (level === "HIGH") return 0;
+  if (level === "MEDIUM") return 1;
+  return 2;
+}
