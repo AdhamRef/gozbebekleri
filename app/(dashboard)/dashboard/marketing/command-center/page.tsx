@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft, BarChart3, CheckCircle2, CircleAlert, Plug, Rocket, Sparkles, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -152,7 +153,7 @@ export default async function MarketingCommandCenterPage() {
   );
 }
 
-function SummaryCard({ title, value, icon }: { title: string; value: string | number; icon: React.ReactNode }) {
+function SummaryCard({ title, value, icon }: { title: string; value: string | number; icon: ReactNode }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -166,7 +167,7 @@ function SummaryCard({ title, value, icon }: { title: string; value: string | nu
   );
 }
 
-function QuickLink({ href, title, icon }: { href: string; title: string; icon: React.ReactNode }) {
+function QuickLink({ href, title, icon }: { href: string; title: string; icon: ReactNode }) {
   return (
     <Link href={href} className="flex items-center justify-between rounded-xl border bg-white p-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
       <span className="flex items-center gap-2">
