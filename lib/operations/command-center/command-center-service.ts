@@ -65,7 +65,7 @@ export function buildOperationsCommandCenterOverview(
       type: "UNBLOCK_TASKS",
       priority: task.status === "BLOCKED" ? "HIGH" : "MEDIUM",
       title: `راجع مهمة: ${task.title}`,
-      reason: `المسؤول: ${task.owner}. الحالة: ${task.status}. مرتبطة بـ ${task.sourceTitle}.`,
+      reason: `المسؤول: ${task.assignee}. الحالة: ${task.status}. مرتبطة بموسم ${task.seasonTitle}.`,
       href: "/dashboard/operations/tasks",
       cta: "فتح المهام",
     });
@@ -79,7 +79,7 @@ export function buildOperationsCommandCenterOverview(
         type: "MOVE_PRODUCTION",
         priority: "HIGH",
         title: `حرّك مادة الإنتاج: ${item.title}`,
-        reason: `المادة عالية الأولوية وحالتها الحالية ${item.stage}. المنصة المستهدفة: ${item.channel}.`,
+        reason: `المادة عالية الأولوية وحالتها الحالية ${item.stage}. النوع: ${item.contentType}.`,
         href: "/dashboard/operations/production",
         cta: "فتح لوحة الإنتاج",
       });
