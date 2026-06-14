@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft, Activity, AlertTriangle, CheckCircle2, ClipboardCheck, Layers3, PlugZap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -127,7 +128,7 @@ export default function ProviderHealthPage() {
   );
 }
 
-function SummaryCard({ title, value, icon }: { title: string; value: number | string; icon: React.ReactNode }) {
+function SummaryCard({ title, value, icon }: { title: string; value: number | string; icon: ReactNode }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
