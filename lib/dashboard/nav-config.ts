@@ -48,6 +48,7 @@ export const DASHBOARD_NAV_GROUPS: {
     group: "التسويق والنمو",
     items: [
       { key: "ads", title: "نظرة عامة", href: "/dashboard/marketing" },
+      { key: "ads", title: "مركز قيادة التسويق", href: "/dashboard/marketing/command-center" },
       { key: "platformConnections", title: "ربط المنصات", href: "/dashboard/marketing/connections" },
       { key: "platformConnections", title: "دليل التكاملات", href: "/dashboard/marketing/connections/catalog" },
       { key: "platformConnections", title: "صحة التكاملات", href: "/dashboard/marketing/connections/health" },
