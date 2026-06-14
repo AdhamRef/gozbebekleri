@@ -36,6 +36,7 @@ export const DASHBOARD_NAV_GROUPS: {
     group: "المحتوى والتشغيل",
     items: [
       { key: "campaigns", title: "نظرة عامة", href: "/dashboard/operations" },
+      { key: "campaigns", title: "مركز قيادة المحتوى", href: "/dashboard/operations/command-center" },
       { key: "campaigns", title: "التقويم والتنبيهات", href: "/dashboard/operations/calendar" },
       { key: "campaigns", title: "مهام الإنتاج", href: "/dashboard/operations/tasks" },
       { key: "campaigns", title: "لوحة الإنتاج", href: "/dashboard/operations/production" },
