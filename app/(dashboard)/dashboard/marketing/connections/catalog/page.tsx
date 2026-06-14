@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft, BookOpen, CheckCircle2, FileText, Layers3, Plug, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -165,7 +166,7 @@ export default function ProviderCatalogPage() {
   );
 }
 
-function SummaryCard({ title, value, icon }: { title: string; value: number; icon: React.ReactNode }) {
+function SummaryCard({ title, value, icon }: { title: string; value: number; icon: ReactNode }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
