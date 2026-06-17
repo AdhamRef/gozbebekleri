@@ -39,9 +39,12 @@ export const DASHBOARD_NAV_GROUPS: {
       { key: "campaigns", title: "نظرة عامة", href: "/dashboard/operations" },
       { key: "campaigns", title: "مركز قيادة المحتوى", href: "/dashboard/operations/command-center" },
       { key: "campaigns", title: "التقويم والتنبيهات", href: "/dashboard/operations/calendar" },
+      { key: "campaigns", title: "جدولة المحتوى", href: "/dashboard/operations/scheduler" },
       { key: "campaigns", title: "مهام الإنتاج", href: "/dashboard/operations/tasks" },
       { key: "campaigns", title: "لوحة الإنتاج", href: "/dashboard/operations/production" },
       { key: "campaigns", title: "الأرشيف", href: "/dashboard/operations/archive" },
+      { key: "campaigns", title: "مساعد المحتوى AI", href: "/dashboard/operations/ai-assistant" },
+      { key: "campaigns", title: "مساعد الأرشيف AI", href: "/dashboard/operations/archive/ai-assistant" },
       { key: "campaigns", title: "لوحة المحتوى", href: "/dashboard/operations/content" },
       { key: "campaigns", title: "خريطة النظام", href: "/dashboard/operations/system" },
     ],
@@ -72,6 +75,8 @@ export const DASHBOARD_NAV_GROUPS: {
   {
     group: "إعدادات الهوية",
     items: [
+      { key: "slides", title: "مركز الهوية", href: "/dashboard/brand/center" },
+      { key: "slides", title: "إعدادات الهوية الحالية", href: "/dashboard/brand" },
       { key: "slides", title: "شرائح الهيرو", href: "/dashboard/slides" },
       { key: "ticker", title: "إعدادات التيكر", href: "/dashboard/ticker" },
     ],
