@@ -69,6 +69,7 @@ export const DASHBOARD_NAV_GROUPS: {
       { key: "referrals", title: "منشئ الحملات والروابط", href: "/dashboard/link-generator" },
       { key: "pixels", title: "البكسلات والتتبع", href: "/dashboard/pixels" },
       { key: "ads", title: "أحداث التحويل", href: "/dashboard/conversion-events" },
+      { key: "ads", title: "مرشحو إعادة الإرسال", href: "/dashboard/conversion-events/retry-truth" },
       { key: "ads", title: "إدارة الإعلانات", href: "/dashboard/ads" },
     ],
   },
