@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -38,6 +39,7 @@ interface MarketingForm {
   twilioTemplateId: string;
   buttonId: string;
   buttonLabel: string;
+  internalNotes: string;
 }
 
 const PAGE_OPTIONS: { id: PageKind; label: string; hint?: string }[] = [
@@ -88,6 +90,7 @@ const initialMarketingForm: MarketingForm = {
   twilioTemplateId: "",
   buttonId: "",
   buttonLabel: "",
+  internalNotes: "",
 };
 
 function needsResourcePick(kind: PageKind) {
@@ -210,6 +213,10 @@ function fieldValue(value: string) {
   return value.trim() || undefined;
 }
 
+function pageOptionLabel(kind: PageKind) {
+  return PAGE_OPTIONS.find((item) => item.id === kind)?.label || "رابط موقع";
+}
+
 export default function LinkGeneratorPage() {
   const [bundle, setBundle] = useState<Bundle | null>(null);
   const [referrals, setReferrals] = useState<ReferralRow[]>([]);
@@ -228,6 +235,7 @@ export default function LinkGeneratorPage() {
   const [refCode, setRefCode] = useState("__none__");
   const [openCartPayment, setOpenCartPayment] = useState(false);
   const [marketingForm, setMarketingForm] = useState<MarketingForm>(initialMarketingForm);
+  const [lastSavedLink, setLastSavedLink] = useState<{ name: string; mode: LinkMode; copied: boolean } | null>(null);
 
   const updateMarketing = (patch: Partial<MarketingForm>) => setMarketingForm((prev) => ({ ...prev, ...patch }));
 
@@ -327,21 +335,25 @@ export default function LinkGeneratorPage() {
     }
   }
 
-  async function saveMarketingLink(copyAfter = false) {
-    if (linkMode !== "marketing") {
-      toast.error("الحفظ في سجل الحملات متاح للروابط التسويقية فقط");
-      return;
-    }
+  async function saveRegistryLink(copyAfter = false) {
     if (!fullUrl) {
       toast.error("أكمل بيانات الرابط أولًا");
       return;
     }
     setSaving(true);
     try {
+      const isMarketingLink = linkMode === "marketing";
+      const registryName = isMarketingLink
+        ? fieldValue(effectiveMarketingForm.campaignName) || fieldValue(effectiveMarketingForm.campaignId) || marketingParams.utm_campaign || "Marketing link"
+        : `${pageOptionLabel(pageKind)}${selectedResource ? ` - ${entityLabel(selectedResource)}` : ""}`;
+      const standardPlatform = "ORGANIC";
+      const standardChannel = "SITE_LINK";
+      const adGroupId = isMarketingLink && effectiveMarketingForm.platform === "google_ads" ? fieldValue(effectiveMarketingForm.adsetId) : undefined;
+      const adsetId = isMarketingLink && effectiveMarketingForm.platform !== "google_ads" ? fieldValue(effectiveMarketingForm.adsetId) : undefined;
       const payload = {
-        name: fieldValue(effectiveMarketingForm.campaignName) || fieldValue(effectiveMarketingForm.campaignId) || marketingParams.utm_campaign,
-        platform: effectiveMarketingForm.platform,
-        channel: selectedPlatform.channel,
+        name: registryName,
+        platform: isMarketingLink ? effectiveMarketingForm.platform : standardPlatform,
+        channel: isMarketingLink ? selectedPlatform.channel : standardChannel,
         url: fullUrl,
         basePath,
         pageKind,
@@ -349,24 +361,45 @@ export default function LinkGeneratorPage() {
         currency: autoCurrency ? "auto" : currency,
         refCode: refCode !== "__none__" ? refCode : undefined,
         utmSource: marketingParams.utm_source,
+        utm_source: marketingParams.utm_source,
         utmMedium: marketingParams.utm_medium,
+        utm_medium: marketingParams.utm_medium,
         utmCampaign: marketingParams.utm_campaign,
+        utm_campaign: marketingParams.utm_campaign,
         utmId: marketingParams.utm_id,
+        utm_id: marketingParams.utm_id,
         utmContent: marketingParams.utm_content,
-        campaignId: effectiveMarketingForm.campaignId,
-        adGroupId: effectiveMarketingForm.platform === "google_ads" ? effectiveMarketingForm.adsetId : undefined,
-        adsetId: effectiveMarketingForm.platform !== "google_ads" ? effectiveMarketingForm.adsetId : undefined,
-        adId: effectiveMarketingForm.adId,
-        placement: effectiveMarketingForm.placement,
-        audienceSegment: effectiveMarketingForm.audienceSegment,
-        messageVariant: effectiveMarketingForm.messageVariant,
-        targetCountry: effectiveMarketingForm.targetCountry,
-        objective: effectiveMarketingForm.objective,
-        twilioCampaignId: effectiveMarketingForm.twilioCampaignId,
-        twilioTemplateId: effectiveMarketingForm.twilioTemplateId,
-        buttonId: effectiveMarketingForm.buttonId,
-        buttonLabel: effectiveMarketingForm.buttonLabel,
-        raw: { marketingParams, pageKind, resourceId, openCartPayment, autoLocale, autoCurrency },
+        utm_content: marketingParams.utm_content,
+        campaignId: isMarketingLink ? fieldValue(effectiveMarketingForm.campaignId) : undefined,
+        campaign_id: isMarketingLink ? fieldValue(effectiveMarketingForm.campaignId) : undefined,
+        adGroupId,
+        ad_group_id: adGroupId,
+        adsetId,
+        adset_id: adsetId,
+        adId: isMarketingLink ? fieldValue(effectiveMarketingForm.adId) : undefined,
+        ad_id: isMarketingLink ? fieldValue(effectiveMarketingForm.adId) : undefined,
+        placement: isMarketingLink ? fieldValue(effectiveMarketingForm.placement) : undefined,
+        audienceSegment: isMarketingLink ? fieldValue(effectiveMarketingForm.audienceSegment) : undefined,
+        audience_segment: isMarketingLink ? fieldValue(effectiveMarketingForm.audienceSegment) : undefined,
+        messageVariant: isMarketingLink ? fieldValue(effectiveMarketingForm.messageVariant) : undefined,
+        message_variant: isMarketingLink ? fieldValue(effectiveMarketingForm.messageVariant) : undefined,
+        targetCountry: isMarketingLink ? fieldValue(effectiveMarketingForm.targetCountry) : undefined,
+        target_country: isMarketingLink ? fieldValue(effectiveMarketingForm.targetCountry) : undefined,
+        objective: isMarketingLink ? fieldValue(effectiveMarketingForm.objective) : undefined,
+        internalNotes: isMarketingLink ? fieldValue(effectiveMarketingForm.internalNotes) : undefined,
+        internal_notes: isMarketingLink ? fieldValue(effectiveMarketingForm.internalNotes) : undefined,
+        raw: {
+          marketingParams,
+          pageKind,
+          resourceId,
+          openCartPayment,
+          autoLocale,
+          autoCurrency,
+          twilioCampaignId: isMarketingLink ? fieldValue(effectiveMarketingForm.twilioCampaignId) : undefined,
+          twilioTemplateId: isMarketingLink ? fieldValue(effectiveMarketingForm.twilioTemplateId) : undefined,
+          buttonId: isMarketingLink ? fieldValue(effectiveMarketingForm.buttonId) : undefined,
+          buttonLabel: isMarketingLink ? fieldValue(effectiveMarketingForm.buttonLabel) : undefined,
+        },
       };
       const res = await fetch("/api/admin/marketing-intelligence/campaign-links", {
         method: "POST",
@@ -376,6 +409,7 @@ export default function LinkGeneratorPage() {
       const data = await res.json().catch(() => null) as { ok?: boolean; error?: string } | null;
       if (!res.ok || !data?.ok) throw new Error(data?.error || "save failed");
       if (copyAfter) await navigator.clipboard.writeText(fullUrl).catch(() => null);
+      setLastSavedLink({ name: registryName, mode: linkMode, copied: copyAfter });
       toast.success(copyAfter ? "تم حفظ ونسخ الرابط" : "تم حفظ الرابط في سجل الحملات");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر حفظ الرابط");
@@ -464,6 +498,10 @@ export default function LinkGeneratorPage() {
                 <Field label="Button ID" value={marketingForm.buttonId} onChange={(v) => updateMarketing({ buttonId: v })} dir="ltr" />
                 <Field label="Button Label" value={marketingForm.buttonLabel} onChange={(v) => updateMarketing({ buttonLabel: v })} />
               </div>
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">ملاحظات داخلية</Label>
+                <Textarea value={marketingForm.internalNotes} onChange={(event) => updateMarketing({ internalNotes: event.target.value })} placeholder="سبب إنشاء الرابط، مالك الحملة، أو ملاحظة مراجعة قبل الإطلاق." className="min-h-24 resize-y" />
+              </div>
               <div className="grid gap-2">
                 {marketingIssues.map((issue, index) => (
                   <Alert key={`${issue.text}-${index}`} className={issue.level === "warn" ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}>
@@ -483,10 +521,19 @@ export default function LinkGeneratorPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" onClick={copyUrl} disabled={!fullUrl} className="gap-2"><Copy className="h-4 w-4" />نسخ الرابط</Button>
-              {linkMode === "marketing" ? <Button type="button" onClick={() => saveMarketingLink(false)} disabled={!fullUrl || saving} variant="outline" className="gap-2">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}حفظ في سجل الحملات</Button> : null}
-              {linkMode === "marketing" ? <Button type="button" onClick={() => saveMarketingLink(true)} disabled={!fullUrl || saving} className="gap-2 bg-[#FA5D17] hover:bg-[#d94c12]">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}حفظ ونسخ الرابط</Button> : null}
+              <Button type="button" onClick={() => saveRegistryLink(false)} disabled={!fullUrl || saving} variant="outline" className="gap-2">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}حفظ في سجل الحملات</Button>
+              <Button type="button" onClick={() => saveRegistryLink(true)} disabled={!fullUrl || saving} className="gap-2 bg-[#FA5D17] hover:bg-[#d94c12]">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}حفظ ونسخ الرابط</Button>
               {fullUrl ? <Button asChild type="button" variant="secondary" className="gap-2"><a href={fullUrl} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" />فتح</a></Button> : null}
             </div>
+            {lastSavedLink ? (
+              <Alert className="border-emerald-200 bg-emerald-50">
+                <ShieldCheck className="h-4 w-4" />
+                <AlertTitle>تم حفظ الرابط في Campaign Registry</AlertTitle>
+                <AlertDescription>
+                  {lastSavedLink.name} · {lastSavedLink.mode === "marketing" ? "رابط حملة" : "رابط موقع"}{lastSavedLink.copied ? " · تم نسخه أيضًا" : ""}
+                </AlertDescription>
+              </Alert>
+            ) : null}
           </section>
         </CardContent>
       </Card>
