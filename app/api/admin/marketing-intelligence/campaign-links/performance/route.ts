@@ -71,18 +71,18 @@ function scoreMatch(link: CampaignLink, attribution: unknown) {
   if (utmContent && donationUtmContent && utmContent === donationUtmContent) { score += 2; reasons.push("utm_content"); }
   const targetCountry = normalize(link.targetCountry);
   const donationCountry = normalize(attrString(attribution, "target_country") || attrString(attribution, "ad_country"));
-  if (targetCountry && donationCountry && targetCountry === targetCountry) { score += 1; reasons.push("target_country"); }
+  if (targetCountry && donationCountry && targetCountry === donationCountry) { score += 1; reasons.push("target_country"); }
   return { score, reasons };
 }
 
 function qualityFromScore(score: number) { if (score >= 7) return "strong"; if (score >= 4) return "medium"; if (score >= 2) return "weak"; return "none"; }
 
 function recommendationFor(args: { status: string; donations: number; revenue: number; strong: number; medium: number; weak: number; campaignId?: string | null; adId?: string | null; utmCampaign?: string | null; }) {
-  const { status, donations, revenue, strong, medium, weak, campaignId, adId, utmCampaign } = args;
+  const { status, donations, revenue, strong, medium, campaignId, adId, utmCampaign } = args;
   if (status === "DELETED") return { tone: "neutral" as RecommendationTone, label: "محذوف", action: "لا يحتاج متابعة إلا إذا أردت استعادته." };
   if (status === "ARCHIVED") return { tone: "neutral" as RecommendationTone, label: "مؤرشف", action: "احتفظ به كسجل تاريخي ولا تستخدمه لحملات جديدة." };
   if (donations > 0 && strong > 0) return { tone: "good" as RecommendationTone, label: "رابط قوي", action: "استمر في استخدامه، ويمكن زيادة الميزانية أو تكرار نفس البنية في حملات مشابهة." };
-  if (donations > 0 && strong === 0 && (medium > 0 || weak > 0)) return { tone: "warning" as RecommendationTone, label: "إسناد يحتاج تحسين", action: "راجع Campaign ID وAd ID داخل الرابط حتى تصبح المطابقة أقوى." };
+  if (donations > 0 && strong === 0 && medium > 0) return { tone: "warning" as RecommendationTone, label: "إسناد يحتاج تحسين", action: "راجع Campaign ID وAd ID داخل الرابط حتى تصبح المطابقة أقوى." };
   if (donations === 0 && (campaignId || adId || utmCampaign)) return { tone: "warning" as RecommendationTone, label: "بدون تبرعات", action: "راجع الاستهداف أو صفحة الهبوط، ولا تزود الميزانية قبل ظهور أول تبرع." };
   if (!campaignId && !utmCampaign) return { tone: "danger" as RecommendationTone, label: "ناقص بيانات", action: "أضف Campaign ID أو UTM Campaign حتى يمكن ربط التبرعات بالحملة." };
   if (revenue === 0) return { tone: "warning" as RecommendationTone, label: "لم يحقق إيراد", action: "استخدمه للاختبار فقط أو أوقفه إذا كان منشورًا في حملة نشطة." };
