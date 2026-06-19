@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { Loader2, RefreshCw, Search } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
@@ -87,6 +88,10 @@ function statusClass(status?: string) {
 function moneyLabel(row: ConversionEventRow) {
   if (typeof row.value !== "number") return "—";
   return `${row.value} ${row.currency ?? ""}`.trim();
+}
+
+function timelineHref(donationId: string) {
+  return `/dashboard/conversion-events/timeline?donationId=${encodeURIComponent(donationId)}`;
 }
 
 function groupByDonation(events: ConversionEventRow[]): DonationTimeline[] {
@@ -252,6 +257,7 @@ export default function ConversionEventsPage() {
               <div className="text-sm text-slate-600">{timeline.amountLabel}</div>
               <div className="text-sm text-slate-600">{timeline.platforms.length ? timeline.platforms.join(" · ") : "—"}</div>
               <div className="text-xs text-slate-500">{statusSummary(timeline.statuses)}</div>
+              {timeline.donationId !== "—" ? <Link href={timelineHref(timeline.donationId)} className="inline-flex items-center rounded-md border px-3 py-2 text-xs font-bold text-[#025EB8] hover:bg-slate-50">فتح Timeline</Link> : null}
               <Button size="sm" variant="outline" disabled={!timeline.canRetry || retryingDonationId === timeline.donationId} onClick={() => retryDonation(timeline.donationId)} className="gap-2">
                 {retryingDonationId === timeline.donationId ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
                 إعادة المحاولة
@@ -282,10 +288,11 @@ export default function ConversionEventsPage() {
                 <th className="px-3 py-2 text-right">Donation ID</th>
                 <th className="px-3 py-2 text-right">Event ID</th>
                 <th className="px-3 py-2 text-right">خطأ</th>
+                <th className="px-3 py-2 text-right">Timeline</th>
               </tr>
             </thead>
             <tbody>
-              {events.length === 0 ? <tr><td colSpan={10} className="px-3 py-10 text-center text-slate-500">لا توجد أحداث مطابقة.</td></tr> : events.map((row, index) => <tr key={rowKey(row, index)} className="border-t">
+              {events.length === 0 ? <tr><td colSpan={11} className="px-3 py-10 text-center text-slate-500">لا توجد أحداث مطابقة.</td></tr> : events.map((row, index) => <tr key={rowKey(row, index)} className="border-t">
                 <td className="whitespace-nowrap px-3 py-2">{renderDate(row.createdAt)}</td>
                 <td className="px-3 py-2 font-semibold">{row.platform ?? "—"}</td>
                 <td className="px-3 py-2">{row.channel ?? "—"}</td>
@@ -296,6 +303,7 @@ export default function ConversionEventsPage() {
                 <td className="max-w-[13rem] truncate px-3 py-2 font-mono text-xs">{row.donationId ?? "—"}</td>
                 <td className="max-w-[16rem] truncate px-3 py-2 font-mono text-xs">{row.eventId ?? "—"}</td>
                 <td className="max-w-[20rem] truncate px-3 py-2 text-xs text-rose-700">{row.error ?? "—"}</td>
+                <td className="px-3 py-2">{row.donationId ? <Link href={timelineHref(row.donationId)} className="text-xs font-bold text-[#025EB8] hover:underline">فتح</Link> : "—"}</td>
               </tr>)}
             </tbody>
           </table>
