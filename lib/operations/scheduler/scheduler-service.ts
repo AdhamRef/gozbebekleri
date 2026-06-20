@@ -1,10 +1,14 @@
-import { scheduledContentItems } from "./scheduler-data";
+import { listScheduledContentItems } from "../repository";
 import type { SchedulerOverview } from "./scheduler-types";
 
-export function getSchedulerOverview(): SchedulerOverview {
+export async function getSchedulerOverview(): Promise<SchedulerOverview> {
+  const dataset = await listScheduledContentItems();
+  const scheduledContentItems = dataset.items;
+
   return {
-    source: "content-scheduler-foundation",
+    source: "content-scheduler-repository",
     generatedAt: new Date().toISOString(),
+    persistence: dataset.persistence,
     summary: {
       total: scheduledContentItems.length,
       scheduled: scheduledContentItems.filter((item) => item.status === "SCHEDULED").length,
