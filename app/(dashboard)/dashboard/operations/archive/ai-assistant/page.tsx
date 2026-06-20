@@ -2,14 +2,15 @@ import Link from "next/link";
 import { Archive, ArrowLeft, Bot, ImageIcon, Search, Tags } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getAiContext } from "@/lib/ai/core/ai-core-service";
+import { getAiAssistantReadiness } from "@/lib/ai/core/ai-core-service";
 
 export const metadata = {
   title: "مساعد الأرشيف AI | لوحة التحكم",
 };
 
 export default function ArchiveAiAssistantPage() {
-  const context = getAiContext("archive");
+  const readiness = getAiAssistantReadiness("archive");
+  const context = readiness?.context;
 
   return (
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
@@ -35,7 +36,13 @@ export default function ArchiveAiAssistantPage() {
               </div>
             </div>
             <div>
-              <p className="text-sm font-black text-slate-900">الأفعال المحظورة</p>
+              <p className="text-sm font-black text-slate-900">ما يستطيع قراءته</p>
+              <div className="mt-2 space-y-2 text-sm text-slate-600">
+                {readiness?.tools.map((tool) => <p key={tool.name}>• {tool.name}: {tool.dataSource}</p>)}
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-black text-slate-900">ما لا يستطيع فعله</p>
               <div className="mt-2 space-y-2 text-sm text-slate-600">
                 {context?.blockedActions.map((action) => <p key={action}>• {action}</p>)}
               </div>
@@ -56,6 +63,18 @@ export default function ArchiveAiAssistantPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Prompts مفيدة</CardTitle>
+          <CardDescription>استخدمه لاسترجاع مواد الأرشيف واقتراح إعادة الاستخدام دون حذف أو تعديل ملفات.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-3">
+          {readiness?.promptExamples.map((prompt) => (
+            <div key={prompt} className="rounded-2xl border bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-700">{prompt}</div>
+          ))}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle>روابط مرتبطة</CardTitle></CardHeader>
