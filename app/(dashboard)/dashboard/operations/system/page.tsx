@@ -98,23 +98,46 @@ export default async function OperationsSystemPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-[#025EB8]" /> حالة بيانات التشغيل</CardTitle>
           <CardDescription className="leading-6">
-            تم نقل Scheduler وProduction وArchive إلى Repository contract واحد، بدون migration وبدون تأثير خارجي.
+            تم توحيد Scheduler وProduction وArchive وContent وTasks خلف Repository contracts، بدون migration وبدون تأثير خارجي.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-3">
-          {persistence.datasets.map((dataset) => (
-            <div key={dataset.key} className="rounded-2xl border bg-slate-50 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-bold text-[#025EB8]">{dataset.label}</p>
-                  <h3 className="mt-1 text-2xl font-black text-slate-900">{dataset.total}</h3>
-                </div>
-                <Badge variant="outline">{dataset.persistence.mode}</Badge>
-              </div>
-              <p className="mt-3 text-xs leading-5 text-slate-600">Current: {dataset.persistence.model}</p>
-              <p className="text-xs leading-5 text-slate-600">Next: {dataset.persistence.nextModel}</p>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-4">
+            <div className="rounded-2xl border bg-white p-4">
+              <p className="text-xs text-slate-500">إجمالي السجلات</p>
+              <h3 className="mt-1 text-2xl font-black text-slate-900">{persistence.summary.totalRecords}</h3>
             </div>
-          ))}
+            <div className="rounded-2xl border bg-white p-4">
+              <p className="text-xs text-slate-500">Foundation</p>
+              <h3 className="mt-1 text-2xl font-black text-slate-900">{persistence.summary.foundationDatasets}</h3>
+            </div>
+            <div className="rounded-2xl border bg-white p-4">
+              <p className="text-xs text-slate-500">جاهز للتحويل لـ DB</p>
+              <h3 className="mt-1 text-2xl font-black text-slate-900">{persistence.summary.dbReadyDatasets}</h3>
+            </div>
+            <div className="rounded-2xl border bg-white p-4">
+              <p className="text-xs text-slate-500">مولد من Engine</p>
+              <h3 className="mt-1 text-2xl font-black text-slate-900">{persistence.summary.generatedDatasets}</h3>
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            {persistence.datasets.map((dataset) => (
+              <div key={dataset.key} className="rounded-2xl border bg-slate-50 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold text-[#025EB8]">{dataset.label}</p>
+                    <h3 className="mt-1 text-2xl font-black text-slate-900">{dataset.total}</h3>
+                  </div>
+                  <Badge variant="outline">{dataset.persistence.mode}</Badge>
+                </div>
+                <p className="mt-3 text-xs leading-5 text-slate-600">Current: {dataset.persistence.model}</p>
+                <p className="text-xs leading-5 text-slate-600">Next: {dataset.persistence.nextModel}</p>
+                <p className="mt-2 text-xs font-bold leading-5 text-slate-700">
+                  {dataset.persistence.readyForDb ? "جاهز للتحويل لـ DB" : "يحتاج تثبيت workflow قبل DB"}
+                </p>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
