@@ -235,7 +235,7 @@ export default function LinkGeneratorPage() {
   const [refCode, setRefCode] = useState("__none__");
   const [openCartPayment, setOpenCartPayment] = useState(false);
   const [marketingForm, setMarketingForm] = useState<MarketingForm>(initialMarketingForm);
-  const [lastSavedLink, setLastSavedLink] = useState<{ name: string; mode: LinkMode; copied: boolean } | null>(null);
+  const [lastSavedLink, setLastSavedLink] = useState<{ name: string; mode: LinkMode; copied: boolean; updated: boolean } | null>(null);
 
   const updateMarketing = (patch: Partial<MarketingForm>) => setMarketingForm((prev) => ({ ...prev, ...patch }));
 
@@ -406,13 +406,14 @@ export default function LinkGeneratorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json().catch(() => null) as { ok?: boolean; error?: string } | null;
+      const data = await res.json().catch(() => null) as { ok?: boolean; error?: string; upserted?: boolean } | null;
       if (!res.ok || !data?.ok) throw new Error(data?.error || "save failed");
       if (copyAfter) await navigator.clipboard.writeText(fullUrl).catch(() => null);
-      setLastSavedLink({ name: registryName, mode: linkMode, copied: copyAfter });
-      toast.success(copyAfter ? "تم حفظ ونسخ الرابط" : "تم حفظ الرابط في سجل الحملات");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "تعذر حفظ الرابط");
+      const updated = data.upserted === false;
+      setLastSavedLink({ name: registryName, mode: linkMode, copied: copyAfter, updated });
+      toast.success(updated ? "تم تحديث رابط موجود" : "تم حفظ الرابط في سجل الحملات");
+    } catch {
+      toast.error("فشل الحفظ");
     } finally {
       setSaving(false);
     }
@@ -521,16 +522,21 @@ export default function LinkGeneratorPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" onClick={copyUrl} disabled={!fullUrl} className="gap-2"><Copy className="h-4 w-4" />نسخ الرابط</Button>
-              <Button type="button" onClick={() => saveRegistryLink(false)} disabled={!fullUrl || saving} variant="outline" className="gap-2">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}حفظ في سجل الحملات</Button>
+              <Button type="button" onClick={() => saveRegistryLink(false)} disabled={!fullUrl || saving} variant="outline" className="gap-2">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save to Campaign Registry</Button>
               <Button type="button" onClick={() => saveRegistryLink(true)} disabled={!fullUrl || saving} className="gap-2 bg-[#FA5D17] hover:bg-[#d94c12]">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}حفظ ونسخ الرابط</Button>
               {fullUrl ? <Button asChild type="button" variant="secondary" className="gap-2"><a href={fullUrl} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" />فتح</a></Button> : null}
             </div>
             {lastSavedLink ? (
               <Alert className="border-emerald-200 bg-emerald-50">
                 <ShieldCheck className="h-4 w-4" />
-                <AlertTitle>تم حفظ الرابط في Campaign Registry</AlertTitle>
-                <AlertDescription>
-                  {lastSavedLink.name} · {lastSavedLink.mode === "marketing" ? "رابط حملة" : "رابط موقع"}{lastSavedLink.copied ? " · تم نسخه أيضًا" : ""}
+                <AlertTitle>{lastSavedLink.updated ? "تم تحديث رابط موجود" : "تم حفظ الرابط في سجل الحملات"}</AlertTitle>
+                <AlertDescription className="space-y-2">
+                  <span className="block">
+                    {lastSavedLink.name} · {lastSavedLink.mode === "marketing" ? "رابط حملة" : "رابط موقع"}{lastSavedLink.copied ? " · تم نسخه أيضًا" : ""}
+                  </span>
+                  <Link href="/dashboard/marketing/campaign-links" className="inline-flex text-xs font-semibold text-emerald-800 underline-offset-4 hover:underline">
+                    Open in Campaign Registry
+                  </Link>
                 </AlertDescription>
               </Alert>
             ) : null}
