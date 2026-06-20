@@ -59,7 +59,7 @@ export const DASHBOARD_NAV_GROUPS: {
       { key: "platformConnections", title: "ربط المنصات", href: "/dashboard/marketing/connections" },
       { key: "platformConnections", title: "دليل التكاملات", href: "/dashboard/marketing/connections/catalog" },
       { key: "platformConnections", title: "صحة التكاملات", href: "/dashboard/marketing/connections/health" },
-      { key: "ads", title: "مركز التتبع", href: "/dashboard/marketing/tracking-hub" },
+      { key: "pixels", title: "مركز التتبع", href: "/dashboard/marketing/tracking-hub" },
       { key: "ads", title: "التحليلات والرؤى", href: "/dashboard/marketing/insights" },
       { key: "ads", title: "نتائج التسويق", href: "/dashboard/marketing/results" },
       { key: "ads", title: "توصيات التسويق", href: "/dashboard/marketing/recommendations" },
