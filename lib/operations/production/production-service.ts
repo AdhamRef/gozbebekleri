@@ -1,15 +1,19 @@
-import { productionItems, productionStages } from "./production-data";
+import { listProductionItems } from "../repository";
+import { productionStages } from "./production-data";
 import type { ProductionBoardOverview } from "./production-types";
 
-export function getProductionBoardOverview(): ProductionBoardOverview {
+export async function getProductionBoardOverview(): Promise<ProductionBoardOverview> {
+  const dataset = await listProductionItems();
+  const productionItems = dataset.items;
   const columns = productionStages.map((stage) => ({
     ...stage,
     items: productionItems.filter((item) => item.stage === stage.stage),
   }));
 
   return {
-    source: "production-board-foundation",
+    source: "production-board-repository",
     generatedAt: new Date().toISOString(),
+    persistence: dataset.persistence,
     summary: {
       totalItems: productionItems.length,
       inProduction: productionItems.filter((item) => !["READY", "PUBLISHED"].includes(item.stage)).length,
