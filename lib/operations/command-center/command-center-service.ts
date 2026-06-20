@@ -41,8 +41,8 @@ export type OperationsCommandCenterOverview = {
 export async function buildOperationsCommandCenterOverview(
   operations: OperationsOverview,
 ): Promise<OperationsCommandCenterOverview> {
-  const taskOverview = getTaskOverview();
-  const [production, archive] = await Promise.all([
+  const [taskOverview, production, archive] = await Promise.all([
+    getTaskOverview(),
     getProductionBoardOverview(),
     getArchiveOverview(),
   ]);
