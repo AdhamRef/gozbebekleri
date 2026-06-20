@@ -24,7 +24,7 @@ const priorityClass: Record<OperationsCommandPriority, string> = {
 
 export default async function OperationsCommandCenterPage() {
   const operations = await getOperationsOverview();
-  const overview = buildOperationsCommandCenterOverview(operations);
+  const overview = await buildOperationsCommandCenterOverview(operations);
 
   return (
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
