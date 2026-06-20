@@ -9,7 +9,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { prisma } from "@/lib/prisma";
 import type { CanonicalEvent } from "@/lib/tracking/canonical";
 import {
   META_EVENT_MAP,
@@ -22,6 +21,7 @@ import {
   type MetaUserData,
   type MetaCustomData,
 } from "@/lib/tracking/meta-capi";
+import { getRawTrackingSettings, trackingString } from "@/lib/tracking/tracking-settings";
 
 const TIKTOK_EVENTS_URL = "https://business-api.tiktok.com/open_api/v1.3/event/track/";
 
@@ -117,24 +117,29 @@ export async function POST(req: NextRequest) {
       req.headers.get("x-real-ip") ||
       undefined;
 
-    const row = await prisma.trackingSettings.findFirst();
+    const row = await getRawTrackingSettings();
+    const facebookPixelId = trackingString(row, "facebookPixelId") || trackingString(row, "metaPixelId");
+    const facebookAccessToken = trackingString(row, "facebookAccessToken") || trackingString(row, "metaAccessToken");
+    const tiktokPixelId = trackingString(row, "tiktokPixelId");
+    const tiktokAccessToken = trackingString(row, "tiktokAccessToken");
+    const gaMeasurementId = trackingString(row, "gaMeasurementId");
     const results: Record<string, unknown> = {};
 
-    if (row?.facebookPixelId && row?.facebookAccessToken) {
+    if (facebookPixelId && facebookAccessToken) {
       if (META_CAPI_OFF_CHANNEL.has(event.event)) {
         console.warn("[/api/track] refused off-channel event:", event.event, "event_id=", event.event_id);
         results.meta = { skipped: true, owner: "dedicated-endpoint" };
       } else {
-        results.meta = await mirrorMetaCanonical(event, row.facebookPixelId, row.facebookAccessToken, clientIp);
+        results.meta = await mirrorMetaCanonical(event, facebookPixelId, facebookAccessToken, clientIp);
       }
     }
 
-    if (row?.tiktokPixelId && row?.tiktokAccessToken) {
-      results.tiktok = await sendTikTokEvents(event, row.tiktokPixelId, row.tiktokAccessToken, clientIp);
+    if (tiktokPixelId && tiktokAccessToken) {
+      results.tiktok = await sendTikTokEvents(event, tiktokPixelId, tiktokAccessToken, clientIp);
     }
 
-    if (row?.gaMeasurementId) {
-      results.ga4 = await sendGa4BrowserMirror(event, row.gaMeasurementId);
+    if (gaMeasurementId) {
+      results.ga4 = await sendGa4BrowserMirror(event, gaMeasurementId);
     }
 
     return NextResponse.json({ ok: true, ...results });
