@@ -3,6 +3,7 @@ import { ArrowLeft, CheckCircle2, CircleDashed, Database, Megaphone, Rocket, Wor
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { getOperationsPersistenceSnapshot } from "@/lib/operations/repository";
 
 const completed = [
   "مركز العمليات الرئيسي",
@@ -49,7 +50,9 @@ const packages = [
   ["Package 4E", "Marketing Handoff", "لاحقًا", "تسليم المحتوى المعتمد للتسويق وربطه بروابط الحملات ونتائج الإعلانات."],
 ] as const;
 
-export default function OperationsSystemPage() {
+export default async function OperationsSystemPage() {
+  const persistence = await getOperationsPersistenceSnapshot();
+
   return (
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
       <div className="flex flex-col gap-4 rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
@@ -89,6 +92,30 @@ export default function OperationsSystemPage() {
             فتح Issue #21
           </Link>
         </CardHeader>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-[#025EB8]" /> حالة بيانات التشغيل</CardTitle>
+          <CardDescription className="leading-6">
+            تم نقل Scheduler وProduction وArchive إلى Repository contract واحد، بدون migration وبدون تأثير خارجي.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-3">
+          {persistence.datasets.map((dataset) => (
+            <div key={dataset.key} className="rounded-2xl border bg-slate-50 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold text-[#025EB8]">{dataset.label}</p>
+                  <h3 className="mt-1 text-2xl font-black text-slate-900">{dataset.total}</h3>
+                </div>
+                <Badge variant="outline">{dataset.persistence.mode}</Badge>
+              </div>
+              <p className="mt-3 text-xs leading-5 text-slate-600">Current: {dataset.persistence.model}</p>
+              <p className="text-xs leading-5 text-slate-600">Next: {dataset.persistence.nextModel}</p>
+            </div>
+          ))}
+        </CardContent>
       </Card>
 
       <Card>
