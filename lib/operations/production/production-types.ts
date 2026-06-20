@@ -1,3 +1,5 @@
+import type { OperationsPersistenceInfo } from "../persistence-types";
+
 export type ProductionStage = "IDEA" | "SCRIPT" | "DESIGN" | "VIDEO" | "REVIEW" | "READY" | "PUBLISHED";
 
 export type ProductionPriority = "HIGH" | "MEDIUM" | "LOW";
@@ -30,6 +32,7 @@ export type ProductionColumn = {
 export type ProductionBoardOverview = {
   source: string;
   generatedAt: string;
+  persistence: OperationsPersistenceInfo;
   summary: {
     totalItems: number;
     inProduction: number;
