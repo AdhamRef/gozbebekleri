@@ -1,3 +1,5 @@
+import type { OperationsPersistenceInfo } from "./persistence-types";
+
 export type OperationsSeason = {
   id?: string;
   title: string;
@@ -48,6 +50,7 @@ export type OperationsOverview = {
   source: string;
   version: string;
   generatedAt: string;
+  persistence?: OperationsPersistenceInfo;
   kpis: {
     openSeasons: number;
     activePlans: number;
