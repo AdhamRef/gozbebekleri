@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { operationsNoStoreHeaders, requireOperationsApiAccess } from "../_auth";
+
+export const dynamic = "force-dynamic";
 
 const seasons = [
   { id: "ramadan", title: "رمضان", focus: "زكاة، إفطار، صدقة يومية", status: "PLANNING", period: "مارس 2027", required: 30, ready: 8, progress: 27 },
@@ -9,5 +12,8 @@ const seasons = [
 ];
 
 export async function GET() {
-  return NextResponse.json({ source: "mock", count: seasons.length, seasons });
+  const denied = await requireOperationsApiAccess();
+  if (denied) return denied;
+
+  return NextResponse.json({ source: "mock", count: seasons.length, seasons }, { headers: operationsNoStoreHeaders });
 }
