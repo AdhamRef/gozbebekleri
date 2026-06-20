@@ -123,6 +123,7 @@ export function userCanExportReports(user: UserLike | undefined): boolean {
 /** Longer prefixes first — first match wins */
 const PATH_RULES: { prefix: string; key: DashboardPermissionKey }[] = [
   { prefix: "/dashboard/marketing/connections", key: "platformConnections" },
+  { prefix: "/dashboard/marketing/tracking-hub", key: "pixels" },
   { prefix: "/dashboard/marketing", key: "ads" },
   { prefix: "/dashboard/marketing-intelligence", key: "ads" },
   { prefix: "/dashboard/conversion-events", key: "ads" },
@@ -144,7 +145,7 @@ const PATH_RULES: { prefix: string; key: DashboardPermissionKey }[] = [
   { prefix: "/dashboard/ticker", key: "ticker" },
   { prefix: "/dashboard/pixels", key: "pixels" },
   { prefix: "/dashboard/donations", key: "revenue" },
-  { prefix: "/dashboard/brand", key: "revenue" },
+  { prefix: "/dashboard/brand", key: "slides" },
   { prefix: "/dashboard/general", key: "generalSettings" },
   { prefix: "/dashboard", key: "revenue" },
 ];
