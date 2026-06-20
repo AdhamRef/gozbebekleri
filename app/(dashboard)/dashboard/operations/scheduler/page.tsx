@@ -8,8 +8,8 @@ export const metadata = {
   title: "جدولة المحتوى | لوحة التحكم",
 };
 
-export default function OperationsSchedulerPage() {
-  const overview = getSchedulerOverview();
+export default async function OperationsSchedulerPage() {
+  const overview = await getSchedulerOverview();
 
   return (
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
@@ -19,6 +19,10 @@ export default function OperationsSchedulerPage() {
         <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
           نسخة تأسيسية لتنظيم عناصر المحتوى والتذكيرات قبل ربط أي تشغيل خارجي.
         </p>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">{overview.persistence.mode}</span>
+          <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">Next: {overview.persistence.nextModel}</span>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
