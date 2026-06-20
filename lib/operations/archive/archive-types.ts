@@ -1,3 +1,5 @@
+import type { OperationsPersistenceInfo } from "../persistence-types";
+
 export type ArchiveAssetType = "DESIGN" | "VIDEO" | "CAROUSEL" | "COPY" | "WHATSAPP" | "EMAIL" | "AD";
 
 export type ArchiveAssetStatus = "DRAFT" | "READY" | "PUBLISHED" | "USED_IN_ADS" | "ARCHIVED";
@@ -21,6 +23,7 @@ export type ArchiveAsset = {
 export type ArchiveOverview = {
   source: string;
   generatedAt: string;
+  persistence: OperationsPersistenceInfo;
   summary: {
     totalAssets: number;
     ready: number;
