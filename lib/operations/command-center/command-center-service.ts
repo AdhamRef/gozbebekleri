@@ -38,12 +38,14 @@ export type OperationsCommandCenterOverview = {
   actions: OperationsCommandAction[];
 };
 
-export function buildOperationsCommandCenterOverview(
+export async function buildOperationsCommandCenterOverview(
   operations: OperationsOverview,
-): OperationsCommandCenterOverview {
+): Promise<OperationsCommandCenterOverview> {
   const taskOverview = getTaskOverview();
-  const production = getProductionBoardOverview();
-  const archive = getArchiveOverview();
+  const [production, archive] = await Promise.all([
+    getProductionBoardOverview(),
+    getArchiveOverview(),
+  ]);
 
   const actions: OperationsCommandAction[] = [];
 
