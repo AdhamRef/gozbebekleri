@@ -237,7 +237,7 @@ export default function CampaignLinkDetailPage() {
     </div>
 
     <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-      <Card>
+      <Card id="performance">
         <CardHeader>
           <CardTitle>جودة المطابقة</CardTitle>
           <CardDescription>{range ? `الفترة: ${range.from} — ${range.to}` : "الفترة الحالية"}</CardDescription>
@@ -280,7 +280,7 @@ export default function CampaignLinkDetailPage() {
     </div>
 
     <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-      <Card>
+      <Card id="details">
         <CardHeader>
           <CardTitle>بيانات الرابط</CardTitle>
           <CardDescription>المعرفات التي يعتمد عليها الربط مع التبرعات والتحويلات.</CardDescription>
