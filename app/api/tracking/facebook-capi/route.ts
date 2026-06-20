@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getRawTrackingSettings, trackingString } from "@/lib/tracking/tracking-settings";
 
 const FB_API_VERSION = "v21.0";
 
@@ -41,9 +41,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "event_name required" }, { status: 400 });
     }
 
-    const row = await prisma.trackingSettings.findFirst();
-    const pixelId = row?.facebookPixelId;
-    const accessToken = row?.facebookAccessToken;
+    const row = await getRawTrackingSettings();
+    const pixelId = trackingString(row, "facebookPixelId") || trackingString(row, "metaPixelId");
+    const accessToken = trackingString(row, "facebookAccessToken") || trackingString(row, "metaAccessToken");
     if (!pixelId || !accessToken) {
       return NextResponse.json({ ok: false, reason: "pixel not configured" }, { status: 200 });
     }
