@@ -1,7 +1,10 @@
-import type { AiAssistantContextDefinition, AiAssistantContextKey, AiCoreOverview, AiDraftResponse } from "./ai-core-types";
+import { listAiAuditLogEntries, recordAiAuditLog } from "./ai-audit-log";
+import { aiHumanApprovalRules, aiToolContracts, findAiToolContract, getAiToolContractsForContext } from "./ai-tool-contracts";
+import type { AiAssistantContextDefinition, AiAssistantContextKey, AiAssistantReadiness, AiAuditStatus, AiCoreOverview, AiDraftResponse } from "./ai-core-types";
+import { generateOpenAiDraft, getOpenAiProviderStatus } from "./openai-provider";
 
 // Shared AI contexts for dashboard assistants.
-// This is intentionally provider-agnostic: real OpenAI calls should be added behind this contract later.
+// Provider calls stay behind server-side configuration and safe fallbacks.
 export const aiAssistantContexts: AiAssistantContextDefinition[] = [
   {
     key: "marketing",
@@ -9,8 +12,8 @@ export const aiAssistantContexts: AiAssistantContextDefinition[] = [
     description: "يساعد فريق التسويق في تحليل النتائج، ROAS، جودة التتبع، وأفكار تحسين الحملات.",
     systemRole: "Marketing performance analyst for donation growth.",
     capabilities: ["ANALYZE_RESULTS", "SUMMARIZE_EXECUTIVE", "WRITE_COPY"],
-    allowedSources: ["marketing-results", "provider-health", "recommendations", "conversion-events"],
-    blockedActions: ["No budget changes", "No external API calls", "No campaign publishing"],
+    allowedSources: ["getMarketingOverview", "getCampaignLinks", "getCampaignLinkDetail", "getConversionTimeline", "getTrackingTruth", "getBrandRules"],
+    blockedActions: ["No budget changes", "No external platform calls", "No campaign publishing", "No tracking setting changes"],
     entryHref: "/dashboard/marketing/ai-assistant",
   },
   {
@@ -19,8 +22,8 @@ export const aiAssistantContexts: AiAssistantContextDefinition[] = [
     description: "يساعد فريق المحتوى في بناء خطط المواسم، النصوص، الكاروسيل، وجدولة المواد.",
     systemRole: "Content planning assistant for Islamic charity campaigns.",
     capabilities: ["PLAN_CONTENT", "WRITE_COPY", "SUMMARIZE_EXECUTIVE"],
-    allowedSources: ["operations-overview", "content-calendar", "production-board", "scheduler"],
-    blockedActions: ["No auto publishing", "No message sending", "No external API calls"],
+    allowedSources: ["getContentSchedule", "getProductionBoard", "getArchiveSummary", "getBrandRules"],
+    blockedActions: ["No auto publishing", "No message sending", "No external platform calls"],
     entryHref: "/dashboard/operations/ai-assistant",
   },
   {
@@ -29,8 +32,8 @@ export const aiAssistantContexts: AiAssistantContextDefinition[] = [
     description: "يساعد في البحث داخل الأرشيف، اقتراح مواد قابلة لإعادة الاستخدام، وتصنيف الأصول.",
     systemRole: "Archive retrieval and asset reuse assistant.",
     capabilities: ["SEARCH_ARCHIVE", "PLAN_CONTENT", "BRAND_GUARDRAILS"],
-    allowedSources: ["archive-assets", "production-board", "brand-guidelines"],
-    blockedActions: ["No file deletion", "No public publishing", "No external API calls"],
+    allowedSources: ["getArchiveSummary", "getBrandRules"],
+    blockedActions: ["No file deletion", "No public publishing", "No external platform calls"],
     entryHref: "/dashboard/operations/archive/ai-assistant",
   },
   {
@@ -39,11 +42,34 @@ export const aiAssistantContexts: AiAssistantContextDefinition[] = [
     description: "يحافظ على نبرة الهوية، الألوان، أسماء الجمعيات، وقواعد الكتابة لكل مؤسسة.",
     systemRole: "Brand governance assistant for multi-organization charity communications.",
     capabilities: ["BRAND_GUARDRAILS", "WRITE_COPY", "SUMMARIZE_EXECUTIVE"],
-    allowedSources: ["brand-guidelines", "brand-assets", "organization-profiles"],
+    allowedSources: ["getBrandRules"],
     blockedActions: ["No logo file changes", "No public publishing", "No legal claims"],
-    entryHref: "/dashboard/brand",
+    entryHref: "/dashboard/brand/center",
   },
 ];
+
+const promptExamples: Record<AiAssistantContextKey, string[]> = {
+  marketing: [
+    "لخص روابط الحملات التي جلبت تبرعات حقيقية لكن Tracking Truth فيها ناقص.",
+    "اقترح أولويات إصلاح Meta/GA4 قبل زيادة الميزانية.",
+    "قارن Campaign Links النشطة وحدد أيها آمن للمراقبة فقط.",
+  ],
+  content: [
+    "اقترح خطة محتوى للأسبوع القادم بناءً على الإنتاج والجدولة.",
+    "ما المواد الجاهزة التي يمكن تسليمها للتسويق بعد مراجعة بشرية؟",
+    "اكتب مسودة واتساب لحملة الوقف مع الالتزام بقواعد الهوية.",
+  ],
+  archive: [
+    "اعثر على مواد أرشيف قابلة لإعادة الاستخدام لحملة غزة.",
+    "اقترح tags للمواد الجاهزة بدون تعديل الملفات.",
+    "ما الأصول التي تصلح لفيديو قصير مع قواعد الهوية؟",
+  ],
+  brand: [
+    "راجع هذه الرسالة ضد قواعد نبرة الهوية.",
+    "ما الألوان وقواعد الاستخدام المعتمدة لكل مؤسسة؟",
+    "اقترح صياغة بديلة لا تحتوي ادعاءات قانونية أو مبالغات.",
+  ],
+};
 
 export function getAiCoreOverview(): AiCoreOverview {
   return {
@@ -53,8 +79,16 @@ export function getAiCoreOverview(): AiCoreOverview {
       contexts: aiAssistantContexts.length,
       capabilities: new Set(aiAssistantContexts.flatMap((context) => context.capabilities)).size,
       protectedActions: aiAssistantContexts.flatMap((context) => context.blockedActions).length,
+      toolContracts: aiToolContracts.length,
     },
     contexts: aiAssistantContexts,
+    toolContracts: aiToolContracts,
+    humanApprovalRules: aiHumanApprovalRules,
+    provider: getOpenAiProviderStatus(),
+    audit: {
+      mode: "memory-foundation",
+      recent: listAiAuditLogEntries(),
+    },
   };
 }
 
@@ -62,17 +96,77 @@ export function getAiContext(key: AiAssistantContextKey) {
   return aiAssistantContexts.find((context) => context.key === key) ?? null;
 }
 
-export function createAiDraftResponse(contextKey: AiAssistantContextKey, prompt: string): AiDraftResponse {
+export function getAiAssistantReadiness(contextKey: AiAssistantContextKey): AiAssistantReadiness | null {
   const context = getAiContext(contextKey);
+  if (!context) return null;
+  return {
+    context,
+    tools: getAiToolContractsForContext(contextKey),
+    humanApprovalRules: aiHumanApprovalRules,
+    provider: getOpenAiProviderStatus(),
+    promptExamples: promptExamples[contextKey],
+  };
+}
+
+export async function createAiDraftResponse(
+  contextKey: AiAssistantContextKey,
+  prompt: string,
+  options: { requestedTool?: string | null; user?: string | null } = {},
+): Promise<AiDraftResponse> {
+  const context = getAiContext(contextKey);
+  const requestedTool = findAiToolContract(options.requestedTool);
+  const requestedToolAllowed = requestedTool ? requestedTool.contexts.includes(contextKey) : true;
+  if (!context || !requestedToolAllowed) {
+    const audit = recordAiAuditLog({
+      prompt,
+      context: contextKey,
+      requestedTool: requestedTool?.name ?? null,
+      user: options.user || "unknown",
+      status: "BLOCKED",
+    });
+    return {
+      context: contextKey,
+      mode: "SAFE_FALLBACK",
+      title: "AI Core رفض الطلب",
+      answer: "الأداة المطلوبة غير مسموحة لهذا السياق أو السياق غير معروف.",
+      requestedTool: requestedTool?.name ?? null,
+      auditId: audit.id,
+      provider: getOpenAiProviderStatus(),
+      suggestedNextActions: ["اختر أداة مناسبة للسياق.", "راجع tool contracts قبل إعادة المحاولة."],
+      safety: { requiresHumanApproval: true, blockedActions: aiHumanApprovalRules.map((rule) => rule.action) },
+    };
+  }
+
+  const providerResult = await generateOpenAiDraft({
+    context,
+    prompt,
+    systemSafety: aiHumanApprovalRules.map((rule) => rule.rule),
+  });
+  const auditStatus: AiAuditStatus = providerResult.status;
+  const audit = recordAiAuditLog({
+    prompt,
+    context: contextKey,
+    requestedTool: requestedTool?.name ?? null,
+    user: options.user || "unknown",
+    status: auditStatus,
+  });
+
   return {
     context: contextKey,
-    mode: "SKELETON",
+    mode: providerResult.mode,
     title: context ? `${context.title} جاهز للربط` : "AI Core جاهز للربط",
-    answer: `تم استقبال الطلب: ${prompt.trim() || "بدون نص"}. هذه نسخة هيكلية آمنة لا تستدعي مزود AI خارجي بعد.`,
+    answer: providerResult.answer || `تم استقبال الطلب: ${prompt.trim() || "بدون نص"}.`,
+    requestedTool: requestedTool?.name ?? null,
+    auditId: audit.id,
+    provider: getOpenAiProviderStatus(),
     suggestedNextActions: [
-      "ربط OpenAI API من Shared Provider Connections.",
-      "تحديد مصادر البيانات المسموحة لهذا السياق.",
-      "إضافة سجل مراجعة قبل أي إجراء تشغيلي.",
+      "راجع مصادر البيانات المسموحة قبل استخدام التحليل.",
+      "حوّل أي اقتراح إرسال أو نشر أو ميزانية إلى طلب موافقة بشرية.",
+      "استخدم tool contracts المناسبة للسياق بدل شات عام.",
     ],
+    safety: {
+      requiresHumanApproval: true,
+      blockedActions: context.blockedActions,
+    },
   };
 }
