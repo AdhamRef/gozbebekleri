@@ -45,6 +45,12 @@ export default async function OperationsContentPage() {
           <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
             مركز تشغيلي واحد للمواسم، الخطط، عناصر المحتوى، مهام الإنتاج، وتسليم المواد الجاهزة للتسويق. مصدر البيانات الحالي: {overview.source}.
           </p>
+          {overview.persistence ? (
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">{overview.persistence.mode}</span>
+              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">Next: {overview.persistence.nextModel}</span>
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="secondary" className="gap-2 font-bold">
