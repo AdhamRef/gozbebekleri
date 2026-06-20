@@ -13,12 +13,18 @@ const draftSchema = z.object({
   prompt: z.string().trim().max(2000).default(""),
 });
 
+function jsonNoStore(body: unknown, init: ResponseInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set("Cache-Control", "no-store");
+  return NextResponse.json(body, { ...init, headers });
+}
+
 export async function GET() {
   const session = await getServerSession(authOptions);
   const denied = requireAdminOrDashboardPermission(session, "ads");
   if (denied) return denied;
 
-  return NextResponse.json(getAiCoreOverview(), { headers: { "Cache-Control": "no-store" } });
+  return jsonNoStore(getAiCoreOverview());
 }
 
 export async function POST(request: NextRequest) {
@@ -29,10 +35,8 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const parsed = draftSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid payload", issues: parsed.error.flatten() }, { status: 400 });
+    return jsonNoStore({ error: "Invalid payload", issues: parsed.error.flatten() }, { status: 400 });
   }
 
-  return NextResponse.json(createAiDraftResponse(parsed.data.context, parsed.data.prompt), {
-    headers: { "Cache-Control": "no-store" },
-  });
+  return jsonNoStore(createAiDraftResponse(parsed.data.context, parsed.data.prompt));
 }
