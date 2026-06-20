@@ -19,10 +19,10 @@ const rules = [
   "أي AI لاحقًا يكون Draft ويحتاج مراجعة بشرية.",
 ] as const;
 
-export default function OperationsHomePage() {
+export default async function OperationsHomePage() {
   const seasonOverview = getSeasonReadinessOverview();
   const planningOverview = getPlanningOverview();
-  const taskOverview = getTaskOverview();
+  const taskOverview = await getTaskOverview();
   const criticalSeasons = seasonOverview.seasons.filter((season) => season.status !== "ON_TRACK");
 
   return <div className="space-y-5 p-4 sm:p-6" dir="rtl">
