@@ -20,8 +20,8 @@ const stageIcon: Record<string, typeof FileText> = {
   PUBLISHED: CheckCircle2,
 };
 
-export default function OperationsProductionPage() {
-  const overview = getProductionBoardOverview();
+export default async function OperationsProductionPage() {
+  const overview = await getProductionBoardOverview();
 
   return (
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
@@ -32,6 +32,10 @@ export default function OperationsProductionPage() {
           <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
             متابعة المواد من الفكرة إلى النشر ثم الاستخدام في الإعلانات. مصدر البيانات: {overview.source}.
           </p>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">{overview.persistence.mode}</span>
+            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">Next: {overview.persistence.nextModel}</span>
+          </div>
         </div>
         <Link href="/dashboard/operations/tasks" className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-bold text-[#025EB8] shadow-sm hover:bg-white/90">
           فتح مهام الإنتاج
