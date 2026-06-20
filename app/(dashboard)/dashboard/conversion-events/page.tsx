@@ -150,6 +150,12 @@ export default function ConversionEventsPage() {
   const [view, setView] = React.useState<"timeline" | "table">("timeline");
   const [retryingDonationId, setRetryingDonationId] = React.useState<string | null>(null);
 
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const query = params.get("q") || params.get("donationId") || "";
+    if (query) setQ(query);
+  }, []);
+
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
