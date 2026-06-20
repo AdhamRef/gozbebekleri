@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
-import { createAiDraftResponse, getAiCoreOverview } from "@/lib/ai/core/ai-core-service";
+import { createAiDraftResponse, getAiAssistantReadiness, getAiCoreOverview } from "@/lib/ai/core/ai-core-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,12 +11,18 @@ export const dynamic = "force-dynamic";
 const draftSchema = z.object({
   context: z.enum(["marketing", "content", "archive", "brand"]),
   prompt: z.string().trim().max(2000).default(""),
+  requestedTool: z.string().trim().max(80).optional().nullable(),
 });
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   const denied = requireAdminOrDashboardPermission(session, "ads");
   if (denied) return denied;
+
+  const context = request.nextUrl.searchParams.get("context");
+  if (context === "marketing" || context === "content" || context === "archive" || context === "brand") {
+    return NextResponse.json({ ok: true, readiness: getAiAssistantReadiness(context) }, { headers: { "Cache-Control": "no-store" } });
+  }
 
   return NextResponse.json(getAiCoreOverview(), { headers: { "Cache-Control": "no-store" } });
 }
@@ -32,7 +38,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid payload", issues: parsed.error.flatten() }, { status: 400 });
   }
 
-  return NextResponse.json(createAiDraftResponse(parsed.data.context, parsed.data.prompt), {
+  const user = session?.user?.email || session?.user?.name || "dashboard-user";
+  const draft = await createAiDraftResponse(parsed.data.context, parsed.data.prompt, {
+    requestedTool: parsed.data.requestedTool,
+    user,
+  });
+
+  return NextResponse.json(draft, {
     headers: { "Cache-Control": "no-store" },
   });
 }
