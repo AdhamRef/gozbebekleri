@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { operationsNoStoreHeaders, requireOperationsApiAccess } from "../_auth";
+
+export const dynamic = "force-dynamic";
 
 const tasks = [
   { id: "task-waqf-script", title: "كتابة نص فيديو الوقف", owner: "فريق المحتوى", status: "IN_PROGRESS", due: "12 يونيو", item: "فيديو تعريفي عن الوقف" },
@@ -8,5 +11,8 @@ const tasks = [
 ];
 
 export async function GET() {
-  return NextResponse.json({ source: "mock", count: tasks.length, tasks });
+  const denied = await requireOperationsApiAccess();
+  if (denied) return denied;
+
+  return NextResponse.json({ source: "mock", count: tasks.length, tasks }, { headers: operationsNoStoreHeaders });
 }
