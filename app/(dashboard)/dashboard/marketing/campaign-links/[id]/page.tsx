@@ -33,10 +33,14 @@ type CampaignLinkDetail = {
   createdAt: string | null;
   updatedAt?: string | null;
   identifiers: {
+    utmSource?: string | null;
+    utmMedium?: string | null;
     utmCampaign?: string | null;
     utmId?: string | null;
+    utmContent?: string | null;
     campaignId?: string | null;
     adsetId?: string | null;
+    adGroupId?: string | null;
     adId?: string | null;
     targetCountry?: string | null;
   };
@@ -109,7 +113,7 @@ function healthScore(link: CampaignLinkDetail) {
   let score = 20;
   if (link.identifiers.utmCampaign) score += 18;
   if (link.identifiers.campaignId || link.identifiers.utmId) score += 18;
-  if (link.identifiers.adsetId) score += 10;
+  if (link.identifiers.adsetId || link.identifiers.adGroupId) score += 10;
   if (link.identifiers.adId) score += 14;
   if (link.identifiers.targetCountry) score += 8;
   if (link.performance.matchQuality.strong > 0) score += 12;
@@ -126,14 +130,20 @@ function qualityLabel(value: string) {
 
 function identifierRows(link: CampaignLinkDetail) {
   return [
+    ["URL", link.url],
+    ["Save Count", String(link.saveCount ?? 0)],
+    ["UTM Source", link.identifiers.utmSource],
+    ["UTM Medium", link.identifiers.utmMedium],
     ["UTM Campaign", link.identifiers.utmCampaign],
     ["UTM ID", link.identifiers.utmId],
+    ["UTM Content", link.identifiers.utmContent],
     ["Campaign ID", link.identifiers.campaignId],
-    ["Ad Set / Ad Group", link.identifiers.adsetId],
+    ["Ad Set ID", link.identifiers.adsetId],
+    ["Ad Group ID", link.identifiers.adGroupId],
     ["Ad ID", link.identifiers.adId],
     ["Target Country", link.identifiers.targetCountry],
     ["Objective", link.metadata?.objective],
-    ["Audience", link.metadata?.audienceSegment],
+    ["Audience Segment", link.metadata?.audienceSegment],
     ["Message Variant", link.metadata?.messageVariant],
   ] as const;
 }
@@ -190,6 +200,11 @@ export default function CampaignLinkDetailPage() {
 
   const score = healthScore(link);
   const missing = link.intelligence?.missingIdentifiers ?? [];
+  const criticalMissing = [
+    !link.identifiers.campaignId && !link.identifiers.utmCampaign ? "campaign_id_or_utm_campaign" : null,
+    !link.identifiers.adId ? "ad_id" : null,
+    !link.identifiers.targetCountry ? "target_country" : null,
+  ].filter(Boolean) as string[];
   const missingConversions = link.intelligence?.conversionGaps.matchedDonationsMissingConversions ?? 0;
   const actions = link.intelligence?.actionQueue ?? [];
   const matchReasons = Object.entries(link.performance.matchReasons || {});
@@ -202,6 +217,8 @@ export default function CampaignLinkDetailPage() {
           <h1 className="text-2xl font-black text-slate-950">{link.name}</h1>
           <Badge variant="outline" className={statusClass(link.status)}>{link.status}</Badge>
           <Badge variant="outline">{link.platform ?? "UNKNOWN"}</Badge>
+          <Badge variant="outline">{link.channel ?? "No channel"}</Badge>
+          <Badge variant="outline">saveCount {link.saveCount ?? 0}</Badge>
         </div>
         <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">تفصيل أداء الرابط، جودة المطابقة، فجوات التحويل، والإجراء التالي قبل قرارات الميزانية.</p>
       </div>
@@ -229,17 +246,29 @@ export default function CampaignLinkDetailPage() {
       <AlertDescription>ضمن الفترة المحددة، لا تظهر تبرعات مطابقة بدون علامة conversionEventsSentAt.</AlertDescription>
     </Alert>}
 
-    <div className="grid gap-3 md:grid-cols-4">
+    {criticalMissing.length > 0 ? <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+      <ShieldAlert className="h-4 w-4" />
+      <AlertTitle>Missing Identifiers</AlertTitle>
+      <AlertDescription>
+        هذا الرابط يحتاج استكمال معرفات أساسية قبل قرارات الميزانية:
+        <span className="mt-2 flex flex-wrap gap-2">
+          {criticalMissing.map((item) => <Badge key={item} variant="outline" className="border-amber-300 bg-white text-amber-900">{IDENTIFIER_LABELS[item] ?? item}</Badge>)}
+        </span>
+      </AlertDescription>
+    </Alert> : null}
+
+    <div className="grid gap-3 md:grid-cols-5">
       <Metric title="Health Score" value={`${score}%`} tone={score >= 75 ? "good" : score >= 55 ? "warning" : "danger"} />
       <Metric title="تبرعات مطابقة" value={link.performance.donations} />
       <Metric title="إيراد مطابق" value={money(link.performance.revenue)} />
+      <Metric title="متوسط التبرع" value={money(link.performance.averageDonation)} />
       <Metric title="Conversions ناقصة" value={missingConversions} tone={missingConversions > 0 ? "danger" : "good"} />
     </div>
 
     <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
       <Card id="performance">
         <CardHeader>
-          <CardTitle>جودة المطابقة</CardTitle>
+          <CardTitle>Performance</CardTitle>
           <CardDescription>{range ? `الفترة: ${range.from} — ${range.to}` : "الفترة الحالية"}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
