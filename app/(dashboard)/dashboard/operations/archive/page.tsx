@@ -22,8 +22,8 @@ const statusClass: Record<string, string> = {
   ARCHIVED: "border-zinc-200 bg-zinc-50 text-zinc-700",
 };
 
-export default function OperationsArchivePage() {
-  const overview = getArchiveOverview();
+export default async function OperationsArchivePage() {
+  const overview = await getArchiveOverview();
 
   return (
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
@@ -34,6 +34,10 @@ export default function OperationsArchivePage() {
           <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
             ذاكرة المواد المنتجة: فيديوهات، تصاميم، رسائل، كاروسيل، وإعلانات مع ربطها بالموسم والحملة والنتيجة.
           </p>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs">
+            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">{overview.persistence.mode}</span>
+            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">Next: {overview.persistence.nextModel}</span>
+          </div>
         </div>
         <Link href="/dashboard/operations/production" className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-bold text-[#025EB8] shadow-sm hover:bg-white/90">
           فتح لوحة الإنتاج
