@@ -1,6 +1,11 @@
 export type ArchivePersistence = {
-  mode: "foundation";
+  mode: "foundation" | "foundation-fallback" | "db-backed";
   nextModels: string[];
+  activeModels?: string[];
+  dbCounts?: {
+    collections: number;
+    projects: number;
+  };
   externalSideEffects: false;
   note: string;
 };
@@ -134,7 +139,7 @@ export type ArchiveVideoFrame = {
 };
 
 export type ArchiveSnapshot = {
-  source: "smart-archive-foundation";
+  source: "smart-archive-foundation" | "smart-archive-db-backed";
   generatedAt: string;
   persistence: ArchivePersistence;
   tabs: ArchiveTab[];

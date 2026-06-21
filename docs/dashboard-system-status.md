@@ -16,14 +16,16 @@
 - Dashboard DB contract registry, status page, and read-only status API.
 - Provider catalog metadata for Google Drive, Google Picker, storage, video frame extraction, and OpenAI readiness.
 - Open PR audit documenting stale dashboard PRs that are already covered or superseded.
+- First dashboard Prisma models appended to `prisma/schema.prisma`.
+- Brand profiles/colors/guidelines cut over to DB-backed read with foundation fallback.
 
-## ما تم تجهيزه في الحزمة الحالية
+## ما يتم تجهيزه في الحزمة الحالية
 
-- تم تجهيز أول Prisma foundation slice في `prisma/dashboard-foundation.schema.prisma`.
-- الشريحة تضم: `BrandProfile`, `BrandColor`, `BrandGuideline`, `ArchiveCollection`, `ArchiveProject`, `OperationTask`.
-- تم توثيق cutover sequence في `docs/dashboard-prisma-foundation-slice.md`.
-- لم يتم تغيير `prisma/schema.prisma` الأساسي بعد، حتى لا يتغير Prisma Client أو runtime قبل PR تحقق مستقل.
-- لا يوجد Google Drive sync، ولا AI client جديد، ولا external platform calls.
+- `ArchiveCollection` و`ArchiveProject` يقرآن الآن من repository DB-backed عند توفر `DATABASE_URL` وبيانات DB.
+- عند غياب قاعدة البيانات أو عدم وجود rows، يرجع Smart Archive تلقائيًا إلى foundation fallback.
+- جميع صفحات `/dashboard/archive` أصبحت تستخدم snapshot ديناميكي موحد.
+- Drive Links وArchive Assets وVideo Frames وArchive AI ما زالت foundation/manual-first.
+- لا يوجد Google Drive sync حقيقي، ولا AI client جديد، ولا external platform calls.
 
 ## المسارات الرئيسية
 
@@ -68,31 +70,28 @@
 ## ما بقي foundation
 
 - Operations datasets ما زالت foundation/repository-backed وليست DB-backed بالكامل، لكن عقود الموديلات أصبحت موثقة ومقروءة من النظام.
-- Smart Archive يستخدم foundation repository data؛ الموديلات الجاهزة للتحويل القادم: `ArchiveCollection`, `ArchiveProject`, `ArchiveDriveLink`, `ArchiveAsset`, `ArchiveVideoFrame`.
-- Brand Center يستخدم foundation repository data؛ الموديلات الجاهزة للتحويل القادم: `BrandProfile`, `BrandAsset`, `BrandColor`, `BrandFont`, `BrandGuideline`, `BrandMessageFramework`.
+- Smart Archive: `ArchiveCollection` و`ArchiveProject` DB-backed read/fallback؛ أما `ArchiveDriveLink`, `ArchiveAsset`, `ArchiveVideoFrame`, Google Drive sync, and AI analysis فباقية foundation/manual-first.
+- Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ أما `BrandAsset`, `BrandFont`, `BrandMessageFramework` فباقية foundation.
 - Shared AI Core جاهز للعقود والـ audit/fallback؛ الموديل المقترح للخطوة التالية: `AiOperationRun`.
 - Connections UI يعرض المنصات الجديدة كعقود جاهزية، لكن sync/testing الحقيقي لهذه المنصات يجب أن يبقى `NOT_IMPLEMENTED` حتى تنفيذ provider clients بشكل آمن.
 
 ## Known risks
 
-- `prisma/dashboard-foundation.schema.prisma` شريحة staged وليست schema runtime بعد.
 - Google Drive metadata sync لا ينفذ external call في foundation mode؛ يحتاج provider-backed implementation لاحقًا.
 - Archive AI analysis draft-only ولا يعتمد أي أصل بدون human review.
+- Archive DB reads تحتاج rows فعلية في `ArchiveCollection` قبل أن يظهر `db-backed`; وإلا سيظهر `foundation-fallback` بشكل مقصود.
 - بعض staff users قد يحتاجون تحديث dashboardPermissions لإضافة `operations`, `archive`, أو `brand` بعد إدخال المفاتيح الجديدة.
 - Brand assets الرسمية ما زالت تحتاج رفع ملفات logo/certificate/template حقيقية قبل تفعيل downloads.
 - PRs القديمة #30, #37, #40, #43, #52, #54 لا يجب دمجها كما هي الآن؛ راجع `docs/dashboard-open-pr-audit.md`.
 
 ## Next recommended package
 
-`Append first dashboard Prisma models`
+`Cut over operation tasks to repository backed storage`
 
-الهدف: نسخ الموديلات الستة من `prisma/dashboard-foundation.schema.prisma` إلى `prisma/schema.prisma` الأساسي، تشغيل `prisma generate` وbuild، ثم بدء cutover repository واحد في PR لاحق.
+الهدف: نقل `OperationTask` إلى repository DB-backed آمن مع validation وpermission guard، بدون إرسال تلقائي وبدون إعادة بناء Scheduler أو Donor Reactivation.
 
-الشريحة الأولى:
+بعدها:
 
-- `BrandProfile`
-- `BrandColor`
-- `BrandGuideline`
-- `ArchiveCollection`
-- `ArchiveProject`
-- `OperationTask`
+- Stage `BrandAsset` أو `ArchiveDriveLink` حسب أولوية الفريق.
+- تجهيز `AiOperationRun` persistence مع سياسة retention وعدم حفظ أسرار.
+- تنفيذ Google Drive metadata sync لاحقًا فقط بعد readiness كاملة في provider catalog وMarketingPlatformConnection.

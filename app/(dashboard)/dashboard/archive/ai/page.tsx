@@ -1,8 +1,10 @@
 import { ArchiveConsole } from "../_components/ArchiveConsole";
-import { getArchiveSnapshot } from "@/lib/archive/archive-service";
+import { getArchiveSnapshotDbBacked } from "@/lib/archive/archive-service";
 
 export const metadata = { title: "Archive AI | لوحة التحكم" };
+export const dynamic = "force-dynamic";
 
-export default function ArchiveAiPage() {
-  return <ArchiveConsole activeTab="ai" snapshot={getArchiveSnapshot()} />;
+export default async function ArchiveAiPage() {
+  const snapshot = await getArchiveSnapshotDbBacked();
+  return <ArchiveConsole activeTab="ai" snapshot={snapshot} />;
 }

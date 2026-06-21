@@ -1,4 +1,9 @@
 import { recordAiAuditLog } from "@/lib/ai/core/ai-audit-log";
+import {
+  getArchiveRepositorySnapshot,
+  type ArchiveFoundationData,
+  type ArchiveRepositorySnapshot,
+} from "./archive-repository";
 import type {
   ArchiveActionResult,
   ArchiveAsset,
@@ -194,11 +199,46 @@ let videoFrames: ArchiveVideoFrame[] = [
   },
 ];
 
-function persistence() {
+function sortedCollections(items: ArchiveCollection[]) {
+  return [...items].sort((a, b) => a.order - b.order);
+}
+
+function foundationArchiveData(): ArchiveFoundationData {
   return {
-    mode: "foundation" as const,
+    collections: sortedCollections(collections),
+    projects: [...projects],
+  };
+}
+
+function persistence(repository?: ArchiveRepositorySnapshot): ArchiveSnapshot["persistence"] {
+  if (repository?.mode === "db-backed") {
+    return {
+      mode: "db-backed",
+      nextModels,
+      activeModels: ["ArchiveCollection", "ArchiveProject"],
+      dbCounts: repository.dbCounts,
+      externalSideEffects: false,
+      note: repository.reason,
+    };
+  }
+
+  if (repository?.mode === "foundation-fallback") {
+    return {
+      mode: "foundation-fallback",
+      nextModels,
+      activeModels: [],
+      dbCounts: repository.dbCounts,
+      externalSideEffects: false,
+      note: repository.reason,
+    };
+  }
+
+  return {
+    mode: "foundation",
     nextModels,
-    externalSideEffects: false as const,
+    activeModels: [],
+    dbCounts: { collections: 0, projects: 0 },
+    externalSideEffects: false,
     note: "Smart Archive is using repository/service contracts and foundation data. DB migration and Google Drive sync can be added safely next.",
   };
 }
@@ -211,24 +251,28 @@ function marketingPicks() {
   return assets.filter((asset) => asset.marketingApproved || (!asset.isSensitive && asset.marketingScore >= 65 && asset.humanReviewStatus !== "REJECTED"));
 }
 
-export function getArchiveSnapshot(): ArchiveSnapshot {
+function buildArchiveSnapshot(repository?: ArchiveRepositorySnapshot): ArchiveSnapshot {
+  const activeCollections = repository ? sortedCollections(repository.collections) : sortedCollections(collections);
+  const activeProjects = repository ? [...repository.projects] : [...projects];
+  const activeMarketingPicks = marketingPicks();
+
   return {
-    source: "smart-archive-foundation",
+    source: repository?.mode === "db-backed" ? "smart-archive-db-backed" : "smart-archive-foundation",
     generatedAt: nowIso(),
-    persistence: persistence(),
+    persistence: persistence(repository),
     tabs: ARCHIVE_TABS,
-    collections: [...collections].sort((a, b) => a.order - b.order),
-    projects: [...projects],
+    collections: activeCollections,
+    projects: activeProjects,
     driveLinks: [...driveLinks],
     assets: [...assets],
-    marketingPicks: marketingPicks(),
+    marketingPicks: activeMarketingPicks,
     videoFrames: [...videoFrames],
     summary: {
-      collections: collections.length,
-      projects: projects.length,
+      collections: activeCollections.length,
+      projects: activeProjects.length,
       driveLinks: driveLinks.length,
       assets: assets.length,
-      marketingReady: marketingPicks().length,
+      marketingReady: activeMarketingPicks.length,
       pendingHumanReview: assets.filter((asset) => asset.humanReviewStatus === "PENDING").length,
       sensitiveAssets: assets.filter((asset) => asset.isSensitive || asset.needsBlur).length,
       reports: assets.filter((asset) => asset.recommendedUse === "REPORT" || asset.fileType === "DOCUMENT").length,
@@ -237,6 +281,9 @@ export function getArchiveSnapshot(): ArchiveSnapshot {
       "Google Drive sync is not automatic and makes no external call in foundation mode.",
       "AI analysis is draft-only and human review is required before marketing use.",
       "Sensitive assets and assets needing blur are excluded from Marketing Picks until approved.",
+      repository?.mode === "db-backed"
+        ? "ArchiveCollection and ArchiveProject are DB-backed. Drive links, assets, video frames, and AI remain foundation/manual-first."
+        : "ArchiveCollection and ArchiveProject are using foundation fallback until database rows are available.",
     ],
     flows: [
       "Google Drive Folder -> ArchiveProject -> ArchiveDriveLink -> ArchiveAsset metadata",
@@ -252,6 +299,15 @@ export function getArchiveSnapshot(): ArchiveSnapshot {
       usesSharedAiCore: true,
     },
   };
+}
+
+export function getArchiveSnapshot(): ArchiveSnapshot {
+  return buildArchiveSnapshot();
+}
+
+export async function getArchiveSnapshotDbBacked(): Promise<ArchiveSnapshot> {
+  const repository = await getArchiveRepositorySnapshot(foundationArchiveData());
+  return buildArchiveSnapshot(repository);
 }
 
 export function listArchiveCollections() {
