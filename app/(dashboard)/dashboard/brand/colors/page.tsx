@@ -3,6 +3,7 @@ import { getBrandCenterSnapshot } from "@/lib/brand/brand-service";
 
 export const metadata = { title: "Brand Colors | لوحة التحكم" };
 
-export default function BrandColorsPage() {
-  return <BrandCenterView activeTab="colors" snapshot={getBrandCenterSnapshot()} />;
+export default async function BrandColorsPage() {
+  const snapshot = await getBrandCenterSnapshot();
+  return <BrandCenterView activeTab="colors" snapshot={snapshot} />;
 }
