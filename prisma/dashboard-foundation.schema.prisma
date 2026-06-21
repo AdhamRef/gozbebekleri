@@ -92,6 +92,26 @@ model BrandColor {
   @@index([order])
 }
 
+model BrandFont {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  profileId String   @db.ObjectId
+  name      String
+  usage     String
+  fallback  String?
+  source    String?
+  notes     String?
+  order     Int      @default(0)
+  status    String   @default("TO_VERIFY")
+  createdBy String?  @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([profileId])
+  @@index([usage])
+  @@index([status])
+  @@index([order])
+}
+
 model BrandGuideline {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   profileId String   @db.ObjectId
@@ -106,6 +126,29 @@ model BrandGuideline {
 
   @@index([profileId])
   @@index([section])
+  @@index([order])
+}
+
+model BrandMessageFramework {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  profileId  String   @db.ObjectId
+  name       String
+  type       String
+  locale     String   @default("tr")
+  structure  Json?
+  sampleText String?
+  doList     String[] @default([])
+  dontList   String[] @default([])
+  order      Int      @default(0)
+  status     String   @default("TO_VERIFY")
+  createdBy  String?  @db.ObjectId
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([profileId])
+  @@index([type])
+  @@index([locale])
+  @@index([status])
   @@index([order])
 }
 
