@@ -37,6 +37,7 @@ export const DASHBOARD_NAV_GROUPS: {
     group: "المحتوى والتشغيل",
     items: [
       { key: "operations", title: "مركز المحتوى والتشغيل", href: "/dashboard/operations" },
+      { key: "archive", title: "الأرشيف الذكي", href: "/dashboard/archive" },
     ],
   },
   {
