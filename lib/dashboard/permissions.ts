@@ -25,6 +25,9 @@ export const DASHBOARD_PERMISSION_KEYS = [
   "pixels",
   "ads",
   "platformConnections",
+  "operations",
+  "archive",
+  "brand",
   "generalSettings",
   // Action permissions — not tied to a sidebar route. Power-user only.
   "donationsEdit",
@@ -123,10 +126,13 @@ export function userCanExportReports(user: UserLike | undefined): boolean {
 /** Longer prefixes first — first match wins */
 const PATH_RULES: { prefix: string; key: DashboardPermissionKey }[] = [
   { prefix: "/dashboard/marketing/connections", key: "platformConnections" },
+  { prefix: "/dashboard/marketing/tracking-hub", key: "pixels" },
   { prefix: "/dashboard/marketing", key: "ads" },
   { prefix: "/dashboard/marketing-intelligence", key: "ads" },
   { prefix: "/dashboard/conversion-events", key: "ads" },
   { prefix: "/dashboard/ads", key: "ads" },
+  { prefix: "/dashboard/operations", key: "operations" },
+  { prefix: "/dashboard/archive", key: "archive" },
   { prefix: "/dashboard/monthly", key: "monthly" },
   { prefix: "/dashboard/link-generator", key: "referrals" },
   { prefix: "/dashboard/referrals", key: "referrals" },
@@ -144,7 +150,7 @@ const PATH_RULES: { prefix: string; key: DashboardPermissionKey }[] = [
   { prefix: "/dashboard/ticker", key: "ticker" },
   { prefix: "/dashboard/pixels", key: "pixels" },
   { prefix: "/dashboard/donations", key: "revenue" },
-  { prefix: "/dashboard/brand", key: "revenue" },
+  { prefix: "/dashboard/brand", key: "brand" },
   { prefix: "/dashboard/general", key: "generalSettings" },
   { prefix: "/dashboard", key: "revenue" },
 ];

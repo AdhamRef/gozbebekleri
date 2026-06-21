@@ -97,6 +97,12 @@ function statusParam(request: NextRequest): LinkStatus | "ALL" {
   return "ACTIVE";
 }
 
+function jsonNoStore(body: unknown, init: ResponseInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set("Cache-Control", "no-store");
+  return NextResponse.json(body, { ...init, headers });
+}
+
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   const denied = requireAdminOrDashboardPermission(session, "ads");
@@ -124,7 +130,7 @@ export async function GET(request: NextRequest) {
     ? (result.cursor as JsonMap).firstBatch
     : [];
 
-  return NextResponse.json({ ok: true, status, links: rows }, { headers: { "Cache-Control": "no-store" } });
+  return jsonNoStore({ ok: true, status, links: rows });
 }
 
 export async function POST(request: NextRequest) {
@@ -136,8 +142,8 @@ export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as JsonMap;
   const payload = readPayload(body);
 
-  if (!payload.url) return NextResponse.json({ ok: false, error: "missing url" }, { status: 400 });
-  if (!payload.platform) return NextResponse.json({ ok: false, error: "missing platform" }, { status: 400 });
+  if (!payload.url) return jsonNoStore({ ok: false, error: "missing url" }, { status: 400 });
+  if (!payload.platform) return jsonNoStore({ ok: false, error: "missing platform" }, { status: 400 });
 
   const now = new Date();
   const hash = urlHash(payload.url);
@@ -182,7 +188,7 @@ export async function POST(request: NextRequest) {
   }) as JsonMap;
 
   const upserted = Array.isArray(result.upserted) && result.upserted.length > 0;
-  return NextResponse.json({ ok: true, upserted, matched: result.n ?? 1, link: { ...document, createdAt: now } });
+  return jsonNoStore({ ok: true, upserted, matched: result.n ?? 1, link: { ...document, createdAt: now } });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -194,7 +200,7 @@ export async function PATCH(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as JsonMap;
   const id = readString(body.id);
   const action = readString(body.action)?.toUpperCase();
-  if (!id) return NextResponse.json({ ok: false, error: "missing id" }, { status: 400 });
+  if (!id) return jsonNoStore({ ok: false, error: "missing id" }, { status: 400 });
   const filter = objectIdFilter(id) ?? { urlHash: id };
 
   const now = new Date();
@@ -226,14 +232,14 @@ export async function PATCH(request: NextRequest) {
       update: "MarketingCampaignLink",
       updates: [{ q: filter, u: { $set: editable }, multi: false }],
     }) as JsonMap;
-    return NextResponse.json({ ok: true, matched: result.n ?? 0, action: "UPDATE" });
+    return jsonNoStore({ ok: true, matched: result.n ?? 0, action: "UPDATE" });
   }
 
   let status: LinkStatus;
   if (action === "ARCHIVE") status = "ARCHIVED";
   else if (action === "DELETE") status = "DELETED";
   else if (action === "RESTORE") status = "ACTIVE";
-  else return NextResponse.json({ ok: false, error: "invalid action" }, { status: 400 });
+  else return jsonNoStore({ ok: false, error: "invalid action" }, { status: 400 });
 
   const update: JsonMap = {
     status,
@@ -254,5 +260,5 @@ export async function PATCH(request: NextRequest) {
     updates: [{ q: filter, u: { $set: update }, multi: false }],
   }) as JsonMap;
 
-  return NextResponse.json({ ok: true, matched: result.n ?? 0, status });
+  return jsonNoStore({ ok: true, matched: result.n ?? 0, status });
 }

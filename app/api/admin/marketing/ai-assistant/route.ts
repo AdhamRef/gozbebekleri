@@ -27,6 +27,12 @@ function maskSecret(value: string | null | undefined) {
   return `${value.slice(0, 4)}••••${value.slice(-4)}`;
 }
 
+function jsonNoStore(body: unknown, init: ResponseInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set("Cache-Control", "no-store");
+  return NextResponse.json(body, { ...init, headers });
+}
+
 export async function GET() {
   const session = await getServerSession(authOptions);
   const denied = requireAdminOrDashboardPermission(session, "ads");
@@ -37,7 +43,7 @@ export async function GET() {
     orderBy: { updatedAt: "desc" },
   });
 
-  return NextResponse.json({
+  return jsonNoStore({
     ok: true,
     settings: row ? {
       id: row.id,
@@ -52,7 +58,7 @@ export async function GET() {
       status: row.status,
       updatedAt: row.updatedAt,
     } : null,
-  }, { headers: { "Cache-Control": "no-store" } });
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -62,7 +68,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => null);
   const parsed = schema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: "Invalid payload", issues: parsed.error.flatten() }, { status: 400 });
+  if (!parsed.success) return jsonNoStore({ error: "Invalid payload", issues: parsed.error.flatten() }, { status: 400 });
 
   const d = parsed.data;
   const actor = auditActorFromDashboardSession(session!);
@@ -103,5 +109,5 @@ export async function POST(request: NextRequest) {
     stream: "TEAM",
   });
 
-  return NextResponse.json({ ok: true, settings: { id: saved.id, provider: saved.accountName, model: saved.accountId, keyPreview: maskSecret(saved.accessToken), hasKey: Boolean(saved.accessToken), baseUrl: saved.businessId, assistantId: saved.managerAccountId, dailyBudgetLimit: saved.defaultCurrency, enabled: saved.enabled, status: saved.status } });
+  return jsonNoStore({ ok: true, settings: { id: saved.id, provider: saved.accountName, model: saved.accountId, keyPreview: maskSecret(saved.accessToken), hasKey: Boolean(saved.accessToken), baseUrl: saved.businessId, assistantId: saved.managerAccountId, dailyBudgetLimit: saved.defaultCurrency, enabled: saved.enabled, status: saved.status } });
 }

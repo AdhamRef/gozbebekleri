@@ -14,6 +14,12 @@ const draftSchema = z.object({
   requestedTool: z.string().trim().max(80).optional().nullable(),
 });
 
+function jsonNoStore(body: unknown, init: ResponseInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set("Cache-Control", "no-store");
+  return NextResponse.json(body, { ...init, headers });
+}
+
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   const denied = requireAdminOrDashboardPermission(session, "ads");
@@ -21,10 +27,10 @@ export async function GET(request: NextRequest) {
 
   const context = request.nextUrl.searchParams.get("context");
   if (context === "marketing" || context === "content" || context === "archive" || context === "brand") {
-    return NextResponse.json({ ok: true, readiness: getAiAssistantReadiness(context) }, { headers: { "Cache-Control": "no-store" } });
+    return jsonNoStore({ ok: true, readiness: getAiAssistantReadiness(context) });
   }
 
-  return NextResponse.json(getAiCoreOverview(), { headers: { "Cache-Control": "no-store" } });
+  return jsonNoStore(getAiCoreOverview());
 }
 
 export async function POST(request: NextRequest) {
@@ -35,7 +41,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const parsed = draftSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid payload", issues: parsed.error.flatten() }, { status: 400 });
+    return jsonNoStore({ error: "Invalid payload", issues: parsed.error.flatten() }, { status: 400 });
   }
 
   const user = session?.user?.email || session?.user?.name || "dashboard-user";
@@ -44,7 +50,5 @@ export async function POST(request: NextRequest) {
     user,
   });
 
-  return NextResponse.json(draft, {
-    headers: { "Cache-Control": "no-store" },
-  });
+  return jsonNoStore(draft);
 }
