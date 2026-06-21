@@ -4,13 +4,26 @@
 
 ## الهدف
 
-هذا الملف يوثق أول شريحة صغيرة وآمنة من موديلات الداشبورد الجاهزة للإدخال في `prisma/schema.prisma` الأساسي لاحقًا.
+هذا الملف يوثق أول شريحة صغيرة وآمنة من موديلات الداشبورد التي تم تجهيزها أولًا كـ reviewable schema artifact ثم إدخالها في `prisma/schema.prisma` الأساسي بدون تغيير runtime behavior.
 
-الشريحة موجودة في:
+الشريحة المرجعية باقية في:
 
 `prisma/dashboard-foundation.schema.prisma`
 
-وهي مقصودة كـ reviewable schema artifact قبل تشغيل cutover فعلي.
+والموديلات الستة نفسها موجودة الآن أيضًا في:
+
+`prisma/schema.prisma`
+
+## الحالة الحالية
+
+تم تنفيذ مرحلة `Append first dashboard Prisma models` بإضافة الموديلات الستة الأولى إلى الـ schema الرئيسي فقط.
+
+لم يتم في هذه المرحلة:
+
+- نقل أي Repository من foundation إلى DB-backed.
+- تغيير أي صفحة Dashboard لتكتب في قاعدة البيانات الجديدة.
+- تشغيل أي إرسال أو نشر تلقائي.
+- تغيير payment أو tracking runtime.
 
 ## التحقق
 
@@ -26,7 +39,7 @@ npm run dashboard:schema:validate
 prisma validate --schema prisma/dashboard-foundation.schema.prisma
 ```
 
-استخدم هذا الأمر قبل PR إدخال الموديلات في الـ schema الرئيسي، وبعد أي تعديل على الشريحة.
+بعد إدخال الموديلات في `prisma/schema.prisma` يجب أن يمر `prisma generate` و`next build` عبر Vercel Preview قبل الدمج.
 
 ## لماذا لم يتم قطع كل repositories مباشرة؟
 
@@ -72,25 +85,24 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 
 العنوان المقترح:
 
-`Append first dashboard Prisma models`
-
-العمل:
-
-- تشغيل `npm run dashboard:schema:validate` على الشريحة المستقلة.
-- نسخ الموديلات الستة من `prisma/dashboard-foundation.schema.prisma` إلى `prisma/schema.prisma` الأساسي.
-- تشغيل Prisma generate/build.
-- عدم تغيير أي runtime service.
-
-### PR بعده
-
-العنوان المقترح:
-
 `Cut over brand profiles to repository backed storage`
 
 العمل:
 
 - نقل `BrandProfile` و`BrandColor` و`BrandGuideline` إلى repository DB-backed مع fallback foundation.
 - إبقاء `BrandAsset` foundation حتى توفر الملفات الرسمية.
+- عدم نقل Archive/Operations في نفس PR.
+
+### PR بعده
+
+العنوان المقترح:
+
+`Cut over archive collections to repository backed storage`
+
+العمل:
+
+- نقل `ArchiveCollection` و`ArchiveProject` إلى DB-backed read/write foundation-safe repositories.
+- إبقاء `ArchiveAsset` وDrive sync في foundation/provider-ready mode.
 
 ## ملاحظات Mongo/Prisma
 
