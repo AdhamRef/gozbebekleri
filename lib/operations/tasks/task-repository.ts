@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { PlanningActionPriority, PlanningActionType } from "../planning/planning-types";
 import type { OperationsRepositoryResult } from "../persistence-types";
@@ -33,6 +34,32 @@ type OperationTaskRow = {
   resultNotes: string | null;
 };
 
+export type OperationTaskMutationInput = {
+  title?: string;
+  description?: string | null;
+  taskType?: PlanningActionType;
+  status?: OperationsTaskStatus;
+  priority?: PlanningActionPriority;
+  assignedTo?: string | null;
+  contentItemId?: string | null;
+  planId?: string | null;
+  seasonId?: string | null;
+  sourceType?: string | null;
+  sourceId?: string | null;
+  dueAt?: Date | null;
+  blockedReason?: string | null;
+  resultNotes?: string | null;
+  qualityRating?: number | null;
+  workloadScore?: number | null;
+};
+
+export type OperationTaskMutationResult = {
+  ok: boolean;
+  mode: "prisma" | "foundation";
+  message: string;
+  task?: OperationsTask;
+};
+
 function foundationTasks(reason: string): OperationsRepositoryResult<OperationsTask> {
   return {
     items: generateTasks(),
@@ -46,6 +73,14 @@ function foundationTasks(reason: string): OperationsRepositoryResult<OperationsT
       externalSideEffects: false,
       note: reason,
     },
+  };
+}
+
+function unavailableWrite(message: string): OperationTaskMutationResult {
+  return {
+    ok: false,
+    mode: "foundation",
+    message,
   };
 }
 
@@ -71,6 +106,14 @@ function progressFor(status: OperationsTaskStatus) {
 
 function dueLabelFor(value: Date | null) {
   return value ? value.toISOString().slice(0, 10) : "غير محدد";
+}
+
+function timestampFor(status: OperationsTaskStatus) {
+  const now = new Date();
+  if (status === "IN_PROGRESS") return { startedAt: now };
+  if (status === "NEEDS_REVIEW") return { reviewRequestedAt: now };
+  if (status === "DONE") return { completedAt: now };
+  return {};
 }
 
 function mapTask(row: OperationTaskRow): OperationsTask {
@@ -112,16 +155,110 @@ export async function listOperationTasksFromRepository(): Promise<OperationsRepo
       persistence: {
         mode: "prisma",
         storage: "prisma",
-        readOnly: true,
+        readOnly: false,
         model: "OperationTask",
-        nextModel: "OperationTaskWriteActions",
+        nextModel: "OperationTaskAuditTrail",
         readyForDb: true,
         externalSideEffects: false,
-        note: "OperationTask is read through Prisma with a foundation fallback. Scheduler, donor reactivation, sending, and publishing remain manual-first.",
+        note: "OperationTask is read through Prisma with safe create/update mutations. Scheduler, donor reactivation, sending, and publishing remain manual-first.",
       },
     };
   } catch (error) {
     console.error("OperationTask repository DB read failed", error);
     return foundationTasks("OperationTask repository DB read failed; using generated foundation tasks.");
+  }
+}
+
+export async function createOperationTaskInRepository(
+  input: Required<Pick<OperationTaskMutationInput, "title">> & OperationTaskMutationInput,
+  actorId?: string | null,
+): Promise<OperationTaskMutationResult> {
+  if (!process.env.DATABASE_URL) {
+    return unavailableWrite("DATABASE_URL is not configured; OperationTask was not created.");
+  }
+
+  try {
+    const status = input.status ?? "PENDING";
+    const row = await prisma.operationTask.create({
+      data: {
+        title: input.title,
+        description: input.description ?? undefined,
+        taskType: input.taskType ?? "WRITING",
+        status,
+        priority: input.priority ?? "MEDIUM",
+        assignedTo: input.assignedTo ?? undefined,
+        contentItemId: input.contentItemId ?? undefined,
+        planId: input.planId ?? undefined,
+        seasonId: input.seasonId ?? undefined,
+        sourceType: input.sourceType ?? "MANUAL",
+        sourceId: input.sourceId ?? undefined,
+        dueAt: input.dueAt ?? undefined,
+        blockedReason: input.blockedReason ?? undefined,
+        resultNotes: input.resultNotes ?? undefined,
+        qualityRating: input.qualityRating ?? undefined,
+        workloadScore: input.workloadScore ?? undefined,
+        createdBy: actorId ?? undefined,
+        updatedBy: actorId ?? undefined,
+        ...timestampFor(status),
+      },
+    });
+
+    return {
+      ok: true,
+      mode: "prisma",
+      message: "OperationTask created.",
+      task: mapTask(row),
+    };
+  } catch (error) {
+    console.error("OperationTask create failed", error);
+    return { ok: false, mode: "prisma", message: "OperationTask create failed." };
+  }
+}
+
+export async function updateOperationTaskInRepository(
+  id: string,
+  input: OperationTaskMutationInput,
+  actorId?: string | null,
+): Promise<OperationTaskMutationResult> {
+  if (!process.env.DATABASE_URL) {
+    return unavailableWrite("DATABASE_URL is not configured; OperationTask was not updated.");
+  }
+
+  try {
+    const data: Prisma.OperationTaskUpdateInput = {
+      updatedBy: actorId ?? undefined,
+    };
+
+    if (input.title !== undefined) data.title = input.title;
+    if (input.description !== undefined) data.description = input.description;
+    if (input.taskType !== undefined) data.taskType = input.taskType;
+    if (input.status !== undefined) Object.assign(data, { status: input.status, ...timestampFor(input.status) });
+    if (input.priority !== undefined) data.priority = input.priority;
+    if (input.assignedTo !== undefined) data.assignedTo = input.assignedTo;
+    if (input.contentItemId !== undefined) data.contentItemId = input.contentItemId;
+    if (input.planId !== undefined) data.planId = input.planId;
+    if (input.seasonId !== undefined) data.seasonId = input.seasonId;
+    if (input.sourceType !== undefined) data.sourceType = input.sourceType;
+    if (input.sourceId !== undefined) data.sourceId = input.sourceId;
+    if (input.dueAt !== undefined) data.dueAt = input.dueAt;
+    if (input.blockedReason !== undefined) data.blockedReason = input.blockedReason;
+    if (input.resultNotes !== undefined) data.resultNotes = input.resultNotes;
+    if (input.qualityRating !== undefined) data.qualityRating = input.qualityRating;
+    if (input.workloadScore !== undefined) data.workloadScore = input.workloadScore;
+
+    const row = await prisma.operationTask.update({
+      where: { id },
+      data,
+    });
+
+    return {
+      ok: true,
+      mode: "prisma",
+      message: "OperationTask updated.",
+      task: mapTask(row),
+    };
+  } catch (error) {
+    console.error("OperationTask update failed", error);
+    return { ok: false, mode: "prisma", message: "OperationTask update failed." };
   }
 }
