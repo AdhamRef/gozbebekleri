@@ -21,18 +21,17 @@
 - Archive collections/projects cut over to DB-backed read with foundation fallback.
 - OperationTask cut over to DB-backed read/write API with computed foundation fallback.
 - `/dashboard/operations/tasks` now has DB-backed manual task creation, safe quick edit, and daily transition controls for real OperationTask rows.
-- `BrandAsset` staged contract added to `prisma/dashboard-foundation.schema.prisma` only.
+- `BrandAsset`, `BrandFont`, `BrandMessageFramework`, and `AiOperationRun` staged contracts added to `prisma/dashboard-foundation.schema.prisma` only.
 - Brand Center assets are sourced through the Brand repository snapshot, with optional Prisma `brandAsset` read fallback when the generated delegate exists.
-- `AiOperationRun` staged contract added to `prisma/dashboard-foundation.schema.prisma` only for future Shared AI Core audit persistence.
 
 ## ما يتم تجهيزه في الحزمة الحالية
 
-- `BrandFont` and `BrandMessageFramework` are now staged in `prisma/dashboard-foundation.schema.prisma` to complete the Brand Center data contracts requested for typography and message frameworks.
-- `BrandFont` tracks profile, font name, usage, fallback, source, notes, order, status, creator, and timestamps.
-- `BrandMessageFramework` tracks profile, name, type, locale, structure, sample text, do/don't lists, order, status, creator, and timestamps.
+- Operations and content workflow DB contracts are now staged in `prisma/dashboard-foundation.schema.prisma` only.
+- New staged models: `OperationSeason`, `MonthlyContentPlan`, `ContentItem`, `ContentPublication`, `MessageSchedule`, `DonorReactivationReminder`, `MarketingLearning`, and `ContentAdLink`.
+- These contracts support monthly/seasonal planning, content production, manual publishing checklist, manual-first scheduling, donor reactivation candidates, content learnings, and content-to-ad identifier linking.
+- `ContentAdLink` links content/ad/platform identifiers only and does not duplicate AdSnapshot or MarketingCampaignSnapshot performance tables.
 - This package does not add these models to `prisma/schema.prisma` yet.
-- This package does not add new create/update/delete UI or repository DB writes for typography/frameworks.
-- No automatic sending, publishing, Google Drive sync, external AI call, payment change, tracking runtime change, or frontend secret exposure.
+- This package does not add automatic sending, publishing, Google Drive sync, external AI calls, payment changes, tracking runtime changes, or frontend secrets.
 
 ## المسارات الرئيسية
 
@@ -78,6 +77,7 @@
 
 - Operations Scheduler, Production, Content Items, and Content Workflow Tasks ما زالت foundation/repository-backed وليست DB-backed بالكامل.
 - Operations Tasks: `OperationTask` DB-backed read/write API وUI create/edit/transitions موجودة للمهام الفعلية؛ الربط المباشر مع ContentItem/ArchiveAsset ما زال pending حتى تدخل هذه الموديلات للـ DB-backed runtime.
+- Operations/Content workflow models now have staged contracts only; runtime schema and repository cutover remain pending.
 - Smart Archive: `ArchiveCollection` و`ArchiveProject` DB-backed read/fallback؛ أما `ArchiveDriveLink`, `ArchiveAsset`, `ArchiveVideoFrame`, Google Drive sync, and AI analysis فباقية foundation/manual-first.
 - Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ `BrandAsset` لديه staged schema + repository read fallback، لكن runtime schema الأساسي ما زال pending. `BrandFont` و`BrandMessageFramework` لديهما staged schema contracts فقط، والـ runtime cutover ما زال pending.
 - Shared AI Core جاهز للعقود والـ provider fallback؛ `AiOperationRun` لديه staged schema contract فقط، والـ runtime schema/repository persistence ما زال pending.
@@ -93,6 +93,7 @@
 - بعض staff users قد يحتاجون تحديث dashboardPermissions لإضافة `operations`, `archive`, أو `brand` بعد إدخال المفاتيح الجديدة.
 - Brand assets الرسمية ما زالت تحتاج سياسة URL/download واضحة ورفع ملفات logo/certificate/template حقيقية قبل تفعيل downloads.
 - Brand typography and message frameworks still need verified real organization rules before production authoring automation.
+- Operations content workflow runtime cutover should be split into small PRs to avoid schema/client blast radius.
 - PRs القديمة #30, #37, #40, #43, #52, #54 لا يجب دمجها كما هي الآن؛ راجع `docs/dashboard-open-pr-audit.md`.
 
 ## Next recommended package
@@ -104,6 +105,7 @@
 بعدها:
 
 - `Append BrandFont and MessageFramework runtime models` ثم cut over Typography/Frameworks read paths تدريجيًا.
+- `Append Operations content workflow runtime models` كشرائح صغيرة.
 - `Append AiOperationRun runtime model` بعد تثبيت sanitization/retention policy.
 - ربط OperationTask تدريجيًا بـ ContentItem وArchiveAsset عند توفر الموديلات الفعلية.
 - تنفيذ Google Drive metadata sync لاحقًا فقط بعد readiness كاملة في provider catalog وMarketingPlatformConnection.
