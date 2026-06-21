@@ -7,7 +7,15 @@
  * dashboard, create/update APIs, test endpoints, and future sync jobs.
  */
 
-export type PlatformCategory = "ADS" | "ANALYTICS" | "MESSAGING" | "EMAIL" | "CUSTOM";
+export type PlatformCategory =
+  | "ADS"
+  | "ANALYTICS"
+  | "MESSAGING"
+  | "EMAIL"
+  | "AI"
+  | "ARCHIVE_STORAGE"
+  | "INTERNAL_API"
+  | "CUSTOM";
 export type PlatformKey =
   | "META"
   | "GOOGLE_ADS"
@@ -15,9 +23,16 @@ export type PlatformKey =
   | "X"
   | "GA4"
   | "TWILIO"
+  | "NETGSM"
   | "EMAIL_PROVIDER"
   | "WHATSAPP_PROVIDER"
   | "SMS_PROVIDER"
+  | "OPENAI"
+  | "GOOGLE_DRIVE"
+  | "GOOGLE_PICKER"
+  | "VIDEO_FRAME_EXTRACTOR"
+  | "STORAGE_PROVIDER"
+  | "INTERNAL_API"
   | "CUSTOM";
 
 export type ConnectionStatus =
@@ -146,6 +161,22 @@ const TWILIO_GUIDE: PlatformRequirements = {
   setupGuideAr: "اربط Twilio لإدارة WhatsApp وSMS والبريد. الإرسال الفعلي الحالي لا يتأثر بهذه الإعدادات حتى تفعيل المزامنة.",
 };
 
+const NETGSM_GUIDE: PlatformRequirements = {
+  platform: "NETGSM",
+  category: "MESSAGING",
+  labelAr: "Netgsm",
+  required: [
+    { field: "accountId", labelAr: "Netgsm Username", secret: false, guidanceAr: "ناقص اسم مستخدم Netgsm. ستجده داخل لوحة Netgsm." },
+    { field: "apiSecret", labelAr: "Netgsm Password / API Secret", secret: true, guidanceAr: "ناقص كلمة مرور أو API Secret الخاص بـ Netgsm. لا تعرضه داخل الواجهة." },
+    { field: "senderId", labelAr: "SMS Header", secret: false, guidanceAr: "ناقص SMS Header المعتمد للإرسال من Netgsm داخل تركيا." },
+  ],
+  optional: [
+    { field: "accountName", labelAr: "اسم الحساب", secret: false, guidanceAr: "اسم الحساب اختياري لتوضيح الحساب للفريق." },
+    { field: "appSecret", labelAr: "Webhook Secret", secret: true, guidanceAr: "Webhook Secret اختياري إذا تم تفعيل callbacks لاحقًا." },
+  ],
+  setupGuideAr: "Netgsm هو مسار SMS الأساسي داخل تركيا. لا تستخدمه كبديل لـ WhatsApp أو البريد.",
+};
+
 const EMAIL_PROVIDER_GUIDE: PlatformRequirements = {
   platform: "EMAIL_PROVIDER",
   category: "EMAIL",
@@ -164,6 +195,94 @@ const EMAIL_PROVIDER_GUIDE: PlatformRequirements = {
 
 const WHATSAPP_PROVIDER_GUIDE: PlatformRequirements = { ...TWILIO_GUIDE, platform: "WHATSAPP_PROVIDER", category: "MESSAGING", labelAr: "موفر WhatsApp" };
 const SMS_PROVIDER_GUIDE: PlatformRequirements = { ...TWILIO_GUIDE, platform: "SMS_PROVIDER", category: "MESSAGING", labelAr: "موفر SMS" };
+
+const OPENAI_GUIDE: PlatformRequirements = {
+  platform: "OPENAI",
+  category: "AI",
+  labelAr: "OpenAI",
+  required: [
+    { field: "apiSecret", labelAr: "OpenAI API Key", secret: true, guidanceAr: "ناقص OpenAI API Key. يُستخدم فقط من الخادم داخل Shared AI Core ولا يظهر في الواجهة." },
+  ],
+  optional: [
+    { field: "accountId", labelAr: "Project أو Organization ID", secret: false, guidanceAr: "اختياري لتحديد المشروع أو المنظمة في OpenAI." },
+    { field: "accountName", labelAr: "اسم سياق الاستخدام", secret: false, guidanceAr: "اختياري، مثل Shared AI Core أو Marketing Assistant." },
+  ],
+  setupGuideAr: "OpenAI هنا عقد جاهزية للـ Shared AI Core فقط. لا إرسال تلقائي، لا نشر، ولا تغيير ميزانيات بدون موافقة بشرية.",
+};
+
+const GOOGLE_DRIVE_GUIDE: PlatformRequirements = {
+  platform: "GOOGLE_DRIVE",
+  category: "ARCHIVE_STORAGE",
+  labelAr: "Google Drive",
+  required: [
+    { field: "accountId", labelAr: "Google Cloud Project ID", secret: false, guidanceAr: "ناقص Project ID. أنشئ مشروعًا في Google Cloud Console ثم فعّل Google Drive API." },
+    { field: "appId", labelAr: "OAuth Client ID", secret: false, guidanceAr: "ناقص OAuth Client ID. أنشئه من Google Cloud Console > Credentials." },
+    { field: "clientSecret", labelAr: "OAuth Client Secret", secret: true, guidanceAr: "ناقص OAuth Client Secret. يجب حفظه في الخادم فقط." },
+    { field: "refreshToken", labelAr: "OAuth Refresh Token", secret: true, guidanceAr: "ناقص Refresh Token. لا تنفّذ sync قبل اعتماد OAuth وRedirect URI." },
+  ],
+  optional: [
+    { field: "accountName", labelAr: "Root Folder ID / Name", secret: false, guidanceAr: "Root folder اختياري لتقييد وصول الأرشيف." },
+    { field: "businessId", labelAr: "Google Workspace Customer", secret: false, guidanceAr: "اختياري إذا كان الربط على Workspace محدد." },
+  ],
+  setupGuideAr: "هذا عقد ربط فقط للأرشيف. استخدم scope drive.file مع Google Picker حيث أمكن، ولا تستخدم drive.readonly إلا عند الحاجة.",
+};
+
+const GOOGLE_PICKER_GUIDE: PlatformRequirements = {
+  platform: "GOOGLE_PICKER",
+  category: "ARCHIVE_STORAGE",
+  labelAr: "Google Picker",
+  required: [
+    { field: "accountId", labelAr: "Google Cloud Project Number / API Key", secret: false, guidanceAr: "ناقص Project Number أو Browser API Key مقيّد بالـ referrer." },
+    { field: "appId", labelAr: "OAuth Client ID", secret: false, guidanceAr: "ناقص OAuth Client ID المستخدم مع Google Picker." },
+  ],
+  optional: [
+    { field: "propertyId", labelAr: "Picker App ID", secret: false, guidanceAr: "Picker App ID اختياري حسب إعداد Google Picker." },
+    { field: "streamId", labelAr: "Scopes", secret: false, guidanceAr: "دوّن scopes المطلوبة هنا. drive.file مفضل، وdrive.readonly أوسع ويحتاج مراجعة." },
+  ],
+  setupGuideAr: "Google Picker يفتح اختيار ملفات آمن داخل المتصفح، لكنه لا يعني تنفيذ Google Drive Sync.",
+};
+
+const VIDEO_FRAME_EXTRACTOR_GUIDE: PlatformRequirements = {
+  platform: "VIDEO_FRAME_EXTRACTOR",
+  category: "ARCHIVE_STORAGE",
+  labelAr: "Video Frame Extractor",
+  required: [
+    { field: "accountId", labelAr: "Runtime contract", secret: false, guidanceAr: "حدّد runtime المقترح لاستخراج الإطارات، مثل FFmpeg worker. لا يوجد تنفيذ فعلي الآن." },
+  ],
+  optional: [
+    { field: "accountName", labelAr: "Queue / Worker name", secret: false, guidanceAr: "اسم الـ queue أو worker اختياري للتحضير لاحقًا." },
+  ],
+  setupGuideAr: "عقد foundation فقط لاستخراج frames من الفيديو لاحقًا. لا تشغيل ملفات ولا workers الآن.",
+};
+
+const STORAGE_PROVIDER_GUIDE: PlatformRequirements = {
+  platform: "STORAGE_PROVIDER",
+  category: "ARCHIVE_STORAGE",
+  labelAr: "Storage Provider",
+  required: [
+    { field: "accountId", labelAr: "Storage namespace / bucket", secret: false, guidanceAr: "ناقص اسم الـ bucket أو namespace الذي سيستضيف أصول الأرشيف." },
+    { field: "apiSecret", labelAr: "Storage write token", secret: true, guidanceAr: "ناقص token التخزين. يجب حفظه server-side فقط وعدم عرضه في أي صفحة." },
+  ],
+  optional: [
+    { field: "accountName", labelAr: "Provider name", secret: false, guidanceAr: "اسم الموفر اختياري، مثل Vercel Blob أو S3 أو Cloudinary بعد الاختيار الرسمي." },
+    { field: "businessId", labelAr: "Region / Project", secret: false, guidanceAr: "المنطقة أو المشروع اختياري للتحضير للتشغيل." },
+  ],
+  setupGuideAr: "عقد تخزين للأرشيف فقط. لا يوجد رفع أو مزامنة فعلية في هذه المرحلة.",
+};
+
+const INTERNAL_API_GUIDE: PlatformRequirements = {
+  platform: "INTERNAL_API",
+  category: "INTERNAL_API",
+  labelAr: "Internal APIs",
+  required: [
+    { field: "accountId", labelAr: "Contract name", secret: false, guidanceAr: "ناقص اسم العقد الداخلي أو مسار الـ API." },
+  ],
+  optional: [
+    { field: "appSecret", labelAr: "Shared Secret", secret: true, guidanceAr: "Shared Secret اختياري للأتمتة الداخلية لاحقًا، ولا يجب عرضه في الواجهة." },
+    { field: "notes", labelAr: "Event names", secret: false, guidanceAr: "دوّن أسماء الأحداث وقواعد idempotency/replay قبل التنفيذ." },
+  ],
+  setupGuideAr: "Internal APIs عقود داخلية فقط. لا يتم استدعاء منصات خارجية منها.",
+};
 
 const CUSTOM_GUIDE: PlatformRequirements = {
   platform: "CUSTOM",
@@ -187,9 +306,16 @@ const REGISTRY: Record<PlatformKey, PlatformRequirements> = {
   X: X_GUIDE,
   GA4: GA4_GUIDE,
   TWILIO: TWILIO_GUIDE,
+  NETGSM: NETGSM_GUIDE,
   EMAIL_PROVIDER: EMAIL_PROVIDER_GUIDE,
   WHATSAPP_PROVIDER: WHATSAPP_PROVIDER_GUIDE,
   SMS_PROVIDER: SMS_PROVIDER_GUIDE,
+  OPENAI: OPENAI_GUIDE,
+  GOOGLE_DRIVE: GOOGLE_DRIVE_GUIDE,
+  GOOGLE_PICKER: GOOGLE_PICKER_GUIDE,
+  VIDEO_FRAME_EXTRACTOR: VIDEO_FRAME_EXTRACTOR_GUIDE,
+  STORAGE_PROVIDER: STORAGE_PROVIDER_GUIDE,
+  INTERNAL_API: INTERNAL_API_GUIDE,
   CUSTOM: CUSTOM_GUIDE,
 };
 
@@ -197,7 +323,16 @@ export function getPlatformRequirements(p: PlatformKey): PlatformRequirements { 
 export const ALL_PLATFORM_REQUIREMENTS: PlatformRequirements[] = Object.values(REGISTRY);
 
 const ALL_PLATFORM_KEYS = Object.keys(REGISTRY) as PlatformKey[];
-const ALL_CATEGORIES: PlatformCategory[] = ["ADS", "ANALYTICS", "MESSAGING", "EMAIL", "CUSTOM"];
+const ALL_CATEGORIES: PlatformCategory[] = [
+  "ADS",
+  "ANALYTICS",
+  "MESSAGING",
+  "EMAIL",
+  "AI",
+  "ARCHIVE_STORAGE",
+  "INTERNAL_API",
+  "CUSTOM",
+];
 
 export function isPlatformKey(v: unknown): v is PlatformKey { return typeof v === "string" && (ALL_PLATFORM_KEYS as string[]).includes(v); }
 export function isCategoryKey(v: unknown): v is PlatformCategory { return typeof v === "string" && (ALL_CATEGORIES as string[]).includes(v); }
