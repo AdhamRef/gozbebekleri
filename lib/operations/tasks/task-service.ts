@@ -6,7 +6,7 @@ export async function getTaskOverview(): Promise<OperationsTaskOverview> {
   const tasks = dataset.items;
 
   return {
-    source: "task-repository-foundation",
+    source: dataset.persistence.mode === "prisma" ? "operation-task-prisma" : "task-repository-foundation",
     generatedAt: new Date().toISOString(),
     persistence: dataset.persistence,
     summary: {
