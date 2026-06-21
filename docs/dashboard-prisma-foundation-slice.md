@@ -22,14 +22,15 @@
 - تم إدخال الموديلات الستة في `prisma/schema.prisma` الأساسي.
 - تم قطع `BrandProfile`, `BrandColor`, `BrandGuideline` إلى قراءة DB-backed مع fallback foundation.
 - تم قطع `ArchiveCollection` و`ArchiveProject` إلى قراءة DB-backed مع fallback foundation.
-- يتم في هذه الحزمة قطع `OperationTask` إلى قراءة DB-backed مع fallback محسوب من Planning Engine.
+- تم قطع `OperationTask` إلى قراءة DB-backed مع fallback محسوب من Planning Engine.
+- يتم في هذه الحزمة إضافة create/update API آمن لـ `OperationTask` مع zod validation وAuditLog.
 
 لم يتم في هذه المرحلة:
 
 - تحويل أفعال الأرشيف إلى DB writes.
 - تشغيل Google Drive sync حقيقي.
 - نقل `ArchiveAsset` أو `ArchiveDriveLink` إلى DB-backed runtime.
-- إضافة create/update task actions قبل validation وAuditLog.
+- إضافة UI transition buttons للمهام.
 - تشغيل أي إرسال أو نشر تلقائي.
 - تغيير payment أو tracking runtime.
 
@@ -81,7 +82,7 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 | `BrandGuideline` | DB-backed read + foundation fallback | Voice/copy rules can read DB guidelines. |
 | `ArchiveCollection` | DB-backed read + foundation fallback | Smart Archive pages read collections through archive repository. |
 | `ArchiveProject` | DB-backed read + foundation fallback | Smart Archive pages read projects through archive repository. |
-| `OperationTask` | DB-backed read + computed foundation fallback | Operations tasks page/API can read Prisma tasks when rows exist. |
+| `OperationTask` | DB-backed read/write API + computed foundation fallback | Tasks page/API can read Prisma tasks and API can create/update validated tasks when DB is available. |
 
 ## ما لا يوجد في هذه الشريحة
 
@@ -99,18 +100,18 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 - لا AI approval تلقائي.
 - BrandAsset يبقى منفصل عن ArchiveAsset.
 - Archive Drive links/assets/video frames/AI remain foundation/manual-first.
-- OperationTask writes remain pending until validation and AuditLog are added.
+- OperationTask writes require operations permission, zod validation, DB availability, and AuditLog.
 
 ## cutover المقترح التالي
 
 العنوان المقترح:
 
-`Add safe operation task mutations`
+`Add operation task transition controls`
 
 العمل:
 
-- إضافة create/update actions لـ `OperationTask` مع zod validation.
-- إضافة AuditLog للأفعال المهمة.
+- إضافة UI buttons للحالات اليومية: Start, Ready for review, Complete, Blocked.
+- استخدام PATCH الحالي بدل بناء endpoint جديد.
 - إبقاء Scheduler وDonor Reactivation manual-first.
 - عدم إضافة إرسال تلقائي.
 
