@@ -23,14 +23,15 @@
 - `/dashboard/operations/tasks` now has DB-backed manual task creation, safe quick edit, and daily transition controls for real OperationTask rows.
 - `BrandAsset` staged contract added to `prisma/dashboard-foundation.schema.prisma` only.
 - Brand Center assets are sourced through the Brand repository snapshot, with optional Prisma `brandAsset` read fallback when the generated delegate exists.
+- `AiOperationRun` staged contract added to `prisma/dashboard-foundation.schema.prisma` only for future Shared AI Core audit persistence.
 
 ## ما يتم تجهيزه في الحزمة الحالية
 
-- `AiOperationRun` is now staged in `prisma/dashboard-foundation.schema.prisma` as the DB contract for Shared AI Core audit persistence.
-- The staged model tracks action, context, requested tool, sanitized prompt preview, sanitized input/output, status, risk level, human approval flags, user, timestamps, and error.
-- This package does not add `AiOperationRun` to `prisma/schema.prisma` yet.
-- This package does not add AI DB write behavior yet.
-- AI outputs remain draft-only and require human approval.
+- `BrandFont` and `BrandMessageFramework` are now staged in `prisma/dashboard-foundation.schema.prisma` to complete the Brand Center data contracts requested for typography and message frameworks.
+- `BrandFont` tracks profile, font name, usage, fallback, source, notes, order, status, creator, and timestamps.
+- `BrandMessageFramework` tracks profile, name, type, locale, structure, sample text, do/don't lists, order, status, creator, and timestamps.
+- This package does not add these models to `prisma/schema.prisma` yet.
+- This package does not add new create/update/delete UI or repository DB writes for typography/frameworks.
 - No automatic sending, publishing, Google Drive sync, external AI call, payment change, tracking runtime change, or frontend secret exposure.
 
 ## المسارات الرئيسية
@@ -78,7 +79,7 @@
 - Operations Scheduler, Production, Content Items, and Content Workflow Tasks ما زالت foundation/repository-backed وليست DB-backed بالكامل.
 - Operations Tasks: `OperationTask` DB-backed read/write API وUI create/edit/transitions موجودة للمهام الفعلية؛ الربط المباشر مع ContentItem/ArchiveAsset ما زال pending حتى تدخل هذه الموديلات للـ DB-backed runtime.
 - Smart Archive: `ArchiveCollection` و`ArchiveProject` DB-backed read/fallback؛ أما `ArchiveDriveLink`, `ArchiveAsset`, `ArchiveVideoFrame`, Google Drive sync, and AI analysis فباقية foundation/manual-first.
-- Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ `BrandAsset` لديه staged schema + repository read fallback، لكن runtime schema الأساسي ما زال pending. `BrandFont` و`BrandMessageFramework` ما زالت foundation.
+- Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ `BrandAsset` لديه staged schema + repository read fallback، لكن runtime schema الأساسي ما زال pending. `BrandFont` و`BrandMessageFramework` لديهما staged schema contracts فقط، والـ runtime cutover ما زال pending.
 - Shared AI Core جاهز للعقود والـ provider fallback؛ `AiOperationRun` لديه staged schema contract فقط، والـ runtime schema/repository persistence ما زال pending.
 - Connections UI يعرض المنصات الجديدة كعقود جاهزية، لكن sync/testing الحقيقي لهذه المنصات يجب أن يبقى `NOT_IMPLEMENTED` حتى تنفيذ provider clients بشكل آمن.
 
@@ -91,6 +92,7 @@
 - OperationTask quick edit يعمل فقط على rows فعلية؛ foundation generated tasks تبقى read-only.
 - بعض staff users قد يحتاجون تحديث dashboardPermissions لإضافة `operations`, `archive`, أو `brand` بعد إدخال المفاتيح الجديدة.
 - Brand assets الرسمية ما زالت تحتاج سياسة URL/download واضحة ورفع ملفات logo/certificate/template حقيقية قبل تفعيل downloads.
+- Brand typography and message frameworks still need verified real organization rules before production authoring automation.
 - PRs القديمة #30, #37, #40, #43, #52, #54 لا يجب دمجها كما هي الآن؛ راجع `docs/dashboard-open-pr-audit.md`.
 
 ## Next recommended package
@@ -101,6 +103,7 @@
 
 بعدها:
 
+- `Append BrandFont and MessageFramework runtime models` ثم cut over Typography/Frameworks read paths تدريجيًا.
 - `Append AiOperationRun runtime model` بعد تثبيت sanitization/retention policy.
 - ربط OperationTask تدريجيًا بـ ContentItem وArchiveAsset عند توفر الموديلات الفعلية.
 - تنفيذ Google Drive metadata sync لاحقًا فقط بعد readiness كاملة في provider catalog وMarketingPlatformConnection.
