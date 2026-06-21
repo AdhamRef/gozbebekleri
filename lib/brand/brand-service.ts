@@ -6,6 +6,7 @@ import {
   brandMessageFrameworks,
   brandProfiles,
 } from "./brand-data";
+import { getBrandRepositorySnapshot, type BrandRepositorySnapshot } from "./brand-repository";
 import type {
   BrandAiSourcePack,
   BrandCenterSnapshot,
@@ -35,8 +36,8 @@ const nextModels = [
   "BrandMessageFramework",
 ];
 
-function activeProfile(profileId?: string | null): BrandProfile {
-  return brandProfiles.find((profile) => profile.id === profileId) ?? brandProfiles.find((profile) => profile.isActive) ?? brandProfiles[0];
+function activeProfile(profiles: BrandProfile[], profileId?: string | null): BrandProfile {
+  return profiles.find((profile) => profile.id === profileId) ?? profiles.find((profile) => profile.isActive) ?? profiles[0];
 }
 
 function scoped<T extends { profileId: string }>(items: T[], profileId: string) {
@@ -65,11 +66,27 @@ function buildDownloads(profile: BrandProfile): BrandDownloadItem[] {
   ];
 }
 
-function buildAlerts(profile: BrandProfile): BrandReadinessAlert[] {
+function buildAlerts(repository: BrandRepositorySnapshot, profile: BrandProfile): BrandReadinessAlert[] {
   const profileAssets = scoped(brandAssets, profile.id);
-  const profileColors = scoped(brandColors, profile.id);
+  const profileColors = scoped(repository.colors, profile.id);
   const profileFrameworks = scoped(brandMessageFrameworks, profile.id);
   const alerts: BrandReadinessAlert[] = [];
+
+  if (repository.mode === "db-backed") {
+    alerts.push({
+      id: `${profile.id}_db_backed`,
+      severity: "success",
+      title: "Brand core is DB-backed",
+      detail: "BrandProfile, BrandColor, and BrandGuideline are read through the repository layer with foundation fallbacks.",
+    });
+  } else {
+    alerts.push({
+      id: `${profile.id}_foundation_fallback`,
+      severity: "info",
+      title: "Brand core is using foundation fallback",
+      detail: repository.reason,
+    });
+  }
 
   if (!profileAssets.some((asset) => asset.type === "LOGO" && asset.fileUrl)) {
     alerts.push({
@@ -107,38 +124,32 @@ function buildAlerts(profile: BrandProfile): BrandReadinessAlert[] {
     });
   }
 
-  if (alerts.length === 0) {
-    alerts.push({
-      id: `${profile.id}_ready`,
-      severity: "success",
-      title: "Brand foundation is ready",
-      detail: "Core profile, colors, assets, and message frameworks are available for review workflows.",
-    });
-  }
-
   return alerts;
 }
 
-export function getBrandCenterSnapshot(profileId?: string | null): BrandCenterSnapshot {
-  const profile = activeProfile(profileId);
+function buildBrandCenterSnapshot(repository: BrandRepositorySnapshot, profileId?: string | null): BrandCenterSnapshot {
+  const profile = activeProfile(repository.profiles, profileId);
   const assets = scoped(brandAssets, profile.id);
-  const colors = scoped(brandColors, profile.id).sort((a, b) => a.order - b.order);
+  const colors = scoped(repository.colors, profile.id).sort((a, b) => a.order - b.order);
   const fonts = scoped(brandFonts, profile.id);
-  const guidelines = scoped(brandGuidelines, profile.id).sort((a, b) => a.order - b.order);
+  const guidelines = scoped(repository.guidelines, profile.id).sort((a, b) => a.order - b.order);
   const messageFrameworks = scoped(brandMessageFrameworks, profile.id);
   const downloads = buildDownloads(profile);
-  const alerts = buildAlerts(profile);
-  const toVerify = [...brandProfiles, ...brandAssets].filter((item) => item.status === "TO_VERIFY").length;
+  const alerts = buildAlerts(repository, profile);
+  const toVerify = [...repository.profiles, ...brandAssets].filter((item) => item.status === "TO_VERIFY").length;
 
   return {
-    source: "brand-center-foundation",
+    source: repository.mode === "db-backed" ? "brand-center-db-backed" : "brand-center-foundation",
     persistence: {
-      mode: "foundation",
+      mode: repository.mode,
       nextModels,
+      activeModels: repository.mode === "db-backed" ? ["BrandProfile", "BrandColor", "BrandGuideline"] : [],
+      reason: repository.reason,
+      dbCounts: repository.dbCounts,
     },
     generatedAt: new Date().toISOString(),
     activeProfile: profile,
-    profiles: brandProfiles,
+    profiles: repository.profiles,
     assets,
     colors,
     fonts,
@@ -148,7 +159,7 @@ export function getBrandCenterSnapshot(profileId?: string | null): BrandCenterSn
     alerts,
     tabs: BRAND_CENTER_TABS,
     summary: {
-      profiles: brandProfiles.length,
+      profiles: repository.profiles.length,
       activeProfileName: profile.name,
       assets: assets.length,
       downloadableAssets: downloads.filter((item) => item.ready).length,
@@ -166,12 +177,50 @@ export function getBrandCenterSnapshot(profileId?: string | null): BrandCenterSn
   };
 }
 
+function getFoundationRepositorySnapshot(): BrandRepositorySnapshot {
+  return {
+    mode: "foundation-fallback",
+    source: "foundation",
+    reason: "Using foundation brand data for synchronous compatibility.",
+    profiles: brandProfiles,
+    colors: brandColors,
+    guidelines: brandGuidelines,
+    dbCounts: {
+      profiles: 0,
+      colors: 0,
+      guidelines: 0,
+    },
+  };
+}
+
+export async function getBrandCenterSnapshot(profileId?: string | null): Promise<BrandCenterSnapshot> {
+  return buildBrandCenterSnapshot(await getBrandRepositorySnapshot(), profileId);
+}
+
 export function getBrandCenterOverview() {
+  return getBrandCenterFoundationSnapshot();
+}
+
+export async function getBrandCenterOverviewDbBacked() {
   return getBrandCenterSnapshot();
 }
 
+export function getBrandCenterFoundationSnapshot(profileId?: string | null): BrandCenterSnapshot {
+  return buildBrandCenterSnapshot(getFoundationRepositorySnapshot(), profileId);
+}
+
 export function getBrandAiSourcePack(profileId?: string | null): BrandAiSourcePack {
-  const snapshot = getBrandCenterSnapshot(profileId);
+  const snapshot = getBrandCenterFoundationSnapshot(profileId);
+  return {
+    profile: snapshot.activeProfile,
+    colors: snapshot.colors,
+    guidelines: snapshot.guidelines,
+    frameworks: snapshot.messageFrameworks,
+  };
+}
+
+export async function getBrandAiSourcePackDbBacked(profileId?: string | null): Promise<BrandAiSourcePack> {
+  const snapshot = await getBrandCenterSnapshot(profileId);
   return {
     profile: snapshot.activeProfile,
     colors: snapshot.colors,

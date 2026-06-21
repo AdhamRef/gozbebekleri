@@ -133,11 +133,20 @@ export type BrandDownloadItem = {
   ready: boolean;
 };
 
+export type BrandCenterPersistenceMode = "foundation" | "foundation-fallback" | "db-backed";
+
 export type BrandCenterSnapshot = {
-  source: "brand-center-foundation";
+  source: "brand-center-foundation" | "brand-center-db-backed";
   persistence: {
-    mode: "foundation";
+    mode: BrandCenterPersistenceMode;
     nextModels: string[];
+    activeModels?: string[];
+    reason?: string;
+    dbCounts?: {
+      profiles: number;
+      colors: number;
+      guidelines: number;
+    };
   };
   generatedAt: string;
   activeProfile: BrandProfile;
