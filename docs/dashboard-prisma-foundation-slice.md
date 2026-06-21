@@ -16,6 +16,8 @@
 
 أما `BrandAsset` فأصبح موجودًا في الشريحة المستقلة كـ staged contract فقط، وتم تجهيز repository read fallback له، لكنه لم يدخل بعد إلى runtime schema الأساسي.
 
+أما `AiOperationRun` فأصبح موجودًا في الشريحة المستقلة كـ staged contract فقط حتى يتم تثبيت سياسة retention وتنقية الأسرار قبل أي runtime persistence.
+
 ## الحالة الحالية
 
 تم تنفيذ المسار الآمن حتى الآن:
@@ -30,6 +32,7 @@
 - تم إضافة نموذج إنشاء مهمة وتشغيل Quick edit محدود للمهام الفعلية.
 - تم تجهيز `BrandAsset` داخل `prisma/dashboard-foundation.schema.prisma` كعقد staged فقط، بدون upload/download policy وبدون runtime cutover.
 - تم تجهيز Brand repository ليقرأ `BrandAsset` إذا كان Prisma Client يوفّر delegate، وإلا يرجع foundation assets بوضوح.
+- تم تجهيز `AiOperationRun` داخل `prisma/dashboard-foundation.schema.prisma` كعقد staged فقط لسجل تشغيل Shared AI Core.
 
 لم يتم في هذه المرحلة:
 
@@ -37,6 +40,8 @@
 - تشغيل Google Drive sync حقيقي.
 - نقل `ArchiveAsset` أو `ArchiveDriveLink` إلى DB-backed runtime.
 - إدخال `BrandAsset` إلى `prisma/schema.prisma` الرئيسي.
+- إدخال `AiOperationRun` إلى `prisma/schema.prisma` الرئيسي.
+- إضافة repository DB-backed write path لـ AI audit log.
 - إضافة create/update/delete/upload/download لأصول الهوية.
 - ربط المهام مباشرة بـ ContentItem أو ArchiveAsset من الواجهة.
 - تشغيل أي إرسال أو نشر تلقائي.
@@ -60,7 +65,7 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 
 ## لماذا القطع تدريجي؟
 
-لأن النظام الحالي يعمل على foundation repositories وواجهات مستقرة. إدخال كل موديلات Operations/Archive/Brand دفعة واحدة يزيد خطر كسر build أو توليد Prisma Client غير مستخدم بعد.
+لأن النظام الحالي يعمل على foundation repositories وواجهات مستقرة. إدخال كل موديلات Operations/Archive/Brand/AI دفعة واحدة يزيد خطر كسر build أو توليد Prisma Client غير مستخدم بعد.
 
 المسار الآمن:
 
@@ -81,6 +86,7 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 - `ArchiveCollection`
 - `ArchiveProject`
 - `OperationTask`
+- `AiOperationRun` staged contract only
 
 ## cutover status
 
@@ -93,13 +99,14 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 | `ArchiveCollection` | DB-backed read + foundation fallback | Smart Archive pages read collections through archive repository. |
 | `ArchiveProject` | DB-backed read + foundation fallback | Smart Archive pages read projects through archive repository. |
 | `OperationTask` | DB-backed read/write API + create/edit UI + transitions + computed foundation fallback | Tasks page/API can create Prisma tasks, edit safe fields, update daily statuses, and fail safely when DB is not available. |
+| `AiOperationRun` | Staged contract only; runtime schema and repository persistence pending | Intended for sanitized Shared AI Core audit entries across marketing, operations, archive, and brand. |
 
 ## ما لا يوجد في هذه الشريحة
 
 - `BrandAsset` لم يدخل runtime schema ولم يحصل على upload/download policy بعد.
+- `AiOperationRun` لم يدخل runtime schema ولم يحصل على DB write path بعد.
 - لا يوجد `ArchiveAsset` بعد، لأن Drive metadata sync يحتاج provider credentials/scopes جاهزة.
 - لا يوجد `ContentItem` بعد، لأن Blog/Templates/Operations links تحتاج cutover تدريجي.
-- لا يوجد `AiOperationRun` بعد، لأن audit persistence يحتاج سياسة retention وعدم حفظ أسرار.
 
 ## قواعد الأمان
 
@@ -110,6 +117,7 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 - لا AI approval تلقائي.
 - BrandAsset يبقى منفصل عن ArchiveAsset.
 - BrandAsset الحالي لا يعني أن أي URL أصبح downloadable أو approved.
+- AI audit input/output يجب أن يكون sanitized ولا يحفظ مفاتيح أو tokens أو أسرار متبرعين.
 - Archive Drive links/assets/video frames/AI remain foundation/manual-first.
 - OperationTask writes require operations permission, zod validation, DB availability, and AuditLog.
 - OperationTask transition and edit buttons are disabled for generated foundation tasks.
@@ -128,9 +136,18 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 - عدم إضافة upload/download policy واسع قبل مراجعة الأمان.
 - إبقاء Scheduler وDonor Reactivation manual-first.
 
+بعدها يمكن تنفيذ:
+
+`Append AiOperationRun runtime model`
+
+- إدخال `AiOperationRun` إلى `prisma/schema.prisma` الرئيسي.
+- إضافة repository آمن للـ AI audit log مع sanitization وretention policy.
+- إبقاء كل AI output كـ draft يحتاج human approval.
+
 ## ملاحظات Mongo/Prisma
 
 - العلاقات في هذه الشريحة محفوظة كـ ObjectId scalar fields بدون relation blocks لتقليل التعقيد.
 - الفهارس مضافة فقط للقراءة المعتادة والفلاتر الرئيسية.
 - لا توجد unique constraints إلا على `BrandProfile.key` و`ArchiveCollection.slug` لأنها معرفات طبيعية مستقرة.
 - `BrandAsset.status` يبدأ بـ `TO_VERIFY` حتى لا تعرض الواجهة الأصل كمعتمد قبل مراجعة بشرية.
+- `AiOperationRun.status` يبدأ بـ `DRAFT` و`humanApprovalRequired` يبدأ بـ `true` حتى لا يتحول أي output إلى إجراء تلقائي.
