@@ -22,23 +22,44 @@ type Settings = {
 
 type ApiResponse = { ok?: boolean; settings?: Settings | null; error?: string };
 
+type CoreTool = {
+  name: string;
+  dataSource: string;
+  accessMode: string;
+  riskLevel: string;
+};
+
+type CoreReadiness = {
+  context: { blockedActions: string[] };
+  tools: CoreTool[];
+  promptExamples: string[];
+  provider: { mode: string; reason: string; model: string | null };
+};
+
+type CoreResponse = { ok?: boolean; readiness?: CoreReadiness };
+
 export default function MarketingAiAssistantPage() {
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [provider, setProvider] = React.useState("OpenAI");
   const [model, setModel] = React.useState("gpt-4.1");
-  const [keyValue, setKeyValue] = React.useState("");
   const [keyPreview, setKeyPreview] = React.useState<string | null>(null);
   const [baseUrl, setBaseUrl] = React.useState("");
   const [assistantId, setAssistantId] = React.useState("");
   const [dailyBudgetLimit, setDailyBudgetLimit] = React.useState("");
+  const [core, setCore] = React.useState<CoreReadiness | null>(null);
 
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/marketing/ai-assistant", { cache: "no-store" });
-      const json = await res.json().catch(() => null) as ApiResponse | null;
-      if (!res.ok || !json?.ok) throw new Error("failed");
+      const [settingsRes, coreRes] = await Promise.all([
+        fetch("/api/admin/marketing/ai-assistant", { cache: "no-store" }),
+        fetch("/api/admin/ai/core?context=marketing", { cache: "no-store" }),
+      ]);
+      const json = await settingsRes.json().catch(() => null) as ApiResponse | null;
+      const coreJson = await coreRes.json().catch(() => null) as CoreResponse | null;
+      if (!settingsRes.ok || !json?.ok) throw new Error("failed");
+      if (coreRes.ok && coreJson?.ok && coreJson.readiness) setCore(coreJson.readiness);
       const s = json.settings;
       if (s) {
         setProvider(s.provider || "OpenAI");
@@ -59,17 +80,15 @@ export default function MarketingAiAssistantPage() {
 
   async function save() {
     if (!provider.trim() || !model.trim()) return toast.error("Provider و Model مطلوبان");
-    if (!keyValue.trim() && !keyPreview) return toast.error("API Key مطلوب أول مرة");
     setSaving(true);
     try {
       const res = await fetch("/api/admin/marketing/ai-assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, model, keyValue, baseUrl, assistantId, dailyBudgetLimit, enabled: true }),
+        body: JSON.stringify({ provider, model, baseUrl, assistantId, dailyBudgetLimit, enabled: true }),
       });
       const json = await res.json().catch(() => null) as ApiResponse | null;
       if (!res.ok || !json?.ok) throw new Error(json?.error || "failed");
-      setKeyValue("");
       setKeyPreview(json.settings?.keyPreview || null);
       toast.success("تم حفظ إعدادات AI Assistant");
     } catch {
@@ -83,20 +102,20 @@ export default function MarketingAiAssistantPage() {
     <div className="rounded-3xl border bg-gradient-to-l from-[#025EB8] to-[#01396f] p-6 text-white shadow-sm">
       <p className="text-sm text-white/75">Marketing Operating System</p>
       <h1 className="mt-2 text-3xl font-black">إعداد AI Assistant</h1>
-      <p className="mt-3 max-w-3xl text-sm leading-7 text-white/85">ضع بيانات API هنا بوضوح. بعد الحفظ سيستخدمها النظام لاحقًا لتحليل بيانات التسويق وإخراج توصيات.</p>
+      <p className="mt-3 max-w-3xl text-sm leading-7 text-white/85">AI Core واحد لسياق التسويق. يقرأ بيانات الأداء والتتبع فقط، ولا يغير ميزانية أو تتبع أو حملات بدون موافقة بشرية.</p>
     </div>
 
     {loading ? <div className="flex min-h-[16rem] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#025EB8]" /></div> : <>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Bot className="h-5 w-5 text-[#025EB8]" />بيانات الاتصال</CardTitle>
-          <CardDescription>هذه هي الأماكن الفعلية لإضافة إعدادات AI. يتم إخفاء المفتاح بعد الحفظ.</CardDescription>
+          <CardDescription>إعدادات تعريفية فقط. مفاتيح OpenAI الحقيقية يجب أن تبقى في server env ولا توضع في الواجهة.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="AI Provider" required><Input value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="OpenAI" /></Field>
             <Field label="Model" required><Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="gpt-4.1" /></Field>
-            <Field label="API Key" required hint={keyPreview ? `المحفوظ حاليًا: ${keyPreview}` : "لم يتم حفظ مفتاح بعد"}><Input type="password" value={keyValue} onChange={(e) => setKeyValue(e.target.value)} placeholder="ضع API Key هنا" /></Field>
+            <Field label="OpenAI Key" hint={keyPreview ? `يوجد مفتاح قديم محفوظ كـ ${keyPreview}. AI Core الجديد يعتمد على OPENAI_API_KEY في السيرفر.` : "لا تضع المفتاح هنا. استخدم OPENAI_API_KEY في بيئة السيرفر."}><Input value={core?.provider.mode || "safe-fallback"} readOnly /></Field>
             <Field label="Base URL" hint="اختياري"><Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" /></Field>
             <Field label="Assistant ID" hint="اختياري"><Input value={assistantId} onChange={(e) => setAssistantId(e.target.value)} placeholder="asst_..." /></Field>
             <Field label="Daily Budget Limit" hint="اختياري"><Input value={dailyBudgetLimit} onChange={(e) => setDailyBudgetLimit(e.target.value)} placeholder="10 USD/day" /></Field>
@@ -106,9 +125,23 @@ export default function MarketingAiAssistantPage() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>ماذا سيستخدم AI؟</CardTitle><CardDescription>بعد التفعيل الكامل سيحلل هذه المصادر.</CardDescription></CardHeader>
+        <CardHeader><CardTitle>ما الذي يستطيع قراءته؟</CardTitle><CardDescription>{core?.provider.reason || "AI Core يعمل بوضع fallback آمن حتى يتم ضبط env."}</CardDescription></CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {['الصرف والحملات', 'التبرعات وROAS', 'Google keywords/search terms', 'جودة التتبع والتحويلات'].map((item) => <div key={item} className="rounded-xl border bg-slate-50 p-3 text-sm font-semibold text-slate-800"><CheckCircle2 className="mb-2 h-4 w-4 text-[#025EB8]" />{item}</div>)}
+          {(core?.tools ?? []).map((tool) => <div key={tool.name} className="rounded-xl border bg-slate-50 p-3 text-sm font-semibold text-slate-800"><CheckCircle2 className="mb-2 h-4 w-4 text-[#025EB8]" />{tool.name}<p className="mt-2 text-xs font-normal leading-5 text-slate-500">{tool.dataSource}</p></div>)}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>ما الذي لا يستطيع فعله؟</CardTitle><CardDescription>أي إجراء تشغيلي يحتاج موافقة بشرية صريحة.</CardDescription></CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-2">
+          {(core?.context.blockedActions ?? []).map((action) => <div key={action} className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900">{action}</div>)}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Prompts مفيدة</CardTitle><CardDescription>استخدمه كمحلل تسويق مرتبط بالبيانات، لا كشات عام.</CardDescription></CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-3">
+          {(core?.promptExamples ?? []).map((prompt) => <div key={prompt} className="rounded-xl border bg-white p-3 text-sm font-semibold leading-6 text-slate-700">{prompt}</div>)}
         </CardContent>
       </Card>
     </>}

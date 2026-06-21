@@ -2,14 +2,15 @@ import Link from "next/link";
 import { ArrowLeft, Bot, CalendarDays, CheckCircle2, FileText, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getAiContext } from "@/lib/ai/core/ai-core-service";
+import { getAiAssistantReadiness } from "@/lib/ai/core/ai-core-service";
 
 export const metadata = {
   title: "مساعد المحتوى AI | لوحة التحكم",
 };
 
 export default function ContentAiAssistantPage() {
-  const context = getAiContext("content");
+  const readiness = getAiAssistantReadiness("content");
+  const context = readiness?.context;
 
   return (
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
@@ -17,7 +18,7 @@ export default function ContentAiAssistantPage() {
         <p className="text-xs text-white/70">Shared AI Core / Content Context</p>
         <h1 className="mt-1.5 text-2xl font-black">مساعد المحتوى AI</h1>
         <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
-          نسخة هيكلية آمنة لمساعد المحتوى. لا تستدعي مزود AI خارجي بعد، لكنها تحدد الصلاحيات والمصادر قبل الربط الحقيقي.
+          نسخة آمنة لمساعد المحتوى. لا تستدعي مزود AI خارجي إلا إذا كانت مفاتيح السيرفر مفعلة صراحة، وتحدد الصلاحيات والمصادر قبل أي استخدام حقيقي.
         </p>
       </div>
 
@@ -35,9 +36,15 @@ export default function ContentAiAssistantPage() {
               </div>
             </div>
             <div>
-              <p className="text-sm font-black text-slate-900">المصادر المسموحة</p>
+              <p className="text-sm font-black text-slate-900">ما يستطيع قراءته</p>
               <div className="mt-2 space-y-2 text-sm text-slate-600">
-                {context?.allowedSources.map((source) => <p key={source}>• {source}</p>)}
+                {readiness?.tools.map((tool) => <p key={tool.name}>• {tool.name}: {tool.dataSource}</p>)}
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-black text-slate-900">ما لا يستطيع فعله</p>
+              <div className="mt-2 space-y-2 text-sm text-slate-600">
+                {readiness?.humanApprovalRules.map((rule) => <p key={rule.key}>• {rule.action}</p>)}
               </div>
             </div>
           </CardContent>
@@ -56,6 +63,18 @@ export default function ContentAiAssistantPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Prompts مفيدة</CardTitle>
+          <CardDescription>استخدمه كمساعد تشغيل بسياق المحتوى، وليس كشات عام.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-3">
+          {readiness?.promptExamples.map((prompt) => (
+            <div key={prompt} className="rounded-2xl border bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-700">{prompt}</div>
+          ))}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle>روابط مرتبطة</CardTitle></CardHeader>
