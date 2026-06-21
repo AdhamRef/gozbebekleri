@@ -22,6 +22,28 @@ type CampaignAction = {
   action: string;
 };
 
+type TrackingBucket = {
+  sent: number;
+  failed: number;
+  skipped: number;
+  pending: number;
+  total: number;
+};
+
+type TrackingTruth = {
+  totalMatchedDonations: number;
+  donationsWithConversionEvent: number;
+  clickIdDonations: number;
+  platformConversionsSent: number;
+  sampleDonationIds: string[];
+  meta: { server: TrackingBucket; browser: TrackingBucket };
+  ga4: TrackingBucket;
+  googleAds: { server: TrackingBucket; browser: TrackingBucket };
+  tiktok: { server: TrackingBucket; browser: TrackingBucket };
+  x: { browser: TrackingBucket };
+  warnings: string[];
+};
+
 type CampaignLinkDetail = {
   id: string;
   name: string;
@@ -33,10 +55,14 @@ type CampaignLinkDetail = {
   createdAt: string | null;
   updatedAt?: string | null;
   identifiers: {
+    utmSource?: string | null;
+    utmMedium?: string | null;
     utmCampaign?: string | null;
     utmId?: string | null;
+    utmContent?: string | null;
     campaignId?: string | null;
     adsetId?: string | null;
+    adGroupId?: string | null;
     adId?: string | null;
     targetCountry?: string | null;
   };
@@ -59,6 +85,7 @@ type CampaignLinkDetail = {
     conversionGaps: { matchedDonationsMissingConversions: number };
     actionQueue: CampaignAction[];
   };
+  trackingTruth?: TrackingTruth;
   samples?: Array<{ id: string; revenue: number; score: number; quality: string; reasons: string[]; createdAt: string; conversionEventsSentAt: string | null }>;
 };
 
@@ -109,7 +136,7 @@ function healthScore(link: CampaignLinkDetail) {
   let score = 20;
   if (link.identifiers.utmCampaign) score += 18;
   if (link.identifiers.campaignId || link.identifiers.utmId) score += 18;
-  if (link.identifiers.adsetId) score += 10;
+  if (link.identifiers.adsetId || link.identifiers.adGroupId) score += 10;
   if (link.identifiers.adId) score += 14;
   if (link.identifiers.targetCountry) score += 8;
   if (link.performance.matchQuality.strong > 0) score += 12;
@@ -126,16 +153,75 @@ function qualityLabel(value: string) {
 
 function identifierRows(link: CampaignLinkDetail) {
   return [
+    ["URL", link.url],
+    ["Save Count", String(link.saveCount ?? 0)],
+    ["UTM Source", link.identifiers.utmSource],
+    ["UTM Medium", link.identifiers.utmMedium],
     ["UTM Campaign", link.identifiers.utmCampaign],
     ["UTM ID", link.identifiers.utmId],
+    ["UTM Content", link.identifiers.utmContent],
     ["Campaign ID", link.identifiers.campaignId],
-    ["Ad Set / Ad Group", link.identifiers.adsetId],
+    ["Ad Set ID", link.identifiers.adsetId],
+    ["Ad Group ID", link.identifiers.adGroupId],
     ["Ad ID", link.identifiers.adId],
     ["Target Country", link.identifiers.targetCountry],
     ["Objective", link.metadata?.objective],
-    ["Audience", link.metadata?.audienceSegment],
+    ["Audience Segment", link.metadata?.audienceSegment],
     ["Message Variant", link.metadata?.messageVariant],
   ] as const;
+}
+
+function hasEvents(bucket: TrackingBucket | undefined) {
+  return Boolean(bucket && bucket.total > 0);
+}
+
+function trackingRows(link: CampaignLinkDetail) {
+  const truth = link.trackingTruth;
+  if (!truth) return [];
+  const platform = (link.platform ?? "").toUpperCase();
+  return [
+    { label: "Meta server", bucket: truth.meta.server, always: true },
+    { label: "Meta browser", bucket: truth.meta.browser, always: true },
+    { label: "GA4", bucket: truth.ga4, always: true },
+    { label: "Google Ads server", bucket: truth.googleAds.server, always: platform === "GOOGLE_ADS" },
+    { label: "Google Ads browser", bucket: truth.googleAds.browser, always: platform === "GOOGLE_ADS" },
+    { label: "TikTok server", bucket: truth.tiktok.server, always: platform === "TIKTOK" },
+    { label: "TikTok browser", bucket: truth.tiktok.browser, always: platform === "TIKTOK" },
+    { label: "X browser", bucket: truth.x.browser, always: platform === "X" },
+  ].filter((row) => row.always || hasEvents(row.bucket));
+}
+
+function firstTrackingDonationId(link: CampaignLinkDetail) {
+  return link.trackingTruth?.sampleDonationIds?.[0] || link.samples?.[0]?.id || null;
+}
+
+function conversionEventsHref(link: CampaignLinkDetail) {
+  const query = firstTrackingDonationId(link) || link.identifiers.campaignId || link.identifiers.utmCampaign || link.id;
+  return `/dashboard/conversion-events?q=${encodeURIComponent(query)}`;
+}
+
+function donationTimelineHref(link: CampaignLinkDetail) {
+  const donationId = firstTrackingDonationId(link);
+  return donationId ? `/dashboard/conversion-events/timeline?donationId=${encodeURIComponent(donationId)}` : null;
+}
+
+function trackingActionQueue(link: CampaignLinkDetail, criticalMissing: string[]) {
+  const truth = link.trackingTruth;
+  const items: Array<{ title: string; body: string; tone: RecommendationTone }> = [];
+  const warnings = truth?.warnings ?? [];
+  if (warnings.some((warning) => warning.includes("Meta") || warning.includes("GA4") || warning.includes("browser") || warning.includes("platform conversions"))) {
+    items.push({ title: "Fix tracking", body: "راجع ConversionEvent للحالات الناقصة قبل زيادة الإنفاق.", tone: "danger" });
+  }
+  if (criticalMissing.length > 0 || warnings.some((warning) => warning.includes("campaign identifiers"))) {
+    items.push({ title: "Improve identifiers", body: "أكمل Campaign ID وAd ID وTarget Country حتى تصبح المطابقة قابلة للتدقيق.", tone: "warning" });
+  }
+  if (link.performance.donations === 0 || link.performance.matchQuality.strong === 0) {
+    items.push({ title: "Review landing page", body: "راجع صفحة الهبوط والرسالة قبل اعتبار الرابط غير صالح.", tone: "neutral" });
+  }
+  if (items.length === 0 && link.performance.revenue > 0 && (truth?.warnings.length ?? 0) === 0) {
+    items.push({ title: "Safe to scale", body: "الأداء والتحويلات لا يظهران مشكلة حرجة ضمن الفترة الحالية.", tone: "good" });
+  }
+  return items.length ? items : [{ title: "Review landing page", body: "انتظر بيانات أكثر قبل اتخاذ قرار توسعة.", tone: "neutral" as RecommendationTone }];
 }
 
 export default function CampaignLinkDetailPage() {
@@ -190,9 +276,18 @@ export default function CampaignLinkDetailPage() {
 
   const score = healthScore(link);
   const missing = link.intelligence?.missingIdentifiers ?? [];
+  const criticalMissing = [
+    !link.identifiers.campaignId && !link.identifiers.utmCampaign ? "campaign_id_or_utm_campaign" : null,
+    !link.identifiers.adId ? "ad_id" : null,
+    !link.identifiers.targetCountry ? "target_country" : null,
+  ].filter(Boolean) as string[];
   const missingConversions = link.intelligence?.conversionGaps.matchedDonationsMissingConversions ?? 0;
   const actions = link.intelligence?.actionQueue ?? [];
   const matchReasons = Object.entries(link.performance.matchReasons || {});
+  const trackingTruth = link.trackingTruth;
+  const trackingWarnings = trackingTruth?.warnings ?? [];
+  const trackingActions = trackingActionQueue(link, criticalMissing);
+  const timelineHref = donationTimelineHref(link);
 
   return <div className="space-y-5 p-4 sm:p-6" dir="rtl">
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -202,6 +297,8 @@ export default function CampaignLinkDetailPage() {
           <h1 className="text-2xl font-black text-slate-950">{link.name}</h1>
           <Badge variant="outline" className={statusClass(link.status)}>{link.status}</Badge>
           <Badge variant="outline">{link.platform ?? "UNKNOWN"}</Badge>
+          <Badge variant="outline">{link.channel ?? "No channel"}</Badge>
+          <Badge variant="outline">saveCount {link.saveCount ?? 0}</Badge>
         </div>
         <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">تفصيل أداء الرابط، جودة المطابقة، فجوات التحويل، والإجراء التالي قبل قرارات الميزانية.</p>
       </div>
@@ -229,17 +326,29 @@ export default function CampaignLinkDetailPage() {
       <AlertDescription>ضمن الفترة المحددة، لا تظهر تبرعات مطابقة بدون علامة conversionEventsSentAt.</AlertDescription>
     </Alert>}
 
-    <div className="grid gap-3 md:grid-cols-4">
+    {criticalMissing.length > 0 ? <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+      <ShieldAlert className="h-4 w-4" />
+      <AlertTitle>Missing Identifiers</AlertTitle>
+      <AlertDescription>
+        هذا الرابط يحتاج استكمال معرفات أساسية قبل قرارات الميزانية:
+        <span className="mt-2 flex flex-wrap gap-2">
+          {criticalMissing.map((item) => <Badge key={item} variant="outline" className="border-amber-300 bg-white text-amber-900">{IDENTIFIER_LABELS[item] ?? item}</Badge>)}
+        </span>
+      </AlertDescription>
+    </Alert> : null}
+
+    <div className="grid gap-3 md:grid-cols-5">
       <Metric title="Health Score" value={`${score}%`} tone={score >= 75 ? "good" : score >= 55 ? "warning" : "danger"} />
       <Metric title="تبرعات مطابقة" value={link.performance.donations} />
       <Metric title="إيراد مطابق" value={money(link.performance.revenue)} />
+      <Metric title="متوسط التبرع" value={money(link.performance.averageDonation)} />
       <Metric title="Conversions ناقصة" value={missingConversions} tone={missingConversions > 0 ? "danger" : "good"} />
     </div>
 
     <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-      <Card>
+      <Card id="performance">
         <CardHeader>
-          <CardTitle>جودة المطابقة</CardTitle>
+          <CardTitle>Performance</CardTitle>
           <CardDescription>{range ? `الفترة: ${range.from} — ${range.to}` : "الفترة الحالية"}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -279,8 +388,52 @@ export default function CampaignLinkDetailPage() {
       </Card>
     </div>
 
-    <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+    <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+      <Card id="tracking-truth">
+        <CardHeader>
+          <CardTitle>Tracking Truth</CardTitle>
+          <CardDescription>قراءة ConversionEvent للتبرعات المطابقة لهذا الرابط. تشخيص فقط بدون إرسال أو إعادة محاولة.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-4">
+            <MiniStat title="Matched donations" value={trackingTruth?.totalMatchedDonations ?? 0} />
+            <MiniStat title="With ConversionEvent" value={trackingTruth?.donationsWithConversionEvent ?? 0} />
+            <MiniStat title="Click ID donations" value={trackingTruth?.clickIdDonations ?? 0} />
+            <MiniStat title="Platform SENT" value={trackingTruth?.platformConversionsSent ?? 0} />
+          </div>
+          <div className="grid gap-2">
+            {trackingRows(link).map((row) => <TrackingBucketRow key={row.label} label={row.label} bucket={row.bucket} />)}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href={conversionEventsHref(link)} className="inline-flex rounded-md border px-3 py-2 text-xs font-bold text-[#025EB8] hover:bg-slate-50">Open Conversion Events filtered by donation/campaign</Link>
+            {timelineHref ? <Link href={timelineHref} className="inline-flex rounded-md border px-3 py-2 text-xs font-bold text-[#025EB8] hover:bg-slate-50">Open Donation Timeline</Link> : <span className="inline-flex rounded-md border bg-slate-50 px-3 py-2 text-xs font-bold text-slate-400">Open Donation Timeline</span>}
+            <Link href={`/dashboard/conversion-events/retry-truth?days=${days}`} className="inline-flex rounded-md border px-3 py-2 text-xs font-bold text-[#025EB8] hover:bg-slate-50">Open Retry Truth</Link>
+          </div>
+          {trackingWarnings.length > 0 ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <div className="text-sm font-black text-amber-900">Warnings</div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {trackingWarnings.map((warning) => <Badge key={warning} variant="outline" className="border-amber-300 bg-white text-amber-900">{warning}</Badge>)}
+            </div>
+          </div> : <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-800">لا توجد تحذيرات Tracking Truth حرجة لهذا الرابط.</div>}
+        </CardContent>
+      </Card>
+
       <Card>
+        <CardHeader>
+          <CardTitle>Tracking Action Queue</CardTitle>
+          <CardDescription>الإجراء التالي بناءً على ConversionEvent والمعرفات.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {trackingActions.map((item) => <div key={item.title} className={`rounded-xl border p-4 ${toneClass(item.tone)}`}>
+            <div className="font-black">{item.title}</div>
+            <p className="mt-2 text-sm leading-6">{item.body}</p>
+          </div>)}
+        </CardContent>
+      </Card>
+    </div>
+
+    <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+      <Card id="details">
         <CardHeader>
           <CardTitle>بيانات الرابط</CardTitle>
           <CardDescription>المعرفات التي يعتمد عليها الربط مع التبرعات والتحويلات.</CardDescription>
@@ -345,6 +498,23 @@ export default function CampaignLinkDetailPage() {
 function Metric({ title, value, tone }: { title: string; value: string | number; tone?: "good" | "warning" | "danger" }) {
   const color = tone === "good" ? "text-emerald-700" : tone === "danger" ? "text-rose-700" : tone === "warning" ? "text-amber-700" : "text-slate-950";
   return <Card><CardContent className="p-4"><div className="text-xs text-slate-500">{title}</div><div className={`mt-1 text-2xl font-black ${color}`}>{value}</div></CardContent></Card>;
+}
+
+function MiniStat({ title, value }: { title: string; value: string | number }) {
+  return <div className="rounded-xl border bg-slate-50 p-3"><div className="text-xs text-slate-500">{title}</div><div className="mt-1 text-xl font-black text-slate-950">{value}</div></div>;
+}
+
+function TrackingBucketRow({ label, bucket }: { label: string; bucket: TrackingBucket }) {
+  const pendingLabel = bucket.pending > 0 ? ` · PENDING ${bucket.pending}` : "";
+  return <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-white px-3 py-2 text-sm">
+    <span className="font-bold text-slate-900">{label}</span>
+    <span className="text-xs text-slate-500">total {bucket.total}</span>
+    <div className="flex flex-wrap gap-1.5">
+      <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">SENT {bucket.sent}</Badge>
+      <Badge variant="outline" className="border-rose-200 bg-rose-50 text-rose-800">FAILED {bucket.failed}</Badge>
+      <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">SKIPPED {bucket.skipped}{pendingLabel}</Badge>
+    </div>
+  </div>;
 }
 
 function Quality({ title, value, className }: { title: string; value: number; className: string }) {
