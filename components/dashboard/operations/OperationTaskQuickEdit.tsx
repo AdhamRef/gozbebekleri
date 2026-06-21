@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
+import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Save, X } from "lucide-react";
 import { toast } from "react-hot-toast";
