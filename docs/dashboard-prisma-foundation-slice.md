@@ -14,7 +14,7 @@
 
 `prisma/schema.prisma`
 
-أما `BrandAsset` فأصبح موجودًا في الشريحة المستقلة كـ staged contract فقط، ولم يتم إدخاله بعد إلى runtime schema.
+أما `BrandAsset` فأصبح موجودًا في الشريحة المستقلة كـ staged contract فقط، وتم تجهيز repository read fallback له، لكنه لم يدخل بعد إلى runtime schema الأساسي.
 
 ## الحالة الحالية
 
@@ -29,6 +29,7 @@
 - تم فتح UI transition controls للمهام الفعلية في `/dashboard/operations/tasks` باستخدام PATCH الحالي.
 - تم إضافة نموذج إنشاء مهمة وتشغيل Quick edit محدود للمهام الفعلية.
 - تم تجهيز `BrandAsset` داخل `prisma/dashboard-foundation.schema.prisma` كعقد staged فقط، بدون upload/download policy وبدون runtime cutover.
+- تم تجهيز Brand repository ليقرأ `BrandAsset` إذا كان Prisma Client يوفّر delegate، وإلا يرجع foundation assets بوضوح.
 
 لم يتم في هذه المرحلة:
 
@@ -36,6 +37,7 @@
 - تشغيل Google Drive sync حقيقي.
 - نقل `ArchiveAsset` أو `ArchiveDriveLink` إلى DB-backed runtime.
 - إدخال `BrandAsset` إلى `prisma/schema.prisma` الرئيسي.
+- إضافة create/update/delete/upload/download لأصول الهوية.
 - ربط المهام مباشرة بـ ContentItem أو ArchiveAsset من الواجهة.
 - تشغيل أي إرسال أو نشر تلقائي.
 - تغيير payment أو tracking runtime.
@@ -73,7 +75,7 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 ## الموديلات في الشريحة الأولى
 
 - `BrandProfile`
-- `BrandAsset` staged contract only
+- `BrandAsset` staged contract + repository read fallback only
 - `BrandColor`
 - `BrandGuideline`
 - `ArchiveCollection`
@@ -85,7 +87,7 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 | Model | Runtime status | Notes |
 | --- | --- | --- |
 | `BrandProfile` | DB-backed read + foundation fallback | Brand overview and brand tabs can read active profile data. |
-| `BrandAsset` | Staged schema contract only | Not appended to the primary runtime schema yet; keeps BrandAsset separate from ArchiveAsset until upload/download policy is reviewed. |
+| `BrandAsset` | Repository read fallback prepared; runtime schema pending | Brand Center assets now come from the Brand repository snapshot. It reads Prisma only when the generated client exposes `brandAsset`, otherwise foundation assets remain honest fallback. |
 | `BrandColor` | DB-backed read + foundation fallback | Colors tab and overview can read DB colors. |
 | `BrandGuideline` | DB-backed read + foundation fallback | Voice/copy rules can read DB guidelines. |
 | `ArchiveCollection` | DB-backed read + foundation fallback | Smart Archive pages read collections through archive repository. |
@@ -94,7 +96,7 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 
 ## ما لا يوجد في هذه الشريحة
 
-- `BrandAsset` موجود كعقد staged فقط؛ لم يدخل runtime schema ولم يحصل على upload/download policy بعد.
+- `BrandAsset` لم يدخل runtime schema ولم يحصل على upload/download policy بعد.
 - لا يوجد `ArchiveAsset` بعد، لأن Drive metadata sync يحتاج provider credentials/scopes جاهزة.
 - لا يوجد `ContentItem` بعد، لأن Blog/Templates/Operations links تحتاج cutover تدريجي.
 - لا يوجد `AiOperationRun` بعد، لأن audit persistence يحتاج سياسة retention وعدم حفظ أسرار.
@@ -107,7 +109,7 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 - لا إرسال أو نشر تلقائي.
 - لا AI approval تلقائي.
 - BrandAsset يبقى منفصل عن ArchiveAsset.
-- BrandAsset الحالي staged فقط، ولا يعني أن أي URL أصبح downloadable أو approved.
+- BrandAsset الحالي لا يعني أن أي URL أصبح downloadable أو approved.
 - Archive Drive links/assets/video frames/AI remain foundation/manual-first.
 - OperationTask writes require operations permission, zod validation, DB availability, and AuditLog.
 - OperationTask transition and edit buttons are disabled for generated foundation tasks.
@@ -121,9 +123,9 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 العمل:
 
 - إدخال `BrandAsset` فقط إلى `prisma/schema.prisma` الرئيسي.
-- إضافة repository read fallback للـ Brand assets بدون upload policy واسع.
-- السماح بـ manual URL records فقط في البداية.
+- السماح للـ repository read fallback الحالي بقراءة manual URL records عند توفرها.
 - عدم خلط `BrandAsset` مع `ArchiveAsset` أو أصول التوثيق الميداني.
+- عدم إضافة upload/download policy واسع قبل مراجعة الأمان.
 - إبقاء Scheduler وDonor Reactivation manual-first.
 
 ## ملاحظات Mongo/Prisma
