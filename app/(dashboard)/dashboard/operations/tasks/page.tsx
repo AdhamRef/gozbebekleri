@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Clock3, ListChecks, Sparkles, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { OperationTaskActions } from "@/components/dashboard/operations/OperationTaskActions";
 import { getTaskOverview } from "@/lib/operations/tasks/task-service";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,7 @@ const statusClass: Record<string, string> = {
 export default async function OperationsTasksPage() {
   const overview = await getTaskOverview();
   const isDbBacked = overview.persistence.mode === "prisma";
+  const canMutateTasks = isDbBacked && !overview.persistence.readOnly;
 
   return (
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
@@ -73,7 +75,7 @@ export default async function OperationsTasksPage() {
           <CardTitle className="flex items-center gap-2"><ListChecks className="h-5 w-5 text-[#025EB8]" /> قائمة مهام الإنتاج</CardTitle>
           <CardDescription>
             {isDbBacked
-              ? "تقرأ هذه الصفحة مهام OperationTask من قاعدة البيانات عبر repository آمن، ويدعم API إنشاء وتحديث المهام مع AuditLog."
+              ? "تقرأ هذه الصفحة مهام OperationTask من قاعدة البيانات عبر repository آمن، وتدعم انتقالات الحالة اليومية من الواجهة مع AuditLog."
               : "لا توجد مهام OperationTask جاهزة في قاعدة البيانات بعد؛ يتم استخدام مهام محسوبة من Planning Engine كـ foundation fallback."}
           </CardDescription>
         </CardHeader>
@@ -100,6 +102,8 @@ export default async function OperationsTasksPage() {
               <div className="mt-4 h-2 overflow-hidden rounded-full bg-white">
                 <div className="h-full rounded-full bg-[#025EB8]" style={{ width: `${task.progress}%` }} />
               </div>
+
+              <OperationTaskActions taskId={task.id} status={task.status} canMutate={canMutateTasks} />
             </div>
           ))}
         </CardContent>
@@ -109,7 +113,7 @@ export default async function OperationsTasksPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-[#025EB8]" /> القادم</CardTitle>
           <CardDescription className="leading-6">
-            الخطوة التالية هي إضافة أزرار UI للانتقالات اليومية مثل Start وReady for review وComplete وBlocked، مع نفس API الآمن الحالي وبدون أي إرسال تلقائي.
+            انتقالات المهام اليومية أصبحت متاحة عبر PATCH الآمن فقط عند وجود OperationTask فعلية. الخطوة التالية هي إنشاء/تحرير مهام من الواجهة وربطها بعناصر المحتوى والأرشيف.
           </CardDescription>
         </CardHeader>
       </Card>
