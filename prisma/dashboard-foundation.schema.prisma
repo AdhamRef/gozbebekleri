@@ -237,6 +237,206 @@ model OperationTask {
   @@index([dueAt])
 }
 
+model OperationSeason {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  name           String
+  type           String
+  theme          String?
+  startsAt       DateTime?
+  endsAt         DateTime?
+  hijriDate      String?
+  source         String?
+  sourceNote     String?
+  aiSuggestedAt  DateTime?
+  manuallyEdited Boolean   @default(false)
+  editedBy       String?   @db.ObjectId
+  status         String    @default("DRAFT")
+  readiness      Int       @default(0)
+  notes          String?
+  createdBy      String?   @db.ObjectId
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([startsAt])
+  @@index([endsAt])
+}
+
+model MonthlyContentPlan {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  title        String
+  month        Int?
+  year         Int?
+  seasonId     String?   @db.ObjectId
+  theme        String?
+  goals        Json?
+  weeklyThemes Json?
+  status       String    @default("DRAFT")
+  createdBy    String?   @db.ObjectId
+  approvedBy   String?   @db.ObjectId
+  approvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([year, month])
+  @@index([seasonId])
+  @@index([status])
+}
+
+model ContentItem {
+  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  title              String
+  theme              String?
+  format             String
+  primaryLocale      String    @default("tr")
+  targetLocales      String[]  @default([])
+  proposedCopy       String?
+  copyByLocale       Json?
+  translationMode    String?
+  seo                Json?
+  relatedPostId      String?   @db.ObjectId
+  relatedCampaignIds String[]  @default([])
+  sourceType         String    @default("MANUAL")
+  sourceAssetId      String?   @db.ObjectId
+  sourceProjectId    String?   @db.ObjectId
+  designUrl          String?
+  videoUrl           String?
+  figmaUrl           String?
+  driveUrl           String?
+  finalAssetUrl      String?
+  assignedTo         String?   @db.ObjectId
+  dueAt              DateTime?
+  publishAt          DateTime?
+  status             String    @default("IDEA")
+  progress           Int       @default(0)
+  reviewStatus       String    @default("PENDING")
+  createdBy          String?   @db.ObjectId
+  updatedBy          String?   @db.ObjectId
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([format])
+  @@index([status])
+  @@index([reviewStatus])
+  @@index([primaryLocale])
+  @@index([assignedTo])
+  @@index([dueAt])
+  @@index([publishAt])
+  @@index([sourceType, sourceAssetId])
+  @@index([sourceType, sourceProjectId])
+}
+
+model ContentPublication {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  contentItemId String?   @db.ObjectId
+  platform      String
+  status        String    @default("PENDING")
+  publishedUrl  String?
+  scheduledAt   DateTime?
+  publishedAt   DateTime?
+  checkedBy     String?   @db.ObjectId
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([contentItemId])
+  @@index([platform])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([publishedAt])
+}
+
+model MessageSchedule {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  contentItemId  String?   @db.ObjectId
+  channel        String
+  templateId     String?   @db.ObjectId
+  provider       String?
+  status         String    @default("DRAFT")
+  scheduledAt    DateTime?
+  sentAt         DateTime?
+  manuallySentAt DateTime?
+  cancelledAt    DateTime?
+  confirmedBy    String?   @db.ObjectId
+  notes          String?
+  createdBy      String?   @db.ObjectId
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([contentItemId])
+  @@index([channel])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+model DonorReactivationReminder {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  donorId        String?   @db.ObjectId
+  lastDonationId String?   @db.ObjectId
+  channel        String
+  locale         String    @default("ar")
+  status         String    @default("PENDING")
+  reason         String?
+  suggestedMessage String?
+  scheduledAt    DateTime?
+  sentAt         DateTime?
+  manuallySentAt DateTime?
+  skippedAt      DateTime?
+  dismissedAt    DateTime?
+  assignedTaskId String?   @db.ObjectId
+  createdBy      String?   @db.ObjectId
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([donorId])
+  @@index([channel])
+  @@index([locale])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+model MarketingLearning {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  sourceType    String
+  sourceId      String?  @db.ObjectId
+  campaignId    String?
+  contentItemId String?  @db.ObjectId
+  summary       String
+  recommendation String?
+  confidence    Int?
+  status        String   @default("DRAFT")
+  createdBy     String?  @db.ObjectId
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([sourceType, sourceId])
+  @@index([campaignId])
+  @@index([contentItemId])
+  @@index([status])
+}
+
+model ContentAdLink {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  contentItemId String   @db.ObjectId
+  platform      String
+  campaignId    String?
+  adGroupId     String?
+  adId          String?
+  connectionId  String?  @db.ObjectId
+  notes         String?
+  createdBy     String?  @db.ObjectId
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([contentItemId])
+  @@index([platform])
+  @@index([campaignId])
+  @@index([adGroupId])
+  @@index([adId])
+  @@index([connectionId])
+}
+
 /* ===================== SHARED AI CORE FIRST SLICE ===================== */
 
 model AiOperationRun {
