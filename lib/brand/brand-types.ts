@@ -144,6 +144,7 @@ export type BrandCenterSnapshot = {
     reason?: string;
     dbCounts?: {
       profiles: number;
+      assets: number;
       colors: number;
       guidelines: number;
     };
