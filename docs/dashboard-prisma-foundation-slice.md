@@ -14,7 +14,7 @@
 
 `prisma/schema.prisma`
 
-أما `BrandAsset` فأصبح موجودًا في الشريحة المستقلة كـ staged contract فقط، وتم تجهيز repository read fallback له، لكنه لم يدخل بعد إلى runtime schema الأساسي.
+أما `BrandAsset`, `BrandFont`, و`BrandMessageFramework` فأصبحت موجودة في الشريحة المستقلة كـ staged contracts فقط. تم تجهيز repository read fallback لـ `BrandAsset`، لكن runtime schema الأساسي لا يحتوي هذه الموديلات بعد.
 
 أما `AiOperationRun` فأصبح موجودًا في الشريحة المستقلة كـ staged contract فقط حتى يتم تثبيت سياسة retention وتنقية الأسرار قبل أي runtime persistence.
 
@@ -32,6 +32,7 @@
 - تم إضافة نموذج إنشاء مهمة وتشغيل Quick edit محدود للمهام الفعلية.
 - تم تجهيز `BrandAsset` داخل `prisma/dashboard-foundation.schema.prisma` كعقد staged فقط، بدون upload/download policy وبدون runtime cutover.
 - تم تجهيز Brand repository ليقرأ `BrandAsset` إذا كان Prisma Client يوفّر delegate، وإلا يرجع foundation assets بوضوح.
+- تم تجهيز `BrandFont` و`BrandMessageFramework` داخل `prisma/dashboard-foundation.schema.prisma` كعقود staged فقط لاستكمال Brand Center data model.
 - تم تجهيز `AiOperationRun` داخل `prisma/dashboard-foundation.schema.prisma` كعقد staged فقط لسجل تشغيل Shared AI Core.
 
 لم يتم في هذه المرحلة:
@@ -39,7 +40,7 @@
 - تحويل أفعال الأرشيف إلى DB writes.
 - تشغيل Google Drive sync حقيقي.
 - نقل `ArchiveAsset` أو `ArchiveDriveLink` إلى DB-backed runtime.
-- إدخال `BrandAsset` إلى `prisma/schema.prisma` الرئيسي.
+- إدخال `BrandAsset`, `BrandFont`, أو `BrandMessageFramework` إلى `prisma/schema.prisma` الرئيسي.
 - إدخال `AiOperationRun` إلى `prisma/schema.prisma` الرئيسي.
 - إضافة repository DB-backed write path لـ AI audit log.
 - إضافة create/update/delete/upload/download لأصول الهوية.
@@ -82,7 +83,9 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 - `BrandProfile`
 - `BrandAsset` staged contract + repository read fallback only
 - `BrandColor`
+- `BrandFont` staged contract only
 - `BrandGuideline`
+- `BrandMessageFramework` staged contract only
 - `ArchiveCollection`
 - `ArchiveProject`
 - `OperationTask`
@@ -95,7 +98,9 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 | `BrandProfile` | DB-backed read + foundation fallback | Brand overview and brand tabs can read active profile data. |
 | `BrandAsset` | Repository read fallback prepared; runtime schema pending | Brand Center assets now come from the Brand repository snapshot. It reads Prisma only when the generated client exposes `brandAsset`, otherwise foundation assets remain honest fallback. |
 | `BrandColor` | DB-backed read + foundation fallback | Colors tab and overview can read DB colors. |
+| `BrandFont` | Staged contract only; runtime schema pending | Intended for typography rules, fallback fonts, and source notes. |
 | `BrandGuideline` | DB-backed read + foundation fallback | Voice/copy rules can read DB guidelines. |
+| `BrandMessageFramework` | Staged contract only; runtime schema pending | Intended for Friday, thank-you, zakat, waqf, emergency, reactivation, Ramadan, and general frameworks. |
 | `ArchiveCollection` | DB-backed read + foundation fallback | Smart Archive pages read collections through archive repository. |
 | `ArchiveProject` | DB-backed read + foundation fallback | Smart Archive pages read projects through archive repository. |
 | `OperationTask` | DB-backed read/write API + create/edit UI + transitions + computed foundation fallback | Tasks page/API can create Prisma tasks, edit safe fields, update daily statuses, and fail safely when DB is not available. |
@@ -103,7 +108,8 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 
 ## ما لا يوجد في هذه الشريحة
 
-- `BrandAsset` لم يدخل runtime schema ولم يحصل على upload/download policy بعد.
+- `BrandAsset`, `BrandFont`, و`BrandMessageFramework` لم تدخل runtime schema بعد.
+- `BrandAsset` لم يحصل على upload/download policy بعد.
 - `AiOperationRun` لم يدخل runtime schema ولم يحصل على DB write path بعد.
 - لا يوجد `ArchiveAsset` بعد، لأن Drive metadata sync يحتاج provider credentials/scopes جاهزة.
 - لا يوجد `ContentItem` بعد، لأن Blog/Templates/Operations links تحتاج cutover تدريجي.
@@ -117,6 +123,7 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 - لا AI approval تلقائي.
 - BrandAsset يبقى منفصل عن ArchiveAsset.
 - BrandAsset الحالي لا يعني أن أي URL أصبح downloadable أو approved.
+- BrandFont وBrandMessageFramework staged فقط ولا يفعّلان أي توليد أو نشر تلقائي.
 - AI audit input/output يجب أن يكون sanitized ولا يحفظ مفاتيح أو tokens أو أسرار متبرعين.
 - Archive Drive links/assets/video frames/AI remain foundation/manual-first.
 - OperationTask writes require operations permission, zod validation, DB availability, and AuditLog.
@@ -138,6 +145,13 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 
 بعدها يمكن تنفيذ:
 
+`Append BrandFont and MessageFramework runtime models`
+
+- إدخال `BrandFont` و`BrandMessageFramework` إلى runtime schema.
+- قطع Typography وMessage Frameworks tabs إلى repository read fallback تدريجيًا.
+
+ثم:
+
 `Append AiOperationRun runtime model`
 
 - إدخال `AiOperationRun` إلى `prisma/schema.prisma` الرئيسي.
@@ -149,5 +163,5 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 - العلاقات في هذه الشريحة محفوظة كـ ObjectId scalar fields بدون relation blocks لتقليل التعقيد.
 - الفهارس مضافة فقط للقراءة المعتادة والفلاتر الرئيسية.
 - لا توجد unique constraints إلا على `BrandProfile.key` و`ArchiveCollection.slug` لأنها معرفات طبيعية مستقرة.
-- `BrandAsset.status` يبدأ بـ `TO_VERIFY` حتى لا تعرض الواجهة الأصل كمعتمد قبل مراجعة بشرية.
+- `BrandAsset.status` و`BrandFont.status` و`BrandMessageFramework.status` تبدأ بـ `TO_VERIFY` حتى لا تعرض الواجهة عناصر الهوية كمعتمدة قبل مراجعة بشرية.
 - `AiOperationRun.status` يبدأ بـ `DRAFT` و`humanApprovalRequired` يبدأ بـ `true` حتى لا يتحول أي output إلى إجراء تلقائي.
