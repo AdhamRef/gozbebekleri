@@ -4,19 +4,11 @@
 
 ## الهدف
 
-هذا الملف يوثق أول شريحة صغيرة وآمنة من موديلات الداشبورد التي تم تجهيزها أولًا كـ reviewable schema artifact ثم إدخالها تدريجيًا في `prisma/schema.prisma` الأساسي مع cutover محدود لكل repository.
-
-الشريحة المرجعية باقية في:
+هذا الملف يوثق شريحة DB foundation آمنة للداشبورد. الشريحة المرجعية موجودة في:
 
 `prisma/dashboard-foundation.schema.prisma`
 
-الموديلات الستة الأولى موجودة الآن أيضًا في:
-
-`prisma/schema.prisma`
-
-أما `BrandAsset`, `BrandFont`, و`BrandMessageFramework` فأصبحت موجودة في الشريحة المستقلة كـ staged contracts فقط. تم تجهيز repository read fallback لـ `BrandAsset`، لكن runtime schema الأساسي لا يحتوي هذه الموديلات بعد.
-
-أما `AiOperationRun` فأصبح موجودًا في الشريحة المستقلة كـ staged contract فقط حتى يتم تثبيت سياسة retention وتنقية الأسرار قبل أي runtime persistence.
+الموديلات الستة الأولى موجودة أيضًا في `prisma/schema.prisma`، أما بقية موديلات Brand/Operations/AI في هذه الشريحة فهي staged contracts فقط حتى يتم إدخالها تدريجيًا في runtime schema.
 
 ## الحالة الحالية
 
@@ -28,29 +20,27 @@
 - تم قطع `ArchiveCollection` و`ArchiveProject` إلى قراءة DB-backed مع fallback foundation.
 - تم قطع `OperationTask` إلى قراءة DB-backed مع fallback محسوب من Planning Engine.
 - تم إضافة create/update API آمن لـ `OperationTask` مع zod validation وAuditLog.
-- تم فتح UI transition controls للمهام الفعلية في `/dashboard/operations/tasks` باستخدام PATCH الحالي.
-- تم إضافة نموذج إنشاء مهمة وتشغيل Quick edit محدود للمهام الفعلية.
-- تم تجهيز `BrandAsset` داخل `prisma/dashboard-foundation.schema.prisma` كعقد staged فقط، بدون upload/download policy وبدون runtime cutover.
+- تم فتح UI transition controls ونموذج إنشاء/تعديل محدود للمهام الفعلية.
+- تم تجهيز `BrandAsset`, `BrandFont`, و`BrandMessageFramework` كعقود staged فقط.
 - تم تجهيز Brand repository ليقرأ `BrandAsset` إذا كان Prisma Client يوفّر delegate، وإلا يرجع foundation assets بوضوح.
-- تم تجهيز `BrandFont` و`BrandMessageFramework` داخل `prisma/dashboard-foundation.schema.prisma` كعقود staged فقط لاستكمال Brand Center data model.
-- تم تجهيز `AiOperationRun` داخل `prisma/dashboard-foundation.schema.prisma` كعقد staged فقط لسجل تشغيل Shared AI Core.
+- تم تجهيز `AiOperationRun` كعقد staged فقط لسجل تشغيل Shared AI Core.
+- تم تجهيز عقود Operations/Content التالية كـ staged contracts فقط: `OperationSeason`, `MonthlyContentPlan`, `ContentItem`, `ContentPublication`, `MessageSchedule`, `DonorReactivationReminder`, `MarketingLearning`, و`ContentAdLink`.
 
 لم يتم في هذه المرحلة:
 
-- تحويل أفعال الأرشيف إلى DB writes.
+- إدخال موديلات Brand/Operations/Content/AI الجديدة إلى `prisma/schema.prisma` الرئيسي.
 - تشغيل Google Drive sync حقيقي.
 - نقل `ArchiveAsset` أو `ArchiveDriveLink` إلى DB-backed runtime.
-- إدخال `BrandAsset`, `BrandFont`, أو `BrandMessageFramework` إلى `prisma/schema.prisma` الرئيسي.
-- إدخال `AiOperationRun` إلى `prisma/schema.prisma` الرئيسي.
-- إضافة repository DB-backed write path لـ AI audit log.
+- إضافة repository DB-backed write path للـ AI audit log.
 - إضافة create/update/delete/upload/download لأصول الهوية.
 - ربط المهام مباشرة بـ ContentItem أو ArchiveAsset من الواجهة.
-- تشغيل أي إرسال أو نشر تلقائي.
+- إرسال أو نشر تلقائي.
+- إنشاء ContentAdPerformance يكرر AdSnapshot.
 - تغيير payment أو tracking runtime.
 
 ## التحقق
 
-تمت إضافة أمر واضح للتحقق من الشريحة المستقلة بدون لمس `prisma/schema.prisma` الأساسي:
+الأمر المرجعي للتحقق من الشريحة المستقلة:
 
 ```bash
 npm run dashboard:schema:validate
@@ -64,21 +54,9 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 
 بعد كل cutover يجب أن يمر Vercel Preview ثم Production بعد الدمج.
 
-## لماذا القطع تدريجي؟
+## الموديلات في الشريحة
 
-لأن النظام الحالي يعمل على foundation repositories وواجهات مستقرة. إدخال كل موديلات Operations/Archive/Brand/AI دفعة واحدة يزيد خطر كسر build أو توليد Prisma Client غير مستخدم بعد.
-
-المسار الآمن:
-
-1. Stage schema slice.
-2. Validate staged slice with `npm run dashboard:schema:validate`.
-3. Append slice to primary `prisma/schema.prisma`.
-4. تشغيل `npx prisma generate` و`npm run build` عبر Vercel.
-5. نقل repository واحد فقط إلى DB-backed mode.
-6. إبقاء fallback foundation عند غياب `DATABASE_URL` أو فشل القراءة.
-7. إبقاء الأفعال الحساسة manual-first حتى يكتمل auth/audit/validation.
-
-## الموديلات في الشريحة الأولى
+### Brand
 
 - `BrandProfile`
 - `BrandAsset` staged contract + repository read fallback only
@@ -86,9 +64,26 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 - `BrandFont` staged contract only
 - `BrandGuideline`
 - `BrandMessageFramework` staged contract only
+
+### Archive
+
 - `ArchiveCollection`
 - `ArchiveProject`
+
+### Operations & Content
+
 - `OperationTask`
+- `OperationSeason` staged contract only
+- `MonthlyContentPlan` staged contract only
+- `ContentItem` staged contract only
+- `ContentPublication` staged contract only
+- `MessageSchedule` staged contract only
+- `DonorReactivationReminder` staged contract only
+- `MarketingLearning` staged contract only
+- `ContentAdLink` staged contract only
+
+### Shared AI
+
 - `AiOperationRun` staged contract only
 
 ## cutover status
@@ -96,23 +91,23 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 | Model | Runtime status | Notes |
 | --- | --- | --- |
 | `BrandProfile` | DB-backed read + foundation fallback | Brand overview and brand tabs can read active profile data. |
-| `BrandAsset` | Repository read fallback prepared; runtime schema pending | Brand Center assets now come from the Brand repository snapshot. It reads Prisma only when the generated client exposes `brandAsset`, otherwise foundation assets remain honest fallback. |
+| `BrandAsset` | Repository read fallback prepared; runtime schema pending | Brand Center assets come from the Brand repository snapshot when available. |
 | `BrandColor` | DB-backed read + foundation fallback | Colors tab and overview can read DB colors. |
-| `BrandFont` | Staged contract only; runtime schema pending | Intended for typography rules, fallback fonts, and source notes. |
+| `BrandFont` | Staged contract only | Typography rules and source notes. |
 | `BrandGuideline` | DB-backed read + foundation fallback | Voice/copy rules can read DB guidelines. |
-| `BrandMessageFramework` | Staged contract only; runtime schema pending | Intended for Friday, thank-you, zakat, waqf, emergency, reactivation, Ramadan, and general frameworks. |
+| `BrandMessageFramework` | Staged contract only | Friday, thank-you, zakat, waqf, emergency, reactivation, Ramadan, and general frameworks. |
 | `ArchiveCollection` | DB-backed read + foundation fallback | Smart Archive pages read collections through archive repository. |
 | `ArchiveProject` | DB-backed read + foundation fallback | Smart Archive pages read projects through archive repository. |
-| `OperationTask` | DB-backed read/write API + create/edit UI + transitions + computed foundation fallback | Tasks page/API can create Prisma tasks, edit safe fields, update daily statuses, and fail safely when DB is not available. |
-| `AiOperationRun` | Staged contract only; runtime schema and repository persistence pending | Intended for sanitized Shared AI Core audit entries across marketing, operations, archive, and brand. |
-
-## ما لا يوجد في هذه الشريحة
-
-- `BrandAsset`, `BrandFont`, و`BrandMessageFramework` لم تدخل runtime schema بعد.
-- `BrandAsset` لم يحصل على upload/download policy بعد.
-- `AiOperationRun` لم يدخل runtime schema ولم يحصل على DB write path بعد.
-- لا يوجد `ArchiveAsset` بعد، لأن Drive metadata sync يحتاج provider credentials/scopes جاهزة.
-- لا يوجد `ContentItem` بعد، لأن Blog/Templates/Operations links تحتاج cutover تدريجي.
+| `OperationTask` | DB-backed read/write API + create/edit UI + transitions + computed foundation fallback | Tasks page/API supports safe manual operations for real rows. |
+| `OperationSeason` | Staged contract only | AI-suggested dates stay suggested until human review. |
+| `MonthlyContentPlan` | Staged contract only | Plans can later generate ContentItems and OperationTasks. |
+| `ContentItem` | Staged contract only | Does not replace Blog/Post models; links to them when needed. |
+| `ContentPublication` | Staged contract only | Manual publishing checklist, not auto-publish. |
+| `MessageSchedule` | Staged contract only | Manual-first scheduling; no automatic send. |
+| `DonorReactivationReminder` | Staged contract only | Candidate reminders only; no automatic outreach. |
+| `MarketingLearning` | Staged contract only | Stores learnings from marketing/content results without duplicating ad snapshots. |
+| `ContentAdLink` | Staged contract only | Links content/ad/platform identifiers only; no performance table duplicate. |
+| `AiOperationRun` | Staged contract only | Sanitized Shared AI Core audit entries. |
 
 ## قواعد الأمان
 
@@ -122,46 +117,28 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 - لا إرسال أو نشر تلقائي.
 - لا AI approval تلقائي.
 - BrandAsset يبقى منفصل عن ArchiveAsset.
-- BrandAsset الحالي لا يعني أن أي URL أصبح downloadable أو approved.
-- BrandFont وBrandMessageFramework staged فقط ولا يفعّلان أي توليد أو نشر تلقائي.
+- ContentAdLink لا يكرر AdSnapshot أو MarketingCampaignSnapshot.
+- Donor Reactivation وScheduler manual-first فقط.
 - AI audit input/output يجب أن يكون sanitized ولا يحفظ مفاتيح أو tokens أو أسرار متبرعين.
-- Archive Drive links/assets/video frames/AI remain foundation/manual-first.
 - OperationTask writes require operations permission, zod validation, DB availability, and AuditLog.
-- OperationTask transition and edit buttons are disabled for generated foundation tasks.
 
 ## cutover المقترح التالي
 
-العنوان المقترح:
+الأولوية ما زالت:
 
 `Append BrandAsset runtime model`
 
-العمل:
-
-- إدخال `BrandAsset` فقط إلى `prisma/schema.prisma` الرئيسي.
-- السماح للـ repository read fallback الحالي بقراءة manual URL records عند توفرها.
-- عدم خلط `BrandAsset` مع `ArchiveAsset` أو أصول التوثيق الميداني.
-- عدم إضافة upload/download policy واسع قبل مراجعة الأمان.
-- إبقاء Scheduler وDonor Reactivation manual-first.
-
 بعدها يمكن تنفيذ:
 
-`Append BrandFont and MessageFramework runtime models`
-
-- إدخال `BrandFont` و`BrandMessageFramework` إلى runtime schema.
-- قطع Typography وMessage Frameworks tabs إلى repository read fallback تدريجيًا.
-
-ثم:
-
-`Append AiOperationRun runtime model`
-
-- إدخال `AiOperationRun` إلى `prisma/schema.prisma` الرئيسي.
-- إضافة repository آمن للـ AI audit log مع sanitization وretention policy.
-- إبقاء كل AI output كـ draft يحتاج human approval.
+- `Append BrandFont and MessageFramework runtime models`.
+- `Append Operations content workflow runtime models` على شرائح صغيرة، وليس دفعة واحدة.
+- `Append AiOperationRun runtime model` بعد تثبيت sanitization/retention policy.
+- ربط OperationTask تدريجيًا بـ ContentItem وArchiveAsset عند توفر الموديلات الفعلية.
 
 ## ملاحظات Mongo/Prisma
 
-- العلاقات في هذه الشريحة محفوظة كـ ObjectId scalar fields بدون relation blocks لتقليل التعقيد.
-- الفهارس مضافة فقط للقراءة المعتادة والفلاتر الرئيسية.
-- لا توجد unique constraints إلا على `BrandProfile.key` و`ArchiveCollection.slug` لأنها معرفات طبيعية مستقرة.
-- `BrandAsset.status` و`BrandFont.status` و`BrandMessageFramework.status` تبدأ بـ `TO_VERIFY` حتى لا تعرض الواجهة عناصر الهوية كمعتمدة قبل مراجعة بشرية.
-- `AiOperationRun.status` يبدأ بـ `DRAFT` و`humanApprovalRequired` يبدأ بـ `true` حتى لا يتحول أي output إلى إجراء تلقائي.
+- العلاقات محفوظة كـ ObjectId scalar fields بدون relation blocks لتقليل التعقيد.
+- الفهارس مضافة للقراءة والفلاتر الرئيسية فقط.
+- `BrandAsset`, `BrandFont`, و`BrandMessageFramework` تبدأ كـ `TO_VERIFY`.
+- `AiOperationRun.status` يبدأ بـ `DRAFT` و`humanApprovalRequired` يبدأ بـ `true`.
+- `ContentPublication`, `MessageSchedule`, و`DonorReactivationReminder` لا تعني أي إرسال/نشر تلقائي.
