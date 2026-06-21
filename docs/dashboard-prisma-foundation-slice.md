@@ -8,7 +8,7 @@
 
 `prisma/dashboard-foundation.schema.prisma`
 
-الموديلات الستة الأولى موجودة أيضًا في `prisma/schema.prisma`، أما بقية موديلات Brand/Operations/AI في هذه الشريحة فهي staged contracts فقط حتى يتم إدخالها تدريجيًا في runtime schema.
+الموديلات الستة الأولى موجودة أيضًا في `prisma/schema.prisma`، أما بقية موديلات Brand/Archive/Operations/AI في هذه الشريحة فهي staged contracts فقط حتى يتم إدخالها تدريجيًا في runtime schema.
 
 ## الحالة الحالية
 
@@ -20,20 +20,19 @@
 - تم قطع `ArchiveCollection` و`ArchiveProject` إلى قراءة DB-backed مع fallback foundation.
 - تم قطع `OperationTask` إلى قراءة DB-backed مع fallback محسوب من Planning Engine.
 - تم إضافة create/update API آمن لـ `OperationTask` مع zod validation وAuditLog.
-- تم فتح UI transition controls ونموذج إنشاء/تعديل محدود للمهام الفعلية.
 - تم تجهيز `BrandAsset`, `BrandFont`, و`BrandMessageFramework` كعقود staged فقط.
 - تم تجهيز Brand repository ليقرأ `BrandAsset` إذا كان Prisma Client يوفّر delegate، وإلا يرجع foundation assets بوضوح.
-- تم تجهيز `AiOperationRun` كعقد staged فقط لسجل تشغيل Shared AI Core.
+- تم تجهيز `ArchiveDriveLink`, `ArchiveAsset`, و`ArchiveVideoFrame` كعقود staged فقط لدعم Google Drive metadata وAI/human review لاحقًا.
 - تم تجهيز عقود Operations/Content التالية كـ staged contracts فقط: `OperationSeason`, `MonthlyContentPlan`, `ContentItem`, `ContentPublication`, `MessageSchedule`, `DonorReactivationReminder`, `MarketingLearning`, و`ContentAdLink`.
+- تم تجهيز `AiOperationRun` كعقد staged فقط لسجل تشغيل Shared AI Core.
 
 لم يتم في هذه المرحلة:
 
-- إدخال موديلات Brand/Operations/Content/AI الجديدة إلى `prisma/schema.prisma` الرئيسي.
+- إدخال موديلات Brand/Archive/Operations/Content/AI الجديدة إلى `prisma/schema.prisma` الرئيسي.
 - تشغيل Google Drive sync حقيقي.
-- نقل `ArchiveAsset` أو `ArchiveDriveLink` إلى DB-backed runtime.
+- تحميل ملفات Drive أو تحليل صور/فيديوهات تلقائيًا.
+- تحويل أفعال Archive approval/create-content/assign-task إلى DB writes.
 - إضافة repository DB-backed write path للـ AI audit log.
-- إضافة create/update/delete/upload/download لأصول الهوية.
-- ربط المهام مباشرة بـ ContentItem أو ArchiveAsset من الواجهة.
 - إرسال أو نشر تلقائي.
 - إنشاء ContentAdPerformance يكرر AdSnapshot.
 - تغيير payment أو tracking runtime.
@@ -69,6 +68,9 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 
 - `ArchiveCollection`
 - `ArchiveProject`
+- `ArchiveDriveLink` staged contract only
+- `ArchiveAsset` staged contract only
+- `ArchiveVideoFrame` staged contract only
 
 ### Operations & Content
 
@@ -95,9 +97,12 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 | `BrandColor` | DB-backed read + foundation fallback | Colors tab and overview can read DB colors. |
 | `BrandFont` | Staged contract only | Typography rules and source notes. |
 | `BrandGuideline` | DB-backed read + foundation fallback | Voice/copy rules can read DB guidelines. |
-| `BrandMessageFramework` | Staged contract only | Friday, thank-you, zakat, waqf, emergency, reactivation, Ramadan, and general frameworks. |
+| `BrandMessageFramework` | Staged contract only | Message frameworks for fundraising and donor communications. |
 | `ArchiveCollection` | DB-backed read + foundation fallback | Smart Archive pages read collections through archive repository. |
 | `ArchiveProject` | DB-backed read + foundation fallback | Smart Archive pages read projects through archive repository. |
+| `ArchiveDriveLink` | Staged contract only | Google Drive link metadata; no external Drive calls yet. |
+| `ArchiveAsset` | Staged contract only | Drive file metadata, AI draft fields, human review fields, marketing/documentation approval flags. |
+| `ArchiveVideoFrame` | Staged contract only | Frame metadata for later video analysis; no frame extraction or AI call yet. |
 | `OperationTask` | DB-backed read/write API + create/edit UI + transitions + computed foundation fallback | Tasks page/API supports safe manual operations for real rows. |
 | `OperationSeason` | Staged contract only | AI-suggested dates stay suggested until human review. |
 | `MonthlyContentPlan` | Staged contract only | Plans can later generate ContentItems and OperationTasks. |
@@ -105,7 +110,7 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 | `ContentPublication` | Staged contract only | Manual publishing checklist, not auto-publish. |
 | `MessageSchedule` | Staged contract only | Manual-first scheduling; no automatic send. |
 | `DonorReactivationReminder` | Staged contract only | Candidate reminders only; no automatic outreach. |
-| `MarketingLearning` | Staged contract only | Stores learnings from marketing/content results without duplicating ad snapshots. |
+| `MarketingLearning` | Staged contract only | Stores learnings without duplicating ad snapshots. |
 | `ContentAdLink` | Staged contract only | Links content/ad/platform identifiers only; no performance table duplicate. |
 | `AiOperationRun` | Staged contract only | Sanitized Shared AI Core audit entries. |
 
@@ -114,13 +119,15 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 - لا تغييرات دفع.
 - لا تغييرات tracking runtime.
 - لا external platform calls.
+- لا Google Drive sync في هذه الحزمة.
+- لا frame extraction أو AI analysis في هذه الحزمة.
 - لا إرسال أو نشر تلقائي.
 - لا AI approval تلقائي.
 - BrandAsset يبقى منفصل عن ArchiveAsset.
+- ArchiveAsset يبقى للصور/الفيديو/التقارير الميدانية، وليس للوجوهات والهوية.
+- sensitive/needsBlur/humanReviewRequired fields موجودة كعقود فقط ولا تمنح اعتمادًا تلقائيًا.
 - ContentAdLink لا يكرر AdSnapshot أو MarketingCampaignSnapshot.
 - Donor Reactivation وScheduler manual-first فقط.
-- AI audit input/output يجب أن يكون sanitized ولا يحفظ مفاتيح أو tokens أو أسرار متبرعين.
-- OperationTask writes require operations permission, zod validation, DB availability, and AuditLog.
 
 ## cutover المقترح التالي
 
@@ -130,15 +137,18 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 
 بعدها يمكن تنفيذ:
 
+- `Append ArchiveDriveLink runtime model` كخطوة صغيرة قبل ArchiveAsset.
+- `Append ArchiveAsset runtime model` بعد readiness لسياسة preview/thumbnail وحماية المواد الحساسة.
 - `Append BrandFont and MessageFramework runtime models`.
-- `Append Operations content workflow runtime models` على شرائح صغيرة، وليس دفعة واحدة.
+- `Append Operations content workflow runtime models` على شرائح صغيرة.
 - `Append AiOperationRun runtime model` بعد تثبيت sanitization/retention policy.
-- ربط OperationTask تدريجيًا بـ ContentItem وArchiveAsset عند توفر الموديلات الفعلية.
 
 ## ملاحظات Mongo/Prisma
 
 - العلاقات محفوظة كـ ObjectId scalar fields بدون relation blocks لتقليل التعقيد.
 - الفهارس مضافة للقراءة والفلاتر الرئيسية فقط.
 - `BrandAsset`, `BrandFont`, و`BrandMessageFramework` تبدأ كـ `TO_VERIFY`.
+- `ArchiveAsset.aiStatus` يبدأ بـ `NOT_ANALYZED` و`humanReviewStatus` يبدأ بـ `PENDING`.
+- `ArchiveVideoFrame.humanReviewRequired` يبدأ بـ `true`.
 - `AiOperationRun.status` يبدأ بـ `DRAFT` و`humanApprovalRequired` يبدأ بـ `true`.
 - `ContentPublication`, `MessageSchedule`, و`DonorReactivationReminder` لا تعني أي إرسال/نشر تلقائي.
