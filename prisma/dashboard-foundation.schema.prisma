@@ -200,6 +200,110 @@ model ArchiveProject {
   @@index([marketingStatus])
 }
 
+model ArchiveDriveLink {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  projectId      String?   @db.ObjectId
+  title          String
+  driveUrl       String
+  driveFolderId  String?
+  driveFileId    String?
+  sharedDriveId  String?
+  linkType       String    @default("FOLDER")
+  syncStatus     String    @default("NOT_SYNCED")
+  lastSyncedAt   DateTime?
+  lastError      String?
+  totalFiles     Int       @default(0)
+  totalImages    Int       @default(0)
+  totalVideos    Int       @default(0)
+  totalOther     Int       @default(0)
+  createdBy      String?   @db.ObjectId
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([projectId])
+  @@index([linkType])
+  @@index([syncStatus])
+  @@index([driveFolderId])
+  @@index([driveFileId])
+}
+
+model ArchiveAsset {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  projectId             String?   @db.ObjectId
+  driveLinkId           String?   @db.ObjectId
+  googleFileId          String?
+  googleFolderId        String?
+  fileName              String
+  mimeType              String?
+  fileType              String
+  webViewLink           String?
+  webContentLink        String?
+  thumbnailLink         String?
+  previewUrl            String?
+  sizeBytes             Float?
+  createdTime           DateTime?
+  modifiedTime          DateTime?
+  aiStatus              String    @default("NOT_ANALYZED")
+  humanReviewStatus     String    @default("PENDING")
+  marketingApproved     Boolean   @default(false)
+  documentationApproved Boolean   @default(false)
+  tags                  String[]  @default([])
+  aiSummary             String?
+  aiWarnings            String?
+  recommendedUse        String?
+  marketingScore        Int?
+  qualityScore          Int?
+  emotionScore          Int?
+  clarityScore          Int?
+  sensitivityScore      Int?
+  hasChildren           Boolean   @default(false)
+  hasFaces              Boolean   @default(false)
+  needsBlur             Boolean   @default(false)
+  isSensitive           Boolean   @default(false)
+  reviewedBy            String?   @db.ObjectId
+  reviewedAt            DateTime?
+  reviewerNote          String?
+  createdBy             String?   @db.ObjectId
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([projectId])
+  @@index([driveLinkId])
+  @@index([googleFileId])
+  @@index([fileType])
+  @@index([aiStatus])
+  @@index([humanReviewStatus])
+  @@index([marketingApproved])
+  @@index([documentationApproved])
+  @@index([recommendedUse])
+  @@index([needsBlur])
+  @@index([isSensitive])
+}
+
+model ArchiveVideoFrame {
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  assetId             String   @db.ObjectId
+  timestampSec        Int
+  frameUrl            String
+  thumbnailUrl        String?
+  aiSummary           String?
+  recommendedUse      String?
+  marketingScore      Int?
+  tags                String[] @default([])
+  needsBlur           Boolean  @default(false)
+  isSensitive         Boolean  @default(false)
+  humanReviewRequired Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([assetId])
+  @@index([timestampSec])
+  @@index([recommendedUse])
+  @@index([marketingScore])
+  @@index([needsBlur])
+  @@index([isSensitive])
+}
+
 /* ===================== OPERATIONS FIRST SLICE ===================== */
 
 model OperationTask {
@@ -371,23 +475,23 @@ model MessageSchedule {
 }
 
 model DonorReactivationReminder {
-  id             String    @id @default(auto()) @map("_id") @db.ObjectId
-  donorId        String?   @db.ObjectId
-  lastDonationId String?   @db.ObjectId
-  channel        String
-  locale         String    @default("ar")
-  status         String    @default("PENDING")
-  reason         String?
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  donorId          String?   @db.ObjectId
+  lastDonationId   String?   @db.ObjectId
+  channel          String
+  locale           String    @default("ar")
+  status           String    @default("PENDING")
+  reason           String?
   suggestedMessage String?
-  scheduledAt    DateTime?
-  sentAt         DateTime?
-  manuallySentAt DateTime?
-  skippedAt      DateTime?
-  dismissedAt    DateTime?
-  assignedTaskId String?   @db.ObjectId
-  createdBy      String?   @db.ObjectId
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  scheduledAt      DateTime?
+  sentAt           DateTime?
+  manuallySentAt   DateTime?
+  skippedAt        DateTime?
+  dismissedAt      DateTime?
+  assignedTaskId   String?   @db.ObjectId
+  createdBy        String?   @db.ObjectId
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([donorId])
   @@index([channel])
@@ -397,18 +501,18 @@ model DonorReactivationReminder {
 }
 
 model MarketingLearning {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  sourceType    String
-  sourceId      String?  @db.ObjectId
-  campaignId    String?
-  contentItemId String?  @db.ObjectId
-  summary       String
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  sourceType     String
+  sourceId       String?  @db.ObjectId
+  campaignId     String?
+  contentItemId  String?  @db.ObjectId
+  summary        String
   recommendation String?
-  confidence    Int?
-  status        String   @default("DRAFT")
-  createdBy     String?  @db.ObjectId
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  confidence     Int?
+  status         String   @default("DRAFT")
+  createdBy      String?  @db.ObjectId
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@index([sourceType, sourceId])
   @@index([campaignId])
