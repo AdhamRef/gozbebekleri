@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Clock3, ListChecks, Sparkles, UserRound } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock3, ListChecks, PlusCircle, Sparkles, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { OperationTaskActions } from "@/components/dashboard/operations/OperationTaskActions";
+import { OperationTaskCreateForm } from "@/components/dashboard/operations/OperationTaskCreateForm";
+import { OperationTaskQuickEdit } from "@/components/dashboard/operations/OperationTaskQuickEdit";
 import { getTaskOverview } from "@/lib/operations/tasks/task-service";
 
 export const dynamic = "force-dynamic";
@@ -72,10 +74,22 @@ export default async function OperationsTasksPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle className="flex items-center gap-2"><PlusCircle className="h-5 w-5 text-[#025EB8]" /> إنشاء مهمة تشغيل</CardTitle>
+          <CardDescription className="leading-6">
+            أضف مهمة يدوية للفريق بدون إرسال أو نشر تلقائي. الحفظ الحقيقي يتم عبر OperationTask API، وأي غياب لقاعدة البيانات يرجع فشلًا آمنًا.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <OperationTaskCreateForm isFoundationMode={!isDbBacked} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle className="flex items-center gap-2"><ListChecks className="h-5 w-5 text-[#025EB8]" /> قائمة مهام الإنتاج</CardTitle>
           <CardDescription>
             {isDbBacked
-              ? "تقرأ هذه الصفحة مهام OperationTask من قاعدة البيانات عبر repository آمن، وتدعم انتقالات الحالة اليومية من الواجهة مع AuditLog."
+              ? "تقرأ هذه الصفحة مهام OperationTask من قاعدة البيانات عبر repository آمن، وتدعم الانتقالات والتعديل السريع من الواجهة مع AuditLog."
               : "لا توجد مهام OperationTask جاهزة في قاعدة البيانات بعد؛ يتم استخدام مهام محسوبة من Planning Engine كـ foundation fallback."}
           </CardDescription>
         </CardHeader>
@@ -104,6 +118,7 @@ export default async function OperationsTasksPage() {
               </div>
 
               <OperationTaskActions taskId={task.id} status={task.status} canMutate={canMutateTasks} />
+              <OperationTaskQuickEdit taskId={task.id} title={task.title} priority={task.priority} dueLabel={task.dueLabel} canMutate={canMutateTasks} />
             </div>
           ))}
         </CardContent>
@@ -113,7 +128,7 @@ export default async function OperationsTasksPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-[#025EB8]" /> القادم</CardTitle>
           <CardDescription className="leading-6">
-            انتقالات المهام اليومية أصبحت متاحة عبر PATCH الآمن فقط عند وجود OperationTask فعلية. الخطوة التالية هي إنشاء/تحرير مهام من الواجهة وربطها بعناصر المحتوى والأرشيف.
+            المهام الآن تقبل إنشاء وتعديلًا سريعًا وانتقالات يومية. الخطوة التالية هي ربط المهام بعناصر ContentItem وArchiveAsset عندما تدخل هذه الموديلات إلى DB-backed runtime.
           </CardDescription>
         </CardHeader>
       </Card>

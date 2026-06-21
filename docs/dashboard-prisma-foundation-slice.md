@@ -25,13 +25,14 @@
 - تم قطع `OperationTask` إلى قراءة DB-backed مع fallback محسوب من Planning Engine.
 - تم إضافة create/update API آمن لـ `OperationTask` مع zod validation وAuditLog.
 - تم فتح UI transition controls للمهام الفعلية في `/dashboard/operations/tasks` باستخدام PATCH الحالي.
+- تم إضافة نموذج إنشاء مهمة وتشغيل Quick edit محدود للمهام الفعلية.
 
 لم يتم في هذه المرحلة:
 
 - تحويل أفعال الأرشيف إلى DB writes.
 - تشغيل Google Drive sync حقيقي.
 - نقل `ArchiveAsset` أو `ArchiveDriveLink` إلى DB-backed runtime.
-- إضافة إنشاء/تحرير كامل للمهام من الواجهة.
+- ربط المهام مباشرة بـ ContentItem أو ArchiveAsset من الواجهة.
 - تشغيل أي إرسال أو نشر تلقائي.
 - تغيير payment أو tracking runtime.
 
@@ -83,7 +84,7 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 | `BrandGuideline` | DB-backed read + foundation fallback | Voice/copy rules can read DB guidelines. |
 | `ArchiveCollection` | DB-backed read + foundation fallback | Smart Archive pages read collections through archive repository. |
 | `ArchiveProject` | DB-backed read + foundation fallback | Smart Archive pages read projects through archive repository. |
-| `OperationTask` | DB-backed read/write API + UI transitions + computed foundation fallback | Tasks page/API can read Prisma tasks, update daily statuses, and fail safely when DB rows are not available. |
+| `OperationTask` | DB-backed read/write API + create/edit UI + transitions + computed foundation fallback | Tasks page/API can create Prisma tasks, edit safe fields, update daily statuses, and fail safely when DB is not available. |
 
 ## ما لا يوجد في هذه الشريحة
 
@@ -102,21 +103,21 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 - BrandAsset يبقى منفصل عن ArchiveAsset.
 - Archive Drive links/assets/video frames/AI remain foundation/manual-first.
 - OperationTask writes require operations permission, zod validation, DB availability, and AuditLog.
-- OperationTask transition buttons are disabled for generated foundation tasks.
+- OperationTask transition and edit buttons are disabled for generated foundation tasks.
 
 ## cutover المقترح التالي
 
 العنوان المقترح:
 
-`Add operation task creation and edit forms`
+`Stage BrandAsset or ArchiveDriveLink persistence`
 
 العمل:
 
-- إضافة نموذج إنشاء مهمة تشغيل.
-- إضافة تعديل محدود للعنوان، المسؤول، الأولوية، الموعد، والملاحظات.
-- ربط المهام تدريجيًا بعناصر المحتوى والأرشيف عند توفر IDs حقيقية.
+- اختيار موديل واحد فقط للمرحلة التالية.
+- تجهيز repository DB-backed read/write محدود مع foundation fallback.
+- عدم تشغيل Google Drive sync حقيقي قبل provider readiness.
+- عدم إضافة upload/download policy واسع قبل مراجعة BrandAsset vs ArchiveAsset boundaries.
 - إبقاء Scheduler وDonor Reactivation manual-first.
-- عدم إضافة إرسال تلقائي.
 
 ## ملاحظات Mongo/Prisma
 
