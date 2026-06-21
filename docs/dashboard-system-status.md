@@ -23,10 +23,11 @@
 
 ## ما يتم تجهيزه في الحزمة الحالية
 
-- `/dashboard/operations/tasks` يعرض أزرار انتقال يومية للمهام الفعلية: Start, Ready for review, Complete, Block, Resume, Back to pending.
-- الأزرار تستخدم PATCH الحالي على `/api/dashboard/operations/tasks` فقط، مع operations permission وzod validation وAuditLog.
-- الأزرار تتعطل تلقائيًا في foundation fallback أو عند عدم وجود ObjectId حقيقي، حتى لا يحدث نجاح وهمي.
-- يوجد feedback واضح عبر toast، ويتم تحديث القائمة بعد كل إجراء ناجح.
+- `/dashboard/operations/tasks` يضيف نموذج إنشاء مهمة تشغيل يدوية عبر POST إلى OperationTask API.
+- الصفحة تضيف Quick edit للمهام الفعلية لتحديث العنوان، الأولوية، الموعد، وملاحظة النتائج.
+- الصفحة ما زالت تعرض أزرار الانتقال اليومية: Start, Ready for review, Complete, Block, Resume, Back to pending.
+- الإنشاء والتعديل يستخدمان operations permission وzod validation وAuditLog من API الحالي.
+- generated foundation tasks تبقى read-only؛ وأي غياب لقاعدة البيانات يرجع فشلًا آمنًا بدل نجاح وهمي.
 - لا يوجد إرسال تلقائي، ولا نشر تلقائي، ولا تغيير Scheduler أو Donor Reactivation.
 
 ## المسارات الرئيسية
@@ -72,7 +73,7 @@
 ## ما بقي foundation
 
 - Operations Scheduler, Production, Content Items, and Content Workflow Tasks ما زالت foundation/repository-backed وليست DB-backed بالكامل.
-- Operations Tasks: `OperationTask` DB-backed read/write API وUI transitions موجودة للمهام الفعلية؛ إنشاء/تحرير المهام من الواجهة ما زال pending.
+- Operations Tasks: `OperationTask` DB-backed read/write API وUI create/edit/transitions موجودة للمهام الفعلية؛ الربط المباشر مع ContentItem/ArchiveAsset ما زال pending حتى تدخل هذه الموديلات للـ DB-backed runtime.
 - Smart Archive: `ArchiveCollection` و`ArchiveProject` DB-backed read/fallback؛ أما `ArchiveDriveLink`, `ArchiveAsset`, `ArchiveVideoFrame`, Google Drive sync, and AI analysis فباقية foundation/manual-first.
 - Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ أما `BrandAsset`, `BrandFont`, `BrandMessageFramework` فباقية foundation.
 - Shared AI Core جاهز للعقود والـ audit/fallback؛ الموديل المقترح للخطوة التالية: `AiOperationRun`.
@@ -83,19 +84,19 @@
 - Google Drive metadata sync لا ينفذ external call في foundation mode؛ يحتاج provider-backed implementation لاحقًا.
 - Archive AI analysis draft-only ولا يعتمد أي أصل بدون human review.
 - DB-backed read modes تحتاج rows فعلية؛ إذا كانت collections فارغة سيظهر foundation fallback بشكل مقصود.
-- OperationTask UI transitions تعمل فقط على rows فعلية؛ foundation generated tasks تبقى read-only.
+- OperationTask quick edit يعمل فقط على rows فعلية؛ foundation generated tasks تبقى read-only.
 - بعض staff users قد يحتاجون تحديث dashboardPermissions لإضافة `operations`, `archive`, أو `brand` بعد إدخال المفاتيح الجديدة.
 - Brand assets الرسمية ما زالت تحتاج رفع ملفات logo/certificate/template حقيقية قبل تفعيل downloads.
 - PRs القديمة #30, #37, #40, #43, #52, #54 لا يجب دمجها كما هي الآن؛ راجع `docs/dashboard-open-pr-audit.md`.
 
 ## Next recommended package
 
-`Add operation task creation and edit forms`
+`Stage BrandAsset or ArchiveDriveLink persistence`
 
-الهدف: إضافة إنشاء/تحرير مهام OperationTask من الواجهة وربطها تدريجيًا بعناصر المحتوى والأرشيف، مع استمرار منع الإرسال والنشر التلقائي.
+الهدف: اختيار موديل واحد فقط من Brand/Archive ونقله تدريجيًا إلى DB-backed runtime مع repository fallback واضح، بدون Google Drive sync حقيقي أو upload policy واسع.
 
 بعدها:
 
-- Stage `BrandAsset` أو `ArchiveDriveLink` حسب أولوية الفريق.
 - تجهيز `AiOperationRun` persistence مع سياسة retention وعدم حفظ أسرار.
+- ربط OperationTask تدريجيًا بـ ContentItem وArchiveAsset عند توفر الموديلات الفعلية.
 - تنفيذ Google Drive metadata sync لاحقًا فقط بعد readiness كاملة في provider catalog وMarketingPlatformConnection.
