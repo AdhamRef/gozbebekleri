@@ -19,10 +19,10 @@
 
 ## ما تم تجهيزه في الحزمة الحالية
 
-- `/dashboard/marketing/connections` أصبح يعرف تصنيفات AI وArchive/Storage وInternal APIs داخل metadata والفلاتر.
-- readiness requirements أصبحت تقبل `OPENAI`, `GOOGLE_DRIVE`, `GOOGLE_PICKER`, `VIDEO_FRAME_EXTRACTOR`, `STORAGE_PROVIDER`, و`INTERNAL_API`.
-- تمت إضافة adapter واضح: `lib/marketing/integrations/provider-connection-adapter.ts` يربط provider catalog keys بـ `MarketingPlatformConnection.platform` وUI sections.
-- تم توثيق PRs القديمة المفتوحة في `docs/dashboard-open-pr-audit.md` حتى لا تُعامل كعمل ناقص.
+- تم تجهيز أول Prisma foundation slice في `prisma/dashboard-foundation.schema.prisma`.
+- الشريحة تضم: `BrandProfile`, `BrandColor`, `BrandGuideline`, `ArchiveCollection`, `ArchiveProject`, `OperationTask`.
+- تم توثيق cutover sequence في `docs/dashboard-prisma-foundation-slice.md`.
+- لم يتم تغيير `prisma/schema.prisma` الأساسي بعد، حتى لا يتغير Prisma Client أو runtime قبل PR تحقق مستقل.
 - لا يوجد Google Drive sync، ولا AI client جديد، ولا external platform calls.
 
 ## المسارات الرئيسية
@@ -75,7 +75,7 @@
 
 ## Known risks
 
-- Prisma schema لم يتم تغييره في حزمة DB contracts؛ هذا مقصود لتجنب migration كبيرة قبل تثبيت العقود.
+- `prisma/dashboard-foundation.schema.prisma` شريحة staged وليست schema runtime بعد.
 - Google Drive metadata sync لا ينفذ external call في foundation mode؛ يحتاج provider-backed implementation لاحقًا.
 - Archive AI analysis draft-only ولا يعتمد أي أصل بدون human review.
 - بعض staff users قد يحتاجون تحديث dashboardPermissions لإضافة `operations`, `archive`, أو `brand` بعد إدخال المفاتيح الجديدة.
@@ -84,11 +84,11 @@
 
 ## Next recommended package
 
-`Prisma Model Migration and Repository Cutover`
+`Append first dashboard Prisma models`
 
-الهدف: إدخال أول شريحة صغيرة من الموديلات في Prisma، تشغيل `prisma generate` وbuild، ثم نقل repository واحد في كل مرة من foundation data إلى DB-backed data.
+الهدف: نسخ الموديلات الستة من `prisma/dashboard-foundation.schema.prisma` إلى `prisma/schema.prisma` الأساسي، تشغيل `prisma generate` وbuild، ثم بدء cutover repository واحد في PR لاحق.
 
-الشريحة الأولى المقترحة:
+الشريحة الأولى:
 
 - `BrandProfile`
 - `BrandColor`
