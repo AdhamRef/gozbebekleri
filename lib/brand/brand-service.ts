@@ -9,6 +9,7 @@ import {
 import { getBrandRepositorySnapshot, type BrandRepositorySnapshot } from "./brand-repository";
 import type {
   BrandAiSourcePack,
+  BrandAsset,
   BrandCenterSnapshot,
   BrandCenterTab,
   BrandDownloadItem,
@@ -44,8 +45,8 @@ function scoped<T extends { profileId: string }>(items: T[], profileId: string) 
   return items.filter((item) => item.profileId === profileId);
 }
 
-function buildDownloads(profile: BrandProfile): BrandDownloadItem[] {
-  const profileAssets = scoped(brandAssets, profile.id);
+function buildDownloads(profile: BrandProfile, assets: BrandAsset[]): BrandDownloadItem[] {
+  const profileAssets = scoped(assets, profile.id);
   return [
     {
       id: `${profile.id}_profile_download`,
@@ -67,7 +68,7 @@ function buildDownloads(profile: BrandProfile): BrandDownloadItem[] {
 }
 
 function buildAlerts(repository: BrandRepositorySnapshot, profile: BrandProfile): BrandReadinessAlert[] {
-  const profileAssets = scoped(brandAssets, profile.id);
+  const profileAssets = scoped(repository.assets, profile.id);
   const profileColors = scoped(repository.colors, profile.id);
   const profileFrameworks = scoped(brandMessageFrameworks, profile.id);
   const alerts: BrandReadinessAlert[] = [];
@@ -77,7 +78,7 @@ function buildAlerts(repository: BrandRepositorySnapshot, profile: BrandProfile)
       id: `${profile.id}_db_backed`,
       severity: "success",
       title: "Brand core is DB-backed",
-      detail: "BrandProfile, BrandColor, and BrandGuideline are read through the repository layer with foundation fallbacks.",
+      detail: repository.reason,
     });
   } else {
     alerts.push({
@@ -127,23 +128,33 @@ function buildAlerts(repository: BrandRepositorySnapshot, profile: BrandProfile)
   return alerts;
 }
 
+function activeModels(repository: BrandRepositorySnapshot): string[] {
+  if (repository.mode !== "db-backed") return [];
+  return [
+    "BrandProfile",
+    ...(repository.dbCounts.assets > 0 ? ["BrandAsset"] : []),
+    "BrandColor",
+    "BrandGuideline",
+  ];
+}
+
 function buildBrandCenterSnapshot(repository: BrandRepositorySnapshot, profileId?: string | null): BrandCenterSnapshot {
   const profile = activeProfile(repository.profiles, profileId);
-  const assets = scoped(brandAssets, profile.id);
+  const assets = scoped(repository.assets, profile.id);
   const colors = scoped(repository.colors, profile.id).sort((a, b) => a.order - b.order);
   const fonts = scoped(brandFonts, profile.id);
   const guidelines = scoped(repository.guidelines, profile.id).sort((a, b) => a.order - b.order);
   const messageFrameworks = scoped(brandMessageFrameworks, profile.id);
-  const downloads = buildDownloads(profile);
+  const downloads = buildDownloads(profile, repository.assets);
   const alerts = buildAlerts(repository, profile);
-  const toVerify = [...repository.profiles, ...brandAssets].filter((item) => item.status === "TO_VERIFY").length;
+  const toVerify = [...repository.profiles, ...repository.assets].filter((item) => item.status === "TO_VERIFY").length;
 
   return {
     source: repository.mode === "db-backed" ? "brand-center-db-backed" : "brand-center-foundation",
     persistence: {
       mode: repository.mode,
       nextModels,
-      activeModels: repository.mode === "db-backed" ? ["BrandProfile", "BrandColor", "BrandGuideline"] : [],
+      activeModels: activeModels(repository),
       reason: repository.reason,
       dbCounts: repository.dbCounts,
     },
@@ -183,10 +194,12 @@ function getFoundationRepositorySnapshot(): BrandRepositorySnapshot {
     source: "foundation",
     reason: "Using foundation brand data for synchronous compatibility.",
     profiles: brandProfiles,
+    assets: brandAssets,
     colors: brandColors,
     guidelines: brandGuidelines,
     dbCounts: {
       profiles: 0,
+      assets: 0,
       colors: 0,
       guidelines: 0,
     },
