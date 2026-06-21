@@ -12,6 +12,7 @@
 - Shared AI Core readiness لسياقات marketing, content, archive, brand مع tool contracts وprovider fallback وaudit log foundation.
 - Dashboard hardening patch: no-store responses، صلاحيات أوضح، وOperations API guards.
 - Brand Center foundation: profiles, assets, colors, typography, voice rules, message frameworks, downloads, and safe Brand AI guard actions.
+- Smart Archive foundation: `/dashboard/archive` with Collections, Projects, Drive Links, Assets Review, Marketing Picks, Reports Archive, Archive AI, and no-store archive APIs.
 
 ## المسارات الرئيسية
 
@@ -34,6 +35,14 @@
 - `/dashboard/operations/system`
 - `/dashboard/operations/ai-assistant`
 - `/dashboard/operations/archive/ai-assistant`
+- `/dashboard/archive`
+- `/dashboard/archive/collections`
+- `/dashboard/archive/projects`
+- `/dashboard/archive/drive-links`
+- `/dashboard/archive/assets`
+- `/dashboard/archive/marketing-picks`
+- `/dashboard/archive/reports`
+- `/dashboard/archive/ai`
 - `/dashboard/brand`
 - `/dashboard/brand/organizations`
 - `/dashboard/brand/assets`
@@ -46,14 +55,15 @@
 ## ما بقي foundation
 
 - Operations datasets ما زالت foundation/repository-backed وليست DB-backed بالكامل.
+- Smart Archive يستخدم foundation repository data؛ الموديلات المقترحة للتحويل القادم: `ArchiveCollection`, `ArchiveProject`, `ArchiveDriveLink`, `ArchiveAsset`, `ArchiveVideoFrame`.
 - Brand Center يستخدم model contracts وfoundation repository data؛ الموديلات المقترحة للتحويل القادم: `BrandProfile`, `BrandAsset`, `BrandColor`, `BrandFont`, `BrandGuideline`, `BrandMessageFramework`.
 - AI Core جاهز للعقود والـ audit/fallback، لكن tools التنفيذية ما زالت تحتاج تنفيذ read-only أو write-proposed لاحقًا.
-- Archive الذكي الكامل لم يدخل main بعد؛ يحتاج PR منفصل بعد استقرار main.
 - Provider catalog القديم #54 ما زال PR منفصلًا ويحتاج مراجعة قبل الدمج أو الإغلاق.
 
 ## Known risks
 
-- Smart Archive المحلي يحتوي schema/models وواجهات جديدة ولم يرفع إلى GitHub/Vercel بعد.
+- Google Drive metadata sync لا ينفذ external call في foundation mode؛ يحتاج provider-backed implementation لاحقًا.
+- Archive AI analysis draft-only ولا يعتمد أي أصل بدون human review.
 - بعض staff users قد يحتاجون تحديث dashboardPermissions لإضافة `operations`, `archive`, أو `brand` بعد إدخال المفاتيح الجديدة.
 - Brand assets الرسمية ما زالت تحتاج رفع ملفات logo/certificate/template حقيقية قبل تفعيل downloads.
 - PR #52 قديم وغير mergeable، ويبدو مكررًا/متجاوزًا جزئيًا بعد executive overview الأحدث.
@@ -61,6 +71,6 @@
 
 ## Next recommended package
 
-`Smart Archive Remote Integration`
+`Operations DB Contracts Small Migration`
 
-الهدف: إعادة تطبيق حزمة Smart Archive فوق main الحالي، فتح PR نظيف، ثم متابعة Vercel Preview قبل أي Production rollout نهائي.
+الهدف: تحويل foundation contracts الأكثر استقرارًا إلى Prisma models صغيرة وآمنة بدون migration كبيرة أو تغيير في payment/tracking runtime.
