@@ -193,3 +193,32 @@ model OperationTask {
   @@index([sourceType, sourceId])
   @@index([dueAt])
 }
+
+/* ===================== SHARED AI CORE FIRST SLICE ===================== */
+
+model AiOperationRun {
+  id                    String   @id @default(auto()) @map("_id") @db.ObjectId
+  action                String
+  context               String
+  requestedTool         String?
+  promptPreview         String?
+  input                 Json?
+  output                Json?
+  status                String   @default("DRAFT")
+  riskLevel             String   @default("LOW")
+  humanApprovalRequired Boolean  @default(true)
+  approvedBy            String?  @db.ObjectId
+  approvedAt            DateTime?
+  error                 String?
+  createdBy             String?  @db.ObjectId
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([context])
+  @@index([action])
+  @@index([requestedTool])
+  @@index([status])
+  @@index([riskLevel])
+  @@index([createdBy])
+  @@index([createdAt])
+}

@@ -22,16 +22,16 @@
 - OperationTask cut over to DB-backed read/write API with computed foundation fallback.
 - `/dashboard/operations/tasks` now has DB-backed manual task creation, safe quick edit, and daily transition controls for real OperationTask rows.
 - `BrandAsset` staged contract added to `prisma/dashboard-foundation.schema.prisma` only.
+- Brand Center assets are sourced through the Brand repository snapshot, with optional Prisma `brandAsset` read fallback when the generated delegate exists.
 
 ## ما يتم تجهيزه في الحزمة الحالية
 
-- Brand Center assets are now sourced through the Brand repository snapshot instead of directly from foundation data.
-- The Brand repository can read `BrandAsset` from Prisma when the generated Prisma Client exposes the delegate.
-- If `BrandAsset` is missing from the generated client, empty, or unavailable, the UI falls back to foundation assets honestly.
-- `BrandAsset` is still not added to `prisma/schema.prisma` in this package.
-- No create/update/delete/upload/download behavior is added for BrandAsset.
-- `ArchiveAsset` remains separate for field photos, videos, reports, and documentation material.
-- No automatic sending, publishing, Google Drive sync, external AI call, or tracking runtime change.
+- `AiOperationRun` is now staged in `prisma/dashboard-foundation.schema.prisma` as the DB contract for Shared AI Core audit persistence.
+- The staged model tracks action, context, requested tool, sanitized prompt preview, sanitized input/output, status, risk level, human approval flags, user, timestamps, and error.
+- This package does not add `AiOperationRun` to `prisma/schema.prisma` yet.
+- This package does not add AI DB write behavior yet.
+- AI outputs remain draft-only and require human approval.
+- No automatic sending, publishing, Google Drive sync, external AI call, payment change, tracking runtime change, or frontend secret exposure.
 
 ## المسارات الرئيسية
 
@@ -79,13 +79,14 @@
 - Operations Tasks: `OperationTask` DB-backed read/write API وUI create/edit/transitions موجودة للمهام الفعلية؛ الربط المباشر مع ContentItem/ArchiveAsset ما زال pending حتى تدخل هذه الموديلات للـ DB-backed runtime.
 - Smart Archive: `ArchiveCollection` و`ArchiveProject` DB-backed read/fallback؛ أما `ArchiveDriveLink`, `ArchiveAsset`, `ArchiveVideoFrame`, Google Drive sync, and AI analysis فباقية foundation/manual-first.
 - Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ `BrandAsset` لديه staged schema + repository read fallback، لكن runtime schema الأساسي ما زال pending. `BrandFont` و`BrandMessageFramework` ما زالت foundation.
-- Shared AI Core جاهز للعقود والـ audit/fallback؛ الموديل المقترح للخطوة التالية: `AiOperationRun`.
+- Shared AI Core جاهز للعقود والـ provider fallback؛ `AiOperationRun` لديه staged schema contract فقط، والـ runtime schema/repository persistence ما زال pending.
 - Connections UI يعرض المنصات الجديدة كعقود جاهزية، لكن sync/testing الحقيقي لهذه المنصات يجب أن يبقى `NOT_IMPLEMENTED` حتى تنفيذ provider clients بشكل آمن.
 
 ## Known risks
 
 - Google Drive metadata sync لا ينفذ external call في foundation mode؛ يحتاج provider-backed implementation لاحقًا.
 - Archive AI analysis draft-only ولا يعتمد أي أصل بدون human review.
+- AI audit persistence يحتاج sanitization/retention policy قبل runtime write path حتى لا يحفظ أسرار أو بيانات حساسة.
 - DB-backed read modes تحتاج rows فعلية؛ إذا كانت collections فارغة سيظهر foundation fallback بشكل مقصود.
 - OperationTask quick edit يعمل فقط على rows فعلية؛ foundation generated tasks تبقى read-only.
 - بعض staff users قد يحتاجون تحديث dashboardPermissions لإضافة `operations`, `archive`, أو `brand` بعد إدخال المفاتيح الجديدة.
@@ -100,6 +101,6 @@
 
 بعدها:
 
-- تجهيز `AiOperationRun` persistence مع سياسة retention وعدم حفظ أسرار.
+- `Append AiOperationRun runtime model` بعد تثبيت sanitization/retention policy.
 - ربط OperationTask تدريجيًا بـ ContentItem وArchiveAsset عند توفر الموديلات الفعلية.
 - تنفيذ Google Drive metadata sync لاحقًا فقط بعد readiness كاملة في provider catalog وMarketingPlatformConnection.
