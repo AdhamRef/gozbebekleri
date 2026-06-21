@@ -4,7 +4,7 @@
 
 ## الهدف
 
-هذا الملف يوثق أول شريحة صغيرة وآمنة من موديلات الداشبورد التي تم تجهيزها أولًا كـ reviewable schema artifact ثم إدخالها في `prisma/schema.prisma` الأساسي بدون تغيير runtime behavior.
+هذا الملف يوثق أول شريحة صغيرة وآمنة من موديلات الداشبورد التي تم تجهيزها أولًا كـ reviewable schema artifact ثم إدخالها تدريجيًا في `prisma/schema.prisma` الأساسي مع cutover محدود لكل repository.
 
 الشريحة المرجعية باقية في:
 
@@ -16,12 +16,18 @@
 
 ## الحالة الحالية
 
-تم تنفيذ مرحلة `Append first dashboard Prisma models` بإضافة الموديلات الستة الأولى إلى الـ schema الرئيسي فقط.
+تم تنفيذ المسار الآمن حتى الآن:
+
+- تم تجهيز الشريحة المستقلة والتحقق منها عبر `npm run dashboard:schema:validate`.
+- تم إدخال الموديلات الستة في `prisma/schema.prisma` الأساسي.
+- تم قطع `BrandProfile`, `BrandColor`, `BrandGuideline` إلى قراءة DB-backed مع fallback foundation.
+- يتم في هذه الحزمة قطع `ArchiveCollection` و`ArchiveProject` إلى قراءة DB-backed مع fallback foundation.
 
 لم يتم في هذه المرحلة:
 
-- نقل أي Repository من foundation إلى DB-backed.
-- تغيير أي صفحة Dashboard لتكتب في قاعدة البيانات الجديدة.
+- تحويل أفعال الأرشيف إلى DB writes.
+- تشغيل Google Drive sync حقيقي.
+- نقل `ArchiveAsset` أو `ArchiveDriveLink` إلى DB-backed runtime.
 - تشغيل أي إرسال أو نشر تلقائي.
 - تغيير payment أو tracking runtime.
 
@@ -39,9 +45,9 @@ npm run dashboard:schema:validate
 prisma validate --schema prisma/dashboard-foundation.schema.prisma
 ```
 
-بعد إدخال الموديلات في `prisma/schema.prisma` يجب أن يمر `prisma generate` و`next build` عبر Vercel Preview قبل الدمج.
+بعد كل cutover يجب أن يمر Vercel Preview ثم Production بعد الدمج.
 
-## لماذا لم يتم قطع كل repositories مباشرة؟
+## لماذا القطع تدريجي؟
 
 لأن النظام الحالي يعمل على foundation repositories وواجهات مستقرة. إدخال كل موديلات Operations/Archive/Brand دفعة واحدة يزيد خطر كسر build أو توليد Prisma Client غير مستخدم بعد.
 
@@ -49,10 +55,11 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 
 1. Stage schema slice.
 2. Validate staged slice with `npm run dashboard:schema:validate`.
-3. Append slice to primary `prisma/schema.prisma` في PR مستقل.
-4. تشغيل `npx prisma generate` و`npm run build`.
+3. Append slice to primary `prisma/schema.prisma`.
+4. تشغيل `npx prisma generate` و`npm run build` عبر Vercel.
 5. نقل repository واحد فقط إلى DB-backed mode.
 6. إبقاء fallback foundation عند غياب `DATABASE_URL` أو فشل القراءة.
+7. إبقاء الأفعال الحساسة manual-first حتى يكتمل auth/audit/validation.
 
 ## الموديلات في الشريحة الأولى
 
@@ -62,6 +69,17 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 - `ArchiveCollection`
 - `ArchiveProject`
 - `OperationTask`
+
+## cutover status
+
+| Model | Runtime status | Notes |
+| --- | --- | --- |
+| `BrandProfile` | DB-backed read + foundation fallback | Brand overview and brand tabs can read active profile data. |
+| `BrandColor` | DB-backed read + foundation fallback | Colors tab and overview can read DB colors. |
+| `BrandGuideline` | DB-backed read + foundation fallback | Voice/copy rules can read DB guidelines. |
+| `ArchiveCollection` | DB-backed read + foundation fallback | Smart Archive pages read collections through archive repository. |
+| `ArchiveProject` | DB-backed read + foundation fallback | Smart Archive pages read projects through archive repository. |
+| `OperationTask` | Schema ready | Runtime cutover remains pending. |
 
 ## ما لا يوجد في هذه الشريحة
 
@@ -78,31 +96,19 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 - لا إرسال أو نشر تلقائي.
 - لا AI approval تلقائي.
 - BrandAsset يبقى منفصل عن ArchiveAsset.
+- Archive Drive links/assets/video frames/AI remain foundation/manual-first.
 
 ## cutover المقترح التالي
 
-### PR التالي
-
 العنوان المقترح:
 
-`Cut over brand profiles to repository backed storage`
+`Cut over operation tasks to repository backed storage`
 
 العمل:
 
-- نقل `BrandProfile` و`BrandColor` و`BrandGuideline` إلى repository DB-backed مع fallback foundation.
-- إبقاء `BrandAsset` foundation حتى توفر الملفات الرسمية.
-- عدم نقل Archive/Operations في نفس PR.
-
-### PR بعده
-
-العنوان المقترح:
-
-`Cut over archive collections to repository backed storage`
-
-العمل:
-
-- نقل `ArchiveCollection` و`ArchiveProject` إلى DB-backed read/write foundation-safe repositories.
-- إبقاء `ArchiveAsset` وDrive sync في foundation/provider-ready mode.
+- نقل `OperationTask` إلى read/write repository آمن مع validation وpermission guard.
+- إبقاء Scheduler وDonor Reactivation manual-first.
+- عدم إضافة إرسال تلقائي.
 
 ## ملاحظات Mongo/Prisma
 
