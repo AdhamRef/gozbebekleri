@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+/*
+  Dashboard foundation schema slice.
+
+  Purpose:
+  - Keep the first DB migration slice reviewable before appending it to the main Prisma schema.
+  - Avoid changing runtime behavior until repositories are cut over one by one.
+  - Keep BrandAsset separate from ArchiveAsset and keep outbound actions manual-first.
+
+  Safety:
+  - No payment changes.
+  - No tracking runtime changes.
+  - No external platform calls.
+  - No automatic sending or publishing.
+  - No AI auto-approval.
+*/
+
+/* ===================== BRAND CENTER FIRST SLICE ===================== */
+
+model BrandProfile {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  key               String   @unique
+  name              String
+  description       String?
+  mission           String?
+  vision            String?
+  contentVoice      String?
+  messagePhilosophy String?
+  primaryLocale     String   @default("tr")
+  supportedLocales  String[] @default([])
+  website           String?
+  isActive          Boolean  @default(false)
+  status            String   @default("FOUNDATION")
+  verificationNote  String?
+  createdBy         String?  @db.ObjectId
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([name])
+  @@index([isActive])
+  @@index([status])
+}
+
+model BrandColor {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  profileId   String   @db.ObjectId
+  name        String
+  hex         String
+  rgb         String?
+  usage       String
+  description String?
+  order       Int      @default(0)
+  createdBy   String?  @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([profileId])
+  @@index([hex])
+  @@index([usage])
+  @@index([order])
+}
+
+model BrandGuideline {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  profileId String   @db.ObjectId
+  section   String
+  title     String
+  body      String
+  examples  String[] @default([])
+  order     Int      @default(0)
+  createdBy String?  @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([profileId])
+  @@index([section])
+  @@index([order])
+}
+
+/* ===================== SMART ARCHIVE FIRST SLICE ===================== */
+
+model ArchiveCollection {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  slug        String   @unique
+  type        String
+  description String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdBy   String?  @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type])
+  @@index([isActive])
+  @@index([order])
+}
+
+model ArchiveProject {
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  collectionId        String?  @db.ObjectId
+  title               String
+  year                Int?
+  country             String?
+  city                String?
+  theme               String?
+  projectType         String?
+  description         String?
+  implementationDate  DateTime?
+  startDate           DateTime?
+  endDate             DateTime?
+  status              String   @default("ACTIVE")
+  documentationStatus String   @default("NEEDS_REVIEW")
+  marketingStatus     String   @default("NOT_REVIEWED")
+  notes               String?
+  createdBy           String?  @db.ObjectId
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([collectionId])
+  @@index([year])
+  @@index([country])
+  @@index([status])
+  @@index([documentationStatus])
+  @@index([marketingStatus])
+}
+
+/* ===================== OPERATIONS FIRST SLICE ===================== */
+
+model OperationTask {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  title             String
+  description       String?
+  taskType          String
+  status            String   @default("PENDING")
+  priority          String   @default("MEDIUM")
+  assignedTo        String?  @db.ObjectId
+  contentItemId     String?  @db.ObjectId
+  planId            String?  @db.ObjectId
+  seasonId          String?  @db.ObjectId
+  sourceType        String?
+  sourceId          String?  @db.ObjectId
+  dueAt             DateTime?
+  startedAt         DateTime?
+  reviewRequestedAt DateTime?
+  completedAt       DateTime?
+  approvedAt        DateTime?
+  blockedReason     String?
+  qualityRating     Int?
+  workloadScore     Int?
+  resultNotes       String?
+  createdBy         String?  @db.ObjectId
+  updatedBy         String?  @db.ObjectId
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([status])
+  @@index([taskType])
+  @@index([assignedTo])
+  @@index([contentItemId])
+  @@index([sourceType, sourceId])
+  @@index([dueAt])
+}
