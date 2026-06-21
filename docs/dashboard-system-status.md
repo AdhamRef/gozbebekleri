@@ -22,16 +22,17 @@
 - OperationTask cut over to DB-backed read/write API with computed foundation fallback.
 - `/dashboard/operations/tasks` now has DB-backed manual task creation, safe quick edit, and daily transition controls for real OperationTask rows.
 - `BrandAsset`, `BrandFont`, `BrandMessageFramework`, and `AiOperationRun` staged contracts added to `prisma/dashboard-foundation.schema.prisma` only.
+- Operations/content workflow staged contracts added to `prisma/dashboard-foundation.schema.prisma` only.
 - Brand Center assets are sourced through the Brand repository snapshot, with optional Prisma `brandAsset` read fallback when the generated delegate exists.
 
 ## ما يتم تجهيزه في الحزمة الحالية
 
-- Operations and content workflow DB contracts are now staged in `prisma/dashboard-foundation.schema.prisma` only.
-- New staged models: `OperationSeason`, `MonthlyContentPlan`, `ContentItem`, `ContentPublication`, `MessageSchedule`, `DonorReactivationReminder`, `MarketingLearning`, and `ContentAdLink`.
-- These contracts support monthly/seasonal planning, content production, manual publishing checklist, manual-first scheduling, donor reactivation candidates, content learnings, and content-to-ad identifier linking.
-- `ContentAdLink` links content/ad/platform identifiers only and does not duplicate AdSnapshot or MarketingCampaignSnapshot performance tables.
+- Smart Archive Drive and Asset DB contracts are now staged in `prisma/dashboard-foundation.schema.prisma` only.
+- New staged models: `ArchiveDriveLink`, `ArchiveAsset`, and `ArchiveVideoFrame`.
+- These contracts support Drive link metadata, Drive file metadata, AI draft analysis fields, human review status, marketing/documentation approval flags, sensitivity flags, and video frame metadata.
 - This package does not add these models to `prisma/schema.prisma` yet.
-- This package does not add automatic sending, publishing, Google Drive sync, external AI calls, payment changes, tracking runtime changes, or frontend secrets.
+- This package does not perform Google Drive API calls, file downloads, frame extraction, AI analysis, approval, publishing, or task creation.
+- No payment changes, tracking runtime changes, external platform calls, or frontend secrets.
 
 ## المسارات الرئيسية
 
@@ -77,8 +78,8 @@
 
 - Operations Scheduler, Production, Content Items, and Content Workflow Tasks ما زالت foundation/repository-backed وليست DB-backed بالكامل.
 - Operations Tasks: `OperationTask` DB-backed read/write API وUI create/edit/transitions موجودة للمهام الفعلية؛ الربط المباشر مع ContentItem/ArchiveAsset ما زال pending حتى تدخل هذه الموديلات للـ DB-backed runtime.
-- Operations/Content workflow models now have staged contracts only; runtime schema and repository cutover remain pending.
-- Smart Archive: `ArchiveCollection` و`ArchiveProject` DB-backed read/fallback؛ أما `ArchiveDriveLink`, `ArchiveAsset`, `ArchiveVideoFrame`, Google Drive sync, and AI analysis فباقية foundation/manual-first.
+- Operations/Content workflow models have staged contracts only; runtime schema and repository cutover remain pending.
+- Smart Archive: `ArchiveCollection` و`ArchiveProject` DB-backed read/fallback؛ `ArchiveDriveLink`, `ArchiveAsset`, و`ArchiveVideoFrame` لديهم staged contracts فقط، وGoogle Drive sync/AI analysis ما زالت foundation/manual-first.
 - Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ `BrandAsset` لديه staged schema + repository read fallback، لكن runtime schema الأساسي ما زال pending. `BrandFont` و`BrandMessageFramework` لديهما staged schema contracts فقط، والـ runtime cutover ما زال pending.
 - Shared AI Core جاهز للعقود والـ provider fallback؛ `AiOperationRun` لديه staged schema contract فقط، والـ runtime schema/repository persistence ما زال pending.
 - Connections UI يعرض المنصات الجديدة كعقود جاهزية، لكن sync/testing الحقيقي لهذه المنصات يجب أن يبقى `NOT_IMPLEMENTED` حتى تنفيذ provider clients بشكل آمن.
@@ -87,6 +88,7 @@
 
 - Google Drive metadata sync لا ينفذ external call في foundation mode؛ يحتاج provider-backed implementation لاحقًا.
 - Archive AI analysis draft-only ولا يعتمد أي أصل بدون human review.
+- ArchiveAsset preview/thumbnail policy needs a dedicated safety pass before runtime writes.
 - AI audit persistence يحتاج sanitization/retention policy قبل runtime write path حتى لا يحفظ أسرار أو بيانات حساسة.
 - DB-backed read modes تحتاج rows فعلية؛ إذا كانت collections فارغة سيظهر foundation fallback بشكل مقصود.
 - OperationTask quick edit يعمل فقط على rows فعلية؛ foundation generated tasks تبقى read-only.
@@ -104,6 +106,8 @@
 
 بعدها:
 
+- `Append ArchiveDriveLink runtime model` قبل أي sync فعلي.
+- `Append ArchiveAsset runtime model` بعد سياسة preview/sensitivity.
 - `Append BrandFont and MessageFramework runtime models` ثم cut over Typography/Frameworks read paths تدريجيًا.
 - `Append Operations content workflow runtime models` كشرائح صغيرة.
 - `Append AiOperationRun runtime model` بعد تثبيت sanitization/retention policy.
