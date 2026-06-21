@@ -112,7 +112,12 @@ export async function POST(request: NextRequest) {
   const actor = await requireActor();
   if (!actor) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401, headers: operationsNoStoreHeaders });
 
-  const result = await createOperationTaskInRepository(toMutationInput(parsed.data) as ReturnType<typeof toMutationInput> & { title: string }, actor.actorId);
+  const mutationInput = toMutationInput(parsed.data);
+  if (!mutationInput.title) {
+    return NextResponse.json({ ok: false, error: "Task title is required" }, { status: 400, headers: operationsNoStoreHeaders });
+  }
+
+  const result = await createOperationTaskInRepository({ ...mutationInput, title: mutationInput.title }, actor.actorId);
 
   if (result.ok && result.task) {
     await writeAuditLog({
