@@ -1,4 +1,5 @@
 import type { PlanningActionPriority, PlanningActionType } from "@/lib/operations/planning/planning-types";
+import type { OperationsPersistenceInfo } from "../persistence-types";
 
 export type OperationsTaskStatus = "PENDING" | "IN_PROGRESS" | "BLOCKED" | "DONE";
 
@@ -20,6 +21,7 @@ export type OperationsTask = {
 export type OperationsTaskOverview = {
   source: string;
   generatedAt: string;
+  persistence: OperationsPersistenceInfo;
   summary: {
     totalTasks: number;
     pending: number;

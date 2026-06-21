@@ -1,12 +1,14 @@
-import { generateTasks } from "./task-engine";
+import { listOperationTasks } from "../repository";
 import type { OperationsTaskOverview } from "./task-types";
 
-export function getTaskOverview(): OperationsTaskOverview {
-  const tasks = generateTasks();
+export async function getTaskOverview(): Promise<OperationsTaskOverview> {
+  const dataset = await listOperationTasks();
+  const tasks = dataset.items;
 
   return {
-    source: "task-engine-foundation",
+    source: "task-repository-foundation",
     generatedAt: new Date().toISOString(),
+    persistence: dataset.persistence,
     summary: {
       totalTasks: tasks.length,
       pending: tasks.filter((task) => task.status === "PENDING").length,
