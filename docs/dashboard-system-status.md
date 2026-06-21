@@ -18,14 +18,15 @@
 - Open PR audit documenting stale dashboard PRs that are already covered or superseded.
 - First dashboard Prisma models appended to `prisma/schema.prisma`.
 - Brand profiles/colors/guidelines cut over to DB-backed read with foundation fallback.
+- Archive collections/projects cut over to DB-backed read with foundation fallback.
 
 ## ما يتم تجهيزه في الحزمة الحالية
 
-- `ArchiveCollection` و`ArchiveProject` يقرآن الآن من repository DB-backed عند توفر `DATABASE_URL` وبيانات DB.
-- عند غياب قاعدة البيانات أو عدم وجود rows، يرجع Smart Archive تلقائيًا إلى foundation fallback.
-- جميع صفحات `/dashboard/archive` أصبحت تستخدم snapshot ديناميكي موحد.
-- Drive Links وArchive Assets وVideo Frames وArchive AI ما زالت foundation/manual-first.
-- لا يوجد Google Drive sync حقيقي، ولا AI client جديد، ولا external platform calls.
+- `OperationTask` يقرأ الآن من repository DB-backed عند توفر `DATABASE_URL` وبيانات DB.
+- عند غياب قاعدة البيانات أو عدم وجود rows، ترجع صفحة المهام وAPI إلى مهام محسوبة من Planning Engine كـ foundation fallback.
+- `/dashboard/operations/tasks` أصبح dynamic ويعرض مصدر التخزين بوضوح.
+- Task statuses توسعت لتشمل حالات التشغيل المتوقعة مثل `NEEDS_REVIEW`, `DELAYED`, `MISSED`, `CANCELLED`.
+- لا يوجد إرسال تلقائي، ولا نشر تلقائي، ولا تغيير Scheduler أو Donor Reactivation.
 
 ## المسارات الرئيسية
 
@@ -69,7 +70,8 @@
 
 ## ما بقي foundation
 
-- Operations datasets ما زالت foundation/repository-backed وليست DB-backed بالكامل، لكن عقود الموديلات أصبحت موثقة ومقروءة من النظام.
+- Operations Scheduler, Production, Content Items, and Content Workflow Tasks ما زالت foundation/repository-backed وليست DB-backed بالكامل.
+- Operations Tasks: `OperationTask` DB-backed read/fallback؛ أما create/update transitions فباقية pending حتى إضافة validation وAuditLog.
 - Smart Archive: `ArchiveCollection` و`ArchiveProject` DB-backed read/fallback؛ أما `ArchiveDriveLink`, `ArchiveAsset`, `ArchiveVideoFrame`, Google Drive sync, and AI analysis فباقية foundation/manual-first.
 - Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ أما `BrandAsset`, `BrandFont`, `BrandMessageFramework` فباقية foundation.
 - Shared AI Core جاهز للعقود والـ audit/fallback؛ الموديل المقترح للخطوة التالية: `AiOperationRun`.
@@ -79,16 +81,17 @@
 
 - Google Drive metadata sync لا ينفذ external call في foundation mode؛ يحتاج provider-backed implementation لاحقًا.
 - Archive AI analysis draft-only ولا يعتمد أي أصل بدون human review.
-- Archive DB reads تحتاج rows فعلية في `ArchiveCollection` قبل أن يظهر `db-backed`; وإلا سيظهر `foundation-fallback` بشكل مقصود.
+- DB-backed read modes تحتاج rows فعلية؛ إذا كانت collections فارغة سيظهر foundation fallback بشكل مقصود.
+- OperationTask writes لم تُفتح بعد حتى لا يتم إدخال transitions بدون AuditLog.
 - بعض staff users قد يحتاجون تحديث dashboardPermissions لإضافة `operations`, `archive`, أو `brand` بعد إدخال المفاتيح الجديدة.
 - Brand assets الرسمية ما زالت تحتاج رفع ملفات logo/certificate/template حقيقية قبل تفعيل downloads.
 - PRs القديمة #30, #37, #40, #43, #52, #54 لا يجب دمجها كما هي الآن؛ راجع `docs/dashboard-open-pr-audit.md`.
 
 ## Next recommended package
 
-`Cut over operation tasks to repository backed storage`
+`Add safe operation task mutations`
 
-الهدف: نقل `OperationTask` إلى repository DB-backed آمن مع validation وpermission guard، بدون إرسال تلقائي وبدون إعادة بناء Scheduler أو Donor Reactivation.
+الهدف: إضافة create/update actions لـ `OperationTask` مع zod validation وAuditLog، مع استمرار منع الإرسال التلقائي والنشر التلقائي.
 
 بعدها:
 
