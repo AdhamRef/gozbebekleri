@@ -21,15 +21,17 @@
 - Archive collections/projects cut over to DB-backed read with foundation fallback.
 - OperationTask cut over to DB-backed read/write API with computed foundation fallback.
 - `/dashboard/operations/tasks` now has DB-backed manual task creation, safe quick edit, and daily transition controls for real OperationTask rows.
+- `BrandAsset` staged contract added to `prisma/dashboard-foundation.schema.prisma` only.
 
 ## ما يتم تجهيزه في الحزمة الحالية
 
-- `BrandAsset` أصبح staged contract داخل `prisma/dashboard-foundation.schema.prisma` فقط.
-- لا يتم إدخال `BrandAsset` إلى `prisma/schema.prisma` الرئيسي في هذه الحزمة.
-- لا يوجد upload/download policy جديد، ولا يتم اعتبار أي asset قابلًا للتحميل أو معتمدًا تلقائيًا.
-- الهدف هو تثبيت حدود BrandAsset قبل runtime cutover: logos, icons, templates, certificates, watermarks, intro/outro فقط.
-- `ArchiveAsset` يبقى منفصلًا لصور وفيديوهات التوثيق الميداني والتقارير.
-- لا يوجد إرسال تلقائي، ولا نشر تلقائي، ولا Google Drive sync، ولا external AI call.
+- Brand Center assets are now sourced through the Brand repository snapshot instead of directly from foundation data.
+- The Brand repository can read `BrandAsset` from Prisma when the generated Prisma Client exposes the delegate.
+- If `BrandAsset` is missing from the generated client, empty, or unavailable, the UI falls back to foundation assets honestly.
+- `BrandAsset` is still not added to `prisma/schema.prisma` in this package.
+- No create/update/delete/upload/download behavior is added for BrandAsset.
+- `ArchiveAsset` remains separate for field photos, videos, reports, and documentation material.
+- No automatic sending, publishing, Google Drive sync, external AI call, or tracking runtime change.
 
 ## المسارات الرئيسية
 
@@ -76,7 +78,7 @@
 - Operations Scheduler, Production, Content Items, and Content Workflow Tasks ما زالت foundation/repository-backed وليست DB-backed بالكامل.
 - Operations Tasks: `OperationTask` DB-backed read/write API وUI create/edit/transitions موجودة للمهام الفعلية؛ الربط المباشر مع ContentItem/ArchiveAsset ما زال pending حتى تدخل هذه الموديلات للـ DB-backed runtime.
 - Smart Archive: `ArchiveCollection` و`ArchiveProject` DB-backed read/fallback؛ أما `ArchiveDriveLink`, `ArchiveAsset`, `ArchiveVideoFrame`, Google Drive sync, and AI analysis فباقية foundation/manual-first.
-- Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ أما `BrandAsset` فهو staged schema contract فقط، و`BrandFont`, `BrandMessageFramework` ما زالت foundation.
+- Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ `BrandAsset` لديه staged schema + repository read fallback، لكن runtime schema الأساسي ما زال pending. `BrandFont` و`BrandMessageFramework` ما زالت foundation.
 - Shared AI Core جاهز للعقود والـ audit/fallback؛ الموديل المقترح للخطوة التالية: `AiOperationRun`.
 - Connections UI يعرض المنصات الجديدة كعقود جاهزية، لكن sync/testing الحقيقي لهذه المنصات يجب أن يبقى `NOT_IMPLEMENTED` حتى تنفيذ provider clients بشكل آمن.
 
@@ -94,7 +96,7 @@
 
 `Append BrandAsset runtime model`
 
-الهدف: إدخال `BrandAsset` فقط إلى `prisma/schema.prisma` الرئيسي ثم إضافة repository read fallback محدود، مع manual URL records فقط وبدون upload policy واسع.
+الهدف: إدخال `BrandAsset` فقط إلى `prisma/schema.prisma` الرئيسي، ثم السماح للـ repository read fallback الحالي بقراءة manual URL records عند توفرها، بدون upload policy واسع.
 
 بعدها:
 
