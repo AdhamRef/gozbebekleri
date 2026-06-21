@@ -15,12 +15,14 @@
 - Smart Archive foundation: `/dashboard/archive` with Collections, Projects, Drive Links, Assets Review, Marketing Picks, Reports Archive, Archive AI, and no-store archive APIs.
 - Dashboard DB contract registry, status page, and read-only status API.
 - Provider catalog metadata for Google Drive, Google Picker, storage, video frame extraction, and OpenAI readiness.
+- Open PR audit documenting stale dashboard PRs that are already covered or superseded.
 
 ## ما تم تجهيزه في الحزمة الحالية
 
 - `/dashboard/marketing/connections` أصبح يعرف تصنيفات AI وArchive/Storage وInternal APIs داخل metadata والفلاتر.
 - readiness requirements أصبحت تقبل `OPENAI`, `GOOGLE_DRIVE`, `GOOGLE_PICKER`, `VIDEO_FRAME_EXTRACTOR`, `STORAGE_PROVIDER`, و`INTERNAL_API`.
 - تمت إضافة adapter واضح: `lib/marketing/integrations/provider-connection-adapter.ts` يربط provider catalog keys بـ `MarketingPlatformConnection.platform` وUI sections.
+- تم توثيق PRs القديمة المفتوحة في `docs/dashboard-open-pr-audit.md` حتى لا تُعامل كعمل ناقص.
 - لا يوجد Google Drive sync، ولا AI client جديد، ولا external platform calls.
 
 ## المسارات الرئيسية
@@ -78,8 +80,7 @@
 - Archive AI analysis draft-only ولا يعتمد أي أصل بدون human review.
 - بعض staff users قد يحتاجون تحديث dashboardPermissions لإضافة `operations`, `archive`, أو `brand` بعد إدخال المفاتيح الجديدة.
 - Brand assets الرسمية ما زالت تحتاج رفع ملفات logo/certificate/template حقيقية قبل تفعيل downloads.
-- PR #52 قديم وغير mergeable، ويبدو مكررًا/متجاوزًا جزئيًا بعد executive overview الأحدث.
-- PR #54 أصبح مرشحًا للإغلاق أو التفكيك بعد دخول provider catalog وconnections adapter في حزم أصغر.
+- PRs القديمة #30, #37, #40, #43, #52, #54 لا يجب دمجها كما هي الآن؛ راجع `docs/dashboard-open-pr-audit.md`.
 
 ## Next recommended package
 
