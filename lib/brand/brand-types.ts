@@ -126,7 +126,7 @@ export type BrandReadinessAlert = {
 
 export type BrandDownloadItem = {
   id: string;
-  title: BrandAssetType | "PROFILE";
+  title: string;
   type: BrandAssetType | "PROFILE";
   url: string | null;
   note: string;
