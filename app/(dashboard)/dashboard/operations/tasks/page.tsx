@@ -73,7 +73,7 @@ export default async function OperationsTasksPage() {
           <CardTitle className="flex items-center gap-2"><ListChecks className="h-5 w-5 text-[#025EB8]" /> قائمة مهام الإنتاج</CardTitle>
           <CardDescription>
             {isDbBacked
-              ? "تقرأ هذه الصفحة مهام OperationTask من قاعدة البيانات عبر repository آمن، بدون إرسال أو نشر تلقائي."
+              ? "تقرأ هذه الصفحة مهام OperationTask من قاعدة البيانات عبر repository آمن، ويدعم API إنشاء وتحديث المهام مع AuditLog."
               : "لا توجد مهام OperationTask جاهزة في قاعدة البيانات بعد؛ يتم استخدام مهام محسوبة من Planning Engine كـ foundation fallback."}
           </CardDescription>
         </CardHeader>
@@ -109,7 +109,7 @@ export default async function OperationsTasksPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-[#025EB8]" /> القادم</CardTitle>
           <CardDescription className="leading-6">
-            الخطوة التالية هي إضافة أفعال إنشاء وتحديث مهام آمنة مع validation وAuditLog، ثم ربطها بعناصر المحتوى والأرشيف بدون أي إرسال تلقائي.
+            الخطوة التالية هي إضافة أزرار UI للانتقالات اليومية مثل Start وReady for review وComplete وBlocked، مع نفس API الآمن الحالي وبدون أي إرسال تلقائي.
           </CardDescription>
         </CardHeader>
       </Card>
