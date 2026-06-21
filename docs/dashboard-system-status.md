@@ -14,12 +14,14 @@
 - Brand Center foundation: profiles, assets, colors, typography, voice rules, message frameworks, downloads, and safe Brand AI guard actions.
 - Smart Archive foundation: `/dashboard/archive` with Collections, Projects, Drive Links, Assets Review, Marketing Picks, Reports Archive, Archive AI, and no-store archive APIs.
 - Dashboard DB contract registry, status page, and read-only status API.
+- Provider catalog metadata for Google Drive, Google Picker, storage, video frame extraction, and OpenAI readiness.
 
 ## ما تم تجهيزه في الحزمة الحالية
 
-- Provider catalog أصبح يحتوي عقود `google_drive`, `google_picker`, `video_frame_extractor`, و`storage_provider`.
-- OpenAI provider contract أصبح مرتبطًا صراحةً بـ Shared AI Core وhuman approval.
-- تم توسيع provider types لـ Archive/Storage capabilities بدون بناء Google Drive sync أو AI client جديد.
+- `/dashboard/marketing/connections` أصبح يعرف تصنيفات AI وArchive/Storage وInternal APIs داخل metadata والفلاتر.
+- readiness requirements أصبحت تقبل `OPENAI`, `GOOGLE_DRIVE`, `GOOGLE_PICKER`, `VIDEO_FRAME_EXTRACTOR`, `STORAGE_PROVIDER`, و`INTERNAL_API`.
+- تمت إضافة adapter واضح: `lib/marketing/integrations/provider-connection-adapter.ts` يربط provider catalog keys بـ `MarketingPlatformConnection.platform` وUI sections.
+- لا يوجد Google Drive sync، ولا AI client جديد، ولا external platform calls.
 
 ## المسارات الرئيسية
 
@@ -30,6 +32,7 @@
 - `/dashboard/marketing/campaign-links/[id]`
 - `/dashboard/marketing/ai-assistant`
 - `/dashboard/marketing/tracking-hub`
+- `/dashboard/marketing/connections`
 - `/dashboard/conversion-events`
 - `/dashboard/conversion-events/timeline`
 - `/dashboard/conversion-events/retry-truth`
@@ -66,7 +69,7 @@
 - Smart Archive يستخدم foundation repository data؛ الموديلات الجاهزة للتحويل القادم: `ArchiveCollection`, `ArchiveProject`, `ArchiveDriveLink`, `ArchiveAsset`, `ArchiveVideoFrame`.
 - Brand Center يستخدم foundation repository data؛ الموديلات الجاهزة للتحويل القادم: `BrandProfile`, `BrandAsset`, `BrandColor`, `BrandFont`, `BrandGuideline`, `BrandMessageFramework`.
 - Shared AI Core جاهز للعقود والـ audit/fallback؛ الموديل المقترح للخطوة التالية: `AiOperationRun`.
-- Provider catalog أصبح يحتوي العقود الناقصة، لكن Connections UI يحتاج لاحقًا adapter أوسع لعرض Archive/Storage/AI provider readiness بشكل كامل.
+- Connections UI يعرض المنصات الجديدة كعقود جاهزية، لكن sync/testing الحقيقي لهذه المنصات يجب أن يبقى `NOT_IMPLEMENTED` حتى تنفيذ provider clients بشكل آمن.
 
 ## Known risks
 
@@ -76,17 +79,13 @@
 - بعض staff users قد يحتاجون تحديث dashboardPermissions لإضافة `operations`, `archive`, أو `brand` بعد إدخال المفاتيح الجديدة.
 - Brand assets الرسمية ما زالت تحتاج رفع ملفات logo/certificate/template حقيقية قبل تفعيل downloads.
 - PR #52 قديم وغير mergeable، ويبدو مكررًا/متجاوزًا جزئيًا بعد executive overview الأحدث.
-- PR #54 أصبح مرشحًا للإغلاق أو التفكيك بعد هذه الحزمة، لأنه لم يعد المصدر الوحيد لعقود Archive/AI providers.
+- PR #54 أصبح مرشحًا للإغلاق أو التفكيك بعد دخول provider catalog وconnections adapter في حزم أصغر.
 
 ## Next recommended package
 
-`Connections UI Adapter and Readiness Alignment`
-
-الهدف: جعل `/dashboard/marketing/connections` يعرض AI وArchive/Storage provider readiness من provider catalog بوضوح، مع masking للأسرار وبدون تنفيذ أي sync خارجي.
-
-بعدها تأتي:
-
 `Prisma Model Migration and Repository Cutover`
+
+الهدف: إدخال أول شريحة صغيرة من الموديلات في Prisma، تشغيل `prisma generate` وbuild، ثم نقل repository واحد في كل مرة من foundation data إلى DB-backed data.
 
 الشريحة الأولى المقترحة:
 
