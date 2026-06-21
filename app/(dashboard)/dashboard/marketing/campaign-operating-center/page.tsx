@@ -65,6 +65,10 @@ function linkHealth(row: PerformanceRow) {
   return Math.min(100, score);
 }
 
+function detailHref(id: string) {
+  return `/dashboard/marketing/campaign-links/${encodeURIComponent(id)}?days=30#performance`;
+}
+
 async function getCampaignOperatingData(): Promise<PerformanceResponse> {
   const base = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "";
   const url = `${base}/api/admin/marketing-intelligence/campaign-links/performance?days=30&limit=100&status=ACTIVE`;
@@ -96,7 +100,7 @@ export default async function CampaignOperatingCenterPage() {
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href="/dashboard/link-generator" className="rounded-md bg-white px-3 py-2 text-sm font-bold text-[#025EB8] hover:bg-white/90">إنشاء رابط حملة</Link>
-          <Link href="/dashboard/marketing-intelligence/campaign-links" className="rounded-md border border-white/30 px-3 py-2 text-sm font-bold text-white hover:bg-white/10">إدارة الروابط</Link>
+          <Link href="/dashboard/marketing/campaign-links" className="rounded-md border border-white/30 px-3 py-2 text-sm font-bold text-white hover:bg-white/10">إدارة الروابط</Link>
         </div>
       </div>
 
@@ -139,6 +143,7 @@ export default async function CampaignOperatingCenterPage() {
                   <Badge variant="outline">{row.platform ?? "UNKNOWN"}</Badge>
                   <Badge variant="outline">Revenue {money(row.performance.revenue)}</Badge>
                 </div>
+                <Link href={detailHref(row.id)} className="mt-3 inline-flex rounded-md border px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">فتح تفاصيل الأداء</Link>
               </div>
             )) : <Empty text="لا توجد إجراءات عاجلة على روابط الحملات." />}
           </CardContent>
@@ -153,7 +158,7 @@ function SummaryCard({ title, value, icon }: { title: string; value: string | nu
 }
 
 function LinkCard({ row }: { row: PerformanceRow }) {
-  return <div className="rounded-2xl border bg-white p-4 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-black text-slate-900">{row.name}</h2><Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">Health {linkHealth(row)}%</Badge></div><p className="mt-2 text-sm text-slate-600">{row.platform ?? "UNKNOWN"} · {row.channel ?? "—"}</p><div className="mt-3 flex flex-wrap gap-2"><Badge variant="secondary">{row.performance.donations} تبرعات</Badge><Badge variant="secondary">{money(row.performance.revenue)}</Badge><Badge variant="outline">Strong {row.performance.matchQuality.strong}</Badge></div></div>;
+  return <div className="rounded-2xl border bg-white p-4 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-black text-slate-900">{row.name}</h2><Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">Health {linkHealth(row)}%</Badge></div><p className="mt-2 text-sm text-slate-600">{row.platform ?? "UNKNOWN"} · {row.channel ?? "—"}</p><div className="mt-3 flex flex-wrap gap-2"><Badge variant="secondary">{row.performance.donations} تبرعات</Badge><Badge variant="secondary">{money(row.performance.revenue)}</Badge><Badge variant="outline">Strong {row.performance.matchQuality.strong}</Badge></div><Link href={detailHref(row.id)} className="mt-3 inline-flex rounded-md border px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">تفاصيل الأداء</Link></div>;
 }
 
 function Empty({ text }: { text: string }) {

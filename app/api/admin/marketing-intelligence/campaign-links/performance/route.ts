@@ -38,6 +38,14 @@ type CampaignLink = {
   updatedAt?: Date | string;
 };
 
+type ConversionEventLike = {
+  donationId?: string;
+  platform?: string;
+  channel?: string;
+  eventName?: string;
+  status?: string;
+};
+
 type CampaignAction = {
   id: string;
   priority: ActionPriority;
@@ -57,6 +65,18 @@ function dateKey(date: Date) { return date.toISOString().slice(0, 10); }
 function objectIdString(value: unknown) { if (typeof value === "string") return value; if (isMap(value) && typeof value.$oid === "string") return value.$oid; if (isMap(value) && typeof value.oid === "string") return value.oid; return null; }
 function linkId(link: CampaignLink, index: number) { return objectIdString(link._id) || `${link.platform || "UNKNOWN"}:${link.campaignId || link.utmCampaign || link.url || index}`; }
 function linkStatus(link: CampaignLink) { const status = typeof link.status === "string" ? link.status.toUpperCase() : "ACTIVE"; if (status === "ARCHIVED" || status === "DELETED") return status; return "ACTIVE"; }
+function hasClickId(attribution: unknown) {
+  return Boolean(
+    attrString(attribution, "fbclid") ||
+    attrString(attribution, "fbc") ||
+    attrString(attribution, "fbp") ||
+    attrString(attribution, "gclid") ||
+    attrString(attribution, "gbraid") ||
+    attrString(attribution, "wbraid") ||
+    attrString(attribution, "ttclid") ||
+    attrString(attribution, "twclid")
+  );
+}
 
 function scoreMatch(link: CampaignLink, attribution: unknown) {
   let score = 0;
@@ -99,6 +119,66 @@ function missingIdentifiersFor(link: CampaignLink) {
 
 function hasCampaignOrAdIdentifiers(link: CampaignLink) {
   return Boolean(link.utmCampaign || link.utmId || link.campaignId || link.adsetId || link.adGroupId || link.adId);
+}
+
+function emptyTruthBucket() { return { sent: 0, failed: 0, skipped: 0, pending: 0, total: 0 }; }
+function countStatus(bucket: ReturnType<typeof emptyTruthBucket>, status?: string) {
+  bucket.total += 1;
+  if (status === "SENT") bucket.sent += 1;
+  else if (status === "FAILED") bucket.failed += 1;
+  else if (status === "SKIPPED") bucket.skipped += 1;
+  else bucket.pending += 1;
+}
+
+function buildTrackingTruth(args: {
+  link: CampaignLink;
+  donations: string[];
+  clickIdDonations: string[];
+  eventsByDonationId: Map<string, ConversionEventLike[]>;
+  strongMatches: number;
+}) {
+  const matchedDonations = [...new Set(args.donations)];
+  const clickIdDonations = [...new Set(args.clickIdDonations)];
+  const truth = {
+    totalMatchedDonations: matchedDonations.length,
+    donationsWithConversionEvent: 0,
+    clickIdDonations: clickIdDonations.length,
+    platformConversionsSent: 0,
+    sampleDonationIds: matchedDonations.slice(0, 5),
+    meta: { server: emptyTruthBucket(), browser: emptyTruthBucket() },
+    ga4: emptyTruthBucket(),
+    googleAds: { server: emptyTruthBucket(), browser: emptyTruthBucket() },
+    tiktok: { server: emptyTruthBucket(), browser: emptyTruthBucket() },
+    x: { browser: emptyTruthBucket() },
+    warnings: [] as string[],
+  };
+  const donationsWithEvents = new Set<string>();
+
+  for (const donationId of matchedDonations) {
+    const events = args.eventsByDonationId.get(donationId) ?? [];
+    if (events.length > 0) donationsWithEvents.add(donationId);
+    for (const event of events) {
+      const platform = (event.platform || "").toUpperCase();
+      const channel = (event.channel || "").toLowerCase();
+      if (event.status === "SENT") truth.platformConversionsSent += 1;
+      if (platform === "META" && channel === "server") countStatus(truth.meta.server, event.status);
+      else if (platform === "META" && channel === "browser") countStatus(truth.meta.browser, event.status);
+      else if (platform === "GA4") countStatus(truth.ga4, event.status);
+      else if (platform === "GOOGLE_ADS" && channel === "server") countStatus(truth.googleAds.server, event.status);
+      else if (platform === "GOOGLE_ADS" && channel === "browser") countStatus(truth.googleAds.browser, event.status);
+      else if (platform === "TIKTOK" && channel === "server") countStatus(truth.tiktok.server, event.status);
+      else if (platform === "TIKTOK" && channel === "browser") countStatus(truth.tiktok.browser, event.status);
+      else if (platform === "X" && channel === "browser") countStatus(truth.x.browser, event.status);
+    }
+  }
+
+  truth.donationsWithConversionEvent = donationsWithEvents.size;
+  if (matchedDonations.length > 0 && truth.meta.server.sent === 0) truth.warnings.push("الرابط جلب تبرعات لكن Meta server ناقص");
+  if (matchedDonations.length > 0 && truth.meta.browser.skipped > 0) truth.warnings.push("الرابط جلب تبرعات لكن browser skipped");
+  if (args.strongMatches > 0 && truth.ga4.sent === 0) truth.warnings.push("الرابط قوي لكن GA4 purchase ناقص");
+  if (clickIdDonations.length > 0 && truth.platformConversionsSent === 0) truth.warnings.push("الرابط فيه click IDs لكن لا توجد platform conversions");
+  if (!args.link.campaignId && !args.link.utmCampaign && !args.link.utmId) truth.warnings.push("الرابط بدون campaign identifiers");
+  return truth;
 }
 
 function buildActionQueue(args: {
@@ -225,6 +305,19 @@ async function getCampaignLinks(limit: number, platform?: string | null, status:
   return rows.filter(isMap) as CampaignLink[];
 }
 
+async function getConversionEventsForDonations(donationIds: string[]): Promise<ConversionEventLike[]> {
+  const ids = [...new Set(donationIds)].filter(Boolean);
+  if (ids.length === 0) return [];
+  const result = await prisma.$runCommandRaw(rawCommand({
+    find: "ConversionEvent",
+    filter: { donationId: { $in: ids } },
+    projection: { donationId: 1, platform: 1, channel: 1, eventName: 1, status: 1 },
+    limit: Math.min(5000, Math.max(100, ids.length * 12)),
+  })) as JsonMap;
+  const rows = isMap(result.cursor) && Array.isArray(result.cursor.firstBatch) ? result.cursor.firstBatch : [];
+  return rows.filter(isMap) as ConversionEventLike[];
+}
+
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   const denied = requireAdminOrDashboardPermission(session, "ads");
@@ -244,7 +337,7 @@ export async function GET(request: NextRequest) {
     getCampaignLinks(limit, platform, status),
     prisma.donation.findMany({ where: { createdAt: { gte: from, lte: to }, ...PAID_DONATION_FILTER }, select: { id: true, amount: true, amountUSD: true, currency: true, createdAt: true, paidAt: true, conversionEventsSentAt: true, attribution: true }, orderBy: { createdAt: "desc" }, take: 5000 }),
   ]);
-  const rows = links.map((link, index) => {
+  const rowDrafts = links.map((link, index) => {
     const id = linkId(link, index);
     let donationsCount = 0;
     let revenue = 0;
@@ -254,6 +347,8 @@ export async function GET(request: NextRequest) {
     let matchedDonationsMissingConversions = 0;
     const matchReasons = new Map<string, number>();
     const sampleDonations: Array<{ id: string; revenue: number; score: number; quality: string; reasons: string[]; createdAt: string; conversionEventsSentAt: string | null }> = [];
+    const matchedDonationIds: string[] = [];
+    const clickIdDonationIds: string[] = [];
     if (linkStatus(link) !== "DELETED") {
       for (const donation of donations) {
         const match = scoreMatch(link, donation.attribution);
@@ -261,6 +356,8 @@ export async function GET(request: NextRequest) {
         const value = donationRowUsdApprox(donation);
         donationsCount += 1;
         revenue += value;
+        matchedDonationIds.push(donation.id);
+        if (hasClickId(donation.attribution)) clickIdDonationIds.push(donation.id);
         const quality = qualityFromScore(match.score);
         if (quality === "strong") strongMatches += 1;
         else if (quality === "medium") mediumMatches += 1;
@@ -283,7 +380,18 @@ export async function GET(request: NextRequest) {
       saveCount: typeof link.saveCount === "number" ? link.saveCount : 0,
       createdAt: link.createdAt || null,
       updatedAt: link.updatedAt || null,
-      identifiers: { utmCampaign: link.utmCampaign || null, utmId: link.utmId || null, campaignId: link.campaignId || null, adsetId: link.adsetId || link.adGroupId || null, adId: link.adId || null, targetCountry: link.targetCountry || null },
+      identifiers: {
+        utmSource: link.utmSource || null,
+        utmMedium: link.utmMedium || null,
+        utmCampaign: link.utmCampaign || null,
+        utmId: link.utmId || null,
+        utmContent: link.utmContent || null,
+        campaignId: link.campaignId || null,
+        adsetId: link.adsetId || null,
+        adGroupId: link.adGroupId || null,
+        adId: link.adId || null,
+        targetCountry: link.targetCountry || null,
+      },
       metadata: { objective: link.objective || null, audienceSegment: link.audienceSegment || null, messageVariant: link.messageVariant || null, internalNotes: link.internalNotes || null },
       recommendation,
       performance: { donations: donationsCount, revenue, averageDonation: donationsCount > 0 ? revenue / donationsCount : 0, matchQuality: { strong: strongMatches, medium: mediumMatches, weak: weakMatches }, matchReasons: Object.fromEntries([...matchReasons.entries()].sort((a, b) => b[1] - a[1])) },
@@ -293,8 +401,27 @@ export async function GET(request: NextRequest) {
         actionQueue: buildActionQueue({ link, linkId: id, status: currentStatus, donations: donationsCount, revenue, strong: strongMatches, medium: mediumMatches, weak: weakMatches, missingIdentifiers, matchedDonationsMissingConversions }),
       },
       samples: sampleDonations,
+      _link: link,
+      _matchedDonationIds: matchedDonationIds,
+      _clickIdDonationIds: clickIdDonationIds,
     };
-  }).sort((a, b) => b.performance.revenue - a.performance.revenue);
+  });
+  const conversionEvents = await getConversionEventsForDonations(rowDrafts.flatMap((row) => row._matchedDonationIds));
+  const eventsByDonationId = new Map<string, ConversionEventLike[]>();
+  for (const event of conversionEvents) {
+    if (!event.donationId) continue;
+    eventsByDonationId.set(event.donationId, [...(eventsByDonationId.get(event.donationId) ?? []), event]);
+  }
+  const rows = rowDrafts.map(({ _link, _matchedDonationIds, _clickIdDonationIds, ...row }) => ({
+    ...row,
+    trackingTruth: buildTrackingTruth({
+      link: _link,
+      donations: _matchedDonationIds,
+      clickIdDonations: _clickIdDonationIds,
+      eventsByDonationId,
+      strongMatches: row.performance.matchQuality.strong,
+    }),
+  })).sort((a, b) => b.performance.revenue - a.performance.revenue);
   const visibleRows = requestedId ? rows.filter((row) => row.id === requestedId || encodeURIComponent(row.id) === requestedId) : rows;
   return NextResponse.json({ ok: true, range: { from: dateKey(from), to: dateKey(to), days, dateBasis: "createdAt" }, status, links: visibleRows, summary: { links: visibleRows.length, activeLinks: visibleRows.filter((row) => row.status === "ACTIVE").length, archivedLinks: visibleRows.filter((row) => row.status === "ARCHIVED").length, deletedLinks: visibleRows.filter((row) => row.status === "DELETED").length, linksWithDonations: visibleRows.filter((row) => row.performance.donations > 0).length, donationsConsidered: donations.length, revenueMatched: visibleRows.reduce((sum, row) => sum + row.performance.revenue, 0), linksWithMissingConversions: visibleRows.filter((row) => row.intelligence.conversionGaps.matchedDonationsMissingConversions > 0).length, highPriorityActions: visibleRows.reduce((sum, row) => sum + row.intelligence.actionQueue.filter((item) => item.priority === "HIGH").length, 0) } }, { headers: { "Cache-Control": "no-store" } });
 }
