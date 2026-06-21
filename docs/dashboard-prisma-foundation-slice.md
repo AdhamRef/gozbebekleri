@@ -23,14 +23,15 @@
 - تم قطع `BrandProfile`, `BrandColor`, `BrandGuideline` إلى قراءة DB-backed مع fallback foundation.
 - تم قطع `ArchiveCollection` و`ArchiveProject` إلى قراءة DB-backed مع fallback foundation.
 - تم قطع `OperationTask` إلى قراءة DB-backed مع fallback محسوب من Planning Engine.
-- يتم في هذه الحزمة إضافة create/update API آمن لـ `OperationTask` مع zod validation وAuditLog.
+- تم إضافة create/update API آمن لـ `OperationTask` مع zod validation وAuditLog.
+- تم فتح UI transition controls للمهام الفعلية في `/dashboard/operations/tasks` باستخدام PATCH الحالي.
 
 لم يتم في هذه المرحلة:
 
 - تحويل أفعال الأرشيف إلى DB writes.
 - تشغيل Google Drive sync حقيقي.
 - نقل `ArchiveAsset` أو `ArchiveDriveLink` إلى DB-backed runtime.
-- إضافة UI transition buttons للمهام.
+- إضافة إنشاء/تحرير كامل للمهام من الواجهة.
 - تشغيل أي إرسال أو نشر تلقائي.
 - تغيير payment أو tracking runtime.
 
@@ -82,7 +83,7 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 | `BrandGuideline` | DB-backed read + foundation fallback | Voice/copy rules can read DB guidelines. |
 | `ArchiveCollection` | DB-backed read + foundation fallback | Smart Archive pages read collections through archive repository. |
 | `ArchiveProject` | DB-backed read + foundation fallback | Smart Archive pages read projects through archive repository. |
-| `OperationTask` | DB-backed read/write API + computed foundation fallback | Tasks page/API can read Prisma tasks and API can create/update validated tasks when DB is available. |
+| `OperationTask` | DB-backed read/write API + UI transitions + computed foundation fallback | Tasks page/API can read Prisma tasks, update daily statuses, and fail safely when DB rows are not available. |
 
 ## ما لا يوجد في هذه الشريحة
 
@@ -101,17 +102,19 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 - BrandAsset يبقى منفصل عن ArchiveAsset.
 - Archive Drive links/assets/video frames/AI remain foundation/manual-first.
 - OperationTask writes require operations permission, zod validation, DB availability, and AuditLog.
+- OperationTask transition buttons are disabled for generated foundation tasks.
 
 ## cutover المقترح التالي
 
 العنوان المقترح:
 
-`Add operation task transition controls`
+`Add operation task creation and edit forms`
 
 العمل:
 
-- إضافة UI buttons للحالات اليومية: Start, Ready for review, Complete, Blocked.
-- استخدام PATCH الحالي بدل بناء endpoint جديد.
+- إضافة نموذج إنشاء مهمة تشغيل.
+- إضافة تعديل محدود للعنوان، المسؤول، الأولوية، الموعد، والملاحظات.
+- ربط المهام تدريجيًا بعناصر المحتوى والأرشيف عند توفر IDs حقيقية.
 - إبقاء Scheduler وDonor Reactivation manual-first.
 - عدم إضافة إرسال تلقائي.
 
