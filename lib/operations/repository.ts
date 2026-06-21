@@ -5,7 +5,7 @@ import { productionItems } from "./production/production-data";
 import type { ProductionItem } from "./production/production-types";
 import { scheduledContentItems } from "./scheduler/scheduler-data";
 import type { ScheduledContentItem } from "./scheduler/scheduler-types";
-import { generateTasks } from "./tasks/task-engine";
+import { listOperationTasksFromRepository } from "./tasks/task-repository";
 import type { OperationsTask } from "./tasks/task-types";
 import type { OperationsPersistenceInfo, OperationsRepositoryResult } from "./persistence-types";
 import type { OperationsContentItem, OperationsContentTask, OperationsOverview } from "./types";
@@ -62,11 +62,7 @@ export async function listContentWorkflowTasks(): Promise<OperationsRepositoryRe
 }
 
 export async function listOperationTasks(): Promise<OperationsRepositoryResult<OperationsTask>> {
-  return fromFoundation(generateTasks(), "OperationsTask", "OperationTask", {
-    storage: "computed-engine",
-    readyForDb: false,
-    note: "Tasks are generated from the Planning Engine through the repository contract. Persist them as OperationTask once task ownership and transitions are finalized.",
-  });
+  return listOperationTasksFromRepository();
 }
 
 export async function getContentOperationsOverview(): Promise<OperationsOverview> {

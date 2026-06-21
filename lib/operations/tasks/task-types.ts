@@ -1,7 +1,15 @@
 import type { PlanningActionPriority, PlanningActionType } from "@/lib/operations/planning/planning-types";
 import type { OperationsPersistenceInfo } from "../persistence-types";
 
-export type OperationsTaskStatus = "PENDING" | "IN_PROGRESS" | "BLOCKED" | "DONE";
+export type OperationsTaskStatus =
+  | "PENDING"
+  | "IN_PROGRESS"
+  | "NEEDS_REVIEW"
+  | "DONE"
+  | "MISSED"
+  | "DELAYED"
+  | "CANCELLED"
+  | "BLOCKED";
 
 export type OperationsTask = {
   id: string;
