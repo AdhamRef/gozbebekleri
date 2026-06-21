@@ -14,6 +14,13 @@
 - Brand Center foundation: profiles, assets, colors, typography, voice rules, message frameworks, downloads, and safe Brand AI guard actions.
 - Smart Archive foundation: `/dashboard/archive` with Collections, Projects, Drive Links, Assets Review, Marketing Picks, Reports Archive, Archive AI, and no-store archive APIs.
 
+## ما تم تجهيزه في الحزمة الحالية
+
+- Dashboard DB contract registry في `lib/dashboard/db-contracts.ts`.
+- صفحة حالة داخل الداشبورد: `/dashboard/operations/system/db-contracts`.
+- API قراءة فقط: `/api/admin/dashboard-system/db-contracts` مع `no-store` وصلاحية `operations`.
+- توثيق مستقل: `docs/dashboard-db-contracts.md`.
+
 ## المسارات الرئيسية
 
 - `/dashboard/system-overview`
@@ -33,6 +40,7 @@
 - `/dashboard/operations/archive`
 - `/dashboard/operations/tasks`
 - `/dashboard/operations/system`
+- `/dashboard/operations/system/db-contracts`
 - `/dashboard/operations/ai-assistant`
 - `/dashboard/operations/archive/ai-assistant`
 - `/dashboard/archive`
@@ -54,14 +62,15 @@
 
 ## ما بقي foundation
 
-- Operations datasets ما زالت foundation/repository-backed وليست DB-backed بالكامل.
-- Smart Archive يستخدم foundation repository data؛ الموديلات المقترحة للتحويل القادم: `ArchiveCollection`, `ArchiveProject`, `ArchiveDriveLink`, `ArchiveAsset`, `ArchiveVideoFrame`.
-- Brand Center يستخدم model contracts وfoundation repository data؛ الموديلات المقترحة للتحويل القادم: `BrandProfile`, `BrandAsset`, `BrandColor`, `BrandFont`, `BrandGuideline`, `BrandMessageFramework`.
-- AI Core جاهز للعقود والـ audit/fallback، لكن tools التنفيذية ما زالت تحتاج تنفيذ read-only أو write-proposed لاحقًا.
+- Operations datasets ما زالت foundation/repository-backed وليست DB-backed بالكامل، لكن عقود الموديلات أصبحت موثقة ومقروءة من النظام.
+- Smart Archive يستخدم foundation repository data؛ الموديلات الجاهزة للتحويل القادم: `ArchiveCollection`, `ArchiveProject`, `ArchiveDriveLink`, `ArchiveAsset`, `ArchiveVideoFrame`.
+- Brand Center يستخدم foundation repository data؛ الموديلات الجاهزة للتحويل القادم: `BrandProfile`, `BrandAsset`, `BrandColor`, `BrandFont`, `BrandGuideline`, `BrandMessageFramework`.
+- Shared AI Core جاهز للعقود والـ audit/fallback؛ الموديل المقترح للخطوة التالية: `AiOperationRun`.
 - Provider catalog القديم #54 ما زال PR منفصلًا ويحتاج مراجعة قبل الدمج أو الإغلاق.
 
 ## Known risks
 
+- Prisma schema لم يتم تغييره في هذه الحزمة؛ هذا مقصود لتجنب migration كبيرة قبل تثبيت العقود.
 - Google Drive metadata sync لا ينفذ external call في foundation mode؛ يحتاج provider-backed implementation لاحقًا.
 - Archive AI analysis draft-only ولا يعتمد أي أصل بدون human review.
 - بعض staff users قد يحتاجون تحديث dashboardPermissions لإضافة `operations`, `archive`, أو `brand` بعد إدخال المفاتيح الجديدة.
@@ -71,6 +80,15 @@
 
 ## Next recommended package
 
-`Operations DB Contracts Small Migration`
+`Prisma Model Migration and Repository Cutover`
 
-الهدف: تحويل foundation contracts الأكثر استقرارًا إلى Prisma models صغيرة وآمنة بدون migration كبيرة أو تغيير في payment/tracking runtime.
+الهدف: إدخال أول شريحة صغيرة من الموديلات في Prisma، تشغيل `prisma generate` وbuild، ثم نقل repository واحد في كل مرة من foundation data إلى DB-backed data.
+
+الشريحة الأولى المقترحة:
+
+- `BrandProfile`
+- `BrandColor`
+- `BrandGuideline`
+- `ArchiveCollection`
+- `ArchiveProject`
+- `OperationTask`
