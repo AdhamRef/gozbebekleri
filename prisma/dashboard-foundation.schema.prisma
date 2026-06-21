@@ -49,6 +49,30 @@ model BrandProfile {
   @@index([status])
 }
 
+model BrandAsset {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  profileId    String   @db.ObjectId
+  title        String
+  type         String
+  format       String
+  fileUrl      String?
+  previewUrl   String?
+  usage        String
+  locale       String   @default("all")
+  notes        String?
+  downloadable Boolean  @default(false)
+  status       String   @default("TO_VERIFY")
+  createdBy    String?  @db.ObjectId
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([profileId])
+  @@index([type])
+  @@index([format])
+  @@index([downloadable])
+  @@index([status])
+}
+
 model BrandColor {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   profileId   String   @db.ObjectId
