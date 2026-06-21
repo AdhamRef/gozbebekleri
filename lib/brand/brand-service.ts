@@ -197,7 +197,11 @@ export async function getBrandCenterSnapshot(profileId?: string | null): Promise
   return buildBrandCenterSnapshot(await getBrandRepositorySnapshot(), profileId);
 }
 
-export async function getBrandCenterOverview() {
+export function getBrandCenterOverview() {
+  return getBrandCenterFoundationSnapshot();
+}
+
+export async function getBrandCenterOverviewDbBacked() {
   return getBrandCenterSnapshot();
 }
 
