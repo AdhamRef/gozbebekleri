@@ -5,6 +5,7 @@ export type ProviderCategory =
   | "MESSAGING_PROVIDER"
   | "EMAIL_PROVIDER"
   | "AI_PROVIDER"
+  | "ARCHIVE_STORAGE_PROVIDER"
   | "INTERNAL_API";
 
 export type ProviderCapability =
@@ -17,12 +18,25 @@ export type ProviderCapability =
   | "EMAIL_DELIVERY"
   | "AI_COMPLETION"
   | "AI_ANALYSIS"
+  | "DRIVE_FILE_ACCESS"
+  | "DRIVE_FILE_PICKER"
+  | "ASSET_STORAGE"
+  | "VIDEO_FRAME_EXTRACTION"
+  | "FILE_UPLOAD"
+  | "FILE_DOWNLOAD"
   | "WEBHOOKS"
   | "INTERNAL_EVENTS";
 
 export type ProviderEnvironment = "SERVER" | "BROWSER" | "BOTH";
 
-export type ProviderReadinessLayer = "BROWSER" | "SERVER" | "REPORTING";
+export type ProviderReadinessLayer =
+  | "BROWSER"
+  | "SERVER"
+  | "REPORTING"
+  | "OAUTH"
+  | "STORAGE"
+  | "AI_CORE"
+  | "ARCHIVE";
 
 export type ProviderImplementationStatus = "PLANNED" | "PARTIAL" | "READY";
 
@@ -35,6 +49,10 @@ export type ProviderKey =
   | "twilio"
   | "netgsm"
   | "openai"
+  | "google_drive"
+  | "google_picker"
+  | "video_frame_extractor"
+  | "storage_provider"
   | "email"
   | "whatsapp"
   | "internal_webhooks";
