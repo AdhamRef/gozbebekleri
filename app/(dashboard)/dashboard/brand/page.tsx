@@ -5,6 +5,7 @@ export const metadata = {
   title: "Brand Center | لوحة التحكم",
 };
 
-export default function BrandPage() {
-  return <BrandCenterView activeTab="overview" snapshot={getBrandCenterSnapshot()} />;
+export default async function BrandPage() {
+  const snapshot = await getBrandCenterSnapshot();
+  return <BrandCenterView activeTab="overview" snapshot={snapshot} />;
 }
