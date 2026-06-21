@@ -12,6 +12,22 @@
 
 وهي مقصودة كـ reviewable schema artifact قبل تشغيل cutover فعلي.
 
+## التحقق
+
+تمت إضافة أمر واضح للتحقق من الشريحة المستقلة بدون لمس `prisma/schema.prisma` الأساسي:
+
+```bash
+npm run dashboard:schema:validate
+```
+
+الأمر يشغل:
+
+```bash
+prisma validate --schema prisma/dashboard-foundation.schema.prisma
+```
+
+استخدم هذا الأمر قبل PR إدخال الموديلات في الـ schema الرئيسي، وبعد أي تعديل على الشريحة.
+
 ## لماذا لم يتم قطع كل repositories مباشرة؟
 
 لأن النظام الحالي يعمل على foundation repositories وواجهات مستقرة. إدخال كل موديلات Operations/Archive/Brand دفعة واحدة يزيد خطر كسر build أو توليد Prisma Client غير مستخدم بعد.
@@ -19,10 +35,11 @@
 المسار الآمن:
 
 1. Stage schema slice.
-2. Append slice to primary `prisma/schema.prisma` في PR مستقل.
-3. تشغيل `npx prisma generate` و`npm run build`.
-4. نقل repository واحد فقط إلى DB-backed mode.
-5. إبقاء fallback foundation عند غياب `DATABASE_URL` أو فشل القراءة.
+2. Validate staged slice with `npm run dashboard:schema:validate`.
+3. Append slice to primary `prisma/schema.prisma` في PR مستقل.
+4. تشغيل `npx prisma generate` و`npm run build`.
+5. نقل repository واحد فقط إلى DB-backed mode.
+6. إبقاء fallback foundation عند غياب `DATABASE_URL` أو فشل القراءة.
 
 ## الموديلات في الشريحة الأولى
 
@@ -59,6 +76,7 @@
 
 العمل:
 
+- تشغيل `npm run dashboard:schema:validate` على الشريحة المستقلة.
 - نسخ الموديلات الستة من `prisma/dashboard-foundation.schema.prisma` إلى `prisma/schema.prisma` الأساسي.
 - تشغيل Prisma generate/build.
 - عدم تغيير أي runtime service.
