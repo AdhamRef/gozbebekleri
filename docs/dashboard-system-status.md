@@ -29,16 +29,17 @@
 - Archive Asset `Assign Task` creates a real `OperationTask` through the Operations task repository when DB is available, with AuditLog on success.
 - Archive Collections and Projects APIs create real runtime rows through Prisma-backed repository services.
 - Archive Drive Links POST persists link metadata as DB-backed `AuditLog` records with `entityType = ArchiveDriveLink`, and GET reads persisted link metadata through the archive repository snapshot until a runtime delegate exists.
+- Archive Asset review actions persist approval/rejection state as DB-backed `AuditLog` records with `entityType = ArchiveAsset`, and list/detail APIs read the saved state through the archive repository snapshot.
 
 ## ما يتم تجهيزه في الحزمة الحالية
 
-- Archive Asset review actions now persist review state as DB-backed `AuditLog` records with `entityType = ArchiveAsset`.
-- Assets list and detail APIs read the DB-backed archive snapshot, so saved approval/rejection state survives refresh and redeploy.
-- Supported review actions: approve for marketing, approve for documentation, and reject.
-- Every saved review marks `externalCall: false`, `humanApproved: true`, and `aiApproved: false`.
-- Documentation approval does not automatically approve marketing use; marketing use remains a separate human decision.
-- This does not call Google Drive, does not download files, does not run AI analysis, and does not auto-approve assets.
-- No payment changes, tracking runtime changes, external platform calls, or frontend secrets.
+- Archive Asset `Create Content Item` now saves a real audit-backed ContentItem proposal instead of returning a throwaway foundation object.
+- Operations content repository reads saved ContentItem proposals from AuditLog and shows them in `/dashboard/operations/content` and the operations overview.
+- Saved proposals include source asset, source project, preview/drive references, recommended use, review state, and safety markers.
+- Rejected archive assets cannot create content items.
+- Non-marketing-approved assets are saved as `IDEA`; marketing-approved assets can enter as `APPROVED` for review workflow visibility only.
+- Every saved proposal marks `externalCall: false`, `autoPublish: false`, `autoSend: false`, and `aiGenerated: false`.
+- No payment changes, tracking runtime changes, external platform calls, auto-publishing, auto-sending, or frontend secrets.
 
 ## المسارات الرئيسية
 
@@ -82,8 +83,9 @@
 
 ## ما بقي foundation
 
-- Operations Scheduler, Production, Content Items, and Content Workflow Tasks ما زالت foundation/repository-backed وليست DB-backed بالكامل.
-- Operations Tasks: `OperationTask` DB-backed read/write API وUI create/edit/transitions موجودة للمهام الفعلية؛ ArchiveAsset can create real OperationTask rows when DB is available، لكن الربط المباشر مع ContentItem ما زال pending حتى يدخل هذا الموديل للـ DB-backed runtime.
+- Operations Scheduler, Production, and Content Workflow Tasks ما زالت foundation/repository-backed وليست DB-backed بالكامل.
+- Operations Content Items: proposals created from ArchiveAsset are audit-backed and visible in Operations, but the dedicated runtime `OperationContentItem` model is still pending.
+- Operations Tasks: `OperationTask` DB-backed read/write API وUI create/edit/transitions موجودة للمهام الفعلية؛ ArchiveAsset can create real OperationTask rows when DB is available، لكن الربط المباشر الكامل مع dedicated ContentItem model ما زال pending.
 - Operations/Content workflow models have staged contracts only; runtime schema and repository cutover remain pending.
 - Smart Archive: `ArchiveCollection` و`ArchiveProject` أصبح لهما DB-backed read/write API مع foundation fallback؛ `ArchiveDriveLink` create/read يعمل عبر AuditLog-backed records إلى أن يدخل runtime model؛ `ArchiveAsset` review actions تعمل عبر AuditLog-backed records، بينما asset metadata و`ArchiveVideoFrame` لديهم staged schema + repository read fallback فقط.
 - Google Drive sync, Drive access testing, file download, and Archive AI analysis remain manual/foundation-first.
@@ -93,7 +95,7 @@
 
 ## Known risks
 
-- ArchiveDriveLink and ArchiveAsset review actions are currently audit-backed, not dedicated runtime models; later cutover should add dedicated models and migrate/read historical audit metadata if needed.
+- ArchiveDriveLink, ArchiveAsset review actions, and Archive-created ContentItem proposals are currently audit-backed, not dedicated runtime models; later cutover should add dedicated models and migrate/read historical audit metadata if needed.
 - Google Drive metadata sync لا ينفذ external call في foundation mode؛ يحتاج provider-backed implementation لاحقًا.
 - Archive AI analysis draft-only ولا يعتمد أي أصل بدون human review.
 - ArchiveAsset preview/thumbnail policy needs a dedicated safety pass before runtime writes.
@@ -108,12 +110,13 @@
 
 ## Next recommended package
 
-`Append ArchiveAsset runtime model`
+`Append OperationContentItem runtime model`
 
-الهدف: إدخال ArchiveAsset runtime model بعد تثبيت سياسة preview/sensitivity، ثم نقل review actions من AuditLog-backed overlay إلى dedicated runtime rows بدون AI أو Drive side effects.
+الهدف: إدخال runtime model مخصص لعناصر المحتوى ثم نقل Archive-created ContentItem proposals من AuditLog-backed overlay إلى dedicated rows، مع إبقاء no auto-publish/no auto-send.
 
 بعدها:
 
+- `Append ArchiveAsset runtime model` بعد تثبيت سياسة preview/sensitivity.
 - `Append BrandAsset runtime model` لقراءة manual URL records حقيقية.
 - `Append BrandFont and MessageFramework runtime models` ثم cut over Typography/Frameworks read paths تدريجيًا.
 - `Append Operations content workflow runtime models` كشرائح صغيرة.
