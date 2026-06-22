@@ -1,6 +1,6 @@
 # Dashboard Prisma Foundation Slice
 
-آخر تحديث: 2026-06-21
+آخر تحديث: 2026-06-22
 
 ## الهدف
 
@@ -21,7 +21,7 @@
 - تم قطع `OperationTask` إلى قراءة DB-backed مع fallback محسوب من Planning Engine.
 - تم إضافة create/update API آمن لـ `OperationTask` مع zod validation وAuditLog.
 - تم تجهيز `BrandAsset`, `BrandFont`, و`BrandMessageFramework` كعقود staged فقط.
-- تم تجهيز Brand repository ليقرأ `BrandAsset` إذا كان Prisma Client يوفّر delegate، وإلا يرجع foundation assets بوضوح.
+- تم تجهيز Brand repository ليقرأ `BrandAsset`, `BrandFont`, و`BrandMessageFramework` إذا كان Prisma Client يوفّر delegates، وإلا يرجع foundation data بوضوح.
 - تم تجهيز `ArchiveDriveLink`, `ArchiveAsset`, و`ArchiveVideoFrame` كعقود staged فقط لدعم Google Drive metadata وAI/human review لاحقًا.
 - تم تجهيز عقود Operations/Content التالية كـ staged contracts فقط: `OperationSeason`, `MonthlyContentPlan`, `ContentItem`, `ContentPublication`, `MessageSchedule`, `DonorReactivationReminder`, `MarketingLearning`, و`ContentAdLink`.
 - تم تجهيز `AiOperationRun` كعقد staged فقط لسجل تشغيل Shared AI Core.
@@ -60,9 +60,9 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 - `BrandProfile`
 - `BrandAsset` staged contract + repository read fallback only
 - `BrandColor`
-- `BrandFont` staged contract only
+- `BrandFont` staged contract + repository read fallback only
 - `BrandGuideline`
-- `BrandMessageFramework` staged contract only
+- `BrandMessageFramework` staged contract + repository read fallback only
 
 ### Archive
 
@@ -95,9 +95,9 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 | `BrandProfile` | DB-backed read + foundation fallback | Brand overview and brand tabs can read active profile data. |
 | `BrandAsset` | Repository read fallback prepared; runtime schema pending | Brand Center assets come from the Brand repository snapshot when available. |
 | `BrandColor` | DB-backed read + foundation fallback | Colors tab and overview can read DB colors. |
-| `BrandFont` | Staged contract only | Typography rules and source notes. |
+| `BrandFont` | Repository read fallback prepared; runtime schema pending | Typography can use the same Brand repository snapshot once runtime model exists. |
 | `BrandGuideline` | DB-backed read + foundation fallback | Voice/copy rules can read DB guidelines. |
-| `BrandMessageFramework` | Staged contract only | Message frameworks for fundraising and donor communications. |
+| `BrandMessageFramework` | Repository read fallback prepared; runtime schema pending | Message frameworks can use the same Brand repository snapshot once runtime model exists. |
 | `ArchiveCollection` | DB-backed read + foundation fallback | Smart Archive pages read collections through archive repository. |
 | `ArchiveProject` | DB-backed read + foundation fallback | Smart Archive pages read projects through archive repository. |
 | `ArchiveDriveLink` | Staged contract only | Google Drive link metadata; no external Drive calls yet. |
