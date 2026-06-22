@@ -1,13 +1,15 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AlertTriangle, Archive, Bot, CheckCircle2, Database, FileText, FolderOpen, Image, Link2, ShieldCheck } from "lucide-react";
-import type { ArchiveAsset, ArchiveDriveLink, ArchiveProject, ArchiveSnapshot, ArchiveTabKey } from "@/lib/archive/archive-types";
+import type { ArchiveAsset, ArchiveCollection, ArchiveDriveLink, ArchiveProject, ArchiveSnapshot, ArchiveTabKey } from "@/lib/archive/archive-types";
 import { ArchiveAssetBrandAssetAction } from "./ArchiveAssetBrandAssetAction";
 import { ArchiveAssetContentItemAction } from "./ArchiveAssetContentItemAction";
 import { ArchiveAssetReviewActions } from "./ArchiveAssetReviewActions";
 import { ArchiveAssetTaskAction } from "./ArchiveAssetTaskAction";
+import { ArchiveCollectionCreatePanel } from "./ArchiveCollectionCreatePanel";
 import { ArchiveDriveLinkActions } from "./ArchiveDriveLinkActions";
 import { ArchiveDriveLinkCreatePanel } from "./ArchiveDriveLinkCreatePanel";
+import { ArchiveProjectCreatePanel } from "./ArchiveProjectCreatePanel";
 
 type Props = {
   activeTab: ArchiveTabKey;
@@ -65,7 +67,7 @@ export function ArchiveConsole({ activeTab, snapshot }: Props) {
 
 function renderTab(activeTab: ArchiveTabKey, snapshot: ArchiveSnapshot) {
   if (activeTab === "collections") return <Collections snapshot={snapshot} />;
-  if (activeTab === "projects") return <Projects projects={snapshot.projects} />;
+  if (activeTab === "projects") return <Projects projects={snapshot.projects} collections={snapshot.collections} />;
   if (activeTab === "drive-links") return <DriveLinks links={snapshot.driveLinks} projects={snapshot.projects} />;
   if (activeTab === "assets") return <Assets assets={snapshot.assets} />;
   if (activeTab === "marketing-picks") return <Assets assets={snapshot.marketingPicks} marketingOnly />;
@@ -102,27 +104,50 @@ function Overview({ snapshot }: { snapshot: ArchiveSnapshot }) {
 
 function Collections({ snapshot }: { snapshot: ArchiveSnapshot }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-4">
-      {snapshot.collections.map((collection) => (
-        <Panel key={collection.id} title={collection.name} description={collection.type} compact>
-          <p className="text-sm leading-6 text-slate-600">{collection.description}</p>
-          <div className="mt-3 flex flex-wrap gap-2"><Badge>{collection.slug}</Badge><Badge>{collection.isActive ? "Active" : "Paused"}</Badge></div>
-        </Panel>
-      ))}
+    <div className="space-y-4">
+      <ArchiveCollectionCreatePanel />
+      {snapshot.collections.length === 0 ? (
+        <EmptyState title="No archive collections yet" text="أنشئ أول مجموعة للأرشيف مثل غزة، القدس، رمضان، الوقف أو الزكاة." />
+      ) : (
+        <div className="grid gap-4 xl:grid-cols-4">
+          {snapshot.collections.map((collection) => (
+            <Panel key={collection.id} title={collection.name} description={collection.type} compact>
+              <p className="text-sm leading-6 text-slate-600">{collection.description}</p>
+              <div className="mt-3 flex flex-wrap gap-2"><Badge>{collection.slug}</Badge><Badge>{collection.isActive ? "Active" : "Paused"}</Badge></div>
+            </Panel>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function Projects({ projects }: { projects: ArchiveProject[] }) {
+function Projects({ projects, collections }: { projects: ArchiveProject[]; collections: ArchiveCollection[] }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
-      {projects.map((project) => (
-        <Panel key={project.id} title={project.title} description={`${project.country} / ${project.city} / ${project.year}`} compact>
-          <p className="text-sm leading-6 text-slate-600">{project.description}</p>
-          <div className="mt-3 flex flex-wrap gap-2"><Badge>{project.status}</Badge><Badge>{project.documentationStatus}</Badge><Badge>{project.marketingStatus}</Badge><Badge>{project.projectType}</Badge></div>
-          <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-600">{project.notes}</p>
-        </Panel>
-      ))}
+    <div className="space-y-4">
+      <ArchiveProjectCreatePanel collections={collections} />
+      {projects.length === 0 ? (
+        <EmptyState title="No archive projects yet" text="أنشئ مشروع أرشيف قبل إضافة Drive Links أو مراجعة Assets." />
+      ) : (
+        <div className="grid gap-4 xl:grid-cols-2">
+          {projects.map((project) => {
+            const collection = collections.find((item) => item.id === project.collectionId);
+            return (
+              <Panel key={project.id} title={project.title} description={`${project.country} / ${project.city} / ${project.year}`} compact>
+                <p className="text-sm leading-6 text-slate-600">{project.description}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Badge>{collection?.name ?? "Unassigned collection"}</Badge>
+                  <Badge>{project.status}</Badge>
+                  <Badge>{project.documentationStatus}</Badge>
+                  <Badge>{project.marketingStatus}</Badge>
+                  <Badge>{project.projectType}</Badge>
+                </div>
+                <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-600">{project.notes}</p>
+              </Panel>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
