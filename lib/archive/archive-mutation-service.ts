@@ -17,6 +17,46 @@ type ArchiveProjectInput = Partial<ArchiveProject> & { title?: string };
 type ArchiveDriveLinkInput = Partial<Pick<ArchiveDriveLink, "projectId" | "title" | "driveUrl">>;
 type ArchiveActor = { actorId?: string | null; actorName?: string | null; actorRole?: string | null };
 
+type ArchiveDriveLinkRuntimeRow = {
+  id: string;
+  projectId: string;
+  title: string;
+  driveUrl: string;
+  driveFolderId: string | null;
+  driveFileId: string | null;
+  sharedDriveId: string | null;
+  linkType: string;
+  syncStatus: string;
+  lastSyncedAt: Date | null;
+  lastError: string | null;
+  totalFiles: number;
+  totalImages: number;
+  totalVideos: number;
+  totalOther: number;
+};
+
+type ArchiveDriveLinkCreateDelegate = {
+  create(args: {
+    data: {
+      projectId: string;
+      title: string;
+      driveUrl: string;
+      driveFolderId?: string | null;
+      driveFileId?: string | null;
+      sharedDriveId?: string | null;
+      linkType: string;
+      syncStatus: string;
+      lastSyncedAt?: Date | null;
+      lastError?: string | null;
+      totalFiles?: number;
+      totalImages?: number;
+      totalVideos?: number;
+      totalOther?: number;
+      createdBy?: string | null;
+    };
+  }): Promise<ArchiveDriveLinkRuntimeRow>;
+};
+
 function safeObjectId(value: string | null | undefined) {
   return value && objectIdPattern.test(value) ? value : undefined;
 }
@@ -121,6 +161,26 @@ function mapProject(row: {
   };
 }
 
+function mapDriveLink(row: ArchiveDriveLinkRuntimeRow): ArchiveDriveLink {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    title: row.title,
+    driveUrl: row.driveUrl,
+    driveFolderId: row.driveFolderId,
+    driveFileId: row.driveFileId,
+    sharedDriveId: row.sharedDriveId,
+    linkType: row.linkType as ArchiveDriveLink["linkType"],
+    syncStatus: row.syncStatus as ArchiveDriveLink["syncStatus"],
+    lastSyncedAt: toIso(row.lastSyncedAt),
+    lastError: row.lastError,
+    totalFiles: row.totalFiles,
+    totalImages: row.totalImages,
+    totalVideos: row.totalVideos,
+    totalOther: row.totalOther,
+  };
+}
+
 function unavailable<T>(message: string): ArchivePersistenceMutationResult<T> {
   return {
     ok: false,
@@ -128,6 +188,33 @@ function unavailable<T>(message: string): ArchivePersistenceMutationResult<T> {
     externalCall: false,
     message,
   };
+}
+
+function getArchiveDriveLinkCreateDelegate(): ArchiveDriveLinkCreateDelegate | null {
+  const prismaWithArchiveDriveLink = prisma as unknown as { archiveDriveLink?: ArchiveDriveLinkCreateDelegate };
+  return prismaWithArchiveDriveLink.archiveDriveLink ?? null;
+}
+
+async function recordArchiveDriveLinkAuditLog(item: ArchiveDriveLink, actor?: ArchiveActor | null) {
+  await prisma.auditLog.create({
+    data: {
+      actorId: safeObjectId(actor?.actorId),
+      actorName: actor?.actorName ?? undefined,
+      actorRole: actor?.actorRole || "ADMIN",
+      action: "archive.drive-link.create",
+      messageAr: "تم حفظ رابط Drive في الأرشيف",
+      messageEn: "Archive Drive link saved",
+      entityType: "ArchiveDriveLink",
+      entityId: item.id,
+      metadata: {
+        ...item,
+        providerSource: "MarketingPlatformConnection/provider-catalog",
+        externalCall: false,
+        syncStarted: false,
+      },
+      stream: "TEAM",
+    },
+  });
 }
 
 export async function createArchiveCollectionInRepository(
@@ -218,6 +305,43 @@ export async function createArchiveDriveLinkInRepository(
 
   try {
     const ids = extractDriveIds(input.driveUrl || "");
+    const delegate = getArchiveDriveLinkCreateDelegate();
+    const projectObjectId = safeObjectId(input.projectId);
+    const syncStatus = ids.linkType === "UNKNOWN" ? "FOUNDATION" : "READY_FOR_SYNC";
+    const lastError = ids.linkType === "UNKNOWN" ? "Drive folder/file id could not be detected." : null;
+
+    if (delegate && projectObjectId) {
+      const row = await delegate.create({
+        data: {
+          projectId: projectObjectId,
+          title: input.title || "Drive link to be verified",
+          driveUrl: input.driveUrl || "to be verified",
+          driveFolderId: ids.driveFolderId,
+          driveFileId: ids.driveFileId,
+          sharedDriveId: ids.sharedDriveId,
+          linkType: ids.linkType,
+          syncStatus,
+          lastSyncedAt: null,
+          lastError,
+          totalFiles: 0,
+          totalImages: 0,
+          totalVideos: 0,
+          totalOther: 0,
+          createdBy: safeObjectId(actor?.actorId) ?? null,
+        },
+      });
+      const item = mapDriveLink(row);
+      await recordArchiveDriveLinkAuditLog(item, actor);
+
+      return {
+        ok: true,
+        mode: "prisma",
+        externalCall: false,
+        message: "ArchiveDriveLink saved in runtime model without Google Drive calls.",
+        data: item,
+      };
+    }
+
     const item: ArchiveDriveLink = {
       id: newObjectId(),
       projectId: input.projectId || "archive_project_unknown",
@@ -227,40 +351,24 @@ export async function createArchiveDriveLinkInRepository(
       driveFileId: ids.driveFileId,
       sharedDriveId: ids.sharedDriveId,
       linkType: ids.linkType,
-      syncStatus: ids.linkType === "UNKNOWN" ? "FOUNDATION" : "READY_FOR_SYNC",
+      syncStatus,
       lastSyncedAt: null,
-      lastError: ids.linkType === "UNKNOWN" ? "Drive folder/file id could not be detected." : null,
+      lastError: lastError ?? (projectObjectId ? null : "ArchiveProject must be DB-backed before ArchiveDriveLink can use the runtime model."),
       totalFiles: 0,
       totalImages: 0,
       totalVideos: 0,
       totalOther: 0,
     };
 
-    await prisma.auditLog.create({
-      data: {
-        actorId: safeObjectId(actor?.actorId),
-        actorName: actor?.actorName ?? undefined,
-        actorRole: actor?.actorRole || "ADMIN",
-        action: "archive.drive-link.create",
-        messageAr: "تم حفظ رابط Drive في الأرشيف",
-        messageEn: "Archive Drive link saved",
-        entityType: "ArchiveDriveLink",
-        entityId: item.id,
-        metadata: {
-          ...item,
-          providerSource: "MarketingPlatformConnection/provider-catalog",
-          externalCall: false,
-          syncStarted: false,
-        },
-        stream: "TEAM",
-      },
-    });
+    await recordArchiveDriveLinkAuditLog(item, actor);
 
     return {
       ok: true,
       mode: "prisma",
       externalCall: false,
-      message: "ArchiveDriveLink persisted without Google Drive calls.",
+      message: delegate
+        ? "ArchiveDriveLink saved as audit-backed fallback because projectId is not a runtime ObjectId yet."
+        : "ArchiveDriveLink saved as audit-backed fallback until runtime model is added to Prisma schema.",
       data: item,
     };
   } catch (error) {
