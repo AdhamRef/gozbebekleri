@@ -23,6 +23,7 @@ import type {
   BrandProfile,
 } from "@/lib/brand/brand-types";
 import { BrandAssetCreatePanel } from "./BrandAssetCreatePanel";
+import { BrandAssetStatusActions } from "./BrandAssetStatusActions";
 import { BrandColorCreatePanel } from "./BrandColorCreatePanel";
 import { BrandCopyButton } from "./BrandCopyButton";
 import { BrandFontCreatePanel } from "./BrandFontCreatePanel";
@@ -180,6 +181,7 @@ function Assets({ assets, activeProfileId }: { assets: BrandAsset[]; activeProfi
                   <Badge>{asset.status}</Badge>
                   <Badge>{asset.downloadable ? "Downloadable" : "Locked"}</Badge>
                 </div>
+                <BrandAssetStatusActions assetId={asset.id} status={asset.status} downloadable={asset.downloadable} hasFileUrl={Boolean(asset.fileUrl)} />
                 <div className="flex flex-wrap gap-2">
                   <BrandCopyButton value={asset.fileUrl} />
                   <a className={`inline-flex min-h-9 items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-bold ${asset.fileUrl ? "text-slate-700 hover:bg-slate-50" : "pointer-events-none text-slate-400 opacity-60"}`} href={asset.fileUrl ?? "#"}>

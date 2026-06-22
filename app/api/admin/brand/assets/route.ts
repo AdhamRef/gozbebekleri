@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { auditActorFromDashboardSession } from "@/lib/audit-log";
 import { createAuditBackedBrandAsset } from "@/lib/brand/brand-asset-repository";
+import { updateAuditBackedBrandAssetStatus } from "@/lib/brand/brand-asset-status-repository";
 import { getBrandCenterSnapshot } from "@/lib/brand/brand-service";
 import { jsonNoStore, readJson, requireBrandApiAccess } from "../_auth";
 
@@ -21,6 +22,13 @@ const brandAssetSchema = z.object({
   status: z.enum(["ACTIVE", "FOUNDATION", "TO_VERIFY"]).default("TO_VERIFY"),
 });
 
+const brandAssetStatusSchema = z.object({
+  id: z.string().trim().min(1).max(160),
+  status: z.enum(["ACTIVE", "FOUNDATION", "TO_VERIFY"]).optional(),
+  downloadable: z.boolean().optional(),
+  notes: z.string().trim().max(500).optional(),
+});
+
 export async function GET() {
   const { denied } = await requireBrandApiAccess();
   if (denied) return denied;
@@ -38,5 +46,22 @@ export async function POST(request: Request) {
   }
 
   const result = await createAuditBackedBrandAsset(parsed.data, session ? auditActorFromDashboardSession(session) : null);
+  return jsonNoStore(result, { status: result.status });
+}
+
+export async function PATCH(request: Request) {
+  const { session, denied } = await requireBrandApiAccess();
+  if (denied) return denied;
+
+  const parsed = brandAssetStatusSchema.safeParse(await readJson(request));
+  if (!parsed.success) {
+    return jsonNoStore({ ok: false, error: "Invalid brand asset status payload", details: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const snapshot = await getBrandCenterSnapshot();
+  const asset = snapshot.assets.find((item) => item.id === parsed.data.id) ?? null;
+  if (!asset) return jsonNoStore({ ok: false, error: "Brand asset not found" }, { status: 404 });
+
+  const result = await updateAuditBackedBrandAssetStatus(asset, parsed.data, session ? auditActorFromDashboardSession(session) : null);
   return jsonNoStore(result, { status: result.status });
 }
