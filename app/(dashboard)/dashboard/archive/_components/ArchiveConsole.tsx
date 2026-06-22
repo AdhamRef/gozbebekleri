@@ -6,6 +6,8 @@ import { ArchiveAssetBrandAssetAction } from "./ArchiveAssetBrandAssetAction";
 import { ArchiveAssetContentItemAction } from "./ArchiveAssetContentItemAction";
 import { ArchiveAssetReviewActions } from "./ArchiveAssetReviewActions";
 import { ArchiveAssetTaskAction } from "./ArchiveAssetTaskAction";
+import { ArchiveDriveLinkActions } from "./ArchiveDriveLinkActions";
+import { ArchiveDriveLinkCreatePanel } from "./ArchiveDriveLinkCreatePanel";
 
 type Props = {
   activeTab: ArchiveTabKey;
@@ -127,19 +129,38 @@ function Projects({ projects }: { projects: ArchiveProject[] }) {
 
 function DriveLinks({ links, projects }: { links: ArchiveDriveLink[]; projects: ArchiveProject[] }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
-      {links.map((link) => {
-        const project = projects.find((item) => item.id === link.projectId);
-        return (
-          <Panel key={link.id} title={link.title} description={project?.title ?? link.projectId} compact>
-            <div className="space-y-3 text-sm leading-6 text-slate-600">
-              <p dir="ltr" className="rounded-md bg-slate-50 p-3 font-mono text-xs">{link.driveUrl}</p>
-              <div className="flex flex-wrap gap-2"><Badge>{link.linkType}</Badge><Badge>{link.syncStatus}</Badge><Badge>{link.totalImages} images</Badge><Badge>{link.totalVideos} videos</Badge></div>
-              {link.lastError && <p className="rounded-md bg-amber-50 p-3 text-amber-900">{link.lastError}</p>}
-            </div>
-          </Panel>
-        );
-      })}
+    <div className="space-y-4">
+      <ArchiveDriveLinkCreatePanel projects={projects} />
+      {links.length === 0 ? (
+        <EmptyState title="No Drive links yet" text="أضف رابط Google Drive لمشروع الأرشيف. سيتم حفظ الرابط فقط بدون مزامنة خارجية أو تحليل AI." />
+      ) : (
+        <div className="grid gap-4 xl:grid-cols-2">
+          {links.map((link) => {
+            const project = projects.find((item) => item.id === link.projectId);
+            return (
+              <Panel key={link.id} title={link.title} description={project?.title ?? link.projectId} compact>
+                <div className="space-y-3 text-sm leading-6 text-slate-600">
+                  <p dir="ltr" className="rounded-md bg-slate-50 p-3 font-mono text-xs">{link.driveUrl}</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <InfoLine title="Folder ID" text={link.driveFolderId || "to be parsed / to be verified"} />
+                    <InfoLine title="File ID" text={link.driveFileId || "to be parsed / to be verified"} />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge>{link.linkType}</Badge>
+                    <Badge>{link.syncStatus}</Badge>
+                    <Badge>{link.totalFiles} files</Badge>
+                    <Badge>{link.totalImages} images</Badge>
+                    <Badge>{link.totalVideos} videos</Badge>
+                    <Badge>{link.totalOther} other</Badge>
+                  </div>
+                  {link.lastError && <p className="rounded-md bg-amber-50 p-3 text-amber-900">{link.lastError}</p>}
+                  <ArchiveDriveLinkActions linkId={link.id} />
+                </div>
+              </Panel>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
