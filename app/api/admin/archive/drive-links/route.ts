@@ -38,6 +38,19 @@ export async function POST(request: Request) {
   const parsed = schema.safeParse(await readJson(request));
   if (!parsed.success) return jsonNoStore({ ok: false, error: "Invalid archive Drive link payload", issues: parsed.error.flatten() }, { status: 400 });
 
+  const snapshot = await getArchiveSnapshotDbBacked();
+  const projectExists = snapshot.projects.some((project) => project.id === parsed.data.projectId);
+  if (!projectExists) {
+    return jsonNoStore(
+      {
+        ok: false,
+        error: "Archive project not found",
+        message: "Create or select a valid Archive Project before saving a Google Drive link.",
+      },
+      { status: 404 },
+    );
+  }
+
   const actor = session?.user ? auditActorFromDashboardSession(session) : null;
   const result = await createArchiveDriveLinkInRepository(parsed.data, actor);
 
