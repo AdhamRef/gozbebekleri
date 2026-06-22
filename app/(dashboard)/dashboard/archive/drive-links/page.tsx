@@ -13,12 +13,32 @@ export default async function ArchiveDriveLinksPage() {
   const folderLinks = snapshot.driveLinks.filter((link) => link.linkType === "FOLDER");
   const fileLinks = snapshot.driveLinks.filter((link) => link.linkType === "FILE");
   const unparsedLinks = snapshot.driveLinks.filter((link) => !link.driveFolderId && !link.driveFileId);
+  const projectsWithoutDriveLinks = snapshot.projects.filter((project) => !linkedProjectIds.has(project.id));
   const readinessPercent = Math.round((readyLinks.length / Math.max(snapshot.driveLinks.length, 1)) * 100);
   const healthGates = [
     { label: "All links have projects", ok: orphanLinks.length === 0, value: orphanLinks.length === 0 ? "Pass" : `${orphanLinks.length} orphan` },
     { label: "At least one Drive id parsed", ok: readyLinks.length > 0 || snapshot.driveLinks.length === 0, value: `${readyLinks.length} ready` },
     { label: "External sync disabled", ok: snapshot.safety.noExternalDriveCall, value: "No external calls" },
     { label: "Human review required", ok: snapshot.safety.humanApprovalRequired, value: "Required" },
+  ];
+  const operatorActions = [
+    "أنشئ Archive Project قبل إضافة أي Drive Link.",
+    "اربط كل مشروع برابط Drive واحد واضح على الأقل.",
+    "راجع Unparsed links وعدّل الرابط إذا لم يظهر Folder ID أو File ID.",
+    "استخدم Test access contract كفحص جاهزية فقط؛ لا يوجد Google API call الآن.",
+  ];
+  const blockedActions = [
+    "لا تشغل Google Drive sync داخل هذه المرحلة.",
+    "لا تعتمد أي أصل تسويقي قبل human review.",
+    "لا تضف ArchiveAsset runtime writes داخل حزمة ArchiveDriveLink.",
+    "لا تضف AI analysis أو download أو thumbnail fetching في نفس الحزمة.",
+  ];
+  const runtimeChecklist = [
+    "Append ArchiveDriveLink model only.",
+    "Run Prisma generate.",
+    "Run production build.",
+    "Keep AuditLog overlay readable.",
+    "Cut over create/read only after delegate exists.",
   ];
 
   return (
@@ -81,8 +101,19 @@ export default async function ArchiveDriveLinksPage() {
               <IssueList title="Unparsed links" emptyText="كل الروابط لديها Folder/File ID أو لا توجد روابط بعد." items={unparsedLinks.slice(0, 4).map((link) => `${link.title} / ${link.linkType}`)} tone="warning" />
               <IssueList title="Ready links" emptyText="لا توجد روابط جاهزة بعد لاختبار provider لاحقًا." items={readyLinks.slice(0, 4).map((link) => link.title)} tone="safe" />
               <IssueList title="Orphan links" emptyText="لا توجد روابط يتيمة." items={orphanLinks.slice(0, 4).map((link) => link.title)} tone="warning" />
-              <IssueList title="Runtime cutover" emptyText="ArchiveDriveLink runtime model is still pending." items={["Keep AuditLog overlay readable", "No Drive sync in this package", "Run Prisma generate + build"]} tone="neutral" />
+              <IssueList title="Runtime cutover" emptyText="ArchiveDriveLink runtime model is still pending." items={runtimeChecklist.slice(0, 4)} tone="neutral" />
             </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 xl:grid-cols-3">
+            <IssueList title="Operator playbook" emptyText="لا توجد خطوات تشغيلية مطلوبة الآن." items={operatorActions} tone="neutral" />
+            <IssueList title="Blocked until runtime" emptyText="كل الحدود آمنة." items={blockedActions} tone="warning" />
+            <IssueList
+              title="Projects missing Drive link"
+              emptyText="كل المشاريع لديها رابط Drive أو لا توجد مشاريع بعد."
+              items={projectsWithoutDriveLinks.slice(0, 5).map((project) => project.title)}
+              tone="warning"
+            />
           </div>
         </div>
       </section>
@@ -121,7 +152,7 @@ function IssueList({ title, emptyText, items, tone }: { title: string; emptyText
         <p className="mt-2 text-sm font-semibold leading-6 opacity-75">{emptyText}</p>
       ) : (
         <ul className="mt-2 space-y-1 text-sm font-semibold leading-6">
-          {items.map((item) => <li key={item}>• {item}</li>)}
+          {items.map((item) => <li key={item}>{item}</li>)}
         </ul>
       )}
     </div>
