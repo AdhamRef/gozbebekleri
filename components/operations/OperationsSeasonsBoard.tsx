@@ -2,6 +2,7 @@ import { CalendarClock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { OperationsOverview } from "@/lib/operations/types";
+import { OperationsSeasonTaskAction } from "./OperationsSeasonTaskAction";
 
 type OperationsSeasonsBoardProps = {
   seasons: OperationsOverview["seasons"];
@@ -16,7 +17,7 @@ export function OperationsSeasonsBoard({ seasons, weeklyThemes, statusClass }: O
         <CardTitle className="flex items-center gap-2">
           <CalendarClock className="h-5 w-5 text-[#025EB8]" /> التقويم التشغيلي والمواسم
         </CardTitle>
-        <CardDescription>نظرة واحدة على المواسم والمحاور التي تقود إنتاج المحتوى خلال الشهر أو الموسم.</CardDescription>
+        <CardDescription>نظرة واحدة على المواسم والمحاور التي تقود إنتاج المحتوى، مع إمكانية تحويل كل موسم إلى مهمة جاهزية محفوظة.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 xl:grid-cols-5">
@@ -37,6 +38,7 @@ export function OperationsSeasonsBoard({ seasons, weeklyThemes, statusClass }: O
                 </div>
                 <p className="text-left font-bold text-slate-700">{season.progress}%</p>
               </div>
+              <OperationsSeasonTaskAction season={season} />
             </div>
           ))}
         </div>
