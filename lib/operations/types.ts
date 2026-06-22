@@ -35,6 +35,9 @@ export type OperationsContentItem = {
   status: string;
   channel: string;
   due: string;
+  publicationCount?: number;
+  lastPublishedAt?: string | null;
+  publishedPlatforms?: string[];
 };
 
 export type OperationsContentTask = {
