@@ -46,7 +46,7 @@ export function ArchiveCollectionCreatePanel() {
     setSaving(false);
 
     if (!response.ok || !result?.ok) {
-      setFeedback({ tone: "error", message: result?.error || result?.message || "فشل إنشاء مجموعة الأرشيف" });
+      setFeedback({ tone: "error", message: result?.error || result?.message || "تعذر حفظ المجموعة" });
       return;
     }
 
@@ -54,7 +54,7 @@ export function ArchiveCollectionCreatePanel() {
     setSlug("");
     setType("GENERAL");
     setDescription("");
-    setFeedback({ tone: "success", message: result?.message || "تم إنشاء مجموعة الأرشيف" });
+    setFeedback({ tone: "success", message: result?.message || "تم حفظ المجموعة" });
     router.refresh();
   }
 
@@ -63,43 +63,42 @@ export function ArchiveCollectionCreatePanel() {
       <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex items-center gap-2 font-black text-slate-950">
-            <FolderPlus className="h-4 w-4 text-[#025EB8]" /> Create Archive Collection
+            <FolderPlus className="h-4 w-4 text-[#025EB8]" /> إضافة مجموعة
           </div>
-          <p className="mt-1 text-sm leading-6 text-slate-600">مجموعة رئيسية مثل غزة، القدس، رمضان، الوقف أو الزكاة. لا يوجد أي اتصال خارجي.</p>
+          <p className="mt-1 text-sm leading-6 text-slate-600">استخدم المجموعات لتنظيم ملفات المشاريع حسب البلد أو الموسم أو نوع الحملة.</p>
         </div>
         <Button type="submit" size="sm" disabled={saving} className="gap-2 font-bold">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          {saving ? "جاري الحفظ" : "Save Collection"}
+          {saving ? "جاري الحفظ" : "حفظ المجموعة"}
         </Button>
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_0.8fr_1fr]">
         <label className="grid gap-1 text-xs font-bold text-slate-600">
-          Name
+          اسم المجموعة
           <input value={name} onChange={(event) => setName(event.target.value)} placeholder="مثال: غزة" className="h-10 rounded-md border bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-[#025EB8]" />
         </label>
         <label className="grid gap-1 text-xs font-bold text-slate-600">
-          Type
+          النوع
           <select value={type} onChange={(event) => setType(event.target.value)} className="h-10 rounded-md border bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-[#025EB8]">
-            <option value="GENERAL">GENERAL</option>
-            <option value="COUNTRY">COUNTRY</option>
-            <option value="SEASON">SEASON</option>
-            <option value="FUND">FUND</option>
-            <option value="THEME">THEME</option>
+            <option value="GENERAL">عام</option>
+            <option value="COUNTRY">بلد</option>
+            <option value="SEASON">موسم</option>
+            <option value="FUND">صندوق</option>
+            <option value="THEME">موضوع</option>
           </select>
         </label>
         <label className="grid gap-1 text-xs font-bold text-slate-600">
-          Slug optional
+          الرابط المختصر
           <input dir="ltr" value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="gaza" className="h-10 rounded-md border bg-white px-3 text-left font-mono text-sm text-slate-900 outline-none focus:border-[#025EB8]" />
         </label>
       </div>
 
       <label className="mt-3 grid gap-1 text-xs font-bold text-slate-600">
-        Description
-        <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="وصف مختصر للمجموعة وما نوع المواد التي ستضمها." className="min-h-20 rounded-md border bg-white px-3 py-2 text-sm leading-6 text-slate-900 outline-none focus:border-[#025EB8]" />
+        الوصف
+        <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="وصف مختصر للمجموعة والمواد التي ستضمها." className="min-h-20 rounded-md border bg-white px-3 py-2 text-sm leading-6 text-slate-900 outline-none focus:border-[#025EB8]" />
       </label>
 
-      <p className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-xs font-semibold leading-5 text-slate-600">يحفظ داخل Archive repository ويكتب AuditLog فقط. لا مزامنة Drive ولا AI.</p>
       {feedback ? (
         <p className={`mt-3 rounded-md border px-3 py-2 text-xs font-semibold ${feedback.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}>
           {feedback.message}
