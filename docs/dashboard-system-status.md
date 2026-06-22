@@ -1,6 +1,6 @@
 # Dashboard System Status
 
-آخر تحديث: 2026-06-21
+آخر تحديث: 2026-06-22
 
 ## ما تم إدخاله إلى main
 
@@ -24,14 +24,16 @@
 - `BrandAsset`, `BrandFont`, `BrandMessageFramework`, and `AiOperationRun` staged contracts added to `prisma/dashboard-foundation.schema.prisma` only.
 - Operations/content workflow staged contracts added to `prisma/dashboard-foundation.schema.prisma` only.
 - Brand Center assets are sourced through the Brand repository snapshot, with optional Prisma `brandAsset` read fallback when the generated delegate exists.
+- Smart Archive Drive and Asset DB contracts are staged in `prisma/dashboard-foundation.schema.prisma` only: `ArchiveDriveLink`, `ArchiveAsset`, and `ArchiveVideoFrame`.
 
 ## ما يتم تجهيزه في الحزمة الحالية
 
-- Smart Archive Drive and Asset DB contracts are now staged in `prisma/dashboard-foundation.schema.prisma` only.
-- New staged models: `ArchiveDriveLink`, `ArchiveAsset`, and `ArchiveVideoFrame`.
-- These contracts support Drive link metadata, Drive file metadata, AI draft analysis fields, human review status, marketing/documentation approval flags, sensitivity flags, and video frame metadata.
+- Brand Center typography and message frameworks now read through the Brand repository snapshot.
+- Optional Prisma delegates are prepared for `BrandFont` and `BrandMessageFramework` when those models are later appended to the generated runtime client.
+- Empty DB collections or missing delegates still fall back to verified foundation data instead of pretending persistence exists.
+- Brand AI source packs will receive typography/framework data from the same repository-backed snapshot path.
 - This package does not add these models to `prisma/schema.prisma` yet.
-- This package does not perform Google Drive API calls, file downloads, frame extraction, AI analysis, approval, publishing, or task creation.
+- This package does not create, edit, delete, upload, download, publish, send, approve, or call external AI/provider APIs.
 - No payment changes, tracking runtime changes, external platform calls, or frontend secrets.
 
 ## المسارات الرئيسية
@@ -80,7 +82,7 @@
 - Operations Tasks: `OperationTask` DB-backed read/write API وUI create/edit/transitions موجودة للمهام الفعلية؛ الربط المباشر مع ContentItem/ArchiveAsset ما زال pending حتى تدخل هذه الموديلات للـ DB-backed runtime.
 - Operations/Content workflow models have staged contracts only; runtime schema and repository cutover remain pending.
 - Smart Archive: `ArchiveCollection` و`ArchiveProject` DB-backed read/fallback؛ `ArchiveDriveLink`, `ArchiveAsset`, و`ArchiveVideoFrame` لديهم staged contracts فقط، وGoogle Drive sync/AI analysis ما زالت foundation/manual-first.
-- Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ `BrandAsset` لديه staged schema + repository read fallback، لكن runtime schema الأساسي ما زال pending. `BrandFont` و`BrandMessageFramework` لديهما staged schema contracts فقط، والـ runtime cutover ما زال pending.
+- Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ `BrandAsset`, `BrandFont`, و`BrandMessageFramework` لديهم staged schema + repository read fallback، لكن runtime schema الأساسي ما زال pending لهذه الموديلات.
 - Shared AI Core جاهز للعقود والـ provider fallback؛ `AiOperationRun` لديه staged schema contract فقط، والـ runtime schema/repository persistence ما زال pending.
 - Connections UI يعرض المنصات الجديدة كعقود جاهزية، لكن sync/testing الحقيقي لهذه المنصات يجب أن يبقى `NOT_IMPLEMENTED` حتى تنفيذ provider clients بشكل آمن.
 
