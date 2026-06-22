@@ -22,6 +22,7 @@ import type {
   BrandMessageFramework,
   BrandProfile,
 } from "@/lib/brand/brand-types";
+import { BrandAssetCreatePanel } from "./BrandAssetCreatePanel";
 import { BrandCopyButton } from "./BrandCopyButton";
 
 type Props = {
@@ -96,7 +97,7 @@ export function BrandCenterView({ activeTab, snapshot }: Props) {
 
 function renderTab(activeTab: BrandCenterTabKey, snapshot: BrandCenterSnapshot) {
   if (activeTab === "organizations") return <Organizations profiles={snapshot.profiles} activeProfileId={snapshot.activeProfile.id} />;
-  if (activeTab === "assets") return <Assets assets={snapshot.assets} />;
+  if (activeTab === "assets") return <Assets assets={snapshot.assets} activeProfileId={snapshot.activeProfile.id} />;
   if (activeTab === "colors") return <Colors colors={snapshot.colors} />;
   if (activeTab === "typography") return <Typography fonts={snapshot.fonts} />;
   if (activeTab === "voice") return <Guidelines guidelines={snapshot.guidelines} />;
@@ -155,34 +156,37 @@ function Organizations({ profiles, activeProfileId }: { profiles: BrandProfile[]
   );
 }
 
-function Assets({ assets }: { assets: BrandAsset[] }) {
-  if (assets.length === 0) return <EmptyState title="No brand assets yet" text="Add logos, templates, certificates, watermarks, and brand guide files here." />;
+function Assets({ assets, activeProfileId }: { assets: BrandAsset[]; activeProfileId: string }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
-      {assets.map((asset) => (
-        <Panel key={asset.id} title={asset.title} description={`${asset.type} / ${asset.format}`} compact>
-          <div className="grid gap-4 md:grid-cols-[120px_1fr]">
-            <div className="flex h-28 items-center justify-center rounded-lg border bg-slate-50 text-center text-xs font-bold text-slate-500">
-              {asset.previewUrl ? "Preview" : "Preview to be verified"}
-            </div>
-            <div className="space-y-3 text-sm leading-6 text-slate-600">
-              <p>{asset.usage}</p>
-              <p className="rounded-md bg-slate-50 p-3">{asset.notes}</p>
-              <div className="flex flex-wrap gap-2">
-                <Badge>{asset.locale.toUpperCase()}</Badge>
-                <Badge>{asset.status}</Badge>
-                <Badge>{asset.downloadable ? "Downloadable" : "Locked"}</Badge>
+    <div className="space-y-4">
+      <BrandAssetCreatePanel profileId={activeProfileId} />
+      {assets.length === 0 ? <EmptyState title="No brand assets yet" text="Add logos, templates, certificates, watermarks, and brand guide files here." /> : null}
+      <div className="grid gap-4 xl:grid-cols-2">
+        {assets.map((asset) => (
+          <Panel key={asset.id} title={asset.title} description={`${asset.type} / ${asset.format}`} compact>
+            <div className="grid gap-4 md:grid-cols-[120px_1fr]">
+              <div className="flex h-28 items-center justify-center rounded-lg border bg-slate-50 text-center text-xs font-bold text-slate-500">
+                {asset.previewUrl ? "Preview" : "Preview to be verified"}
               </div>
-              <div className="flex flex-wrap gap-2">
-                <BrandCopyButton value={asset.fileUrl} />
-                <a className={`inline-flex min-h-9 items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-bold ${asset.fileUrl ? "text-slate-700 hover:bg-slate-50" : "pointer-events-none text-slate-400 opacity-60"}`} href={asset.fileUrl ?? "#"}>
-                  <Download className="h-3.5 w-3.5" /> Download
-                </a>
+              <div className="space-y-3 text-sm leading-6 text-slate-600">
+                <p>{asset.usage}</p>
+                <p className="rounded-md bg-slate-50 p-3">{asset.notes}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Badge>{asset.locale.toUpperCase()}</Badge>
+                  <Badge>{asset.status}</Badge>
+                  <Badge>{asset.downloadable ? "Downloadable" : "Locked"}</Badge>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <BrandCopyButton value={asset.fileUrl} />
+                  <a className={`inline-flex min-h-9 items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-bold ${asset.fileUrl ? "text-slate-700 hover:bg-slate-50" : "pointer-events-none text-slate-400 opacity-60"}`} href={asset.fileUrl ?? "#"}>
+                    <Download className="h-3.5 w-3.5" /> Download
+                  </a>
+                </div>
               </div>
             </div>
-          </div>
-        </Panel>
-      ))}
+          </Panel>
+        ))}
+      </div>
     </div>
   );
 }
