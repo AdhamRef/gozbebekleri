@@ -46,13 +46,17 @@
 - `/api/admin/brand/frameworks` supports guarded no-store `GET` and `POST` for audit-backed `BrandMessageFramework` records until the runtime delegate exists.
 - `/dashboard/brand/frameworks` has a usable manual message framework creation panel for Friday, thank-you, zakat, waqf, emergency, donor reactivation, Ramadan, and general frameworks.
 - Brand repository reads audit-backed BrandMessageFramework records and merges them with foundation/runtime frameworks.
+- `/dashboard/operations/content` content-item cards expose `SCHEDULED` and `PUBLISHED` status transitions in addition to `REVIEW` and `APPROVED`.
+- `PUBLISHED` is explicitly a manual status update only; the UI confirms that no automatic sending or publishing happens.
 
 ## ما يتم تجهيزه في الحزمة الحالية
 
-- `/dashboard/operations/content` content-item cards now expose `SCHEDULED` and `PUBLISHED` status transitions in addition to `REVIEW` and `APPROVED`.
-- `PUBLISHED` is explicitly a manual status update only; the UI confirms that no automatic sending or publishing happens.
-- The existing guarded no-store `PATCH /api/dashboard/operations/items` persists the new statuses through audit-backed content item records.
-- No provider call, no auto-send, no auto-publish, no payment changes, no tracking runtime changes, no external platform calls, and no frontend secrets.
+- `/api/admin/brand/fonts` supports guarded no-store `GET` and `POST` for audit-backed `BrandFont` records until the runtime delegate exists.
+- `/dashboard/brand/typography` has a usable manual font creation panel for heading, body, Arabic UI, and campaign typography rules.
+- Brand repository reads audit-backed BrandFont records and merges them with foundation/runtime fonts.
+- New BrandFont records use DB-backed AuditLog with `action = brand.font.manual-create`.
+- Font creation records safety metadata: `externalCall: false`, `fileDownloaded: false`, `autoPublish: false`, `aiGenerated: false`, and `humanReviewRequired: true`.
+- No file upload, file download, Google Drive sync, AI generation, publishing, sending, payment changes, tracking runtime changes, external platform calls, or frontend secrets.
 
 ## المسارات الرئيسية
 
@@ -103,19 +107,20 @@
 - Operations/Content workflow models have staged contracts only; runtime schema and repository cutover remain pending.
 - Smart Archive: `ArchiveCollection` و`ArchiveProject` أصبح لهما DB-backed read/write API مع foundation fallback؛ `ArchiveDriveLink` create/read يعمل عبر AuditLog-backed records إلى أن يدخل runtime model؛ `ArchiveAsset` review actions تعمل عبر AuditLog-backed records، بينما asset metadata و`ArchiveVideoFrame` لديهم staged schema + repository read fallback فقط.
 - Google Drive sync, Drive access testing, file download, and Archive AI analysis remain manual/foundation-first.
-- Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ BrandColor and BrandGuideline manual creation are runtime Prisma-backed with AuditLog؛ BrandAsset and BrandMessageFramework manual records are audit-backed and visible in Brand Center, while dedicated runtime `BrandAsset` and generated `BrandMessageFramework` delegates are still pending. `BrandFont` لديه staged schema + repository read fallback فقط.
+- Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ BrandColor and BrandGuideline manual creation are runtime Prisma-backed with AuditLog؛ BrandAsset, BrandFont, and BrandMessageFramework manual records are audit-backed and visible in Brand Center, while dedicated runtime `BrandAsset`, `BrandFont`, and generated `BrandMessageFramework` delegates are still pending.
 - Shared AI Core جاهز للعقود والـ provider fallback؛ `AiOperationRun` لديه staged schema + optional persistence fallback، لكن runtime schema ما زال pending.
 - Connections UI يعرض المنصات الجديدة كعقود جاهزية، لكن sync/testing الحقيقي لهذه المنصات يجب أن يبقى `NOT_IMPLEMENTED` حتى تنفيذ provider clients بشكل آمن.
 
 ## Known risks
 
-- ArchiveDriveLink, ArchiveAsset review actions, Operations Content Items, manual BrandAsset records, and manual BrandMessageFramework records are currently audit-backed, not dedicated runtime models; later cutover should add dedicated models and migrate/read historical audit metadata if needed.
+- ArchiveDriveLink, ArchiveAsset review actions, Operations Content Items, manual BrandAsset records, manual BrandFont records, and manual BrandMessageFramework records are currently audit-backed, not dedicated runtime models; later cutover should add dedicated models and migrate/read historical audit metadata if needed.
 - Google Drive metadata sync لا ينفذ external call في foundation mode؛ يحتاج provider-backed implementation لاحقًا.
 - Archive AI analysis draft-only ولا يعتمد أي أصل بدون human review.
 - ArchiveAsset preview/thumbnail policy needs a dedicated safety pass before runtime writes.
 - BrandAsset manual URL records must be verified before being treated as official production downloads.
 - BrandColor manual rows should be reviewed against official brand files before being treated as final design authority.
 - BrandGuideline manual rows should be reviewed before AI or team workflows treat them as final voice authority.
+- BrandFont manual rows should be reviewed before designers treat them as final typography authority.
 - BrandMessageFramework manual rows should be reviewed before AI or team workflows use them for campaign messages.
 - Content item `PUBLISHED` status is currently a manual workflow marker only; full ContentPublication runtime rows are still pending.
 - AI audit persistence يحتاج runtime schema قبل DB writes فعلية، ويجب أن يظل sanitized ودون أسرار.
@@ -123,7 +128,6 @@
 - OperationTask quick edit يعمل فقط على rows فعلية؛ foundation generated tasks تبقى read-only.
 - Some Operations content items are audit-backed and should be migrated to `ContentItem` rows after the runtime model is appended.
 - بعض staff users قد يحتاجون تحديث dashboardPermissions لإضافة `operations`, `archive`, أو `brand` بعد إدخال المفاتيح الجديدة.
-- Brand typography still needs verified real organization rules before production authoring automation.
 - Operations content workflow runtime cutover should be split into small PRs to avoid schema/client blast radius.
 - PRs القديمة #30, #37, #40, #43, #52, #54 لا يجب دمجها كما هي الآن؛ راجع `docs/dashboard-open-pr-audit.md`.
 
