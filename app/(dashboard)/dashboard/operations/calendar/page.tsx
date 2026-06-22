@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getOperationsCalendarOverview } from "@/lib/operations/calendar-service";
 import { getPlanningOverview } from "@/lib/operations/planning/planning-service";
 import { getSeasonReadinessOverview } from "@/lib/operations/seasons/season-service";
+import { CalendarEventTaskAction } from "./_components/CalendarEventTaskAction";
 import { PlanningActionTaskAction } from "./_components/PlanningActionTaskAction";
 
 const categoryLabel: Record<string, string> = {
@@ -134,7 +135,7 @@ export default function OperationsCalendarPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-[#025EB8]" /> خريطة المواسم والتنبيهات</CardTitle>
-            <CardDescription>نسخة تأسيسية ثابتة. لاحقًا سيتم ربطها بقاعدة البيانات، التقويم الهجري، والتنبيهات الفعلية.</CardDescription>
+            <CardDescription>نسخة تأسيسية ثابتة يمكن تحويل عناصرها الآن إلى مهام تشغيل محفوظة لحين ربطها بقاعدة البيانات والتقويم الهجري.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {events.map((event) => (
@@ -159,6 +160,17 @@ export default function OperationsCalendarPage() {
                     <Badge key={asset} variant="outline" className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700">{asset}</Badge>
                   ))}
                 </div>
+                <CalendarEventTaskAction
+                  eventId={event.id}
+                  title={event.title}
+                  category={event.category}
+                  dateLabel={event.dateLabel}
+                  hijriLabel={event.hijriLabel}
+                  leadTimeDays={event.leadTimeDays}
+                  priority={event.priority}
+                  focus={event.focus}
+                  requiredAssets={event.requiredAssets}
+                />
               </div>
             ))}
           </CardContent>
