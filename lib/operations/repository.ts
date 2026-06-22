@@ -6,11 +6,13 @@ import { createFallbackOperationsOverview } from "./mock-data";
 import { productionItems } from "./production/production-data";
 import type { ProductionItem } from "./production/production-types";
 import { scheduledContentItems } from "./scheduler/scheduler-data";
-import type { ScheduledContentItem } from "./scheduler/scheduler-types";
+import type { ScheduledContentItem, ScheduledManualStatus } from "./scheduler/scheduler-types";
 import { listOperationTasksFromRepository } from "./tasks/task-repository";
 import type { OperationsTask } from "./tasks/task-types";
 import type { OperationsPersistenceInfo, OperationsRepositoryResult } from "./persistence-types";
 import type { OperationsContentItem, OperationsContentTask, OperationsOverview } from "./types";
+
+const scheduledManualStatuses: ScheduledManualStatus[] = ["SCHEDULED", "PUBLISHED", "MANUALLY_SENT", "CANCELLED", "FAILED"];
 
 function foundationPersistence(
   model: string,
@@ -84,6 +86,10 @@ function publicationTime(publication: { publishedAt: string | null; scheduledAt:
   return publication.publishedAt ?? publication.scheduledAt;
 }
 
+function asScheduledManualStatus(value: string | null | undefined): ScheduledManualStatus | null {
+  return scheduledManualStatuses.includes(value as ScheduledManualStatus) ? (value as ScheduledManualStatus) : null;
+}
+
 async function attachSchedulerPublicationMarkers(items: ScheduledContentItem[]): Promise<ScheduledContentItem[]> {
   const publications = await readAuditBackedContentPublications();
   if (publications.length === 0) return items;
@@ -100,7 +106,7 @@ async function attachSchedulerPublicationMarkers(items: ScheduledContentItem[]):
     return {
       ...item,
       publicationCount: itemPublications.length,
-      lastManualStatus: latest?.status ?? null,
+      lastManualStatus: asScheduledManualStatus(latest?.status),
       lastManualAt: latest ? publicationTime(latest) : null,
       lastManualPlatform: latest?.platform ?? null,
     };
