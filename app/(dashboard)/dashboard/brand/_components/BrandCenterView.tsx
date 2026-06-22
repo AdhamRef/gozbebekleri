@@ -23,6 +23,7 @@ import type {
   BrandProfile,
 } from "@/lib/brand/brand-types";
 import { BrandAssetCreatePanel } from "./BrandAssetCreatePanel";
+import { BrandColorCreatePanel } from "./BrandColorCreatePanel";
 import { BrandCopyButton } from "./BrandCopyButton";
 
 type Props = {
@@ -98,7 +99,7 @@ export function BrandCenterView({ activeTab, snapshot }: Props) {
 function renderTab(activeTab: BrandCenterTabKey, snapshot: BrandCenterSnapshot) {
   if (activeTab === "organizations") return <Organizations profiles={snapshot.profiles} activeProfileId={snapshot.activeProfile.id} />;
   if (activeTab === "assets") return <Assets assets={snapshot.assets} activeProfileId={snapshot.activeProfile.id} />;
-  if (activeTab === "colors") return <Colors colors={snapshot.colors} />;
+  if (activeTab === "colors") return <Colors colors={snapshot.colors} activeProfileId={snapshot.activeProfile.id} />;
   if (activeTab === "typography") return <Typography fonts={snapshot.fonts} />;
   if (activeTab === "voice") return <Guidelines guidelines={snapshot.guidelines} />;
   if (activeTab === "frameworks") return <Frameworks frameworks={snapshot.messageFrameworks} />;
@@ -191,21 +192,28 @@ function Assets({ assets, activeProfileId }: { assets: BrandAsset[]; activeProfi
   );
 }
 
-function Colors({ colors }: { colors: BrandColor[] }) {
+function Colors({ colors, activeProfileId }: { colors: BrandColor[]; activeProfileId: string }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      {colors.map((color) => (
-        <div key={color.id} className="overflow-hidden rounded-lg border bg-white shadow-sm">
-          <div className="h-24" style={{ backgroundColor: color.hex }} />
-          <div className="space-y-2 p-4">
-            <p className="font-black text-slate-950">{color.name}</p>
-            <p className="font-mono text-sm text-slate-700" dir="ltr">{color.hex}</p>
-            <p className="text-xs text-slate-500" dir="ltr">RGB {color.rgb}</p>
-            <p className="text-sm leading-6 text-slate-600">{color.description}</p>
-            <Badge>{color.usage}</Badge>
+    <div className="space-y-4">
+      <BrandColorCreatePanel profileId={activeProfileId} />
+      {colors.length === 0 ? <EmptyState title="No brand colors yet" text="Add primary, CTA, text, background, accent, and status colors here." /> : null}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {colors.map((color) => (
+          <div key={color.id} className="overflow-hidden rounded-lg border bg-white shadow-sm">
+            <div className="h-24" style={{ backgroundColor: color.hex }} />
+            <div className="space-y-2 p-4">
+              <p className="font-black text-slate-950">{color.name}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-mono text-sm text-slate-700" dir="ltr">{color.hex}</p>
+                <BrandCopyButton value={color.hex} />
+              </div>
+              <p className="text-xs text-slate-500" dir="ltr">RGB {color.rgb}</p>
+              <p className="text-sm leading-6 text-slate-600">{color.description}</p>
+              <Badge>{color.usage}</Badge>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
