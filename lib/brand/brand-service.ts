@@ -70,7 +70,7 @@ function buildDownloads(profile: BrandProfile, assets: BrandAsset[]): BrandDownl
 function buildAlerts(repository: BrandRepositorySnapshot, profile: BrandProfile): BrandReadinessAlert[] {
   const profileAssets = scoped(repository.assets, profile.id);
   const profileColors = scoped(repository.colors, profile.id);
-  const profileFrameworks = scoped(brandMessageFrameworks, profile.id);
+  const profileFrameworks = scoped(repository.messageFrameworks, profile.id);
   const alerts: BrandReadinessAlert[] = [];
 
   if (repository.mode === "db-backed") {
@@ -134,7 +134,9 @@ function activeModels(repository: BrandRepositorySnapshot): string[] {
     "BrandProfile",
     ...(repository.dbCounts.assets > 0 ? ["BrandAsset"] : []),
     "BrandColor",
+    ...(repository.dbCounts.fonts > 0 ? ["BrandFont"] : []),
     "BrandGuideline",
+    ...(repository.dbCounts.messageFrameworks > 0 ? ["BrandMessageFramework"] : []),
   ];
 }
 
@@ -142,9 +144,9 @@ function buildBrandCenterSnapshot(repository: BrandRepositorySnapshot, profileId
   const profile = activeProfile(repository.profiles, profileId);
   const assets = scoped(repository.assets, profile.id);
   const colors = scoped(repository.colors, profile.id).sort((a, b) => a.order - b.order);
-  const fonts = scoped(brandFonts, profile.id);
+  const fonts = scoped(repository.fonts, profile.id);
   const guidelines = scoped(repository.guidelines, profile.id).sort((a, b) => a.order - b.order);
-  const messageFrameworks = scoped(brandMessageFrameworks, profile.id);
+  const messageFrameworks = scoped(repository.messageFrameworks, profile.id);
   const downloads = buildDownloads(profile, repository.assets);
   const alerts = buildAlerts(repository, profile);
   const toVerify = [...repository.profiles, ...repository.assets].filter((item) => item.status === "TO_VERIFY").length;
@@ -196,12 +198,16 @@ function getFoundationRepositorySnapshot(): BrandRepositorySnapshot {
     profiles: brandProfiles,
     assets: brandAssets,
     colors: brandColors,
+    fonts: brandFonts,
     guidelines: brandGuidelines,
+    messageFrameworks: brandMessageFrameworks,
     dbCounts: {
       profiles: 0,
       assets: 0,
       colors: 0,
+      fonts: 0,
       guidelines: 0,
+      messageFrameworks: 0,
     },
   };
 }
