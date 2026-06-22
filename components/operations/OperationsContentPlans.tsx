@@ -2,6 +2,7 @@ import { FileText, CalendarClock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { OperationsOverview } from "@/lib/operations/types";
+import { OperationsContentPlanTaskAction } from "./OperationsContentPlanTaskAction";
 
 type Props = {
   plans: OperationsOverview['plans'];
@@ -15,15 +16,24 @@ export function OperationsContentPlans({ plans, items, statusClass }: Props) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><CalendarClock className="h-5 w-5 text-[#025EB8]" /> خطط المحتوى</CardTitle>
-          <CardDescription>نماذج تقرأ الآن من API overview.</CardDescription>
+          <CardDescription>نماذج تقرأ الآن من API overview ويمكن تحويل كل خطة إلى مهمة متابعة محفوظة.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {plans.map((plan) => (
             <div key={plan.id || plan.title} className="rounded-2xl border bg-slate-50 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div><h2 className="font-black text-slate-900">{plan.title}</h2><p className="mt-1 text-sm leading-6 text-slate-600">{plan.theme}</p></div>
+                <div>
+                  <h2 className="font-black text-slate-900">{plan.title}</h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">{plan.theme}</p>
+                </div>
                 <Badge variant="outline" className={statusClass[plan.status]}>{plan.status}</Badge>
               </div>
+              <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-3">
+                <span>العناصر: <b>{plan.items}</b></span>
+                <span>المنشور: <b>{plan.published}</b></span>
+                <span>الفترة: <b>{plan.date}</b></span>
+              </div>
+              <OperationsContentPlanTaskAction plan={plan} />
             </div>
           ))}
         </CardContent>
