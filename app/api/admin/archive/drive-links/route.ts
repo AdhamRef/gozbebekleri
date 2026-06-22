@@ -7,10 +7,21 @@ import { jsonNoStore, readJson, requireArchiveApiAccess } from "../_auth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const googleDriveHostnames = new Set(["drive.google.com"]);
+
+function isGoogleDriveUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return googleDriveHostnames.has(url.hostname) || url.hostname.endsWith(".drive.google.com");
+  } catch {
+    return false;
+  }
+}
+
 const schema = z.object({
-  projectId: z.string().trim().max(160).optional(),
-  title: z.string().trim().max(180).optional(),
-  driveUrl: z.string().trim().max(1200).optional(),
+  projectId: z.string().trim().min(1).max(160),
+  title: z.string().trim().min(1).max(180),
+  driveUrl: z.string().trim().min(1).max(1200).refine(isGoogleDriveUrl, "Drive URL must be a valid Google Drive URL."),
 });
 
 export async function GET() {
@@ -25,7 +36,7 @@ export async function POST(request: Request) {
   if (denied) return denied;
 
   const parsed = schema.safeParse(await readJson(request));
-  if (!parsed.success) return jsonNoStore({ ok: false, error: "Invalid payload", issues: parsed.error.flatten() }, { status: 400 });
+  if (!parsed.success) return jsonNoStore({ ok: false, error: "Invalid archive Drive link payload", issues: parsed.error.flatten() }, { status: 400 });
 
   const actor = session?.user ? auditActorFromDashboardSession(session) : null;
   const result = await createArchiveDriveLinkInRepository(parsed.data, actor);
