@@ -17,6 +17,7 @@ export type BrandAssetActor = {
 };
 
 export type BrandAssetWriteInput = {
+  id?: string | null;
   profileId?: string | null;
   title?: string | null;
   type?: string | null;
@@ -115,7 +116,7 @@ export async function readAuditBackedBrandAssets(): Promise<BrandAsset[]> {
     for (const row of rows) {
       const asset = brandAssetFromMetadata(row.metadata);
       if (!asset) continue;
-      if (!latest.has(asset.id ?? row.id)) latest.set(asset.id ?? row.id, asset);
+      if (!latest.has(asset.id)) latest.set(asset.id, asset);
     }
 
     return [...latest.values()];
@@ -143,6 +144,58 @@ function buildBrandAsset(input: BrandAssetWriteInput, actor?: BrandAssetActor | 
   };
 }
 
+function buildUpdatedBrandAsset(input: BrandAssetWriteInput, existing: BrandAsset, actor?: BrandAssetActor | null): BrandAsset {
+  return {
+    ...existing,
+    profileId: stringField(input.profileId) ?? existing.profileId,
+    title: stringField(input.title) ?? existing.title,
+    type: input.type ? asAssetType(input.type) : existing.type,
+    format: input.format ? asAssetFormat(input.format) : existing.format,
+    fileUrl: stringField(input.fileUrl) ?? existing.fileUrl,
+    previewUrl: stringField(input.previewUrl) ?? existing.previewUrl,
+    usage: stringField(input.usage) ?? existing.usage,
+    locale: input.locale ? asAssetLocale(input.locale) : existing.locale,
+    notes: stringField(input.notes) ?? existing.notes,
+    downloadable: typeof input.downloadable === "boolean" ? input.downloadable : existing.downloadable,
+    createdBy: existing.createdBy || actor?.actorName || actor?.actorId || "dashboard-user",
+    status: input.status ? asAssetStatus(input.status) : existing.status,
+  };
+}
+
+async function writeBrandAssetAuditRecord(params: {
+  action: string;
+  messageAr: string;
+  messageEn: string;
+  brandAsset: BrandAsset;
+  actor?: BrandAssetActor | null;
+  metadata?: Record<string, unknown>;
+}) {
+  await prisma.auditLog.create({
+    data: {
+      actorId: safeObjectId(params.actor?.actorId),
+      actorName: params.actor?.actorName ?? undefined,
+      actorRole: params.actor?.actorRole || "ADMIN",
+      action: params.action,
+      messageAr: params.messageAr,
+      messageEn: params.messageEn,
+      entityType: "BrandAsset",
+      entityId: params.brandAsset.id,
+      metadata: {
+        brandAsset: params.brandAsset,
+        sourceType: "MANUAL_URL",
+        externalCall: false,
+        uploadPerformed: false,
+        downloadPerformed: false,
+        autoPublish: false,
+        aiGenerated: false,
+        humanReviewRequired: true,
+        ...params.metadata,
+      },
+      stream: "TEAM",
+    },
+  });
+}
+
 export async function createAuditBackedBrandAsset(input: BrandAssetWriteInput, actor?: BrandAssetActor | null): Promise<BrandAssetWriteResult> {
   if (!process.env.DATABASE_URL) {
     return { ok: false, mode: "foundation", externalCall: false, status: 503, message: "DATABASE_URL is not configured; brand asset was not saved." };
@@ -151,33 +204,58 @@ export async function createAuditBackedBrandAsset(input: BrandAssetWriteInput, a
   const brandAsset = buildBrandAsset(input, actor);
 
   try {
-    await prisma.auditLog.create({
-      data: {
-        actorId: safeObjectId(actor?.actorId),
-        actorName: actor?.actorName ?? undefined,
-        actorRole: actor?.actorRole || "ADMIN",
-        action: brandAssetCreateAction,
-        messageAr: "تمت إضافة أصل هوية يدوي",
-        messageEn: "Manual brand asset created",
-        entityType: "BrandAsset",
-        entityId: brandAsset.id,
-        metadata: {
-          brandAsset,
-          sourceType: "MANUAL_URL",
-          externalCall: false,
-          uploadPerformed: false,
-          downloadPerformed: false,
-          autoPublish: false,
-          aiGenerated: false,
-          humanReviewRequired: true,
-        },
-        stream: "TEAM",
-      },
+    await writeBrandAssetAuditRecord({
+      action: brandAssetCreateAction,
+      messageAr: "تمت إضافة أصل هوية يدوي",
+      messageEn: "Manual brand asset created",
+      brandAsset,
+      actor,
     });
 
     return { ok: true, mode: "prisma", externalCall: false, status: 201, message: "Brand asset saved.", data: brandAsset };
   } catch (error) {
     console.error("Brand asset save failed", error);
     return { ok: false, mode: "prisma", externalCall: false, status: 503, message: "Brand asset save failed." };
+  }
+}
+
+export async function updateAuditBackedBrandAsset(
+  input: BrandAssetWriteInput,
+  actor?: BrandAssetActor | null,
+  existingAsset?: BrandAsset | null,
+): Promise<BrandAssetWriteResult> {
+  const id = stringField(input.id);
+  if (!id) {
+    return { ok: false, mode: "foundation", externalCall: false, status: 400, message: "Brand asset id is required." };
+  }
+  if (!process.env.DATABASE_URL) {
+    return { ok: false, mode: "foundation", externalCall: false, status: 503, message: "DATABASE_URL is not configured; brand asset was not updated." };
+  }
+
+  const existing = existingAsset ?? (await readAuditBackedBrandAssets()).find((asset) => asset.id === id) ?? null;
+  if (!existing) {
+    return { ok: false, mode: "prisma", externalCall: false, status: 404, message: "Brand asset not found." };
+  }
+
+  const brandAsset = buildUpdatedBrandAsset(input, existing, actor);
+
+  try {
+    await writeBrandAssetAuditRecord({
+      action: brandAssetUpdateAction,
+      messageAr: "تم تحديث أصل هوية يدوي",
+      messageEn: "Manual brand asset updated",
+      brandAsset,
+      actor,
+      metadata: {
+        updateOnly: true,
+        previousStatus: existing.status,
+        previousDownloadable: existing.downloadable,
+      },
+    });
+
+    return { ok: true, mode: "prisma", externalCall: false, status: 200, message: "Brand asset updated.", data: brandAsset };
+  } catch (error) {
+    console.error("Brand asset update failed", error);
+    return { ok: false, mode: "prisma", externalCall: false, status: 503, message: "Brand asset update failed." };
   }
 }
