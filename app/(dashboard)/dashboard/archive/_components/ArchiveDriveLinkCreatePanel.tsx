@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FormEvent, useMemo, useState } from "react";
+import type { FormEvent } from "react";
+import { useMemo, useState } from "react";
 import { FolderPlus, Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ArchiveProject } from "@/lib/archive/archive-types";
