@@ -23,6 +23,7 @@
 - تم تجهيز `BrandAsset`, `BrandFont`, و`BrandMessageFramework` كعقود staged فقط.
 - تم تجهيز Brand repository ليقرأ `BrandAsset`, `BrandFont`, و`BrandMessageFramework` إذا كان Prisma Client يوفّر delegates، وإلا يرجع foundation data بوضوح.
 - تم تجهيز `ArchiveDriveLink`, `ArchiveAsset`, و`ArchiveVideoFrame` كعقود staged فقط لدعم Google Drive metadata وAI/human review لاحقًا.
+- تم تجهيز Archive repository ليقرأ `ArchiveDriveLink`, `ArchiveAsset`, و`ArchiveVideoFrame` إذا كان Prisma Client يوفّر delegates، وإلا يرجع foundation data بوضوح.
 - تم تجهيز عقود Operations/Content التالية كـ staged contracts فقط: `OperationSeason`, `MonthlyContentPlan`, `ContentItem`, `ContentPublication`, `MessageSchedule`, `DonorReactivationReminder`, `MarketingLearning`, و`ContentAdLink`.
 - تم تجهيز `AiOperationRun` كعقد staged فقط لسجل تشغيل Shared AI Core.
 
@@ -68,9 +69,9 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 
 - `ArchiveCollection`
 - `ArchiveProject`
-- `ArchiveDriveLink` staged contract only
-- `ArchiveAsset` staged contract only
-- `ArchiveVideoFrame` staged contract only
+- `ArchiveDriveLink` staged contract + repository read fallback only
+- `ArchiveAsset` staged contract + repository read fallback only
+- `ArchiveVideoFrame` staged contract + repository read fallback only
 
 ### Operations & Content
 
@@ -100,9 +101,9 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 | `BrandMessageFramework` | Repository read fallback prepared; runtime schema pending | Message frameworks can use the same Brand repository snapshot once runtime model exists. |
 | `ArchiveCollection` | DB-backed read + foundation fallback | Smart Archive pages read collections through archive repository. |
 | `ArchiveProject` | DB-backed read + foundation fallback | Smart Archive pages read projects through archive repository. |
-| `ArchiveDriveLink` | Staged contract only | Google Drive link metadata; no external Drive calls yet. |
-| `ArchiveAsset` | Staged contract only | Drive file metadata, AI draft fields, human review fields, marketing/documentation approval flags. |
-| `ArchiveVideoFrame` | Staged contract only | Frame metadata for later video analysis; no frame extraction or AI call yet. |
+| `ArchiveDriveLink` | Repository read fallback prepared; runtime schema pending | Google Drive link metadata can be read when runtime model exists; no external Drive calls. |
+| `ArchiveAsset` | Repository read fallback prepared; runtime schema pending | Asset metadata, AI draft fields, human review fields, and approval flags can be read when runtime model exists. |
+| `ArchiveVideoFrame` | Repository read fallback prepared; runtime schema pending | Video frame metadata can be read when runtime model exists; no frame extraction or AI call. |
 | `OperationTask` | DB-backed read/write API + create/edit UI + transitions + computed foundation fallback | Tasks page/API supports safe manual operations for real rows. |
 | `OperationSeason` | Staged contract only | AI-suggested dates stay suggested until human review. |
 | `MonthlyContentPlan` | Staged contract only | Plans can later generate ContentItems and OperationTasks. |
