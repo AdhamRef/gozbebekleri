@@ -1,5 +1,6 @@
 import { archiveAssets } from "./archive/archive-data";
 import type { ArchiveAsset } from "./archive/archive-types";
+import { readAuditBackedContentItems } from "./content-item-repository";
 import { createFallbackOperationsOverview } from "./mock-data";
 import { productionItems } from "./production/production-data";
 import type { ProductionItem } from "./production/production-types";
@@ -39,6 +40,19 @@ function fromFoundation<T>(
   };
 }
 
+function auditBackedContentPersistence(count: number): OperationsPersistenceInfo {
+  return {
+    mode: "prisma",
+    storage: "prisma",
+    readOnly: false,
+    model: "OperationsContentItemAuditLog",
+    nextModel: "OperationContentItem",
+    readyForDb: true,
+    externalSideEffects: false,
+    note: `${count} content item proposal(s) are persisted through AuditLog records until the runtime OperationContentItem model is added. No publishing or sending is automatic.`,
+  };
+}
+
 export async function listScheduledContentItems(): Promise<OperationsRepositoryResult<ScheduledContentItem>> {
   return fromFoundation(scheduledContentItems, "ScheduledContentItem", "ContentSchedule");
 }
@@ -53,6 +67,16 @@ export async function listArchiveAssets(): Promise<OperationsRepositoryResult<Ar
 
 export async function listContentItems(): Promise<OperationsRepositoryResult<OperationsContentItem>> {
   const overview = createFallbackOperationsOverview();
+  const auditItems = await readAuditBackedContentItems();
+  const items = auditItems.length > 0 ? [...auditItems, ...overview.items] : overview.items;
+
+  if (auditItems.length > 0) {
+    return {
+      items,
+      persistence: auditBackedContentPersistence(auditItems.length),
+    };
+  }
+
   return fromFoundation(overview.items, "OperationsContentItem", "OperationContentItem");
 }
 
@@ -74,8 +98,8 @@ export async function getContentOperationsOverview(): Promise<OperationsOverview
 
   return {
     ...overview,
-    source: "content-operations-repository",
-    version: "operations-overview-foundation",
+    source: contentItems.persistence.mode === "prisma" ? "content-operations-audit-backed" : "content-operations-repository",
+    version: contentItems.persistence.mode === "prisma" ? "operations-overview-audit-backed" : "operations-overview-foundation",
     kpis: {
       ...overview.kpis,
       contentItems: contentItems.items.length,
@@ -84,9 +108,11 @@ export async function getContentOperationsOverview(): Promise<OperationsOverview
     },
     items: contentItems.items,
     tasks: contentTasks.items,
-    persistence: foundationPersistence("OperationsOverview", "OperationContentWorkspace", {
-      note: "Content workspace data is grouped behind a repository contract while seasons and plans remain foundation records.",
-    }),
+    persistence: contentItems.persistence.mode === "prisma"
+      ? contentItems.persistence
+      : foundationPersistence("OperationsOverview", "OperationContentWorkspace", {
+          note: "Content workspace data is grouped behind a repository contract while seasons and plans remain foundation records.",
+        }),
   };
 }
 
