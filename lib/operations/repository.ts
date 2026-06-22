@@ -215,7 +215,8 @@ export async function getOperationsPersistenceSnapshot() {
     {
       key: "tasks",
       label: "Operations Tasks",
-      total: tasks.persistence,
+      total: tasks.items.length,
+      persistence: tasks.persistence,
     },
   ];
 
