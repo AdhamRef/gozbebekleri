@@ -16,10 +16,10 @@ export function OperationsContentKanban({ items, boardColumns, statusClass }: Op
     <Card>
       <CardHeader>
         <CardTitle>مراحل إنتاج المحتوى</CardTitle>
-        <CardDescription>Kanban يقرأ من repository واحد. العناصر المحفوظة يمكن نقلها للمراجعة أو اعتمادها بدون نشر تلقائي.</CardDescription>
+        <CardDescription>Kanban يقرأ من repository واحد. العناصر المحفوظة تبقى ظاهرة حتى بعد الجدولة أو تسجيل النشر اليدوي.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-3 xl:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">
           {boardColumns.map(([status, label, description]) => {
             const columnItems = items.filter((item) => item.status === status);
 
