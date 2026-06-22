@@ -43,16 +43,16 @@
 - `/api/admin/brand/guidelines` supports guarded no-store `GET` and `POST` for real `BrandGuideline` rows.
 - `/dashboard/brand/voice` has a usable manual guideline creation panel for voice, copy, proof, donor dignity, CTA, and localization rules.
 - New BrandGuideline rows are saved through Prisma with best-effort AuditLog using `action = brand.guideline.create`.
+- `/api/admin/brand/frameworks` supports guarded no-store `GET` and `POST` for audit-backed `BrandMessageFramework` records until the runtime delegate exists.
+- `/dashboard/brand/frameworks` has a usable manual message framework creation panel for Friday, thank-you, zakat, waqf, emergency, donor reactivation, Ramadan, and general frameworks.
+- Brand repository reads audit-backed BrandMessageFramework records and merges them with foundation/runtime frameworks.
 
 ## ما يتم تجهيزه في الحزمة الحالية
 
-- `/api/admin/brand/frameworks` supports guarded no-store `GET` and `POST` for audit-backed `BrandMessageFramework` records until the runtime delegate exists.
-- `/dashboard/brand/frameworks` has a usable manual message framework creation panel for Friday, thank-you, zakat, waqf, emergency, donor reactivation, Ramadan, and general frameworks.
-- Message framework authoring supports locale, structure, sample text, Do list, Do-not list, feedback, and refresh.
-- Brand repository reads audit-backed BrandMessageFramework records and merges them with foundation/runtime frameworks.
-- New BrandMessageFramework records use DB-backed AuditLog with `action = brand.message-framework.manual-create`.
-- Framework creation records safety metadata: `externalCall: false`, `autoPublish: false`, `aiGenerated: false`, and `humanReviewRequired: true`.
-- No file upload, file download, Google Drive sync, AI generation, publishing, sending, payment changes, tracking runtime changes, external platform calls, or frontend secrets.
+- `/dashboard/operations/content` content-item cards now expose `SCHEDULED` and `PUBLISHED` status transitions in addition to `REVIEW` and `APPROVED`.
+- `PUBLISHED` is explicitly a manual status update only; the UI confirms that no automatic sending or publishing happens.
+- The existing guarded no-store `PATCH /api/dashboard/operations/items` persists the new statuses through audit-backed content item records.
+- No provider call, no auto-send, no auto-publish, no payment changes, no tracking runtime changes, no external platform calls, and no frontend secrets.
 
 ## المسارات الرئيسية
 
@@ -117,6 +117,7 @@
 - BrandColor manual rows should be reviewed against official brand files before being treated as final design authority.
 - BrandGuideline manual rows should be reviewed before AI or team workflows treat them as final voice authority.
 - BrandMessageFramework manual rows should be reviewed before AI or team workflows use them for campaign messages.
+- Content item `PUBLISHED` status is currently a manual workflow marker only; full ContentPublication runtime rows are still pending.
 - AI audit persistence يحتاج runtime schema قبل DB writes فعلية، ويجب أن يظل sanitized ودون أسرار.
 - ArchiveCollection وArchiveProject write paths تعتمد على DB availability وunique slugs؛ الفشل يظهر بوضوح بدل الحفظ الوهمي.
 - OperationTask quick edit يعمل فقط على rows فعلية؛ foundation generated tasks تبقى read-only.
