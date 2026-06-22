@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ClipboardCheck } from "lucide-react";
+import { CalendarCheck2, CheckCircle2, ClipboardCheck, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type OperationsContentItemActionsProps = {
@@ -19,6 +19,10 @@ export function OperationsContentItemActions({ id, status }: OperationsContentIt
 
   async function updateStatus(nextStatus: string) {
     if (!id) return;
+    if (nextStatus === "PUBLISHED" && !window.confirm("تأكيد نشر يدوي؟ لن يتم إرسال أو نشر أي محتوى تلقائيًا؛ سيتم تحديث حالة العنصر فقط.")) {
+      return;
+    }
+
     setBusy(nextStatus);
     setError(null);
 
@@ -38,20 +42,33 @@ export function OperationsContentItemActions({ id, status }: OperationsContentIt
     router.refresh();
   }
 
+  const isPublished = status === "PUBLISHED";
+
   return (
     <div className="mt-3 space-y-2 border-t pt-3">
       <div className="flex flex-wrap gap-2">
-        {status !== "REVIEW" ? (
+        {status !== "REVIEW" && !isPublished ? (
           <Button type="button" variant="outline" size="sm" disabled={busy !== null} onClick={() => updateStatus("REVIEW")}>
             <ClipboardCheck className="h-3.5 w-3.5" /> مراجعة
           </Button>
         ) : null}
-        {status !== "APPROVED" ? (
+        {status !== "APPROVED" && !isPublished ? (
           <Button type="button" variant="outline" size="sm" disabled={busy !== null} onClick={() => updateStatus("APPROVED")}>
             <CheckCircle2 className="h-3.5 w-3.5" /> اعتماد
           </Button>
         ) : null}
+        {status !== "SCHEDULED" && !isPublished ? (
+          <Button type="button" variant="outline" size="sm" disabled={busy !== null} onClick={() => updateStatus("SCHEDULED")}>
+            <CalendarCheck2 className="h-3.5 w-3.5" /> جدولة
+          </Button>
+        ) : null}
+        {!isPublished ? (
+          <Button type="button" variant="outline" size="sm" disabled={busy !== null} onClick={() => updateStatus("PUBLISHED")}>
+            <Megaphone className="h-3.5 w-3.5" /> نشر يدوي
+          </Button>
+        ) : null}
       </div>
+      <p className="text-[11px] font-semibold leading-5 text-slate-500">النشر اليدوي يحدّث الحالة فقط؛ لا يوجد إرسال أو نشر تلقائي.</p>
       {busy ? <p className="text-xs font-semibold text-slate-500">جاري التحديث...</p> : null}
       {error ? <p className="text-xs font-semibold text-rose-600">{error}</p> : null}
     </div>
