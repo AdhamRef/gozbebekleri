@@ -207,7 +207,21 @@ function foundationArchiveData(): ArchiveFoundationData {
   return {
     collections: sortedCollections(collections),
     projects: [...projects],
+    driveLinks: [...driveLinks],
+    assets: [...assets],
+    videoFrames: [...videoFrames],
   };
+}
+
+function activeArchiveModels(repository: ArchiveRepositorySnapshot): string[] {
+  if (repository.mode !== "db-backed") return [];
+  return [
+    "ArchiveCollection",
+    "ArchiveProject",
+    ...(repository.dbCounts.driveLinks > 0 ? ["ArchiveDriveLink"] : []),
+    ...(repository.dbCounts.assets > 0 ? ["ArchiveAsset"] : []),
+    ...(repository.dbCounts.videoFrames > 0 ? ["ArchiveVideoFrame"] : []),
+  ];
 }
 
 function persistence(repository?: ArchiveRepositorySnapshot): ArchiveSnapshot["persistence"] {
@@ -215,7 +229,7 @@ function persistence(repository?: ArchiveRepositorySnapshot): ArchiveSnapshot["p
     return {
       mode: "db-backed",
       nextModels,
-      activeModels: ["ArchiveCollection", "ArchiveProject"],
+      activeModels: activeArchiveModels(repository),
       dbCounts: repository.dbCounts,
       externalSideEffects: false,
       note: repository.reason,
@@ -237,7 +251,7 @@ function persistence(repository?: ArchiveRepositorySnapshot): ArchiveSnapshot["p
     mode: "foundation",
     nextModels,
     activeModels: [],
-    dbCounts: { collections: 0, projects: 0 },
+    dbCounts: { collections: 0, projects: 0, driveLinks: 0, assets: 0, videoFrames: 0 },
     externalSideEffects: false,
     note: "Smart Archive is using repository/service contracts and foundation data. DB migration and Google Drive sync can be added safely next.",
   };
@@ -247,14 +261,17 @@ function projectFor(asset: ArchiveAsset) {
   return projects.find((project) => project.id === asset.projectId) ?? null;
 }
 
-function marketingPicks() {
-  return assets.filter((asset) => asset.marketingApproved || (!asset.isSensitive && asset.marketingScore >= 65 && asset.humanReviewStatus !== "REJECTED"));
+function marketingPicks(sourceAssets: ArchiveAsset[]) {
+  return sourceAssets.filter((asset) => asset.marketingApproved || (!asset.isSensitive && asset.marketingScore >= 65 && asset.humanReviewStatus !== "REJECTED"));
 }
 
 function buildArchiveSnapshot(repository?: ArchiveRepositorySnapshot): ArchiveSnapshot {
   const activeCollections = repository ? sortedCollections(repository.collections) : sortedCollections(collections);
   const activeProjects = repository ? [...repository.projects] : [...projects];
-  const activeMarketingPicks = marketingPicks();
+  const activeDriveLinks = repository ? [...repository.driveLinks] : [...driveLinks];
+  const activeAssets = repository ? [...repository.assets] : [...assets];
+  const activeVideoFrames = repository ? [...repository.videoFrames] : [...videoFrames];
+  const activeMarketingPicks = marketingPicks(activeAssets);
 
   return {
     source: repository?.mode === "db-backed" ? "smart-archive-db-backed" : "smart-archive-foundation",
@@ -263,27 +280,27 @@ function buildArchiveSnapshot(repository?: ArchiveRepositorySnapshot): ArchiveSn
     tabs: ARCHIVE_TABS,
     collections: activeCollections,
     projects: activeProjects,
-    driveLinks: [...driveLinks],
-    assets: [...assets],
+    driveLinks: activeDriveLinks,
+    assets: activeAssets,
     marketingPicks: activeMarketingPicks,
-    videoFrames: [...videoFrames],
+    videoFrames: activeVideoFrames,
     summary: {
       collections: activeCollections.length,
       projects: activeProjects.length,
-      driveLinks: driveLinks.length,
-      assets: assets.length,
+      driveLinks: activeDriveLinks.length,
+      assets: activeAssets.length,
       marketingReady: activeMarketingPicks.length,
-      pendingHumanReview: assets.filter((asset) => asset.humanReviewStatus === "PENDING").length,
-      sensitiveAssets: assets.filter((asset) => asset.isSensitive || asset.needsBlur).length,
-      reports: assets.filter((asset) => asset.recommendedUse === "REPORT" || asset.fileType === "DOCUMENT").length,
+      pendingHumanReview: activeAssets.filter((asset) => asset.humanReviewStatus === "PENDING").length,
+      sensitiveAssets: activeAssets.filter((asset) => asset.isSensitive || asset.needsBlur).length,
+      reports: activeAssets.filter((asset) => asset.recommendedUse === "REPORT" || asset.fileType === "DOCUMENT").length,
     },
     warnings: [
       "Google Drive sync is not automatic and makes no external call in foundation mode.",
       "AI analysis is draft-only and human review is required before marketing use.",
       "Sensitive assets and assets needing blur are excluded from Marketing Picks until approved.",
       repository?.mode === "db-backed"
-        ? "ArchiveCollection and ArchiveProject are DB-backed. Drive links, assets, video frames, and AI remain foundation/manual-first."
-        : "ArchiveCollection and ArchiveProject are using foundation fallback until database rows are available.",
+        ? "Archive repository is DB-backed where generated delegates exist. Drive sync, AI analysis, approvals, and task creation remain manual/foundation-first."
+        : "Archive data is using foundation fallback until database rows are available.",
     ],
     flows: [
       "Google Drive Folder -> ArchiveProject -> ArchiveDriveLink -> ArchiveAsset metadata",
