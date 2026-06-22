@@ -2,6 +2,7 @@ import type { OperationsPersistenceInfo } from "../persistence-types";
 
 export type ScheduledChannel = "SOCIAL" | "WHATSAPP" | "EMAIL" | "SMS" | "TEAM_REMINDER";
 export type ScheduledItemStatus = "DRAFT" | "READY" | "SCHEDULED" | "SENT" | "BLOCKED";
+export type ScheduledManualStatus = "SCHEDULED" | "PUBLISHED" | "MANUALLY_SENT" | "CANCELLED" | "FAILED";
 
 export type ScheduledContentItem = {
   id: string;
@@ -14,6 +15,10 @@ export type ScheduledContentItem = {
   providerKey?: string;
   contentUrl?: string;
   note: string;
+  publicationCount?: number;
+  lastManualStatus?: ScheduledManualStatus | null;
+  lastManualAt?: string | null;
+  lastManualPlatform?: string | null;
 };
 
 export type SchedulerOverview = {

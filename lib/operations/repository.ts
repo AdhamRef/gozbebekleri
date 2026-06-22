@@ -6,11 +6,13 @@ import { createFallbackOperationsOverview } from "./mock-data";
 import { productionItems } from "./production/production-data";
 import type { ProductionItem } from "./production/production-types";
 import { scheduledContentItems } from "./scheduler/scheduler-data";
-import type { ScheduledContentItem } from "./scheduler/scheduler-types";
+import type { ScheduledContentItem, ScheduledManualStatus } from "./scheduler/scheduler-types";
 import { listOperationTasksFromRepository } from "./tasks/task-repository";
 import type { OperationsTask } from "./tasks/task-types";
 import type { OperationsPersistenceInfo, OperationsRepositoryResult } from "./persistence-types";
 import type { OperationsContentItem, OperationsContentTask, OperationsOverview } from "./types";
+
+const scheduledManualStatuses: ScheduledManualStatus[] = ["SCHEDULED", "PUBLISHED", "MANUALLY_SENT", "CANCELLED", "FAILED"];
 
 function foundationPersistence(
   model: string,
@@ -80,8 +82,42 @@ async function attachPublicationMarkers(items: OperationsContentItem[]): Promise
   });
 }
 
+function publicationTime(publication: { publishedAt: string | null; scheduledAt: string | null }) {
+  return publication.publishedAt ?? publication.scheduledAt;
+}
+
+function asScheduledManualStatus(value: string | null | undefined): ScheduledManualStatus | null {
+  return scheduledManualStatuses.includes(value as ScheduledManualStatus) ? (value as ScheduledManualStatus) : null;
+}
+
+async function attachSchedulerPublicationMarkers(items: ScheduledContentItem[]): Promise<ScheduledContentItem[]> {
+  const publications = await readAuditBackedContentPublications();
+  if (publications.length === 0) return items;
+
+  return items.map((item) => {
+    const itemPublications = publications.filter((publication) => publication.contentItemId === item.id);
+    if (itemPublications.length === 0) return item;
+    const latest = [...itemPublications].sort((a, b) => {
+      const aTime = publicationTime(a) ? new Date(publicationTime(a) as string).getTime() : 0;
+      const bTime = publicationTime(b) ? new Date(publicationTime(b) as string).getTime() : 0;
+      return bTime - aTime;
+    })[0];
+
+    return {
+      ...item,
+      publicationCount: itemPublications.length,
+      lastManualStatus: asScheduledManualStatus(latest?.status),
+      lastManualAt: latest ? publicationTime(latest) : null,
+      lastManualPlatform: latest?.platform ?? null,
+    };
+  });
+}
+
 export async function listScheduledContentItems(): Promise<OperationsRepositoryResult<ScheduledContentItem>> {
-  return fromFoundation(scheduledContentItems, "ScheduledContentItem", "ContentSchedule");
+  const items = await attachSchedulerPublicationMarkers(scheduledContentItems);
+  return fromFoundation(items, "ScheduledContentItem", "ContentSchedule", {
+    note: "Scheduler items are foundation records, while manual send/cancel markers are read from audit-backed ContentPublication records when available.",
+  });
 }
 
 export async function listProductionItems(): Promise<OperationsRepositoryResult<ProductionItem>> {
