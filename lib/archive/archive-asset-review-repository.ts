@@ -29,6 +29,20 @@ export type ArchiveAssetReviewResult = {
   data?: ArchiveAsset;
 };
 
+type ArchiveAssetReviewUpdateDelegate = {
+  update(args: {
+    where: { id: string };
+    data: {
+      marketingApproved: boolean;
+      documentationApproved: boolean;
+      humanReviewStatus: string;
+      reviewedBy?: string | null;
+      reviewedAt?: Date | null;
+      reviewerNote?: string | null;
+    };
+  }): Promise<unknown>;
+};
+
 const reviewActions = [
   "archive.asset.approve-marketing",
   "archive.asset.approve-documentation",
@@ -127,6 +141,31 @@ function overrideFromMetadata(metadata: unknown): ArchiveAssetReviewOverride | n
   };
 }
 
+function getArchiveAssetReviewUpdateDelegate(): ArchiveAssetReviewUpdateDelegate | null {
+  const prismaWithArchiveAsset = prisma as unknown as { archiveAsset?: ArchiveAssetReviewUpdateDelegate };
+  return prismaWithArchiveAsset.archiveAsset ?? null;
+}
+
+async function updateArchiveAssetRuntimeReview(review: ArchiveAssetReviewOverride): Promise<boolean> {
+  const delegate = getArchiveAssetReviewUpdateDelegate();
+  const assetObjectId = safeObjectId(review.assetId);
+  if (!delegate || !assetObjectId) return false;
+
+  await delegate.update({
+    where: { id: assetObjectId },
+    data: {
+      marketingApproved: review.marketingApproved,
+      documentationApproved: review.documentationApproved,
+      humanReviewStatus: review.humanReviewStatus,
+      reviewedBy: safeObjectId(review.reviewedBy) ?? review.reviewedBy,
+      reviewedAt: review.reviewedAt ? new Date(review.reviewedAt) : null,
+      reviewerNote: review.reviewerNote,
+    },
+  });
+
+  return true;
+}
+
 export function applyArchiveAssetReviewOverrides(
   assets: ArchiveAsset[],
   overrides: ArchiveAssetReviewOverride[],
@@ -187,6 +226,10 @@ export async function persistArchiveAssetReviewInRepository(
 
   try {
     const review = overrideFromIntent(asset, intent, actor);
+    const runtimeUpdated = await updateArchiveAssetRuntimeReview(review).catch((error) => {
+      console.error("Archive asset runtime review update failed; falling back to audit log", error);
+      return false;
+    });
     const messages = messagesForIntent(intent);
     await prisma.auditLog.create({
       data: {
@@ -203,6 +246,7 @@ export async function persistArchiveAssetReviewInRepository(
           fileName: asset.fileName,
           intent,
           review,
+          runtimeUpdated,
           externalCall: false,
           humanApproved: true,
           aiApproved: false,
@@ -215,7 +259,7 @@ export async function persistArchiveAssetReviewInRepository(
       ok: true,
       mode: "prisma",
       externalCall: false,
-      message: "Archive asset review saved.",
+      message: runtimeUpdated ? "Archive asset review saved in runtime model." : "Archive asset review saved as audit-backed fallback.",
       data: applyArchiveAssetReviewOverrides([asset], [review])[0],
     };
   } catch (error) {
