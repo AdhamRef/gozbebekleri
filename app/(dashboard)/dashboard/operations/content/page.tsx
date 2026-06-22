@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { OperationsContentKanban } from "@/components/operations/OperationsContentKanban";
-import { OperationsContentPlans } from "@/components/operations/OperationsContentPlans";
-import { OperationsFilters } from "@/components/operations/OperationsFilters";
+import { OperationsContentWorkspace } from "@/components/operations/OperationsContentWorkspace";
 import { OperationsInfoCards } from "@/components/operations/OperationsInfoCards";
 import { OperationsKpis } from "@/components/operations/OperationsKpis";
 import { OperationsProductionTasks } from "@/components/operations/OperationsProductionTasks";
@@ -67,10 +65,8 @@ export default async function OperationsContentPage() {
       <ContentItemCreatePanel />
       <OperationsKpis kpis={kpis} />
       <OperationsSeasonsBoard seasons={seasons} weeklyThemes={weeklyThemes} statusClass={statusClass} />
-      <OperationsFilters filters={filters} />
-      <OperationsContentKanban items={items} boardColumns={boardColumns} statusClass={statusClass} />
+      <OperationsContentWorkspace filters={filters} items={items} plans={plans} boardColumns={boardColumns} statusClass={statusClass} />
       <OperationsProductionTasks tasks={tasks} statusClass={statusClass} />
-      <OperationsContentPlans plans={plans} items={items} statusClass={statusClass} />
       <OperationsInfoCards />
     </div>
   );
