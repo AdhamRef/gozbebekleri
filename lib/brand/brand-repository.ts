@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { readAuditBackedBrandAssets } from "./brand-asset-repository";
+import { readAuditBackedBrandFonts } from "./brand-font-repository";
 import { readAuditBackedBrandMessageFrameworks } from "./brand-message-framework-repository";
 import {
   brandAssets,
@@ -205,6 +206,18 @@ function mergeBrandAssets(baseAssets: BrandAsset[], auditAssets: BrandAsset[], p
   return [...merged.values()];
 }
 
+function mergeBrandFonts(baseFonts: BrandFont[], auditFonts: BrandFont[], profiles: BrandProfile[]) {
+  const profileIds = new Set(profiles.map((profile) => profile.id));
+  const merged = new Map<string, BrandFont>();
+  for (const font of baseFonts) {
+    if (profileIds.has(font.profileId)) merged.set(font.id, font);
+  }
+  for (const font of auditFonts) {
+    if (profileIds.has(font.profileId)) merged.set(font.id, font);
+  }
+  return [...merged.values()];
+}
+
 function mergeBrandMessageFrameworks(baseFrameworks: BrandMessageFramework[], auditFrameworks: BrandMessageFramework[], profiles: BrandProfile[]) {
   const profileIds = new Set(profiles.map((profile) => profile.id));
   const merged = new Map<string, BrandMessageFramework>();
@@ -226,12 +239,13 @@ export async function getBrandRepositorySnapshot(): Promise<BrandRepositorySnaps
     const brandAssetDelegate = getBrandAssetDelegate();
     const brandFontDelegate = getBrandFontDelegate();
     const brandMessageFrameworkDelegate = getBrandMessageFrameworkDelegate();
-    const [profileRows, assetRows, auditAssetRows, colorRows, fontRows, guidelineRows, frameworkRows, auditFrameworkRows] = await Promise.all([
+    const [profileRows, assetRows, auditAssetRows, colorRows, fontRows, auditFontRows, guidelineRows, frameworkRows, auditFrameworkRows] = await Promise.all([
       prisma.brandProfile.findMany({ orderBy: [{ isActive: "desc" }, { name: "asc" }] }),
       brandAssetDelegate ? brandAssetDelegate.findMany({ orderBy: [{ title: "asc" }] }) : Promise.resolve([]),
       readAuditBackedBrandAssets(),
       prisma.brandColor.findMany({ orderBy: [{ order: "asc" }, { name: "asc" }] }),
       brandFontDelegate ? brandFontDelegate.findMany({ orderBy: [{ name: "asc" }] }) : Promise.resolve([]),
+      readAuditBackedBrandFonts(),
       prisma.brandGuideline.findMany({ orderBy: [{ order: "asc" }, { title: "asc" }] }),
       brandMessageFrameworkDelegate
         ? brandMessageFrameworkDelegate.findMany({ orderBy: [{ name: "asc" }] })
@@ -366,11 +380,15 @@ export async function getBrandRepositorySnapshot(): Promise<BrandRepositorySnaps
     if (auditAssetRows.length > 0) {
       reasonParts.push(`${auditAssetRows.length} BrandAsset record(s) are currently audit-backed manual URL records.`);
     }
+    if (auditFontRows.length > 0) {
+      reasonParts.push(`${auditFontRows.length} BrandFont record(s) are currently audit-backed manual font records.`);
+    }
     if (auditFrameworkRows.length > 0) {
       reasonParts.push(`${auditFrameworkRows.length} BrandMessageFramework record(s) are currently audit-backed manual framework records.`);
     }
 
     const foundationAssets = brandAssets.filter((asset) => profiles.some((profile) => profile.id === asset.profileId));
+    const foundationFonts = brandFonts.filter((font) => profiles.some((profile) => profile.id === font.profileId));
     const foundationFrameworks = brandMessageFrameworks.filter((framework) => profiles.some((profile) => profile.id === framework.profileId));
 
     return {
@@ -380,14 +398,14 @@ export async function getBrandRepositorySnapshot(): Promise<BrandRepositorySnaps
       profiles,
       assets: mergeBrandAssets(assets.length > 0 ? assets : foundationAssets, auditAssetRows, profiles),
       colors: colors.length > 0 ? colors : brandColors.filter((color) => profiles.some((profile) => profile.id === color.profileId)),
-      fonts: fonts.length > 0 ? fonts : brandFonts.filter((font) => profiles.some((profile) => profile.id === font.profileId)),
+      fonts: mergeBrandFonts(fonts.length > 0 ? fonts : foundationFonts, auditFontRows, profiles),
       guidelines: guidelines.length > 0 ? guidelines : brandGuidelines.filter((guideline) => profiles.some((profile) => profile.id === guideline.profileId)),
       messageFrameworks: mergeBrandMessageFrameworks(messageFrameworks.length > 0 ? messageFrameworks : foundationFrameworks, auditFrameworkRows, profiles),
       dbCounts: {
         profiles: profileRows.length,
         assets: assetRows.length + auditAssetRows.length,
         colors: colorRows.length,
-        fonts: fontRows.length,
+        fonts: fontRows.length + auditFontRows.length,
         guidelines: guidelineRows.length,
         messageFrameworks: frameworkRows.length + auditFrameworkRows.length,
       },
