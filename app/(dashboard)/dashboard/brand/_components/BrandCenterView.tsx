@@ -25,6 +25,7 @@ import type {
 import { BrandAssetCreatePanel } from "./BrandAssetCreatePanel";
 import { BrandColorCreatePanel } from "./BrandColorCreatePanel";
 import { BrandCopyButton } from "./BrandCopyButton";
+import { BrandFontCreatePanel } from "./BrandFontCreatePanel";
 import { BrandGuidelineCreatePanel } from "./BrandGuidelineCreatePanel";
 import { BrandMessageFrameworkCreatePanel } from "./BrandMessageFrameworkCreatePanel";
 
@@ -102,7 +103,7 @@ function renderTab(activeTab: BrandCenterTabKey, snapshot: BrandCenterSnapshot) 
   if (activeTab === "organizations") return <Organizations profiles={snapshot.profiles} activeProfileId={snapshot.activeProfile.id} />;
   if (activeTab === "assets") return <Assets assets={snapshot.assets} activeProfileId={snapshot.activeProfile.id} />;
   if (activeTab === "colors") return <Colors colors={snapshot.colors} activeProfileId={snapshot.activeProfile.id} />;
-  if (activeTab === "typography") return <Typography fonts={snapshot.fonts} />;
+  if (activeTab === "typography") return <Typography fonts={snapshot.fonts} activeProfileId={snapshot.activeProfile.id} />;
   if (activeTab === "voice") return <Guidelines guidelines={snapshot.guidelines} activeProfileId={snapshot.activeProfile.id} />;
   if (activeTab === "frameworks") return <Frameworks frameworks={snapshot.messageFrameworks} activeProfileId={snapshot.activeProfile.id} />;
   if (activeTab === "downloads") return <Downloads snapshot={snapshot} />;
@@ -220,19 +221,23 @@ function Colors({ colors, activeProfileId }: { colors: BrandColor[]; activeProfi
   );
 }
 
-function Typography({ fonts }: { fonts: BrandFont[] }) {
+function Typography({ fonts, activeProfileId }: { fonts: BrandFont[]; activeProfileId: string }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {fonts.map((font) => (
-        <Panel key={font.id} title={font.name} description={font.usage} compact>
-          <div className="space-y-3">
-            <p className="text-2xl font-black text-slate-950">Minber-i Aksa / Gözbebekleri</p>
-            <p className="text-sm leading-6 text-slate-600">Fallback: {font.fallback}</p>
-            <p className="text-sm leading-6 text-slate-600">Source: {font.source}</p>
-            <p className="rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-600">{font.notes}</p>
-          </div>
-        </Panel>
-      ))}
+    <div className="space-y-4">
+      <BrandFontCreatePanel profileId={activeProfileId} />
+      {fonts.length === 0 ? <EmptyState title="No brand fonts yet" text="Add heading, body, Arabic UI, and campaign typography rules here." /> : null}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {fonts.map((font) => (
+          <Panel key={font.id} title={font.name} description={font.usage} compact>
+            <div className="space-y-3">
+              <p className="text-2xl font-black text-slate-950">Minber-i Aksa / Gözbebekleri</p>
+              <p className="text-sm leading-6 text-slate-600">Fallback: {font.fallback}</p>
+              <p className="text-sm leading-6 text-slate-600">Source: {font.source}</p>
+              <p className="rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-600">{font.notes}</p>
+            </div>
+          </Panel>
+        ))}
+      </div>
     </div>
   );
 }
