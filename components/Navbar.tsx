@@ -1,42 +1,40 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+
+import React, { useEffect, useRef, useState } from "react";
 import {
-  Menu,
-  X,
-  ShoppingCart,
-  Search,
-  LogOut,
-  LayoutDashboard,
+  BookOpen,
   ChevronDown,
+  HandHeart,
   Heart,
-  Facebook,
-  Instagram,
-  Youtube,
-  Twitter,
-  MessageCircle,
-  Phone,
+  Landmark,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Repeat2,
+  ShieldCheck,
+  ShoppingCart,
   UserCircle,
+  Users,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import { Link, usePathname, useRouter } from "@/i18n/routing";
-import { useTranslations, useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import axios from "axios";
-import { useSession, signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import CartSheet from "../components/CartSheet";
 import { useCart } from "@/hooks/useCart";
-import { CART_OPEN_EVENT, CART_CHANGED_EVENT } from "@/components/CartReminder";
+import { CART_CHANGED_EVENT, CART_OPEN_EVENT } from "@/components/CartReminder";
 import CurrencySelector from "./CurrencySelector";
 import LanguageSwitcher from "./LanguageSelector";
 import SignInDialog from "@/components/SignInDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import dynamic from "next/dynamic";
-const CartPaymentDialog = dynamic(() => import("./CartPaymentDialog"), { ssr: false });
-// framer-motion removed — replaced with CSS-only fade animations to keep ~70 KiB
-// of motion JS off the homepage critical path.
 import { appendCurrencyQuery, getCurrencyCodeForLinks } from "@/lib/currency-link";
 import { CURRENCY_COOKIE_UPDATED_EVENT } from "@/components/CurrencyFromUrlSync";
-import { getSocialLinks } from "@/lib/social-links";
+
+const CartPaymentDialog = dynamic(() => import("./CartPaymentDialog"), { ssr: false });
 
 interface CartItem {
   id: string;
@@ -53,14 +51,46 @@ interface CartItem {
   };
 }
 
-const LOGO_URL = "logo.png";
-const LOGO_MOBILE_URL = "/logo.png";
+const LOGO_URL = "/logo.png";
+
+const utilityLabels = {
+  ar: {
+    partner: "كن شريكًا لنا",
+    volunteer: "تطوع معنا",
+    partnerProjects: "مشاريع الشركاء",
+    proof: "تبرع آمن · إيصال · تحديثات أثر",
+    signIn: "دخول",
+    dashboard: "لوحة التحكم",
+    profile: "حسابي",
+    signOut: "تسجيل الخروج",
+  },
+  tr: {
+    partner: "Partner Olun",
+    volunteer: "Gönüllü Olun",
+    partnerProjects: "Partner Projeleri",
+    proof: "Güvenli bağış · Makbuz · Etki güncellemeleri",
+    signIn: "Giriş",
+    dashboard: "Dashboard",
+    profile: "Profilim",
+    signOut: "Çıkış",
+  },
+  en: {
+    partner: "Become a Partner",
+    volunteer: "Volunteer with Us",
+    partnerProjects: "Partner Projects",
+    proof: "Secure giving · Receipt · Impact updates",
+    signIn: "Sign in",
+    dashboard: "Dashboard",
+    profile: "My Profile",
+    signOut: "Sign out",
+  },
+};
 
 const Navbar = () => {
   const t = useTranslations("Navbar");
   const locale = useLocale();
   const isRTL = locale === "ar";
-  const social = getSocialLinks(locale);
+  const labels = utilityLabels[locale as keyof typeof utilityLabels] ?? utilityLabels.en;
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const router = useRouter();
@@ -69,7 +99,6 @@ const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSignInOpen, setIsSignInOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -78,11 +107,10 @@ const Navbar = () => {
   const [cartGuestMode, setCartGuestMode] = useState(false);
   const { items: zustandItems, removeItem: zustandRemoveItem, clearItems: clearZustandItems } = useCart();
   const userMenuRef = useRef<HTMLDivElement>(null);
-  // Force a re-render when the currency cookie changes so SSR'd `?currency=USD`
-  // links refresh once middleware / CurrencyFromUrlSync settles the real choice.
   const [, setCurrencyTick] = useState(0);
+
   useEffect(() => {
-    setCurrencyTick((n) => n + 1); // hydration: re-read after middleware-set cookie
+    setCurrencyTick((n) => n + 1);
     const onUpdate = () => setCurrencyTick((n) => n + 1);
     window.addEventListener(CURRENCY_COOKIE_UPDATED_EVENT, onUpdate);
     return () => window.removeEventListener(CURRENCY_COOKIE_UPDATED_EVENT, onUpdate);
@@ -146,20 +174,6 @@ const Navbar = () => {
     setIsCartPaymentDialogOpen(true);
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      router.push(
-        appendCurrencyQuery(
-          `/campaigns?search=${encodeURIComponent(searchQuery.trim())}`,
-          getCurrencyCodeForLinks()
-        )
-      );
-      setSearchQuery("");
-      setIsMobileMenuOpen(false);
-    }
-  };
-
   const openCart = () => {
     if (session?.user) {
       setCartGuestMode(false);
@@ -169,15 +183,12 @@ const Navbar = () => {
       setIsCartOpen(true);
     } else {
       setSignInCallbackUrl(
-        typeof window !== "undefined"
-          ? appendCurrencyQuery(pathname, getCurrencyCodeForLinks())
-          : undefined
+        typeof window !== "undefined" ? appendCurrencyQuery(pathname, getCurrencyCodeForLinks()) : undefined
       );
       setIsSignInOpen(true);
     }
   };
 
-  // Floating CartReminder asks Navbar to open the cart sheet via this event.
   useEffect(() => {
     const onOpen = () => openCart();
     window.addEventListener(CART_OPEN_EVENT, onOpen);
@@ -185,200 +196,144 @@ const Navbar = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user, zustandItems.length, pathname]);
 
-  const navLinks = [
-    { href: "/about-us", label: t("about") },
-    { href: "/campaigns", label: t("projects") },
-    { href: "/blog", label: t("news") },
-    { href: "/bank-transfer", label: t("bankAccounts") },
-    { href: "/contact-us", label: t("contact") },
+  const mainLinks = [
+    { href: "/campaigns", label: t("projects") || "Projects", icon: HandHeart },
+    { href: "/campaigns?type=funds", label: locale === "ar" ? "الصناديق" : locale === "tr" ? "Fonlar" : "Funds", icon: ShieldCheck },
+    { href: "/campaigns?intent=zakat", label: locale === "ar" ? "الزكاة" : locale === "tr" ? "Zekat" : "Zakat", icon: HandHeart },
+    { href: "/campaigns?intent=waqf", label: locale === "ar" ? "الوقف" : locale === "tr" ? "Vakıf" : "Waqf", icon: Landmark },
+    { href: "/campaigns?frequency=monthly", label: locale === "ar" ? "التبرع الدوري" : locale === "tr" ? "Düzenli" : "Recurring", icon: Repeat2 },
+    { href: "/blog", label: t("news") || "Knowledge", icon: BookOpen },
+    { href: "/about-us", label: t("about") || "About", icon: Users },
+  ];
+
+  const utilityLinks = [
+    { href: "/contact-us", label: labels.partner },
+    { href: "/contact-us", label: labels.volunteer },
+    { href: "/campaigns?type=partner", label: labels.partnerProjects },
   ];
 
   const checkoutCartItems =
-    isCartPaymentDialogOpen && cartGuestMode
-      ? zustandItems
-      : session?.user
-      ? cartItems
-      : zustandItems;
+    isCartPaymentDialogOpen && cartGuestMode ? zustandItems : session?.user ? cartItems : zustandItems;
 
   const cartPaymentCallbackUrl =
     typeof window !== "undefined"
       ? appendCurrencyQuery(`${pathname}?openCartPayment=1`, getCurrencyCodeForLinks())
       : undefined;
 
+  const cartCount = session?.user ? cartItems.length : zustandItems.length;
+
+  const isActive = (href: string) => {
+    const cleanHref = href.split("?")[0];
+    return pathname === cleanHref || (cleanHref !== "/" && pathname.startsWith(cleanHref));
+  };
+
   return (
     <>
-      <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-shadow duration-300 ${
-          isScrolled ? "shadow-lg" : "shadow-md"
-        }`}
-      >
-        {/* ── Top Info Bar (desktop only) ── */}
-        <div className="bg-[#025EB8] text-white text-xs hidden lg:block">
-          <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-9">
-            {/* Left: social icons + phone */}
-            <div className="flex items-center gap-3">
-              <a href={social.instagram} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="hover:text-blue-200 transition-colors">
-                <Instagram className="w-3.5 h-3.5" />
-              </a>
-              <a href={social.youtube} target="_blank" rel="noopener noreferrer" aria-label="Youtube" className="hover:text-blue-200 transition-colors">
-                <Youtube className="w-3.5 h-3.5" />
-              </a>
-              <a href={social.facebook} target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="hover:text-blue-200 transition-colors">
-                <Facebook className="w-3.5 h-3.5" />
-              </a>
-              <a href={social.twitter} target="_blank" rel="noopener noreferrer" aria-label="Twitter" className="hover:text-blue-200 transition-colors">
-                <Twitter className="w-3.5 h-3.5" />
-              </a>
-              <span className="border-l border-white/30 pl-3 flex items-center gap-1.5">
-                <a href="https://wa.me/905380308212" className="flex items-center gap-1.5 hover:text-blue-200 transition-colors">
-                  <MessageCircle className="w-3.5 h-3.5" />
-                  <span dir="ltr">+90 212 288 59 30</span>
-                </a>
-              </span>
+      <header className={`fixed inset-x-0 top-0 z-50 transition-shadow duration-300 ${isScrolled ? "shadow-lg" : "shadow-sm"}`}>
+        <div className="hidden border-b border-white/10 bg-[#10212B] text-[#FFFDF8] lg:block">
+          <div className="mx-auto flex h-9 max-w-7xl items-center justify-between px-4 text-xs">
+            <div className="flex items-center gap-2 text-white/70">
+              <ShieldCheck className="h-3.5 w-3.5 text-[#D39A27]" />
+              <span>{labels.proof}</span>
             </div>
-            {/* Right: language + currency */}
-            <div className="flex items-center gap-3">
-              <LanguageSwitcher />
-              <div className="border-l border-white/30 pl-3">
-                <CurrencySelector />
+            <div className="flex items-center gap-5">
+              {utilityLinks.map((link) => (
+                <Link key={link.label} href={link.href} className="font-semibold text-white/75 transition-colors hover:text-[#D39A27]">
+                  {link.label}
+                </Link>
+              ))}
+              <div className="flex items-center gap-3 border-s border-white/15 ps-4">
+                <LanguageSwitcher onDark />
+                <CurrencySelector onDark />
               </div>
             </div>
           </div>
         </div>
 
-        {/* ── Main Navbar ── */}
-        <nav className="bg-white border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 flex items-center h-16 lg:h-[68px] gap-2">
-
-            {/* Logo — always visible */}
-            <Link href="/" className="flex-shrink-0 flex items-center gap-2">
-              {/* Mobile: narrow square logo */}
-              <Image src={LOGO_MOBILE_URL} alt="Logo" width={48} height={48} className="lg:hidden h-9 w-auto object-contain" />
-              {/* Desktop: wide logo — width must match aspect ratio to prevent blur */}
-              <Image src={LOGO_URL} alt="Logo" width={240} height={48} className="hidden lg:block h-12 w-auto object-contain" />
+        <nav className="border-b border-[#E9DDCA] bg-[#FFFDF8]/95 backdrop-blur-xl">
+          <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 lg:h-[72px]">
+            <Link href="/" className="flex shrink-0 items-center gap-2">
+              <Image src={LOGO_URL} alt="Minber-i Aksa" width={220} height={56} className="hidden h-12 w-auto object-contain lg:block" />
+              <Image src={LOGO_URL} alt="Minber-i Aksa" width={120} height={44} className="h-10 w-auto object-contain lg:hidden" />
             </Link>
 
-            {/* Desktop Nav Links */}
-            <div className="hidden lg:flex items-center gap-1 flex-1 justify-center">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href + link.label}
-                  href={link.href}
-                  className={`px-3 py-2 text-sm font-semibold uppercase tracking-wide transition-colors rounded-md ${
-                    pathname === link.href
-                      ? "text-[#025EB8]"
-                      : "text-gray-700 hover:text-[#025EB8]"
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              ))}
+            <div className="hidden flex-1 items-center justify-center gap-1 lg:flex">
+              {mainLinks.map((link) => {
+                const active = isActive(link.href);
+                return (
+                  <Link
+                    key={link.href + link.label}
+                    href={link.href}
+                    className={`rounded-full px-3 py-2 text-sm font-bold transition-colors ${
+                      active ? "bg-[#10212B] text-[#FFFDF8]" : "text-[#132C38] hover:bg-[#F7F2EA] hover:text-[#A93428]"
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
             </div>
 
-            {/* Desktop: Search */}
-            {/* <form
-              onSubmit={handleSearch}
-              className="hidden lg:flex items-center border border-gray-300 rounded-lg overflow-hidden flex-shrink-0"
-            >
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t("searchPlaceholder") || "Ara..."}
-                className="px-3 py-2 text-sm outline-none w-44 xl:w-56"
-              />
-              <button
-                type="submit"
-                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 transition-colors border-l border-gray-300"
-              >
-                <Search className="w-4 h-4 text-gray-500" />
-              </button>
-            </form> */}
-
-            {/* Desktop: Donate button */}
             <Link
               href="/campaigns"
-              className="hidden lg:flex items-center gap-1.5 bg-[#FA5D17] hover:bg-[#e04d0f] text-white font-bold text-sm px-4 py-2.5 rounded-lg transition-colors flex-shrink-0"
+              className="hidden shrink-0 items-center gap-1.5 rounded-full bg-[#A93428] px-4 py-2.5 text-sm font-black text-white shadow-sm transition-colors hover:bg-[#8f2a21] lg:flex"
             >
-              <Heart className="w-4 h-4" />
-              {t("donate") || "BAĞIŞ YAP"}
+              <Heart className="h-4 w-4" />
+              {t("donate") || "Donate Now"}
             </Link>
 
-            {/* Spacer — pushes right-side items to the edge on mobile */}
             <div className="flex-1 lg:hidden" />
 
-            {/* Mobile: Language + Currency */}
-            <div className="flex lg:hidden items-center gap-0.5">
+            <div className="flex items-center gap-1 lg:hidden">
               <LanguageSwitcher onDark={false} />
               <CurrencySelector onDark={false} />
             </div>
 
-            {/* Cart button — always visible */}
             <button
               type="button"
               onClick={openCart}
-              className="relative p-2 text-gray-600 hover:text-[#025EB8] transition-colors flex-shrink-0"
+              className="relative shrink-0 rounded-full p-2 text-[#132C38] transition-colors hover:bg-[#F7F2EA] hover:text-[#A93428]"
               aria-label="Cart"
             >
-              <ShoppingCart className="w-5 h-5" />
-              {(session?.user ? cartItems.length : zustandItems.length) > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 bg-[#FA5D17] text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                  {session?.user ? cartItems.length : zustandItems.length}
+              <ShoppingCart className="h-5 w-5" />
+              {cartCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#A93428] text-[10px] font-bold text-white">
+                  {cartCount}
                 </span>
               )}
             </button>
 
-            {/* User avatar / Sign in */}
             {status === "authenticated" && session?.user ? (
-              <div className={`relative flex-shrink-0 ${isRTL ? "mr-3" : "ml-3"}`} ref={userMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center gap-1.5"
-                >
-                  <Avatar className="w-8 h-8">
+              <div className={`relative shrink-0 ${isRTL ? "mr-2" : "ml-2"}`} ref={userMenuRef}>
+                <button type="button" onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex items-center gap-1.5">
+                  <Avatar className="h-8 w-8">
                     <AvatarImage src={session.user.image ?? ""} />
-                    <AvatarFallback className="bg-[#025EB8] text-white text-xs">
+                    <AvatarFallback className="bg-[#10212B] text-xs text-white">
                       {session.user.name?.[0]?.toUpperCase() ?? "U"}
                     </AvatarFallback>
                   </Avatar>
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-500 hidden lg:block" />
+                  <ChevronDown className="hidden h-3.5 w-3.5 text-[#52616B] lg:block" />
                 </button>
                 {isUserMenuOpen && (
-                  <div
-                    className={`absolute mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 animate-fade-in ${isRTL ? "left-0" : "right-0"}`}
-                  >
-                      <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="text-sm font-semibold text-gray-800 truncate">{session.user.name}</p>
-                        <p className="text-xs text-gray-500 truncate">{session.user.email}</p>
-                      </div>
-                           {(session.user.role === "ADMIN" || session.user.role === "STAFF") && (
-                        <a
-                          href="/dashboard"
-                          onClick={() => setIsUserMenuOpen(false)}
-                          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-t border-gray-100"
-                        >
-                          <LayoutDashboard className="w-4 h-4 text-[#025EB8]" />
-                          {isRTL ? "لوحة التحكم" : "Dashboard"}
-                        </a>
-                      )}
-                      <Link
-                        href="/profile"
-                        onClick={() => setIsUserMenuOpen(false)}
-                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        <UserCircle className="w-4 h-4 text-[#025EB8]" />
-                        {t("profile") || "Profilim"}
-                      </Link>
-                 
-                      <button
-                        type="button"
-                        onClick={() => { setIsUserMenuOpen(false); signOut({ callbackUrl: "/" }); }}
-                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        {t("signOut") || "Çıkış"}
-                      </button>
+                  <div className={`absolute z-50 mt-2 w-56 rounded-2xl border border-[#E9DDCA] bg-white py-1 shadow-xl ${isRTL ? "left-0" : "right-0"}`}>
+                    <div className="border-b border-[#F1E7D8] px-4 py-3">
+                      <p className="truncate text-sm font-bold text-[#132C38]">{session.user.name}</p>
+                      <p className="truncate text-xs text-[#52616B]">{session.user.email}</p>
+                    </div>
+                    {(session.user.role === "ADMIN" || session.user.role === "STAFF") && (
+                      <a href="/dashboard" onClick={() => setIsUserMenuOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#132C38] hover:bg-[#F7F2EA]">
+                        <LayoutDashboard className="h-4 w-4 text-[#D39A27]" />
+                        {labels.dashboard}
+                      </a>
+                    )}
+                    <Link href="/profile" onClick={() => setIsUserMenuOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#132C38] hover:bg-[#F7F2EA]">
+                      <UserCircle className="h-4 w-4 text-[#D39A27]" />
+                      {labels.profile}
+                    </Link>
+                    <button type="button" onClick={() => { setIsUserMenuOpen(false); signOut({ callbackUrl: "/" }); }} className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-[#A93428] hover:bg-[#A93428]/10">
+                      <LogOut className="h-4 w-4" />
+                      {labels.signOut}
+                    </button>
                   </div>
                 )}
               </div>
@@ -386,152 +341,96 @@ const Navbar = () => {
               <button
                 type="button"
                 onClick={() => {
-                  setSignInCallbackUrl(
-        typeof window !== "undefined"
-          ? appendCurrencyQuery(pathname, getCurrencyCodeForLinks())
-          : undefined
-      );
+                  setSignInCallbackUrl(typeof window !== "undefined" ? appendCurrencyQuery(pathname, getCurrencyCodeForLinks()) : undefined);
                   setIsSignInOpen(true);
                 }}
-                className="hidden lg:flex items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-[#025EB8] transition-colors flex-shrink-0"
+                className="hidden shrink-0 rounded-full border border-[#D8C8AD] px-3 py-2 text-sm font-bold text-[#132C38] transition-colors hover:border-[#D39A27] hover:text-[#A93428] lg:flex"
               >
-                {t("signIn") || "Giriş Yap"}
+                {t("signIn") || labels.signIn}
               </button>
             )}
 
-            {/* Mobile: Hamburger */}
-            <button
-              type="button"
-              className="lg:hidden p-2 text-gray-700 flex-shrink-0"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              aria-label="Menu"
-            >
-              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            <button type="button" className="shrink-0 rounded-full p-2 text-[#132C38] lg:hidden" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label="Menu">
+              {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
           </div>
 
-          {/* ── Mobile Menu ── */}
           {isMobileMenuOpen && (
-            <div className="lg:hidden overflow-hidden border-t border-gray-200 bg-white animate-fade-in">
-                {/* Search */}
-                {/* <form
-                  onSubmit={handleSearch}
-                  className="flex items-center gap-2 px-4 py-3 border-b border-gray-100"
-                >
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={t("searchPlaceholder") || "Ara..."}
-                    className="flex-1 text-sm outline-none text-gray-700"
-                  />
-                  <button type="submit" className="text-gray-400 hover:text-[#025EB8] transition-colors">
-                    <Search className="w-4 h-4" />
-                  </button>
-                </form> */}
+            <div className="border-t border-[#E9DDCA] bg-[#FFFDF8] lg:hidden">
+              <div className="px-4 py-3 text-xs text-[#52616B]">
+                <div className="flex items-center gap-2 rounded-2xl bg-[#F7F2EA] px-3 py-2">
+                  <ShieldCheck className="h-4 w-4 text-[#D39A27]" />
+                  <span>{labels.proof}</span>
+                </div>
+              </div>
 
-                {/* Nav links */}
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.href + link.label}
-                    href={link.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className={`flex items-center px-4 py-3 text-sm font-semibold uppercase tracking-wide border-b border-gray-100 transition-colors ${
-                      pathname === link.href
-                        ? "text-[#025EB8] bg-blue-50"
-                        : "text-gray-700 hover:bg-gray-50"
-                    }`}
-                  >
+              <div className="grid grid-cols-1 gap-1 px-3 pb-3">
+                {mainLinks.map((link) => {
+                  const Icon = link.icon;
+                  const active = isActive(link.href);
+                  return (
+                    <Link
+                      key={link.href + link.label}
+                      href={link.href}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold transition-colors ${
+                        active ? "bg-[#10212B] text-[#FFFDF8]" : "text-[#132C38] hover:bg-[#F7F2EA]"
+                      }`}
+                    >
+                      <Icon className={`h-4 w-4 ${active ? "text-[#D39A27]" : "text-[#D39A27]"}`} />
+                      {link.label}
+                    </Link>
+                  );
+                })}
+              </div>
+
+              <div className="grid grid-cols-1 gap-1 border-t border-[#E9DDCA] px-3 py-3">
+                {utilityLinks.map((link) => (
+                  <Link key={link.label} href={link.href} onClick={() => setIsMobileMenuOpen(false)} className="rounded-xl px-3 py-2 text-sm font-semibold text-[#52616B] hover:bg-[#F7F2EA] hover:text-[#132C38]">
                     {link.label}
                   </Link>
                 ))}
+              </div>
 
-                {/* User info (mobile) */}
-                {status === "authenticated" && session?.user && (
-                  <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
-                    <Avatar className="w-9 h-9">
+              {status === "authenticated" && session?.user && (
+                <div className="border-t border-[#E9DDCA] px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-9 w-9">
                       <AvatarImage src={session.user.image ?? ""} />
-                      <AvatarFallback className="bg-[#025EB8] text-white text-xs">
-                        {session.user.name?.[0]?.toUpperCase() ?? "U"}
-                      </AvatarFallback>
+                      <AvatarFallback className="bg-[#10212B] text-xs text-white">{session.user.name?.[0]?.toUpperCase() ?? "U"}</AvatarFallback>
                     </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{session.user.name}</p>
-                      <p className="text-xs text-gray-500 truncate">{session.user.email}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-[#132C38]">{session.user.name}</p>
+                      <p className="truncate text-xs text-[#52616B]">{session.user.email}</p>
                     </div>
-                    <div className="flex gap-2">
-                      <Link
-                        href="/profile"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className="p-2 rounded-lg bg-blue-50 text-[#025EB8] hover:bg-blue-100 transition-colors"
-                      >
-                        <LayoutDashboard className="w-4 h-4" />
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => { setIsMobileMenuOpen(false); signOut({ callbackUrl: "/" }); }}
-                        className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                      >
-                        <LogOut className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Donate + Sign in */}
-                <div className="px-4 py-3 flex gap-3 border-b border-gray-100">
-                  <Link
-                    href="/campaigns"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex-1 flex items-center justify-center gap-1.5 bg-[#FA5D17] hover:bg-[#e04d0f] text-white font-bold text-sm px-4 py-2.5 rounded-lg transition-colors"
-                  >
-                    <Heart className="w-4 h-4" />
-                    {t("donate") || "BAĞIŞ YAP"}
-                  </Link>
-                  {!session?.user && (
-                    <button
-                      type="button"
-                      onClick={() => { setIsMobileMenuOpen(false); setIsSignInOpen(true); }}
-                      className="flex-1 flex items-center justify-center text-sm font-medium text-[#025EB8] border border-[#025EB8] rounded-lg px-4 py-2.5 hover:bg-blue-50 transition-colors"
-                    >
-                      {t("signIn") || "Giriş Yap"}
+                    <Link href="/profile" onClick={() => setIsMobileMenuOpen(false)} className="rounded-xl bg-[#F7F2EA] p-2 text-[#132C38]">
+                      <UserCircle className="h-4 w-4" />
+                    </Link>
+                    <button type="button" onClick={() => { setIsMobileMenuOpen(false); signOut({ callbackUrl: "/" }); }} className="rounded-xl bg-[#A93428]/10 p-2 text-[#A93428]">
+                      <LogOut className="h-4 w-4" />
                     </button>
-                  )}
+                  </div>
                 </div>
+              )}
 
-                {/* Social links */}
-                <div className="px-4 py-3 flex items-center justify-center gap-5">
-                  <a href={social.instagram} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-[#025EB8] hover:text-white transition-colors">
-                    <Instagram className="w-4 h-4" />
-                  </a>
-                  <a href={social.youtube} target="_blank" rel="noopener noreferrer" aria-label="Youtube" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-[#025EB8] hover:text-white transition-colors">
-                    <Youtube className="w-4 h-4" />
-                  </a>
-                  <a href={social.facebook} target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-[#025EB8] hover:text-white transition-colors">
-                    <Facebook className="w-4 h-4" />
-                  </a>
-                  <a href={social.twitter} target="_blank" rel="noopener noreferrer" aria-label="Twitter" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-[#025EB8] hover:text-white transition-colors">
-                    <Twitter className="w-4 h-4" />
-                  </a>
-                  <a href="https://wa.me/905380308212" aria-label="WhatsApp" className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-[#025EB8] hover:text-white transition-colors">
-                    <MessageCircle className="w-4 h-4" />
-                  </a>
-                </div>
+              <div className="flex gap-3 border-t border-[#E9DDCA] px-4 py-3">
+                <Link href="/campaigns" onClick={() => setIsMobileMenuOpen(false)} className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-[#A93428] px-4 py-3 text-sm font-black text-white">
+                  <Heart className="h-4 w-4" />
+                  {t("donate") || "Donate Now"}
+                </Link>
+                {!session?.user && (
+                  <button type="button" onClick={() => { setIsMobileMenuOpen(false); setIsSignInOpen(true); }} className="flex flex-1 items-center justify-center rounded-full border border-[#D8C8AD] px-4 py-3 text-sm font-bold text-[#132C38]">
+                    {t("signIn") || labels.signIn}
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </nav>
       </header>
 
-      {/* Cart Sheet */}
-      <CartSheet
-        open={isCartOpen}
-        onOpenChange={setIsCartOpen}
-        cartItems={session?.user ? cartItems : zustandItems}
-        handleRemoveItem={handleRemoveItem}
-        onOpenDonationDialog={onOpenDonationDialog}
-      />
+      <CartSheet open={isCartOpen} onOpenChange={setIsCartOpen} cartItems={session?.user ? cartItems : zustandItems} handleRemoveItem={handleRemoveItem} onOpenDonationDialog={onOpenDonationDialog} />
 
-      {/* Cart Payment Dialog */}
       <CartPaymentDialog
         isOpen={isCartPaymentDialogOpen}
         onClose={() => setIsCartPaymentDialogOpen(false)}
@@ -545,12 +444,7 @@ const Navbar = () => {
         }}
       />
 
-      {/* Sign In Dialog */}
-      <SignInDialog
-        isOpen={isSignInOpen}
-        onClose={() => setIsSignInOpen(false)}
-        callbackUrl={signInCallbackUrl}
-      />
+      <SignInDialog isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} callbackUrl={signInCallbackUrl} />
     </>
   );
 };
