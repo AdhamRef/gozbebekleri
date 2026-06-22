@@ -46,10 +46,10 @@ function auditBackedContentPersistence(count: number): OperationsPersistenceInfo
     storage: "prisma",
     readOnly: false,
     model: "OperationsContentItemAuditLog",
-    nextModel: "OperationContentItem",
+    nextModel: "ContentItem",
     readyForDb: true,
     externalSideEffects: false,
-    note: `${count} content item proposal(s) are persisted through AuditLog records until the runtime OperationContentItem model is added. No publishing or sending is automatic.`,
+    note: `${count} content item(s) are persisted through DB-backed AuditLog records until the dedicated ContentItem runtime model is appended. No publishing, sending, or AI approval is automatic.`,
   };
 }
 
@@ -77,7 +77,7 @@ export async function listContentItems(): Promise<OperationsRepositoryResult<Ope
     };
   }
 
-  return fromFoundation(overview.items, "OperationsContentItem", "OperationContentItem");
+  return fromFoundation(overview.items, "OperationsContentItem", "ContentItem");
 }
 
 export async function listContentWorkflowTasks(): Promise<OperationsRepositoryResult<OperationsContentTask>> {
