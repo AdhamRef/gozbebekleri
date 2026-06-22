@@ -5,6 +5,9 @@ export type ArchivePersistence = {
   dbCounts?: {
     collections: number;
     projects: number;
+    driveLinks: number;
+    assets: number;
+    videoFrames: number;
   };
   externalSideEffects: false;
   note: string;
