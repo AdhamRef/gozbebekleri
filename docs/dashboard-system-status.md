@@ -37,14 +37,17 @@
 - `/dashboard/brand/assets` has a usable manual asset creation panel for logos, templates, certificates, watermarks, and brand guides.
 - Brand repository reads audit-backed BrandAsset records and merges them with foundation/runtime Brand assets.
 - Saved BrandAsset records are marked `TO_VERIFY` by default and include safety markers: `externalCall: false`, `uploadPerformed: false`, `downloadPerformed: false`, `autoPublish: false`, `aiGenerated: false`, and `humanReviewRequired: true`.
+- `/api/admin/brand/colors` supports guarded no-store `GET` and `POST` for real `BrandColor` rows.
+- `/dashboard/brand/colors` has a usable manual color creation panel with HEX validation, usage selection, order, feedback, refresh, and Copy HEX.
+- New BrandColor rows are saved through Prisma with best-effort AuditLog using `action = brand.color.create`.
 
 ## ما يتم تجهيزه في الحزمة الحالية
 
-- `/api/admin/brand/colors` supports guarded no-store `GET` and `POST` for real `BrandColor` rows.
-- `/dashboard/brand/colors` has a usable manual color creation panel with HEX validation, usage selection, order, feedback, and refresh.
-- Brand Color cards expose Copy HEX for designers and writers.
-- New BrandColor rows are saved through Prisma, with best-effort AuditLog using `action = brand.color.create`.
-- Color creation records safety metadata: `externalCall: false`, `autoPublish: false`, `aiGenerated: false`, and `humanReviewRequired: true`.
+- `/api/admin/brand/guidelines` supports guarded no-store `GET` and `POST` for real `BrandGuideline` rows.
+- `/dashboard/brand/voice` has a usable manual guideline creation panel for voice, copy, proof, donor dignity, CTA, and localization rules.
+- Guideline authoring supports title, body, examples, order, feedback, and refresh.
+- New BrandGuideline rows are saved through Prisma, with best-effort AuditLog using `action = brand.guideline.create`.
+- Guideline creation records safety metadata: `externalCall: false`, `autoPublish: false`, `aiGenerated: false`, and `humanReviewRequired: true`.
 - No file upload, file download, Google Drive sync, AI generation, publishing, sending, payment changes, tracking runtime changes, external platform calls, or frontend secrets.
 
 ## المسارات الرئيسية
@@ -96,7 +99,7 @@
 - Operations/Content workflow models have staged contracts only; runtime schema and repository cutover remain pending.
 - Smart Archive: `ArchiveCollection` و`ArchiveProject` أصبح لهما DB-backed read/write API مع foundation fallback؛ `ArchiveDriveLink` create/read يعمل عبر AuditLog-backed records إلى أن يدخل runtime model؛ `ArchiveAsset` review actions تعمل عبر AuditLog-backed records، بينما asset metadata و`ArchiveVideoFrame` لديهم staged schema + repository read fallback فقط.
 - Google Drive sync, Drive access testing, file download, and Archive AI analysis remain manual/foundation-first.
-- Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ BrandColor manual creation is runtime Prisma-backed with AuditLog؛ BrandAsset manual URL records are audit-backed and visible in Brand Center, while the dedicated runtime `BrandAsset` model is still pending. `BrandFont` و`BrandMessageFramework` لديهم staged schema + repository read fallback فقط.
+- Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ BrandColor and BrandGuideline manual creation are runtime Prisma-backed with AuditLog؛ BrandAsset manual URL records are audit-backed and visible in Brand Center, while the dedicated runtime `BrandAsset` model is still pending. `BrandFont` و`BrandMessageFramework` لديهم staged schema + repository read fallback فقط.
 - Shared AI Core جاهز للعقود والـ provider fallback؛ `AiOperationRun` لديه staged schema + optional persistence fallback، لكن runtime schema ما زال pending.
 - Connections UI يعرض المنصات الجديدة كعقود جاهزية، لكن sync/testing الحقيقي لهذه المنصات يجب أن يبقى `NOT_IMPLEMENTED` حتى تنفيذ provider clients بشكل آمن.
 
@@ -108,6 +111,7 @@
 - ArchiveAsset preview/thumbnail policy needs a dedicated safety pass before runtime writes.
 - BrandAsset manual URL records must be verified before being treated as official production downloads.
 - BrandColor manual rows should be reviewed against official brand files before being treated as final design authority.
+- BrandGuideline manual rows should be reviewed before AI or team workflows treat them as final voice authority.
 - AI audit persistence يحتاج runtime schema قبل DB writes فعلية، ويجب أن يظل sanitized ودون أسرار.
 - ArchiveCollection وArchiveProject write paths تعتمد على DB availability وunique slugs؛ الفشل يظهر بوضوح بدل الحفظ الوهمي.
 - OperationTask quick edit يعمل فقط على rows فعلية؛ foundation generated tasks تبقى read-only.

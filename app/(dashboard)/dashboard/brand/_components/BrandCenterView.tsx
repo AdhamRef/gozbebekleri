@@ -25,6 +25,7 @@ import type {
 import { BrandAssetCreatePanel } from "./BrandAssetCreatePanel";
 import { BrandColorCreatePanel } from "./BrandColorCreatePanel";
 import { BrandCopyButton } from "./BrandCopyButton";
+import { BrandGuidelineCreatePanel } from "./BrandGuidelineCreatePanel";
 
 type Props = {
   activeTab: BrandCenterTabKey;
@@ -101,7 +102,7 @@ function renderTab(activeTab: BrandCenterTabKey, snapshot: BrandCenterSnapshot) 
   if (activeTab === "assets") return <Assets assets={snapshot.assets} activeProfileId={snapshot.activeProfile.id} />;
   if (activeTab === "colors") return <Colors colors={snapshot.colors} activeProfileId={snapshot.activeProfile.id} />;
   if (activeTab === "typography") return <Typography fonts={snapshot.fonts} />;
-  if (activeTab === "voice") return <Guidelines guidelines={snapshot.guidelines} />;
+  if (activeTab === "voice") return <Guidelines guidelines={snapshot.guidelines} activeProfileId={snapshot.activeProfile.id} />;
   if (activeTab === "frameworks") return <Frameworks frameworks={snapshot.messageFrameworks} />;
   if (activeTab === "downloads") return <Downloads snapshot={snapshot} />;
   return <Overview snapshot={snapshot} />;
@@ -235,19 +236,23 @@ function Typography({ fonts }: { fonts: BrandFont[] }) {
   );
 }
 
-function Guidelines({ guidelines }: { guidelines: BrandGuideline[] }) {
+function Guidelines({ guidelines, activeProfileId }: { guidelines: BrandGuideline[]; activeProfileId: string }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
-      {guidelines.map((guideline) => (
-        <Panel key={guideline.id} title={guideline.title} description={guideline.section} compact>
-          <p className="text-sm leading-6 text-slate-600">{guideline.body}</p>
-          <div className="mt-4 grid gap-2">
-            {guideline.examples.map((example) => (
-              <p key={example} className="rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-700">{example}</p>
-            ))}
-          </div>
-        </Panel>
-      ))}
+    <div className="space-y-4">
+      <BrandGuidelineCreatePanel profileId={activeProfileId} />
+      {guidelines.length === 0 ? <EmptyState title="No brand rules yet" text="Add voice, copy, proof, donor dignity, CTA, and localization rules here." /> : null}
+      <div className="grid gap-4 xl:grid-cols-2">
+        {guidelines.map((guideline) => (
+          <Panel key={guideline.id} title={guideline.title} description={guideline.section} compact>
+            <p className="text-sm leading-6 text-slate-600">{guideline.body}</p>
+            <div className="mt-4 grid gap-2">
+              {guideline.examples.map((example) => (
+                <p key={example} className="rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-700">{example}</p>
+              ))}
+            </div>
+          </Panel>
+        ))}
+      </div>
     </div>
   );
 }
