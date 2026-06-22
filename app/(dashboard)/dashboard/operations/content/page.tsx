@@ -9,6 +9,7 @@ import { OperationsKpis } from "@/components/operations/OperationsKpis";
 import { OperationsProductionTasks } from "@/components/operations/OperationsProductionTasks";
 import { OperationsSeasonsBoard } from "@/components/operations/OperationsSeasonsBoard";
 import { getOperationsOverview } from "@/lib/operations/service";
+import { ContentItemCreatePanel } from "./_components/ContentItemCreatePanel";
 
 const boardColumns = [
   ["IDEA", "أفكار", "مواد تحتاج اعتماد الفكرة"],
@@ -56,12 +57,10 @@ export default async function OperationsContentPage() {
           <Button asChild variant="secondary" className="gap-2 font-bold">
             <Link href="/dashboard/operations"><PlusCircle className="h-4 w-4" /> العودة لمركز العمليات</Link>
           </Button>
-          <Button variant="secondary" disabled className="gap-2 font-bold opacity-80">
-            <PlusCircle className="h-4 w-4" /> إضافة عنصر قريبًا
-          </Button>
         </div>
       </div>
 
+      <ContentItemCreatePanel />
       <OperationsKpis kpis={kpis} />
       <OperationsSeasonsBoard seasons={seasons} weeklyThemes={weeklyThemes} statusClass={statusClass} />
       <OperationsFilters filters={filters} />

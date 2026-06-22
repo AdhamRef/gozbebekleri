@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { OperationsOverview } from "@/lib/operations/types";
+import { OperationsContentItemActions } from "./OperationsContentItemActions";
 
 type BoardColumn = readonly [status: string, label: string, description: string];
 
@@ -15,7 +16,7 @@ export function OperationsContentKanban({ items, boardColumns, statusClass }: Op
     <Card>
       <CardHeader>
         <CardTitle>مراحل إنتاج المحتوى</CardTitle>
-        <CardDescription>Kanban يقرأ الآن من API overview، وسيتم استبدال مصدره لاحقًا بقاعدة البيانات.</CardDescription>
+        <CardDescription>Kanban يقرأ من repository واحد. العناصر المحفوظة يمكن نقلها للمراجعة أو اعتمادها بدون نشر تلقائي.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid gap-3 xl:grid-cols-5">
@@ -42,6 +43,7 @@ export function OperationsContentKanban({ items, boardColumns, statusClass }: Op
                         <p>القناة: <b>{item.channel}</b></p>
                         <p>الموعد: <b>{item.due}</b></p>
                       </div>
+                      <OperationsContentItemActions id={item.id} status={item.status} />
                     </div>
                   ))}
                   {columnItems.length === 0 ? (

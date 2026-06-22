@@ -4,11 +4,31 @@ import type { OperationsContentItem } from "./types";
 
 const objectIdPattern = /^[a-f\d]{24}$/i;
 const archiveContentItemAction = "operations.content-item.create-from-archive-asset";
+const manualContentItemCreateAction = "operations.content-item.manual-create";
+const manualContentItemUpdateAction = "operations.content-item.manual-update";
+const contentItemActions = [archiveContentItemAction, manualContentItemCreateAction, manualContentItemUpdateAction];
+const allowedStatuses = new Set(["IDEA", "WRITING", "DESIGN", "REVIEW", "APPROVED", "COPY_NEEDED", "COPY_READY", "SCHEDULED", "PUBLISHED"]);
 
 export type ContentItemProposalActor = {
   actorId?: string | null;
   actorName?: string | null;
   actorRole?: string | null;
+};
+
+export type ContentItemWriteInput = {
+  id?: string | null;
+  title?: string | null;
+  type?: string | null;
+  format?: string | null;
+  status?: string | null;
+  channel?: string | null;
+  due?: string | null;
+  sourceType?: string | null;
+  sourceAssetId?: string | null;
+  sourceProjectId?: string | null;
+  driveUrl?: string | null;
+  previewUrl?: string | null;
+  notes?: string | null;
 };
 
 export type ContentItemProposalResult = {
@@ -20,6 +40,13 @@ export type ContentItemProposalResult = {
   data?: OperationsContentItem;
 };
 
+type StoredContentItemEntry = {
+  item: OperationsContentItem;
+  sourceAssetId: string | null;
+  sourceProjectId: string | null;
+  metadata: Record<string, unknown>;
+};
+
 function safeObjectId(value: string | null | undefined) {
   return value && objectIdPattern.test(value) ? value : undefined;
 }
@@ -29,13 +56,22 @@ function metadataObject(value: unknown): Record<string, unknown> {
 }
 
 function stringField(value: unknown) {
-  return typeof value === "string" && value.trim() ? value : null;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function sanitizeStatus(value: unknown, fallback = "IDEA") {
+  const status = stringField(value)?.toUpperCase();
+  return status && allowedStatuses.has(status) ? status : fallback;
 }
 
 function addDays(days: number) {
   const date = new Date();
   date.setDate(date.getDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+function generatedContentItemId() {
+  return `content_item_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function contentTypeForAsset(asset: ArchiveAsset) {
@@ -63,7 +99,7 @@ function titleForAsset(asset: ArchiveAsset) {
 
 function buildContentItemFromAsset(asset: ArchiveAsset): OperationsContentItem {
   return {
-    id: `content_item_archive_${asset.id}_${Date.now()}`,
+    id: generatedContentItemId(),
     title: titleForAsset(asset),
     type: contentTypeForAsset(asset),
     status: asset.marketingApproved ? "APPROVED" : "IDEA",
@@ -72,7 +108,20 @@ function buildContentItemFromAsset(asset: ArchiveAsset): OperationsContentItem {
   };
 }
 
-function contentItemFromMetadata(metadata: unknown): { item: OperationsContentItem; sourceAssetId: string | null } | null {
+function buildManualContentItem(input: ContentItemWriteInput): OperationsContentItem {
+  const title = stringField(input.title) ?? "New content item";
+  const type = stringField(input.type) ?? stringField(input.format) ?? "DESIGN";
+  return {
+    id: stringField(input.id) ?? generatedContentItemId(),
+    title,
+    type: type.toUpperCase(),
+    status: sanitizeStatus(input.status, type.toUpperCase() === "SEO_ARTICLE" ? "WRITING" : "IDEA"),
+    channel: stringField(input.channel) ?? "Social",
+    due: stringField(input.due) ?? addDays(7),
+  };
+}
+
+function contentItemFromMetadata(metadata: unknown): StoredContentItemEntry | null {
   const root = metadataObject(metadata);
   const contentItem = metadataObject(root.contentItem);
   const id = stringField(contentItem.id);
@@ -84,37 +133,155 @@ function contentItemFromMetadata(metadata: unknown): { item: OperationsContentIt
       id,
       title,
       type: stringField(contentItem.type) ?? "DESIGN",
-      status: stringField(contentItem.status) ?? "IDEA",
+      status: sanitizeStatus(contentItem.status),
       channel: stringField(contentItem.channel) ?? "Social",
       due: stringField(contentItem.due) ?? "to be scheduled",
     },
     sourceAssetId: stringField(root.sourceAssetId),
+    sourceProjectId: stringField(root.sourceProjectId),
+    metadata: root,
   };
 }
 
-export async function readAuditBackedContentItems(): Promise<OperationsContentItem[]> {
+async function readStoredContentItemEntries(): Promise<StoredContentItemEntry[]> {
   if (!process.env.DATABASE_URL) return [];
 
   try {
     const rows = await prisma.auditLog.findMany({
-      where: { entityType: "ContentItem", action: archiveContentItemAction },
+      where: { entityType: "ContentItem", action: { in: contentItemActions } },
       orderBy: { createdAt: "desc" },
-      take: 300,
+      take: 500,
       select: { id: true, metadata: true },
     });
 
-    const latest = new Map<string, OperationsContentItem>();
+    const latest = new Map<string, StoredContentItemEntry>();
     for (const row of rows) {
       const parsed = contentItemFromMetadata(row.metadata);
       if (!parsed) continue;
-      const dedupeKey = parsed.sourceAssetId ?? parsed.item.id ?? row.id;
-      if (!latest.has(dedupeKey)) latest.set(dedupeKey, parsed.item);
+      const dedupeKey = parsed.sourceAssetId ? `archive:${parsed.sourceAssetId}` : parsed.item.id ?? row.id;
+      if (!latest.has(dedupeKey)) latest.set(dedupeKey, parsed);
     }
 
     return [...latest.values()];
   } catch (error) {
     console.error("Audit-backed content item read failed", error);
     return [];
+  }
+}
+
+export async function readAuditBackedContentItems(): Promise<OperationsContentItem[]> {
+  const entries = await readStoredContentItemEntries();
+  return entries.map((entry) => entry.item);
+}
+
+async function writeContentItemAuditRecord(params: {
+  action: string;
+  messageAr: string;
+  messageEn: string;
+  contentItem: OperationsContentItem;
+  actor?: ContentItemProposalActor | null;
+  metadata?: Record<string, unknown>;
+}) {
+  await prisma.auditLog.create({
+    data: {
+      actorId: safeObjectId(params.actor?.actorId),
+      actorName: params.actor?.actorName ?? undefined,
+      actorRole: params.actor?.actorRole || "ADMIN",
+      action: params.action,
+      messageAr: params.messageAr,
+      messageEn: params.messageEn,
+      entityType: "ContentItem",
+      entityId: params.contentItem.id,
+      metadata: {
+        contentItem: params.contentItem,
+        externalCall: false,
+        autoPublish: false,
+        autoSend: false,
+        aiGenerated: false,
+        humanReviewRequired: true,
+        ...params.metadata,
+      },
+      stream: "TEAM",
+    },
+  });
+}
+
+export async function createAuditBackedContentItem(
+  input: ContentItemWriteInput,
+  actor?: ContentItemProposalActor | null,
+): Promise<ContentItemProposalResult> {
+  if (!process.env.DATABASE_URL) {
+    return { ok: false, mode: "foundation", externalCall: false, status: 503, message: "DATABASE_URL is not configured; content item was not saved." };
+  }
+
+  const contentItem = buildManualContentItem(input);
+
+  try {
+    await writeContentItemAuditRecord({
+      action: manualContentItemCreateAction,
+      messageAr: "تم إنشاء عنصر محتوى يدوي",
+      messageEn: "Manual content item created",
+      contentItem,
+      actor,
+      metadata: {
+        sourceType: stringField(input.sourceType) ?? "MANUAL",
+        sourceAssetId: stringField(input.sourceAssetId),
+        sourceProjectId: stringField(input.sourceProjectId),
+        driveUrl: stringField(input.driveUrl),
+        previewUrl: stringField(input.previewUrl),
+        notes: stringField(input.notes),
+      },
+    });
+
+    return { ok: true, mode: "prisma", externalCall: false, status: 201, message: "Content item saved.", data: contentItem };
+  } catch (error) {
+    console.error("Content item save failed", error);
+    return { ok: false, mode: "prisma", externalCall: false, status: 503, message: "Content item save failed." };
+  }
+}
+
+export async function updateAuditBackedContentItem(
+  input: ContentItemWriteInput,
+  actor?: ContentItemProposalActor | null,
+): Promise<ContentItemProposalResult> {
+  const id = stringField(input.id);
+  if (!id) return { ok: false, mode: "foundation", externalCall: false, status: 400, message: "Content item id is required." };
+  if (!process.env.DATABASE_URL) {
+    return { ok: false, mode: "foundation", externalCall: false, status: 503, message: "DATABASE_URL is not configured; content item was not updated." };
+  }
+
+  const entries = await readStoredContentItemEntries();
+  const existing = entries.find((entry) => entry.item.id === id);
+  if (!existing) return { ok: false, mode: "prisma", externalCall: false, status: 404, message: "Content item not found." };
+
+  const contentItem: OperationsContentItem = {
+    ...existing.item,
+    title: stringField(input.title) ?? existing.item.title,
+    type: (stringField(input.type) ?? stringField(input.format) ?? existing.item.type).toUpperCase(),
+    status: input.status ? sanitizeStatus(input.status, existing.item.status) : existing.item.status,
+    channel: stringField(input.channel) ?? existing.item.channel,
+    due: stringField(input.due) ?? existing.item.due,
+  };
+
+  try {
+    await writeContentItemAuditRecord({
+      action: manualContentItemUpdateAction,
+      messageAr: "تم تحديث عنصر محتوى",
+      messageEn: "Content item updated",
+      contentItem,
+      actor,
+      metadata: {
+        ...existing.metadata,
+        sourceAssetId: existing.sourceAssetId,
+        sourceProjectId: existing.sourceProjectId,
+        notes: stringField(input.notes) ?? stringField(existing.metadata.notes),
+      },
+    });
+
+    return { ok: true, mode: "prisma", externalCall: false, status: 200, message: "Content item updated.", data: contentItem };
+  } catch (error) {
+    console.error("Content item update failed", error);
+    return { ok: false, mode: "prisma", externalCall: false, status: 503, message: "Content item update failed." };
   }
 }
 
@@ -145,35 +312,23 @@ export async function persistContentItemProposalFromArchiveAsset(
   const contentItem = buildContentItemFromAsset(asset);
 
   try {
-    await prisma.auditLog.create({
-      data: {
-        actorId: safeObjectId(actor?.actorId),
-        actorName: actor?.actorName ?? undefined,
-        actorRole: actor?.actorRole || "ADMIN",
-        action: archiveContentItemAction,
-        messageAr: "تم إنشاء عنصر محتوى من أصل أرشيف",
-        messageEn: "Content item proposal created from archive asset",
-        entityType: "ContentItem",
-        entityId: safeObjectId(contentItem.id),
-        metadata: {
-          contentItem,
-          sourceType: "ARCHIVE_ASSET",
-          sourceAssetId: asset.id,
-          sourceProjectId: asset.projectId,
-          driveUrl: asset.webViewLink,
-          previewUrl: asset.previewUrl,
-          fileName: asset.fileName,
-          recommendedUse: asset.recommendedUse,
-          humanReviewStatus: asset.humanReviewStatus,
-          marketingApproved: asset.marketingApproved,
-          documentationApproved: asset.documentationApproved,
-          externalCall: false,
-          autoPublish: false,
-          autoSend: false,
-          aiGenerated: false,
-          humanReviewRequired: true,
-        },
-        stream: "TEAM",
+    await writeContentItemAuditRecord({
+      action: archiveContentItemAction,
+      messageAr: "تم إنشاء عنصر محتوى من أصل أرشيف",
+      messageEn: "Content item proposal created from archive asset",
+      contentItem,
+      actor,
+      metadata: {
+        sourceType: "ARCHIVE_ASSET",
+        sourceAssetId: asset.id,
+        sourceProjectId: asset.projectId,
+        driveUrl: asset.webViewLink,
+        previewUrl: asset.previewUrl,
+        fileName: asset.fileName,
+        recommendedUse: asset.recommendedUse,
+        humanReviewStatus: asset.humanReviewStatus,
+        marketingApproved: asset.marketingApproved,
+        documentationApproved: asset.documentationApproved,
       },
     });
 
