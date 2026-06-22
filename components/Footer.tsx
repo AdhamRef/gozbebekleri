@@ -1,296 +1,243 @@
-'use client';
-import React, { useEffect, useState } from 'react';
-import Image from 'next/image';
-import { Mail, Phone, MapPin, Facebook, Instagram, Youtube, Twitter, Send, Heart, ChevronRight } from 'lucide-react';
-import { useTranslations, useLocale } from 'next-intl';
-import { useSession } from 'next-auth/react';
-import { usePathname, useRouter } from '@/i18n/routing';
-import { Link } from '@/i18n/routing';
-import { useSearchParams } from 'next/navigation';
-import SignInDialog from '@/components/SignInDialog';
-import { appendCurrencyQuery, getCurrencyCodeForLinks } from '@/lib/currency-link';
-import { getSocialLinks } from '@/lib/social-links';
-import { track } from '@vercel/analytics';
+"use client";
 
-const LOGO_URL = 'logo-white.png';
+import React from "react";
+import Image from "next/image";
+import { ChevronRight, FileText, Globe2, Heart, ShieldCheck } from "lucide-react";
+import { useLocale } from "next-intl";
+import { Link } from "@/i18n/routing";
+import LanguageSwitcher from "./LanguageSelector";
+import CurrencySelector from "./CurrencySelector";
+
+const LOGO_URL = "/logo-white.png";
+
+type FooterLink = { label: string; href: string };
+
+type FooterCopy = {
+  summary: string;
+  donors: string;
+  impact: string;
+  join: string;
+  legal: string;
+  officialNotice: string;
+  verifiedOnly: string;
+  languageCurrency: string;
+  copyrightName: string;
+  links: Record<string, string>;
+};
+
+const arCopy: FooterCopy = {
+  summary: "منبر الأقصى منصة تبرع رسمية لدعم القدس والأقصى وغزة ومشاريع الزكاة والوقف والصدقة عبر تجربة تبرع آمنة وواضحة الأثر.",
+  donors: "للمتبرعين",
+  impact: "الأثر والتقارير",
+  join: "شارك معنا",
+  legal: "الدعم والقانوني",
+  officialNotice: "استخدم فقط بيانات التواصل والحسابات البنكية المنشورة رسميًا داخل الموقع.",
+  verifiedOnly: "بيانات التواصل التفصيلية قيد التحقق قبل النشر النهائي.",
+  languageCurrency: "اللغة والعملة",
+  copyrightName: "مؤسسة منبر الأقصى الدولية",
+  links: {
+    projects: "المشاريع",
+    funds: "الصناديق",
+    zakat: "الزكاة",
+    waqf: "الوقف",
+    recurring: "التبرع الدوري",
+    donorAccount: "حساب المتبرع",
+    achievements: "الإنجازات",
+    stories: "القصص والتحديثات",
+    reports: "التقارير",
+    knowledge: "مركز المعرفة",
+    becomePartner: "كن شريكًا لنا",
+    volunteer: "تطوع معنا",
+    partnerProjects: "مشاريع الشركاء",
+    bankAccounts: "الحسابات البنكية",
+    privacy: "سياسة الخصوصية",
+    terms: "شروط الاستخدام",
+    contact: "تواصل معنا",
+  },
+};
+
+const enCopy: FooterCopy = {
+  summary: "Minber-i Aksa is an official donation platform supporting Al-Quds, Al-Aqsa, Gaza, zakat, waqf and sadaqah projects through a secure and transparent giving experience.",
+  donors: "For Donors",
+  impact: "Impact and Reports",
+  join: "Join Us",
+  legal: "Support and Legal",
+  officialNotice: "Use only contact and bank details published officially on the website.",
+  verifiedOnly: "Detailed contact information is pending final verification before production publication.",
+  languageCurrency: "Language and Currency",
+  copyrightName: "Minber-i Aksa International Association",
+  links: {
+    projects: "Projects",
+    funds: "Funds",
+    zakat: "Zakat",
+    waqf: "Waqf",
+    recurring: "Recurring Giving",
+    donorAccount: "Donor Account",
+    achievements: "Achievements",
+    stories: "Stories and Updates",
+    reports: "Reports",
+    knowledge: "Knowledge Center",
+    becomePartner: "Become a Partner",
+    volunteer: "Volunteer with Us",
+    partnerProjects: "Partner Projects",
+    bankAccounts: "Bank Accounts",
+    privacy: "Privacy Policy",
+    terms: "Terms of Use",
+    contact: "Contact",
+  },
+};
+
+const trCopy: FooterCopy = {
+  ...enCopy,
+  summary: "Minber-i Aksa; Kudüs, Mescid-i Aksa, Gazze, zekat, vakıf ve sadaka projeleri için güvenli ve şeffaf bağış deneyimi sunan resmi bağış platformudur.",
+  donors: "Bağışçılar",
+  impact: "Etki ve Raporlar",
+  join: "Bize Katılın",
+  legal: "Destek ve Yasal",
+  officialNotice: "Yalnızca web sitesinde resmi olarak yayınlanan iletişim ve banka bilgilerini kullanın.",
+  verifiedOnly: "Ayrıntılı iletişim bilgileri son yayın öncesi doğrulanacaktır.",
+  languageCurrency: "Dil ve Para Birimi",
+  copyrightName: "Minber-i Aksa Derneği",
+  links: {
+    projects: "Projeler",
+    funds: "Fonlar",
+    zakat: "Zekat",
+    waqf: "Vakıf",
+    recurring: "Düzenli Bağış",
+    donorAccount: "Bağışçı Hesabı",
+    achievements: "Başarılar",
+    stories: "Hikayeler",
+    reports: "Raporlar",
+    knowledge: "Bilgi Merkezi",
+    becomePartner: "Partner Olun",
+    volunteer: "Gönüllü Olun",
+    partnerProjects: "Partner Projeleri",
+    bankAccounts: "Banka Hesapları",
+    privacy: "Gizlilik Politikası",
+    terms: "Kullanım Şartları",
+    contact: "İletişim",
+  },
+};
+
+function getCopy(locale: string): FooterCopy {
+  if (locale === "ar") return arCopy;
+  if (locale === "tr") return trCopy;
+  return enCopy;
+}
+
+function columns(copy: FooterCopy): Array<{ title: string; links: FooterLink[] }> {
+  return [
+    {
+      title: copy.donors,
+      links: [
+        { label: copy.links.projects, href: "/campaigns" },
+        { label: copy.links.funds, href: "/campaigns" },
+        { label: copy.links.zakat, href: "/campaigns" },
+        { label: copy.links.waqf, href: "/campaigns" },
+        { label: copy.links.recurring, href: "/campaigns" },
+        { label: copy.links.donorAccount, href: "/profile" },
+      ],
+    },
+    {
+      title: copy.impact,
+      links: [
+        { label: copy.links.achievements, href: "/blog" },
+        { label: copy.links.stories, href: "/blog" },
+        { label: copy.links.reports, href: "/blog" },
+        { label: copy.links.knowledge, href: "/blog" },
+      ],
+    },
+    {
+      title: copy.join,
+      links: [
+        { label: copy.links.becomePartner, href: "/contact-us" },
+        { label: copy.links.volunteer, href: "/contact-us" },
+        { label: copy.links.partnerProjects, href: "/campaigns" },
+      ],
+    },
+    {
+      title: copy.legal,
+      links: [
+        { label: copy.links.bankAccounts, href: "/bank-transfer" },
+        { label: copy.links.privacy, href: "/privacy" },
+        { label: copy.links.terms, href: "/terms" },
+        { label: copy.links.contact, href: "/contact-us" },
+      ],
+    },
+  ];
+}
 
 const Footer = () => {
-  const t = useTranslations('Footer');
-  const locale = useLocale() as 'ar' | 'en' | 'fr' | 'tr';
-  const { data: session } = useSession();
-  const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [body, setBody] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitMessage, setSubmitMessage] = useState('');
-  const [isSignInOpen, setIsSignInOpen] = useState(false);
-  const [categories, setCategories] = useState<{ id: string; slug?: string | null; name: string }[]>([]);
-  const pendingMessageKey = 'footer_pending_contact_message';
-  const signInCallbackUrl =
-    typeof window !== 'undefined'
-      ? `${window.location.pathname}?footerMessageSent=1`
-      : undefined;
-
-  useEffect(() => {
-    const shouldSend = searchParams.get('footerMessageSent') === '1';
-    if (!shouldSend || !session?.user?.id) return;
-    const run = async () => {
-      try {
-        const raw = window.sessionStorage.getItem(pendingMessageKey);
-        if (!raw) { router.replace(appendCurrencyQuery(pathname, getCurrencyCodeForLinks())); return; }
-        const parsed = JSON.parse(raw) as { body?: string; locale?: string };
-        const trimmed = (parsed.body || '').trim();
-        if (!trimmed) { window.sessionStorage.removeItem(pendingMessageKey); router.replace(appendCurrencyQuery(pathname, getCurrencyCodeForLinks())); return; }
-        const res = await fetch('/api/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ body: trimmed, locale: parsed.locale || locale, subject: 'COMPLAINT' }),
-        });
-        if (!res.ok) throw new Error('Failed');
-        window.sessionStorage.removeItem(pendingMessageKey);
-        setBody('');
-        setSubmitMessage(t('sendSuccess'));
-        try { track('contact_message_sent', { source: 'footer_after_signin', subject: 'COMPLAINT', locale }); } catch {}
-        setTimeout(() => setSubmitMessage(''), 4000);
-      } catch {
-        try { track('contact_message_failed', { source: 'footer_after_signin', subject: 'COMPLAINT', locale }); } catch {}
-        setSubmitMessage(t('sendError'));
-        setTimeout(() => setSubmitMessage(''), 3000);
-      } finally {
-        router.replace(appendCurrencyQuery(pathname, getCurrencyCodeForLinks()));
-      }
-    };
-    run();
-  }, [searchParams, session?.user?.id, pathname, router, t, locale]);
-
-  useEffect(() => {
-    fetch(`/api/categories?locale=${locale}&limit=20`)
-      .then((r) => r.json())
-      .then((data) => {
-        const items = data?.items ?? data ?? [];
-        if (Array.isArray(items)) {
-          setCategories(
-            items.map((c: { id: string; name: string; slug?: string | null }) => ({
-              id: c.id,
-              slug: c.slug ?? null,
-              name: c.name,
-            }))
-          );
-        }
-      })
-      .catch(() => {});
-  }, [locale]);
-
-  const handleMessageSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = body.trim();
-    if (!trimmed || trimmed.length < 3) {
-      setSubmitMessage(t('sendError'));
-      setTimeout(() => setSubmitMessage(''), 3000);
-      return;
-    }
-    if (!session?.user?.id) {
-      if (typeof window !== 'undefined') {
-        window.sessionStorage.setItem(pendingMessageKey, JSON.stringify({ body: trimmed, locale }));
-      }
-      setIsSignInOpen(true);
-      return;
-    }
-    setIsSubmitting(true);
-    setSubmitMessage('');
-    try {
-      const res = await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: trimmed, locale, subject: 'COMPLAINT' }),
-      });
-      if (!res.ok) throw new Error('Failed');
-      setSubmitMessage(t('sendSuccess'));
-      setBody('');
-      try { track('contact_message_sent', { source: 'footer', subject: 'COMPLAINT', locale }); } catch {}
-      setTimeout(() => setSubmitMessage(''), 4000);
-    } catch {
-      try { track('contact_message_failed', { source: 'footer', subject: 'COMPLAINT', locale }); } catch {}
-      setSubmitMessage(t('sendError'));
-      setTimeout(() => setSubmitMessage(''), 3000);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const isTr = locale === 'tr';
-  const isAr = locale === 'ar';
-
-  // Built dynamically from the API — see useEffect above
-
-  const quickLinks = [
-    { label: isTr ? 'Hakkımızda' : isAr ? 'من نحن' : 'About Us', href: '/about-us' },
-    { label: isTr ? 'Projeler' : isAr ? 'المشاريع' : 'Projects', href: '/campaigns' },
-    { label: isTr ? 'Haberler' : isAr ? 'الأخبار' : 'News', href: '/blog' },
-    { label: isTr ? 'Faaliyetler' : isAr ? 'الأنشطة' : 'Activities', href: '/campaigns' },
-    { label: isTr ? 'İletişim' : isAr ? 'اتصل بنا' : 'Contact', href: '/contact-us' },
-    { label: isTr ? 'Gizlilik Politikası' : isAr ? 'سياسة الخصوصية' : 'Privacy Policy', href: '/privacy' },
-    { label: isTr ? 'Kullanım Şartları' : isAr ? 'شروط الاستخدام' : 'Terms of Use', href: '/terms' },
-  ];
-
-  const social = getSocialLinks(locale);
-  const socialLinks = [
-    { Icon: Facebook, href: social.facebook, label: 'Facebook' },
-    { Icon: Twitter, href: social.twitter, label: 'Twitter' },
-    { Icon: Instagram, href: social.instagram, label: 'Instagram' },
-    { Icon: Youtube, href: social.youtube, label: 'Youtube' },
-  ] as const;
+  const locale = useLocale();
+  const copy = getCopy(locale);
 
   return (
-    <footer className="bg-[#0A2D6E] text-white">
+    <footer className="bg-[#10212B] text-[#FFFDF8]">
+      <div className="border-b border-white/10 bg-[#132C38]">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 text-sm text-[#E8D8BE] sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-[#D39A27]" />
+            <span>{copy.officialNotice}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="hidden text-xs font-semibold uppercase tracking-[0.2em] text-white/45 sm:inline">{copy.languageCurrency}</span>
+            <LanguageSwitcher onDark />
+            <CurrencySelector onDark />
+          </div>
+        </div>
+      </div>
 
-      {/* ── Main content ── */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10 gap-2">
-
-          {/* ── Brand ── */}
-          <div className="sm:col-span-2 lg:col-span-1 flex flex-col">
-            <Link href="/" className="inline-block mb-5">
-              <Image src={LOGO_URL} alt="Logo" width={112} height={56} className="h-14 w-auto object-contain brightness-0 invert" />
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
+          <div className="lg:col-span-4">
+            <Link href="/" className="inline-flex">
+              <Image src={LOGO_URL} alt="Minber-i Aksa" width={180} height={64} className="h-14 w-auto object-contain" />
             </Link>
-            <p className="text-sm text-white/70 leading-relaxed mb-6 max-w-xs">
-              {t('aboutUsDesc1')}
-            </p>
-            {/* Social icons */}
-            <div className="flex items-center gap-2 mt-auto">
-              {socialLinks.map(({ Icon, href, label }) => (
-                <a
-                  key={label}
-                  href={href}
-                  aria-label={label}
-                  className="w-9 h-9 rounded-full bg-white/10 hover:bg-[#FA5D17] flex items-center justify-center transition-colors"
-                >
-                  <Icon className="w-4 h-4" />
-                </a>
-              ))}
+            <p className="mt-5 max-w-md text-sm leading-7 text-white/70">{copy.summary}</p>
+
+            <div className="mt-6 grid gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-white/70">
+              <div className="flex items-start gap-3">
+                <FileText className="mt-0.5 h-4 w-4 shrink-0 text-[#D39A27]" />
+                <Link href="/bank-transfer" className="hover:text-white">{copy.links.bankAccounts}</Link>
+              </div>
+              <div className="text-white/55">{copy.verifiedOnly}</div>
             </div>
           </div>
 
-          {/* ── Online Donate ── */}
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-widest mb-5 text-white/50 border-b border-white/10 pb-3">
-              {isTr ? 'Online Bağış' : isAr ? 'التبرع الإلكتروني' : 'Online Donate'}
-            </h4>
-            <ul className="space-y-2.5">
-              {categories.map((cat) => (
-                <li key={cat.id}>
-                  <Link
-                    href={`/category/${cat.slug || cat.id}`}
-                    className="group flex items-center gap-1.5 text-sm text-white/65 hover:text-white transition-colors"
-                  >
-                    <ChevronRight className="w-3.5 h-3.5 text-[#FA5D17] flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
-                    {cat.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* ── Quick Links ── */}
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-widest mb-5 text-white/50 border-b border-white/10 pb-3">
-              {isTr ? 'Bağlantılar' : isAr ? 'روابط سريعة' : 'Quick Links'}
-            </h4>
-            <ul className="space-y-2.5">
-              {quickLinks.map((item) => (
-                <li key={item.label}>
-                  <Link
-                    href={item.href}
-                    className="group flex items-center gap-1.5 text-sm text-white/65 hover:text-white transition-colors"
-                  >
-                    <ChevronRight className="w-3.5 h-3.5 text-[#FA5D17] flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* ── Contact + Message ── */}
-          <div className="sm:col-span-2 lg:col-span-1">
-            <h4 className="text-xs font-bold uppercase tracking-widest mb-5 text-white/50 border-b border-white/10 pb-3">
-              {isTr ? 'İletişim' : isAr ? 'تواصل معنا' : 'Contact'}
-            </h4>
-
-            {/* Contact info */}
-            <ul className="space-y-3 mb-6">
-              <li className="flex items-start gap-3 text-sm text-white/70">
-                <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-[#FA5D17]" />
-                {isTr ? 'İstanbul, Türkiye' : isAr ? 'إسطنبول، تركيا' : 'Istanbul, Turkey'}
-              </li>
-              <li>
-                <a
-                  href="tel:+902122885930"
-                  className="flex items-center gap-3 text-sm text-white/70 hover:text-white transition-colors"
-                >
-                  <Phone className="w-4 h-4 flex-shrink-0 text-[#FA5D17]" />
-                  <span dir="ltr">+90 212 288 59 30</span>
-                </a>
-              </li>
-              <li>
-                <a
-                  href="mailto:info@gozbebekleri.org.tr"
-                  className="flex items-center gap-3 text-sm text-white/70 hover:text-white transition-colors"
-                >
-                  <Mail className="w-4 h-4 flex-shrink-0 text-[#FA5D17]" />
-                  info@gozbebekleri.org.tr
-                </a>
-              </li>
-            </ul>
-
-            {/* Message form */}
-            <form onSubmit={handleMessageSubmit} className="flex flex-col gap-2">
-              <textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                placeholder={t('messagePlaceholder')}
-                disabled={isSubmitting}
-                rows={3}
-                className="w-full px-4 py-3 text-sm rounded-xl bg-white/10 border border-white/20 text-white placeholder:text-white/40 focus:outline-none focus:border-[#FA5D17]/60 focus:bg-white/15 resize-none disabled:opacity-50 transition-colors"
-              />
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="flex items-center justify-center gap-2 w-full py-2.5 bg-[#FA5D17] hover:bg-[#e04d0f] text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
-              >
-                <Send className="w-4 h-4" />
-                {isSubmitting ? t('sending') : t('send')}
-              </button>
-            </form>
-            {submitMessage && (
-              <p className={`mt-2 text-xs ${/success|نجاح|başar/i.test(submitMessage) ? 'text-green-300' : 'text-red-300'}`}>
-                {submitMessage}
-              </p>
-            )}
+          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:col-span-8 lg:grid-cols-4">
+            {columns(copy).map((column) => (
+              <div key={column.title}>
+                <h4 className="border-b border-white/10 pb-3 text-xs font-bold uppercase tracking-[0.22em] text-[#D39A27]">
+                  {column.title}
+                </h4>
+                <ul className="mt-5 space-y-3">
+                  {column.links.map((item) => (
+                    <li key={item.href + item.label}>
+                      <Link href={item.href} className="group flex items-center gap-2 text-sm text-white/65 transition-colors hover:text-white">
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#D39A27] transition-transform group-hover:translate-x-0.5" />
+                        <span>{item.label}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* ── Bottom bar ── */}
-      <div className="border-t border-white/10 bg-[#071d4a]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-white/50">
+      <div className="border-t border-white/10 bg-[#0B1A22]">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-5 text-xs text-white/50 sm:flex-row sm:px-6 lg:px-8">
           <p className="flex items-center gap-1.5">
-            <Heart className="w-3 h-3 text-[#FA5D17]" />
-            {t('copyright', { year: new Date().getFullYear() })}
+            <Heart className="h-3.5 w-3.5 text-[#A93428]" />
+            © {new Date().getFullYear()} {copy.copyrightName}
           </p>
-          <a
-            href="https://www.jubyte.net"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-white transition-colors"
-          >
-            {t('developedBy')}
-          </a>
+          <p className="flex items-center gap-1.5">
+            <Globe2 className="h-3.5 w-3.5 text-[#D39A27]" />
+            minberiaksa.org
+          </p>
         </div>
       </div>
-
-      <SignInDialog isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} callbackUrl={signInCallbackUrl} />
     </footer>
   );
 };
