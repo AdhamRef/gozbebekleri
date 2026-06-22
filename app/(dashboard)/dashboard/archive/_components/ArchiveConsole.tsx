@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { AlertTriangle, Archive, Bot, CheckCircle2, Database, FileText, FolderOpen, Image, Link2, ShieldCheck } from "lucide-react";
 import type { ArchiveAsset, ArchiveDriveLink, ArchiveProject, ArchiveSnapshot, ArchiveTabKey } from "@/lib/archive/archive-types";
+import { ArchiveAssetBrandAssetAction } from "./ArchiveAssetBrandAssetAction";
 
 type Props = {
   activeTab: ArchiveTabKey;
@@ -144,24 +145,41 @@ function Assets({ assets, marketingOnly = false }: { assets: ArchiveAsset[]; mar
   if (assets.length === 0) return <EmptyState title="No assets here yet" text={marketingOnly ? "Marketing Picks waits for approved, non-sensitive assets." : "Drive metadata sync will populate ArchiveAssets later."} />;
   return (
     <div className="grid gap-4 xl:grid-cols-2">
-      {assets.map((asset) => (
-        <Panel key={asset.id} title={asset.fileName} description={`${asset.fileType} / ${asset.recommendedUse}`} compact>
-          <div className="grid gap-4 md:grid-cols-[128px_1fr]">
-            <div className="flex h-32 items-center justify-center rounded-lg border bg-slate-50 text-center text-xs font-bold text-slate-500">Preview to be synced</div>
-            <div className="space-y-3 text-sm leading-6 text-slate-600">
-              <p>{asset.aiSummary || "Not analyzed yet."}</p>
-              {asset.aiWarnings && <p className="rounded-md bg-amber-50 p-3 text-amber-900">{asset.aiWarnings}</p>}
-              <div className="flex flex-wrap gap-2">
-                <Badge>{asset.aiStatus}</Badge><Badge>{asset.humanReviewStatus}</Badge><Badge>Marketing {asset.marketingScore}</Badge><Badge>Quality {asset.qualityScore}</Badge>
-                {asset.isSensitive && <Badge>Sensitive</Badge>}{asset.needsBlur && <Badge>Needs blur</Badge>}
+      {assets.map((asset) => {
+        const brandAssetBlockReason = getBrandAssetBlockReason(asset);
+        return (
+          <Panel key={asset.id} title={asset.fileName} description={`${asset.fileType} / ${asset.recommendedUse}`} compact>
+            <div className="grid gap-4 md:grid-cols-[128px_1fr]">
+              <div className="flex h-32 items-center justify-center rounded-lg border bg-slate-50 text-center text-xs font-bold text-slate-500">Preview to be synced</div>
+              <div className="space-y-3 text-sm leading-6 text-slate-600">
+                <p>{asset.aiSummary || "Not analyzed yet."}</p>
+                {asset.aiWarnings && <p className="rounded-md bg-amber-50 p-3 text-amber-900">{asset.aiWarnings}</p>}
+                <div className="flex flex-wrap gap-2">
+                  <Badge>{asset.aiStatus}</Badge><Badge>{asset.humanReviewStatus}</Badge><Badge>Marketing {asset.marketingScore}</Badge><Badge>Quality {asset.qualityScore}</Badge>
+                  {asset.isSensitive && <Badge>Sensitive</Badge>}{asset.needsBlur && <Badge>Needs blur</Badge>}
+                </div>
+                <div className="flex flex-wrap gap-2">{asset.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
+                <ArchiveAssetBrandAssetAction assetId={asset.id} disabled={Boolean(brandAssetBlockReason)} disabledReason={brandAssetBlockReason} />
               </div>
-              <div className="flex flex-wrap gap-2">{asset.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
             </div>
-          </div>
-        </Panel>
-      ))}
+          </Panel>
+        );
+      })}
     </div>
   );
+}
+
+function getBrandAssetBlockReason(asset: ArchiveAsset) {
+  if (asset.humanReviewStatus === "REJECTED" || asset.recommendedUse === "DO_NOT_USE") {
+    return "لا يمكن نقل أصل مرفوض إلى مركز الهوية.";
+  }
+  if (asset.isSensitive || asset.needsBlur) {
+    return "الأصول الحساسة أو التي تحتاج blur لا تدخل مركز الهوية.";
+  }
+  if (!asset.marketingApproved && !asset.documentationApproved) {
+    return "اعتمد الأصل للتسويق أو التوثيق أولًا.";
+  }
+  return null;
 }
 
 function Reports({ snapshot }: { snapshot: ArchiveSnapshot }) {
