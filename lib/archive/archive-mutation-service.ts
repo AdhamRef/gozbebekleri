@@ -1,5 +1,6 @@
+import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
-import type { ArchiveCollection, ArchiveProject } from "./archive-types";
+import type { ArchiveCollection, ArchiveDriveLink, ArchiveProject } from "./archive-types";
 
 const objectIdPattern = /^[a-f\d]{24}$/i;
 
@@ -13,9 +14,15 @@ export type ArchivePersistenceMutationResult<T> = {
 
 type ArchiveCollectionInput = Partial<Pick<ArchiveCollection, "name" | "slug" | "type" | "description" | "order" | "isActive">>;
 type ArchiveProjectInput = Partial<ArchiveProject> & { title?: string };
+type ArchiveDriveLinkInput = Partial<Pick<ArchiveDriveLink, "projectId" | "title" | "driveUrl">>;
+type ArchiveActor = { actorId?: string | null; actorName?: string | null; actorRole?: string | null };
 
 function safeObjectId(value: string | null | undefined) {
   return value && objectIdPattern.test(value) ? value : undefined;
+}
+
+function newObjectId() {
+  return randomBytes(12).toString("hex");
 }
 
 function slugify(value: string) {
@@ -30,6 +37,28 @@ function slugify(value: string) {
 
 function toIso(value: Date | null | undefined) {
   return value ? value.toISOString() : null;
+}
+
+function extractDriveIds(rawUrl: string) {
+  const value = String(rawUrl ?? "").trim();
+  if (!value || value === "to be verified") return { driveFolderId: null, driveFileId: null, sharedDriveId: null, linkType: "UNKNOWN" as const };
+
+  try {
+    const url = new URL(value);
+    const folder = url.pathname.match(/\/folders\/([^/?#]+)/)?.[1] ?? null;
+    const file = url.pathname.match(/\/file\/d\/([^/?#]+)/)?.[1] ?? url.searchParams.get("id");
+    const sharedDriveId = url.searchParams.get("driveId") ?? null;
+    return {
+      driveFolderId: folder,
+      driveFileId: folder ? null : file,
+      sharedDriveId,
+      linkType: folder ? "FOLDER" as const : file ? "FILE" as const : "UNKNOWN" as const,
+    };
+  } catch {
+    const folder = value.match(/folders\/([^/?#]+)/)?.[1] ?? null;
+    const file = value.match(/file\/d\/([^/?#]+)/)?.[1] ?? value.match(/[?&]id=([^&#]+)/)?.[1] ?? null;
+    return { driveFolderId: folder, driveFileId: folder ? null : file, sharedDriveId: null, linkType: folder ? "FOLDER" as const : file ? "FILE" as const : "UNKNOWN" as const };
+  }
 }
 
 function mapCollection(row: {
@@ -176,5 +205,66 @@ export async function createArchiveProjectInRepository(
   } catch (error) {
     console.error("ArchiveProject create failed", error);
     return { ok: false, mode: "prisma", externalCall: false, message: "ArchiveProject create failed." };
+  }
+}
+
+export async function createArchiveDriveLinkInRepository(
+  input: ArchiveDriveLinkInput,
+  actor?: ArchiveActor | null,
+): Promise<ArchivePersistenceMutationResult<ArchiveDriveLink>> {
+  if (!process.env.DATABASE_URL) {
+    return unavailable("DATABASE_URL is not configured; ArchiveDriveLink was not created.");
+  }
+
+  try {
+    const ids = extractDriveIds(input.driveUrl || "");
+    const item: ArchiveDriveLink = {
+      id: newObjectId(),
+      projectId: input.projectId || "archive_project_unknown",
+      title: input.title || "Drive link to be verified",
+      driveUrl: input.driveUrl || "to be verified",
+      driveFolderId: ids.driveFolderId,
+      driveFileId: ids.driveFileId,
+      sharedDriveId: ids.sharedDriveId,
+      linkType: ids.linkType,
+      syncStatus: ids.linkType === "UNKNOWN" ? "FOUNDATION" : "READY_FOR_SYNC",
+      lastSyncedAt: null,
+      lastError: ids.linkType === "UNKNOWN" ? "Drive folder/file id could not be detected." : null,
+      totalFiles: 0,
+      totalImages: 0,
+      totalVideos: 0,
+      totalOther: 0,
+    };
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: safeObjectId(actor?.actorId),
+        actorName: actor?.actorName ?? undefined,
+        actorRole: actor?.actorRole || "ADMIN",
+        action: "archive.drive-link.create",
+        messageAr: "تم حفظ رابط Drive في الأرشيف",
+        messageEn: "Archive Drive link saved",
+        entityType: "ArchiveDriveLink",
+        entityId: item.id,
+        metadata: {
+          ...item,
+          providerSource: "MarketingPlatformConnection/provider-catalog",
+          externalCall: false,
+          syncStarted: false,
+        },
+        stream: "TEAM",
+      },
+    });
+
+    return {
+      ok: true,
+      mode: "prisma",
+      externalCall: false,
+      message: "ArchiveDriveLink persisted without Google Drive calls.",
+      data: item,
+    };
+  } catch (error) {
+    console.error("ArchiveDriveLink create failed", error);
+    return { ok: false, mode: "prisma", externalCall: false, message: "ArchiveDriveLink create failed." };
   }
 }
