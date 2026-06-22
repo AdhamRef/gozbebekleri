@@ -3,6 +3,7 @@ import { ArrowLeft, CheckCircle2, Clapperboard, FileText, Megaphone, Palette, Sp
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getProductionBoardOverview } from "@/lib/operations/production/production-service";
+import { ProductionItemTaskAction } from "./_components/ProductionItemTaskAction";
 
 const priorityClass: Record<string, string> = {
   HIGH: "border-rose-200 bg-rose-50 text-rose-700",
@@ -82,6 +83,14 @@ export default async function OperationsProductionPage() {
                       {item.designUrl ? <span className="rounded-full bg-slate-100 px-2 py-1">تصميم: {item.designUrl}</span> : null}
                       {item.videoUrl ? <span className="rounded-full bg-slate-100 px-2 py-1">فيديو: {item.videoUrl}</span> : null}
                     </div>
+                    <ProductionItemTaskAction
+                      itemId={item.id}
+                      title={item.title}
+                      stage={item.stage}
+                      priority={item.priority}
+                      owner={item.owner}
+                      dueLabel={item.dueLabel}
+                    />
                   </div>
                 ))}
               </CardContent>
