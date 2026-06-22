@@ -34,7 +34,7 @@ export const aiAssistantContexts: AiAssistantContextDefinition[] = [
     capabilities: ["SEARCH_ARCHIVE", "PLAN_CONTENT", "BRAND_GUARDRAILS"],
     allowedSources: ["getArchiveSummary", "getBrandRules"],
     blockedActions: ["No file deletion", "No public publishing", "No external platform calls"],
-    entryHref: "/dashboard/operations/archive/ai-assistant",
+    entryHref: "/dashboard/archive/ai",
   },
   {
     key: "brand",
@@ -44,7 +44,7 @@ export const aiAssistantContexts: AiAssistantContextDefinition[] = [
     capabilities: ["BRAND_GUARDRAILS", "WRITE_COPY", "SUMMARIZE_EXECUTIVE"],
     allowedSources: ["getBrandRules"],
     blockedActions: ["No logo file changes", "No public publishing", "No legal claims"],
-    entryHref: "/dashboard/brand/center",
+    entryHref: "/dashboard/brand",
   },
 ];
 
