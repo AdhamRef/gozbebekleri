@@ -19,6 +19,14 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     );
   }
 
+  const projectExists = snapshot.projects.some((project) => project.id === link.projectId);
+  if (!projectExists) {
+    return jsonNoStore(
+      { ok: false, mode: snapshot.persistence.mode, externalCall: false, message: "Drive link project was not found." },
+      { status: 409 },
+    );
+  }
+
   const hasDriveId = Boolean(link.driveFolderId || link.driveFileId);
 
   return jsonNoStore(
