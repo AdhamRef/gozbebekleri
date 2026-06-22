@@ -101,6 +101,13 @@ type ArchiveVideoFrameRow = {
   isSensitive: boolean;
 };
 
+type ArchiveDriveLinkAuditRow = {
+  id: string;
+  entityId: string | null;
+  metadata: unknown;
+  createdAt: Date;
+};
+
 type ArchiveDriveLinkDelegate = {
   findMany(args: { orderBy: Array<Record<string, "asc" | "desc">> }): Promise<ArchiveDriveLinkRow[]>;
 };
@@ -189,6 +196,50 @@ function getArchiveVideoFrameDelegate(): ArchiveVideoFrameDelegate | null {
   return prismaWithArchiveVideoFrame.archiveVideoFrame ?? null;
 }
 
+function metadataObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function stringField(value: unknown) {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function numberField(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function mapAuditDriveLink(
+  row: ArchiveDriveLinkAuditRow,
+  validProjectIds: Set<string>,
+  fallbackProjectId: string,
+): ArchiveDriveLink | null {
+  const metadata = metadataObject(row.metadata);
+  const id = stringField(metadata.id) ?? row.entityId ?? row.id;
+  const projectId = stringField(metadata.projectId);
+  const title = stringField(metadata.title);
+  const driveUrl = stringField(metadata.driveUrl);
+
+  if (!title || !driveUrl) return null;
+
+  return {
+    id,
+    projectId: projectId && validProjectIds.has(projectId) ? projectId : fallbackProjectId,
+    title,
+    driveUrl,
+    driveFolderId: stringField(metadata.driveFolderId),
+    driveFileId: stringField(metadata.driveFileId),
+    sharedDriveId: stringField(metadata.sharedDriveId),
+    linkType: asLinkType(stringField(metadata.linkType)),
+    syncStatus: asSyncStatus(stringField(metadata.syncStatus)),
+    lastSyncedAt: stringField(metadata.lastSyncedAt),
+    lastError: stringField(metadata.lastError),
+    totalFiles: numberField(metadata.totalFiles),
+    totalImages: numberField(metadata.totalImages),
+    totalVideos: numberField(metadata.totalVideos),
+    totalOther: numberField(metadata.totalOther),
+  };
+}
+
 function fallback(foundation: ArchiveFoundationData, reason: string): ArchiveRepositorySnapshot {
   return {
     mode: "foundation-fallback",
@@ -218,55 +269,75 @@ export async function getArchiveRepositorySnapshot(foundation: ArchiveFoundation
     const archiveDriveLinkDelegate = getArchiveDriveLinkDelegate();
     const archiveAssetDelegate = getArchiveAssetDelegate();
     const archiveVideoFrameDelegate = getArchiveVideoFrameDelegate();
-    const [collectionRows, projectRows, driveLinkRows, assetRows, videoFrameRows] = await Promise.all([
+    const [collectionRows, projectRows, driveLinkRows, driveLinkAuditRows, assetRows, videoFrameRows] = await Promise.all([
       prisma.archiveCollection.findMany({ orderBy: [{ order: "asc" }, { name: "asc" }] }),
       prisma.archiveProject.findMany({ orderBy: [{ year: "desc" }, { title: "asc" }] }),
       archiveDriveLinkDelegate ? archiveDriveLinkDelegate.findMany({ orderBy: [{ title: "asc" }] }) : Promise.resolve([]),
+      archiveDriveLinkDelegate
+        ? Promise.resolve([])
+        : prisma.auditLog.findMany({
+            where: { entityType: "ArchiveDriveLink", action: "archive.drive-link.create" },
+            orderBy: { createdAt: "desc" },
+            take: 200,
+            select: { id: true, entityId: true, metadata: true, createdAt: true },
+          }),
       archiveAssetDelegate ? archiveAssetDelegate.findMany({ orderBy: [{ fileName: "asc" }] }) : Promise.resolve([]),
       archiveVideoFrameDelegate ? archiveVideoFrameDelegate.findMany({ orderBy: [{ timestampSec: "asc" }] }) : Promise.resolve([]),
     ]);
 
-    if (collectionRows.length === 0) {
-      return fallback(foundation, "ArchiveCollection collection is empty; using foundation archive data.");
+    const hasDbArchiveData =
+      collectionRows.length > 0 ||
+      projectRows.length > 0 ||
+      driveLinkRows.length > 0 ||
+      driveLinkAuditRows.length > 0 ||
+      assetRows.length > 0 ||
+      videoFrameRows.length > 0;
+
+    if (!hasDbArchiveData) {
+      return fallback(foundation, "Archive runtime collections are empty; using foundation archive data.");
     }
 
-    const collections: ArchiveCollection[] = collectionRows.map((collection) => ({
-      id: collection.id,
-      name: collection.name,
-      slug: collection.slug,
-      type: collection.type,
-      description: collection.description ?? "to be verified",
-      order: collection.order,
-      isActive: collection.isActive,
-    }));
+    const collections: ArchiveCollection[] = collectionRows.length > 0
+      ? collectionRows.map((collection) => ({
+          id: collection.id,
+          name: collection.name,
+          slug: collection.slug,
+          type: collection.type,
+          description: collection.description ?? "to be verified",
+          order: collection.order,
+          isActive: collection.isActive,
+        }))
+      : foundation.collections;
 
     const validCollectionIds = new Set(collections.map((collection) => collection.id));
     const fallbackCollectionId = collections[0]?.id ?? foundation.collections[0]?.id ?? "archive_collection_unknown";
 
-    const projects: ArchiveProject[] = projectRows.map((project) => ({
-      id: project.id,
-      collectionId: project.collectionId && validCollectionIds.has(project.collectionId) ? project.collectionId : fallbackCollectionId,
-      title: project.title,
-      year: project.year ?? new Date().getFullYear(),
-      country: project.country ?? "to be verified",
-      city: project.city ?? "to be verified",
-      theme: project.theme ?? "general",
-      projectType: project.projectType ?? "General",
-      description: project.description ?? "to be verified",
-      implementationDate: toIso(project.implementationDate),
-      startDate: toIso(project.startDate),
-      endDate: toIso(project.endDate),
-      status: asProjectStatus(project.status),
-      documentationStatus: asDocumentationStatus(project.documentationStatus),
-      marketingStatus: asMarketingStatus(project.marketingStatus),
-      notes: project.notes ?? "to be verified",
-      createdBy: project.createdBy ?? "archive-db",
-    }));
+    const projects: ArchiveProject[] = projectRows.length > 0
+      ? projectRows.map((project) => ({
+          id: project.id,
+          collectionId: project.collectionId && validCollectionIds.has(project.collectionId) ? project.collectionId : fallbackCollectionId,
+          title: project.title,
+          year: project.year ?? new Date().getFullYear(),
+          country: project.country ?? "to be verified",
+          city: project.city ?? "to be verified",
+          theme: project.theme ?? "general",
+          projectType: project.projectType ?? "General",
+          description: project.description ?? "to be verified",
+          implementationDate: toIso(project.implementationDate),
+          startDate: toIso(project.startDate),
+          endDate: toIso(project.endDate),
+          status: asProjectStatus(project.status),
+          documentationStatus: asDocumentationStatus(project.documentationStatus),
+          marketingStatus: asMarketingStatus(project.marketingStatus),
+          notes: project.notes ?? "to be verified",
+          createdBy: project.createdBy ?? "archive-db",
+        }))
+      : foundation.projects;
 
     const validProjectIds = new Set(projects.map((project) => project.id));
     const fallbackProjectId = projects[0]?.id ?? foundation.projects[0]?.id ?? "archive_project_unknown";
 
-    const driveLinks = driveLinkRows.map((link): ArchiveDriveLink => ({
+    const delegatedDriveLinks = driveLinkRows.map((link): ArchiveDriveLink => ({
       id: link.id,
       projectId: validProjectIds.has(link.projectId) ? link.projectId : fallbackProjectId,
       title: link.title,
@@ -283,6 +354,10 @@ export async function getArchiveRepositorySnapshot(foundation: ArchiveFoundation
       totalVideos: link.totalVideos,
       totalOther: link.totalOther,
     }));
+    const auditDriveLinks = driveLinkAuditRows
+      .map((row) => mapAuditDriveLink(row, validProjectIds, fallbackProjectId))
+      .filter((link): link is ArchiveDriveLink => Boolean(link));
+    const driveLinks = delegatedDriveLinks.length > 0 ? delegatedDriveLinks : auditDriveLinks;
 
     const validDriveLinkIds = new Set(driveLinks.map((link) => link.id));
     const assets = assetRows.map((asset): ArchiveAsset => ({
@@ -344,12 +419,12 @@ export async function getArchiveRepositorySnapshot(foundation: ArchiveFoundation
       .filter((frame): frame is ArchiveVideoFrame => Boolean(frame));
 
     const availableOptionalModels = [
-      archiveDriveLinkDelegate ? "ArchiveDriveLink" : null,
+      archiveDriveLinkDelegate ? "ArchiveDriveLink" : driveLinks.length > 0 ? "ArchiveDriveLink audit-backed records" : null,
       archiveAssetDelegate ? "ArchiveAsset" : null,
       archiveVideoFrameDelegate ? "ArchiveVideoFrame" : null,
     ].filter((model): model is string => Boolean(model));
     const reason = availableOptionalModels.length > 0
-      ? `Archive repository can read optional runtime delegates for ${availableOptionalModels.join(", ")}; empty collections still use foundation fallback.`
+      ? `Archive repository can read ${availableOptionalModels.join(", ")}; Drive sync, file downloads, and AI analysis remain disabled.`
       : "ArchiveCollection and ArchiveProject are read from Prisma; Drive links, assets, and video frames use foundation fallback until generated Prisma delegates exist.";
 
     return {
@@ -357,14 +432,14 @@ export async function getArchiveRepositorySnapshot(foundation: ArchiveFoundation
       source: "prisma",
       reason,
       collections,
-      projects: projects.length > 0 ? projects : foundation.projects,
+      projects,
       driveLinks: driveLinks.length > 0 ? driveLinks : foundation.driveLinks,
       assets: assets.length > 0 ? assets : foundation.assets,
       videoFrames: videoFrames.length > 0 ? videoFrames : foundation.videoFrames,
       dbCounts: {
         collections: collectionRows.length,
         projects: projectRows.length,
-        driveLinks: driveLinkRows.length,
+        driveLinks: driveLinkRows.length + auditDriveLinks.length,
         assets: assetRows.length,
         videoFrames: videoFrameRows.length,
       },
