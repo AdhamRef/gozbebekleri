@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { AlertTriangle, Archive, Bot, CheckCircle2, Database, FileText, FolderOpen, Image, Link2, ShieldCheck } from "lucide-react";
 import type { ArchiveAsset, ArchiveDriveLink, ArchiveProject, ArchiveSnapshot, ArchiveTabKey } from "@/lib/archive/archive-types";
 import { ArchiveAssetBrandAssetAction } from "./ArchiveAssetBrandAssetAction";
+import { ArchiveAssetContentItemAction } from "./ArchiveAssetContentItemAction";
 import { ArchiveAssetReviewActions } from "./ArchiveAssetReviewActions";
 
 type Props = {
@@ -147,6 +148,7 @@ function Assets({ assets, marketingOnly = false }: { assets: ArchiveAsset[]; mar
   return (
     <div className="grid gap-4 xl:grid-cols-2">
       {assets.map((asset) => {
+        const contentItemBlockReason = getContentItemBlockReason(asset);
         const brandAssetBlockReason = getBrandAssetBlockReason(asset);
         return (
           <Panel key={asset.id} title={asset.fileName} description={`${asset.fileType} / ${asset.recommendedUse}`} compact>
@@ -169,6 +171,7 @@ function Assets({ assets, marketingOnly = false }: { assets: ArchiveAsset[]; mar
                   isSensitive={asset.isSensitive}
                   needsBlur={asset.needsBlur}
                 />
+                <ArchiveAssetContentItemAction assetId={asset.id} fileName={asset.fileName} disabled={Boolean(contentItemBlockReason)} disabledReason={contentItemBlockReason} />
                 <ArchiveAssetBrandAssetAction assetId={asset.id} disabled={Boolean(brandAssetBlockReason)} disabledReason={brandAssetBlockReason} />
               </div>
             </div>
@@ -177,6 +180,13 @@ function Assets({ assets, marketingOnly = false }: { assets: ArchiveAsset[]; mar
       })}
     </div>
   );
+}
+
+function getContentItemBlockReason(asset: ArchiveAsset) {
+  if (asset.humanReviewStatus === "REJECTED" || asset.recommendedUse === "DO_NOT_USE") {
+    return "لا يمكن إنشاء عنصر محتوى من أصل مرفوض أو موسوم بعدم الاستخدام.";
+  }
+  return null;
 }
 
 function getBrandAssetBlockReason(asset: ArchiveAsset) {
