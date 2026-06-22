@@ -25,7 +25,7 @@
 - تم تجهيز `ArchiveDriveLink`, `ArchiveAsset`, و`ArchiveVideoFrame` كعقود staged فقط لدعم Google Drive metadata وAI/human review لاحقًا.
 - تم تجهيز Archive repository ليقرأ `ArchiveDriveLink`, `ArchiveAsset`, و`ArchiveVideoFrame` إذا كان Prisma Client يوفّر delegates، وإلا يرجع foundation data بوضوح.
 - تم تجهيز عقود Operations/Content التالية كـ staged contracts فقط: `OperationSeason`, `MonthlyContentPlan`, `ContentItem`, `ContentPublication`, `MessageSchedule`, `DonorReactivationReminder`, `MarketingLearning`, و`ContentAdLink`.
-- تم تجهيز `AiOperationRun` كعقد staged فقط لسجل تشغيل Shared AI Core.
+- تم تجهيز `AiOperationRun` كعقد staged لسجل تشغيل Shared AI Core، مع optional persistence fallback إذا كان Prisma Client يوفّر delegate لاحقًا.
 
 لم يتم في هذه المرحلة:
 
@@ -33,7 +33,7 @@
 - تشغيل Google Drive sync حقيقي.
 - تحميل ملفات Drive أو تحليل صور/فيديوهات تلقائيًا.
 - تحويل أفعال Archive approval/create-content/assign-task إلى DB writes.
-- إضافة repository DB-backed write path للـ AI audit log.
+- تفعيل DB-backed AI audit log فعليًا قبل وجود runtime schema.
 - إرسال أو نشر تلقائي.
 - إنشاء ContentAdPerformance يكرر AdSnapshot.
 - تغيير payment أو tracking runtime.
@@ -87,7 +87,7 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 
 ### Shared AI
 
-- `AiOperationRun` staged contract only
+- `AiOperationRun` staged contract + optional persistence fallback only
 
 ## cutover status
 
@@ -113,7 +113,7 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 | `DonorReactivationReminder` | Staged contract only | Candidate reminders only; no automatic outreach. |
 | `MarketingLearning` | Staged contract only | Stores learnings without duplicating ad snapshots. |
 | `ContentAdLink` | Staged contract only | Links content/ad/platform identifiers only; no performance table duplicate. |
-| `AiOperationRun` | Staged contract only | Sanitized Shared AI Core audit entries. |
+| `AiOperationRun` | Optional persistence fallback prepared; runtime schema pending | Sanitized Shared AI Core audit entries remain memory-first until runtime model exists. |
 
 ## قواعد الأمان
 
@@ -129,6 +129,7 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 - sensitive/needsBlur/humanReviewRequired fields موجودة كعقود فقط ولا تمنح اعتمادًا تلقائيًا.
 - ContentAdLink لا يكرر AdSnapshot أو MarketingCampaignSnapshot.
 - Donor Reactivation وScheduler manual-first فقط.
+- AI audit prompt preview is sanitized and capped before optional persistence.
 
 ## cutover المقترح التالي
 

@@ -24,16 +24,16 @@
 - `BrandAsset`, `BrandFont`, `BrandMessageFramework`, and `AiOperationRun` staged contracts added to `prisma/dashboard-foundation.schema.prisma` only.
 - Operations/content workflow staged contracts added to `prisma/dashboard-foundation.schema.prisma` only.
 - Brand Center assets, typography, and message frameworks are sourced through the Brand repository snapshot, with optional Prisma delegate read fallback when generated delegates exist.
-- Smart Archive Drive and Asset DB contracts are staged in `prisma/dashboard-foundation.schema.prisma` only: `ArchiveDriveLink`, `ArchiveAsset`, and `ArchiveVideoFrame`.
+- Smart Archive Drive links/assets/video frames are sourced through the Archive repository snapshot, with optional Prisma delegate read fallback when generated delegates exist.
 
 ## ما يتم تجهيزه في الحزمة الحالية
 
-- Smart Archive Drive Links, Assets, and Video Frames now read through the Archive repository snapshot when optional Prisma delegates exist.
-- Empty DB collections or missing delegates still fall back to foundation data instead of pretending persistence exists.
-- Archive snapshots now expose DB counts for collections, projects, drive links, assets, and video frames.
-- Marketing Picks, report counts, sensitive asset counts, and pending human review counts are computed from the active repository snapshot.
-- This package does not add these models to `prisma/schema.prisma` yet.
-- This package does not call Google Drive, download files, extract frames, run AI analysis, approve assets, publish content, create tasks, or send messages.
+- Shared AI Core audit logging now prepares optional `AiOperationRun` DB persistence when the generated Prisma delegate exists.
+- The memory audit log remains the immediate foundation path and UI source.
+- Prompts and user identifiers are sanitized before any persistence attempt.
+- Persisted audit rows are draft/human-approval-required diagnostics only.
+- This package does not add `AiOperationRun` to `prisma/schema.prisma` yet.
+- This package does not call external AI, publish content, send messages, change budgets, change tracking settings, or expose frontend secrets.
 - No payment changes, tracking runtime changes, external platform calls, or frontend secrets.
 
 ## المسارات الرئيسية
@@ -83,7 +83,7 @@
 - Operations/Content workflow models have staged contracts only; runtime schema and repository cutover remain pending.
 - Smart Archive: `ArchiveCollection` و`ArchiveProject` DB-backed read/fallback؛ `ArchiveDriveLink`, `ArchiveAsset`, و`ArchiveVideoFrame` لديهم staged schema + repository read fallback، لكن Google Drive sync/AI analysis/actions ما زالت foundation/manual-first.
 - Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ `BrandAsset`, `BrandFont`, و`BrandMessageFramework` لديهم staged schema + repository read fallback، لكن runtime schema الأساسي ما زال pending لهذه الموديلات.
-- Shared AI Core جاهز للعقود والـ provider fallback؛ `AiOperationRun` لديه staged schema contract فقط، والـ runtime schema/repository persistence ما زال pending.
+- Shared AI Core جاهز للعقود والـ provider fallback؛ `AiOperationRun` لديه staged schema + optional persistence fallback، لكن runtime schema ما زال pending.
 - Connections UI يعرض المنصات الجديدة كعقود جاهزية، لكن sync/testing الحقيقي لهذه المنصات يجب أن يبقى `NOT_IMPLEMENTED` حتى تنفيذ provider clients بشكل آمن.
 
 ## Known risks
@@ -91,7 +91,7 @@
 - Google Drive metadata sync لا ينفذ external call في foundation mode؛ يحتاج provider-backed implementation لاحقًا.
 - Archive AI analysis draft-only ولا يعتمد أي أصل بدون human review.
 - ArchiveAsset preview/thumbnail policy needs a dedicated safety pass before runtime writes.
-- AI audit persistence يحتاج sanitization/retention policy قبل runtime write path حتى لا يحفظ أسرار أو بيانات حساسة.
+- AI audit persistence يحتاج runtime schema قبل DB writes فعلية، ويجب أن يظل sanitized ودون أسرار.
 - DB-backed read modes تحتاج rows فعلية؛ إذا كانت collections فارغة سيظهر foundation fallback بشكل مقصود.
 - OperationTask quick edit يعمل فقط على rows فعلية؛ foundation generated tasks تبقى read-only.
 - بعض staff users قد يحتاجون تحديث dashboardPermissions لإضافة `operations`, `archive`, أو `brand` بعد إدخال المفاتيح الجديدة.
