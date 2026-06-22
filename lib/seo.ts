@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
-export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.gozbebekleri.org").replace(/\/$/, "");
-export const SITE_NAME = "Gözbebekleri";
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://minberiaksa.org").replace(/\/$/, "");
+export const SITE_NAME = "Minber-i Aksa";
 export const OG_IMAGE = `${SITE_URL}/og-image.jpg`;
 
 export const LOCALES = ["ar", "en", "fr", "tr", "id", "pt", "es", "de"] as const;
@@ -30,290 +30,179 @@ type LocaleSEO = {
   blog: { title: string; description: string };
 };
 
+const sharedKeywords = [
+  "Minber-i Aksa",
+  "Minber Al-Aqsa",
+  "Minbar al-Aqsa",
+  "Al-Quds donation",
+  "Al-Aqsa donation",
+  "Gaza donation",
+  "Palestine charity",
+  "zakat online",
+  "waqf donation",
+  "sadaqah",
+  "Islamic charity",
+  "donate online",
+  "recurring giving",
+  "Palestine relief",
+  "secure donation",
+];
+
 export const LOCALE_SEO: Record<Locale, LocaleSEO> = {
   ar: {
-    siteName: "جمعية قرة العيون للإغاثة والتكافل",
-    title: "جمعية قرة العيون للإغاثة والتكافل | زكاة، تبرع، صدقة، إغاثة إنسانية",
-    description: "جمعية قرة العيون للإغاثة والتكافل — تبرع لإنقاذ أرواح الأطفال والمرضى السوريين. ادفع زكاتك وصدقتك لعمليات طبية عاجلة، كفالة أيتام، وإغاثة إنسانية شاملة. موثوق منذ 2011.",
+    siteName: "مؤسسة منبر الأقصى الدولية",
+    title: "منبر الأقصى | تبرع آمن للقدس والأقصى وغزة والزكاة والوقف",
+    description:
+      "منبر الأقصى منصة تبرع موثوقة لدعم القدس والأقصى وغزة ومشاريع الزكاة والوقف والصدقة، مع إيصالات وتحديثات أثر وتقارير ميدانية عند توفرها.",
     keywords: [
-      "جمعية قرة العيون", "تبرع سوريا", "زكاة المال اونلاين", "صدقة جارية",
-      "كفالة يتيم", "إغاثة إنسانية سوريا", "تبرع عملية طبية عاجلة", "مساعدة أطفال سوريا",
-      "تبرع رمضان", "مشاريع تبرع خيرية", "جمعية خيرية إسلامية", "تبرع اونلاين",
-      "مشاريع إنسانية سوريا", "دعم المرضى السوريين", "عمليات قلب سوريا",
-      "تبرع طارئ سوريا", "صدقة اونلاين", "كفالة أسرة", "مساعدة اليتامى",
-      "تبرع تعليم أطفال", "إغاثة الأطفال السوريين", "منصة تبرع موثوقة",
+      "منبر الأقصى",
+      "مؤسسة منبر الأقصى الدولية",
+      "تبرع للقدس",
+      "تبرع للأقصى",
+      "تبرع لغزة",
+      "زكاة فلسطين",
+      "وقف القدس",
+      "صدقة جارية",
+      "تبرع آمن",
+      "مشاريع خيرية فلسطين",
+      "إغاثة غزة",
+      "القدس",
+      "المسجد الأقصى",
+      "منصة تبرع موثوقة",
     ],
-    titleTemplate: "%s | جمعية قرة العيون للإغاثة والتكافل",
+    titleTemplate: "%s | منبر الأقصى",
     campaigns: {
-      title: "مشاريع التبرع | جمعية قرة العيون – زكاة، صدقة، إغاثة إنسانية",
-      description: "تصفح مشاريع التبرع الطبية والإنسانية الفعّالة. زكاتك وصدقتك تموّل عمليات عاجلة وعلاجات حيوية وكفالة أيتام للأسر السورية المحتاجة.",
+      title: "مشاريع التبرع | منبر الأقصى",
+      description:
+        "استكشف مشاريع منبر الأقصى الرسمية لدعم القدس والأقصى وغزة والزكاة والوقف، وتبرع بأمان مع إمكانية متابعة الأثر والتحديثات.",
     },
     about: {
-      title: "من نحن | جمعية قرة العيون للإغاثة والتكافل",
-      description: "جمعية قرة العيون منظمة إنسانية إسلامية موثوقة تأسست 2011 لدعم الأطفال والأسر السورية المحتاجة. تعرّف على رسالتنا وقيمنا ومشاريعنا الإنسانية.",
+      title: "من نحن | منبر الأقصى",
+      description:
+        "تعرف على رسالة منبر الأقصى في خدمة القدس والأقصى وغزة عبر منظومة تبرع موثوقة ومشاريع خيرية واضحة الأثر.",
     },
     contact: {
-      title: "تواصل معنا | جمعية قرة العيون للإغاثة والتكافل",
-      description: "هل لديك سؤال أو تريد التبرع؟ تواصل مع فريق جمعية قرة العيون للإغاثة والتكافل — نرد على استفساراتك في أقرب وقت.",
+      title: "تواصل معنا | منبر الأقصى",
+      description:
+        "تواصل مع فريق منبر الأقصى للاستفسار عن التبرعات، المشاريع، الزكاة، الوقف، الشراكات أو التطوع.",
     },
     blog: {
-      title: "أخبار وتقارير ميدانية | جمعية قرة العيون للإغاثة والتكافل",
-      description: "آخر الأخبار والتقارير الميدانية حول المشاريع الإنسانية والطبية والتعليمية في سوريا من جمعية قرة العيون للإغاثة والتكافل.",
+      title: "المعرفة والتقارير | منبر الأقصى",
+      description:
+        "مقالات وتقارير وتحديثات توضح أثر التبرعات ومفاهيم الزكاة والوقف ودعم القدس والأقصى وغزة.",
     },
   },
-
   en: {
-    siteName: "Gözbebekleri – Qurrat al-Uyun Relief & Solidarity Association",
-    title: "Gözbebekleri | Zakat, Donate, Sadaqah & Humanitarian Relief – قرة العيون",
-    description: "Gözbebekleri (قرة العيون) – Trusted Islamic charity since 2011. Donate zakat, sadaqah & emergency funds for urgent Syrian medical aid, orphan sponsorship, and humanitarian relief. 100% goes to beneficiaries.",
-    keywords: [
-      "Gozbebekleri charity", "donate to Syria", "zakat online", "sadaqah donation",
-      "Syrian medical aid", "orphan sponsorship Syria", "urgent surgery donation",
-      "humanitarian relief Syria", "Islamic charity donation", "Muslim charity online",
-      "Syrian children help", "emergency medical fund Syria", "donate for Syria online",
-      "Ramadan donation", "sponsor Syrian family", "heart surgery Syria donation",
-      "Syrian refugees charity", "online charity Syria", "nonprofit Syria",
-      "reliable Islamic charity", "charity for Syrian orphans",
-    ],
-    titleTemplate: "%s | Gözbebekleri – قرة العيون",
+    siteName: "Minber-i Aksa International Association",
+    title: "Minber-i Aksa | Secure Giving for Al-Quds, Al-Aqsa, Gaza, Zakat and Waqf",
+    description:
+      "Minber-i Aksa is a trusted donation platform supporting Al-Quds, Al-Aqsa, Gaza, zakat, waqf and sadaqah projects with secure giving, receipts and impact updates when available.",
+    keywords: sharedKeywords,
+    titleTemplate: "%s | Minber-i Aksa",
     campaigns: {
-      title: "Donation Campaigns | Gözbebekleri – Zakat, Sadaqah & Syrian Relief",
-      description: "Browse active medical and humanitarian donation campaigns. Your zakat and sadaqah directly fund urgent surgeries, orphan care, and life-saving aid for Syrian families.",
+      title: "Donation Projects | Minber-i Aksa",
+      description:
+        "Browse official Minber-i Aksa donation projects for Al-Quds, Al-Aqsa, Gaza, zakat and waqf, and give securely with clear campaign information.",
     },
     about: {
-      title: "About Us | Gözbebekleri – Trusted Islamic Humanitarian Charity Since 2011",
-      description: "Gözbebekleri is a transparent Islamic humanitarian charity founded in 2011, dedicated to saving Syrian lives through medical aid, orphan sponsorship, and education support.",
+      title: "About Us | Minber-i Aksa",
+      description:
+        "Learn about Minber-i Aksa's mission to support Al-Quds, Al-Aqsa and Gaza through trusted donation infrastructure and transparent charitable projects.",
     },
     contact: {
-      title: "Contact Us | Gözbebekleri – قرة العيون Charity",
-      description: "Have a question or want to donate? Reach out to the Gözbebekleri team — we're here to help you give your zakat and sadaqah where it's needed most.",
+      title: "Contact | Minber-i Aksa",
+      description:
+        "Contact Minber-i Aksa for donation, project, zakat, waqf, partnership or volunteer questions.",
     },
     blog: {
-      title: "News & Field Reports | Gözbebekleri – Syrian Relief Updates",
-      description: "Latest field reports and news from Gözbebekleri's humanitarian, medical, and educational projects supporting Syrian children and families.",
+      title: "Knowledge and Reports | Minber-i Aksa",
+      description:
+        "Read donor guides, impact updates and educational content about zakat, waqf, Al-Quds, Al-Aqsa and Gaza support.",
     },
   },
-
   fr: {
-    siteName: "Gözbebekleri – Association Humanitaire قرة العيون",
-    title: "Gözbebekleri | Zakat, Don, Sadaqa & Aide Humanitaire Syrie – قرة العيون",
-    description: "Gözbebekleri (قرة العيون) — Association islamique de confiance depuis 2011. Faites votre zakat, sadaqa et dons d'urgence pour l'aide médicale syrienne, parrainage d'orphelins et secours humanitaire.",
-    keywords: [
-      "Gozbebekleri association", "don Syrie", "zakat en ligne", "sadaqa don",
-      "aide médicale Syrie", "parrainage orphelin Syrie", "don chirurgie urgence",
-      "aide humanitaire Syrie", "association islamique caritative", "charité musulmane",
-      "enfants syriens aide", "don urgence médical Syrie", "ONG Syrie",
-      "don Ramadan", "parrainer famille syrienne", "réfugiés syriens aide",
-    ],
-    titleTemplate: "%s | Gözbebekleri – قرة العيون",
-    campaigns: {
-      title: "Campagnes de Don | Gözbebekleri – Zakat, Sadaqa & Aide Syrienne",
-      description: "Parcourez les campagnes de dons médicaux et humanitaires. Votre zakat et sadaqa financent des chirurgies urgentes, le parrainage d'orphelins et l'aide aux familles syriennes.",
-    },
-    about: {
-      title: "Qui Sommes-Nous | Gözbebekleri – Association Humanitaire Islamique depuis 2011",
-      description: "Gözbebekleri est une association islamique humanitaire transparente fondée en 2011, dédiée à sauver des vies syriennes par l'aide médicale, le parrainage d'orphelins et le soutien éducatif.",
-    },
-    contact: {
-      title: "Contactez-Nous | Gözbebekleri – قرة العيون",
-      description: "Une question ou souhaitez faire un don ? Contactez l'équipe Gözbebekleri — nous vous aidons à placer votre zakat et sadaqa là où c'est le plus nécessaire.",
-    },
-    blog: {
-      title: "Actualités & Rapports de Terrain | Gözbebekleri – Aide Syrie",
-      description: "Derniers rapports de terrain et actualités des projets humanitaires, médicaux et éducatifs de Gözbebekleri en Syrie.",
-    },
+    siteName: "Association Internationale Minber-i Aksa",
+    title: "Minber-i Aksa | Dons sécurisés pour Al-Quds, Al-Aqsa, Gaza, Zakat et Waqf",
+    description:
+      "Minber-i Aksa est une plateforme de dons fiable pour soutenir Al-Quds, Al-Aqsa, Gaza, la zakat, le waqf et la sadaqa, avec paiement sécurisé et suivi d'impact lorsque disponible.",
+    keywords: ["Minber-i Aksa", "don Al-Quds", "don Al-Aqsa", "don Gaza", "zakat en ligne", "waqf", "Palestine", "association islamique", "don sécurisé"],
+    titleTemplate: "%s | Minber-i Aksa",
+    campaigns: { title: "Projets de don | Minber-i Aksa", description: "Découvrez les projets officiels de Minber-i Aksa pour Al-Quds, Al-Aqsa, Gaza, la zakat et le waqf." },
+    about: { title: "Qui sommes-nous | Minber-i Aksa", description: "Découvrez la mission de Minber-i Aksa pour soutenir Al-Quds, Al-Aqsa et Gaza par des projets de dons fiables." },
+    contact: { title: "Contact | Minber-i Aksa", description: "Contactez Minber-i Aksa pour les dons, projets, zakat, waqf, partenariats ou bénévolat." },
+    blog: { title: "Connaissances et rapports | Minber-i Aksa", description: "Guides, rapports et mises à jour sur la zakat, le waqf, Al-Quds, Al-Aqsa et Gaza." },
   },
-
   tr: {
-    siteName: "Gözbebekleri Derneği – قرة العيون İnsani Yardım",
-    title: "Gözbebekleri Derneği | Zekat, Bağış, Sadaka & İnsani Yardım – قرة العيون",
-    description: "Gözbebekleri (قرة العيون) — 2011'den beri güvenilir İslami yardım derneği. Zekatınızı, sadakanızı ve acil bağışlarınızı Suriyeli hastalara, yetimlere ve ailelere ulaştırıyoruz. Şeffaf ve güvenilir.",
-    keywords: [
-      "Gözbebekleri derneği", "Suriye bağış", "zekat online", "sadaka bağışı",
-      "Suriye tıbbi yardım", "yetim sponsorluğu Suriye", "acil ameliyat bağışı",
-      "insani yardım Suriye", "İslami hayır derneği", "Müslüman hayır kurumu",
-      "Suriyeli çocuklar yardım", "acil tıbbi yardım Suriye", "Ramazan bağışı",
-      "Suriyeli aile sponsorluğu", "STK Suriye yardım", "güvenilir bağış platformu",
-    ],
-    titleTemplate: "%s | Gözbebekleri Derneği – قرة العيون",
-    campaigns: {
-      title: "Bağış Kampanyaları | Gözbebekleri – Zekat, Sadaka & Suriye Yardımı",
-      description: "Aktif tıbbi ve insani yardım kampanyalarına göz atın. Zekatınız ve sadakanız acil ameliyatları, yetim bakımını ve Suriyeli ailelere yardımı finanse eder.",
-    },
-    about: {
-      title: "Hakkımızda | Gözbebekleri – 2011'den Beri Güvenilir İnsani Yardım Derneği",
-      description: "Gözbebekleri, 2011'de kurulan şeffaf bir İslami insani yardım derneğidir. Tıbbi yardım, yetim sponsorluğu ve eğitim desteğiyle Suriyeli hayatlara dokunuyoruz.",
-    },
-    contact: {
-      title: "İletişim | Gözbebekleri Derneği – قرة العيون",
-      description: "Sorularınız mı var ya da bağış yapmak mı istiyorsunuz? Gözbebekleri ekibiyle iletişime geçin — zekat ve sadakanızı en çok ihtiyaç duyulan yere ulaştıralım.",
-    },
-    blog: {
-      title: "Haberler & Saha Raporları | Gözbebekleri – Suriye Yardım Güncellemeleri",
-      description: "Gözbebekleri'nin Suriye'deki insani, tıbbi ve eğitim projelerine ilişkin son saha raporları ve haberler.",
-    },
+    siteName: "Minber-i Aksa Derneği",
+    title: "Minber-i Aksa | Kudüs, Mescid-i Aksa, Gazze, Zekat ve Vakıf için Güvenli Bağış",
+    description:
+      "Minber-i Aksa; Kudüs, Mescid-i Aksa, Gazze, zekat, vakıf ve sadaka projelerini destekleyen güvenilir bağış platformudur. Güvenli ödeme ve mümkün olduğunda etki güncellemeleri sunar.",
+    keywords: ["Minber-i Aksa", "Kudüs bağış", "Mescid-i Aksa bağış", "Gazze bağış", "zekat bağışı", "vakıf bağışı", "sadaka", "Filistin yardım", "güvenli bağış"],
+    titleTemplate: "%s | Minber-i Aksa",
+    campaigns: { title: "Bağış Projeleri | Minber-i Aksa", description: "Kudüs, Mescid-i Aksa, Gazze, zekat ve vakıf için resmi Minber-i Aksa bağış projelerini inceleyin." },
+    about: { title: "Hakkımızda | Minber-i Aksa", description: "Minber-i Aksa'nın Kudüs, Mescid-i Aksa ve Gazze'ye yönelik güvenilir bağış ve yardım misyonunu keşfedin." },
+    contact: { title: "İletişim | Minber-i Aksa", description: "Bağış, proje, zekat, vakıf, ortaklık veya gönüllülük için Minber-i Aksa ile iletişime geçin." },
+    blog: { title: "Bilgi Merkezi ve Raporlar | Minber-i Aksa", description: "Zekat, vakıf, Kudüs, Mescid-i Aksa ve Gazze desteği hakkında rehberler ve saha güncellemeleri." },
   },
-
   id: {
-    siteName: "Gözbebekleri – Yayasan Kemanusiaan قرة العيون",
-    title: "Gözbebekleri | Zakat, Donasi, Sedekah & Bantuan Kemanusiaan Suriah – قرة العيون",
-    description: "Gözbebekleri (قرة العيون) — Yayasan Islam terpercaya sejak 2011. Tunaikan zakat, sedekah, dan donasi darurat untuk bantuan medis Suriah, sponsor yatim, dan bantuan kemanusiaan. Transparan & amanah.",
-    keywords: [
-      "Gozbebekleri yayasan", "donasi Suriah", "zakat online", "sedekah donasi",
-      "bantuan medis Suriah", "sponsor anak yatim Suriah", "donasi operasi darurat",
-      "bantuan kemanusiaan Suriah", "yayasan Islam amanah", "donasi Muslim online",
-      "anak-anak Suriah bantuan", "donasi darurat medis", "NGO Suriah",
-      "donasi Ramadan", "sponsor keluarga Suriah", "lembaga donasi terpercaya",
-    ],
-    titleTemplate: "%s | Gözbebekleri – قرة العيون",
-    campaigns: {
-      title: "Kampanye Donasi | Gözbebekleri – Zakat, Sedekah & Bantuan Suriah",
-      description: "Telusuri kampanye donasi medis dan kemanusiaan aktif. Zakat dan sedekah Anda membiayai operasi darurat, perawatan yatim, dan bantuan bagi keluarga Suriah.",
-    },
-    about: {
-      title: "Tentang Kami | Gözbebekleri – Yayasan Kemanusiaan Islam Terpercaya Sejak 2011",
-      description: "Gözbebekleri adalah yayasan kemanusiaan Islam yang transparan, didirikan tahun 2011 untuk menyelamatkan nyawa warga Suriah melalui bantuan medis, sponsor yatim, dan dukungan pendidikan.",
-    },
-    contact: {
-      title: "Hubungi Kami | Gözbebekleri – قرة العيون",
-      description: "Ada pertanyaan atau ingin berdonasi? Hubungi tim Gözbebekleri — kami membantu Anda menyalurkan zakat dan sedekah ke tempat yang paling membutuhkan.",
-    },
-    blog: {
-      title: "Berita & Laporan Lapangan | Gözbebekleri – Update Bantuan Suriah",
-      description: "Laporan lapangan dan berita terbaru dari proyek kemanusiaan, medis, dan pendidikan Gözbebekleri di Suriah.",
-    },
+    siteName: "Minber-i Aksa International Association",
+    title: "Minber-i Aksa | Donasi Aman untuk Al-Quds, Al-Aqsa, Gaza, Zakat dan Waqf",
+    description: "Minber-i Aksa adalah platform donasi tepercaya untuk mendukung Al-Quds, Al-Aqsa, Gaza, zakat, waqf dan sedekah dengan pembayaran aman dan pembaruan dampak bila tersedia.",
+    keywords: ["Minber-i Aksa", "donasi Al-Quds", "donasi Al-Aqsa", "donasi Gaza", "zakat online", "waqf", "Palestina", "donasi aman"],
+    titleTemplate: "%s | Minber-i Aksa",
+    campaigns: { title: "Proyek Donasi | Minber-i Aksa", description: "Jelajahi proyek donasi resmi Minber-i Aksa untuk Al-Quds, Al-Aqsa, Gaza, zakat dan waqf." },
+    about: { title: "Tentang Kami | Minber-i Aksa", description: "Pelajari misi Minber-i Aksa untuk mendukung Al-Quds, Al-Aqsa dan Gaza melalui proyek donasi yang tepercaya." },
+    contact: { title: "Kontak | Minber-i Aksa", description: "Hubungi Minber-i Aksa untuk donasi, proyek, zakat, waqf, kemitraan atau relawan." },
+    blog: { title: "Pusat Pengetahuan dan Laporan | Minber-i Aksa", description: "Panduan, laporan dan pembaruan dampak tentang zakat, waqf, Al-Quds, Al-Aqsa dan Gaza." },
   },
-
   pt: {
-    siteName: "Gözbebekleri – Associação Humanitária قرة العيون",
-    title: "Gözbebekleri | Zakat, Doação, Sadaqa & Ajuda Humanitária Síria – قرة العيون",
-    description: "Gözbebekleri (قرة العيون) — Organização islâmica de confiança desde 2011. Pague seu zakat, sadaqa e doações de emergência para ajuda médica síria, apadrinhamento de órfãos e socorro humanitário. Transparente e seguro.",
-    keywords: [
-      "Gozbebekleri associação", "doação Síria", "zakat online", "sadaqa doação",
-      "ajuda médica Síria", "apadrinhamento órfão Síria", "doação cirurgia urgente",
-      "ajuda humanitária Síria", "organização islâmica beneficente", "caridade muçulmana",
-      "crianças sírias ajuda", "doação médica urgente Síria", "ONG Síria",
-      "doação Ramadã", "patrocinar família síria", "plataforma doação confiável",
-    ],
-    titleTemplate: "%s | Gözbebekleri – قرة العيون",
-    campaigns: {
-      title: "Campanhas de Doação | Gözbebekleri – Zakat, Sadaqa & Ajuda Síria",
-      description: "Explore campanhas de doações médicas e humanitárias ativas. Seu zakat e sadaqa financiam cirurgias urgentes, cuidados com órfãos e ajuda às famílias sírias.",
-    },
-    about: {
-      title: "Sobre Nós | Gözbebekleri – Organização Humanitária Islâmica desde 2011",
-      description: "Gözbebekleri é uma organização humanitária islâmica transparente, fundada em 2011 para salvar vidas sírias por meio de ajuda médica, apadrinhamento de órfãos e apoio educacional.",
-    },
-    contact: {
-      title: "Contacte-Nos | Gözbebekleri – قرة العيون",
-      description: "Tem dúvidas ou quer fazer uma doação? Entre em contato com a equipa Gözbebekleri — ajudamos a canalizar seu zakat e sadaqa para quem mais precisa.",
-    },
-    blog: {
-      title: "Notícias & Relatórios de Campo | Gözbebekleri – Atualizações Síria",
-      description: "Últimos relatórios de campo e notícias dos projetos humanitários, médicos e educacionais da Gözbebekleri na Síria.",
-    },
+    siteName: "Associação Internacional Minber-i Aksa",
+    title: "Minber-i Aksa | Doações seguras para Al-Quds, Al-Aqsa, Gaza, Zakat e Waqf",
+    description: "Minber-i Aksa é uma plataforma de doações confiável para apoiar Al-Quds, Al-Aqsa, Gaza, zakat, waqf e sadaqah com pagamento seguro e atualizações de impacto quando disponíveis.",
+    keywords: ["Minber-i Aksa", "doação Al-Quds", "doação Al-Aqsa", "doação Gaza", "zakat online", "waqf", "Palestina", "doação segura"],
+    titleTemplate: "%s | Minber-i Aksa",
+    campaigns: { title: "Projetos de Doação | Minber-i Aksa", description: "Explore projetos oficiais da Minber-i Aksa para Al-Quds, Al-Aqsa, Gaza, zakat e waqf." },
+    about: { title: "Sobre Nós | Minber-i Aksa", description: "Conheça a missão da Minber-i Aksa para apoiar Al-Quds, Al-Aqsa e Gaza por meio de projetos de doação confiáveis." },
+    contact: { title: "Contato | Minber-i Aksa", description: "Entre em contato com a Minber-i Aksa para dúvidas sobre doações, projetos, zakat, waqf, parcerias ou voluntariado." },
+    blog: { title: "Conhecimento e Relatórios | Minber-i Aksa", description: "Guias, relatórios e atualizações sobre zakat, waqf, Al-Quds, Al-Aqsa e Gaza." },
   },
-
   es: {
-    siteName: "Gözbebekleri – Asociación Humanitaria قرة العيون",
-    title: "Gözbebekleri | Zakat, Donación, Sadaqa & Ayuda Humanitaria Siria – قرة العيون",
-    description: "Gözbebekleri (قرة العيون) — Organización islámica de confianza desde 2011. Paga tu zakat, sadaqa y donaciones de emergencia para ayuda médica siria, apadrinamiento de huérfanos y socorro humanitario. Transparente y seguro.",
-    keywords: [
-      "Gozbebekleri organización", "donación Siria", "zakat online", "sadaqa donación",
-      "ayuda médica Siria", "apadrinamiento huérfano Siria", "donación cirugía urgente",
-      "ayuda humanitaria Siria", "organización islámica benéfica", "caridad musulmana",
-      "niños sirios ayuda", "donación médica urgente Siria", "ONG Siria",
-      "donación Ramadán", "patrocinar familia siria", "plataforma donación confiable",
-    ],
-    titleTemplate: "%s | Gözbebekleri – قرة العيون",
-    campaigns: {
-      title: "Campañas de Donación | Gözbebekleri – Zakat, Sadaqa & Ayuda Siria",
-      description: "Explora campañas de donación médica y humanitaria activas. Tu zakat y sadaqa financian cirugías urgentes, cuidado de huérfanos y ayuda a familias sirias.",
-    },
-    about: {
-      title: "Quiénes Somos | Gözbebekleri – Organización Humanitaria Islámica desde 2011",
-      description: "Gözbebekleri es una organización humanitaria islámica transparente, fundada en 2011 para salvar vidas sirias mediante ayuda médica, apadrinamiento de huérfanos y apoyo educativo.",
-    },
-    contact: {
-      title: "Contáctanos | Gözbebekleri – قرة العيون",
-      description: "¿Tienes preguntas o quieres donar? Contacta al equipo de Gözbebekleri — te ayudamos a canalizar tu zakat y sadaqa donde más se necesita.",
-    },
-    blog: {
-      title: "Noticias & Informes de Campo | Gözbebekleri – Actualizaciones Siria",
-      description: "Últimos informes de campo y noticias de los proyectos humanitarios, médicos y educativos de Gözbebekleri en Siria.",
-    },
+    siteName: "Asociación Internacional Minber-i Aksa",
+    title: "Minber-i Aksa | Donaciones seguras para Al-Quds, Al-Aqsa, Gaza, Zakat y Waqf",
+    description: "Minber-i Aksa es una plataforma de donación confiable para apoyar Al-Quds, Al-Aqsa, Gaza, zakat, waqf y sadaqah con pagos seguros y actualizaciones de impacto cuando estén disponibles.",
+    keywords: ["Minber-i Aksa", "donación Al-Quds", "donación Al-Aqsa", "donación Gaza", "zakat online", "waqf", "Palestina", "donación segura"],
+    titleTemplate: "%s | Minber-i Aksa",
+    campaigns: { title: "Proyectos de Donación | Minber-i Aksa", description: "Explora proyectos oficiales de Minber-i Aksa para Al-Quds, Al-Aqsa, Gaza, zakat y waqf." },
+    about: { title: "Quiénes Somos | Minber-i Aksa", description: "Conoce la misión de Minber-i Aksa para apoyar Al-Quds, Al-Aqsa y Gaza mediante proyectos de donación confiables." },
+    contact: { title: "Contacto | Minber-i Aksa", description: "Contacta con Minber-i Aksa para donaciones, proyectos, zakat, waqf, alianzas o voluntariado." },
+    blog: { title: "Conocimiento e Informes | Minber-i Aksa", description: "Guías, informes y actualizaciones sobre zakat, waqf, Al-Quds, Al-Aqsa y Gaza." },
   },
-
   de: {
-    siteName: "Gözbebekleri – Humanitärer Verein قرة العيون",
-    title: "Gözbebekleri | Zakat, Spende, Sadaqa & Humanitäre Hilfe Syrien – قرة العيون",
-    description: "Gözbebekleri (قرة العيون) — Vertrauenswürdige islamische Hilfsorganisation seit 2011. Spende deine Zakat, Sadaqa und Soforthilfe für syrische Medizinversorgung, Waisen­patenschaften und humanitäre Hilfe. Transparent und sicher.",
-    keywords: [
-      "Gözbebekleri Verein", "Spende Syrien", "Zakat online", "Sadaqa Spende",
-      "medizinische Hilfe Syrien", "Waisenpatenschaft Syrien", "Spende Notoperation",
-      "humanitäre Hilfe Syrien", "islamische Hilfsorganisation", "muslimische Wohltätigkeit",
-      "syrische Kinder Hilfe", "medizinischer Notfallfonds Syrien", "NGO Syrien",
-      "Ramadan Spende", "syrische Familie patenschaft", "verlässliche Spendenplattform",
-    ],
-    titleTemplate: "%s | Gözbebekleri – قرة العيون",
-    campaigns: {
-      title: "Spendenkampagnen | Gözbebekleri – Zakat, Sadaqa & Syrien-Hilfe",
-      description: "Entdecke aktive medizinische und humanitäre Spendenkampagnen. Deine Zakat und Sadaqa finanzieren dringende Operationen, Waisenversorgung und Hilfe für syrische Familien.",
-    },
-    about: {
-      title: "Über Uns | Gözbebekleri – Vertrauenswürdige Islamische Hilfsorganisation seit 2011",
-      description: "Gözbebekleri ist eine transparente islamische humanitäre Organisation, gegründet 2011, um syrische Leben durch medizinische Hilfe, Waisenpatenschaft und Bildungsförderung zu retten.",
-    },
-    contact: {
-      title: "Kontakt | Gözbebekleri – قرة العيون",
-      description: "Hast du Fragen oder möchtest spenden? Kontaktiere das Gözbebekleri-Team — wir leiten deine Zakat und Sadaqa dorthin, wo sie am dringendsten gebraucht werden.",
-    },
-    blog: {
-      title: "Nachrichten & Feldberichte | Gözbebekleri – Syrien-Hilfe Updates",
-      description: "Aktuelle Feldberichte und Neuigkeiten zu den humanitären, medizinischen und Bildungsprojekten von Gözbebekleri in Syrien.",
-    },
+    siteName: "Minber-i Aksa Internationale Vereinigung",
+    title: "Minber-i Aksa | Sichere Spenden für Al-Quds, Al-Aqsa, Gaza, Zakat und Waqf",
+    description: "Minber-i Aksa ist eine vertrauenswürdige Spendenplattform zur Unterstützung von Al-Quds, Al-Aqsa, Gaza, Zakat, Waqf und Sadaqah mit sicherer Zahlung und verfügbaren Wirkungsupdates.",
+    keywords: ["Minber-i Aksa", "Al-Quds Spende", "Al-Aqsa Spende", "Gaza Spende", "Zakat online", "Waqf", "Palästina", "sichere Spende"],
+    titleTemplate: "%s | Minber-i Aksa",
+    campaigns: { title: "Spendenprojekte | Minber-i Aksa", description: "Entdecke offizielle Minber-i Aksa Spendenprojekte für Al-Quds, Al-Aqsa, Gaza, Zakat und Waqf." },
+    about: { title: "Über Uns | Minber-i Aksa", description: "Erfahre mehr über die Mission von Minber-i Aksa, Al-Quds, Al-Aqsa und Gaza durch vertrauenswürdige Spendenprojekte zu unterstützen." },
+    contact: { title: "Kontakt | Minber-i Aksa", description: "Kontaktiere Minber-i Aksa für Fragen zu Spenden, Projekten, Zakat, Waqf, Partnerschaften oder Freiwilligenarbeit." },
+    blog: { title: "Wissen und Berichte | Minber-i Aksa", description: "Leitfäden, Berichte und Updates zu Zakat, Waqf, Al-Quds, Al-Aqsa und Gaza." },
   },
 };
 
-/** Build hreflang alternates for a given path (e.g. "/campaigns") */
 export function buildHreflang(path: string, currentLocale: string) {
   const normalizedPath = path === "/" ? "" : path;
   const languages: Record<string, string> = {};
-  for (const locale of LOCALES) {
-    languages[locale] = `${SITE_URL}/${locale}${normalizedPath}`;
-  }
+  for (const locale of LOCALES) languages[locale] = `${SITE_URL}/${locale}${normalizedPath}`;
   languages["x-default"] = `${SITE_URL}/ar${normalizedPath}`;
-  return {
-    canonical: `${SITE_URL}/${currentLocale}${normalizedPath}`,
-    languages,
-  };
+  return { canonical: `${SITE_URL}/${currentLocale}${normalizedPath}`, languages };
 }
 
-/**
- * Build hreflang/canonical alternates for a slug-routed entity (campaign, post,
- * category) where each locale may have its OWN translation slug.
- *
- * Each locale's URL uses its own per-locale slug when present, falling back to
- * the entity's base slug, then to `fallback` (typically the entity id).
- *
- * Example: an AR campaign with slug "زكاة-القدس" and an EN translation slug
- * "pay-your-zakat-at-al-quds" yields:
- *   hreflang="ar" → /ar/campaign/زكاة-القدس
- *   hreflang="en" → /en/campaign/pay-your-zakat-at-al-quds
- *
- * Without this, Google sees the same slug under every hreflang and may drop
- * the per-locale variants from the index.
- */
 export function buildLocalizedAlternates(args: {
-  /** URL prefix without trailing slash, e.g. "/campaign", "/blog", "/category" */
   basePath: string;
-  /** Default-locale (Arabic) slug from the entity row */
   baseSlug?: string | null;
-  /** Per-locale translation rows; only `locale` and optional `slug` are used */
   translations?: Array<{ locale: string; slug?: string | null }> | null;
-  /** Used when neither a translation slug nor base slug is set (typically the entity id) */
   fallback: string;
-  /** Locale of the page we're rendering — drives `canonical` */
   currentLocale: string;
 }): { canonical: string; languages: Record<string, string> } {
   const { basePath, baseSlug, translations, fallback, currentLocale } = args;
@@ -321,50 +210,23 @@ export function buildLocalizedAlternates(args: {
     const t = translations?.find((tt) => tt.locale === loc && tt.slug);
     return t?.slug || baseSlug || fallback;
   };
-  const url = (loc: string): string =>
-    `${SITE_URL}/${loc}${basePath}/${encodeURIComponent(slugFor(loc))}`;
-
+  const url = (loc: string): string => `${SITE_URL}/${loc}${basePath}/${encodeURIComponent(slugFor(loc))}`;
   const languages: Record<string, string> = {};
   for (const locale of LOCALES) languages[locale] = url(locale);
   languages["x-default"] = url("ar");
   return { canonical: url(currentLocale), languages };
 }
 
-/** Build full per-page metadata (layout/page generateMetadata helper) */
-export function buildPageMetadata(
-  locale: string,
-  overrides: {
-    title: string;
-    description: string;
-    path: string;
-    image?: string;
-    keywords?: string[];
-    type?: "website" | "article";
-  }
-): Metadata {
+export function buildPageMetadata(locale: string, overrides: { title: string; description: string; path: string; image?: string; keywords?: string[]; type?: "website" | "article" }): Metadata {
   const seo = LOCALE_SEO[locale as Locale] ?? LOCALE_SEO.en;
   const image = overrides.image ?? OG_IMAGE;
   const alternates = buildHreflang(overrides.path, locale);
-
   return {
     title: overrides.title,
     description: overrides.description,
     keywords: overrides.keywords ?? seo.keywords,
     alternates,
-    openGraph: {
-      title: overrides.title,
-      description: overrides.description,
-      url: alternates.canonical,
-      siteName: seo.siteName,
-      locale: OG_LOCALE_MAP[locale as Locale] ?? "en_US",
-      type: overrides.type ?? "website",
-      images: [{ url: image, width: 1200, height: 630, alt: overrides.title }],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: overrides.title,
-      description: overrides.description,
-      images: [image],
-    },
+    openGraph: { title: overrides.title, description: overrides.description, url: alternates.canonical, siteName: seo.siteName, locale: OG_LOCALE_MAP[locale as Locale] ?? "en_US", type: overrides.type ?? "website", images: [{ url: image, width: 1200, height: 630, alt: overrides.title }] },
+    twitter: { card: "summary_large_image", title: overrides.title, description: overrides.description, images: [image] },
   };
 }
