@@ -26,30 +26,30 @@ type Props = {
 function previewDriveUrl(value: string): DriveUrlPreview {
   const trimmed = value.trim();
   if (!trimmed) {
-    return { valid: false, type: "UNKNOWN", id: null, message: "أدخل رابط Google Drive للمعاينة قبل الحفظ." };
+    return { valid: false, type: "UNKNOWN", id: null, message: "أدخل رابط الملف قبل الحفظ." };
   }
 
   try {
     const url = new URL(trimmed);
     const isGoogleDrive = url.hostname === "drive.google.com" || url.hostname.endsWith(".drive.google.com");
     if (!isGoogleDrive) {
-      return { valid: false, type: "UNKNOWN", id: null, message: "الرابط يجب أن يكون من Google Drive فقط." };
+      return { valid: false, type: "UNKNOWN", id: null, message: "استخدم رابطًا صحيحًا من Google Drive." };
     }
 
     const folderId = url.pathname.match(/\/folders\/([^/?#]+)/)?.[1] ?? null;
     const fileId = url.pathname.match(/\/file\/d\/([^/?#]+)/)?.[1] ?? url.searchParams.get("id");
 
     if (folderId) {
-      return { valid: true, type: "FOLDER", id: folderId, message: "تم التعرف على Google Drive Folder. سيتم حفظ البيانات فقط بدون مزامنة خارجية." };
+      return { valid: true, type: "FOLDER", id: folderId, message: "تم التعرف على مجلد." };
     }
 
     if (fileId) {
-      return { valid: true, type: "FILE", id: fileId, message: "تم التعرف على Google Drive File. سيتم حفظ البيانات فقط بدون تنزيل الملف." };
+      return { valid: true, type: "FILE", id: fileId, message: "تم التعرف على ملف." };
     }
 
-    return { valid: true, type: "UNKNOWN", id: null, message: "رابط Google Drive صحيح، لكن لم يتم التعرف على Folder/File ID تلقائيًا." };
+    return { valid: true, type: "UNKNOWN", id: null, message: "الرابط صحيح، لكنه يحتاج مراجعة بعد الحفظ." };
   } catch {
-    return { valid: false, type: "UNKNOWN", id: null, message: "صيغة الرابط غير صحيحة. استخدم رابطًا كاملًا من Google Drive." };
+    return { valid: false, type: "UNKNOWN", id: null, message: "صيغة الرابط غير صحيحة." };
   }
 }
 
@@ -69,7 +69,7 @@ export function ArchiveDriveLinkCreatePanel({ projects }: Props) {
     if (saving) return;
 
     if (!projectId || !title.trim() || !driveUrl.trim()) {
-      setFeedback({ tone: "error", message: "أكمل المشروع، العنوان، ورابط Google Drive أولًا." });
+      setFeedback({ tone: "error", message: "أكمل المشروع، اسم الرابط، والرابط أولًا." });
       return;
     }
 
@@ -90,13 +90,13 @@ export function ArchiveDriveLinkCreatePanel({ projects }: Props) {
     setSaving(false);
 
     if (!response.ok || !result?.ok) {
-      setFeedback({ tone: "error", message: result?.error || result?.message || "فشل حفظ رابط Drive" });
+      setFeedback({ tone: "error", message: result?.error || result?.message || "تعذر حفظ الرابط" });
       return;
     }
 
     setTitle("");
     setDriveUrl("");
-    setFeedback({ tone: "success", message: result?.message || "تم حفظ رابط Drive بدون أي اتصال خارجي." });
+    setFeedback({ tone: "success", message: result?.message || "تم حفظ الرابط" });
     router.refresh();
   }
 
@@ -104,9 +104,9 @@ export function ArchiveDriveLinkCreatePanel({ projects }: Props) {
     return (
       <div className="rounded-lg border border-dashed bg-white p-5 text-sm leading-6 text-slate-600">
         <div className="flex items-center gap-2 font-black text-slate-950">
-          <FolderPlus className="h-4 w-4 text-[#025EB8]" /> Add Drive Link
+          <FolderPlus className="h-4 w-4 text-[#025EB8]" /> إضافة رابط ملف
         </div>
-        <p className="mt-2">أنشئ Archive Project أولًا قبل ربط Google Drive. لا توجد مزامنة أو تحليل تلقائي في هذه المرحلة.</p>
+        <p className="mt-2">أنشئ مشروعًا أولًا قبل إضافة روابط الملفات.</p>
       </div>
     );
   }
@@ -116,30 +116,30 @@ export function ArchiveDriveLinkCreatePanel({ projects }: Props) {
       <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex items-center gap-2 font-black text-slate-950">
-            <FolderPlus className="h-4 w-4 text-[#025EB8]" /> Add Google Drive Link
+            <FolderPlus className="h-4 w-4 text-[#025EB8]" /> إضافة رابط ملف
           </div>
-          <p className="mt-1 text-sm leading-6 text-slate-600">يحفظ الرابط ويستخرج Folder/File ID فقط. لا يتم اختبار Google Drive أو تنزيل ملفات تلقائيًا.</p>
+          <p className="mt-1 text-sm leading-6 text-slate-600">اربط المشروع بمجلد أو ملف واضح ليسهل الوصول إليه لاحقًا.</p>
         </div>
         <Button type="submit" size="sm" disabled={saving || !drivePreview.valid} className="gap-2 font-bold">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          {saving ? "جاري الحفظ" : "Save Link"}
+          {saving ? "جاري الحفظ" : "حفظ الرابط"}
         </Button>
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-[0.9fr_1fr_1.6fr]">
         <label className="grid gap-1 text-xs font-bold text-slate-600">
-          Project
+          المشروع
           <select value={projectId} onChange={(event) => setProjectId(event.target.value)} className="h-10 rounded-md border bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-[#025EB8]">
             {projectOptions.map((project) => <option key={project.id} value={project.id}>{project.label}</option>)}
           </select>
         </label>
         <label className="grid gap-1 text-xs font-bold text-slate-600">
-          Title
-          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="مثال: Gaza 2025 field folder" className="h-10 rounded-md border bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-[#025EB8]" />
+          اسم الرابط
+          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="مثال: ملف صور غزة 2025" className="h-10 rounded-md border bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-[#025EB8]" />
         </label>
         <label className="grid gap-1 text-xs font-bold text-slate-600">
-          Drive URL
-          <input dir="ltr" value={driveUrl} onChange={(event) => setDriveUrl(event.target.value)} placeholder="https://drive.google.com/drive/folders/..." className="h-10 rounded-md border bg-white px-3 text-left font-mono text-sm text-slate-900 outline-none focus:border-[#025EB8]" />
+          رابط الملف
+          <input dir="ltr" value={driveUrl} onChange={(event) => setDriveUrl(event.target.value)} placeholder="https://drive.google.com/..." className="h-10 rounded-md border bg-white px-3 text-left font-mono text-sm text-slate-900 outline-none focus:border-[#025EB8]" />
         </label>
       </div>
 
@@ -151,12 +151,11 @@ export function ArchiveDriveLinkCreatePanel({ projects }: Props) {
         {drivePreview.id ? (
           <div dir="ltr" className="mt-1 flex items-center gap-2 truncate font-mono text-[11px]">
             {drivePreview.type === "FOLDER" ? <FolderPlus className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
-            {drivePreview.type}: {drivePreview.id}
+            {drivePreview.id}
           </div>
         ) : null}
       </div>
 
-      <p className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-xs font-semibold leading-5 text-slate-600">Provider source: MarketingPlatformConnection / provider catalog. External Drive access stays disabled until provider-backed sync is intentionally implemented.</p>
       {feedback ? (
         <p className={`mt-3 rounded-md border px-3 py-2 text-xs font-semibold ${feedback.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}>
           {feedback.message}
