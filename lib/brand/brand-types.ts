@@ -146,7 +146,9 @@ export type BrandCenterSnapshot = {
       profiles: number;
       assets: number;
       colors: number;
+      fonts: number;
       guidelines: number;
+      messageFrameworks: number;
     };
   };
   generatedAt: string;

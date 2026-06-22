@@ -1,6 +1,23 @@
 import { prisma } from "@/lib/prisma";
-import { brandAssets, brandColors, brandGuidelines, brandProfiles } from "./brand-data";
-import type { BrandAsset, BrandColor, BrandGuideline, BrandLocale, BrandOrganizationKey, BrandProfile, BrandProfileStatus } from "./brand-types";
+import {
+  brandAssets,
+  brandColors,
+  brandFonts,
+  brandGuidelines,
+  brandMessageFrameworks,
+  brandProfiles,
+} from "./brand-data";
+import type {
+  BrandAsset,
+  BrandColor,
+  BrandFont,
+  BrandGuideline,
+  BrandLocale,
+  BrandMessageFramework,
+  BrandOrganizationKey,
+  BrandProfile,
+  BrandProfileStatus,
+} from "./brand-types";
 
 const organizationKeys: BrandOrganizationKey[] = ["gozbebekleri", "minber_aksa", "burak"];
 const locales: BrandLocale[] = ["ar", "tr", "en", "fr", "id", "pt", "es", "de"];
@@ -9,6 +26,16 @@ const assetTypes: BrandAsset["type"][] = ["LOGO", "ICON", "TEMPLATE", "CERTIFICA
 const assetFormats: BrandAsset["format"][] = ["SVG", "PNG", "JPG", "PDF", "FIGMA", "VIDEO", "DOC", "URL"];
 const colorUsages: BrandColor["usage"][] = ["PRIMARY", "CTA", "BACKGROUND", "ACCENT", "TEXT", "STATUS"];
 const guidelineSections: BrandGuideline["section"][] = ["voice", "copy", "proof", "donor-dignity", "cta", "localization"];
+const frameworkTypes: BrandMessageFramework["type"][] = [
+  "FRIDAY",
+  "THANK_YOU",
+  "ZAKAT",
+  "WAQF",
+  "EMERGENCY",
+  "DONOR_REACTIVATION",
+  "RAMADAN",
+  "GENERAL",
+];
 
 type BrandAssetRow = {
   id: string;
@@ -26,8 +53,38 @@ type BrandAssetRow = {
   createdBy: string | null;
 };
 
+type BrandFontRow = {
+  id: string;
+  profileId: string;
+  name: string;
+  usage: string;
+  fallback: string | null;
+  source: string | null;
+  notes: string | null;
+};
+
+type BrandMessageFrameworkRow = {
+  id: string;
+  profileId: string;
+  name: string;
+  type: string;
+  locale: string;
+  structure: string[];
+  sampleText: string | null;
+  doList: string[];
+  dontList: string[];
+};
+
 type BrandAssetDelegate = {
   findMany(args: { orderBy: Array<Record<string, "asc" | "desc">> }): Promise<BrandAssetRow[]>;
+};
+
+type BrandFontDelegate = {
+  findMany(args: { orderBy: Array<Record<string, "asc" | "desc">> }): Promise<BrandFontRow[]>;
+};
+
+type BrandMessageFrameworkDelegate = {
+  findMany(args: { orderBy: Array<Record<string, "asc" | "desc">> }): Promise<BrandMessageFrameworkRow[]>;
 };
 
 export type BrandRepositoryPersistenceMode = "db-backed" | "foundation-fallback";
@@ -39,12 +96,16 @@ export type BrandRepositorySnapshot = {
   profiles: BrandProfile[];
   assets: BrandAsset[];
   colors: BrandColor[];
+  fonts: BrandFont[];
   guidelines: BrandGuideline[];
+  messageFrameworks: BrandMessageFramework[];
   dbCounts: {
     profiles: number;
     assets: number;
     colors: number;
+    fonts: number;
     guidelines: number;
+    messageFrameworks: number;
   };
 };
 
@@ -85,6 +146,10 @@ function asGuidelineSection(value: string | null | undefined): BrandGuideline["s
   return guidelineSections.includes(value as BrandGuideline["section"]) ? (value as BrandGuideline["section"]) : "copy";
 }
 
+function asFrameworkType(value: string | null | undefined): BrandMessageFramework["type"] {
+  return frameworkTypes.includes(value as BrandMessageFramework["type"]) ? (value as BrandMessageFramework["type"]) : "GENERAL";
+}
+
 function stableProfileId(key: string, dbId: string) {
   return isKnownOrganizationKey(key) ? `brand_${key}` : dbId;
 }
@@ -92,6 +157,16 @@ function stableProfileId(key: string, dbId: string) {
 function getBrandAssetDelegate(): BrandAssetDelegate | null {
   const prismaWithBrandAsset = prisma as unknown as { brandAsset?: BrandAssetDelegate };
   return prismaWithBrandAsset.brandAsset ?? null;
+}
+
+function getBrandFontDelegate(): BrandFontDelegate | null {
+  const prismaWithBrandFont = prisma as unknown as { brandFont?: BrandFontDelegate };
+  return prismaWithBrandFont.brandFont ?? null;
+}
+
+function getBrandMessageFrameworkDelegate(): BrandMessageFrameworkDelegate | null {
+  const prismaWithBrandMessageFramework = prisma as unknown as { brandMessageFramework?: BrandMessageFrameworkDelegate };
+  return prismaWithBrandMessageFramework.brandMessageFramework ?? null;
 }
 
 function fallback(reason: string): BrandRepositorySnapshot {
@@ -102,12 +177,16 @@ function fallback(reason: string): BrandRepositorySnapshot {
     profiles: brandProfiles,
     assets: brandAssets,
     colors: brandColors,
+    fonts: brandFonts,
     guidelines: brandGuidelines,
+    messageFrameworks: brandMessageFrameworks,
     dbCounts: {
       profiles: 0,
       assets: 0,
       colors: 0,
+      fonts: 0,
       guidelines: 0,
+      messageFrameworks: 0,
     },
   };
 }
@@ -119,11 +198,17 @@ export async function getBrandRepositorySnapshot(): Promise<BrandRepositorySnaps
 
   try {
     const brandAssetDelegate = getBrandAssetDelegate();
-    const [profileRows, assetRows, colorRows, guidelineRows] = await Promise.all([
+    const brandFontDelegate = getBrandFontDelegate();
+    const brandMessageFrameworkDelegate = getBrandMessageFrameworkDelegate();
+    const [profileRows, assetRows, colorRows, fontRows, guidelineRows, frameworkRows] = await Promise.all([
       prisma.brandProfile.findMany({ orderBy: [{ isActive: "desc" }, { name: "asc" }] }),
       brandAssetDelegate ? brandAssetDelegate.findMany({ orderBy: [{ title: "asc" }] }) : Promise.resolve([]),
       prisma.brandColor.findMany({ orderBy: [{ order: "asc" }, { name: "asc" }] }),
+      brandFontDelegate ? brandFontDelegate.findMany({ orderBy: [{ name: "asc" }] }) : Promise.resolve([]),
       prisma.brandGuideline.findMany({ orderBy: [{ order: "asc" }, { title: "asc" }] }),
+      brandMessageFrameworkDelegate
+        ? brandMessageFrameworkDelegate.findMany({ orderBy: [{ name: "asc" }] })
+        : Promise.resolve([]),
     ]);
 
     if (profileRows.length === 0) {
@@ -192,6 +277,22 @@ export async function getBrandRepositorySnapshot(): Promise<BrandRepositorySnaps
       })
       .filter((color): color is BrandColor => Boolean(color));
 
+    const fonts = fontRows
+      .map((font): BrandFont | null => {
+        const profileId = profileIdByDbId.get(font.profileId);
+        if (!profileId) return null;
+        return {
+          id: font.id,
+          profileId,
+          name: font.name,
+          usage: font.usage,
+          fallback: font.fallback ?? "to be verified",
+          source: font.source ?? "to be verified",
+          notes: font.notes ?? "to be verified",
+        };
+      })
+      .filter((font): font is BrandFont => Boolean(font));
+
     const guidelines = guidelineRows
       .map((guideline): BrandGuideline | null => {
         const profileId = profileIdByDbId.get(guideline.profileId);
@@ -208,9 +309,32 @@ export async function getBrandRepositorySnapshot(): Promise<BrandRepositorySnaps
       })
       .filter((guideline): guideline is BrandGuideline => Boolean(guideline));
 
-    const reason = brandAssetDelegate
-      ? "BrandProfile, BrandAsset, BrandColor, and BrandGuideline are read through the repository layer with foundation fallback when collections are empty."
-      : "BrandProfile, BrandColor, and BrandGuideline are read from Prisma; BrandAsset uses foundation fallback until the generated Prisma Client exposes the BrandAsset delegate.";
+    const messageFrameworks = frameworkRows
+      .map((framework): BrandMessageFramework | null => {
+        const profileId = profileIdByDbId.get(framework.profileId);
+        if (!profileId) return null;
+        return {
+          id: framework.id,
+          profileId,
+          name: framework.name,
+          type: asFrameworkType(framework.type),
+          locale: asLocale(framework.locale),
+          structure: framework.structure,
+          sampleText: framework.sampleText ?? "to be verified",
+          doList: framework.doList,
+          dontList: framework.dontList,
+        };
+      })
+      .filter((framework): framework is BrandMessageFramework => Boolean(framework));
+
+    const availableOptionalModels = [
+      brandAssetDelegate ? "BrandAsset" : null,
+      brandFontDelegate ? "BrandFont" : null,
+      brandMessageFrameworkDelegate ? "BrandMessageFramework" : null,
+    ].filter((model): model is string => Boolean(model));
+    const reason = availableOptionalModels.length > 0
+      ? `Brand repository can read optional runtime delegates for ${availableOptionalModels.join(", ")}; empty collections still use foundation fallback.`
+      : "BrandProfile, BrandColor, and BrandGuideline are read from Prisma; BrandAsset, BrandFont, and BrandMessageFramework use foundation fallback until the generated Prisma Client exposes their delegates.";
 
     return {
       mode: "db-backed",
@@ -219,12 +343,18 @@ export async function getBrandRepositorySnapshot(): Promise<BrandRepositorySnaps
       profiles,
       assets: assets.length > 0 ? assets : brandAssets.filter((asset) => profiles.some((profile) => profile.id === asset.profileId)),
       colors: colors.length > 0 ? colors : brandColors.filter((color) => profiles.some((profile) => profile.id === color.profileId)),
+      fonts: fonts.length > 0 ? fonts : brandFonts.filter((font) => profiles.some((profile) => profile.id === font.profileId)),
       guidelines: guidelines.length > 0 ? guidelines : brandGuidelines.filter((guideline) => profiles.some((profile) => profile.id === guideline.profileId)),
+      messageFrameworks: messageFrameworks.length > 0
+        ? messageFrameworks
+        : brandMessageFrameworks.filter((framework) => profiles.some((profile) => profile.id === framework.profileId)),
       dbCounts: {
         profiles: profileRows.length,
         assets: assetRows.length,
         colors: colorRows.length,
+        fonts: fontRows.length,
         guidelines: guidelineRows.length,
+        messageFrameworks: frameworkRows.length,
       },
     };
   } catch (error) {
