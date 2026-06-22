@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getOperationsCalendarOverview } from "@/lib/operations/calendar-service";
 import { getPlanningOverview } from "@/lib/operations/planning/planning-service";
 import { getSeasonReadinessOverview } from "@/lib/operations/seasons/season-service";
+import { PlanningActionTaskAction } from "./_components/PlanningActionTaskAction";
 
 const categoryLabel: Record<string, string> = {
   RELIGIOUS: "مناسبة دينية",
@@ -59,7 +60,7 @@ export default function OperationsCalendarPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-[#025EB8]" /> الخطة المقترحة</CardTitle>
-          <CardDescription>إجراءات إنتاجية محسوبة من Planning Engine بناءً على نقص المواد في Season Engine.</CardDescription>
+          <CardDescription>إجراءات إنتاجية محسوبة من Planning Engine بناءً على نقص المواد في Season Engine. يمكن الآن تحويل أي إجراء إلى OperationTask محفوظة.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 lg:grid-cols-2">
           {planningOverview.actions.map((action) => (
@@ -76,6 +77,17 @@ export default function OperationsCalendarPage() {
                 <span>المسؤول: <b>{action.suggestedOwner}</b></span>
                 <span>الموعد: <b>{action.dueLabel}</b></span>
               </div>
+              <PlanningActionTaskAction
+                actionId={action.id}
+                seasonTitle={action.seasonTitle}
+                title={action.title}
+                type={action.type}
+                priority={action.priority}
+                suggestedOwner={action.suggestedOwner}
+                dueLabel={action.dueLabel}
+                quantity={action.quantity}
+                reason={action.reason}
+              />
             </div>
           ))}
         </CardContent>
