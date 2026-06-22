@@ -1,0 +1,3 @@
+ChatGPT send test for Vercel preview.
+Branch: code-chatgpt-send-test
+Repo: saladin76/minberiaksa
