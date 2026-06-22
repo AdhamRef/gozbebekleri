@@ -31,16 +31,16 @@
 - Archive Drive Links POST persists link metadata as DB-backed `AuditLog` records with `entityType = ArchiveDriveLink`, and GET reads persisted link metadata through the archive repository snapshot until a runtime delegate exists.
 - Archive Asset review actions persist approval/rejection state as DB-backed `AuditLog` records with `entityType = ArchiveAsset`, and list/detail APIs read the saved state through the archive repository snapshot.
 - Archive Asset `Create Content Item` saves a DB-backed AuditLog content item proposal and Operations reads it in `/dashboard/operations/content`.
+- `/api/dashboard/operations/items` supports guarded no-store `GET`, `POST`, and `PATCH` for audit-backed content items.
+- `/dashboard/operations/content` has a usable content item creation panel and persisted item status transitions to `REVIEW` / `APPROVED`.
 
 ## ما يتم تجهيزه في الحزمة الحالية
 
-- `/api/dashboard/operations/items` now supports guarded no-store `GET`, `POST`, and `PATCH` for content items.
-- `/dashboard/operations/content` now has a usable content item creation panel instead of a disabled placeholder button.
-- Persisted content items can be moved to `REVIEW` or `APPROVED` from the Kanban board.
-- The write path is DB-backed through sanitized `AuditLog` records until the dedicated `ContentItem` runtime model is appended.
-- Saved records include safety markers: `externalCall: false`, `autoPublish: false`, `autoSend: false`, `aiGenerated: false`, and `humanReviewRequired: true`.
-- Foundation/mock content items remain read-only, so the UI does not pretend that generated sample data can be updated.
-- No payment changes, tracking runtime changes, external platform calls, auto-publishing, auto-sending, or frontend secrets.
+- `/api/admin/brand/assets` now supports guarded no-store `GET` and `POST` for manual BrandAsset URL records.
+- `/dashboard/brand/assets` now has a usable manual asset creation panel for logos, templates, certificates, watermarks, and brand guides.
+- Brand repository reads audit-backed BrandAsset records and merges them with foundation/runtime Brand assets.
+- Saved BrandAsset records are marked `TO_VERIFY` by default and include safety markers: `externalCall: false`, `uploadPerformed: false`, `downloadPerformed: false`, `autoPublish: false`, `aiGenerated: false`, and `humanReviewRequired: true`.
+- No file upload, file download, Google Drive sync, AI generation, publishing, sending, payment changes, tracking runtime changes, external platform calls, or frontend secrets.
 
 ## المسارات الرئيسية
 
@@ -91,36 +91,35 @@
 - Operations/Content workflow models have staged contracts only; runtime schema and repository cutover remain pending.
 - Smart Archive: `ArchiveCollection` و`ArchiveProject` أصبح لهما DB-backed read/write API مع foundation fallback؛ `ArchiveDriveLink` create/read يعمل عبر AuditLog-backed records إلى أن يدخل runtime model؛ `ArchiveAsset` review actions تعمل عبر AuditLog-backed records، بينما asset metadata و`ArchiveVideoFrame` لديهم staged schema + repository read fallback فقط.
 - Google Drive sync, Drive access testing, file download, and Archive AI analysis remain manual/foundation-first.
-- Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ `BrandAsset`, `BrandFont`, و`BrandMessageFramework` لديهم staged schema + repository read fallback، لكن runtime schema الأساسي ما زال pending لهذه الموديلات.
+- Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ BrandAsset manual URL records are audit-backed and visible in Brand Center, while the dedicated runtime `BrandAsset` model is still pending. `BrandFont` و`BrandMessageFramework` لديهم staged schema + repository read fallback فقط.
 - Shared AI Core جاهز للعقود والـ provider fallback؛ `AiOperationRun` لديه staged schema + optional persistence fallback، لكن runtime schema ما زال pending.
 - Connections UI يعرض المنصات الجديدة كعقود جاهزية، لكن sync/testing الحقيقي لهذه المنصات يجب أن يبقى `NOT_IMPLEMENTED` حتى تنفيذ provider clients بشكل آمن.
 
 ## Known risks
 
-- ArchiveDriveLink, ArchiveAsset review actions, and Operations Content Items are currently audit-backed, not dedicated runtime models; later cutover should add dedicated models and migrate/read historical audit metadata if needed.
+- ArchiveDriveLink, ArchiveAsset review actions, Operations Content Items, and manual BrandAsset records are currently audit-backed, not dedicated runtime models; later cutover should add dedicated models and migrate/read historical audit metadata if needed.
 - Google Drive metadata sync لا ينفذ external call في foundation mode؛ يحتاج provider-backed implementation لاحقًا.
 - Archive AI analysis draft-only ولا يعتمد أي أصل بدون human review.
 - ArchiveAsset preview/thumbnail policy needs a dedicated safety pass before runtime writes.
+- BrandAsset manual URL records must be verified before being treated as official production downloads.
 - AI audit persistence يحتاج runtime schema قبل DB writes فعلية، ويجب أن يظل sanitized ودون أسرار.
 - ArchiveCollection وArchiveProject write paths تعتمد على DB availability وunique slugs؛ الفشل يظهر بوضوح بدل الحفظ الوهمي.
 - OperationTask quick edit يعمل فقط على rows فعلية؛ foundation generated tasks تبقى read-only.
 - Some Operations content items are audit-backed and should be migrated to `ContentItem` rows after the runtime model is appended.
 - بعض staff users قد يحتاجون تحديث dashboardPermissions لإضافة `operations`, `archive`, أو `brand` بعد إدخال المفاتيح الجديدة.
-- Brand assets الرسمية ما زالت تحتاج سياسة URL/download واضحة ورفع ملفات logo/certificate/template حقيقية قبل تفعيل downloads.
 - Brand typography and message frameworks still need verified real organization rules before production authoring automation.
 - Operations content workflow runtime cutover should be split into small PRs to avoid schema/client blast radius.
 - PRs القديمة #30, #37, #40, #43, #52, #54 لا يجب دمجها كما هي الآن؛ راجع `docs/dashboard-open-pr-audit.md`.
 
 ## Next recommended package
 
-`Append ContentItem runtime model`
+`Append ContentItem and BrandAsset runtime models`
 
-الهدف: إدخال runtime model مخصص لعناصر المحتوى ثم نقل manual content items وArchive-created ContentItem proposals من AuditLog-backed overlay إلى dedicated rows، مع إبقاء no auto-publish/no auto-send.
+الهدف: إدخال runtime models مخصصة لعناصر المحتوى وأصول الهوية ثم نقل manual content items وArchive-created ContentItem proposals وmanual BrandAsset records من AuditLog-backed overlay إلى dedicated rows، مع إبقاء no auto-publish/no auto-send/no upload.
 
 بعدها:
 
 - `Append ArchiveAsset runtime model` بعد تثبيت سياسة preview/sensitivity.
-- `Append BrandAsset runtime model` لقراءة manual URL records حقيقية.
 - `Append BrandFont and MessageFramework runtime models` ثم cut over Typography/Frameworks read paths تدريجيًا.
 - `Append Operations content workflow runtime models` كشرائح صغيرة.
 - `Append AiOperationRun runtime model` بعد تثبيت sanitization/retention policy.
