@@ -12,7 +12,7 @@ import type { OperationsTask } from "./tasks/task-types";
 import type { OperationsPersistenceInfo, OperationsRepositoryResult } from "./persistence-types";
 import type { OperationsContentItem, OperationsContentTask, OperationsOverview } from "./types";
 
-const scheduledManualStatuses: ScheduledManualStatus[] = ["SCHEDULED", "PUBLISHED", "MANUALLY_SENT", "CANCELLED", "FAILED"];
+const scheduledManualStatuses: ScheduledManualStatus[] = ["SCHEDULED", "READY_FOR_MANUAL_SEND", "PUBLISHED", "MANUALLY_SENT", "CANCELLED", "FAILED"];
 
 function foundationPersistence(
   model: string,

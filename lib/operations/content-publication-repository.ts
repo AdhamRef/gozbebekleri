@@ -4,7 +4,7 @@ import type { OperationsContentItem } from "./types";
 const objectIdPattern = /^[a-f\d]{24}$/i;
 const manualPublicationAction = "operations.content-publication.manual-upsert";
 const publicationActions = [manualPublicationAction];
-const allowedStatuses = new Set(["SCHEDULED", "PUBLISHED", "MANUALLY_SENT", "CANCELLED", "FAILED"]);
+const allowedStatuses = new Set(["SCHEDULED", "READY_FOR_MANUAL_SEND", "PUBLISHED", "MANUALLY_SENT", "CANCELLED", "FAILED"]);
 
 export type ContentPublicationActor = {
   actorId?: string | null;
@@ -151,7 +151,7 @@ export async function createAuditBackedContentPublication(
     status,
     publishedUrl: safeUrl(input.publishedUrl),
     scheduledAt: safeIso(input.scheduledAt),
-    publishedAt: safeIso(input.publishedAt) ?? (status === "PUBLISHED" || status === "MANUALLY_SENT" ? now : null),
+    publishedAt: safeIso(input.publishedAt) ?? (["PUBLISHED", "MANUALLY_SENT", "READY_FOR_MANUAL_SEND", "CANCELLED", "FAILED"].includes(status) ? now : null),
     checkedBy: actor?.actorName ?? actor?.actorId ?? "dashboard-user",
     notes: stringField(input.notes) ?? "Manual publication marker only. No automatic sending or publishing happened.",
   };

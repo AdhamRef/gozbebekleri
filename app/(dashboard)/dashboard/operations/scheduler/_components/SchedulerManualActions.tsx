@@ -2,13 +2,18 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Ban, CheckCircle2, Loader2 } from "lucide-react";
+import { Ban, CheckCircle2, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ScheduledChannel } from "@/lib/operations/scheduler/scheduler-types";
 
-type ManualStatus = "MANUALLY_SENT" | "CANCELLED";
+type ManualStatus = "READY_FOR_MANUAL_SEND" | "MANUALLY_SENT" | "CANCELLED";
 
 const actionCopy: Record<ManualStatus, { label: string; success: string; confirm: string }> = {
+  READY_FOR_MANUAL_SEND: {
+    label: "Send Now",
+    success: "تم وضع العنصر في طابور الإرسال اليدوي",
+    confirm: "Send Now لا يرسل تلقائيًا الآن. سيتم تسجيل العنصر كجاهز للإرسال اليدوي فقط.",
+  },
   MANUALLY_SENT: {
     label: "Mark manually sent",
     success: "تم تسجيل الإرسال اليدوي",
@@ -55,6 +60,7 @@ export function SchedulerManualActions({
           platform: channel,
           status,
           scheduledAt: scheduledFor,
+          publishedAt: new Date().toISOString(),
           notes: `${copy.label} from Operations Scheduler for: ${title}. No automatic sending or publishing happened.`,
         }),
       });
@@ -78,6 +84,10 @@ export function SchedulerManualActions({
   return (
     <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">
       <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" disabled={disabled} onClick={() => record("READY_FOR_MANUAL_SEND")}>
+          {busy === "READY_FOR_MANUAL_SEND" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          Send Now
+        </Button>
         <Button type="button" size="sm" variant="secondary" className="bg-slate-50 text-slate-700 hover:bg-slate-100" disabled={disabled} onClick={() => record("MANUALLY_SENT")}>
           {busy === "MANUALLY_SENT" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
           Mark manually sent

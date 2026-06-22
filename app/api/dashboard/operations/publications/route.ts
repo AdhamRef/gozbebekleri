@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 const publicationSchema = z.object({
   contentItemId: z.string().trim().min(1).max(120),
   platform: z.string().trim().min(1).max(80).optional(),
-  status: z.enum(["SCHEDULED", "PUBLISHED", "MANUALLY_SENT", "CANCELLED", "FAILED"]).default("PUBLISHED"),
+  status: z.enum(["SCHEDULED", "READY_FOR_MANUAL_SEND", "PUBLISHED", "MANUALLY_SENT", "CANCELLED", "FAILED"]).default("PUBLISHED"),
   publishedUrl: z.string().trim().url().optional(),
   scheduledAt: z.string().trim().max(80).optional(),
   publishedAt: z.string().trim().max(80).optional(),
