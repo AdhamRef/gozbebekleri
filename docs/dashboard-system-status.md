@@ -25,15 +25,15 @@
 - Operations/content workflow staged contracts added to `prisma/dashboard-foundation.schema.prisma` only.
 - Brand Center assets, typography, and message frameworks are sourced through the Brand repository snapshot, with optional Prisma delegate read fallback when generated delegates exist.
 - Smart Archive Drive links/assets/video frames are sourced through the Archive repository snapshot, with optional Prisma delegate read fallback when generated delegates exist.
+- Shared AI Core audit logging has optional `AiOperationRun` persistence fallback when generated delegates exist.
 
 ## ما يتم تجهيزه في الحزمة الحالية
 
-- Shared AI Core audit logging now prepares optional `AiOperationRun` DB persistence when the generated Prisma delegate exists.
-- The memory audit log remains the immediate foundation path and UI source.
-- Prompts and user identifiers are sanitized before any persistence attempt.
-- Persisted audit rows are draft/human-approval-required diagnostics only.
-- This package does not add `AiOperationRun` to `prisma/schema.prisma` yet.
-- This package does not call external AI, publish content, send messages, change budgets, change tracking settings, or expose frontend secrets.
+- Archive Asset `Assign Task` now creates a real `OperationTask` through the existing Operations task repository.
+- The Archive module still does not own a separate task system; it delegates to the shared `OperationTask` model.
+- The API writes an AuditLog entry when a real task is created.
+- Foundation archive assets can still produce a clear failure if DB persistence is unavailable, instead of pretending work was saved.
+- No Google Drive sync, file download, AI analysis, auto approval, publishing, or sending is introduced.
 - No payment changes, tracking runtime changes, external platform calls, or frontend secrets.
 
 ## المسارات الرئيسية
@@ -79,7 +79,7 @@
 ## ما بقي foundation
 
 - Operations Scheduler, Production, Content Items, and Content Workflow Tasks ما زالت foundation/repository-backed وليست DB-backed بالكامل.
-- Operations Tasks: `OperationTask` DB-backed read/write API وUI create/edit/transitions موجودة للمهام الفعلية؛ الربط المباشر مع ContentItem/ArchiveAsset ما زال pending حتى تدخل هذه الموديلات للـ DB-backed runtime.
+- Operations Tasks: `OperationTask` DB-backed read/write API وUI create/edit/transitions موجودة للمهام الفعلية؛ ArchiveAsset can now create real OperationTask rows when DB is available، لكن الربط المباشر مع ContentItem ما زال pending حتى يدخل هذا الموديل للـ DB-backed runtime.
 - Operations/Content workflow models have staged contracts only; runtime schema and repository cutover remain pending.
 - Smart Archive: `ArchiveCollection` و`ArchiveProject` DB-backed read/fallback؛ `ArchiveDriveLink`, `ArchiveAsset`, و`ArchiveVideoFrame` لديهم staged schema + repository read fallback، لكن Google Drive sync/AI analysis/actions ما زالت foundation/manual-first.
 - Brand Center: `BrandProfile`, `BrandColor`, `BrandGuideline` DB-backed read/fallback؛ `BrandAsset`, `BrandFont`, و`BrandMessageFramework` لديهم staged schema + repository read fallback، لكن runtime schema الأساسي ما زال pending لهذه الموديلات.
@@ -97,22 +97,22 @@
 - بعض staff users قد يحتاجون تحديث dashboardPermissions لإضافة `operations`, `archive`, أو `brand` بعد إدخال المفاتيح الجديدة.
 - Brand assets الرسمية ما زالت تحتاج سياسة URL/download واضحة ورفع ملفات logo/certificate/template حقيقية قبل تفعيل downloads.
 - Brand typography and message frameworks still need verified real organization rules before production authoring automation.
-- Archive action handlers still operate in foundation/manual mode; DB write paths must be added later with validation and AuditLog.
+- Archive action handlers still operate in foundation/manual mode except `assign-task`, which now creates real OperationTask rows when DB is available.
 - Operations content workflow runtime cutover should be split into small PRs to avoid schema/client blast radius.
 - PRs القديمة #30, #37, #40, #43, #52, #54 لا يجب دمجها كما هي الآن؛ راجع `docs/dashboard-open-pr-audit.md`.
 
 ## Next recommended package
 
-`Append BrandAsset runtime model`
+`Persist ArchiveAsset review actions`
 
-الهدف: إدخال `BrandAsset` فقط إلى `prisma/schema.prisma` الرئيسي، ثم السماح للـ repository read fallback الحالي بقراءة manual URL records عند توفرها، بدون upload policy واسع.
+الهدف: جعل approve/reject/documentation-only لأصول الأرشيف تكتب في DB عندما يدخل `ArchiveAsset` للـ runtime schema، مع AuditLog وبدون أي AI/Drive side effects.
 
 بعدها:
 
+- `Append BrandAsset runtime model` لقراءة manual URL records حقيقية.
 - `Append ArchiveDriveLink runtime model` قبل أي sync فعلي.
 - `Append ArchiveAsset runtime model` بعد سياسة preview/sensitivity.
 - `Append BrandFont and MessageFramework runtime models` ثم cut over Typography/Frameworks read paths تدريجيًا.
 - `Append Operations content workflow runtime models` كشرائح صغيرة.
 - `Append AiOperationRun runtime model` بعد تثبيت sanitization/retention policy.
-- ربط OperationTask تدريجيًا بـ ContentItem وArchiveAsset عند توفر الموديلات الفعلية.
 - تنفيذ Google Drive metadata sync لاحقًا فقط بعد readiness كاملة في provider catalog وMarketingPlatformConnection.
