@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { AlertTriangle, Archive, Bot, CheckCircle2, Database, FileText, FolderOpen, Image, Link2, ShieldCheck } from "lucide-react";
 import type { ArchiveAsset, ArchiveDriveLink, ArchiveProject, ArchiveSnapshot, ArchiveTabKey } from "@/lib/archive/archive-types";
 import { ArchiveAssetBrandAssetAction } from "./ArchiveAssetBrandAssetAction";
+import { ArchiveAssetReviewActions } from "./ArchiveAssetReviewActions";
 
 type Props = {
   activeTab: ArchiveTabKey;
@@ -159,6 +160,15 @@ function Assets({ assets, marketingOnly = false }: { assets: ArchiveAsset[]; mar
                   {asset.isSensitive && <Badge>Sensitive</Badge>}{asset.needsBlur && <Badge>Needs blur</Badge>}
                 </div>
                 <div className="flex flex-wrap gap-2">{asset.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
+                <ArchiveAssetReviewActions
+                  assetId={asset.id}
+                  fileName={asset.fileName}
+                  humanReviewStatus={asset.humanReviewStatus}
+                  marketingApproved={asset.marketingApproved}
+                  documentationApproved={asset.documentationApproved}
+                  isSensitive={asset.isSensitive}
+                  needsBlur={asset.needsBlur}
+                />
                 <ArchiveAssetBrandAssetAction assetId={asset.id} disabled={Boolean(brandAssetBlockReason)} disabledReason={brandAssetBlockReason} />
               </div>
             </div>
