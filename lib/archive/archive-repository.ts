@@ -1,4 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import {
+  applyArchiveAssetReviewOverrides,
+  readArchiveAssetReviewOverrides,
+} from "./archive-asset-review-repository";
 import type {
   ArchiveAsset,
   ArchiveCollection,
@@ -269,7 +273,7 @@ export async function getArchiveRepositorySnapshot(foundation: ArchiveFoundation
     const archiveDriveLinkDelegate = getArchiveDriveLinkDelegate();
     const archiveAssetDelegate = getArchiveAssetDelegate();
     const archiveVideoFrameDelegate = getArchiveVideoFrameDelegate();
-    const [collectionRows, projectRows, driveLinkRows, driveLinkAuditRows, assetRows, videoFrameRows] = await Promise.all([
+    const [collectionRows, projectRows, driveLinkRows, driveLinkAuditRows, assetRows, assetReviewOverrides, videoFrameRows] = await Promise.all([
       prisma.archiveCollection.findMany({ orderBy: [{ order: "asc" }, { name: "asc" }] }),
       prisma.archiveProject.findMany({ orderBy: [{ year: "desc" }, { title: "asc" }] }),
       archiveDriveLinkDelegate ? archiveDriveLinkDelegate.findMany({ orderBy: [{ title: "asc" }] }) : Promise.resolve([]),
@@ -282,6 +286,7 @@ export async function getArchiveRepositorySnapshot(foundation: ArchiveFoundation
             select: { id: true, entityId: true, metadata: true, createdAt: true },
           }),
       archiveAssetDelegate ? archiveAssetDelegate.findMany({ orderBy: [{ fileName: "asc" }] }) : Promise.resolve([]),
+      readArchiveAssetReviewOverrides(),
       archiveVideoFrameDelegate ? archiveVideoFrameDelegate.findMany({ orderBy: [{ timestampSec: "asc" }] }) : Promise.resolve([]),
     ]);
 
@@ -291,6 +296,7 @@ export async function getArchiveRepositorySnapshot(foundation: ArchiveFoundation
       driveLinkRows.length > 0 ||
       driveLinkAuditRows.length > 0 ||
       assetRows.length > 0 ||
+      assetReviewOverrides.length > 0 ||
       videoFrameRows.length > 0;
 
     if (!hasDbArchiveData) {
@@ -360,7 +366,7 @@ export async function getArchiveRepositorySnapshot(foundation: ArchiveFoundation
     const driveLinks = delegatedDriveLinks.length > 0 ? delegatedDriveLinks : auditDriveLinks;
 
     const validDriveLinkIds = new Set(driveLinks.map((link) => link.id));
-    const assets = assetRows.map((asset): ArchiveAsset => ({
+    const persistedAssets = assetRows.map((asset): ArchiveAsset => ({
       id: asset.id,
       projectId: validProjectIds.has(asset.projectId) ? asset.projectId : fallbackProjectId,
       driveLinkId: asset.driveLinkId && validDriveLinkIds.has(asset.driveLinkId) ? asset.driveLinkId : null,
@@ -397,6 +403,10 @@ export async function getArchiveRepositorySnapshot(foundation: ArchiveFoundation
       reviewedAt: toIso(asset.reviewedAt),
       reviewerNote: asset.reviewerNote,
     }));
+    const assets = applyArchiveAssetReviewOverrides(
+      persistedAssets.length > 0 ? persistedAssets : foundation.assets,
+      assetReviewOverrides,
+    );
 
     const validAssetIds = new Set(assets.map((asset) => asset.id));
     const videoFrames = videoFrameRows
@@ -420,7 +430,7 @@ export async function getArchiveRepositorySnapshot(foundation: ArchiveFoundation
 
     const availableOptionalModels = [
       archiveDriveLinkDelegate ? "ArchiveDriveLink" : driveLinks.length > 0 ? "ArchiveDriveLink audit-backed records" : null,
-      archiveAssetDelegate ? "ArchiveAsset" : null,
+      archiveAssetDelegate ? "ArchiveAsset" : assetReviewOverrides.length > 0 ? "ArchiveAsset review audit-backed records" : null,
       archiveVideoFrameDelegate ? "ArchiveVideoFrame" : null,
     ].filter((model): model is string => Boolean(model));
     const reason = availableOptionalModels.length > 0
@@ -434,7 +444,7 @@ export async function getArchiveRepositorySnapshot(foundation: ArchiveFoundation
       collections,
       projects,
       driveLinks: driveLinks.length > 0 ? driveLinks : foundation.driveLinks,
-      assets: assets.length > 0 ? assets : foundation.assets,
+      assets,
       videoFrames: videoFrames.length > 0 ? videoFrames : foundation.videoFrames,
       dbCounts: {
         collections: collectionRows.length,
