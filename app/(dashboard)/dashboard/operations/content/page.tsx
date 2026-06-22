@@ -17,9 +17,11 @@ const boardColumns = [
   ["DESIGN", "تصميم", "تصاميم وفيديوهات قيد الإنتاج"],
   ["REVIEW", "مراجعة", "جاهز للمراجعة النهائية"],
   ["APPROVED", "معتمد", "جاهز للنشر أو التسويق"],
+  ["SCHEDULED", "مجدول", "مواد لها موعد نشر يدوي"],
+  ["PUBLISHED", "منشور يدويًا", "تم تسجيل نشرها بدون إرسال تلقائي"],
 ] as const;
 
-const filters = ["كل الحالات", "IDEA", "WRITING", "DESIGN", "REVIEW", "APPROVED"] as const;
+const filters = ["كل الحالات", "IDEA", "WRITING", "DESIGN", "REVIEW", "APPROVED", "SCHEDULED", "PUBLISHED"] as const;
 
 const statusClass: Record<string, string> = {
   PLANNING: "bg-amber-50 text-amber-700 border-amber-200",
@@ -31,6 +33,8 @@ const statusClass: Record<string, string> = {
   WRITING: "bg-sky-50 text-sky-700 border-sky-200",
   APPROVED: "bg-emerald-50 text-emerald-700 border-emerald-200",
   DESIGN: "bg-rose-50 text-rose-700 border-rose-200",
+  SCHEDULED: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  PUBLISHED: "bg-teal-50 text-teal-700 border-teal-200",
 };
 
 export default async function OperationsContentPage() {
