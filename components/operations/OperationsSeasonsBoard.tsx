@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { OperationsOverview } from "@/lib/operations/types";
 import { OperationsSeasonTaskAction } from "./OperationsSeasonTaskAction";
+import { OperationsWeeklyThemeTaskAction } from "./OperationsWeeklyThemeTaskAction";
 
 type OperationsSeasonsBoardProps = {
   seasons: OperationsOverview["seasons"];
@@ -17,7 +18,7 @@ export function OperationsSeasonsBoard({ seasons, weeklyThemes, statusClass }: O
         <CardTitle className="flex items-center gap-2">
           <CalendarClock className="h-5 w-5 text-[#025EB8]" /> التقويم التشغيلي والمواسم
         </CardTitle>
-        <CardDescription>نظرة واحدة على المواسم والمحاور التي تقود إنتاج المحتوى، مع إمكانية تحويل كل موسم إلى مهمة جاهزية محفوظة.</CardDescription>
+        <CardDescription>نظرة واحدة على المواسم والمحاور التي تقود إنتاج المحتوى، مع إمكانية تحويل كل موسم أو محور أسبوعي إلى مهمة محفوظة.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 xl:grid-cols-5">
@@ -51,6 +52,7 @@ export function OperationsSeasonsBoard({ seasons, weeklyThemes, statusClass }: O
                 <p className="text-xs font-bold text-[#025EB8]">{theme.week}</p>
                 <h4 className="mt-1 font-black text-slate-900">{theme.theme}</h4>
                 <p className="mt-1 text-xs leading-5 text-slate-500">{theme.description}</p>
+                <OperationsWeeklyThemeTaskAction theme={theme} />
               </div>
             ))}
           </div>
