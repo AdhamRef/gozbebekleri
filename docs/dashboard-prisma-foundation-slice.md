@@ -26,12 +26,14 @@
 - تم تجهيز Brand repository ليقرأ `BrandAsset`, `BrandFont`, و`BrandMessageFramework` إذا كان Prisma Client يوفّر delegates، وإلا يرجع foundation data بوضوح.
 - تم تجهيز `ArchiveDriveLink`, `ArchiveAsset`, و`ArchiveVideoFrame` كعقود staged فقط لدعم Google Drive metadata وAI/human review لاحقًا.
 - تم تجهيز Archive repository ليقرأ `ArchiveDriveLink`, `ArchiveAsset`, و`ArchiveVideoFrame` إذا كان Prisma Client يوفّر delegates، وإلا يرجع foundation data بوضوح.
+- تم تجهيز `ArchiveDriveLink` mutation path ليحاول الكتابة في runtime `archiveDriveLink` delegate فور توفره، مع AuditLog fallback آمن عندما يكون الموديل غير موجود في `prisma/schema.prisma` الرئيسي أو عندما يكون المشروع ليس runtime ObjectId بعد.
 - تم تجهيز عقود Operations/Content التالية كـ staged contracts فقط: `OperationSeason`, `MonthlyContentPlan`, `ContentItem`, `ContentPublication`, `MessageSchedule`, `DonorReactivationReminder`, `MarketingLearning`, و`ContentAdLink`.
 - تم تجهيز `AiOperationRun` كعقد staged لسجل تشغيل Shared AI Core، مع optional persistence fallback إذا كان Prisma Client يوفّر delegate لاحقًا.
 
 لم يتم في هذه المرحلة:
 
 - إدخال بقية موديلات Brand/Archive/Operations/Content/AI الجديدة إلى `prisma/schema.prisma` الرئيسي.
+- إدخال `ArchiveDriveLink` نفسه إلى `prisma/schema.prisma` الرئيسي؛ mutation path جاهز للـ delegate فقط.
 - تشغيل Google Drive sync حقيقي.
 - تحميل ملفات Drive أو تحليل صور/فيديوهات تلقائيًا.
 - تحويل أفعال Archive approval/create-content إلى DB writes.
@@ -71,7 +73,7 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 
 - `ArchiveCollection`
 - `ArchiveProject`
-- `ArchiveDriveLink` staged contract + repository read fallback only
+- `ArchiveDriveLink` staged contract + repository read fallback + mutation runtime-delegate fallback prepared
 - `ArchiveAsset` staged contract + repository read fallback only
 - `ArchiveVideoFrame` staged contract + repository read fallback only
 
@@ -103,7 +105,7 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 | `BrandMessageFramework` | Repository read fallback prepared; runtime schema pending | Message frameworks can use the same Brand repository snapshot once runtime model exists. |
 | `ArchiveCollection` | DB-backed read/write API + foundation fallback | Smart Archive pages can read and create collections through archive repository/service paths. |
 | `ArchiveProject` | DB-backed read/write API + foundation fallback | Smart Archive pages can read and create projects through archive repository/service paths. |
-| `ArchiveDriveLink` | Repository read fallback prepared; runtime schema pending | Google Drive link metadata can be read when runtime model exists; no external Drive calls. |
+| `ArchiveDriveLink` | Repository read fallback prepared; mutation delegate path prepared; runtime schema pending | Google Drive link metadata can be read/written through runtime delegate once model exists; until then create action remains audit-backed and no external Drive calls happen. |
 | `ArchiveAsset` | Repository read fallback prepared; runtime schema pending | Asset metadata, AI draft fields, human review fields, and approval flags can be read when runtime model exists. |
 | `ArchiveVideoFrame` | Repository read fallback prepared; runtime schema pending | Video frame metadata can be read when runtime model exists; no frame extraction or AI call. |
 | `OperationTask` | DB-backed read/write API + create/edit UI + transitions + computed foundation fallback | Tasks page/API supports safe manual operations for real rows; Archive assign-task delegates here. |
@@ -133,12 +135,19 @@ prisma validate --schema prisma/dashboard-foundation.schema.prisma
 - Donor Reactivation وScheduler manual-first فقط.
 - AI audit prompt preview is sanitized and capped before optional persistence.
 - Archive collection/project create APIs validate input and fail clearly if DB persistence is unavailable.
+- Archive Drive Link create path لا يستدعي Google Drive؛ يكتب runtime delegate فقط عند توفره، وإلا يسجل AuditLog fallback بوضوح.
 
 ## cutover المقترح التالي
 
 الأولوية الآن:
 
+`Append ArchiveDriveLink to runtime schema`
+
+بعدها مباشرة:
+
 `Persist Archive Drive Links`
+
+لأن mutation path أصبح جاهزًا لاستخدام runtime delegate فور توفره من Prisma Client.
 
 بعدها يمكن تنفيذ:
 
