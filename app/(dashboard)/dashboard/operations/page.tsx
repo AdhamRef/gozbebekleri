@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, CheckCircle2, ClipboardList, FileText, Megaphone, Sparkles, UserRoundCheck } from "lucide-react";
+import { ArrowLeft, CalendarDays, CheckCircle2, ClipboardList, FileText, Megaphone, Send, Sparkles, UserRoundCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPlanningOverview } from "@/lib/operations/planning/planning-service";
 import { getSeasonReadinessOverview } from "@/lib/operations/seasons/season-service";
@@ -8,6 +8,7 @@ import { getTaskOverview } from "@/lib/operations/tasks/task-service";
 const pillars = [
   ["التقويم", "المناسبات، المواسم، والأسابيع التشغيلية.", CalendarDays, "/dashboard/operations/calendar"],
   ["خطة المحتوى", "الأفكار، النصوص، التصاميم، والفيديوهات.", FileText, "/dashboard/operations/content"],
+  ["النشر اليدوي", "Checklist لكل منصة بدون أي نشر تلقائي.", Send, "/dashboard/operations/publishing"],
   ["مهام الفريق", "من المسؤول؟ ما الحالة؟ وما موعد التسليم؟", ClipboardList, "/dashboard/operations/tasks"],
   ["تنشيط المتبرعين", "مرشحون للتواصل اليدوي بدون أي إرسال تلقائي.", UserRoundCheck, "/dashboard/operations/donor-reactivation"],
   ["التسليم للتسويق", "ربط المحتوى لاحقًا بروابط الحملات ونتائج الأداء.", Megaphone, "/dashboard/marketing"],
@@ -48,7 +49,7 @@ export default async function OperationsHomePage() {
       <Card><CardHeader><CardDescription>مهام عالية</CardDescription><CardTitle className="text-3xl">{taskOverview.summary.highPriority}</CardTitle></CardHeader></Card>
     </div>
 
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
       {pillars.map(([title, description, Icon, href]) => <Link key={title} href={href} className="block h-full">
         <Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm">
           <CardHeader>
