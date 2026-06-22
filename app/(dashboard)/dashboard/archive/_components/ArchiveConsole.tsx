@@ -5,6 +5,7 @@ import type { ArchiveAsset, ArchiveDriveLink, ArchiveProject, ArchiveSnapshot, A
 import { ArchiveAssetBrandAssetAction } from "./ArchiveAssetBrandAssetAction";
 import { ArchiveAssetContentItemAction } from "./ArchiveAssetContentItemAction";
 import { ArchiveAssetReviewActions } from "./ArchiveAssetReviewActions";
+import { ArchiveAssetTaskAction } from "./ArchiveAssetTaskAction";
 
 type Props = {
   activeTab: ArchiveTabKey;
@@ -172,6 +173,7 @@ function Assets({ assets, marketingOnly = false }: { assets: ArchiveAsset[]; mar
                   needsBlur={asset.needsBlur}
                 />
                 <ArchiveAssetContentItemAction assetId={asset.id} fileName={asset.fileName} disabled={Boolean(contentItemBlockReason)} disabledReason={contentItemBlockReason} />
+                <ArchiveAssetTaskAction assetId={asset.id} fileName={asset.fileName} />
                 <ArchiveAssetBrandAssetAction assetId={asset.id} disabled={Boolean(brandAssetBlockReason)} disabledReason={brandAssetBlockReason} />
               </div>
             </div>
