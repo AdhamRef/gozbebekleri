@@ -29,6 +29,9 @@
 - Archive Asset `Assign Task` creates a real `OperationTask` through the Operations task repository when DB is available, with AuditLog on success.
 - Archive Collections and Projects APIs create real runtime rows through Prisma-backed repository services.
 - Archive Drive Links POST persists link metadata as DB-backed `AuditLog` records with `entityType = ArchiveDriveLink`, and GET reads persisted link metadata through the archive repository snapshot until a runtime delegate exists.
+- Archive Drive Link create path is prepared to use a future `archiveDriveLink` runtime delegate once `ArchiveDriveLink` is appended to `prisma/schema.prisma`; until then it stays audit-backed and performs no external calls.
+- `/dashboard/archive/drive-links` validates Drive URLs in the UI, identifies folder/file style links before save, and blocks non-Google-Drive links before POST.
+- `/api/admin/archive/drive-links` now validates required fields server-side and rejects non-Google-Drive URLs even if the UI is bypassed.
 - Archive Asset review actions persist approval/rejection state as DB-backed `AuditLog` records with `entityType = ArchiveAsset`, and list/detail APIs read the saved state through the archive repository snapshot.
 - Archive Asset `Create Content Item` saves a DB-backed AuditLog content item proposal and Operations reads it in `/dashboard/operations/content`.
 - `/api/dashboard/operations/items` supports guarded no-store `GET`, `POST`, and `PATCH` for audit-backed content items.
@@ -133,12 +136,14 @@
 
 ## Next recommended package
 
-`Append ContentItem and BrandAsset runtime models`
+`Append ArchiveDriveLink runtime model`
 
-الهدف: إدخال runtime models مخصصة لعناصر المحتوى وأصول الهوية ثم نقل manual content items وArchive-created ContentItem proposals وmanual BrandAsset records من AuditLog-backed overlay إلى dedicated rows، مع إبقاء no auto-publish/no auto-send/no upload.
+الهدف: إدخال `ArchiveDriveLink` فقط إلى `prisma/schema.prisma` ثم تشغيل Prisma/Vercel build. لا Google Drive sync، لا ArchiveAsset، لا AI، لا تنزيل ملفات.
 
-بعدها:
+بعد نجاح ذلك:
 
+- `Cut over ArchiveDriveLink create/read to runtime delegate` مع إبقاء AuditLog historical overlay.
+- `Append ContentItem and BrandAsset runtime models` بعد تأكيد أن cutover صغير وآمن.
 - `Append ArchiveAsset runtime model` بعد تثبيت سياسة preview/sensitivity.
 - `Append BrandFont and MessageFramework runtime models` ثم cut over Typography/Frameworks read paths تدريجيًا.
 - `Append Operations content workflow runtime models` كشرائح صغيرة.
