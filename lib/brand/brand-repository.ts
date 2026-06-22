@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { readAuditBackedBrandAssets } from "./brand-asset-repository";
 import {
   brandAssets,
   brandColors,
@@ -191,6 +192,18 @@ function fallback(reason: string): BrandRepositorySnapshot {
   };
 }
 
+function mergeBrandAssets(baseAssets: BrandAsset[], auditAssets: BrandAsset[], profiles: BrandProfile[]) {
+  const profileIds = new Set(profiles.map((profile) => profile.id));
+  const merged = new Map<string, BrandAsset>();
+  for (const asset of baseAssets) {
+    if (profileIds.has(asset.profileId)) merged.set(asset.id, asset);
+  }
+  for (const asset of auditAssets) {
+    if (profileIds.has(asset.profileId)) merged.set(asset.id, asset);
+  }
+  return [...merged.values()];
+}
+
 export async function getBrandRepositorySnapshot(): Promise<BrandRepositorySnapshot> {
   if (!process.env.DATABASE_URL) {
     return fallback("DATABASE_URL is not configured; using foundation brand data.");
@@ -200,9 +213,10 @@ export async function getBrandRepositorySnapshot(): Promise<BrandRepositorySnaps
     const brandAssetDelegate = getBrandAssetDelegate();
     const brandFontDelegate = getBrandFontDelegate();
     const brandMessageFrameworkDelegate = getBrandMessageFrameworkDelegate();
-    const [profileRows, assetRows, colorRows, fontRows, guidelineRows, frameworkRows] = await Promise.all([
+    const [profileRows, assetRows, auditAssetRows, colorRows, fontRows, guidelineRows, frameworkRows] = await Promise.all([
       prisma.brandProfile.findMany({ orderBy: [{ isActive: "desc" }, { name: "asc" }] }),
       brandAssetDelegate ? brandAssetDelegate.findMany({ orderBy: [{ title: "asc" }] }) : Promise.resolve([]),
+      readAuditBackedBrandAssets(),
       prisma.brandColor.findMany({ orderBy: [{ order: "asc" }, { name: "asc" }] }),
       brandFontDelegate ? brandFontDelegate.findMany({ orderBy: [{ name: "asc" }] }) : Promise.resolve([]),
       prisma.brandGuideline.findMany({ orderBy: [{ order: "asc" }, { title: "asc" }] }),
@@ -332,16 +346,21 @@ export async function getBrandRepositorySnapshot(): Promise<BrandRepositorySnaps
       brandFontDelegate ? "BrandFont" : null,
       brandMessageFrameworkDelegate ? "BrandMessageFramework" : null,
     ].filter((model): model is string => Boolean(model));
-    const reason = availableOptionalModels.length > 0
-      ? `Brand repository can read optional runtime delegates for ${availableOptionalModels.join(", ")}; empty collections still use foundation fallback.`
-      : "BrandProfile, BrandColor, and BrandGuideline are read from Prisma; BrandAsset, BrandFont, and BrandMessageFramework use foundation fallback until the generated Prisma Client exposes their delegates.";
+    const reasonParts = availableOptionalModels.length > 0
+      ? [`Brand repository can read optional runtime delegates for ${availableOptionalModels.join(", ")}.`]
+      : ["BrandProfile, BrandColor, and BrandGuideline are read from Prisma; BrandAsset, BrandFont, and BrandMessageFramework use foundation fallback until the generated Prisma Client exposes their delegates."];
+    if (auditAssetRows.length > 0) {
+      reasonParts.push(`${auditAssetRows.length} BrandAsset record(s) are currently audit-backed manual URL records.`);
+    }
+
+    const foundationAssets = brandAssets.filter((asset) => profiles.some((profile) => profile.id === asset.profileId));
 
     return {
       mode: "db-backed",
       source: "prisma",
-      reason,
+      reason: reasonParts.join(" "),
       profiles,
-      assets: assets.length > 0 ? assets : brandAssets.filter((asset) => profiles.some((profile) => profile.id === asset.profileId)),
+      assets: mergeBrandAssets(assets.length > 0 ? assets : foundationAssets, auditAssetRows, profiles),
       colors: colors.length > 0 ? colors : brandColors.filter((color) => profiles.some((profile) => profile.id === color.profileId)),
       fonts: fonts.length > 0 ? fonts : brandFonts.filter((font) => profiles.some((profile) => profile.id === font.profileId)),
       guidelines: guidelines.length > 0 ? guidelines : brandGuidelines.filter((guideline) => profiles.some((profile) => profile.id === guideline.profileId)),
@@ -350,7 +369,7 @@ export async function getBrandRepositorySnapshot(): Promise<BrandRepositorySnaps
         : brandMessageFrameworks.filter((framework) => profiles.some((profile) => profile.id === framework.profileId)),
       dbCounts: {
         profiles: profileRows.length,
-        assets: assetRows.length,
+        assets: assetRows.length + auditAssetRows.length,
         colors: colorRows.length,
         fonts: fontRows.length,
         guidelines: guidelineRows.length,
