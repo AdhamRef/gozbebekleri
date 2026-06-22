@@ -26,6 +26,7 @@ import { BrandAssetCreatePanel } from "./BrandAssetCreatePanel";
 import { BrandColorCreatePanel } from "./BrandColorCreatePanel";
 import { BrandCopyButton } from "./BrandCopyButton";
 import { BrandGuidelineCreatePanel } from "./BrandGuidelineCreatePanel";
+import { BrandMessageFrameworkCreatePanel } from "./BrandMessageFrameworkCreatePanel";
 
 type Props = {
   activeTab: BrandCenterTabKey;
@@ -103,7 +104,7 @@ function renderTab(activeTab: BrandCenterTabKey, snapshot: BrandCenterSnapshot) 
   if (activeTab === "colors") return <Colors colors={snapshot.colors} activeProfileId={snapshot.activeProfile.id} />;
   if (activeTab === "typography") return <Typography fonts={snapshot.fonts} />;
   if (activeTab === "voice") return <Guidelines guidelines={snapshot.guidelines} activeProfileId={snapshot.activeProfile.id} />;
-  if (activeTab === "frameworks") return <Frameworks frameworks={snapshot.messageFrameworks} />;
+  if (activeTab === "frameworks") return <Frameworks frameworks={snapshot.messageFrameworks} activeProfileId={snapshot.activeProfile.id} />;
   if (activeTab === "downloads") return <Downloads snapshot={snapshot} />;
   return <Overview snapshot={snapshot} />;
 }
@@ -257,21 +258,25 @@ function Guidelines({ guidelines, activeProfileId }: { guidelines: BrandGuidelin
   );
 }
 
-function Frameworks({ frameworks }: { frameworks: BrandMessageFramework[] }) {
+function Frameworks({ frameworks, activeProfileId }: { frameworks: BrandMessageFramework[]; activeProfileId: string }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
-      {frameworks.map((framework) => (
-        <Panel key={framework.id} title={framework.name} description={`${framework.type} / ${framework.locale.toUpperCase()}`} compact>
-          <div className="space-y-4 text-sm leading-6 text-slate-600">
-            <div className="flex flex-wrap gap-2">{framework.structure.map((step) => <Badge key={step}>{step}</Badge>)}</div>
-            <p className="rounded-md border bg-white p-3 text-slate-800">{framework.sampleText}</p>
-            <div className="grid gap-3 md:grid-cols-2">
-              <List title="Do" items={framework.doList} />
-              <List title="Do not" items={framework.dontList} />
+    <div className="space-y-4">
+      <BrandMessageFrameworkCreatePanel profileId={activeProfileId} />
+      {frameworks.length === 0 ? <EmptyState title="No message frameworks yet" text="Add Friday, thank-you, zakat, waqf, emergency, donor reactivation, Ramadan, and general message frameworks here." /> : null}
+      <div className="grid gap-4 xl:grid-cols-2">
+        {frameworks.map((framework) => (
+          <Panel key={framework.id} title={framework.name} description={`${framework.type} / ${framework.locale.toUpperCase()}`} compact>
+            <div className="space-y-4 text-sm leading-6 text-slate-600">
+              <div className="flex flex-wrap gap-2">{framework.structure.map((step) => <Badge key={step}>{step}</Badge>)}</div>
+              <p className="rounded-md border bg-white p-3 text-slate-800">{framework.sampleText}</p>
+              <div className="grid gap-3 md:grid-cols-2">
+                <List title="Do" items={framework.doList} />
+                <List title="Do not" items={framework.dontList} />
+              </div>
             </div>
-          </div>
-        </Panel>
-      ))}
+          </Panel>
+        ))}
+      </div>
     </div>
   );
 }
