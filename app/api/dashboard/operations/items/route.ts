@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { auditActorFromDashboardSession } from "@/lib/audit-log";
 import { createAuditBackedContentItem, updateAuditBackedContentItem } from "@/lib/operations/content-item-repository";
+import { createAuditBackedContentPublication } from "@/lib/operations/content-publication-repository";
 import { listContentItems } from "@/lib/operations/repository";
 import { operationsNoStoreHeaders, requireOperationsApiAccess } from "../_auth";
 
@@ -27,6 +28,9 @@ const contentItemCreateSchema = z.object({
 
 const contentItemUpdateSchema = contentItemCreateSchema.partial().extend({
   id: z.string().trim().min(1).max(120),
+  publishedUrl: z.string().trim().url().optional(),
+  publicationPlatform: z.string().trim().max(80).optional(),
+  publicationNotes: z.string().trim().max(500).optional(),
 });
 
 async function readJson(request: Request) {
@@ -77,6 +81,25 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: false, error: "Invalid content item update", details: parsed.error.flatten() }, { status: 400, headers: operationsNoStoreHeaders });
   }
 
-  const result = await updateAuditBackedContentItem(parsed.data, await dashboardActor());
-  return NextResponse.json(result, { status: result.status, headers: operationsNoStoreHeaders });
+  const actor = await dashboardActor();
+  const result = await updateAuditBackedContentItem(parsed.data, actor);
+  const shouldRecordPublication = parsed.data.status?.toUpperCase() === "PUBLISHED" && result.ok && result.data;
+
+  if (!shouldRecordPublication) {
+    return NextResponse.json(result, { status: result.status, headers: operationsNoStoreHeaders });
+  }
+
+  const publication = await createAuditBackedContentPublication(
+    {
+      contentItemId: result.data?.id,
+      platform: parsed.data.publicationPlatform || result.data?.channel,
+      status: "PUBLISHED",
+      publishedUrl: parsed.data.publishedUrl,
+      notes: parsed.data.publicationNotes || "Manual publish status update from Operations content board.",
+    },
+    actor,
+    result.data,
+  );
+
+  return NextResponse.json({ ...result, publication }, { status: result.status, headers: operationsNoStoreHeaders });
 }

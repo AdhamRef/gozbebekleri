@@ -14,22 +14,28 @@ export function OperationsContentItemActions({ id, status }: OperationsContentIt
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   if (!id?.startsWith("content_item_")) return null;
 
   async function updateStatus(nextStatus: string) {
     if (!id) return;
-    if (nextStatus === "PUBLISHED" && !window.confirm("تأكيد نشر يدوي؟ لن يتم إرسال أو نشر أي محتوى تلقائيًا؛ سيتم تحديث حالة العنصر فقط.")) {
+    if (nextStatus === "PUBLISHED" && !window.confirm("تأكيد نشر يدوي؟ لن يتم إرسال أو نشر أي محتوى تلقائيًا؛ سيتم تحديث الحالة وتسجيل ContentPublication يدوي فقط.")) {
       return;
     }
 
     setBusy(nextStatus);
     setError(null);
+    setSuccess(null);
 
     const response = await fetch("/api/dashboard/operations/items", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status: nextStatus }),
+      body: JSON.stringify({
+        id,
+        status: nextStatus,
+        publicationNotes: nextStatus === "PUBLISHED" ? "Manual publish confirmed from Operations content board. No automatic sending or publishing happened." : undefined,
+      }),
     });
     const result = await response.json().catch(() => null);
     setBusy(null);
@@ -39,6 +45,7 @@ export function OperationsContentItemActions({ id, status }: OperationsContentIt
       return;
     }
 
+    setSuccess(nextStatus === "PUBLISHED" ? (result?.publication?.message || "تم تسجيل النشر اليدوي") : "تم تحديث حالة عنصر المحتوى");
     router.refresh();
   }
 
@@ -68,8 +75,9 @@ export function OperationsContentItemActions({ id, status }: OperationsContentIt
           </Button>
         ) : null}
       </div>
-      <p className="text-[11px] font-semibold leading-5 text-slate-500">النشر اليدوي يحدّث الحالة فقط؛ لا يوجد إرسال أو نشر تلقائي.</p>
+      <p className="text-[11px] font-semibold leading-5 text-slate-500">النشر اليدوي يحدّث الحالة ويسجل ContentPublication فقط؛ لا يوجد إرسال أو نشر تلقائي.</p>
       {busy ? <p className="text-xs font-semibold text-slate-500">جاري التحديث...</p> : null}
+      {success ? <p className="text-xs font-semibold text-emerald-600">{success}</p> : null}
       {error ? <p className="text-xs font-semibold text-rose-600">{error}</p> : null}
     </div>
   );
