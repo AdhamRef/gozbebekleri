@@ -6,7 +6,7 @@ import {
   getDonorReactivationOverview,
   runDonorReactivationAction,
 } from "@/lib/operations/donor-reactivation/donor-reactivation-service";
-import { operationsNoStoreHeaders, requireOperationsApiAccess } from "../_auth";
+import { requireOperationsApiAccess } from "../_auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,8 +17,10 @@ const actionSchema = z.object({
   note: z.string().trim().max(500).optional().nullable(),
 });
 
-function jsonNoStore(body: unknown, init?: ResponseInit) {
-  return NextResponse.json(body, { ...init, headers: { ...operationsNoStoreHeaders, ...(init?.headers ?? {}) } });
+function jsonNoStore(body: unknown, init: ResponseInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set("Cache-Control", "no-store");
+  return NextResponse.json(body, { ...init, headers });
 }
 
 export async function GET() {
