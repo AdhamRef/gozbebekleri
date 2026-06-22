@@ -17,7 +17,16 @@ type OperationsContentWorkspaceProps = {
 };
 
 function searchableText(item: OperationsOverview["items"][number]) {
-  return [item.title, item.type, item.status, item.channel, item.due].join(" ").toLowerCase();
+  return [
+    item.title,
+    item.type,
+    item.status,
+    item.channel,
+    item.due,
+    item.publicationCount,
+    item.lastPublishedAt,
+    ...(item.publishedPlatforms ?? []),
+  ].join(" ").toLowerCase();
 }
 
 export function OperationsContentWorkspace({ filters, items, plans, boardColumns, statusClass }: OperationsContentWorkspaceProps) {

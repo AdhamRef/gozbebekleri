@@ -11,6 +11,13 @@ type OperationsContentKanbanProps = {
   statusClass: Record<string, string>;
 };
 
+function formatDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("ar-EG", { month: "short", day: "numeric", year: "numeric" });
+}
+
 export function OperationsContentKanban({ items, boardColumns, statusClass }: OperationsContentKanbanProps) {
   return (
     <Card>
@@ -33,19 +40,25 @@ export function OperationsContentKanban({ items, boardColumns, statusClass }: Op
                   <Badge variant="outline" className={statusClass[status]}>{columnItems.length}</Badge>
                 </div>
                 <div className="space-y-2">
-                  {columnItems.map((item) => (
-                    <div key={item.id || item.title} className="rounded-xl border bg-white p-3 shadow-sm">
-                      <div className="flex items-start justify-between gap-2">
-                        <h4 className="text-sm font-bold leading-6 text-slate-900">{item.title}</h4>
-                        <Badge variant="outline" className={statusClass[item.status]}>{item.type}</Badge>
+                  {columnItems.map((item) => {
+                    const lastPublishedAt = formatDate(item.lastPublishedAt);
+                    return (
+                      <div key={item.id || item.title} className="rounded-xl border bg-white p-3 shadow-sm">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="text-sm font-bold leading-6 text-slate-900">{item.title}</h4>
+                          <Badge variant="outline" className={statusClass[item.status]}>{item.type}</Badge>
+                        </div>
+                        <div className="mt-3 space-y-1 text-xs text-slate-500">
+                          <p>القناة: <b>{item.channel}</b></p>
+                          <p>الموعد: <b>{item.due}</b></p>
+                          {item.publicationCount ? (
+                            <p>النشر: <b>{item.publicationCount}</b> سجل · <b>{item.publishedPlatforms?.join(" / ") || "Manual"}</b>{lastPublishedAt ? ` · ${lastPublishedAt}` : ""}</p>
+                          ) : null}
+                        </div>
+                        <OperationsContentItemActions id={item.id} status={item.status} />
                       </div>
-                      <div className="mt-3 space-y-1 text-xs text-slate-500">
-                        <p>القناة: <b>{item.channel}</b></p>
-                        <p>الموعد: <b>{item.due}</b></p>
-                      </div>
-                      <OperationsContentItemActions id={item.id} status={item.status} />
-                    </div>
-                  ))}
+                    );
+                  })}
                   {columnItems.length === 0 ? (
                     <p className="rounded-xl border border-dashed bg-white p-3 text-center text-xs text-slate-400">لا توجد عناصر حالية</p>
                   ) : null}

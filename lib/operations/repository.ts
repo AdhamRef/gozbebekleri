@@ -1,6 +1,7 @@
 import { archiveAssets } from "./archive/archive-data";
 import type { ArchiveAsset } from "./archive/archive-types";
 import { readAuditBackedContentItems } from "./content-item-repository";
+import { readAuditBackedContentPublications } from "./content-publication-repository";
 import { createFallbackOperationsOverview } from "./mock-data";
 import { productionItems } from "./production/production-data";
 import type { ProductionItem } from "./production/production-types";
@@ -53,6 +54,32 @@ function auditBackedContentPersistence(count: number): OperationsPersistenceInfo
   };
 }
 
+function latestIso(values: Array<string | null>) {
+  const dates = values
+    .filter((value): value is string => Boolean(value))
+    .map((value) => new Date(value))
+    .filter((date) => !Number.isNaN(date.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime());
+  return dates[0]?.toISOString() ?? null;
+}
+
+async function attachPublicationMarkers(items: OperationsContentItem[]): Promise<OperationsContentItem[]> {
+  const publications = await readAuditBackedContentPublications();
+  if (publications.length === 0) return items;
+
+  return items.map((item) => {
+    if (!item.id) return item;
+    const itemPublications = publications.filter((publication) => publication.contentItemId === item.id);
+    if (itemPublications.length === 0) return item;
+    return {
+      ...item,
+      publicationCount: itemPublications.length,
+      lastPublishedAt: latestIso(itemPublications.map((publication) => publication.publishedAt)),
+      publishedPlatforms: [...new Set(itemPublications.map((publication) => publication.platform))],
+    };
+  });
+}
+
 export async function listScheduledContentItems(): Promise<OperationsRepositoryResult<ScheduledContentItem>> {
   return fromFoundation(scheduledContentItems, "ScheduledContentItem", "ContentSchedule");
 }
@@ -68,7 +95,7 @@ export async function listArchiveAssets(): Promise<OperationsRepositoryResult<Ar
 export async function listContentItems(): Promise<OperationsRepositoryResult<OperationsContentItem>> {
   const overview = createFallbackOperationsOverview();
   const auditItems = await readAuditBackedContentItems();
-  const items = auditItems.length > 0 ? [...auditItems, ...overview.items] : overview.items;
+  const items = await attachPublicationMarkers(auditItems.length > 0 ? [...auditItems, ...overview.items] : overview.items);
 
   if (auditItems.length > 0) {
     return {
@@ -77,7 +104,7 @@ export async function listContentItems(): Promise<OperationsRepositoryResult<Ope
     };
   }
 
-  return fromFoundation(overview.items, "OperationsContentItem", "ContentItem");
+  return fromFoundation(items, "OperationsContentItem", "ContentItem");
 }
 
 export async function listContentWorkflowTasks(): Promise<OperationsRepositoryResult<OperationsContentTask>> {
