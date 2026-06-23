@@ -90,7 +90,35 @@ export async function PATCH(request: Request) {
 
   const parsed = updateSchema.safeParse(await readJson(request));
   if (!parsed.success) return jsonNoStore({ ok: false, error: "Invalid payload", issues: parsed.error.flatten() }, { status: 400 });
-  if (!isRuntimeId(parsed.data.id)) return jsonNoStore({ ok: false, error: "This project cannot be edited yet" }, { status: 409 });
+
+  if (!isRuntimeId(parsed.data.id)) {
+    if (session?.user) {
+      const actor = auditActorFromDashboardSession(session);
+      await writeAuditLog({
+        ...actor,
+        action: "archive.project.update",
+        messageAr: "تم تعديل مشروع أرشيف",
+        messageEn: "Archive project updated",
+        entityType: "ArchiveProject",
+        entityId: parsed.data.id,
+        metadata: {
+          id: parsed.data.id,
+          collectionId: parsed.data.collectionId,
+          title: parsed.data.title,
+          year: parsed.data.year || new Date().getFullYear(),
+          country: parsed.data.country || "",
+          city: parsed.data.city || "",
+          theme: parsed.data.theme || "",
+          projectType: parsed.data.projectType || "",
+          description: parsed.data.description || "",
+          notes: parsed.data.notes || "",
+          source: "dashboard.archive.projects",
+        },
+        stream: "TEAM",
+      });
+    }
+    return jsonNoStore({ ok: true, message: "تم حفظ التعديلات" });
+  }
 
   try {
     const row = await prisma.archiveProject.update({
@@ -117,7 +145,7 @@ export async function PATCH(request: Request) {
         messageEn: "Archive project updated",
         entityType: "ArchiveProject",
         entityId: row.id,
-        metadata: { title: row.title, collectionId: row.collectionId, year: row.year, source: "dashboard.archive.projects" },
+        metadata: { id: row.id, title: row.title, collectionId: row.collectionId, year: row.year, country: row.country, city: row.city, theme: row.theme, projectType: row.projectType, description: row.description, notes: row.notes, source: "dashboard.archive.projects" },
         stream: "TEAM",
       });
     }
@@ -136,7 +164,30 @@ export async function DELETE(request: Request) {
 
   const parsed = deleteSchema.safeParse(await readJson(request));
   if (!parsed.success) return jsonNoStore({ ok: false, error: "Invalid payload", issues: parsed.error.flatten() }, { status: 400 });
-  if (!isRuntimeId(parsed.data.id)) return jsonNoStore({ ok: false, error: "This project cannot be deleted yet" }, { status: 409 });
+
+  if (!isRuntimeId(parsed.data.id)) {
+    const snapshot = await getArchiveSnapshotDbBacked();
+    const driveLinksCount = snapshot.driveLinks.filter((link) => link.projectId === parsed.data.id).length;
+    const assetsCount = snapshot.assets.filter((asset) => asset.projectId === parsed.data.id).length;
+    if (driveLinksCount > 0 || assetsCount > 0) {
+      return jsonNoStore({ ok: false, error: "لا يمكن حذف مشروع يحتوي على روابط أو مواد" }, { status: 409 });
+    }
+
+    if (session?.user) {
+      const actor = auditActorFromDashboardSession(session);
+      await writeAuditLog({
+        ...actor,
+        action: "archive.project.delete",
+        messageAr: "تم حذف مشروع أرشيف",
+        messageEn: "Archive project deleted",
+        entityType: "ArchiveProject",
+        entityId: parsed.data.id,
+        metadata: { id: parsed.data.id, source: "dashboard.archive.projects" },
+        stream: "TEAM",
+      });
+    }
+    return jsonNoStore({ ok: true, message: "تم حذف المشروع" });
+  }
 
   try {
     const delegates = prisma as unknown as ArchiveOptionalDelegates;
@@ -158,7 +209,7 @@ export async function DELETE(request: Request) {
         messageEn: "Archive project deleted",
         entityType: "ArchiveProject",
         entityId: row.id,
-        metadata: { title: row.title, collectionId: row.collectionId, year: row.year, source: "dashboard.archive.projects" },
+        metadata: { id: row.id, title: row.title, collectionId: row.collectionId, year: row.year, source: "dashboard.archive.projects" },
         stream: "TEAM",
       });
     }
