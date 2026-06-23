@@ -10,6 +10,13 @@ export const dynamic = "force-dynamic";
 
 const objectIdPattern = /^[a-f\d]{24}$/i;
 
+type CountByProjectDelegate = { count(args: { where: { projectId: string } }): Promise<number> };
+
+type ArchiveOptionalDelegates = {
+  archiveDriveLink?: CountByProjectDelegate;
+  archiveAsset?: CountByProjectDelegate;
+};
+
 const schema = z.object({
   collectionId: z.string().trim().optional(),
   title: z.string().trim().min(1).max(220),
@@ -132,9 +139,9 @@ export async function DELETE(request: Request) {
   if (!isRuntimeId(parsed.data.id)) return jsonNoStore({ ok: false, error: "This project cannot be deleted yet" }, { status: 409 });
 
   try {
-    const driveLinksDelegate = prisma as unknown as { archiveDriveLink?: { count(args: { where: { projectId: string } }): Promise<number> } };
-    const driveLinksCount = driveLinksDelegate.archiveDriveLink ? await driveLinksDelegate.archiveDriveLink.count({ where: { projectId: parsed.data.id } }) : 0;
-    const assetsCount = await prisma.archiveAsset.count({ where: { projectId: parsed.data.id } });
+    const delegates = prisma as unknown as ArchiveOptionalDelegates;
+    const driveLinksCount = delegates.archiveDriveLink ? await delegates.archiveDriveLink.count({ where: { projectId: parsed.data.id } }) : 0;
+    const assetsCount = delegates.archiveAsset ? await delegates.archiveAsset.count({ where: { projectId: parsed.data.id } }) : 0;
 
     if (driveLinksCount > 0 || assetsCount > 0) {
       return jsonNoStore({ ok: false, error: "لا يمكن حذف مشروع يحتوي على روابط أو مواد" }, { status: 409 });
