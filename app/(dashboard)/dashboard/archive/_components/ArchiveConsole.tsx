@@ -1,15 +1,17 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Archive, CheckCircle2, Database, FileText, FolderOpen, Image, Link2, ShieldCheck } from "lucide-react";
+import { Archive, CheckCircle2, Database, FileText, FolderOpen, Image, ShieldCheck } from "lucide-react";
 import type { ArchiveAsset, ArchiveCollection, ArchiveDriveLink, ArchiveProject, ArchiveSnapshot, ArchiveTabKey } from "@/lib/archive/archive-types";
 import { ArchiveAssetBrandAssetAction } from "./ArchiveAssetBrandAssetAction";
 import { ArchiveAssetContentItemAction } from "./ArchiveAssetContentItemAction";
 import { ArchiveAssetReviewActions } from "./ArchiveAssetReviewActions";
 import { ArchiveAssetTaskAction } from "./ArchiveAssetTaskAction";
 import { ArchiveCollectionCreatePanel } from "./ArchiveCollectionCreatePanel";
+import { ArchiveCollectionManageActions } from "./ArchiveCollectionManageActions";
 import { ArchiveDriveLinkActions } from "./ArchiveDriveLinkActions";
 import { ArchiveDriveLinkCreatePanel } from "./ArchiveDriveLinkCreatePanel";
 import { ArchiveProjectCreatePanel } from "./ArchiveProjectCreatePanel";
+import { ArchiveProjectManageActions } from "./ArchiveProjectManageActions";
 
 type Props = {
   activeTab: ArchiveTabKey;
@@ -87,8 +89,8 @@ function buildDashboardNotes(snapshot: ArchiveSnapshot) {
   const notes: string[] = [];
   if (snapshot.driveLinks.length === 0) notes.push("أضف رابط ملف واحد على الأقل لكل مشروع نشط.");
   if (snapshot.summary.pendingHumanReview > 0) notes.push("هناك مواد تحتاج مراجعة قبل اعتمادها للفريق.");
-  if (snapshot.summary.sensitiveAssets > 0) notes.push("بعض المواد تحتاج تعاملًا حساسًا قبل استخدامها." );
-  if (snapshot.summary.marketingReady > 0) notes.push("توجد مواد جاهزة للاستخدام التسويقي." );
+  if (snapshot.summary.sensitiveAssets > 0) notes.push("بعض المواد تحتاج تعاملًا حساسًا قبل استخدامها.");
+  if (snapshot.summary.marketingReady > 0) notes.push("توجد مواد جاهزة للاستخدام التسويقي.");
   return notes.slice(0, 3);
 }
 
@@ -142,6 +144,7 @@ function Collections({ snapshot }: { snapshot: ArchiveSnapshot }) {
             <Panel key={collection.id} title={collection.name} description={collection.type} compact>
               <p className="text-sm leading-6 text-slate-600">{collection.description}</p>
               <div className="mt-3 flex flex-wrap gap-2"><Badge>{collection.slug}</Badge><Badge>{collection.isActive ? "نشطة" : "متوقفة"}</Badge></div>
+              <ArchiveCollectionManageActions collection={collection} />
             </Panel>
           ))}
         </div>
@@ -171,6 +174,7 @@ function Projects({ projects, collections }: { projects: ArchiveProject[]; colle
                   <Badge>{project.projectType}</Badge>
                 </div>
                 <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-600">{project.notes}</p>
+                <ArchiveProjectManageActions project={project} collections={collections} />
               </Panel>
             );
           })}
@@ -205,7 +209,7 @@ function DriveLinks({ links, projects }: { links: ArchiveDriveLink[]; projects: 
                     <Badge>{link.totalVideos} فيديو</Badge>
                     <Badge>{link.totalOther} أخرى</Badge>
                   </div>
-                  {link.lastError && <p className="rounded-md bg-amber-50 p-3 text-amber-900">تعذر قراءة الرابط بالكامل.</p>}
+                  {link.lastError && <p className="rounded-md bg-slate-50 p-3 text-slate-700">تعذر قراءة الرابط بالكامل.</p>}
                   <ArchiveDriveLinkActions linkId={link.id} />
                 </div>
               </Panel>
@@ -230,7 +234,7 @@ function Assets({ assets, marketingOnly = false }: { assets: ArchiveAsset[]; mar
               <div className="flex h-32 items-center justify-center rounded-lg border bg-slate-50 text-center text-xs font-bold text-slate-500">معاينة</div>
               <div className="space-y-3 text-sm leading-6 text-slate-600">
                 <p>{asset.aiSummary || "بانتظار المراجعة."}</p>
-                {asset.aiWarnings && <p className="rounded-md bg-amber-50 p-3 text-amber-900">تحتاج مراجعة إضافية.</p>}
+                {asset.aiWarnings && <p className="rounded-md bg-slate-50 p-3 text-slate-700">تحتاج مراجعة إضافية.</p>}
                 <div className="flex flex-wrap gap-2">
                   <Badge>{asset.humanReviewStatus}</Badge><Badge>تسويق {asset.marketingScore}</Badge><Badge>جودة {asset.qualityScore}</Badge>
                   {asset.isSensitive && <Badge>حساس</Badge>}{asset.needsBlur && <Badge>يحتاج معالجة</Badge>}
@@ -296,11 +300,24 @@ function ArchiveAssistant({ snapshot }: { snapshot: ArchiveSnapshot }) {
         <InfoLine title="الفيديو" text="اختيار لقطات مناسبة عند توفر المواد." />
         <InfoLine title="التقارير" text="تلخيص يساعد فريق المشاريع على المتابعة." />
       </Panel>
-      <Panel title="خطة التطوير" description="عناصر يتم تفعيلها تدريجيًا داخل النظام.">
-        <div className="flex flex-wrap gap-2">{snapshot.persistence.nextModels.slice(0, 5).map((model) => <Badge key={model}>{model.replace("Archive", "")}</Badge>)}</div>
+      <Panel title="حالة الأقسام" description="ملخص للأقسام التي يتم تجهيزها داخل الأرشيف.">
+        <div className="flex flex-wrap gap-2">
+          {snapshot.persistence.nextModels.slice(0, 5).map((model) => <Badge key={model}>{sectionLabel(model)}</Badge>)}
+        </div>
       </Panel>
     </div>
   );
+}
+
+function sectionLabel(model: string) {
+  const labels: Record<string, string> = {
+    ArchiveCollection: "المجموعات",
+    ArchiveProject: "المشاريع",
+    ArchiveDriveLink: "روابط الملفات",
+    ArchiveAsset: "المواد",
+    ArchiveVideoFrame: "لقطات الفيديو",
+  };
+  return labels[model] ?? model;
 }
 
 function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
@@ -316,7 +333,7 @@ function InfoLine({ title, text }: { title: string; text: string }) {
 }
 
 function StateLine({ title, text }: { title: string; text: string }) {
-  return <div className="rounded-lg border bg-emerald-50 p-3"><div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-600" /><p className="font-black text-emerald-950">{title}</p></div><p className="mt-1 text-sm leading-6 text-emerald-800">{text}</p></div>;
+  return <div className="rounded-lg border bg-white p-3"><div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#025EB8]" /><p className="font-black text-slate-950">{title}</p></div><p className="mt-1 text-sm leading-6 text-slate-700">{text}</p></div>;
 }
 
 function Badge({ children }: { children: ReactNode }) {
