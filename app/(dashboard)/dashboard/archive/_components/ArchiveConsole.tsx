@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Archive, CheckCircle2, Database, FileText, FolderOpen, Image, ShieldCheck } from "lucide-react";
+import { Archive, CheckCircle2, Database, FolderOpen, Image, ShieldCheck } from "lucide-react";
 import type { ArchiveAsset, ArchiveCollection, ArchiveDriveLink, ArchiveProject, ArchiveSnapshot, ArchiveTabKey } from "@/lib/archive/archive-types";
 import { ArchiveAssetBrandAssetAction } from "./ArchiveAssetBrandAssetAction";
 import { ArchiveAssetContentItemAction } from "./ArchiveAssetContentItemAction";
@@ -169,9 +169,9 @@ function Projects({ projects, collections }: { projects: ArchiveProject[]; colle
                 <p className="text-sm leading-6 text-slate-600">{project.description}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Badge>{collection?.name ?? "بدون مجموعة"}</Badge>
-                  <Badge>{project.status}</Badge>
-                  <Badge>{project.documentationStatus}</Badge>
-                  <Badge>{project.marketingStatus}</Badge>
+                  <Badge>{projectStatusLabel(project.status)}</Badge>
+                  <Badge>{documentationStatusLabel(project.documentationStatus)}</Badge>
+                  <Badge>{marketingStatusLabel(project.marketingStatus)}</Badge>
                   <Badge>{project.projectType}</Badge>
                 </div>
                 <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-600">{project.notes}</p>
@@ -231,17 +231,22 @@ function Assets({ assets, marketingOnly = false }: { assets: ArchiveAsset[]; mar
         const contentItemBlockReason = getContentItemBlockReason(asset);
         const brandAssetBlockReason = getBrandAssetBlockReason(asset);
         return (
-          <Panel key={asset.id} title={asset.fileName} description={`${asset.fileType} / ${asset.recommendedUse}`} compact>
+          <Panel key={asset.id} title={asset.fileName} description={`${fileTypeLabel(asset.fileType)} / ${recommendedUseLabel(asset.recommendedUse)}`} compact>
             <div className="grid gap-4 md:grid-cols-[128px_1fr]">
               <div className="flex h-32 items-center justify-center rounded-lg border bg-slate-50 text-center text-xs font-bold text-slate-500">معاينة</div>
               <div className="space-y-3 text-sm leading-6 text-slate-600">
-                <p>{asset.aiSummary || "بانتظار المراجعة."}</p>
+                <p>{assetSummary(asset)}</p>
                 {asset.aiWarnings && <p className="rounded-md bg-slate-50 p-3 text-slate-700">تحتاج مراجعة إضافية.</p>}
                 <div className="flex flex-wrap gap-2">
-                  <Badge>{asset.humanReviewStatus}</Badge><Badge>تسويق {asset.marketingScore}</Badge><Badge>جودة {asset.qualityScore}</Badge>
-                  {asset.isSensitive && <Badge>حساس</Badge>}{asset.needsBlur && <Badge>يحتاج معالجة</Badge>}
+                  <Badge>{reviewStatusLabel(asset.humanReviewStatus)}</Badge>
+                  <Badge>تسويق {asset.marketingScore}</Badge>
+                  <Badge>جودة {asset.qualityScore}</Badge>
+                  {asset.marketingApproved && <Badge>معتمد للتسويق</Badge>}
+                  {asset.documentationApproved && <Badge>معتمد للتوثيق</Badge>}
+                  {asset.isSensitive && <Badge>حساس</Badge>}
+                  {asset.needsBlur && <Badge>يحتاج معالجة</Badge>}
                 </div>
-                <div className="flex flex-wrap gap-2">{asset.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
+                {asset.tags.length > 0 ? <div className="flex flex-wrap gap-2">{asset.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div> : null}
                 <ArchiveAssetReviewActions
                   assetId={asset.id}
                   fileName={asset.fileName}
@@ -263,22 +268,96 @@ function Assets({ assets, marketingOnly = false }: { assets: ArchiveAsset[]; mar
   );
 }
 
+function assetSummary(asset: ArchiveAsset) {
+  const text = asset.aiSummary?.trim();
+  if (!text) return "بانتظار مراجعة المادة.";
+  const internalTerms = ["foundation", "draft ai", "human review required", "external ai", "contract"];
+  return internalTerms.some((term) => text.toLowerCase().includes(term)) ? "بانتظار مراجعة المادة." : text;
+}
+
+function fileTypeLabel(value: ArchiveAsset["fileType"]) {
+  const labels: Record<ArchiveAsset["fileType"], string> = {
+    IMAGE: "صورة",
+    VIDEO: "فيديو",
+    DOCUMENT: "مستند",
+    FOLDER: "مجلد",
+    OTHER: "ملف آخر",
+  };
+  return labels[value] ?? value;
+}
+
+function recommendedUseLabel(value: ArchiveAsset["recommendedUse"]) {
+  const labels: Record<string, string> = {
+    ADS: "إعلانات",
+    SOCIAL_POST: "منشور",
+    REEL: "ريلز",
+    CAROUSEL: "كاروسيل",
+    REPORT: "تقرير",
+    SEO_ARTICLE: "مقال",
+    HERO: "واجهة رئيسية",
+    WHATSAPP: "واتساب",
+    DOCUMENTATION_ONLY: "توثيق فقط",
+    DO_NOT_USE: "لا يستخدم",
+  };
+  return labels[value] ?? value;
+}
+
+function reviewStatusLabel(value: ArchiveAsset["humanReviewStatus"]) {
+  const labels: Record<ArchiveAsset["humanReviewStatus"], string> = {
+    PENDING: "بانتظار المراجعة",
+    APPROVED: "معتمد",
+    REJECTED: "مرفوض",
+    DOCUMENTATION_ONLY: "للتوثيق فقط",
+  };
+  return labels[value] ?? value;
+}
+
+function projectStatusLabel(value: ArchiveProject["status"]) {
+  const labels: Record<ArchiveProject["status"], string> = {
+    PLANNED: "مخطط",
+    ACTIVE: "نشط",
+    COMPLETED: "مكتمل",
+    PAUSED: "متوقف",
+  };
+  return labels[value] ?? value;
+}
+
+function documentationStatusLabel(value: ArchiveProject["documentationStatus"]) {
+  const labels: Record<ArchiveProject["documentationStatus"], string> = {
+    NOT_STARTED: "توثيق غير مكتمل",
+    PARTIAL: "توثيق جزئي",
+    READY: "توثيق جاهز",
+    MISSING_PROOF: "ينقصه إثبات",
+  };
+  return labels[value] ?? value;
+}
+
+function marketingStatusLabel(value: ArchiveProject["marketingStatus"]) {
+  const labels: Record<ArchiveProject["marketingStatus"], string> = {
+    NOT_REVIEWED: "لم يراجع للتسويق",
+    NEEDS_REVIEW: "يحتاج مراجعة تسويقية",
+    READY: "جاهز للتسويق",
+    IN_USE: "قيد الاستخدام",
+  };
+  return labels[value] ?? value;
+}
+
 function getContentItemBlockReason(asset: ArchiveAsset) {
   if (asset.humanReviewStatus === "REJECTED" || asset.recommendedUse === "DO_NOT_USE") {
-    return "لا يمكن إنشاء عنصر محتوى من أصل مرفوض أو موسوم بعدم الاستخدام.";
+    return "لا يمكن إنشاء عنصر محتوى من مادة مرفوضة أو غير مناسبة للاستخدام.";
   }
   return null;
 }
 
 function getBrandAssetBlockReason(asset: ArchiveAsset) {
   if (asset.humanReviewStatus === "REJECTED" || asset.recommendedUse === "DO_NOT_USE") {
-    return "لا يمكن نقل أصل مرفوض إلى مركز الهوية.";
+    return "لا يمكن نقل مادة مرفوضة إلى مركز الهوية.";
   }
   if (asset.isSensitive || asset.needsBlur) {
-    return "الأصول الحساسة أو التي تحتاج معالجة لا تدخل مركز الهوية.";
+    return "المواد الحساسة أو التي تحتاج معالجة لا تدخل مركز الهوية.";
   }
   if (!asset.marketingApproved && !asset.documentationApproved) {
-    return "اعتمد الأصل للتسويق أو التوثيق أولًا.";
+    return "اعتمد المادة للتسويق أو التوثيق أولًا.";
   }
   return null;
 }
@@ -303,9 +382,7 @@ function ArchiveAssistant({ snapshot }: { snapshot: ArchiveSnapshot }) {
         <InfoLine title="التقارير" text="تلخيص يساعد فريق المشاريع على المتابعة." />
       </Panel>
       <Panel title="حالة الأقسام" description="ملخص للأقسام التي يتم تجهيزها داخل الأرشيف.">
-        <div className="flex flex-wrap gap-2">
-          {snapshot.persistence.nextModels.slice(0, 5).map((model) => <Badge key={model}>{sectionLabel(model)}</Badge>)}
-        </div>
+        <div className="flex flex-wrap gap-2">{snapshot.persistence.nextModels.slice(0, 5).map((model) => <Badge key={model}>{sectionLabel(model)}</Badge>)}</div>
       </Panel>
     </div>
   );
