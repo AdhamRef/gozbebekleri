@@ -112,6 +112,10 @@ type ArchiveDriveLinkAuditRow = {
   createdAt: Date;
 };
 
+type ArchiveEntityAuditRow = ArchiveDriveLinkAuditRow & {
+  action: string;
+};
+
 type ArchiveDriveLinkDelegate = {
   findMany(args: { orderBy: Array<Record<string, "asc" | "desc">> }): Promise<ArchiveDriveLinkRow[]>;
 };
@@ -212,6 +216,73 @@ function numberField(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+function booleanField(value: unknown) {
+  return typeof value === "boolean" ? value : null;
+}
+
+function auditEntityId(row: ArchiveEntityAuditRow) {
+  const metadata = metadataObject(row.metadata);
+  return row.entityId ?? stringField(metadata.id);
+}
+
+function applyCollectionAuditRows(items: ArchiveCollection[], rows: ArchiveEntityAuditRow[]) {
+  let next = [...items];
+  for (const row of rows) {
+    const id = auditEntityId(row);
+    if (!id) continue;
+    if (row.action === "archive.collection.delete") {
+      next = next.filter((collection) => collection.id !== id);
+      continue;
+    }
+    if (row.action !== "archive.collection.update") continue;
+    const metadata = metadataObject(row.metadata);
+    next = next.map((collection) => collection.id === id
+      ? {
+          ...collection,
+          name: stringField(metadata.name) ?? collection.name,
+          slug: stringField(metadata.slug) ?? collection.slug,
+          type: stringField(metadata.type) ?? collection.type,
+          description: stringField(metadata.description) ?? collection.description,
+          isActive: booleanField(metadata.isActive) ?? collection.isActive,
+        }
+      : collection);
+  }
+  return next;
+}
+
+function applyProjectAuditRows(items: ArchiveProject[], rows: ArchiveEntityAuditRow[], validCollectionIds: Set<string>, fallbackCollectionId: string) {
+  let next = [...items];
+  for (const row of rows) {
+    const id = auditEntityId(row);
+    if (!id) continue;
+    if (row.action === "archive.project.delete") {
+      next = next.filter((project) => project.id !== id);
+      continue;
+    }
+    if (row.action !== "archive.project.update") continue;
+    const metadata = metadataObject(row.metadata);
+    const collectionId = stringField(metadata.collectionId);
+    next = next.map((project) => project.id === id
+      ? {
+          ...project,
+          collectionId: collectionId && validCollectionIds.has(collectionId) ? collectionId : project.collectionId || fallbackCollectionId,
+          title: stringField(metadata.title) ?? project.title,
+          year: numberField(metadata.year) || project.year,
+          country: stringField(metadata.country) ?? project.country,
+          city: stringField(metadata.city) ?? project.city,
+          theme: stringField(metadata.theme) ?? project.theme,
+          projectType: stringField(metadata.projectType) ?? project.projectType,
+          description: stringField(metadata.description) ?? project.description,
+          notes: stringField(metadata.notes) ?? project.notes,
+          status: asProjectStatus(stringField(metadata.status) ?? project.status),
+          documentationStatus: asDocumentationStatus(stringField(metadata.documentationStatus) ?? project.documentationStatus),
+          marketingStatus: asMarketingStatus(stringField(metadata.marketingStatus) ?? project.marketingStatus),
+        }
+      : project);
+  }
+  return next;
+}
+
 function mapAuditDriveLink(
   row: ArchiveDriveLinkAuditRow,
   validProjectIds: Set<string>,
@@ -273,9 +344,21 @@ export async function getArchiveRepositorySnapshot(foundation: ArchiveFoundation
     const archiveDriveLinkDelegate = getArchiveDriveLinkDelegate();
     const archiveAssetDelegate = getArchiveAssetDelegate();
     const archiveVideoFrameDelegate = getArchiveVideoFrameDelegate();
-    const [collectionRows, projectRows, driveLinkRows, driveLinkAuditRows, assetRows, assetReviewOverrides, videoFrameRows] = await Promise.all([
+    const [collectionRows, projectRows, collectionAuditRows, projectAuditRows, driveLinkRows, driveLinkAuditRows, assetRows, assetReviewOverrides, videoFrameRows] = await Promise.all([
       prisma.archiveCollection.findMany({ orderBy: [{ order: "asc" }, { name: "asc" }] }),
       prisma.archiveProject.findMany({ orderBy: [{ year: "desc" }, { title: "asc" }] }),
+      prisma.auditLog.findMany({
+        where: { entityType: "ArchiveCollection", action: { in: ["archive.collection.update", "archive.collection.delete"] } },
+        orderBy: { createdAt: "asc" },
+        take: 500,
+        select: { id: true, entityId: true, action: true, metadata: true, createdAt: true },
+      }),
+      prisma.auditLog.findMany({
+        where: { entityType: "ArchiveProject", action: { in: ["archive.project.update", "archive.project.delete"] } },
+        orderBy: { createdAt: "asc" },
+        take: 500,
+        select: { id: true, entityId: true, action: true, metadata: true, createdAt: true },
+      }),
       archiveDriveLinkDelegate ? archiveDriveLinkDelegate.findMany({ orderBy: [{ title: "asc" }] }) : Promise.resolve([]),
       archiveDriveLinkDelegate
         ? Promise.resolve([])
@@ -293,6 +376,8 @@ export async function getArchiveRepositorySnapshot(foundation: ArchiveFoundation
     const hasDbArchiveData =
       collectionRows.length > 0 ||
       projectRows.length > 0 ||
+      collectionAuditRows.length > 0 ||
+      projectAuditRows.length > 0 ||
       driveLinkRows.length > 0 ||
       driveLinkAuditRows.length > 0 ||
       assetRows.length > 0 ||
@@ -303,7 +388,7 @@ export async function getArchiveRepositorySnapshot(foundation: ArchiveFoundation
       return fallback(foundation, "Archive runtime collections are empty; using foundation archive data.");
     }
 
-    const collections: ArchiveCollection[] = collectionRows.length > 0
+    const baseCollections: ArchiveCollection[] = collectionRows.length > 0
       ? collectionRows.map((collection) => ({
           id: collection.id,
           name: collection.name,
@@ -314,11 +399,12 @@ export async function getArchiveRepositorySnapshot(foundation: ArchiveFoundation
           isActive: collection.isActive,
         }))
       : foundation.collections;
+    const collections = applyCollectionAuditRows(baseCollections, collectionAuditRows);
 
     const validCollectionIds = new Set(collections.map((collection) => collection.id));
     const fallbackCollectionId = collections[0]?.id ?? foundation.collections[0]?.id ?? "archive_collection_unknown";
 
-    const projects: ArchiveProject[] = projectRows.length > 0
+    const baseProjects: ArchiveProject[] = projectRows.length > 0
       ? projectRows.map((project) => ({
           id: project.id,
           collectionId: project.collectionId && validCollectionIds.has(project.collectionId) ? project.collectionId : fallbackCollectionId,
@@ -339,6 +425,7 @@ export async function getArchiveRepositorySnapshot(foundation: ArchiveFoundation
           createdBy: project.createdBy ?? "archive-db",
         }))
       : foundation.projects;
+    const projects = applyProjectAuditRows(baseProjects, projectAuditRows, validCollectionIds, fallbackCollectionId);
 
     const validProjectIds = new Set(projects.map((project) => project.id));
     const fallbackProjectId = projects[0]?.id ?? foundation.projects[0]?.id ?? "archive_project_unknown";
