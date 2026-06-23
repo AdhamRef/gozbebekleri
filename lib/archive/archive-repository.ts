@@ -136,18 +136,7 @@ const syncStatuses: ArchiveDriveLink["syncStatus"][] = ["FOUNDATION", "READY_FOR
 const fileTypes: ArchiveAsset["fileType"][] = ["IMAGE", "VIDEO", "DOCUMENT", "FOLDER", "OTHER"];
 const aiStatuses: ArchiveAsset["aiStatus"][] = ["NOT_ANALYZED", "DRAFT_REVIEW_REQUIRED", "ANALYSIS_SKIPPED"];
 const reviewStatuses: ArchiveAsset["humanReviewStatus"][] = ["PENDING", "APPROVED", "REJECTED", "DOCUMENTATION_ONLY"];
-const recommendedUses: ArchiveRecommendedUse[] = [
-  "ADS",
-  "SOCIAL_POST",
-  "REEL",
-  "CAROUSEL",
-  "REPORT",
-  "SEO_ARTICLE",
-  "HERO",
-  "WHATSAPP",
-  "DOCUMENTATION_ONLY",
-  "DO_NOT_USE",
-];
+const recommendedUses: ArchiveRecommendedUse[] = ["ADS", "SOCIAL_POST", "REEL", "CAROUSEL", "REPORT", "SEO_ARTICLE", "HERO", "WHATSAPP", "DOCUMENTATION_ONLY", "DO_NOT_USE"];
 
 function toIso(value: Date | null | undefined) {
   return value ? value.toISOString() : null;
@@ -236,16 +225,7 @@ function applyCollectionAuditRows(items: ArchiveCollection[], rows: ArchiveEntit
     }
     if (row.action !== "archive.collection.update") continue;
     const metadata = metadataObject(row.metadata);
-    next = next.map((collection) => collection.id === id
-      ? {
-          ...collection,
-          name: stringField(metadata.name) ?? collection.name,
-          slug: stringField(metadata.slug) ?? collection.slug,
-          type: stringField(metadata.type) ?? collection.type,
-          description: stringField(metadata.description) ?? collection.description,
-          isActive: booleanField(metadata.isActive) ?? collection.isActive,
-        }
-      : collection);
+    next = next.map((collection) => collection.id === id ? { ...collection, name: stringField(metadata.name) ?? collection.name, slug: stringField(metadata.slug) ?? collection.slug, type: stringField(metadata.type) ?? collection.type, description: stringField(metadata.description) ?? collection.description, isActive: booleanField(metadata.isActive) ?? collection.isActive } : collection);
   }
   return next;
 }
@@ -262,83 +242,44 @@ function applyProjectAuditRows(items: ArchiveProject[], rows: ArchiveEntityAudit
     if (row.action !== "archive.project.update") continue;
     const metadata = metadataObject(row.metadata);
     const collectionId = stringField(metadata.collectionId);
-    next = next.map((project) => project.id === id
-      ? {
-          ...project,
-          collectionId: collectionId && validCollectionIds.has(collectionId) ? collectionId : project.collectionId || fallbackCollectionId,
-          title: stringField(metadata.title) ?? project.title,
-          year: numberField(metadata.year) || project.year,
-          country: stringField(metadata.country) ?? project.country,
-          city: stringField(metadata.city) ?? project.city,
-          theme: stringField(metadata.theme) ?? project.theme,
-          projectType: stringField(metadata.projectType) ?? project.projectType,
-          description: stringField(metadata.description) ?? project.description,
-          notes: stringField(metadata.notes) ?? project.notes,
-          status: asProjectStatus(stringField(metadata.status) ?? project.status),
-          documentationStatus: asDocumentationStatus(stringField(metadata.documentationStatus) ?? project.documentationStatus),
-          marketingStatus: asMarketingStatus(stringField(metadata.marketingStatus) ?? project.marketingStatus),
-        }
-      : project);
+    next = next.map((project) => project.id === id ? { ...project, collectionId: collectionId && validCollectionIds.has(collectionId) ? collectionId : project.collectionId || fallbackCollectionId, title: stringField(metadata.title) ?? project.title, year: numberField(metadata.year) || project.year, country: stringField(metadata.country) ?? project.country, city: stringField(metadata.city) ?? project.city, theme: stringField(metadata.theme) ?? project.theme, projectType: stringField(metadata.projectType) ?? project.projectType, description: stringField(metadata.description) ?? project.description, notes: stringField(metadata.notes) ?? project.notes, status: asProjectStatus(stringField(metadata.status) ?? project.status), documentationStatus: asDocumentationStatus(stringField(metadata.documentationStatus) ?? project.documentationStatus), marketingStatus: asMarketingStatus(stringField(metadata.marketingStatus) ?? project.marketingStatus) } : project);
   }
   return next;
 }
 
-function mapAuditDriveLink(
-  row: ArchiveDriveLinkAuditRow,
-  validProjectIds: Set<string>,
-  fallbackProjectId: string,
-): ArchiveDriveLink | null {
+function mapAuditDriveLink(row: ArchiveEntityAuditRow, validProjectIds: Set<string>, fallbackProjectId: string): ArchiveDriveLink | null {
   const metadata = metadataObject(row.metadata);
   const id = stringField(metadata.id) ?? row.entityId ?? row.id;
   const projectId = stringField(metadata.projectId);
   const title = stringField(metadata.title);
   const driveUrl = stringField(metadata.driveUrl);
-
   if (!title || !driveUrl) return null;
+  return { id, projectId: projectId && validProjectIds.has(projectId) ? projectId : fallbackProjectId, title, driveUrl, driveFolderId: stringField(metadata.driveFolderId), driveFileId: stringField(metadata.driveFileId), sharedDriveId: stringField(metadata.sharedDriveId), linkType: asLinkType(stringField(metadata.linkType)), syncStatus: asSyncStatus(stringField(metadata.syncStatus)), lastSyncedAt: stringField(metadata.lastSyncedAt), lastError: stringField(metadata.lastError), totalFiles: numberField(metadata.totalFiles), totalImages: numberField(metadata.totalImages), totalVideos: numberField(metadata.totalVideos), totalOther: numberField(metadata.totalOther) };
+}
 
-  return {
-    id,
-    projectId: projectId && validProjectIds.has(projectId) ? projectId : fallbackProjectId,
-    title,
-    driveUrl,
-    driveFolderId: stringField(metadata.driveFolderId),
-    driveFileId: stringField(metadata.driveFileId),
-    sharedDriveId: stringField(metadata.sharedDriveId),
-    linkType: asLinkType(stringField(metadata.linkType)),
-    syncStatus: asSyncStatus(stringField(metadata.syncStatus)),
-    lastSyncedAt: stringField(metadata.lastSyncedAt),
-    lastError: stringField(metadata.lastError),
-    totalFiles: numberField(metadata.totalFiles),
-    totalImages: numberField(metadata.totalImages),
-    totalVideos: numberField(metadata.totalVideos),
-    totalOther: numberField(metadata.totalOther),
-  };
+function applyDriveLinkAuditRows(items: ArchiveDriveLink[], rows: ArchiveEntityAuditRow[], validProjectIds: Set<string>, fallbackProjectId: string) {
+  let next = [...items];
+  for (const row of rows) {
+    const id = auditEntityId(row);
+    if (!id) continue;
+    if (row.action === "archive.drive-link.delete") {
+      next = next.filter((link) => link.id !== id);
+      continue;
+    }
+    if (row.action !== "archive.drive-link.update") continue;
+    const metadata = metadataObject(row.metadata);
+    const projectId = stringField(metadata.projectId);
+    next = next.map((link) => link.id === id ? { ...link, projectId: projectId && validProjectIds.has(projectId) ? projectId : fallbackProjectId, title: stringField(metadata.title) ?? link.title, driveUrl: stringField(metadata.driveUrl) ?? link.driveUrl, driveFolderId: stringField(metadata.driveFolderId), driveFileId: stringField(metadata.driveFileId), sharedDriveId: stringField(metadata.sharedDriveId), linkType: asLinkType(stringField(metadata.linkType) ?? link.linkType), syncStatus: asSyncStatus(stringField(metadata.syncStatus) ?? link.syncStatus), lastError: stringField(metadata.lastError) } : link);
+  }
+  return next;
 }
 
 function fallback(foundation: ArchiveFoundationData, reason: string): ArchiveRepositorySnapshot {
-  return {
-    mode: "foundation-fallback",
-    source: "foundation",
-    reason,
-    collections: foundation.collections,
-    projects: foundation.projects,
-    driveLinks: foundation.driveLinks,
-    assets: foundation.assets,
-    videoFrames: foundation.videoFrames,
-    dbCounts: {
-      collections: 0,
-      projects: 0,
-      driveLinks: 0,
-      assets: 0,
-      videoFrames: 0,
-    },
-  };
+  return { mode: "foundation-fallback", source: "foundation", reason, collections: foundation.collections, projects: foundation.projects, driveLinks: foundation.driveLinks, assets: foundation.assets, videoFrames: foundation.videoFrames, dbCounts: { collections: 0, projects: 0, driveLinks: 0, assets: 0, videoFrames: 0 } };
 }
 
 export async function getArchiveRepositorySnapshot(foundation: ArchiveFoundationData): Promise<ArchiveRepositorySnapshot> {
-  if (!process.env.DATABASE_URL) {
-    return fallback(foundation, "DATABASE_URL is not configured; using foundation archive collections, projects, links, assets, and frames.");
-  }
+  if (!process.env.DATABASE_URL) return fallback(foundation, "DATABASE_URL is not configured; using foundation archive collections, projects, links, assets, and frames.");
 
   try {
     const archiveDriveLinkDelegate = getArchiveDriveLinkDelegate();
@@ -347,200 +288,44 @@ export async function getArchiveRepositorySnapshot(foundation: ArchiveFoundation
     const [collectionRows, projectRows, collectionAuditRows, projectAuditRows, driveLinkRows, driveLinkAuditRows, assetRows, assetReviewOverrides, videoFrameRows] = await Promise.all([
       prisma.archiveCollection.findMany({ orderBy: [{ order: "asc" }, { name: "asc" }] }),
       prisma.archiveProject.findMany({ orderBy: [{ year: "desc" }, { title: "asc" }] }),
-      prisma.auditLog.findMany({
-        where: { entityType: "ArchiveCollection", action: { in: ["archive.collection.update", "archive.collection.delete"] } },
-        orderBy: { createdAt: "asc" },
-        take: 500,
-        select: { id: true, entityId: true, action: true, metadata: true, createdAt: true },
-      }),
-      prisma.auditLog.findMany({
-        where: { entityType: "ArchiveProject", action: { in: ["archive.project.update", "archive.project.delete"] } },
-        orderBy: { createdAt: "asc" },
-        take: 500,
-        select: { id: true, entityId: true, action: true, metadata: true, createdAt: true },
-      }),
+      prisma.auditLog.findMany({ where: { entityType: "ArchiveCollection", action: { in: ["archive.collection.update", "archive.collection.delete"] } }, orderBy: { createdAt: "asc" }, take: 500, select: { id: true, entityId: true, action: true, metadata: true, createdAt: true } }),
+      prisma.auditLog.findMany({ where: { entityType: "ArchiveProject", action: { in: ["archive.project.update", "archive.project.delete"] } }, orderBy: { createdAt: "asc" }, take: 500, select: { id: true, entityId: true, action: true, metadata: true, createdAt: true } }),
       archiveDriveLinkDelegate ? archiveDriveLinkDelegate.findMany({ orderBy: [{ title: "asc" }] }) : Promise.resolve([]),
-      archiveDriveLinkDelegate
-        ? Promise.resolve([])
-        : prisma.auditLog.findMany({
-            where: { entityType: "ArchiveDriveLink", action: "archive.drive-link.create" },
-            orderBy: { createdAt: "desc" },
-            take: 200,
-            select: { id: true, entityId: true, metadata: true, createdAt: true },
-          }),
+      prisma.auditLog.findMany({ where: { entityType: "ArchiveDriveLink", action: { in: ["archive.drive-link.create", "archive.drive-link.update", "archive.drive-link.delete"] } }, orderBy: { createdAt: "asc" }, take: 500, select: { id: true, entityId: true, action: true, metadata: true, createdAt: true } }),
       archiveAssetDelegate ? archiveAssetDelegate.findMany({ orderBy: [{ fileName: "asc" }] }) : Promise.resolve([]),
       readArchiveAssetReviewOverrides(),
       archiveVideoFrameDelegate ? archiveVideoFrameDelegate.findMany({ orderBy: [{ timestampSec: "asc" }] }) : Promise.resolve([]),
     ]);
 
-    const hasDbArchiveData =
-      collectionRows.length > 0 ||
-      projectRows.length > 0 ||
-      collectionAuditRows.length > 0 ||
-      projectAuditRows.length > 0 ||
-      driveLinkRows.length > 0 ||
-      driveLinkAuditRows.length > 0 ||
-      assetRows.length > 0 ||
-      assetReviewOverrides.length > 0 ||
-      videoFrameRows.length > 0;
+    const hasDbArchiveData = collectionRows.length > 0 || projectRows.length > 0 || collectionAuditRows.length > 0 || projectAuditRows.length > 0 || driveLinkRows.length > 0 || driveLinkAuditRows.length > 0 || assetRows.length > 0 || assetReviewOverrides.length > 0 || videoFrameRows.length > 0;
+    if (!hasDbArchiveData) return fallback(foundation, "Archive runtime collections are empty; using foundation archive data.");
 
-    if (!hasDbArchiveData) {
-      return fallback(foundation, "Archive runtime collections are empty; using foundation archive data.");
-    }
-
-    const baseCollections: ArchiveCollection[] = collectionRows.length > 0
-      ? collectionRows.map((collection) => ({
-          id: collection.id,
-          name: collection.name,
-          slug: collection.slug,
-          type: collection.type,
-          description: collection.description ?? "to be verified",
-          order: collection.order,
-          isActive: collection.isActive,
-        }))
-      : foundation.collections;
+    const baseCollections: ArchiveCollection[] = collectionRows.length > 0 ? collectionRows.map((collection) => ({ id: collection.id, name: collection.name, slug: collection.slug, type: collection.type, description: collection.description ?? "to be verified", order: collection.order, isActive: collection.isActive })) : foundation.collections;
     const collections = applyCollectionAuditRows(baseCollections, collectionAuditRows);
-
     const validCollectionIds = new Set(collections.map((collection) => collection.id));
     const fallbackCollectionId = collections[0]?.id ?? foundation.collections[0]?.id ?? "archive_collection_unknown";
 
-    const baseProjects: ArchiveProject[] = projectRows.length > 0
-      ? projectRows.map((project) => ({
-          id: project.id,
-          collectionId: project.collectionId && validCollectionIds.has(project.collectionId) ? project.collectionId : fallbackCollectionId,
-          title: project.title,
-          year: project.year ?? new Date().getFullYear(),
-          country: project.country ?? "to be verified",
-          city: project.city ?? "to be verified",
-          theme: project.theme ?? "general",
-          projectType: project.projectType ?? "General",
-          description: project.description ?? "to be verified",
-          implementationDate: toIso(project.implementationDate),
-          startDate: toIso(project.startDate),
-          endDate: toIso(project.endDate),
-          status: asProjectStatus(project.status),
-          documentationStatus: asDocumentationStatus(project.documentationStatus),
-          marketingStatus: asMarketingStatus(project.marketingStatus),
-          notes: project.notes ?? "to be verified",
-          createdBy: project.createdBy ?? "archive-db",
-        }))
-      : foundation.projects;
+    const baseProjects: ArchiveProject[] = projectRows.length > 0 ? projectRows.map((project) => ({ id: project.id, collectionId: project.collectionId && validCollectionIds.has(project.collectionId) ? project.collectionId : fallbackCollectionId, title: project.title, year: project.year ?? new Date().getFullYear(), country: project.country ?? "to be verified", city: project.city ?? "to be verified", theme: project.theme ?? "general", projectType: project.projectType ?? "General", description: project.description ?? "to be verified", implementationDate: toIso(project.implementationDate), startDate: toIso(project.startDate), endDate: toIso(project.endDate), status: asProjectStatus(project.status), documentationStatus: asDocumentationStatus(project.documentationStatus), marketingStatus: asMarketingStatus(project.marketingStatus), notes: project.notes ?? "to be verified", createdBy: project.createdBy ?? "archive-db" })) : foundation.projects;
     const projects = applyProjectAuditRows(baseProjects, projectAuditRows, validCollectionIds, fallbackCollectionId);
-
     const validProjectIds = new Set(projects.map((project) => project.id));
     const fallbackProjectId = projects[0]?.id ?? foundation.projects[0]?.id ?? "archive_project_unknown";
 
-    const delegatedDriveLinks = driveLinkRows.map((link): ArchiveDriveLink => ({
-      id: link.id,
-      projectId: validProjectIds.has(link.projectId) ? link.projectId : fallbackProjectId,
-      title: link.title,
-      driveUrl: link.driveUrl,
-      driveFolderId: link.driveFolderId,
-      driveFileId: link.driveFileId,
-      sharedDriveId: link.sharedDriveId,
-      linkType: asLinkType(link.linkType),
-      syncStatus: asSyncStatus(link.syncStatus),
-      lastSyncedAt: toIso(link.lastSyncedAt),
-      lastError: link.lastError,
-      totalFiles: link.totalFiles,
-      totalImages: link.totalImages,
-      totalVideos: link.totalVideos,
-      totalOther: link.totalOther,
-    }));
-    const auditDriveLinks = driveLinkAuditRows
-      .map((row) => mapAuditDriveLink(row, validProjectIds, fallbackProjectId))
-      .filter((link): link is ArchiveDriveLink => Boolean(link));
-    const driveLinks = delegatedDriveLinks.length > 0 ? delegatedDriveLinks : auditDriveLinks;
+    const delegatedDriveLinks = driveLinkRows.map((link): ArchiveDriveLink => ({ id: link.id, projectId: validProjectIds.has(link.projectId) ? link.projectId : fallbackProjectId, title: link.title, driveUrl: link.driveUrl, driveFolderId: link.driveFolderId, driveFileId: link.driveFileId, sharedDriveId: link.sharedDriveId, linkType: asLinkType(link.linkType), syncStatus: asSyncStatus(link.syncStatus), lastSyncedAt: toIso(link.lastSyncedAt), lastError: link.lastError, totalFiles: link.totalFiles, totalImages: link.totalImages, totalVideos: link.totalVideos, totalOther: link.totalOther }));
+    const auditCreatedDriveLinks = driveLinkAuditRows.filter((row) => row.action === "archive.drive-link.create").map((row) => mapAuditDriveLink(row, validProjectIds, fallbackProjectId)).filter((link): link is ArchiveDriveLink => Boolean(link));
+    const baseDriveLinks = delegatedDriveLinks.length > 0 ? delegatedDriveLinks : auditCreatedDriveLinks.length > 0 ? auditCreatedDriveLinks : foundation.driveLinks;
+    const driveLinks = applyDriveLinkAuditRows(baseDriveLinks, driveLinkAuditRows, validProjectIds, fallbackProjectId);
 
     const validDriveLinkIds = new Set(driveLinks.map((link) => link.id));
-    const persistedAssets = assetRows.map((asset): ArchiveAsset => ({
-      id: asset.id,
-      projectId: validProjectIds.has(asset.projectId) ? asset.projectId : fallbackProjectId,
-      driveLinkId: asset.driveLinkId && validDriveLinkIds.has(asset.driveLinkId) ? asset.driveLinkId : null,
-      googleFileId: asset.googleFileId,
-      googleFolderId: asset.googleFolderId,
-      fileName: asset.fileName,
-      mimeType: asset.mimeType,
-      fileType: asFileType(asset.fileType),
-      webViewLink: asset.webViewLink,
-      webContentLink: asset.webContentLink,
-      thumbnailLink: asset.thumbnailLink,
-      previewUrl: asset.previewUrl,
-      sizeBytes: asset.sizeBytes,
-      createdTime: toIso(asset.createdTime),
-      modifiedTime: toIso(asset.modifiedTime),
-      aiStatus: asAiStatus(asset.aiStatus),
-      humanReviewStatus: asReviewStatus(asset.humanReviewStatus),
-      marketingApproved: asset.marketingApproved,
-      documentationApproved: asset.documentationApproved,
-      tags: asset.tags,
-      aiSummary: asset.aiSummary,
-      aiWarnings: asset.aiWarnings,
-      recommendedUse: asRecommendedUse(asset.recommendedUse),
-      marketingScore: asset.marketingScore,
-      qualityScore: asset.qualityScore,
-      emotionScore: asset.emotionScore,
-      clarityScore: asset.clarityScore,
-      sensitivityScore: asset.sensitivityScore,
-      hasChildren: asset.hasChildren,
-      hasFaces: asset.hasFaces,
-      needsBlur: asset.needsBlur,
-      isSensitive: asset.isSensitive,
-      reviewedBy: asset.reviewedBy,
-      reviewedAt: toIso(asset.reviewedAt),
-      reviewerNote: asset.reviewerNote,
-    }));
-    const assets = applyArchiveAssetReviewOverrides(
-      persistedAssets.length > 0 ? persistedAssets : foundation.assets,
-      assetReviewOverrides,
-    );
+    const persistedAssets = assetRows.map((asset): ArchiveAsset => ({ id: asset.id, projectId: validProjectIds.has(asset.projectId) ? asset.projectId : fallbackProjectId, driveLinkId: asset.driveLinkId && validDriveLinkIds.has(asset.driveLinkId) ? asset.driveLinkId : null, googleFileId: asset.googleFileId, googleFolderId: asset.googleFolderId, fileName: asset.fileName, mimeType: asset.mimeType, fileType: asFileType(asset.fileType), webViewLink: asset.webViewLink, webContentLink: asset.webContentLink, thumbnailLink: asset.thumbnailLink, previewUrl: asset.previewUrl, sizeBytes: asset.sizeBytes, createdTime: toIso(asset.createdTime), modifiedTime: toIso(asset.modifiedTime), aiStatus: asAiStatus(asset.aiStatus), humanReviewStatus: asReviewStatus(asset.humanReviewStatus), marketingApproved: asset.marketingApproved, documentationApproved: asset.documentationApproved, tags: asset.tags, aiSummary: asset.aiSummary, aiWarnings: asset.aiWarnings, recommendedUse: asRecommendedUse(asset.recommendedUse), marketingScore: asset.marketingScore, qualityScore: asset.qualityScore, emotionScore: asset.emotionScore, clarityScore: asset.clarityScore, sensitivityScore: asset.sensitivityScore, hasChildren: asset.hasChildren, hasFaces: asset.hasFaces, needsBlur: asset.needsBlur, isSensitive: asset.isSensitive, reviewedBy: asset.reviewedBy, reviewedAt: toIso(asset.reviewedAt), reviewerNote: asset.reviewerNote }));
+    const assets = applyArchiveAssetReviewOverrides(persistedAssets.length > 0 ? persistedAssets : foundation.assets, assetReviewOverrides);
 
     const validAssetIds = new Set(assets.map((asset) => asset.id));
-    const videoFrames = videoFrameRows
-      .map((frame): ArchiveVideoFrame | null => {
-        if (!validAssetIds.has(frame.assetId)) return null;
-        return {
-          id: frame.id,
-          assetId: frame.assetId,
-          timestampSec: frame.timestampSec,
-          frameUrl: frame.frameUrl,
-          thumbnailUrl: frame.thumbnailUrl,
-          aiSummary: frame.aiSummary,
-          recommendedUse: asRecommendedUse(frame.recommendedUse),
-          marketingScore: frame.marketingScore,
-          tags: frame.tags,
-          needsBlur: frame.needsBlur,
-          isSensitive: frame.isSensitive,
-        };
-      })
-      .filter((frame): frame is ArchiveVideoFrame => Boolean(frame));
+    const videoFrames = videoFrameRows.map((frame): ArchiveVideoFrame | null => validAssetIds.has(frame.assetId) ? { id: frame.id, assetId: frame.assetId, timestampSec: frame.timestampSec, frameUrl: frame.frameUrl, thumbnailUrl: frame.thumbnailUrl, aiSummary: frame.aiSummary, recommendedUse: asRecommendedUse(frame.recommendedUse), marketingScore: frame.marketingScore, tags: frame.tags, needsBlur: frame.needsBlur, isSensitive: frame.isSensitive } : null).filter((frame): frame is ArchiveVideoFrame => Boolean(frame));
 
-    const availableOptionalModels = [
-      archiveDriveLinkDelegate ? "ArchiveDriveLink" : driveLinks.length > 0 ? "ArchiveDriveLink audit-backed records" : null,
-      archiveAssetDelegate ? "ArchiveAsset" : assetReviewOverrides.length > 0 ? "ArchiveAsset review audit-backed records" : null,
-      archiveVideoFrameDelegate ? "ArchiveVideoFrame" : null,
-    ].filter((model): model is string => Boolean(model));
-    const reason = availableOptionalModels.length > 0
-      ? `Archive repository can read ${availableOptionalModels.join(", ")}; Drive sync, file downloads, and AI analysis remain disabled.`
-      : "ArchiveCollection and ArchiveProject are read from Prisma; Drive links, assets, and video frames use foundation fallback until generated Prisma delegates exist.";
+    const availableOptionalModels = [archiveDriveLinkDelegate ? "ArchiveDriveLink" : driveLinks.length > 0 ? "ArchiveDriveLink audit-backed records" : null, archiveAssetDelegate ? "ArchiveAsset" : assetReviewOverrides.length > 0 ? "ArchiveAsset review audit-backed records" : null, archiveVideoFrameDelegate ? "ArchiveVideoFrame" : null].filter((model): model is string => Boolean(model));
+    const reason = availableOptionalModels.length > 0 ? `Archive repository can read ${availableOptionalModels.join(", ")}; Drive sync, file downloads, and AI analysis remain disabled.` : "ArchiveCollection and ArchiveProject are read from Prisma; Drive links, assets, and video frames use foundation fallback until generated Prisma delegates exist.";
 
-    return {
-      mode: "db-backed",
-      source: "prisma",
-      reason,
-      collections,
-      projects,
-      driveLinks: driveLinks.length > 0 ? driveLinks : foundation.driveLinks,
-      assets,
-      videoFrames: videoFrames.length > 0 ? videoFrames : foundation.videoFrames,
-      dbCounts: {
-        collections: collectionRows.length,
-        projects: projectRows.length,
-        driveLinks: driveLinkRows.length + auditDriveLinks.length,
-        assets: assetRows.length,
-        videoFrames: videoFrameRows.length,
-      },
-    };
+    return { mode: "db-backed", source: "prisma", reason, collections, projects, driveLinks, assets, videoFrames: videoFrames.length > 0 ? videoFrames : foundation.videoFrames, dbCounts: { collections: collectionRows.length, projects: projectRows.length, driveLinks: driveLinkRows.length + auditCreatedDriveLinks.length, assets: assetRows.length, videoFrames: videoFrameRows.length } };
   } catch (error) {
     console.error("Archive repository DB read failed", error);
     return fallback(foundation, "Archive repository DB read failed; using foundation archive data.");
