@@ -16,9 +16,9 @@ export default async function ArchiveDriveLinksPage() {
   const projectsWithoutDriveLinks = snapshot.projects.filter((project) => !linkedProjectIds.has(project.id));
   const readinessPercent = Math.round((readyLinks.length / Math.max(snapshot.driveLinks.length, 1)) * 100);
   const healthGates = [
-    { label: "ارتباط المشاريع", ok: orphanLinks.length === 0, value: orphanLinks.length === 0 ? "سليم" : `${orphanLinks.length} يحتاج مراجعة` },
-    { label: "قراءة الروابط", ok: readyLinks.length > 0 || snapshot.driveLinks.length === 0, value: `${readyLinks.length} جاهز` },
-    { label: "المراجعة", ok: snapshot.safety.humanApprovalRequired, value: "مطلوبة" },
+    { label: "ارتباط المشاريع", value: orphanLinks.length === 0 ? "سليم" : `${orphanLinks.length} يحتاج مراجعة` },
+    { label: "قراءة الروابط", value: `${readyLinks.length} جاهز` },
+    { label: "المراجعة", value: "مطلوبة" },
   ];
   const nextActions = [
     "إضافة رابط للمشاريع التي لا تملك ملفًا مرتبطًا.",
@@ -40,7 +40,7 @@ export default async function ArchiveDriveLinksPage() {
                     متابعة روابط ملفات المشاريع والتأكد من جاهزيتها للاستخدام داخل الأرشيف.
                   </p>
                 </div>
-                <div className="rounded-2xl border bg-[#FFFDF8] px-5 py-4 text-center shadow-inner lg:min-w-40">
+                <div className="rounded-2xl border bg-white px-5 py-4 text-center lg:min-w-40">
                   <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">جاهزية</p>
                   <p className="mt-1 text-4xl font-black text-slate-950">{readinessPercent}%</p>
                   <p className="text-xs font-bold text-slate-500">{readyLinks.length} من {snapshot.driveLinks.length} روابط</p>
@@ -51,7 +51,7 @@ export default async function ArchiveDriveLinksPage() {
                 <Metric label="الروابط" value={snapshot.driveLinks.length} hint="إجمالي محفوظ" />
                 <Metric label="جاهزة" value={readyLinks.length} hint="مرتبطة ومقروءة" />
                 <Metric label="المشاريع" value={linkedProjectIds.size} hint={`${snapshot.projects.length} مشروع`} />
-                <Metric label="تحتاج مراجعة" value={orphanLinks.length + unparsedLinks.length} hint="روابط غير مكتملة" tone={orphanLinks.length + unparsedLinks.length > 0 ? "warning" : "safe"} />
+                <Metric label="تحتاج مراجعة" value={orphanLinks.length + unparsedLinks.length} hint="روابط غير مكتملة" />
               </div>
             </div>
 
@@ -61,8 +61,8 @@ export default async function ArchiveDriveLinksPage() {
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <CompactFact label="مجلدات" value={folderLinks.length} />
                   <CompactFact label="ملفات" value={fileLinks.length} />
-                  <CompactFact label="غير مقروءة" value={unparsedLinks.length} tone={unparsedLinks.length ? "warning" : "safe"} />
-                  <CompactFact label="بلا مشروع" value={orphanLinks.length} tone={orphanLinks.length ? "warning" : "safe"} />
+                  <CompactFact label="غير مقروءة" value={unparsedLinks.length} />
+                  <CompactFact label="بلا مشروع" value={orphanLinks.length} />
                 </div>
               </div>
 
@@ -82,9 +82,9 @@ export default async function ArchiveDriveLinksPage() {
           </div>
 
           <div className="grid gap-3 border-t p-4 xl:grid-cols-3">
-            <IssueList title="روابط تحتاج مراجعة" emptyText="لا توجد روابط تحتاج مراجعة." items={unparsedLinks.slice(0, 4).map((link) => link.title)} tone="warning" />
-            <IssueList title="روابط جاهزة" emptyText="لا توجد روابط جاهزة بعد." items={readyLinks.slice(0, 4).map((link) => link.title)} tone="safe" />
-            <IssueList title="مشاريع بلا رابط" emptyText="كل المشاريع لديها رابط ملف." items={projectsWithoutDriveLinks.slice(0, 5).map((project) => project.title)} tone="warning" />
+            <IssueList title="روابط تحتاج مراجعة" emptyText="لا توجد روابط تحتاج مراجعة." items={unparsedLinks.slice(0, 4).map((link) => link.title)} />
+            <IssueList title="روابط جاهزة" emptyText="لا توجد روابط جاهزة بعد." items={readyLinks.slice(0, 4).map((link) => link.title)} />
+            <IssueList title="مشاريع بلا رابط" emptyText="كل المشاريع لديها رابط ملف." items={projectsWithoutDriveLinks.slice(0, 5).map((project) => project.title)} />
           </div>
         </div>
       </section>
@@ -93,15 +93,9 @@ export default async function ArchiveDriveLinksPage() {
   );
 }
 
-function Metric({ label, value, hint, tone = "neutral" }: { label: string; value: number; hint: string; tone?: "neutral" | "safe" | "warning" }) {
-  const toneClass = tone === "safe"
-    ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-    : tone === "warning"
-      ? "border-amber-200 bg-amber-50 text-amber-900"
-      : "border-slate-200 bg-white text-slate-900";
-
+function Metric({ label, value, hint }: { label: string; value: number; hint: string }) {
   return (
-    <div className={`rounded-xl border p-4 ${toneClass}`}>
+    <div className="rounded-xl border border-slate-200 bg-white p-4 text-slate-900">
       <p className="text-xs font-black uppercase tracking-[0.12em] opacity-60">{label}</p>
       <p className="mt-2 text-3xl font-black">{value}</p>
       <p className="mt-1 text-xs font-bold opacity-70">{hint}</p>
@@ -109,19 +103,18 @@ function Metric({ label, value, hint, tone = "neutral" }: { label: string; value
   );
 }
 
-function CompactFact({ label, value, tone = "neutral" }: { label: string; value: number | string; tone?: "neutral" | "safe" | "warning" }) {
-  const toneClass = tone === "safe" ? "text-emerald-700" : tone === "warning" ? "text-amber-700" : "text-slate-700";
+function CompactFact({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="rounded-lg border bg-white px-3 py-2">
       <p className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-400">{label}</p>
-      <p className={`mt-1 text-lg font-black ${toneClass}`}>{value}</p>
+      <p className="mt-1 text-lg font-black text-slate-700">{value}</p>
     </div>
   );
 }
 
-function HealthGate({ label, ok, value }: { label: string; ok: boolean; value: string }) {
+function HealthGate({ label, value }: { label: string; value: string }) {
   return (
-    <div className={`rounded-lg border px-3 py-2 text-sm font-bold ${ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+    <div className="rounded-lg border bg-white px-3 py-2 text-sm font-bold text-slate-700">
       <div className="flex items-center justify-between gap-3">
         <span>{label}</span>
         <span>{value}</span>
@@ -130,11 +123,10 @@ function HealthGate({ label, ok, value }: { label: string; ok: boolean; value: s
   );
 }
 
-function IssueList({ title, emptyText, items, tone }: { title: string; emptyText: string; items: string[]; tone: "safe" | "warning" }) {
-  const toneClass = tone === "safe" ? "border-emerald-100 bg-emerald-50 text-emerald-900" : "border-amber-100 bg-amber-50 text-amber-900";
+function IssueList({ title, emptyText, items }: { title: string; emptyText: string; items: string[] }) {
   return (
-    <div className={`rounded-xl border p-4 ${toneClass}`}>
-      <p className="font-black">{title}</p>
+    <div className="rounded-xl border bg-white p-4 text-slate-700">
+      <p className="font-black text-slate-950">{title}</p>
       {items.length === 0 ? (
         <p className="mt-2 text-sm font-semibold leading-6 opacity-75">{emptyText}</p>
       ) : (
