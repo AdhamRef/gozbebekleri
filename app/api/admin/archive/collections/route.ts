@@ -84,7 +84,30 @@ export async function PATCH(request: Request) {
 
   const parsed = updateSchema.safeParse(await readJson(request));
   if (!parsed.success) return jsonNoStore({ ok: false, error: "Invalid payload", issues: parsed.error.flatten() }, { status: 400 });
-  if (!isRuntimeId(parsed.data.id)) return jsonNoStore({ ok: false, error: "This collection cannot be edited yet" }, { status: 409 });
+
+  if (!isRuntimeId(parsed.data.id)) {
+    if (session?.user) {
+      const actor = auditActorFromDashboardSession(session);
+      await writeAuditLog({
+        ...actor,
+        action: "archive.collection.update",
+        messageAr: "تم تعديل مجموعة أرشيف",
+        messageEn: "Archive collection updated",
+        entityType: "ArchiveCollection",
+        entityId: parsed.data.id,
+        metadata: {
+          id: parsed.data.id,
+          name: parsed.data.name,
+          slug: parsed.data.slug ? slugify(parsed.data.slug) : slugify(parsed.data.name),
+          type: parsed.data.type || "GENERAL",
+          description: parsed.data.description || "",
+          source: "dashboard.archive.collections",
+        },
+        stream: "TEAM",
+      });
+    }
+    return jsonNoStore({ ok: true, message: "تم حفظ التعديلات" });
+  }
 
   try {
     const row = await prisma.archiveCollection.update({
@@ -106,7 +129,7 @@ export async function PATCH(request: Request) {
         messageEn: "Archive collection updated",
         entityType: "ArchiveCollection",
         entityId: row.id,
-        metadata: { name: row.name, slug: row.slug, type: row.type, source: "dashboard.archive.collections" },
+        metadata: { id: row.id, name: row.name, slug: row.slug, type: row.type, description: row.description, source: "dashboard.archive.collections" },
         stream: "TEAM",
       });
     }
@@ -125,7 +148,27 @@ export async function DELETE(request: Request) {
 
   const parsed = deleteSchema.safeParse(await readJson(request));
   if (!parsed.success) return jsonNoStore({ ok: false, error: "Invalid payload", issues: parsed.error.flatten() }, { status: 400 });
-  if (!isRuntimeId(parsed.data.id)) return jsonNoStore({ ok: false, error: "This collection cannot be deleted yet" }, { status: 409 });
+
+  if (!isRuntimeId(parsed.data.id)) {
+    const snapshot = await getArchiveSnapshotDbBacked();
+    const projectsCount = snapshot.projects.filter((project) => project.collectionId === parsed.data.id).length;
+    if (projectsCount > 0) return jsonNoStore({ ok: false, error: "لا يمكن حذف مجموعة تحتوي على مشاريع" }, { status: 409 });
+
+    if (session?.user) {
+      const actor = auditActorFromDashboardSession(session);
+      await writeAuditLog({
+        ...actor,
+        action: "archive.collection.delete",
+        messageAr: "تم حذف مجموعة أرشيف",
+        messageEn: "Archive collection deleted",
+        entityType: "ArchiveCollection",
+        entityId: parsed.data.id,
+        metadata: { id: parsed.data.id, source: "dashboard.archive.collections" },
+        stream: "TEAM",
+      });
+    }
+    return jsonNoStore({ ok: true, message: "تم حذف المجموعة" });
+  }
 
   try {
     const projectsCount = await prisma.archiveProject.count({ where: { collectionId: parsed.data.id } });
@@ -142,7 +185,7 @@ export async function DELETE(request: Request) {
         messageEn: "Archive collection deleted",
         entityType: "ArchiveCollection",
         entityId: row.id,
-        metadata: { name: row.name, slug: row.slug, source: "dashboard.archive.collections" },
+        metadata: { id: row.id, name: row.name, slug: row.slug, source: "dashboard.archive.collections" },
         stream: "TEAM",
       });
     }
