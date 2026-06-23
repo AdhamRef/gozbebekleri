@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { Edit3, Loader2, Save, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -96,6 +97,6 @@ export function ArchiveCollectionManageActions({ collection }: Props) {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="grid gap-1 text-xs font-bold text-slate-600">{label}{children}</label>;
 }
