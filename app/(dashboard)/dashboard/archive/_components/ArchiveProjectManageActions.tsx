@@ -27,10 +27,8 @@ export function ArchiveProjectManageActions({ project, collections }: Props) {
   const [description, setDescription] = useState(project.description || "");
   const [notes, setNotes] = useState(project.notes || "");
 
-  if (!editable) return null;
-
   async function saveChanges() {
-    if (busy || !title.trim()) return;
+    if (!editable || busy || !title.trim()) return;
     const parsedYear = Number(year);
     if (!Number.isInteger(parsedYear)) {
       setFeedback({ tone: "error", message: "السنة غير صحيحة" });
@@ -55,7 +53,7 @@ export function ArchiveProjectManageActions({ project, collections }: Props) {
   }
 
   async function removeItem() {
-    if (busy || !window.confirm("متأكد؟")) return;
+    if (!editable || busy || !window.confirm("متأكد؟")) return;
     setBusy(true);
     setFeedback(null);
     const response = await fetch("/api/admin/archive/projects", {
@@ -74,7 +72,7 @@ export function ArchiveProjectManageActions({ project, collections }: Props) {
 
   return (
     <div className="mt-4 rounded-lg border bg-white p-3">
-      {editing ? (
+      {editing && editable ? (
         <div className="grid gap-3">
           <div className="grid gap-3 md:grid-cols-3">
             <select value={collectionId} onChange={(event) => setCollectionId(event.target.value)} className="h-9 rounded-md border px-3 text-sm outline-none focus:border-[#025EB8]">
@@ -106,8 +104,8 @@ export function ArchiveProjectManageActions({ project, collections }: Props) {
         </div>
       ) : (
         <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={() => setEditing(true)} className="gap-2 font-bold"><Edit3 className="h-4 w-4" /> تعديل</Button>
-          <Button type="button" size="sm" variant="outline" onClick={removeItem} disabled={busy} className="gap-2 font-bold text-rose-700"><Trash2 className="h-4 w-4" /> حذف</Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => setEditing(true)} disabled={!editable} className="gap-2 font-bold"><Edit3 className="h-4 w-4" /> تعديل</Button>
+          <Button type="button" size="sm" variant="outline" onClick={removeItem} disabled={!editable || busy} className="gap-2 font-bold text-rose-700 disabled:text-slate-400"><Trash2 className="h-4 w-4" /> حذف</Button>
         </div>
       )}
       {feedback ? <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{feedback.message}</p> : null}
