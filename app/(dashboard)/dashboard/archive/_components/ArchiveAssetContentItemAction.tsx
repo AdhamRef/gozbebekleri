@@ -25,7 +25,7 @@ export function ArchiveAssetContentItemAction({ assetId, fileName, disabled = fa
 
   async function createContentItem() {
     if (disabled || saving) return;
-    const confirmed = window.confirm(`إنشاء Content Item من أصل الأرشيف: ${fileName}? لن يتم النشر أو الإرسال تلقائيًا.`);
+    const confirmed = window.confirm(`إنشاء عنصر محتوى من هذه المادة: ${fileName}؟`);
     if (!confirmed) return;
 
     setSaving(true);
@@ -38,11 +38,11 @@ export function ArchiveAssetContentItemAction({ assetId, fileName, disabled = fa
     setSaving(false);
 
     if (!response.ok || !result?.ok) {
-      setFeedback({ tone: "error", message: result?.error || result?.message || "فشل إنشاء عنصر المحتوى" });
+      setFeedback({ tone: "error", message: result?.error || result?.message || "تعذر إنشاء عنصر المحتوى" });
       return;
     }
 
-    setFeedback({ tone: "success", message: result?.message || "تم إنشاء عنصر محتوى من الأصل" });
+    setFeedback({ tone: "success", message: result?.message || "تم إنشاء عنصر محتوى من المادة" });
     router.refresh();
   }
 
@@ -50,11 +50,11 @@ export function ArchiveAssetContentItemAction({ assetId, fileName, disabled = fa
     <div className="rounded-md border bg-slate-50 p-3">
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" size="sm" variant="outline" disabled={disabled || saving} onClick={createContentItem} className="gap-2 font-bold">
-          <Layers3 className="h-4 w-4" /> {saving ? "جاري الإنشاء" : "Create Content Item"}
+          <Layers3 className="h-4 w-4" /> {saving ? "جاري الإنشاء" : "إنشاء عنصر محتوى"}
         </Button>
         {feedback?.tone === "success" ? (
           <Link href="/dashboard/operations/content" className="inline-flex items-center gap-1 text-xs font-bold text-[#025EB8] hover:underline">
-            Open Operations Content <ExternalLink className="h-3.5 w-3.5" />
+            فتح إدارة المحتوى <ExternalLink className="h-3.5 w-3.5" />
           </Link>
         ) : null}
       </div>
