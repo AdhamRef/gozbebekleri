@@ -57,7 +57,7 @@ export function ArchiveAssetReviewActions({
     setPendingAction(null);
 
     if (!response.ok || !result?.ok) {
-      setFeedback({ tone: "error", message: result?.error || result?.message || "فشلت عملية مراجعة الأصل" });
+      setFeedback({ tone: "error", message: result?.error || result?.message || "تعذر حفظ المراجعة" });
       return;
     }
 
@@ -66,8 +66,8 @@ export function ArchiveAssetReviewActions({
   }
 
   const marketingConfirm = hasSafetyFlag
-    ? `هذا الأصل عليه علامة حساسية أو يحتاج blur: ${fileName}. هل تريد اعتماده للتسويق يدويًا؟`
-    : `اعتماد هذا الأصل للتسويق: ${fileName}?`;
+    ? `هذه المادة تحتاج مراجعة دقيقة: ${fileName}. هل تريد اعتمادها للتسويق؟`
+    : `اعتماد هذه المادة للتسويق: ${fileName}؟`;
 
   return (
     <div className="rounded-md border bg-white p-3">
@@ -77,34 +77,34 @@ export function ArchiveAssetReviewActions({
           size="sm"
           variant="outline"
           disabled={Boolean(pendingAction) || marketingApproved || humanReviewStatus === "REJECTED"}
-          onClick={() => submitReview({ key: "marketing", endpoint: "approve-marketing", successMessage: "تم اعتماد الأصل للتسويق", confirmMessage: marketingConfirm })}
+          onClick={() => submitReview({ key: "marketing", endpoint: "approve-marketing", successMessage: "تم اعتماد المادة للتسويق", confirmMessage: marketingConfirm })}
           className="gap-2 font-bold"
         >
-          <CheckCircle2 className="h-4 w-4" /> {pendingAction === "marketing" ? "جاري الاعتماد" : "Approve Marketing"}
+          <CheckCircle2 className="h-4 w-4" /> {pendingAction === "marketing" ? "جاري الاعتماد" : "اعتماد للتسويق"}
         </Button>
         <Button
           type="button"
           size="sm"
           variant="outline"
           disabled={Boolean(pendingAction) || documentationApproved || humanReviewStatus === "REJECTED"}
-          onClick={() => submitReview({ key: "documentation", endpoint: "approve-documentation", successMessage: "تم اعتماد الأصل للتوثيق" })}
+          onClick={() => submitReview({ key: "documentation", endpoint: "approve-documentation", successMessage: "تم اعتماد المادة للتوثيق" })}
           className="gap-2 font-bold"
         >
-          <ClipboardCheck className="h-4 w-4" /> {pendingAction === "documentation" ? "جاري الحفظ" : "Approve Documentation"}
+          <ClipboardCheck className="h-4 w-4" /> {pendingAction === "documentation" ? "جاري الحفظ" : "اعتماد للتوثيق"}
         </Button>
         <Button
           type="button"
           size="sm"
           variant="outline"
           disabled={Boolean(pendingAction) || humanReviewStatus === "REJECTED"}
-          onClick={() => submitReview({ key: "reject", endpoint: "reject", successMessage: "تم رفض الأصل", confirmMessage: `رفض هذا الأصل: ${fileName}?` })}
+          onClick={() => submitReview({ key: "reject", endpoint: "reject", successMessage: "تم رفض المادة", confirmMessage: `رفض هذه المادة: ${fileName}؟` })}
           className="gap-2 border-rose-200 font-bold text-rose-700 hover:bg-rose-50 hover:text-rose-800"
         >
-          <XCircle className="h-4 w-4" /> {pendingAction === "reject" ? "جاري الرفض" : "Reject"}
+          <XCircle className="h-4 w-4" /> {pendingAction === "reject" ? "جاري الرفض" : "رفض"}
         </Button>
       </div>
       <p className="mt-2 text-xs font-semibold text-slate-500">الحالة الحالية: {statusLabel(humanReviewStatus, marketingApproved, documentationApproved)}</p>
-      {hasSafetyFlag ? <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">هذا الأصل يحتاج مراجعة بشرية دقيقة قبل استخدامه في التسويق.</p> : null}
+      {hasSafetyFlag ? <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">هذه المادة تحتاج مراجعة بشرية دقيقة قبل استخدامها.</p> : null}
       {feedback ? (
         <p className={`mt-2 rounded-md border px-3 py-2 text-xs font-semibold ${feedback.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}>
           {feedback.message}
