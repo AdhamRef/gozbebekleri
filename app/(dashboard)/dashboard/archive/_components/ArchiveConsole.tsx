@@ -10,6 +10,7 @@ import { ArchiveCollectionCreatePanel } from "./ArchiveCollectionCreatePanel";
 import { ArchiveCollectionManageActions } from "./ArchiveCollectionManageActions";
 import { ArchiveDriveLinkActions } from "./ArchiveDriveLinkActions";
 import { ArchiveDriveLinkCreatePanel } from "./ArchiveDriveLinkCreatePanel";
+import { ArchiveDriveLinkManageActions } from "./ArchiveDriveLinkManageActions";
 import { ArchiveProjectCreatePanel } from "./ArchiveProjectCreatePanel";
 import { ArchiveProjectManageActions } from "./ArchiveProjectManageActions";
 
@@ -211,6 +212,7 @@ function DriveLinks({ links, projects }: { links: ArchiveDriveLink[]; projects: 
                   </div>
                   {link.lastError && <p className="rounded-md bg-slate-50 p-3 text-slate-700">تعذر قراءة الرابط بالكامل.</p>}
                   <ArchiveDriveLinkActions linkId={link.id} />
+                  <ArchiveDriveLinkManageActions link={link} projects={projects} />
                 </div>
               </Panel>
             );
