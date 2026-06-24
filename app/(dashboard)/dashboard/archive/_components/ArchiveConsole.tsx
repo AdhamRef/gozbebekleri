@@ -75,14 +75,14 @@ export function ArchiveConsole({ snapshot }: Props) {
         {explorer.length === 0 ? (
           <EmptyState title="لا توجد مجموعات بعد" text="أضف أول مجموعة مثل غزة، القدس، السودان، الوقف أو الزكاة." />
         ) : (
-          explorer.map((item) => <CollectionExplorer key={item.collection.id} item={item} collections={snapshot.collections} />)
+          explorer.map((item) => <CollectionExplorer key={item.collection.id} item={item} collections={snapshot.collections} projects={snapshot.projects} />)
         )}
       </section>
     </main>
   );
 }
 
-function CollectionExplorer({ item, collections }: { item: CollectionBundle; collections: ArchiveCollection[] }) {
+function CollectionExplorer({ item, collections, projects }: { item: CollectionBundle; collections: ArchiveCollection[]; projects: ArchiveProject[] }) {
   return (
     <section className="rounded-2xl border bg-white shadow-sm">
       <div className="border-b p-5">
@@ -100,14 +100,14 @@ function CollectionExplorer({ item, collections }: { item: CollectionBundle; col
         {item.years.length === 0 ? (
           <EmptyState title="لا توجد سنوات بعد" text="أضف مشروعًا لهذه المجموعة وحدد السنة ليظهر هنا." compact />
         ) : (
-          item.years.map((year) => <YearExplorer key={`${item.collection.id}-${year.year}`} year={year} collections={collections} />)
+          item.years.map((year) => <YearExplorer key={`${item.collection.id}-${year.year}`} year={year} collections={collections} projects={projects} />)
         )}
       </div>
     </section>
   );
 }
 
-function YearExplorer({ year, collections }: { year: YearBundle; collections: ArchiveCollection[] }) {
+function YearExplorer({ year, collections, projects }: { year: YearBundle; collections: ArchiveCollection[]; projects: ArchiveProject[] }) {
   return (
     <section className="rounded-xl border bg-slate-50/60">
       <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -118,13 +118,13 @@ function YearExplorer({ year, collections }: { year: YearBundle; collections: Ar
         <span className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-600 shadow-sm">{year.projects.length} مشروع</span>
       </div>
       <div className="grid gap-4 p-4 xl:grid-cols-2">
-        {year.projects.map((bundle) => <ProjectExplorer key={bundle.project.id} bundle={bundle} collections={collections} />)}
+        {year.projects.map((bundle) => <ProjectExplorer key={bundle.project.id} bundle={bundle} collections={collections} projects={projects} />)}
       </div>
     </section>
   );
 }
 
-function ProjectExplorer({ bundle, collections }: { bundle: ProjectBundle; collections: ArchiveCollection[] }) {
+function ProjectExplorer({ bundle, collections, projects }: { bundle: ProjectBundle; collections: ArchiveCollection[]; projects: ArchiveProject[] }) {
   const { project, links, assets } = bundle;
 
   return (
@@ -148,7 +148,7 @@ function ProjectExplorer({ bundle, collections }: { bundle: ProjectBundle; colle
             <p className="rounded-lg border border-dashed bg-slate-50 p-4 text-sm text-slate-600">لم تتم إضافة رابط لهذا المشروع بعد.</p>
           ) : (
             <div className="space-y-3">
-              {links.map((link) => <DriveLinkCard key={link.id} link={link} projects={collections.length ? undefined : undefined} />)}
+              {links.map((link) => <DriveLinkCard key={link.id} link={link} projects={projects} />)}
             </div>
           )}
         </div>
@@ -163,7 +163,7 @@ function ProjectExplorer({ bundle, collections }: { bundle: ProjectBundle; colle
   );
 }
 
-function DriveLinkCard({ link }: { link: ArchiveDriveLink; projects?: ArchiveProject[] }) {
+function DriveLinkCard({ link, projects }: { link: ArchiveDriveLink; projects: ArchiveProject[] }) {
   return (
     <div className="rounded-lg border bg-slate-50 p-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -179,7 +179,7 @@ function DriveLinkCard({ link }: { link: ArchiveDriveLink; projects?: ArchivePro
         </div>
         <div className="flex flex-wrap gap-2">
           <ArchiveDriveLinkActions linkId={link.id} />
-          <ArchiveDriveLinkManageActions link={link} projects={[]} />
+          <ArchiveDriveLinkManageActions link={link} projects={projects} />
         </div>
       </div>
     </div>
