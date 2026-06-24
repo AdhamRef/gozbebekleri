@@ -12,6 +12,7 @@ export type ArchiveProjectOptions = {
 
 export const ARCHIVE_PROJECT_OPTIONS_EVENT = "archive-project-options-updated";
 export const ARCHIVE_PROJECT_OPTIONS_STORAGE_KEY = "gozbebekleri.archive.project-options";
+export const ARCHIVE_PROJECT_OPTIONS_API = "/api/admin/archive/project-options";
 
 export const DEFAULT_ARCHIVE_PROJECT_OPTIONS: ArchiveProjectOptions = {
   years: Array.from({ length: 8 }, (_, index) => String(new Date().getFullYear() - index)),
@@ -22,19 +23,36 @@ export const DEFAULT_ARCHIVE_PROJECT_OPTIONS: ArchiveProjectOptions = {
 };
 
 export function useArchiveProjectOptions(defaultYear?: number) {
-  const [options, setOptions] = useState<ArchiveProjectOptions>(() => withDefaultYear(DEFAULT_ARCHIVE_PROJECT_OPTIONS, defaultYear));
+  const [options, setOptions] = useState<ArchiveProjectOptions>(() => withDefaultYear(readArchiveProjectOptions(), defaultYear));
 
   useEffect(() => {
-    function refresh() {
+    let cancelled = false;
+
+    function refreshLocal() {
       setOptions(withDefaultYear(readArchiveProjectOptions(), defaultYear));
     }
 
-    refresh();
-    window.addEventListener(ARCHIVE_PROJECT_OPTIONS_EVENT, refresh);
-    window.addEventListener("storage", refresh);
+    async function refreshShared() {
+      try {
+        const response = await fetch(ARCHIVE_PROJECT_OPTIONS_API, { cache: "no-store" });
+        const result = await response.json().catch(() => null);
+        if (!response.ok || !result?.ok || !result?.options || cancelled) return;
+        const next = normalizeOptions(result.options);
+        writeLocalOptions(next);
+        setOptions(withDefaultYear(next, defaultYear));
+      } catch {
+        refreshLocal();
+      }
+    }
+
+    refreshLocal();
+    void refreshShared();
+    window.addEventListener(ARCHIVE_PROJECT_OPTIONS_EVENT, refreshLocal);
+    window.addEventListener("storage", refreshLocal);
     return () => {
-      window.removeEventListener(ARCHIVE_PROJECT_OPTIONS_EVENT, refresh);
-      window.removeEventListener("storage", refresh);
+      cancelled = true;
+      window.removeEventListener(ARCHIVE_PROJECT_OPTIONS_EVENT, refreshLocal);
+      window.removeEventListener("storage", refreshLocal);
     };
   }, [defaultYear]);
 
@@ -53,14 +71,37 @@ export function readArchiveProjectOptions(): ArchiveProjectOptions {
   }
 }
 
-export function saveArchiveProjectOptions(options: ArchiveProjectOptions) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(ARCHIVE_PROJECT_OPTIONS_STORAGE_KEY, JSON.stringify(normalizeOptions(options)));
-  window.dispatchEvent(new Event(ARCHIVE_PROJECT_OPTIONS_EVENT));
+export async function saveArchiveProjectOptions(options: ArchiveProjectOptions) {
+  const normalized = normalizeOptions(options);
+  if (typeof window !== "undefined") {
+    writeLocalOptions(normalized);
+    window.dispatchEvent(new Event(ARCHIVE_PROJECT_OPTIONS_EVENT));
+  }
+
+  const response = await fetch(ARCHIVE_PROJECT_OPTIONS_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(normalized),
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok || !result?.ok) {
+    throw new Error(result?.error || result?.message || "تعذر حفظ خيارات الأرشيف");
+  }
+
+  const saved = normalizeOptions(result.options ?? normalized);
+  if (typeof window !== "undefined") {
+    writeLocalOptions(saved);
+    window.dispatchEvent(new Event(ARCHIVE_PROJECT_OPTIONS_EVENT));
+  }
+  return saved;
 }
 
 export function withSelectedOption(options: string[], selected?: string | null) {
   return unique([selected ?? "", ...options]);
+}
+
+function writeLocalOptions(options: ArchiveProjectOptions) {
+  window.localStorage.setItem(ARCHIVE_PROJECT_OPTIONS_STORAGE_KEY, JSON.stringify(normalizeOptions(options)));
 }
 
 function withDefaultYear(options: ArchiveProjectOptions, defaultYear?: number): ArchiveProjectOptions {
