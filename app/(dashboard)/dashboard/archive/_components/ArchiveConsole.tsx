@@ -53,7 +53,7 @@ export function ArchiveConsole({ snapshot, selection }: Props) {
       ) : activeProject ? (
         <ProjectDetail bundle={activeProject.bundle} collections={snapshot.collections} projects={snapshot.projects} />
       ) : activeYear ? (
-        <YearDetail collection={activeCollection.collection} year={activeYear} collections={snapshot.collections} projects={snapshot.projects} />
+        <YearDetail collection={activeCollection.collection} year={activeYear} collections={snapshot.collections} />
       ) : (
         <CollectionDetail item={activeCollection} collections={snapshot.collections} />
       )}
@@ -86,23 +86,21 @@ function Hero({ snapshot, explorer }: { snapshot: ArchiveSnapshot; explorer: Col
 function RootExplorer({ snapshot, explorer }: { snapshot: ArchiveSnapshot; explorer: CollectionBundle[] }) {
   return (
     <div className="mt-4 space-y-4">
-      <section className="grid gap-3 xl:grid-cols-3">
+      <section className="grid gap-3 xl:grid-cols-[0.9fr_1.1fr]">
         <CompactPanel title="إضافة مجموعة" description="مجموعة رئيسية مثل غزة، القدس أو الوقف.">
           <ArchiveCollectionCreatePanel />
         </CompactPanel>
-        <ArchiveFileQuickPanel
-          title="إضافة ملفات مشاريع تسويقية"
-          description="PDF أو Excel مثل تقارير حملات أو خطط مشاريع."
-          category="MARKETING"
-        />
-        <ArchiveFileQuickPanel
-          title="إضافة ملفات رسمية"
-          description="عقود، أوراق المؤسسة، تراخيص أو ملفات رسمية."
-          category="OFFICIAL"
-        />
+        <Panel title="ملخص المواد" description="إجمالي المواد المفهرسة داخل المشاريع.">
+          <div className="grid gap-2 sm:grid-cols-4">
+            <SummaryCard icon={<Image />} title="صور" value={countAssets(snapshot.assets, "IMAGE")} />
+            <SummaryCard icon={<Video />} title="فيديوهات" value={countAssets(snapshot.assets, "VIDEO")} />
+            <SummaryCard icon={<FileText />} title="تقارير ومستندات" value={countAssets(snapshot.assets, "DOCUMENT")} />
+            <SummaryCard icon={<Database />} title="مواد أخرى" value={countOtherAssets(snapshot.assets)} />
+          </div>
+        </Panel>
       </section>
 
-      <Panel title="المجموعات" description="الصف الأول: المجموعات الرئيسية للأرشيف.">
+      <Panel title="المجموعات" description="اختر المجموعة الرئيسية للدخول إليها.">
         {explorer.length === 0 ? (
           <EmptyState title="لا توجد مجموعات بعد" text="أضف أول مجموعة للبدء في بناء الأرشيف." />
         ) : (
@@ -110,18 +108,6 @@ function RootExplorer({ snapshot, explorer }: { snapshot: ArchiveSnapshot; explo
             {explorer.map((item) => <CollectionCard key={item.collection.id} item={item} />)}
           </div>
         )}
-      </Panel>
-
-      <ArchiveFileRow title="ملفات المشاريع التسويقية" description="الصف الثاني: ملفات PDF وExcel المرتبطة بالتسويق والتقارير والخطط." items={marketingFilePlaceholders()} />
-      <ArchiveFileRow title="الأوراق الرسمية" description="الصف الثالث: عقود، أوراق مؤسسة، تراخيص ومستندات رسمية." items={officialFilePlaceholders()} />
-
-      <Panel title="ملخص المواد" description="إجمالي المواد المفهرسة داخل كل المشاريع.">
-        <div className="grid gap-2 sm:grid-cols-4">
-          <SummaryCard icon={<Image />} title="صور" value={countAssets(snapshot.assets, "IMAGE")} />
-          <SummaryCard icon={<Video />} title="فيديوهات" value={countAssets(snapshot.assets, "VIDEO")} />
-          <SummaryCard icon={<FileText />} title="تقارير ومستندات" value={countAssets(snapshot.assets, "DOCUMENT")} />
-          <SummaryCard icon={<Database />} title="مواد أخرى" value={countOtherAssets(snapshot.assets)} />
-        </div>
       </Panel>
     </div>
   );
@@ -141,7 +127,7 @@ function CollectionDetail({ item, collections }: { item: CollectionBundle; colle
         </div>
       </section>
 
-      <CompactPanel title="إضافة مشروع" description="نموذج سريع أعلى الصفحة.">
+      <CompactPanel title="إضافة مشروع" description="أضف مشروعًا داخل هذه المجموعة وحدد السنة المناسبة له.">
         <ArchiveProjectCreatePanel collections={collections} />
       </CompactPanel>
 
@@ -160,20 +146,20 @@ function CollectionDetail({ item, collections }: { item: CollectionBundle; colle
   );
 }
 
-function YearDetail({ collection, year, collections }: { collection: ArchiveCollection; year: YearBundle; collections: ArchiveCollection[]; projects: ArchiveProject[] }) {
+function YearDetail({ collection, year, collections }: { collection: ArchiveCollection; year: YearBundle; collections: ArchiveCollection[] }) {
   return (
     <div className="mt-4 space-y-4">
       <section className="rounded-xl border bg-white p-4 shadow-sm">
         <p className="text-xs font-bold text-slate-500">{collection.name}</p>
         <h2 className="mt-1 text-2xl font-black text-slate-950">{year.year}</h2>
-        <p className="mt-2 text-xs text-slate-600">المشاريع هنا تظهر في جدول حتى يكون التعديل والمتابعة أوضح.</p>
+        <p className="mt-2 text-xs text-slate-600">اختر المشروع الذي تريد فتح روابطه ومواده.</p>
       </section>
 
       <CompactPanel title="إضافة مشروع" description="أضف مشروعًا داخل نفس المجموعة والسنة.">
         <ArchiveProjectCreatePanel collections={collections} defaultYear={year.year} />
       </CompactPanel>
 
-      <Panel title="المشاريع" description="جدول مشاريع السنة المختارة.">
+      <Panel title="المشاريع" description="مشاريع السنة المختارة.">
         <ProjectTable collection={collection} year={year} collections={collections} />
       </Panel>
     </div>
@@ -288,57 +274,6 @@ function CollectionCard({ item }: { item: CollectionBundle }) {
         <ArchiveCollectionManageActions collection={item.collection} />
       </div>
     </article>
-  );
-}
-
-function ArchiveFileQuickPanel({ title, description, category }: { title: string; description: string; category: string }) {
-  return (
-    <section className="rounded-xl border bg-white p-3 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-black text-slate-950">{title}</h2>
-          <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
-        </div>
-        <FileText className="h-4 w-4 text-[#025EB8]" />
-      </div>
-      <div className="mt-3 grid gap-2">
-        <input placeholder="اسم الملف" className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]" />
-        <div className="grid grid-cols-[0.8fr_1.2fr_auto] gap-2">
-          <select defaultValue="PDF" className="h-8 rounded-md border bg-white px-2 text-xs outline-none focus:border-[#025EB8]">
-            <option value="PDF">PDF</option>
-            <option value="EXCEL">Excel</option>
-          </select>
-          <input dir="ltr" placeholder="https://drive.google.com/..." className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]" />
-          <button type="button" className="h-8 rounded-md border px-3 text-xs font-bold text-slate-700 hover:border-[#025EB8] hover:text-[#025EB8]">حفظ</button>
-        </div>
-        <p className="text-[11px] text-slate-400">{category === "MARKETING" ? "سيتم ربطها لاحقًا بملفات المشاريع التسويقية." : "سيتم ربطها لاحقًا بملفات المؤسسة الرسمية."}</p>
-      </div>
-    </section>
-  );
-}
-
-function ArchiveFileRow({ title, description, items }: { title: string; description: string; items: { title: string; type: string; count: number }[] }) {
-  return (
-    <Panel title={title} description={description}>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {items.map((item) => (
-          <article key={item.title} className="rounded-lg border bg-white p-3 shadow-sm">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-[11px] font-bold text-slate-500">{item.type}</p>
-                <h3 className="mt-1 text-sm font-black text-slate-950">{item.title}</h3>
-              </div>
-              <FileText className="h-4 w-4 text-[#025EB8]" />
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-              <SmallCounter label="ملفات" value={item.count} />
-              <SmallCounter label="روابط" value={item.count} />
-            </div>
-            <button type="button" className="mt-3 inline-flex h-8 items-center rounded-md border bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-[#025EB8] hover:text-[#025EB8]">فتح</button>
-          </article>
-        ))}
-      </div>
-    </Panel>
   );
 }
 
@@ -533,22 +468,6 @@ function archiveText(value?: string | null) {
 function cleanDriveUrl(value?: string | null) {
   if (!value || !/^https?:\/\//i.test(value)) return "لم يتم إدخال رابط صالح بعد";
   return value;
-}
-
-function marketingFilePlaceholders() {
-  return [
-    { title: "ملفات حملات PDF", type: "PDF", count: 0 },
-    { title: "جداول نتائج Excel", type: "Excel", count: 0 },
-    { title: "خطط مشاريع تسويقية", type: "PDF / Excel", count: 0 },
-  ];
-}
-
-function officialFilePlaceholders() {
-  return [
-    { title: "عقود وشراكات", type: "PDF", count: 0 },
-    { title: "أوراق المؤسسة", type: "PDF", count: 0 },
-    { title: "تراخيص وملفات قانونية", type: "PDF / Excel", count: 0 },
-  ];
 }
 
 function countYears(explorer: CollectionBundle[]) {
