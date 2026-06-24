@@ -63,16 +63,16 @@ export function ArchiveConsole({ snapshot, selection }: Props) {
 
 function Hero({ snapshot, explorer }: { snapshot: ArchiveSnapshot; explorer: CollectionBundle[] }) {
   return (
-    <section className="rounded-2xl border bg-white p-5 shadow-sm sm:p-6">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <section className="rounded-2xl border bg-white p-4 shadow-sm sm:p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.16em] text-[#025EB8]">Archive Explorer</p>
-          <h1 className="mt-2 text-2xl font-black sm:text-4xl">الأرشيف</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+          <h1 className="mt-1 text-2xl font-black sm:text-3xl">الأرشيف</h1>
+          <p className="mt-2 max-w-3xl text-xs leading-6 text-slate-600">
             تصفح المواد خطوة بخطوة: المجموعة، ثم السنة، ثم المشروع، ثم جدول المواد. رابط Google Drive يضاف داخل المشروع فقط.
           </p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-4 lg:min-w-[560px]">
+        <div className="grid gap-2 sm:grid-cols-4 lg:min-w-[520px]">
           <Metric icon={<FolderOpen />} label="المجموعات" value={snapshot.summary.collections} />
           <Metric icon={<CalendarDays />} label="السنوات" value={countYears(explorer)} />
           <Metric icon={<Archive />} label="المشاريع" value={snapshot.summary.projects} />
@@ -85,29 +85,43 @@ function Hero({ snapshot, explorer }: { snapshot: ArchiveSnapshot; explorer: Col
 
 function RootExplorer({ snapshot, explorer }: { snapshot: ArchiveSnapshot; explorer: CollectionBundle[] }) {
   return (
-    <div className="mt-5 space-y-5">
-      <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <Panel title="إضافة مجموعة" description="أضف مجموعة رئيسية مثل غزة، القدس، السودان، الوقف أو الزكاة.">
+    <div className="mt-4 space-y-4">
+      <section className="grid gap-3 xl:grid-cols-3">
+        <CompactPanel title="إضافة مجموعة" description="مجموعة رئيسية مثل غزة، القدس أو الوقف.">
           <ArchiveCollectionCreatePanel />
-        </Panel>
-        <Panel title="ملخص المواد" description="إجمالي المواد المفهرسة داخل كل المشاريع.">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <SummaryCard icon={<Image />} title="صور" value={countAssets(snapshot.assets, "IMAGE")} />
-            <SummaryCard icon={<Video />} title="فيديوهات" value={countAssets(snapshot.assets, "VIDEO")} />
-            <SummaryCard icon={<FileText />} title="تقارير ومستندات" value={countAssets(snapshot.assets, "DOCUMENT")} />
-            <SummaryCard icon={<Database />} title="مواد أخرى" value={countOtherAssets(snapshot.assets)} />
-          </div>
-        </Panel>
+        </CompactPanel>
+        <ArchiveFileQuickPanel
+          title="إضافة ملفات مشاريع تسويقية"
+          description="PDF أو Excel مثل تقارير حملات أو خطط مشاريع."
+          category="MARKETING"
+        />
+        <ArchiveFileQuickPanel
+          title="إضافة ملفات رسمية"
+          description="عقود، أوراق المؤسسة، تراخيص أو ملفات رسمية."
+          category="OFFICIAL"
+        />
       </section>
 
-      <Panel title="المجموعات" description="اختر المجموعة التي تريد الدخول إليها.">
+      <Panel title="المجموعات" description="الصف الأول: المجموعات الرئيسية للأرشيف.">
         {explorer.length === 0 ? (
           <EmptyState title="لا توجد مجموعات بعد" text="أضف أول مجموعة للبدء في بناء الأرشيف." />
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {explorer.map((item) => <CollectionCard key={item.collection.id} item={item} />)}
           </div>
         )}
+      </Panel>
+
+      <ArchiveFileRow title="ملفات المشاريع التسويقية" description="الصف الثاني: ملفات PDF وExcel المرتبطة بالتسويق والتقارير والخطط." items={marketingFilePlaceholders()} />
+      <ArchiveFileRow title="الأوراق الرسمية" description="الصف الثالث: عقود، أوراق مؤسسة، تراخيص ومستندات رسمية." items={officialFilePlaceholders()} />
+
+      <Panel title="ملخص المواد" description="إجمالي المواد المفهرسة داخل كل المشاريع.">
+        <div className="grid gap-2 sm:grid-cols-4">
+          <SummaryCard icon={<Image />} title="صور" value={countAssets(snapshot.assets, "IMAGE")} />
+          <SummaryCard icon={<Video />} title="فيديوهات" value={countAssets(snapshot.assets, "VIDEO")} />
+          <SummaryCard icon={<FileText />} title="تقارير ومستندات" value={countAssets(snapshot.assets, "DOCUMENT")} />
+          <SummaryCard icon={<Database />} title="مواد أخرى" value={countOtherAssets(snapshot.assets)} />
+        </div>
       </Panel>
     </div>
   );
@@ -115,29 +129,29 @@ function RootExplorer({ snapshot, explorer }: { snapshot: ArchiveSnapshot; explo
 
 function CollectionDetail({ item, collections }: { item: CollectionBundle; collections: ArchiveCollection[] }) {
   return (
-    <div className="mt-5 space-y-5">
-      <section className="rounded-2xl border bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="mt-4 space-y-4">
+      <section className="rounded-xl border bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs font-bold text-slate-500">مجموعة</p>
-            <h2 className="mt-1 text-3xl font-black text-slate-950">{item.collection.name}</h2>
-            {archiveText(item.collection.description) ? <p className="mt-2 text-sm leading-7 text-slate-600">{archiveText(item.collection.description)}</p> : null}
+            <h2 className="mt-1 text-2xl font-black text-slate-950">{item.collection.name}</h2>
+            {archiveText(item.collection.description) ? <p className="mt-2 text-xs leading-6 text-slate-600">{archiveText(item.collection.description)}</p> : null}
           </div>
           <ArchiveCollectionManageActions collection={item.collection} />
         </div>
       </section>
 
-      <Panel title="إضافة مشروع" description="أضف مشروعًا داخل هذه المجموعة وحدد السنة المناسبة له.">
+      <CompactPanel title="إضافة مشروع" description="نموذج سريع أعلى الصفحة.">
         <ArchiveProjectCreatePanel collections={collections} />
-      </Panel>
+      </CompactPanel>
 
       <Panel title="السنوات" description="اختر السنة التي تريد عرض مشاريعها.">
-        <div className="grid gap-3 sm:grid-cols-4 xl:grid-cols-6">
+        <div className="grid gap-2 sm:grid-cols-4 xl:grid-cols-6">
           {yearOptions(item).map((year) => (
-            <Link key={year} href={archiveHref({ collectionId: item.collection.id, year })} className="rounded-xl border bg-slate-50 p-4 text-center transition hover:border-[#025EB8] hover:bg-white">
-              <p className="text-xs font-bold text-slate-500">السنة</p>
-              <p className="mt-1 text-2xl font-black text-slate-950">{year}</p>
-              <p className="mt-1 text-xs text-slate-500">{item.years.find((itemYear) => itemYear.year === year)?.projects.length ?? 0} مشروع</p>
+            <Link key={year} href={archiveHref({ collectionId: item.collection.id, year })} className="rounded-lg border bg-slate-50 p-3 text-center transition hover:border-[#025EB8] hover:bg-white">
+              <p className="text-[11px] font-bold text-slate-500">السنة</p>
+              <p className="mt-1 text-xl font-black text-slate-950">{year}</p>
+              <p className="mt-1 text-[11px] text-slate-500">{item.years.find((itemYear) => itemYear.year === year)?.projects.length ?? 0} مشروع</p>
             </Link>
           ))}
         </div>
@@ -146,27 +160,21 @@ function CollectionDetail({ item, collections }: { item: CollectionBundle; colle
   );
 }
 
-function YearDetail({ collection, year, collections, projects }: { collection: ArchiveCollection; year: YearBundle; collections: ArchiveCollection[]; projects: ArchiveProject[] }) {
+function YearDetail({ collection, year, collections }: { collection: ArchiveCollection; year: YearBundle; collections: ArchiveCollection[]; projects: ArchiveProject[] }) {
   return (
-    <div className="mt-5 space-y-5">
-      <section className="rounded-2xl border bg-white p-5 shadow-sm">
+    <div className="mt-4 space-y-4">
+      <section className="rounded-xl border bg-white p-4 shadow-sm">
         <p className="text-xs font-bold text-slate-500">{collection.name}</p>
-        <h2 className="mt-1 text-3xl font-black text-slate-950">{year.year}</h2>
-        <p className="mt-2 text-sm text-slate-600">اختر المشروع الذي تريد فتح روابطه ومواده.</p>
+        <h2 className="mt-1 text-2xl font-black text-slate-950">{year.year}</h2>
+        <p className="mt-2 text-xs text-slate-600">المشاريع هنا تظهر في جدول حتى يكون التعديل والمتابعة أوضح.</p>
       </section>
 
-      <Panel title="إضافة مشروع" description="يمكنك إضافة مشروع آخر داخل نفس المجموعة والسنة.">
-        <ArchiveProjectCreatePanel collections={collections} />
-      </Panel>
+      <CompactPanel title="إضافة مشروع" description="أضف مشروعًا داخل نفس المجموعة والسنة.">
+        <ArchiveProjectCreatePanel collections={collections} defaultYear={year.year} />
+      </CompactPanel>
 
-      <Panel title="المشاريع" description="اضغط فتح للدخول إلى المشروع ورؤية روابط التوثيق والمواد.">
-        {year.projects.length === 0 ? (
-          <EmptyState title="لا توجد مشاريع" text="لم يتم إنشاء مشاريع في هذه السنة بعد. أضف أول مشروع من النموذج بالأعلى." compact />
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {year.projects.map((bundle) => <ProjectCard key={bundle.project.id} bundle={bundle} collection={collection} collections={collections} />)}
-          </div>
-        )}
+      <Panel title="المشاريع" description="جدول مشاريع السنة المختارة.">
+        <ProjectTable collection={collection} year={year} collections={collections} />
       </Panel>
     </div>
   );
@@ -176,29 +184,29 @@ function ProjectDetail({ bundle, collections, projects }: { bundle: ProjectBundl
   const { project, links, assets } = bundle;
 
   return (
-    <div className="mt-5 space-y-5">
-      <section className="rounded-2xl border bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="mt-4 space-y-4">
+      <section className="rounded-xl border bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs font-bold text-slate-500">مشروع</p>
-            <h2 className="mt-1 text-3xl font-black text-slate-950">{project.title}</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-600">{projectMeta(project)}</p>
-            {archiveText(project.description) ? <p className="mt-3 text-sm leading-7 text-slate-600">{archiveText(project.description)}</p> : null}
+            <h2 className="mt-1 text-2xl font-black text-slate-950">{project.title}</h2>
+            <p className="mt-1 text-xs leading-6 text-slate-600">{projectMeta(project)}</p>
+            {archiveText(project.description) ? <p className="mt-2 text-xs leading-6 text-slate-600">{archiveText(project.description)}</p> : null}
           </div>
           <ArchiveProjectManageActions project={project} collections={collections} />
         </div>
       </section>
 
-      <Panel title="إضافة رابط توثيق" description="ضع رابط Google Drive الخاص بهذا المشروع فقط ليتم فهرسة مواده لاحقًا.">
+      <CompactPanel title="إضافة رابط توثيق" description="ضع رابط Google Drive الخاص بهذا المشروع فقط.">
         <ArchiveDriveLinkCreatePanel projects={[project]} />
-      </Panel>
+      </CompactPanel>
 
-      <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+      <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
         <Panel title="روابط التوثيق" description="الروابط التي سيتم استخدامها في المزامنة والفهرسة.">
           {links.length === 0 ? (
             <EmptyState title="لا توجد روابط" text="أضف رابط Google Drive لهذا المشروع." compact />
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {links.map((link) => <DriveLinkCard key={link.id} link={link} projects={projects} />)}
             </div>
           )}
@@ -213,58 +221,124 @@ function ProjectDetail({ bundle, collections, projects }: { bundle: ProjectBundl
   );
 }
 
+function ProjectTable({ collection, year, collections }: { collection: ArchiveCollection; year: YearBundle; collections: ArchiveCollection[] }) {
+  if (year.projects.length === 0) {
+    return <EmptyState title="لا توجد مشاريع" text="لم يتم إنشاء مشاريع في هذه السنة بعد. أضف أول مشروع من النموذج بالأعلى." compact />;
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-lg border bg-white">
+      <table className="w-full min-w-[900px] text-sm">
+        <thead className="bg-slate-50 text-xs text-slate-500">
+          <tr>
+            <th className="p-3 text-right">المشروع</th>
+            <th className="p-3 text-right">المدينة</th>
+            <th className="p-3 text-right">التصنيف</th>
+            <th className="p-3 text-right">الروابط</th>
+            <th className="p-3 text-right">المواد</th>
+            <th className="p-3 text-right">الإجراءات</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {year.projects.map((bundle) => (
+            <tr key={bundle.project.id} className="align-top">
+              <td className="p-3">
+                <p className="font-black text-slate-950">{bundle.project.title}</p>
+                <p className="mt-1 text-xs text-slate-500">{archiveText(bundle.project.description) || "بدون وصف"}</p>
+              </td>
+              <td className="p-3 text-slate-700">{archiveText(bundle.project.city) || "-"}</td>
+              <td className="p-3 text-slate-700">{archiveText(bundle.project.theme) || "-"}</td>
+              <td className="p-3 font-bold text-slate-800">{bundle.links.length}</td>
+              <td className="p-3 font-bold text-slate-800">{bundle.assets.length}</td>
+              <td className="p-3">
+                <div className="flex flex-wrap gap-2">
+                  <Link href={archiveHref({ collectionId: collection.id, year: bundle.project.year, projectId: bundle.project.id })} className="inline-flex h-8 items-center rounded-md border bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-[#025EB8] hover:text-[#025EB8]">فتح</Link>
+                  <ArchiveProjectManageActions project={bundle.project} collections={collections} />
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function CollectionCard({ item }: { item: CollectionBundle }) {
   const stats = collectionStats(item);
   const description = archiveText(item.collection.description);
 
   return (
-    <article className="rounded-xl border bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
+    <article className="rounded-lg border bg-white p-3 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-xs font-bold text-slate-500">مجموعة</p>
-          <h3 className="mt-1 text-xl font-black text-slate-950">{item.collection.name}</h3>
+          <p className="text-[11px] font-bold text-slate-500">مجموعة</p>
+          <h3 className="mt-1 text-lg font-black text-slate-950">{item.collection.name}</h3>
         </div>
-        <FolderOpen className="h-5 w-5 text-[#025EB8]" />
+        <FolderOpen className="h-4 w-4 text-[#025EB8]" />
       </div>
-      {description ? <p className="mt-3 min-h-[48px] text-sm leading-6 text-slate-600">{description}</p> : null}
-      <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+      {description ? <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{description}</p> : null}
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
         <SmallCounter label="سنوات" value={item.years.length} />
         <SmallCounter label="مشاريع" value={stats.projects} />
         <SmallCounter label="روابط" value={stats.links} />
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Link href={archiveHref({ collectionId: item.collection.id })} className="inline-flex h-9 items-center rounded-md bg-[#025EB8] px-3 text-sm font-bold text-white transition hover:bg-[#014f9f]">فتح</Link>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link href={archiveHref({ collectionId: item.collection.id })} className="inline-flex h-8 items-center rounded-md border bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-[#025EB8] hover:text-[#025EB8]">فتح</Link>
         <ArchiveCollectionManageActions collection={item.collection} />
       </div>
     </article>
   );
 }
 
-function ProjectCard({ bundle, collection, collections }: { bundle: ProjectBundle; collection: ArchiveCollection; collections: ArchiveCollection[] }) {
-  const { project, links, assets } = bundle;
-  const description = archiveText(project.description);
-
+function ArchiveFileQuickPanel({ title, description, category }: { title: string; description: string; category: string }) {
   return (
-    <article className="rounded-xl border bg-white p-4 shadow-sm">
+    <section className="rounded-xl border bg-white p-3 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-bold text-slate-500">مشروع</p>
-          <h3 className="mt-1 text-lg font-black text-slate-950">{project.title}</h3>
-          <p className="mt-1 text-xs text-slate-500">{projectMeta(project)}</p>
+          <h2 className="text-sm font-black text-slate-950">{title}</h2>
+          <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
         </div>
-        <Archive className="h-5 w-5 text-[#025EB8]" />
+        <FileText className="h-4 w-4 text-[#025EB8]" />
       </div>
-      {description ? <p className="mt-3 min-h-[44px] text-sm leading-6 text-slate-600">{description}</p> : null}
-      <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-        <SmallCounter label="روابط" value={links.length} />
-        <SmallCounter label="مواد" value={assets.length} />
-        <SmallCounter label="صور" value={countAssets(assets, "IMAGE")} />
+      <div className="mt-3 grid gap-2">
+        <input placeholder="اسم الملف" className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]" />
+        <div className="grid grid-cols-[0.8fr_1.2fr_auto] gap-2">
+          <select defaultValue="PDF" className="h-8 rounded-md border bg-white px-2 text-xs outline-none focus:border-[#025EB8]">
+            <option value="PDF">PDF</option>
+            <option value="EXCEL">Excel</option>
+          </select>
+          <input dir="ltr" placeholder="https://drive.google.com/..." className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]" />
+          <button type="button" className="h-8 rounded-md border px-3 text-xs font-bold text-slate-700 hover:border-[#025EB8] hover:text-[#025EB8]">حفظ</button>
+        </div>
+        <p className="text-[11px] text-slate-400">{category === "MARKETING" ? "سيتم ربطها لاحقًا بملفات المشاريع التسويقية." : "سيتم ربطها لاحقًا بملفات المؤسسة الرسمية."}</p>
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Link href={archiveHref({ collectionId: collection.id, year: project.year, projectId: project.id })} className="inline-flex h-9 items-center rounded-md bg-[#025EB8] px-3 text-sm font-bold text-white transition hover:bg-[#014f9f]">فتح</Link>
-        <ArchiveProjectManageActions project={project} collections={collections} />
+    </section>
+  );
+}
+
+function ArchiveFileRow({ title, description, items }: { title: string; description: string; items: { title: string; type: string; count: number }[] }) {
+  return (
+    <Panel title={title} description={description}>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {items.map((item) => (
+          <article key={item.title} className="rounded-lg border bg-white p-3 shadow-sm">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-[11px] font-bold text-slate-500">{item.type}</p>
+                <h3 className="mt-1 text-sm font-black text-slate-950">{item.title}</h3>
+              </div>
+              <FileText className="h-4 w-4 text-[#025EB8]" />
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+              <SmallCounter label="ملفات" value={item.count} />
+              <SmallCounter label="روابط" value={item.count} />
+            </div>
+            <button type="button" className="mt-3 inline-flex h-8 items-center rounded-md border bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-[#025EB8] hover:text-[#025EB8]">فتح</button>
+          </article>
+        ))}
       </div>
-    </article>
+    </Panel>
   );
 }
 
@@ -341,7 +415,7 @@ function MaterialTable({ assets }: { assets: ArchiveAsset[] }) {
 function Breadcrumb({ collection, year, project }: { collection?: ArchiveCollection; year?: number; project?: ArchiveProject }) {
   if (!collection && !year && !project) return null;
   return (
-    <nav className="mt-4 flex flex-wrap items-center gap-2 text-sm font-bold text-slate-600">
+    <nav className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600">
       <Link href="/dashboard/archive" className="rounded-md border bg-white px-3 py-1.5 hover:border-[#025EB8]">الأرشيف</Link>
       {collection ? <Link href={archiveHref({ collectionId: collection.id })} className="rounded-md border bg-white px-3 py-1.5 hover:border-[#025EB8]">{collection.name}</Link> : null}
       {collection && year ? <Link href={archiveHref({ collectionId: collection.id, year })} className="rounded-md border bg-white px-3 py-1.5 hover:border-[#025EB8]">{year}</Link> : null}
@@ -461,6 +535,22 @@ function cleanDriveUrl(value?: string | null) {
   return value;
 }
 
+function marketingFilePlaceholders() {
+  return [
+    { title: "ملفات حملات PDF", type: "PDF", count: 0 },
+    { title: "جداول نتائج Excel", type: "Excel", count: 0 },
+    { title: "خطط مشاريع تسويقية", type: "PDF / Excel", count: 0 },
+  ];
+}
+
+function officialFilePlaceholders() {
+  return [
+    { title: "عقود وشراكات", type: "PDF", count: 0 },
+    { title: "أوراق المؤسسة", type: "PDF", count: 0 },
+    { title: "تراخيص وملفات قانونية", type: "PDF / Excel", count: 0 },
+  ];
+}
+
 function countYears(explorer: CollectionBundle[]) {
   return new Set(explorer.flatMap((item) => item.years.map((year) => `${item.collection.id}-${year.year}`))).size;
 }
@@ -491,23 +581,27 @@ function driveLinkTypeLabel(value: ArchiveDriveLink["linkType"]) {
 }
 
 function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
-  return <div className="rounded-xl border bg-slate-50 p-3"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold text-slate-500">{label}</p><p className="mt-1 text-2xl font-black text-slate-950">{value}</p></div><span className="text-[#025EB8] [&>svg]:h-5 [&>svg]:w-5">{icon}</span></div></div>;
+  return <div className="rounded-lg border bg-slate-50 p-2.5"><div className="flex items-center justify-between gap-2"><div><p className="text-[11px] font-bold text-slate-500">{label}</p><p className="mt-1 text-xl font-black text-slate-950">{value}</p></div><span className="text-[#025EB8] [&>svg]:h-4 [&>svg]:w-4">{icon}</span></div></div>;
 }
 
 function SummaryCard({ icon, title, value }: { icon: ReactNode; title: string; value: number }) {
-  return <div className="rounded-xl border bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><div><p className="text-sm font-black text-slate-950">{title}</p><p className="mt-1 text-2xl font-black text-slate-950">{value}</p></div><span className="text-[#025EB8] [&>svg]:h-5 [&>svg]:w-5">{icon}</span></div></div>;
+  return <div className="rounded-lg border bg-slate-50 p-3"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black text-slate-950">{title}</p><p className="mt-1 text-xl font-black text-slate-950">{value}</p></div><span className="text-[#025EB8] [&>svg]:h-4 [&>svg]:w-4">{icon}</span></div></div>;
 }
 
 function SmallCounter({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-lg border bg-white px-3 py-2"><p className="text-xs font-bold text-slate-500">{label}</p><p className="mt-1 font-black text-slate-950">{value}</p></div>;
+  return <div className="rounded-md border bg-white px-2 py-1.5"><p className="text-[10px] font-bold text-slate-500">{label}</p><p className="mt-0.5 text-sm font-black text-slate-950">{value}</p></div>;
 }
 
 function Panel({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
-  return <section className="rounded-2xl border bg-white shadow-sm"><div className="border-b p-5"><h2 className="text-lg font-black text-slate-950">{title}</h2>{description ? <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p> : null}</div><div className="p-5">{children}</div></section>;
+  return <section className="rounded-xl border bg-white shadow-sm"><div className="border-b p-4"><h2 className="text-base font-black text-slate-950">{title}</h2>{description ? <p className="mt-1 text-xs leading-5 text-slate-600">{description}</p> : null}</div><div className="p-4">{children}</div></section>;
+}
+
+function CompactPanel({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
+  return <section className="rounded-xl border bg-white shadow-sm"><div className="border-b p-3"><h2 className="text-sm font-black text-slate-950">{title}</h2>{description ? <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p> : null}</div><div className="p-3">{children}</div></section>;
 }
 
 function Badge({ children }: { children: ReactNode }) {
-  return <span className="inline-flex items-center rounded-md bg-white px-2.5 py-1 text-xs font-bold text-slate-700 ring-1 ring-slate-200">{children}</span>;
+  return <span className="inline-flex items-center rounded-md bg-white px-2 py-1 text-[11px] font-bold text-slate-700 ring-1 ring-slate-200">{children}</span>;
 }
 
 function EmptyState({ title, text, compact = false }: { title: string; text: string; compact?: boolean }) {
