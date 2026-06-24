@@ -2,16 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import type { FormEvent, ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FolderKanban, Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ArchiveCollection } from "@/lib/archive/archive-types";
-
-const YEAR_OPTIONS = Array.from({ length: 8 }, (_, index) => String(new Date().getFullYear() - index));
-const COUNTRY_OPTIONS = ["فلسطين", "السودان", "سوريا", "تركيا", "اليمن", "لبنان", "عام"];
-const CITY_OPTIONS = ["غزة", "القدس", "الخرطوم", "إدلب", "إسطنبول", "صنعاء", "عام"];
-const THEME_OPTIONS = ["مياه", "طرود", "إفطار", "كفالات", "زكاة", "وقف", "تعليم", "صحة", "إيواء", "أضاحي"];
-const PROJECT_TYPE_OPTIONS = ["إغاثة طارئة", "مشروع موسمي", "مشروع دائم", "توثيق ميداني", "حملة تسويقية", "ملف رسمي"];
+import { DEFAULT_ARCHIVE_PROJECT_OPTIONS, useArchiveProjectOptions } from "./archiveProjectOptions";
 
 type FeedbackState = {
   tone: "success" | "error";
@@ -25,20 +20,29 @@ type Props = {
 
 export function ArchiveProjectCreatePanel({ collections, defaultYear }: Props) {
   const router = useRouter();
+  const options = useArchiveProjectOptions(defaultYear);
   const currentYear = String(defaultYear ?? new Date().getFullYear());
   const [collectionId, setCollectionId] = useState(collections[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [year, setYear] = useState(currentYear);
-  const [country, setCountry] = useState(COUNTRY_OPTIONS[0]);
-  const [city, setCity] = useState(CITY_OPTIONS[0]);
-  const [theme, setTheme] = useState(THEME_OPTIONS[0]);
-  const [projectType, setProjectType] = useState(PROJECT_TYPE_OPTIONS[0]);
+  const [country, setCountry] = useState(DEFAULT_ARCHIVE_PROJECT_OPTIONS.countries[0]);
+  const [city, setCity] = useState(DEFAULT_ARCHIVE_PROJECT_OPTIONS.cities[0]);
+  const [theme, setTheme] = useState(DEFAULT_ARCHIVE_PROJECT_OPTIONS.themes[0]);
+  const [projectType, setProjectType] = useState(DEFAULT_ARCHIVE_PROJECT_OPTIONS.projectTypes[0]);
   const [description, setDescription] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
 
   const collectionOptions = useMemo(() => collections.map((collection) => ({ id: collection.id, label: collection.name })), [collections]);
+
+  useEffect(() => {
+    if (!options.years.includes(year)) setYear(options.years[0] ?? currentYear);
+    if (!options.countries.includes(country)) setCountry(options.countries[0] ?? "");
+    if (!options.cities.includes(city)) setCity(options.cities[0] ?? "");
+    if (!options.themes.includes(theme)) setTheme(options.themes[0] ?? "");
+    if (!options.projectTypes.includes(projectType)) setProjectType(options.projectTypes[0] ?? "");
+  }, [city, country, currentYear, options, projectType, theme, year]);
 
   async function submitProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -116,17 +120,17 @@ export function ArchiveProjectCreatePanel({ collections, defaultYear }: Props) {
         </Field>
         <Field label="السنة">
           <select value={year} onChange={(event) => setYear(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-xs font-semibold text-slate-900 outline-none focus:border-[#025EB8]">
-            {YEAR_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+            {options.years.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
         </Field>
         <Field label="المدينة">
           <select value={city} onChange={(event) => setCity(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-[#025EB8]">
-            {CITY_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+            {options.cities.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
         </Field>
         <Field label="التصنيف">
           <select value={theme} onChange={(event) => setTheme(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-[#025EB8]">
-            {THEME_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+            {options.themes.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
         </Field>
       </div>
@@ -134,12 +138,12 @@ export function ArchiveProjectCreatePanel({ collections, defaultYear }: Props) {
       <div className="mt-2 grid gap-2 lg:grid-cols-[0.9fr_0.9fr_1fr_1fr]">
         <Field label="البلد">
           <select value={country} onChange={(event) => setCountry(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-[#025EB8]">
-            {COUNTRY_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+            {options.countries.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
         </Field>
         <Field label="نوع المشروع">
           <select value={projectType} onChange={(event) => setProjectType(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-[#025EB8]">
-            {PROJECT_TYPE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+            {options.projectTypes.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
         </Field>
         <Field label="الوصف">
