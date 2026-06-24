@@ -36,14 +36,14 @@ export function ArchiveDriveLinkActions({ linkId }: Props) {
       const result = await response.json().catch(() => null);
 
       if (!response.ok || !result?.ok) {
-        setFeedback({ tone: "error", message: result?.message || result?.error || "Action failed" });
+        setFeedback({ tone: "error", message: cleanMessage(result?.message || result?.error || "تعذّر تنفيذ الإجراء") });
         return;
       }
 
-      setFeedback({ tone: "success", message: result?.message || "Updated" });
+      setFeedback({ tone: "success", message: cleanMessage(result?.message || "تم التحديث") });
       router.refresh();
     } catch {
-      setFeedback({ tone: "error", message: "Action failed" });
+      setFeedback({ tone: "error", message: "تعذّر تنفيذ الإجراء" });
     } finally {
       setRunning(null);
     }
@@ -57,11 +57,11 @@ export function ArchiveDriveLinkActions({ linkId }: Props) {
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" size="sm" variant="outline" disabled={Boolean(running)} onClick={() => runAction("test")} className="gap-2 font-bold">
           {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radar className="h-4 w-4" />}
-          Check
+          فحص الرابط
         </Button>
         <Button type="button" size="sm" variant="outline" disabled={Boolean(running)} onClick={() => runAction("sync")} className="gap-2 font-bold">
           {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Refresh
+          تحديث المواد
         </Button>
       </div>
 
@@ -75,4 +75,11 @@ export function ArchiveDriveLinkActions({ linkId }: Props) {
       ) : null}
     </div>
   );
+}
+
+function cleanMessage(message: string) {
+  if (/external|provider|disabled|sync|runtime/i.test(message)) return "تم تسجيل الطلب. سيتم تحديث حالة الرابط بعد توفر المزامنة.";
+  if (/failed/i.test(message)) return "تعذّر تنفيذ الإجراء";
+  if (/updated/i.test(message)) return "تم التحديث";
+  return message;
 }
