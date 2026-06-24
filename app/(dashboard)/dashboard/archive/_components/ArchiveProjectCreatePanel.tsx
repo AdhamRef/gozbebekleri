@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { FolderKanban, Loader2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -159,6 +159,6 @@ export function ArchiveProjectCreatePanel({ collections, defaultYear }: Props) {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="grid gap-1 text-[11px] font-bold text-slate-600">{label}{children}</label>;
 }
