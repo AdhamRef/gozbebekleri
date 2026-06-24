@@ -9,6 +9,7 @@ import { ArchiveDriveLinkCreatePanel } from "./ArchiveDriveLinkCreatePanel";
 import { ArchiveDriveLinkManageActions } from "./ArchiveDriveLinkManageActions";
 import { ArchiveProjectCreatePanel } from "./ArchiveProjectCreatePanel";
 import { ArchiveProjectManageActions } from "./ArchiveProjectManageActions";
+import { ArchiveProjectOptionsPanel } from "./ArchiveProjectOptionsPanel";
 
 type Props = {
   activeTab?: ArchiveTabKey;
@@ -99,6 +100,8 @@ function RootExplorer({ snapshot, explorer }: { snapshot: ArchiveSnapshot; explo
           </div>
         </Panel>
       </section>
+
+      <ArchiveProjectOptionsPanel />
 
       <Panel title="المجموعات" description="اختر المجموعة الرئيسية للدخول إليها.">
         {explorer.length === 0 ? (
