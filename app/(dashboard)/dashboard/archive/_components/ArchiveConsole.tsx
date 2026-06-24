@@ -41,7 +41,7 @@ export function ArchiveConsole({ snapshot, selection }: Props) {
   const activeCollection = explorer.find((item) => item.collection.id === selection?.collectionId);
   const activeProject = selection?.projectId ? findProject(explorer, selection.projectId) : null;
   const selectedYear = activeProject?.year.year ?? selection?.year;
-  const activeYear = activeProject?.year ?? activeCollection?.years.find((year) => year.year === selectedYear);
+  const activeYear = activeProject?.year ?? getSelectedYear(activeCollection, selectedYear);
 
   return (
     <main className="min-h-screen bg-[#FFFDF8] p-4 text-slate-950 sm:p-6" dir="rtl">
@@ -121,7 +121,7 @@ function CollectionDetail({ item, collections }: { item: CollectionBundle; colle
           <div>
             <p className="text-xs font-bold text-slate-500">مجموعة</p>
             <h2 className="mt-1 text-3xl font-black text-slate-950">{item.collection.name}</h2>
-            {item.collection.description ? <p className="mt-2 text-sm leading-7 text-slate-600">{item.collection.description}</p> : null}
+            {archiveText(item.collection.description) ? <p className="mt-2 text-sm leading-7 text-slate-600">{archiveText(item.collection.description)}</p> : null}
           </div>
           <ArchiveCollectionManageActions collection={item.collection} />
         </div>
@@ -132,19 +132,15 @@ function CollectionDetail({ item, collections }: { item: CollectionBundle; colle
       </Panel>
 
       <Panel title="السنوات" description="اختر السنة التي تريد عرض مشاريعها.">
-        {yearOptions(item).length === 0 ? (
-          <EmptyState title="لا توجد سنوات بعد" text="أضف مشروعًا لهذه المجموعة ليظهر ضمن سنة محددة." compact />
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-4 xl:grid-cols-6">
-            {yearOptions(item).map((year) => (
-              <Link key={year} href={archiveHref({ collectionId: item.collection.id, year })} className="rounded-xl border bg-slate-50 p-4 text-center transition hover:border-[#025EB8] hover:bg-white">
-                <p className="text-xs font-bold text-slate-500">السنة</p>
-                <p className="mt-1 text-2xl font-black text-slate-950">{year}</p>
-                <p className="mt-1 text-xs text-slate-500">{item.years.find((itemYear) => itemYear.year === year)?.projects.length ?? 0} مشروع</p>
-              </Link>
-            ))}
-          </div>
-        )}
+        <div className="grid gap-3 sm:grid-cols-4 xl:grid-cols-6">
+          {yearOptions(item).map((year) => (
+            <Link key={year} href={archiveHref({ collectionId: item.collection.id, year })} className="rounded-xl border bg-slate-50 p-4 text-center transition hover:border-[#025EB8] hover:bg-white">
+              <p className="text-xs font-bold text-slate-500">السنة</p>
+              <p className="mt-1 text-2xl font-black text-slate-950">{year}</p>
+              <p className="mt-1 text-xs text-slate-500">{item.years.find((itemYear) => itemYear.year === year)?.projects.length ?? 0} مشروع</p>
+            </Link>
+          ))}
+        </div>
       </Panel>
     </div>
   );
@@ -165,10 +161,10 @@ function YearDetail({ collection, year, collections, projects }: { collection: A
 
       <Panel title="المشاريع" description="اضغط فتح للدخول إلى المشروع ورؤية روابط التوثيق والمواد.">
         {year.projects.length === 0 ? (
-          <EmptyState title="لا توجد مشاريع" text="لم يتم إنشاء مشاريع في هذه السنة بعد." compact />
+          <EmptyState title="لا توجد مشاريع" text="لم يتم إنشاء مشاريع في هذه السنة بعد. أضف أول مشروع من النموذج بالأعلى." compact />
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {year.projects.map((bundle) => <ProjectCard key={bundle.project.id} bundle={bundle} collection={collection} collections={collections} projects={projects} />)}
+            {year.projects.map((bundle) => <ProjectCard key={bundle.project.id} bundle={bundle} collection={collection} collections={collections} />)}
           </div>
         )}
       </Panel>
@@ -186,8 +182,8 @@ function ProjectDetail({ bundle, collections, projects }: { bundle: ProjectBundl
           <div>
             <p className="text-xs font-bold text-slate-500">مشروع</p>
             <h2 className="mt-1 text-3xl font-black text-slate-950">{project.title}</h2>
-            <p className="mt-1 text-sm leading-6 text-slate-600">{[project.country, project.city, project.projectType].filter(Boolean).join(" / ")}</p>
-            {project.description ? <p className="mt-3 text-sm leading-7 text-slate-600">{project.description}</p> : null}
+            <p className="mt-1 text-sm leading-6 text-slate-600">{projectMeta(project)}</p>
+            {archiveText(project.description) ? <p className="mt-3 text-sm leading-7 text-slate-600">{archiveText(project.description)}</p> : null}
           </div>
           <ArchiveProjectManageActions project={project} collections={collections} />
         </div>
@@ -219,6 +215,8 @@ function ProjectDetail({ bundle, collections, projects }: { bundle: ProjectBundl
 
 function CollectionCard({ item }: { item: CollectionBundle }) {
   const stats = collectionStats(item);
+  const description = archiveText(item.collection.description);
+
   return (
     <article className="rounded-xl border bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -228,7 +226,7 @@ function CollectionCard({ item }: { item: CollectionBundle }) {
         </div>
         <FolderOpen className="h-5 w-5 text-[#025EB8]" />
       </div>
-      {item.collection.description ? <p className="mt-3 min-h-[48px] text-sm leading-6 text-slate-600">{item.collection.description}</p> : null}
+      {description ? <p className="mt-3 min-h-[48px] text-sm leading-6 text-slate-600">{description}</p> : null}
       <div className="mt-4 grid grid-cols-3 gap-2 text-center">
         <SmallCounter label="سنوات" value={item.years.length} />
         <SmallCounter label="مشاريع" value={stats.projects} />
@@ -242,19 +240,21 @@ function CollectionCard({ item }: { item: CollectionBundle }) {
   );
 }
 
-function ProjectCard({ bundle, collection, collections }: { bundle: ProjectBundle; collection: ArchiveCollection; collections: ArchiveCollection[]; projects: ArchiveProject[] }) {
+function ProjectCard({ bundle, collection, collections }: { bundle: ProjectBundle; collection: ArchiveCollection; collections: ArchiveCollection[] }) {
   const { project, links, assets } = bundle;
+  const description = archiveText(project.description);
+
   return (
     <article className="rounded-xl border bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-bold text-slate-500">مشروع</p>
           <h3 className="mt-1 text-lg font-black text-slate-950">{project.title}</h3>
-          <p className="mt-1 text-xs text-slate-500">{[project.country, project.city].filter(Boolean).join(" / ")}</p>
+          <p className="mt-1 text-xs text-slate-500">{projectMeta(project)}</p>
         </div>
         <Archive className="h-5 w-5 text-[#025EB8]" />
       </div>
-      {project.description ? <p className="mt-3 min-h-[44px] text-sm leading-6 text-slate-600">{project.description}</p> : null}
+      {description ? <p className="mt-3 min-h-[44px] text-sm leading-6 text-slate-600">{description}</p> : null}
       <div className="mt-4 grid grid-cols-3 gap-2 text-center">
         <SmallCounter label="روابط" value={links.length} />
         <SmallCounter label="مواد" value={assets.length} />
@@ -273,8 +273,8 @@ function DriveLinkCard({ link, projects }: { link: ArchiveDriveLink; projects: A
     <div className="rounded-lg border bg-slate-50 p-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <p className="font-black text-slate-950">{link.title}</p>
-          <p dir="ltr" className="mt-1 truncate text-xs text-slate-500">{link.driveUrl}</p>
+          <p className="font-black text-slate-950">{archiveText(link.title) || "رابط توثيق"}</p>
+          <p dir="ltr" className="mt-1 truncate text-xs text-slate-500">{cleanDriveUrl(link.driveUrl)}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Badge>{driveLinkTypeLabel(link.linkType)}</Badge>
             <Badge>{link.totalFiles} ملف</Badge>
@@ -321,7 +321,7 @@ function MaterialTable({ assets }: { assets: ArchiveAsset[] }) {
           {assets.slice(0, 12).map((asset) => (
             <tr key={asset.id}>
               <td className="p-3 font-bold text-slate-700">{fileTypeLabel(asset.fileType)}</td>
-              <td className="p-3 text-slate-700">{asset.fileName}</td>
+              <td className="p-3 text-slate-700">{archiveText(asset.fileName) || asset.fileName}</td>
               <td className="p-3">
                 {asset.webViewLink ? (
                   <a className="font-bold text-[#025EB8] hover:underline" href={asset.webViewLink} target="_blank" rel="noreferrer">عرض</a>
@@ -391,6 +391,11 @@ function buildExplorer(snapshot: ArchiveSnapshot): CollectionBundle[] {
     });
 }
 
+function getSelectedYear(collection: CollectionBundle | undefined, selectedYear: number | undefined): YearBundle | undefined {
+  if (!collection || !selectedYear) return undefined;
+  return collection.years.find((year) => year.year === selectedYear) ?? { year: selectedYear, projects: [] };
+}
+
 function findProject(explorer: CollectionBundle[], projectId: string) {
   for (const collection of explorer) {
     for (const year of collection.years) {
@@ -428,6 +433,32 @@ function archiveHref({ collectionId, year, projectId }: { collectionId?: string;
   if (projectId) params.set("project", projectId);
   const query = params.toString();
   return query ? `/dashboard/archive?${query}` : "/dashboard/archive";
+}
+
+function projectMeta(project: ArchiveProject) {
+  return [archiveText(project.country), archiveText(project.city), archiveText(project.projectType)].filter(Boolean).join(" / ") || "بدون تفاصيل إضافية";
+}
+
+function archiveText(value?: string | null) {
+  if (!value) return "";
+  const lower = value.toLowerCase();
+  if (lower.includes("field documentation")) return "توثيقات ميدانية وملفات إثبات ومواد قابلة للاستخدام.";
+  if (lower.includes("al-quds implementation")) return "توثيقات تنفيذية وتقارير ومواد معتمدة للقدس.";
+  if (lower.includes("waqf reports")) return "تقارير الوقف والشهادات وملفات الإثبات طويلة المدى.";
+  if (lower.includes("zakat documentation")) return "توثيقات الزكاة وملفات إثبات الاستحقاق.";
+  if (lower.includes("foundation project") || lower.includes("metadata") || lower.includes("review")) return "مشروع موثق بانتظار استكمال روابط التوثيق والمراجعة.";
+  if (lower.includes("planned al-quds")) return "مسار توثيق مخطط لمشروع القدس.";
+  if (lower.includes("gaza water folder")) return "رابط توثيق مشروع المياه";
+  if (lower.includes("emergency aid")) return "إغاثة طارئة";
+  if (lower === "palestine") return "فلسطين";
+  if (lower === "gaza") return "غزة";
+  if (lower === "al-quds") return "القدس";
+  return value;
+}
+
+function cleanDriveUrl(value?: string | null) {
+  if (!value || !/^https?:\/\//i.test(value)) return "لم يتم إدخال رابط صالح بعد";
+  return value;
 }
 
 function countYears(explorer: CollectionBundle[]) {
