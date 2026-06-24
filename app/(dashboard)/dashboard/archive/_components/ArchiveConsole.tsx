@@ -1,11 +1,6 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
-import { Archive, CheckCircle2, Database, FolderOpen, Image, ShieldCheck } from "lucide-react";
+import { Archive, CalendarDays, Database, FileText, FolderOpen, Image, Link2, Video } from "lucide-react";
 import type { ArchiveAsset, ArchiveCollection, ArchiveDriveLink, ArchiveProject, ArchiveSnapshot, ArchiveTabKey } from "@/lib/archive/archive-types";
-import { ArchiveAssetBrandAssetAction } from "./ArchiveAssetBrandAssetAction";
-import { ArchiveAssetContentItemAction } from "./ArchiveAssetContentItemAction";
-import { ArchiveAssetReviewActions } from "./ArchiveAssetReviewActions";
-import { ArchiveAssetTaskAction } from "./ArchiveAssetTaskAction";
 import { ArchiveCollectionCreatePanel } from "./ArchiveCollectionCreatePanel";
 import { ArchiveCollectionManageActions } from "./ArchiveCollectionManageActions";
 import { ArchiveDriveLinkActions } from "./ArchiveDriveLinkActions";
@@ -15,410 +10,323 @@ import { ArchiveProjectCreatePanel } from "./ArchiveProjectCreatePanel";
 import { ArchiveProjectManageActions } from "./ArchiveProjectManageActions";
 
 type Props = {
-  activeTab: ArchiveTabKey;
+  activeTab?: ArchiveTabKey;
   snapshot: ArchiveSnapshot;
 };
 
-export function ArchiveConsole({ activeTab, snapshot }: Props) {
-  const dashboardNotes = buildDashboardNotes(snapshot);
+type ProjectBundle = {
+  project: ArchiveProject;
+  links: ArchiveDriveLink[];
+  assets: ArchiveAsset[];
+};
+
+type YearBundle = {
+  year: number;
+  projects: ProjectBundle[];
+};
+
+type CollectionBundle = {
+  collection: ArchiveCollection;
+  years: YearBundle[];
+};
+
+export function ArchiveConsole({ snapshot }: Props) {
+  const explorer = buildExplorer(snapshot);
 
   return (
     <main className="min-h-screen bg-[#FFFDF8] p-4 text-slate-950 sm:p-6" dir="rtl">
-      <section className="rounded-xl border bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <section className="rounded-2xl border bg-white p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#025EB8]">Archive</p>
-            <h1 className="mt-2 text-2xl font-black sm:text-3xl">الأرشيف</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              مساحة مركزية لتنظيم ملفات المشاريع، مراجعة المواد، وتجهيز المختارات المناسبة للفريق.
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-[#025EB8]">Archive Explorer</p>
+            <h1 className="mt-2 text-2xl font-black sm:text-4xl">الأرشيف</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+              تصفح بسيط حسب المجموعة، السنة، المشروع، ثم المواد. رابط Google Drive يضاف داخل المشروع فقط، ومنه يتم بناء مستكشف المواد لاحقًا.
             </p>
           </div>
-          <div className="rounded-xl border bg-slate-50 p-4 text-sm leading-6 text-slate-700 lg:max-w-sm">
-            <p className="font-black text-slate-950">حالة الأرشيف</p>
-            <p>{snapshot.summary.projects > 0 ? "جاهز للمراجعة والتحديث." : "بانتظار إضافة المشاريع والملفات."}</p>
+          <div className="grid gap-3 sm:grid-cols-4 lg:min-w-[560px]">
+            <Metric icon={<FolderOpen />} label="المجموعات" value={snapshot.summary.collections} />
+            <Metric icon={<CalendarDays />} label="السنوات" value={countYears(explorer)} />
+            <Metric icon={<Archive />} label="المشاريع" value={snapshot.summary.projects} />
+            <Metric icon={<Link2 />} label="الروابط" value={snapshot.summary.driveLinks} />
           </div>
         </div>
-        <nav className="mt-5 flex gap-2 overflow-x-auto border-t pt-4" aria-label="Archive tabs">
-          {snapshot.tabs.map((tab) => (
-            <Link key={tab.key} href={tab.href} className={`whitespace-nowrap rounded-md px-3 py-2 text-sm font-bold transition ${activeTab === tab.key ? "bg-[#10212B] text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>
-              {tabLabel(tab.key)}
-            </Link>
-          ))}
-        </nav>
       </section>
 
-      <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric icon={<FolderOpen />} label="المجموعات" value={snapshot.summary.collections} />
-        <Metric icon={<Archive />} label="المشاريع" value={snapshot.summary.projects} />
-        <Metric icon={<Image />} label="المواد" value={snapshot.summary.assets} />
-        <Metric icon={<ShieldCheck />} label="تحتاج مراجعة" value={snapshot.summary.pendingHumanReview} />
+      <section className="mt-5 grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+        <Panel title="إضافة وتنظيم" description="ابدأ بالمجموعة، ثم المشروع، ثم أضف رابط التوثيق داخل المشروع.">
+          <div className="space-y-4">
+            <ArchiveCollectionCreatePanel />
+            <ArchiveProjectCreatePanel collections={snapshot.collections} />
+            <ArchiveDriveLinkCreatePanel projects={snapshot.projects} />
+          </div>
+        </Panel>
+        <Panel title="المواد" description="ملخص سريع للمواد المفهرسة داخل المشاريع.">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <SummaryCard icon={<Image />} title="صور" value={countAssets(snapshot.assets, "IMAGE")} />
+            <SummaryCard icon={<Video />} title="فيديوهات" value={countAssets(snapshot.assets, "VIDEO")} />
+            <SummaryCard icon={<FileText />} title="تقارير ومستندات" value={countAssets(snapshot.assets, "DOCUMENT")} />
+            <SummaryCard icon={<Database />} title="مواد أخرى" value={countOtherAssets(snapshot.assets)} />
+          </div>
+        </Panel>
       </section>
 
-      {dashboardNotes.length > 0 ? (
-        <section className="mt-5 grid gap-3 lg:grid-cols-3">
-          {dashboardNotes.map((note) => (
-            <div key={note} className="rounded-lg border bg-white p-4 shadow-sm">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 h-5 w-5 text-[#025EB8]" />
-                <p className="text-sm font-semibold leading-6 text-slate-700">{note}</p>
-              </div>
-            </div>
-          ))}
-        </section>
-      ) : null}
-
-      <section className="mt-5">{renderTab(activeTab, snapshot)}</section>
+      <section className="mt-5 space-y-5">
+        {explorer.length === 0 ? (
+          <EmptyState title="لا توجد مجموعات بعد" text="أضف أول مجموعة مثل غزة، القدس، السودان، الوقف أو الزكاة." />
+        ) : (
+          explorer.map((item) => <CollectionExplorer key={item.collection.id} item={item} collections={snapshot.collections} />)
+        )}
+      </section>
     </main>
   );
 }
 
-function tabLabel(key: ArchiveTabKey) {
-  const labels: Record<ArchiveTabKey, string> = {
-    overview: "نظرة عامة",
-    collections: "المجموعات",
-    projects: "المشاريع",
-    "drive-links": "روابط الملفات",
-    assets: "مراجعة المواد",
-    "marketing-picks": "مختارات التسويق",
-    reports: "التقارير",
-    ai: "المساعد",
-  };
-  return labels[key];
-}
-
-function buildDashboardNotes(snapshot: ArchiveSnapshot) {
-  const notes: string[] = [];
-  if (snapshot.driveLinks.length === 0) notes.push("أضف رابط ملف واحد على الأقل لكل مشروع نشط.");
-  if (snapshot.summary.pendingHumanReview > 0) notes.push("هناك مواد تحتاج مراجعة قبل اعتمادها للفريق.");
-  if (snapshot.summary.sensitiveAssets > 0) notes.push("بعض المواد تحتاج تعاملًا حساسًا قبل استخدامها.");
-  if (snapshot.summary.marketingReady > 0) notes.push("توجد مواد جاهزة للاستخدام التسويقي.");
-  return notes.slice(0, 3);
-}
-
-function renderTab(activeTab: ArchiveTabKey, snapshot: ArchiveSnapshot) {
-  if (activeTab === "collections") return <Collections snapshot={snapshot} />;
-  if (activeTab === "projects") return <Projects projects={snapshot.projects} collections={snapshot.collections} />;
-  if (activeTab === "drive-links") return <DriveLinks links={snapshot.driveLinks} projects={snapshot.projects} />;
-  if (activeTab === "assets") return <Assets assets={snapshot.assets} />;
-  if (activeTab === "marketing-picks") return <Assets assets={snapshot.marketingPicks} marketingOnly />;
-  if (activeTab === "reports") return <Reports snapshot={snapshot} />;
-  if (activeTab === "ai") return <ArchiveAssistant snapshot={snapshot} />;
-  return <Overview snapshot={snapshot} />;
-}
-
-function Overview({ snapshot }: { snapshot: ArchiveSnapshot }) {
+function CollectionExplorer({ item, collections }: { item: CollectionBundle; collections: ArchiveCollection[] }) {
   return (
-    <div className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
-      <Panel title="مسار العمل" description="طريقة انتقال المواد من الملف إلى المراجعة ثم الاستخدام.">
-        <div className="grid gap-3">
-          <InfoLine title="ربط الملفات" text="أضف رابط الملفات للمشروع ثم تأكد من قراءته بشكل صحيح." />
-          <InfoLine title="مراجعة المواد" text="راجع الصور والملفات قبل استخدامها في أي حملة." />
-          <InfoLine title="اختيار المواد" text="انقل المواد المعتمدة إلى مختارات التسويق أو التوثيق." />
+    <section className="rounded-2xl border bg-white shadow-sm">
+      <div className="border-b p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-bold text-slate-500">مجموعة</p>
+            <h2 className="mt-1 text-2xl font-black text-slate-950">{item.collection.name}</h2>
+            {item.collection.description ? <p className="mt-2 text-sm leading-7 text-slate-600">{item.collection.description}</p> : null}
+          </div>
+          <ArchiveCollectionManageActions collection={item.collection} />
         </div>
-      </Panel>
-      <Panel title="المطلوب الآن" description="خطوات مختصرة تساعد الفريق على إكمال الأرشيف.">
-        <InfoLine title="إكمال الروابط" text="اربط كل مشروع بملف أو مجلد واضح." />
-        <InfoLine title="مراجعة المواد" text="راجع المواد الحساسة أو غير المكتملة أولًا." />
-        <InfoLine title="تجهيز المحتوى" text="حوّل المواد المناسبة إلى أفكار محتوى قابلة للتنفيذ." />
-      </Panel>
-      <Panel title="مؤشرات المتابعة" description="ملخص سريع لحالة الأرشيف.">
-        <div className="grid gap-3 md:grid-cols-2">
-          <StateLine title="المراجعة البشرية" text={snapshot.safety.humanApprovalRequired ? "مطلوبة" : "غير مطلوبة"} />
-          <StateLine title="المهام" text={snapshot.safety.usesOperationTaskContract ? "مرتبطة بفريق العمليات" : "غير مرتبطة"} />
-          <StateLine title="المواد الجاهزة" text={String(snapshot.summary.marketingReady)} />
-          <StateLine title="التقارير" text={String(snapshot.summary.reports)} />
-        </div>
-      </Panel>
-    </div>
+      </div>
+
+      <div className="space-y-4 p-5">
+        {item.years.length === 0 ? (
+          <EmptyState title="لا توجد سنوات بعد" text="أضف مشروعًا لهذه المجموعة وحدد السنة ليظهر هنا." compact />
+        ) : (
+          item.years.map((year) => <YearExplorer key={`${item.collection.id}-${year.year}`} year={year} collections={collections} />)
+        )}
+      </div>
+    </section>
   );
 }
 
-function Collections({ snapshot }: { snapshot: ArchiveSnapshot }) {
+function YearExplorer({ year, collections }: { year: YearBundle; collections: ArchiveCollection[] }) {
   return (
-    <div className="space-y-4">
-      <ArchiveCollectionCreatePanel />
-      {snapshot.collections.length === 0 ? (
-        <EmptyState title="لا توجد مجموعات بعد" text="أنشئ أول مجموعة للأرشيف مثل غزة، القدس، رمضان، الوقف أو الزكاة." />
-      ) : (
-        <div className="grid gap-4 xl:grid-cols-4">
-          {snapshot.collections.map((collection) => (
-            <Panel key={collection.id} title={collection.name} description={collection.type} compact>
-              <p className="text-sm leading-6 text-slate-600">{collection.description}</p>
-              <div className="mt-3 flex flex-wrap gap-2"><Badge>{collection.slug}</Badge><Badge>{collection.isActive ? "نشطة" : "متوقفة"}</Badge></div>
-              <ArchiveCollectionManageActions collection={collection} />
-            </Panel>
-          ))}
+    <section className="rounded-xl border bg-slate-50/60">
+      <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-bold text-slate-500">السنة</p>
+          <h3 className="mt-1 text-xl font-black text-slate-950">{year.year}</h3>
         </div>
-      )}
-    </div>
+        <span className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-600 shadow-sm">{year.projects.length} مشروع</span>
+      </div>
+      <div className="grid gap-4 p-4 xl:grid-cols-2">
+        {year.projects.map((bundle) => <ProjectExplorer key={bundle.project.id} bundle={bundle} collections={collections} />)}
+      </div>
+    </section>
   );
 }
 
-function Projects({ projects, collections }: { projects: ArchiveProject[]; collections: ArchiveCollection[] }) {
-  return (
-    <div className="space-y-4">
-      <ArchiveProjectCreatePanel collections={collections} />
-      {projects.length === 0 ? (
-        <EmptyState title="لا توجد مشاريع بعد" text="أنشئ مشروع أرشيف قبل إضافة روابط الملفات أو مراجعة المواد." />
-      ) : (
-        <div className="grid gap-4 xl:grid-cols-2">
-          {projects.map((project) => {
-            const collection = collections.find((item) => item.id === project.collectionId);
-            return (
-              <Panel key={project.id} title={project.title} description={`${project.country} / ${project.city} / ${project.year}`} compact>
-                <p className="text-sm leading-6 text-slate-600">{project.description}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Badge>{collection?.name ?? "بدون مجموعة"}</Badge>
-                  <Badge>{projectStatusLabel(project.status)}</Badge>
-                  <Badge>{documentationStatusLabel(project.documentationStatus)}</Badge>
-                  <Badge>{marketingStatusLabel(project.marketingStatus)}</Badge>
-                  <Badge>{project.projectType}</Badge>
-                </div>
-                <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-600">{project.notes}</p>
-                <ArchiveProjectManageActions project={project} collections={collections} />
-              </Panel>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
+function ProjectExplorer({ bundle, collections }: { bundle: ProjectBundle; collections: ArchiveCollection[] }) {
+  const { project, links, assets } = bundle;
 
-function DriveLinks({ links, projects }: { links: ArchiveDriveLink[]; projects: ArchiveProject[] }) {
   return (
-    <div className="space-y-4">
-      <ArchiveDriveLinkCreatePanel projects={projects} />
-      {links.length === 0 ? (
-        <EmptyState title="لا توجد روابط بعد" text="أضف رابط ملف أو مجلد للمشروع." />
-      ) : (
-        <div className="grid gap-4 xl:grid-cols-2">
-          {links.map((link) => {
-            const project = projects.find((item) => item.id === link.projectId);
-            return (
-              <Panel key={link.id} title={link.title} description={project?.title ?? "مشروع غير محدد"} compact>
-                <div className="space-y-3 text-sm leading-6 text-slate-600">
-                  <p dir="ltr" className="rounded-md bg-slate-50 p-3 font-mono text-xs">{link.driveUrl}</p>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <InfoLine title="المجلد" text={link.driveFolderId || "غير مقروء بعد"} />
-                    <InfoLine title="الملف" text={link.driveFileId || "غير مقروء بعد"} />
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge>{link.linkType === "FOLDER" ? "مجلد" : link.linkType === "FILE" ? "ملف" : "غير محدد"}</Badge>
-                    <Badge>{link.totalFiles} ملفات</Badge>
-                    <Badge>{link.totalImages} صور</Badge>
-                    <Badge>{link.totalVideos} فيديو</Badge>
-                    <Badge>{link.totalOther} أخرى</Badge>
-                  </div>
-                  {link.lastError && <p className="rounded-md bg-slate-50 p-3 text-slate-700">تعذر قراءة الرابط بالكامل.</p>}
-                  <ArchiveDriveLinkActions linkId={link.id} />
-                  <ArchiveDriveLinkManageActions link={link} projects={projects} />
-                </div>
-              </Panel>
-            );
-          })}
+    <article className="rounded-xl border bg-white shadow-sm">
+      <div className="border-b p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-bold text-slate-500">مشروع</p>
+            <h4 className="mt-1 text-lg font-black text-slate-950">{project.title}</h4>
+            <p className="mt-1 text-sm leading-6 text-slate-600">{[project.country, project.city, project.projectType].filter(Boolean).join(" / ")}</p>
+          </div>
+          <ArchiveProjectManageActions project={project} collections={collections} />
         </div>
-      )}
-    </div>
-  );
-}
+        {project.description ? <p className="mt-3 text-sm leading-7 text-slate-600">{project.description}</p> : null}
+      </div>
 
-function Assets({ assets, marketingOnly = false }: { assets: ArchiveAsset[]; marketingOnly?: boolean }) {
-  if (assets.length === 0) return <EmptyState title="لا توجد مواد بعد" text={marketingOnly ? "تظهر هنا المواد المعتمدة للاستخدام." : "أضف ملفات للمشاريع ثم راجع المواد هنا."} />;
-  return (
-    <div className="grid gap-4 xl:grid-cols-2">
-      {assets.map((asset) => {
-        const contentItemBlockReason = getContentItemBlockReason(asset);
-        const brandAssetBlockReason = getBrandAssetBlockReason(asset);
-        return (
-          <Panel key={asset.id} title={asset.fileName} description={`${fileTypeLabel(asset.fileType)} / ${recommendedUseLabel(asset.recommendedUse)}`} compact>
-            <div className="grid gap-4 md:grid-cols-[128px_1fr]">
-              <div className="flex h-32 items-center justify-center rounded-lg border bg-slate-50 text-center text-xs font-bold text-slate-500">معاينة</div>
-              <div className="space-y-3 text-sm leading-6 text-slate-600">
-                <p>{assetSummary(asset)}</p>
-                {asset.aiWarnings && <p className="rounded-md bg-slate-50 p-3 text-slate-700">تحتاج مراجعة إضافية.</p>}
-                <div className="flex flex-wrap gap-2">
-                  <Badge>{reviewStatusLabel(asset.humanReviewStatus)}</Badge>
-                  <Badge>تسويق {asset.marketingScore}</Badge>
-                  <Badge>جودة {asset.qualityScore}</Badge>
-                  {asset.marketingApproved && <Badge>معتمد للتسويق</Badge>}
-                  {asset.documentationApproved && <Badge>معتمد للتوثيق</Badge>}
-                  {asset.isSensitive && <Badge>حساس</Badge>}
-                  {asset.needsBlur && <Badge>يحتاج معالجة</Badge>}
-                </div>
-                {asset.tags.length > 0 ? <div className="flex flex-wrap gap-2">{asset.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div> : null}
-                <ArchiveAssetReviewActions
-                  assetId={asset.id}
-                  fileName={asset.fileName}
-                  humanReviewStatus={asset.humanReviewStatus}
-                  marketingApproved={asset.marketingApproved}
-                  documentationApproved={asset.documentationApproved}
-                  isSensitive={asset.isSensitive}
-                  needsBlur={asset.needsBlur}
-                />
-                <ArchiveAssetContentItemAction assetId={asset.id} fileName={asset.fileName} disabled={Boolean(contentItemBlockReason)} disabledReason={contentItemBlockReason} />
-                <ArchiveAssetTaskAction assetId={asset.id} fileName={asset.fileName} />
-                <ArchiveAssetBrandAssetAction assetId={asset.id} disabled={Boolean(brandAssetBlockReason)} disabledReason={brandAssetBlockReason} />
-              </div>
+      <div className="space-y-4 p-4">
+        <div>
+          <SectionTitle title="روابط التوثيق" count={links.length} />
+          {links.length === 0 ? (
+            <p className="rounded-lg border border-dashed bg-slate-50 p-4 text-sm text-slate-600">لم تتم إضافة رابط لهذا المشروع بعد.</p>
+          ) : (
+            <div className="space-y-3">
+              {links.map((link) => <DriveLinkCard key={link.id} link={link} projects={collections.length ? undefined : undefined} />)}
             </div>
-          </Panel>
-        );
-      })}
+          )}
+        </div>
+
+        <div>
+          <SectionTitle title="مستكشف المواد" count={assets.length} />
+          <MaterialSummary assets={assets} />
+          <MaterialTable assets={assets} />
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function DriveLinkCard({ link }: { link: ArchiveDriveLink; projects?: ArchiveProject[] }) {
+  return (
+    <div className="rounded-lg border bg-slate-50 p-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <p className="font-black text-slate-950">{link.title}</p>
+          <p dir="ltr" className="mt-1 truncate text-xs text-slate-500">{link.driveUrl}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge>{driveLinkTypeLabel(link.linkType)}</Badge>
+            <Badge>{link.totalFiles} ملف</Badge>
+            <Badge>{link.totalImages} صورة</Badge>
+            <Badge>{link.totalVideos} فيديو</Badge>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <ArchiveDriveLinkActions linkId={link.id} />
+          <ArchiveDriveLinkManageActions link={link} projects={[]} />
+        </div>
+      </div>
     </div>
   );
 }
 
-function assetSummary(asset: ArchiveAsset) {
-  const text = asset.aiSummary?.trim();
-  if (!text) return "بانتظار مراجعة المادة.";
-  const internalTerms = ["foundation", "draft ai", "human review required", "external ai", "contract"];
-  return internalTerms.some((term) => text.toLowerCase().includes(term)) ? "بانتظار مراجعة المادة." : text;
+function MaterialSummary({ assets }: { assets: ArchiveAsset[] }) {
+  return (
+    <div className="mb-3 grid gap-2 sm:grid-cols-4">
+      <SmallCounter label="صور" value={countAssets(assets, "IMAGE")} />
+      <SmallCounter label="فيديو" value={countAssets(assets, "VIDEO")} />
+      <SmallCounter label="تقارير" value={countAssets(assets, "DOCUMENT")} />
+      <SmallCounter label="أخرى" value={countOtherAssets(assets)} />
+    </div>
+  );
+}
+
+function MaterialTable({ assets }: { assets: ArchiveAsset[] }) {
+  if (assets.length === 0) {
+    return <p className="rounded-lg border border-dashed bg-white p-4 text-sm text-slate-600">ستظهر المواد هنا بعد مزامنة رابط التوثيق.</p>;
+  }
+
+  return (
+    <div className="overflow-hidden rounded-lg border bg-white">
+      <table className="w-full text-sm">
+        <thead className="bg-slate-50 text-xs text-slate-500">
+          <tr>
+            <th className="p-3 text-right">النوع</th>
+            <th className="p-3 text-right">الاسم</th>
+            <th className="p-3 text-right">الرابط</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {assets.slice(0, 8).map((asset) => (
+            <tr key={asset.id}>
+              <td className="p-3 font-bold text-slate-700">{fileTypeLabel(asset.fileType)}</td>
+              <td className="p-3 text-slate-700">{asset.fileName}</td>
+              <td className="p-3">
+                {asset.webViewLink ? (
+                  <a className="font-bold text-[#025EB8] hover:underline" href={asset.webViewLink} target="_blank" rel="noreferrer">عرض</a>
+                ) : (
+                  <span className="text-slate-400">غير متاح</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {assets.length > 8 ? <p className="border-t bg-slate-50 p-3 text-xs text-slate-500">يعرض أول 8 مواد فقط.</p> : null}
+    </div>
+  );
+}
+
+function buildExplorer(snapshot: ArchiveSnapshot): CollectionBundle[] {
+  const linksByProject = new Map<string, ArchiveDriveLink[]>();
+  snapshot.driveLinks.forEach((link) => {
+    const list = linksByProject.get(link.projectId) ?? [];
+    list.push(link);
+    linksByProject.set(link.projectId, list);
+  });
+
+  const assetsByProject = new Map<string, ArchiveAsset[]>();
+  snapshot.assets.forEach((asset) => {
+    const list = assetsByProject.get(asset.projectId) ?? [];
+    list.push(asset);
+    assetsByProject.set(asset.projectId, list);
+  });
+
+  return snapshot.collections
+    .slice()
+    .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "ar"))
+    .map((collection) => {
+      const projects = snapshot.projects
+        .filter((project) => project.collectionId === collection.id)
+        .slice()
+        .sort((a, b) => b.year - a.year || a.title.localeCompare(b.title, "ar"));
+
+      const years = Array.from(new Set(projects.map((project) => project.year)))
+        .sort((a, b) => b - a)
+        .map((year) => ({
+          year,
+          projects: projects
+            .filter((project) => project.year === year)
+            .map((project) => ({
+              project,
+              links: linksByProject.get(project.id) ?? [],
+              assets: assetsByProject.get(project.id) ?? [],
+            })),
+        }));
+
+      return { collection, years };
+    });
+}
+
+function countYears(explorer: CollectionBundle[]) {
+  return new Set(explorer.flatMap((item) => item.years.map((year) => `${item.collection.id}-${year.year}`))).size;
+}
+
+function countAssets(assets: ArchiveAsset[], type: ArchiveAsset["fileType"]) {
+  return assets.filter((asset) => asset.fileType === type).length;
+}
+
+function countOtherAssets(assets: ArchiveAsset[]) {
+  return assets.filter((asset) => !["IMAGE", "VIDEO", "DOCUMENT"].includes(asset.fileType)).length;
 }
 
 function fileTypeLabel(value: ArchiveAsset["fileType"]) {
   const labels: Record<ArchiveAsset["fileType"], string> = {
     IMAGE: "صورة",
     VIDEO: "فيديو",
-    DOCUMENT: "مستند",
+    DOCUMENT: "تقرير",
     FOLDER: "مجلد",
-    OTHER: "ملف آخر",
+    OTHER: "ملف",
   };
   return labels[value] ?? value;
 }
 
-function recommendedUseLabel(value: ArchiveAsset["recommendedUse"]) {
-  const labels: Record<string, string> = {
-    ADS: "إعلانات",
-    SOCIAL_POST: "منشور",
-    REEL: "ريلز",
-    CAROUSEL: "كاروسيل",
-    REPORT: "تقرير",
-    SEO_ARTICLE: "مقال",
-    HERO: "واجهة رئيسية",
-    WHATSAPP: "واتساب",
-    DOCUMENTATION_ONLY: "توثيق فقط",
-    DO_NOT_USE: "لا يستخدم",
-  };
-  return labels[value] ?? value;
+function driveLinkTypeLabel(value: ArchiveDriveLink["linkType"]) {
+  if (value === "FOLDER") return "مجلد";
+  if (value === "FILE") return "ملف";
+  return "رابط";
 }
 
-function reviewStatusLabel(value: ArchiveAsset["humanReviewStatus"]) {
-  const labels: Record<ArchiveAsset["humanReviewStatus"], string> = {
-    PENDING: "بانتظار المراجعة",
-    APPROVED: "معتمد",
-    REJECTED: "مرفوض",
-    DOCUMENTATION_ONLY: "للتوثيق فقط",
-  };
-  return labels[value] ?? value;
-}
-
-function projectStatusLabel(value: ArchiveProject["status"]) {
-  const labels: Record<ArchiveProject["status"], string> = {
-    PLANNED: "مخطط",
-    ACTIVE: "نشط",
-    COMPLETED: "مكتمل",
-    PAUSED: "متوقف",
-  };
-  return labels[value] ?? value;
-}
-
-function documentationStatusLabel(value: ArchiveProject["documentationStatus"]) {
-  const labels: Record<ArchiveProject["documentationStatus"], string> = {
-    NOT_STARTED: "توثيق غير مكتمل",
-    PARTIAL: "توثيق جزئي",
-    READY: "توثيق جاهز",
-    MISSING_PROOF: "ينقصه إثبات",
-  };
-  return labels[value] ?? value;
-}
-
-function marketingStatusLabel(value: ArchiveProject["marketingStatus"]) {
-  const labels: Record<ArchiveProject["marketingStatus"], string> = {
-    NOT_REVIEWED: "لم يراجع للتسويق",
-    NEEDS_REVIEW: "يحتاج مراجعة تسويقية",
-    READY: "جاهز للتسويق",
-    IN_USE: "قيد الاستخدام",
-  };
-  return labels[value] ?? value;
-}
-
-function getContentItemBlockReason(asset: ArchiveAsset) {
-  if (asset.humanReviewStatus === "REJECTED" || asset.recommendedUse === "DO_NOT_USE") {
-    return "لا يمكن إنشاء عنصر محتوى من مادة مرفوضة أو غير مناسبة للاستخدام.";
-  }
-  return null;
-}
-
-function getBrandAssetBlockReason(asset: ArchiveAsset) {
-  if (asset.humanReviewStatus === "REJECTED" || asset.recommendedUse === "DO_NOT_USE") {
-    return "لا يمكن نقل مادة مرفوضة إلى مركز الهوية.";
-  }
-  if (asset.isSensitive || asset.needsBlur) {
-    return "المواد الحساسة أو التي تحتاج معالجة لا تدخل مركز الهوية.";
-  }
-  if (!asset.marketingApproved && !asset.documentationApproved) {
-    return "اعتمد المادة للتسويق أو التوثيق أولًا.";
-  }
-  return null;
-}
-
-function Reports({ snapshot }: { snapshot: ArchiveSnapshot }) {
-  const reports = snapshot.assets.filter((asset) => asset.fileType === "DOCUMENT" || asset.recommendedUse === "REPORT");
-  return (
-    <Panel title="التقارير" description="تقارير وملفات توثيق لفريق المشاريع.">
-      <div className="grid gap-3">
-        {reports.map((report) => <InfoLine key={report.id} title={report.fileName} text={report.documentationApproved ? "معتمد" : "بانتظار المراجعة"} />)}
-      </div>
-    </Panel>
-  );
-}
-
-function ArchiveAssistant({ snapshot }: { snapshot: ArchiveSnapshot }) {
-  return (
-    <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-      <Panel title="المساعد" description="اقتراحات تساعد الفريق على فرز المواد وتجهيزها.">
-        <InfoLine title="الصور" text="اقتراح تصنيف واستخدام مناسب بعد مراجعة الفريق." />
-        <InfoLine title="الفيديو" text="اختيار لقطات مناسبة عند توفر المواد." />
-        <InfoLine title="التقارير" text="تلخيص يساعد فريق المشاريع على المتابعة." />
-      </Panel>
-      <Panel title="حالة الأقسام" description="ملخص للأقسام التي يتم تجهيزها داخل الأرشيف.">
-        <div className="flex flex-wrap gap-2">{snapshot.persistence.nextModels.slice(0, 5).map((model) => <Badge key={model}>{sectionLabel(model)}</Badge>)}</div>
-      </Panel>
-    </div>
-  );
-}
-
-function sectionLabel(model: string) {
-  const labels: Record<string, string> = {
-    ArchiveCollection: "المجموعات",
-    ArchiveProject: "المشاريع",
-    ArchiveDriveLink: "روابط الملفات",
-    ArchiveAsset: "المواد",
-    ArchiveVideoFrame: "لقطات الفيديو",
-  };
-  return labels[model] ?? model;
+function SectionTitle({ title, count }: { title: string; count: number }) {
+  return <div className="mb-3 flex items-center justify-between gap-3"><p className="font-black text-slate-950">{title}</p><span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">{count}</span></div>;
 }
 
 function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
-  return <div className="rounded-lg border bg-white p-4 shadow-sm"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{label}</p><p className="mt-2 text-2xl font-black text-slate-950">{value}</p></div><span className="text-[#025EB8] [&>svg]:h-5 [&>svg]:w-5">{icon}</span></div></div>;
+  return <div className="rounded-xl border bg-slate-50 p-3"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold text-slate-500">{label}</p><p className="mt-1 text-2xl font-black text-slate-950">{value}</p></div><span className="text-[#025EB8] [&>svg]:h-5 [&>svg]:w-5">{icon}</span></div></div>;
 }
 
-function Panel({ title, description, children, compact = false }: { title: string; description?: string; children: ReactNode; compact?: boolean }) {
-  return <section className="rounded-lg border bg-white shadow-sm"><div className={`border-b ${compact ? "p-4" : "p-5"}`}><h2 className="text-lg font-black text-slate-950">{title}</h2>{description && <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>}</div><div className={compact ? "p-4" : "p-5"}>{children}</div></section>;
+function SummaryCard({ icon, title, value }: { icon: ReactNode; title: string; value: number }) {
+  return <div className="rounded-xl border bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><div><p className="text-sm font-black text-slate-950">{title}</p><p className="mt-1 text-2xl font-black text-slate-950">{value}</p></div><span className="text-[#025EB8] [&>svg]:h-5 [&>svg]:w-5">{icon}</span></div></div>;
 }
 
-function InfoLine({ title, text }: { title: string; text: string }) {
-  return <div className="rounded-lg border bg-slate-50 p-4"><p className="font-black text-slate-950">{title}</p><p className="mt-1 text-sm leading-6 text-slate-600">{text}</p></div>;
+function SmallCounter({ label, value }: { label: string; value: number }) {
+  return <div className="rounded-lg border bg-white px-3 py-2"><p className="text-xs font-bold text-slate-500">{label}</p><p className="mt-1 font-black text-slate-950">{value}</p></div>;
 }
 
-function StateLine({ title, text }: { title: string; text: string }) {
-  return <div className="rounded-lg border bg-white p-3"><div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#025EB8]" /><p className="font-black text-slate-950">{title}</p></div><p className="mt-1 text-sm leading-6 text-slate-700">{text}</p></div>;
+function Panel({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
+  return <section className="rounded-2xl border bg-white shadow-sm"><div className="border-b p-5"><h2 className="text-lg font-black text-slate-950">{title}</h2>{description ? <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p> : null}</div><div className="p-5">{children}</div></section>;
 }
 
 function Badge({ children }: { children: ReactNode }) {
-  return <span className="inline-flex items-center rounded-md bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{children}</span>;
+  return <span className="inline-flex items-center rounded-md bg-white px-2.5 py-1 text-xs font-bold text-slate-700 ring-1 ring-slate-200">{children}</span>;
 }
 
-function EmptyState({ title, text }: { title: string; text: string }) {
-  return <div className="rounded-lg border border-dashed bg-white p-8 text-center"><Database className="mx-auto h-8 w-8 text-slate-400" /><p className="mt-3 font-black text-slate-950">{title}</p><p className="mt-2 text-sm text-slate-600">{text}</p></div>;
+function EmptyState({ title, text, compact = false }: { title: string; text: string; compact?: boolean }) {
+  return <div className={`rounded-xl border border-dashed bg-white text-center ${compact ? "p-4" : "p-8"}`}><Database className="mx-auto h-7 w-7 text-slate-400" /><p className="mt-3 font-black text-slate-950">{title}</p><p className="mt-2 text-sm text-slate-600">{text}</p></div>;
 }
