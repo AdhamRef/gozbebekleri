@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { Archive, CalendarDays, Database, FileText, FolderOpen, Image, Link2, Video } from "lucide-react";
 import type { ArchiveAsset, ArchiveCollection, ArchiveDriveLink, ArchiveProject, ArchiveSnapshot, ArchiveTabKey } from "@/lib/archive/archive-types";
@@ -12,6 +13,11 @@ import { ArchiveProjectManageActions } from "./ArchiveProjectManageActions";
 type Props = {
   activeTab?: ArchiveTabKey;
   snapshot: ArchiveSnapshot;
+  selection?: {
+    collectionId?: string;
+    year?: number;
+    projectId?: string;
+  };
 };
 
 type ProjectBundle = {
@@ -30,38 +36,61 @@ type CollectionBundle = {
   years: YearBundle[];
 };
 
-export function ArchiveConsole({ snapshot }: Props) {
+export function ArchiveConsole({ snapshot, selection }: Props) {
   const explorer = buildExplorer(snapshot);
+  const activeCollection = explorer.find((item) => item.collection.id === selection?.collectionId);
+  const activeProject = selection?.projectId ? findProject(explorer, selection.projectId) : null;
+  const selectedYear = activeProject?.year.year ?? selection?.year;
+  const activeYear = activeProject?.year ?? activeCollection?.years.find((year) => year.year === selectedYear);
 
   return (
     <main className="min-h-screen bg-[#FFFDF8] p-4 text-slate-950 sm:p-6" dir="rtl">
-      <section className="rounded-2xl border bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-[#025EB8]">Archive Explorer</p>
-            <h1 className="mt-2 text-2xl font-black sm:text-4xl">الأرشيف</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-              تصفح بسيط حسب المجموعة، السنة، المشروع، ثم المواد. رابط Google Drive يضاف داخل المشروع فقط، ومنه يتم بناء مستكشف المواد لاحقًا.
-            </p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-4 lg:min-w-[560px]">
-            <Metric icon={<FolderOpen />} label="المجموعات" value={snapshot.summary.collections} />
-            <Metric icon={<CalendarDays />} label="السنوات" value={countYears(explorer)} />
-            <Metric icon={<Archive />} label="المشاريع" value={snapshot.summary.projects} />
-            <Metric icon={<Link2 />} label="الروابط" value={snapshot.summary.driveLinks} />
-          </div>
-        </div>
-      </section>
+      <Hero snapshot={snapshot} explorer={explorer} />
+      <Breadcrumb collection={activeCollection?.collection} year={selectedYear} project={activeProject?.bundle.project} />
 
-      <section className="mt-5 grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <Panel title="إضافة وتنظيم" description="ابدأ بالمجموعة، ثم المشروع، ثم أضف رابط التوثيق داخل المشروع.">
-          <div className="space-y-4">
-            <ArchiveCollectionCreatePanel />
-            <ArchiveProjectCreatePanel collections={snapshot.collections} />
-            <ArchiveDriveLinkCreatePanel projects={snapshot.projects} />
-          </div>
+      {!activeCollection ? (
+        <RootExplorer snapshot={snapshot} explorer={explorer} />
+      ) : activeProject ? (
+        <ProjectDetail bundle={activeProject.bundle} collections={snapshot.collections} projects={snapshot.projects} />
+      ) : activeYear ? (
+        <YearDetail collection={activeCollection.collection} year={activeYear} collections={snapshot.collections} projects={snapshot.projects} />
+      ) : (
+        <CollectionDetail item={activeCollection} collections={snapshot.collections} />
+      )}
+    </main>
+  );
+}
+
+function Hero({ snapshot, explorer }: { snapshot: ArchiveSnapshot; explorer: CollectionBundle[] }) {
+  return (
+    <section className="rounded-2xl border bg-white p-5 shadow-sm sm:p-6">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-[#025EB8]">Archive Explorer</p>
+          <h1 className="mt-2 text-2xl font-black sm:text-4xl">الأرشيف</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+            تصفح المواد خطوة بخطوة: المجموعة، ثم السنة، ثم المشروع، ثم جدول المواد. رابط Google Drive يضاف داخل المشروع فقط.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-4 lg:min-w-[560px]">
+          <Metric icon={<FolderOpen />} label="المجموعات" value={snapshot.summary.collections} />
+          <Metric icon={<CalendarDays />} label="السنوات" value={countYears(explorer)} />
+          <Metric icon={<Archive />} label="المشاريع" value={snapshot.summary.projects} />
+          <Metric icon={<Link2 />} label="الروابط" value={snapshot.summary.driveLinks} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RootExplorer({ snapshot, explorer }: { snapshot: ArchiveSnapshot; explorer: CollectionBundle[] }) {
+  return (
+    <div className="mt-5 space-y-5">
+      <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+        <Panel title="إضافة مجموعة" description="أضف مجموعة رئيسية مثل غزة، القدس، السودان، الوقف أو الزكاة.">
+          <ArchiveCollectionCreatePanel />
         </Panel>
-        <Panel title="المواد" description="ملخص سريع للمواد المفهرسة داخل المشاريع.">
+        <Panel title="ملخص المواد" description="إجمالي المواد المفهرسة داخل كل المشاريع.">
           <div className="grid gap-3 sm:grid-cols-2">
             <SummaryCard icon={<Image />} title="صور" value={countAssets(snapshot.assets, "IMAGE")} />
             <SummaryCard icon={<Video />} title="فيديوهات" value={countAssets(snapshot.assets, "VIDEO")} />
@@ -71,93 +100,169 @@ export function ArchiveConsole({ snapshot }: Props) {
         </Panel>
       </section>
 
-      <section className="mt-5 space-y-5">
+      <Panel title="المجموعات" description="اختر المجموعة التي تريد الدخول إليها.">
         {explorer.length === 0 ? (
-          <EmptyState title="لا توجد مجموعات بعد" text="أضف أول مجموعة مثل غزة، القدس، السودان، الوقف أو الزكاة." />
+          <EmptyState title="لا توجد مجموعات بعد" text="أضف أول مجموعة للبدء في بناء الأرشيف." />
         ) : (
-          explorer.map((item) => <CollectionExplorer key={item.collection.id} item={item} collections={snapshot.collections} projects={snapshot.projects} />)
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {explorer.map((item) => <CollectionCard key={item.collection.id} item={item} />)}
+          </div>
         )}
-      </section>
-    </main>
+      </Panel>
+    </div>
   );
 }
 
-function CollectionExplorer({ item, collections, projects }: { item: CollectionBundle; collections: ArchiveCollection[]; projects: ArchiveProject[] }) {
+function CollectionDetail({ item, collections }: { item: CollectionBundle; collections: ArchiveCollection[] }) {
   return (
-    <section className="rounded-2xl border bg-white shadow-sm">
-      <div className="border-b p-5">
+    <div className="mt-5 space-y-5">
+      <section className="rounded-2xl border bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs font-bold text-slate-500">مجموعة</p>
-            <h2 className="mt-1 text-2xl font-black text-slate-950">{item.collection.name}</h2>
+            <h2 className="mt-1 text-3xl font-black text-slate-950">{item.collection.name}</h2>
             {item.collection.description ? <p className="mt-2 text-sm leading-7 text-slate-600">{item.collection.description}</p> : null}
           </div>
           <ArchiveCollectionManageActions collection={item.collection} />
         </div>
-      </div>
+      </section>
 
-      <div className="space-y-4 p-5">
-        {item.years.length === 0 ? (
-          <EmptyState title="لا توجد سنوات بعد" text="أضف مشروعًا لهذه المجموعة وحدد السنة ليظهر هنا." compact />
+      <Panel title="إضافة مشروع" description="أضف مشروعًا داخل هذه المجموعة وحدد السنة المناسبة له.">
+        <ArchiveProjectCreatePanel collections={collections} />
+      </Panel>
+
+      <Panel title="السنوات" description="اختر السنة التي تريد عرض مشاريعها.">
+        {yearOptions(item).length === 0 ? (
+          <EmptyState title="لا توجد سنوات بعد" text="أضف مشروعًا لهذه المجموعة ليظهر ضمن سنة محددة." compact />
         ) : (
-          item.years.map((year) => <YearExplorer key={`${item.collection.id}-${year.year}`} year={year} collections={collections} projects={projects} />)
+          <div className="grid gap-3 sm:grid-cols-4 xl:grid-cols-6">
+            {yearOptions(item).map((year) => (
+              <Link key={year} href={archiveHref({ collectionId: item.collection.id, year })} className="rounded-xl border bg-slate-50 p-4 text-center transition hover:border-[#025EB8] hover:bg-white">
+                <p className="text-xs font-bold text-slate-500">السنة</p>
+                <p className="mt-1 text-2xl font-black text-slate-950">{year}</p>
+                <p className="mt-1 text-xs text-slate-500">{item.years.find((itemYear) => itemYear.year === year)?.projects.length ?? 0} مشروع</p>
+              </Link>
+            ))}
+          </div>
         )}
-      </div>
-    </section>
+      </Panel>
+    </div>
   );
 }
 
-function YearExplorer({ year, collections, projects }: { year: YearBundle; collections: ArchiveCollection[]; projects: ArchiveProject[] }) {
+function YearDetail({ collection, year, collections, projects }: { collection: ArchiveCollection; year: YearBundle; collections: ArchiveCollection[]; projects: ArchiveProject[] }) {
   return (
-    <section className="rounded-xl border bg-slate-50/60">
-      <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs font-bold text-slate-500">السنة</p>
-          <h3 className="mt-1 text-xl font-black text-slate-950">{year.year}</h3>
-        </div>
-        <span className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-slate-600 shadow-sm">{year.projects.length} مشروع</span>
-      </div>
-      <div className="grid gap-4 p-4 xl:grid-cols-2">
-        {year.projects.map((bundle) => <ProjectExplorer key={bundle.project.id} bundle={bundle} collections={collections} projects={projects} />)}
-      </div>
-    </section>
+    <div className="mt-5 space-y-5">
+      <section className="rounded-2xl border bg-white p-5 shadow-sm">
+        <p className="text-xs font-bold text-slate-500">{collection.name}</p>
+        <h2 className="mt-1 text-3xl font-black text-slate-950">{year.year}</h2>
+        <p className="mt-2 text-sm text-slate-600">اختر المشروع الذي تريد فتح روابطه ومواده.</p>
+      </section>
+
+      <Panel title="إضافة مشروع" description="يمكنك إضافة مشروع آخر داخل نفس المجموعة والسنة.">
+        <ArchiveProjectCreatePanel collections={collections} />
+      </Panel>
+
+      <Panel title="المشاريع" description="اضغط فتح للدخول إلى المشروع ورؤية روابط التوثيق والمواد.">
+        {year.projects.length === 0 ? (
+          <EmptyState title="لا توجد مشاريع" text="لم يتم إنشاء مشاريع في هذه السنة بعد." compact />
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {year.projects.map((bundle) => <ProjectCard key={bundle.project.id} bundle={bundle} collection={collection} collections={collections} projects={projects} />)}
+          </div>
+        )}
+      </Panel>
+    </div>
   );
 }
 
-function ProjectExplorer({ bundle, collections, projects }: { bundle: ProjectBundle; collections: ArchiveCollection[]; projects: ArchiveProject[] }) {
+function ProjectDetail({ bundle, collections, projects }: { bundle: ProjectBundle; collections: ArchiveCollection[]; projects: ArchiveProject[] }) {
   const { project, links, assets } = bundle;
 
   return (
-    <article className="rounded-xl border bg-white shadow-sm">
-      <div className="border-b p-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+    <div className="mt-5 space-y-5">
+      <section className="rounded-2xl border bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs font-bold text-slate-500">مشروع</p>
-            <h4 className="mt-1 text-lg font-black text-slate-950">{project.title}</h4>
+            <h2 className="mt-1 text-3xl font-black text-slate-950">{project.title}</h2>
             <p className="mt-1 text-sm leading-6 text-slate-600">{[project.country, project.city, project.projectType].filter(Boolean).join(" / ")}</p>
+            {project.description ? <p className="mt-3 text-sm leading-7 text-slate-600">{project.description}</p> : null}
           </div>
           <ArchiveProjectManageActions project={project} collections={collections} />
         </div>
-        {project.description ? <p className="mt-3 text-sm leading-7 text-slate-600">{project.description}</p> : null}
-      </div>
+      </section>
 
-      <div className="space-y-4 p-4">
-        <div>
-          <SectionTitle title="روابط التوثيق" count={links.length} />
+      <Panel title="إضافة رابط توثيق" description="ضع رابط Google Drive الخاص بهذا المشروع فقط ليتم فهرسة مواده لاحقًا.">
+        <ArchiveDriveLinkCreatePanel projects={[project]} />
+      </Panel>
+
+      <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+        <Panel title="روابط التوثيق" description="الروابط التي سيتم استخدامها في المزامنة والفهرسة.">
           {links.length === 0 ? (
-            <p className="rounded-lg border border-dashed bg-slate-50 p-4 text-sm text-slate-600">لم تتم إضافة رابط لهذا المشروع بعد.</p>
+            <EmptyState title="لا توجد روابط" text="أضف رابط Google Drive لهذا المشروع." compact />
           ) : (
             <div className="space-y-3">
               {links.map((link) => <DriveLinkCard key={link.id} link={link} projects={projects} />)}
             </div>
           )}
-        </div>
+        </Panel>
 
-        <div>
-          <SectionTitle title="مستكشف المواد" count={assets.length} />
+        <Panel title="مستكشف المواد" description="تظهر المواد هنا بعد المزامنة والتحليل.">
           <MaterialSummary assets={assets} />
           <MaterialTable assets={assets} />
+        </Panel>
+      </section>
+    </div>
+  );
+}
+
+function CollectionCard({ item }: { item: CollectionBundle }) {
+  const stats = collectionStats(item);
+  return (
+    <article className="rounded-xl border bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold text-slate-500">مجموعة</p>
+          <h3 className="mt-1 text-xl font-black text-slate-950">{item.collection.name}</h3>
         </div>
+        <FolderOpen className="h-5 w-5 text-[#025EB8]" />
+      </div>
+      {item.collection.description ? <p className="mt-3 min-h-[48px] text-sm leading-6 text-slate-600">{item.collection.description}</p> : null}
+      <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+        <SmallCounter label="سنوات" value={item.years.length} />
+        <SmallCounter label="مشاريع" value={stats.projects} />
+        <SmallCounter label="روابط" value={stats.links} />
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link href={archiveHref({ collectionId: item.collection.id })} className="inline-flex h-9 items-center rounded-md bg-[#025EB8] px-3 text-sm font-bold text-white transition hover:bg-[#014f9f]">فتح</Link>
+        <ArchiveCollectionManageActions collection={item.collection} />
+      </div>
+    </article>
+  );
+}
+
+function ProjectCard({ bundle, collection, collections }: { bundle: ProjectBundle; collection: ArchiveCollection; collections: ArchiveCollection[]; projects: ArchiveProject[] }) {
+  const { project, links, assets } = bundle;
+  return (
+    <article className="rounded-xl border bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold text-slate-500">مشروع</p>
+          <h3 className="mt-1 text-lg font-black text-slate-950">{project.title}</h3>
+          <p className="mt-1 text-xs text-slate-500">{[project.country, project.city].filter(Boolean).join(" / ")}</p>
+        </div>
+        <Archive className="h-5 w-5 text-[#025EB8]" />
+      </div>
+      {project.description ? <p className="mt-3 min-h-[44px] text-sm leading-6 text-slate-600">{project.description}</p> : null}
+      <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+        <SmallCounter label="روابط" value={links.length} />
+        <SmallCounter label="مواد" value={assets.length} />
+        <SmallCounter label="صور" value={countAssets(assets, "IMAGE")} />
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link href={archiveHref({ collectionId: collection.id, year: project.year, projectId: project.id })} className="inline-flex h-9 items-center rounded-md bg-[#025EB8] px-3 text-sm font-bold text-white transition hover:bg-[#014f9f]">فتح</Link>
+        <ArchiveProjectManageActions project={project} collections={collections} />
       </div>
     </article>
   );
@@ -213,7 +318,7 @@ function MaterialTable({ assets }: { assets: ArchiveAsset[] }) {
           </tr>
         </thead>
         <tbody className="divide-y">
-          {assets.slice(0, 8).map((asset) => (
+          {assets.slice(0, 12).map((asset) => (
             <tr key={asset.id}>
               <td className="p-3 font-bold text-slate-700">{fileTypeLabel(asset.fileType)}</td>
               <td className="p-3 text-slate-700">{asset.fileName}</td>
@@ -228,8 +333,20 @@ function MaterialTable({ assets }: { assets: ArchiveAsset[] }) {
           ))}
         </tbody>
       </table>
-      {assets.length > 8 ? <p className="border-t bg-slate-50 p-3 text-xs text-slate-500">يعرض أول 8 مواد فقط.</p> : null}
+      {assets.length > 12 ? <p className="border-t bg-slate-50 p-3 text-xs text-slate-500">يعرض أول 12 مادة فقط.</p> : null}
     </div>
+  );
+}
+
+function Breadcrumb({ collection, year, project }: { collection?: ArchiveCollection; year?: number; project?: ArchiveProject }) {
+  if (!collection && !year && !project) return null;
+  return (
+    <nav className="mt-4 flex flex-wrap items-center gap-2 text-sm font-bold text-slate-600">
+      <Link href="/dashboard/archive" className="rounded-md border bg-white px-3 py-1.5 hover:border-[#025EB8]">الأرشيف</Link>
+      {collection ? <Link href={archiveHref({ collectionId: collection.id })} className="rounded-md border bg-white px-3 py-1.5 hover:border-[#025EB8]">{collection.name}</Link> : null}
+      {collection && year ? <Link href={archiveHref({ collectionId: collection.id, year })} className="rounded-md border bg-white px-3 py-1.5 hover:border-[#025EB8]">{year}</Link> : null}
+      {collection && year && project ? <span className="rounded-md bg-slate-900 px-3 py-1.5 text-white">{project.title}</span> : null}
+    </nav>
   );
 }
 
@@ -274,6 +391,45 @@ function buildExplorer(snapshot: ArchiveSnapshot): CollectionBundle[] {
     });
 }
 
+function findProject(explorer: CollectionBundle[], projectId: string) {
+  for (const collection of explorer) {
+    for (const year of collection.years) {
+      const bundle = year.projects.find((item) => item.project.id === projectId);
+      if (bundle) return { collection, year, bundle };
+    }
+  }
+  return null;
+}
+
+function collectionStats(item: CollectionBundle) {
+  return item.years.reduce(
+    (stats, year) => {
+      year.projects.forEach((bundle) => {
+        stats.projects += 1;
+        stats.links += bundle.links.length;
+        stats.assets += bundle.assets.length;
+      });
+      return stats;
+    },
+    { projects: 0, links: 0, assets: 0 },
+  );
+}
+
+function yearOptions(item: CollectionBundle) {
+  const currentYear = new Date().getFullYear();
+  const baseYears = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3];
+  return Array.from(new Set([...item.years.map((year) => year.year), ...baseYears])).sort((a, b) => b - a);
+}
+
+function archiveHref({ collectionId, year, projectId }: { collectionId?: string; year?: number; projectId?: string }) {
+  const params = new URLSearchParams();
+  if (collectionId) params.set("collection", collectionId);
+  if (year) params.set("year", String(year));
+  if (projectId) params.set("project", projectId);
+  const query = params.toString();
+  return query ? `/dashboard/archive?${query}` : "/dashboard/archive";
+}
+
 function countYears(explorer: CollectionBundle[]) {
   return new Set(explorer.flatMap((item) => item.years.map((year) => `${item.collection.id}-${year.year}`))).size;
 }
@@ -301,10 +457,6 @@ function driveLinkTypeLabel(value: ArchiveDriveLink["linkType"]) {
   if (value === "FOLDER") return "مجلد";
   if (value === "FILE") return "ملف";
   return "رابط";
-}
-
-function SectionTitle({ title, count }: { title: string; count: number }) {
-  return <div className="mb-3 flex items-center justify-between gap-3"><p className="font-black text-slate-950">{title}</p><span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">{count}</span></div>;
 }
 
 function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
