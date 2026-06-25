@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Settings2, Trash2 } from "lucide-react";
+import { Loader2, Plus, Settings2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { readArchiveProjectOptions, saveArchiveProjectOptions, type ArchiveProjectOptions } from "./archiveProjectOptions";
 
@@ -12,6 +12,8 @@ type OptionGroup = {
   title: string;
   placeholder: string;
 };
+
+type Feedback = { tone: "success" | "error"; message: string } | null;
 
 const GROUPS: OptionGroup[] = [
   { key: "years", title: "السنوات", placeholder: "مثال: 2027" },
@@ -24,31 +26,55 @@ const GROUPS: OptionGroup[] = [
 export function ArchiveProjectOptionsPanel() {
   const [options, setOptions] = useState<ArchiveProjectOptions>(() => readArchiveProjectOptions());
   const [drafts, setDrafts] = useState<Record<OptionKey, string>>({ years: "", countries: "", cities: "", themes: "", projectTypes: "" });
+  const [savingKey, setSavingKey] = useState<OptionKey | null>(null);
+  const [feedback, setFeedback] = useState<Feedback>(null);
 
   useEffect(() => {
+    let cancelled = false;
     setOptions(readArchiveProjectOptions());
+    fetch("/api/admin/archive/project-options", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((result) => {
+        if (!cancelled && result?.ok && result.options) setOptions(result.options);
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
   }, []);
+
+  async function persist(next: ArchiveProjectOptions, key: OptionKey) {
+    setOptions(next);
+    setSavingKey(key);
+    setFeedback(null);
+    try {
+      const saved = await saveArchiveProjectOptions(next);
+      setOptions(saved);
+      setFeedback({ tone: "success", message: "تم حفظ الخيارات للفريق" });
+    } catch (error) {
+      setFeedback({ tone: "error", message: error instanceof Error ? error.message : "تعذر حفظ الخيارات" });
+    } finally {
+      setSavingKey(null);
+    }
+  }
 
   function addOption(key: OptionKey) {
     const value = drafts[key].trim();
-    if (!value) return;
+    if (!value || savingKey) return;
 
     const next = {
       ...options,
       [key]: normalizeOptionList([value, ...options[key]]),
     };
-    setOptions(next);
     setDrafts((current) => ({ ...current, [key]: "" }));
-    saveArchiveProjectOptions(next);
+    void persist(next, key);
   }
 
   function removeOption(key: OptionKey, value: string) {
+    if (savingKey) return;
     const next = {
       ...options,
       [key]: options[key].filter((item) => item !== value),
     };
-    setOptions(next);
-    saveArchiveProjectOptions(next);
+    void persist(next, key);
   }
 
   return (
@@ -58,7 +84,8 @@ export function ArchiveProjectOptionsPanel() {
           <Settings2 className="h-4 w-4 text-[#025EB8]" />
           <h2 className="text-base font-black text-slate-950">إعدادات خيارات المشاريع</h2>
         </div>
-        <p className="mt-1 text-xs leading-5 text-slate-600">أضف القيم التي تريد ظهورها في نماذج إضافة وتعديل المشاريع.</p>
+        <p className="mt-1 text-xs leading-5 text-slate-600">أضف القيم التي تريد ظهورها في نماذج إضافة وتعديل المشاريع لكل أعضاء الفريق.</p>
+        {feedback ? <p className={`mt-2 rounded-md border px-3 py-2 text-xs font-semibold ${feedback.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}>{feedback.message}</p> : null}
       </div>
       <div className="grid gap-3 p-4 lg:grid-cols-5">
         {GROUPS.map((group) => (
@@ -75,10 +102,11 @@ export function ArchiveProjectOptionsPanel() {
                   }
                 }}
                 placeholder={group.placeholder}
-                className="h-8 min-w-0 flex-1 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-[#025EB8]"
+                disabled={Boolean(savingKey)}
+                className="h-8 min-w-0 flex-1 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-[#025EB8] disabled:opacity-60"
               />
-              <Button type="button" size="sm" onClick={() => addOption(group.key)} className="h-8 px-2">
-                <Plus className="h-3.5 w-3.5" />
+              <Button type="button" size="sm" onClick={() => addOption(group.key)} disabled={Boolean(savingKey)} className="h-8 px-2">
+                {savingKey === group.key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
               </Button>
             </div>
             <div className="mt-3 flex max-h-28 flex-wrap gap-1 overflow-auto">
@@ -87,7 +115,8 @@ export function ArchiveProjectOptionsPanel() {
                   type="button"
                   key={option}
                   onClick={() => removeOption(group.key, option)}
-                  className="inline-flex items-center gap-1 rounded-md border bg-white px-2 py-1 text-[11px] font-bold text-slate-700 transition hover:border-rose-200 hover:text-rose-700"
+                  disabled={Boolean(savingKey)}
+                  className="inline-flex items-center gap-1 rounded-md border bg-white px-2 py-1 text-[11px] font-bold text-slate-700 transition hover:border-rose-200 hover:text-rose-700 disabled:opacity-60"
                   title="حذف الخيار"
                 >
                   {option}
