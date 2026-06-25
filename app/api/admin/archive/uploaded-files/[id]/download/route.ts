@@ -11,15 +11,15 @@ export async function GET(_request: Request, context: Params) {
   if (denied) return denied;
 
   const { id } = await Promise.resolve(context.params);
-  const row = await prisma.auditLog.findUnique({ where: { id }, select: { metadata: true, action: true, entityType: true } });
+  const row = await prisma.auditLog.findUnique({ where: { id }, select: { id: true, metadata: true, action: true, entityType: true } });
   if (!row || row.action !== "archive.uploadedFile.create" || row.entityType !== "ArchiveUploadedFile") {
     return new Response("Not found", { status: 404 });
   }
 
   const metadata = metadataObject(row.metadata);
-  const base64 = stringField(metadata.base64);
   const fileName = safeFileName(stringField(metadata.fileName) || stringField(metadata.title) || "archive-file");
   const mimeType = stringField(metadata.mimeType) || "application/octet-stream";
+  const base64 = await readStoredBase64(row.id, metadata);
 
   if (!base64) return new Response("Not found", { status: 404 });
 
@@ -33,12 +33,40 @@ export async function GET(_request: Request, context: Params) {
   });
 }
 
+async function readStoredBase64(id: string, metadata: Record<string, unknown>) {
+  const inline = stringField(metadata.base64);
+  if (inline) return inline;
+
+  const rows = await prisma.auditLog.findMany({
+    where: { action: "archive.uploadedFile.chunk", entityType: "ArchiveUploadedFileChunk", entityId: id },
+    orderBy: { createdAt: "asc" },
+    select: { metadata: true },
+  });
+
+  return rows
+    .map((row) => {
+      const chunkMetadata = metadataObject(row.metadata);
+      return {
+        index: numberField(chunkMetadata.index),
+        base64: stringField(chunkMetadata.base64),
+      };
+    })
+    .filter((chunk) => chunk.base64)
+    .sort((a, b) => a.index - b.index)
+    .map((chunk) => chunk.base64)
+    .join("");
+}
+
 function metadataObject(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
 function stringField(value: unknown) {
   return typeof value === "string" ? value : "";
+}
+
+function numberField(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 function safeFileName(value: string) {
