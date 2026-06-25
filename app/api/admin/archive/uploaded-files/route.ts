@@ -5,7 +5,8 @@ import { jsonNoStore, requireArchiveApiAccess } from "../_auth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MAX_FILE_BYTES = 8 * 1024 * 1024;
+const MAX_FILE_BYTES = 30 * 1024 * 1024;
+const BASE64_CHUNK_SIZE = 3_500_000;
 const allowedCategories = ["MARKETING", "DOCUMENTS"] as const;
 type ArchiveUploadCategory = (typeof allowedCategories)[number];
 
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
   if (!category) return jsonNoStore({ ok: false, error: "اختر نوع الملف" }, { status: 400 });
   if (!(file instanceof File)) return jsonNoStore({ ok: false, error: "اختر ملفًا أولًا" }, { status: 400 });
   if (file.size <= 0) return jsonNoStore({ ok: false, error: "الملف فارغ" }, { status: 400 });
-  if (file.size > MAX_FILE_BYTES) return jsonNoStore({ ok: false, error: "حجم الملف كبير جدًا" }, { status: 400 });
+  if (file.size > MAX_FILE_BYTES) return jsonNoStore({ ok: false, error: "حجم الملف كبير جدًا. الحد الحالي 30MB" }, { status: 400 });
 
   const extension = file.name.split(".").pop()?.toLowerCase() || "";
   if (!allowedExtensions.includes(extension) && !allowedMimeTypes.includes(file.type)) {
@@ -61,6 +62,9 @@ export async function POST(request: Request) {
 
   const actor = auditActorFromDashboardSession(session);
   const buffer = Buffer.from(await file.arrayBuffer());
+  const base64 = buffer.toString("base64");
+  const chunks = chunkString(base64, BASE64_CHUNK_SIZE);
+
   const row = await prisma.auditLog.create({
     data: {
       ...actor,
@@ -76,11 +80,35 @@ export async function POST(request: Request) {
         mimeType: file.type || mimeFromExtension(extension),
         sizeBytes: file.size,
         extension,
-        base64: buffer.toString("base64"),
+        storageMode: chunks.length > 1 ? "CHUNKED" : "INLINE",
+        chunkCount: chunks.length,
+        base64: chunks.length === 1 ? base64 : undefined,
       },
       stream: "TEAM",
     },
   });
+
+  if (chunks.length > 1) {
+    for (let index = 0; index < chunks.length; index += 1) {
+      await prisma.auditLog.create({
+        data: {
+          ...actor,
+          action: "archive.uploadedFile.chunk",
+          messageAr: "تم حفظ جزء من ملف أرشيفي",
+          messageEn: "Archive uploaded file chunk saved",
+          entityType: "ArchiveUploadedFileChunk",
+          entityId: row.id,
+          metadata: {
+            fileId: row.id,
+            index,
+            total: chunks.length,
+            base64: chunks[index],
+          },
+          stream: "TEAM",
+        },
+      });
+    }
+  }
 
   return jsonNoStore({ ok: true, file: toFileItem(row), message: "تم رفع الملف" });
 }
@@ -115,6 +143,8 @@ function toFileItem(row: { id: string; createdAt: Date; actorName?: string | nul
     mimeType: stringField(metadata.mimeType),
     sizeBytes: numberField(metadata.sizeBytes),
     extension: stringField(metadata.extension),
+    storageMode: stringField(metadata.storageMode) || "INLINE",
+    chunkCount: numberField(metadata.chunkCount) || 1,
     createdAt: row.createdAt.toISOString(),
     uploadedBy: row.actorName || "الفريق",
   };
@@ -125,4 +155,12 @@ function mimeFromExtension(extension: string) {
   if (extension === "xls") return "application/vnd.ms-excel";
   if (extension === "xlsx") return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
   return "application/octet-stream";
+}
+
+function chunkString(value: string, size: number) {
+  const chunks: string[] = [];
+  for (let index = 0; index < value.length; index += size) {
+    chunks.push(value.slice(index, index + size));
+  }
+  return chunks;
 }
