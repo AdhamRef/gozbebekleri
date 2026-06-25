@@ -59,44 +59,48 @@ export function ArchiveCollectionManageActions({ collection }: Props) {
   }
 
   return (
-    <div className="mt-4 rounded-lg border bg-white p-3">
+    <div className="rounded-md border bg-white p-2">
       {editing ? (
-        <div className="grid gap-3">
-          <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-2">
+          <div className="grid gap-2 md:grid-cols-3">
             <Field label="اسم المجموعة">
-              <input value={name} onChange={(event) => setName(event.target.value)} className="h-9 rounded-md border px-3 text-sm outline-none focus:border-[#025EB8]" />
+              <input value={name} onChange={(event) => setName(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]" />
             </Field>
             <Field label="النوع">
-              <input value={type} onChange={(event) => setType(event.target.value)} className="h-9 rounded-md border px-3 text-sm outline-none focus:border-[#025EB8]" />
+              <input value={type} onChange={(event) => setType(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]" />
             </Field>
             <Field label="الرابط المختصر">
-              <input dir="ltr" value={slug} onChange={(event) => setSlug(event.target.value)} className="h-9 rounded-md border px-3 text-left font-mono text-sm outline-none focus:border-[#025EB8]" />
+              <input dir="ltr" value={slug} onChange={(event) => setSlug(event.target.value)} className="h-8 rounded-md border px-2 text-left font-mono text-xs outline-none focus:border-[#025EB8]" />
             </Field>
           </div>
           <Field label="الوصف">
-            <textarea value={description} onChange={(event) => setDescription(event.target.value)} className="min-h-16 rounded-md border px-3 py-2 text-sm outline-none focus:border-[#025EB8]" />
+            <textarea value={description} onChange={(event) => setDescription(event.target.value)} className="min-h-14 rounded-md border px-2 py-2 text-xs outline-none focus:border-[#025EB8]" />
           </Field>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" onClick={saveChanges} disabled={busy} className="gap-2 font-bold">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            <Button type="button" size="sm" onClick={saveChanges} disabled={busy} className="h-8 gap-1.5 px-2.5 text-xs font-bold">
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
               حفظ
             </Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => setEditing(false)} disabled={busy} className="gap-2 font-bold">
-              <X className="h-4 w-4" /> إلغاء
+            <Button type="button" size="sm" variant="outline" onClick={() => setEditing(false)} disabled={busy} className="h-8 gap-1.5 px-2.5 text-xs font-bold">
+              <X className="h-3.5 w-3.5" /> إلغاء
             </Button>
           </div>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={() => setEditing(true)} className="gap-2 font-bold"><Edit3 className="h-4 w-4" /> تعديل</Button>
-          <Button type="button" size="sm" variant="outline" onClick={removeItem} disabled={busy} className="gap-2 font-bold text-rose-700"><Trash2 className="h-4 w-4" /> حذف</Button>
+        <div className="flex items-center gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={() => setEditing(true)} className="h-8 gap-1.5 px-2.5 text-xs font-bold">
+            <Edit3 className="h-3.5 w-3.5" /> تعديل
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={removeItem} disabled={busy} aria-label="حذف" title="حذف" className="h-8 w-8 p-0 text-rose-700">
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
         </div>
       )}
-      {feedback ? <p className={`mt-3 rounded-md border px-3 py-2 text-xs font-semibold ${feedback.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}>{feedback.message}</p> : null}
+      {feedback ? <p className={`mt-2 rounded-md border px-3 py-2 text-xs font-semibold ${feedback.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}>{feedback.message}</p> : null}
     </div>
   );
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="grid gap-1 text-xs font-bold text-slate-600">{label}{children}</label>;
+  return <label className="grid gap-1 text-[11px] font-bold text-slate-600">{label}{children}</label>;
 }
