@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { FileUp, Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { uploadArchiveFile } from "./archiveUploadClient";
 
 type Category = "MARKETING" | "DOCUMENTS";
 
@@ -18,6 +19,7 @@ export function ArchiveUploadCard({ category, title, description, openHref }: Pr
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [fileTitle, setFileTitle] = useState("");
   const [saving, setSaving] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [tone, setTone] = useState<"success" | "error">("success");
 
@@ -29,28 +31,18 @@ export function ArchiveUploadCard({ category, title, description, openHref }: Pr
       return;
     }
 
-    const formData = new FormData();
-    formData.set("category", category);
-    formData.set("title", fileTitle.trim() || file.name);
-    formData.set("file", file);
-
     setSaving(true);
+    setProgress(0);
     setMessage(null);
     try {
-      const response = await fetch("/api/admin/archive/uploaded-files", { method: "POST", body: formData });
-      const result = await response.json().catch(() => null);
-      if (!response.ok || !result?.ok) {
-        setTone("error");
-        setMessage(result?.error || result?.message || "تعذر رفع الملف");
-        return;
-      }
+      await uploadArchiveFile({ category, title: fileTitle.trim() || file.name, file, onProgress: setProgress });
       setTone("success");
       setMessage("تم رفع الملف داخل الأرشيف.");
       setFileTitle("");
       if (fileRef.current) fileRef.current.value = "";
-    } catch {
+    } catch (error) {
       setTone("error");
-      setMessage("تعذر رفع الملف");
+      setMessage(error instanceof Error ? error.message : "تعذر رفع الملف");
     } finally {
       setSaving(false);
     }
@@ -72,12 +64,13 @@ export function ArchiveUploadCard({ category, title, description, openHref }: Pr
         <div className="grid grid-cols-[1fr_auto] gap-2">
           <Button type="button" size="sm" onClick={upload} disabled={saving} className="h-8 gap-2 text-xs font-bold">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-            رفع
+            {saving ? `${progress}%` : "رفع"}
           </Button>
           <Link href={openHref} className="inline-flex h-8 items-center justify-center rounded-md border bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-[#025EB8] hover:text-[#025EB8]">
             فتح
           </Link>
         </div>
+        {saving ? <div className="h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-[#025EB8] transition-all" style={{ width: `${progress}%` }} /></div> : null}
         {message ? (
           <p className={`rounded-md border px-2 py-1.5 text-[11px] font-bold ${tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}>
             {message}
