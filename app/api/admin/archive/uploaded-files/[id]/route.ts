@@ -16,6 +16,7 @@ export async function DELETE(_request: Request, context: Params) {
     return jsonNoStore({ ok: false, error: "الملف غير موجود" }, { status: 404 });
   }
 
+  await prisma.auditLog.deleteMany({ where: { action: "archive.uploadedFile.chunk", entityType: "ArchiveUploadedFileChunk", entityId: id } });
   await prisma.auditLog.delete({ where: { id } });
   return jsonNoStore({ ok: true, message: "تم حذف الملف" });
 }
