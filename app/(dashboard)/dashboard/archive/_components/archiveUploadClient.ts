@@ -8,15 +8,19 @@ type UploadArgs = {
   title: string;
   notes?: string;
   file: File;
+  linkedCollectionId?: string;
+  linkedProjectId?: string;
   onProgress?: (progress: number) => void;
 };
 
-export async function uploadArchiveFile({ category, title, notes, file, onProgress }: UploadArgs) {
+export async function uploadArchiveFile({ category, title, notes, file, linkedCollectionId, linkedProjectId, onProgress }: UploadArgs) {
   if (file.size <= DIRECT_UPLOAD_MAX_BYTES) {
     const formData = new FormData();
     formData.set("category", category);
     formData.set("title", title || file.name);
     formData.set("notes", notes || "");
+    formData.set("linkedCollectionId", linkedCollectionId || "");
+    formData.set("linkedProjectId", linkedProjectId || "");
     formData.set("file", file);
     const response = await fetch("/api/admin/archive/uploaded-files", { method: "POST", body: formData });
     const result = await response.json().catch(() => null);
@@ -37,6 +41,8 @@ export async function uploadArchiveFile({ category, title, notes, file, onProgre
       mimeType: file.type || "application/octet-stream",
       sizeBytes: file.size,
       totalChunks,
+      linkedCollectionId: linkedCollectionId || "",
+      linkedProjectId: linkedProjectId || "",
     }),
   });
   const startResult = await startResponse.json().catch(() => null);
