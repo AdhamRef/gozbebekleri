@@ -1,6 +1,8 @@
 import { auditActorFromDashboardSession } from "@/lib/audit-log";
+import { archiveBlobEnabled, storeArchiveBlobFile } from "@/lib/archive/archive-blob-storage";
+import { getArchiveRepositorySnapshot } from "@/lib/archive/archive-repository";
 import { prisma } from "@/lib/prisma";
-import { jsonNoStore, requireArchiveApiAccess } from "../_auth";
+import { jsonNoStore, requireArchiveActionAccess, requireArchiveUploadedFileListAccess } from "../_auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,12 +21,14 @@ const allowedMimeTypes = [
 ];
 
 export async function GET(request: Request) {
-  const { denied } = await requireArchiveApiAccess();
-  if (denied) return denied;
-
   const category = parseCategory(new URL(request.url).searchParams.get("category"));
   if (!category) return jsonNoStore({ ok: false, error: "Invalid category" }, { status: 400 });
 
+  const { denied } = await requireArchiveUploadedFileListAccess(category);
+  if (denied) return denied;
+
+  const snapshot = await getArchiveRepositorySnapshot();
+  const references = buildReferences(snapshot.collections, snapshot.projects);
   const rows = await prisma.auditLog.findMany({
     where: { action: "archive.uploadedFile.create", entityType: "ArchiveUploadedFile" },
     orderBy: { createdAt: "desc" },
@@ -33,14 +37,14 @@ export async function GET(request: Request) {
   });
 
   const files = rows
-    .map((row) => toFileItem(row))
+    .map((row) => toFileItem(row, references))
     .filter((file): file is NonNullable<ReturnType<typeof toFileItem>> => Boolean(file) && file.category === category);
 
-  return jsonNoStore({ ok: true, files });
+  return jsonNoStore({ ok: true, files, references, storage: { blobEnabled: archiveBlobEnabled() } });
 }
 
 export async function POST(request: Request) {
-  const { session, denied } = await requireArchiveApiAccess();
+  const { session, denied } = await requireArchiveActionAccess("archiveUpload");
   if (denied) return denied;
   if (!session?.user) return jsonNoStore({ ok: false, error: "Unauthorized" }, { status: 401 });
 
@@ -51,6 +55,10 @@ export async function POST(request: Request) {
   const notes = String(formData.get("notes") || "").trim();
 
   if (!category) return jsonNoStore({ ok: false, error: "اختر نوع الملف" }, { status: 400 });
+  if (category === "DOCUMENTS") {
+    const docsAccess = await requireArchiveUploadedFileListAccess("DOCUMENTS");
+    if (docsAccess.denied) return docsAccess.denied;
+  }
   if (!(file instanceof File)) return jsonNoStore({ ok: false, error: "اختر ملفًا أولًا" }, { status: 400 });
   if (file.size <= 0) return jsonNoStore({ ok: false, error: "الملف فارغ" }, { status: 400 });
   if (file.size > MAX_FILE_BYTES) return jsonNoStore({ ok: false, error: "حجم الملف كبير جدًا. الحد الحالي 30MB" }, { status: 400 });
@@ -60,10 +68,16 @@ export async function POST(request: Request) {
     return jsonNoStore({ ok: false, error: "الملفات المسموحة PDF أو Excel فقط" }, { status: 400 });
   }
 
+  const snapshot = await getArchiveRepositorySnapshot();
+  const references = buildReferences(snapshot.collections, snapshot.projects);
+  const linkedCollectionId = validCollectionId(String(formData.get("linkedCollectionId") || ""), references);
+  const linkedProjectId = validProjectId(String(formData.get("linkedProjectId") || ""), references);
   const actor = auditActorFromDashboardSession(session);
   const buffer = Buffer.from(await file.arrayBuffer());
-  const base64 = buffer.toString("base64");
-  const chunks = chunkString(base64, BASE64_CHUNK_SIZE);
+  const mimeType = file.type || mimeFromExtension(extension);
+  const blob = await tryStoreBlob({ category, fileName: file.name, mimeType, buffer });
+  const base64 = blob ? "" : buffer.toString("base64");
+  const chunks = blob ? [] : chunkString(base64, BASE64_CHUNK_SIZE);
 
   const row = await prisma.auditLog.create({
     data: {
@@ -77,21 +91,26 @@ export async function POST(request: Request) {
         title: title || file.name,
         notes: notes || undefined,
         fileName: file.name,
-        mimeType: file.type || mimeFromExtension(extension),
+        mimeType,
         sizeBytes: file.size,
         extension,
+        linkedCollectionId,
+        linkedProjectId,
         fileCategory: defaultFileCategory(category),
         reviewStatus: "NEW",
-        storageMode: chunks.length > 1 ? "CHUNKED" : "INLINE",
-        chunkCount: chunks.length,
+        storageMode: blob?.storageMode || (chunks.length > 1 ? "CHUNKED" : "INLINE"),
+        blobUrl: blob?.blobUrl,
+        blobDownloadUrl: blob?.blobDownloadUrl,
+        blobPathname: blob?.blobPathname,
+        chunkCount: blob ? 0 : chunks.length,
         uploadStatus: "READY",
-        base64: chunks.length === 1 ? base64 : undefined,
+        base64: !blob && chunks.length === 1 ? base64 : undefined,
       },
       stream: "TEAM",
     },
   });
 
-  if (chunks.length > 1) {
+  if (!blob && chunks.length > 1) {
     for (let index = 0; index < chunks.length; index += 1) {
       await prisma.auditLog.create({
         data: {
@@ -101,19 +120,14 @@ export async function POST(request: Request) {
           messageEn: "Archive uploaded file chunk saved",
           entityType: "ArchiveUploadedFileChunk",
           entityId: row.id,
-          metadata: {
-            fileId: row.id,
-            index,
-            total: chunks.length,
-            base64: chunks[index],
-          },
+          metadata: { fileId: row.id, index, total: chunks.length, base64: chunks[index] },
           stream: "TEAM",
         },
       });
     }
   }
 
-  return jsonNoStore({ ok: true, file: toFileItem(row), message: "تم رفع الملف" });
+  return jsonNoStore({ ok: true, file: toFileItem(row, references), message: "تم رفع الملف" });
 }
 
 function parseCategory(value: string | null): ArchiveUploadCategory | null {
@@ -128,12 +142,26 @@ function metadataObject(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-function stringField(value: unknown) {
-  return typeof value === "string" ? value : "";
+function stringField(value: unknown) { return typeof value === "string" ? value : ""; }
+function numberField(value: unknown) { return typeof value === "number" && Number.isFinite(value) ? value : 0; }
+
+function buildReferences(collections: { id: string; name: string }[], projects: { id: string; title: string; collectionId: string; year: number }[]) {
+  return {
+    collections: collections.map((item) => ({ id: item.id, name: item.name })),
+    projects: projects.map((item) => ({ id: item.id, title: item.title, collectionId: item.collectionId, year: item.year })),
+  };
 }
 
-function numberField(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+function validCollectionId(value: string, references: ReturnType<typeof buildReferences>) {
+  return references.collections.some((item) => item.id === value) ? value : "";
+}
+
+function validProjectId(value: string, references: ReturnType<typeof buildReferences>) {
+  return references.projects.some((item) => item.id === value) ? value : "";
+}
+
+function referenceName(id: string, items: { id: string; name?: string; title?: string }[]) {
+  return items.find((item) => item.id === id)?.name || items.find((item) => item.id === id)?.title || "";
 }
 
 function analysisField(value: unknown) {
@@ -149,10 +177,12 @@ function analysisField(value: unknown) {
   };
 }
 
-function toFileItem(row: { id: string; createdAt: Date; actorName?: string | null; metadata: unknown }) {
+function toFileItem(row: { id: string; createdAt: Date; actorName?: string | null; metadata: unknown }, references: ReturnType<typeof buildReferences>) {
   const metadata = metadataObject(row.metadata);
   const category = parseCategory(stringField(metadata.category));
   if (!category) return null;
+  const linkedCollectionId = stringField(metadata.linkedCollectionId);
+  const linkedProjectId = stringField(metadata.linkedProjectId);
 
   return {
     id: row.id,
@@ -168,6 +198,10 @@ function toFileItem(row: { id: string; createdAt: Date; actorName?: string | nul
     uploadStatus: stringField(metadata.uploadStatus) || "READY",
     storageMode: stringField(metadata.storageMode) || "INLINE",
     chunkCount: numberField(metadata.chunkCount) || 1,
+    linkedCollectionId,
+    linkedCollectionName: referenceName(linkedCollectionId, references.collections),
+    linkedProjectId,
+    linkedProjectName: referenceName(linkedProjectId, references.projects),
     aiAnalysis: analysisField(metadata.aiAnalysis),
     aiAnalyzedAt: stringField(metadata.aiAnalyzedAt),
     createdAt: row.createdAt.toISOString(),
@@ -184,8 +218,15 @@ function mimeFromExtension(extension: string) {
 
 function chunkString(value: string, size: number) {
   const chunks: string[] = [];
-  for (let index = 0; index < value.length; index += size) {
-    chunks.push(value.slice(index, index + size));
-  }
+  for (let index = 0; index < value.length; index += size) chunks.push(value.slice(index, index + size));
   return chunks;
+}
+
+async function tryStoreBlob(args: { category: string; fileName: string; mimeType: string; buffer: Buffer }) {
+  if (!archiveBlobEnabled()) return null;
+  try {
+    return await storeArchiveBlobFile({ category: args.category, fileName: args.fileName, contentType: args.mimeType, body: args.buffer });
+  } catch {
+    return null;
+  }
 }
