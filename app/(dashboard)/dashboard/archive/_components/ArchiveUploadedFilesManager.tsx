@@ -2,12 +2,21 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, Edit3, FileText, Loader2, Save, Search, Trash2, Upload, X } from "lucide-react";
+import { Download, Edit3, FileText, Loader2, Save, Search, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { uploadArchiveFile } from "./archiveUploadClient";
 
 type Category = "MARKETING" | "DOCUMENTS";
 type ReviewStatus = "NEW" | "REVIEWED" | "IMPORTANT";
+
+type FileAnalysis = {
+  summary: string;
+  suggestedCategory: string;
+  suggestedUse: string;
+  keywords: string[];
+  teamNotes: string[];
+  confidence: "metadata_only" | "ai_assisted" | string;
+};
 
 type UploadedFile = {
   id: string;
@@ -23,6 +32,8 @@ type UploadedFile = {
   uploadStatus?: string;
   storageMode?: string;
   chunkCount?: number;
+  aiAnalysis?: FileAnalysis | null;
+  aiAnalyzedAt?: string;
   createdAt: string;
   uploadedBy: string;
 };
@@ -52,6 +63,7 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [draft, setDraft] = useState({ title: "", notes: "", fileCategory: "", reviewStatus: "NEW" as ReviewStatus });
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
 
@@ -59,7 +71,8 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
   const filteredFiles = useMemo(() => {
     const term = search.trim().toLowerCase();
     return files.filter((file) => {
-      const matchesSearch = !term || [file.title, file.fileName, file.notes, file.fileCategory].some((value) => (value || "").toLowerCase().includes(term));
+      const analysisText = [file.aiAnalysis?.summary, file.aiAnalysis?.suggestedUse, ...(file.aiAnalysis?.keywords ?? [])].join(" ");
+      const matchesSearch = !term || [file.title, file.fileName, file.notes, file.fileCategory, analysisText].some((value) => (value || "").toLowerCase().includes(term));
       const matchesType = typeFilter === "ALL" || file.extension?.toLowerCase() === typeFilter.toLowerCase();
       const matchesCategory = categoryFilter === "ALL" || file.fileCategory === categoryFilter;
       const matchesStatus = statusFilter === "ALL" || file.reviewStatus === statusFilter;
@@ -131,6 +144,21 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
     }
     setFeedback({ tone: "success", message: "تم حفظ التعديل" });
     setEditingId(null);
+    await loadFiles();
+  }
+
+  async function analyzeFile(id: string) {
+    if (analyzingId) return;
+    setAnalyzingId(id);
+    setFeedback(null);
+    const response = await fetch(`/api/admin/archive/uploaded-files/${id}/analyze`, { method: "POST" });
+    const result = await response.json().catch(() => null);
+    setAnalyzingId(null);
+    if (!response.ok || !result?.ok) {
+      setFeedback({ tone: "error", message: result?.error || result?.message || "تعذر تحليل الملف" });
+      return;
+    }
+    setFeedback({ tone: "success", message: "تم تحليل الملف" });
     await loadFiles();
   }
 
@@ -217,7 +245,7 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
           ) : filteredFiles.length === 0 ? (
             <p className="rounded-lg border border-dashed bg-white p-6 text-center text-sm text-slate-600">لا توجد ملفات مطابقة.</p>
           ) : (
-            <table className="w-full min-w-[1180px] text-sm">
+            <table className="w-full min-w-[1220px] text-sm">
               <thead className="bg-slate-50 text-xs text-slate-500">
                 <tr>
                   <th className="p-3 text-right">اسم الملف</th>
@@ -233,6 +261,7 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
               <tbody className="divide-y">
                 {filteredFiles.map((file) => {
                   const isEditing = editingId === file.id;
+                  const isAnalyzing = analyzingId === file.id;
                   return (
                     <tr key={file.id} className="align-top">
                       <td className="p-3">
@@ -246,6 +275,7 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
                             <p className="font-black text-slate-950">{file.title}</p>
                             <p className="mt-1 text-xs text-slate-500">{file.fileName}</p>
                             {file.notes ? <p className="mt-1 text-xs text-slate-500">{file.notes}</p> : null}
+                            {file.aiAnalysis ? <AnalysisBox analysis={file.aiAnalysis} analyzedAt={file.aiAnalyzedAt} /> : null}
                           </>
                         )}
                       </td>
@@ -280,6 +310,10 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
                             </>
                           ) : (
                             <>
+                              <button type="button" onClick={() => void analyzeFile(file.id)} disabled={Boolean(analyzingId)} className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-white px-3 text-xs font-bold text-slate-800 hover:border-[#025EB8] hover:text-[#025EB8] disabled:opacity-60">
+                                {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                                تحليل
+                              </button>
                               <button type="button" onClick={() => startEdit(file)} className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-white px-3 text-xs font-bold text-slate-800 hover:border-[#025EB8] hover:text-[#025EB8]"><Edit3 className="h-3.5 w-3.5" /> تعديل</button>
                               <a href={`/api/admin/archive/uploaded-files/${file.id}/download`} className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-white px-3 text-xs font-bold text-slate-800 hover:border-[#025EB8] hover:text-[#025EB8]"><Download className="h-3.5 w-3.5" /> تنزيل</a>
                               <button type="button" onClick={() => void removeFile(file.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-md border bg-white text-rose-700 hover:border-rose-300"><Trash2 className="h-3.5 w-3.5" /></button>
@@ -296,6 +330,30 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
         </div>
       </section>
     </main>
+  );
+}
+
+function AnalysisBox({ analysis, analyzedAt }: { analysis: FileAnalysis; analyzedAt?: string }) {
+  return (
+    <div className="mt-3 rounded-lg border bg-slate-50 p-3 text-xs leading-6 text-slate-700">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="rounded-md bg-white px-2 py-1 font-black text-[#025EB8] ring-1 ring-slate-200">تحليل الملف</span>
+        <span className="rounded-md bg-white px-2 py-1 font-bold text-slate-500 ring-1 ring-slate-200">{analysis.confidence === "ai_assisted" ? "مدعوم بالذكاء" : "اعتمادًا على بيانات الملف"}</span>
+        {analyzedAt ? <span className="text-[11px] text-slate-400">{formatDate(analyzedAt)}</span> : null}
+      </div>
+      <p className="mt-2 font-semibold text-slate-800">{analysis.summary}</p>
+      <p className="mt-1"><span className="font-bold">الاستخدام المقترح:</span> {analysis.suggestedUse}</p>
+      {analysis.keywords?.length ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {analysis.keywords.map((keyword) => <span key={keyword} className="rounded bg-white px-2 py-0.5 text-[11px] font-bold text-slate-600 ring-1 ring-slate-200">{keyword}</span>)}
+        </div>
+      ) : null}
+      {analysis.teamNotes?.length ? (
+        <ul className="mt-2 list-disc space-y-1 pr-5">
+          {analysis.teamNotes.map((note) => <li key={note}>{note}</li>)}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 
