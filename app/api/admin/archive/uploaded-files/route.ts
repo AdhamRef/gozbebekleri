@@ -136,6 +136,19 @@ function numberField(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+function analysisField(value: unknown) {
+  const analysis = metadataObject(value);
+  if (!analysis.summary) return null;
+  return {
+    summary: stringField(analysis.summary),
+    suggestedCategory: stringField(analysis.suggestedCategory),
+    suggestedUse: stringField(analysis.suggestedUse),
+    keywords: Array.isArray(analysis.keywords) ? analysis.keywords.map(stringField).filter(Boolean).slice(0, 10) : [],
+    teamNotes: Array.isArray(analysis.teamNotes) ? analysis.teamNotes.map(stringField).filter(Boolean).slice(0, 5) : [],
+    confidence: stringField(analysis.confidence) || "metadata_only",
+  };
+}
+
 function toFileItem(row: { id: string; createdAt: Date; actorName?: string | null; metadata: unknown }) {
   const metadata = metadataObject(row.metadata);
   const category = parseCategory(stringField(metadata.category));
@@ -155,6 +168,8 @@ function toFileItem(row: { id: string; createdAt: Date; actorName?: string | nul
     uploadStatus: stringField(metadata.uploadStatus) || "READY",
     storageMode: stringField(metadata.storageMode) || "INLINE",
     chunkCount: numberField(metadata.chunkCount) || 1,
+    aiAnalysis: analysisField(metadata.aiAnalysis),
+    aiAnalyzedAt: stringField(metadata.aiAnalyzedAt),
     createdAt: row.createdAt.toISOString(),
     uploadedBy: row.actorName || "الفريق",
   };
