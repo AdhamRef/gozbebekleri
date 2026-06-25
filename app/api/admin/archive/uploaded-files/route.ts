@@ -80,8 +80,11 @@ export async function POST(request: Request) {
         mimeType: file.type || mimeFromExtension(extension),
         sizeBytes: file.size,
         extension,
+        fileCategory: defaultFileCategory(category),
+        reviewStatus: "NEW",
         storageMode: chunks.length > 1 ? "CHUNKED" : "INLINE",
         chunkCount: chunks.length,
+        uploadStatus: "READY",
         base64: chunks.length === 1 ? base64 : undefined,
       },
       stream: "TEAM",
@@ -117,6 +120,10 @@ function parseCategory(value: string | null): ArchiveUploadCategory | null {
   return allowedCategories.includes(value as ArchiveUploadCategory) ? (value as ArchiveUploadCategory) : null;
 }
 
+function defaultFileCategory(category: ArchiveUploadCategory) {
+  return category === "MARKETING" ? "ملفات مشاريع" : "أوراق المؤسسة";
+}
+
 function metadataObject(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
@@ -143,6 +150,9 @@ function toFileItem(row: { id: string; createdAt: Date; actorName?: string | nul
     mimeType: stringField(metadata.mimeType),
     sizeBytes: numberField(metadata.sizeBytes),
     extension: stringField(metadata.extension),
+    fileCategory: stringField(metadata.fileCategory) || defaultFileCategory(category),
+    reviewStatus: stringField(metadata.reviewStatus) || "NEW",
+    uploadStatus: stringField(metadata.uploadStatus) || "READY",
     storageMode: stringField(metadata.storageMode) || "INLINE",
     chunkCount: numberField(metadata.chunkCount) || 1,
     createdAt: row.createdAt.toISOString(),
