@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Download, FileText, Loader2, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { uploadArchiveFile } from "./archiveUploadClient";
 
 type Category = "MARKETING" | "DOCUMENTS";
 
@@ -16,6 +17,8 @@ type UploadedFile = {
   mimeType: string;
   sizeBytes: number;
   extension: string;
+  storageMode?: string;
+  chunkCount?: number;
   createdAt: string;
   uploadedBy: string;
 };
@@ -33,6 +36,7 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
 
   async function loadFiles() {
@@ -58,28 +62,18 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
       return;
     }
 
-    const formData = new FormData();
-    formData.set("category", category);
-    formData.set("title", fileTitle.trim() || file.name);
-    formData.set("notes", notes.trim());
-    formData.set("file", file);
-
     setSaving(true);
+    setProgress(0);
     setFeedback(null);
     try {
-      const response = await fetch("/api/admin/archive/uploaded-files", { method: "POST", body: formData });
-      const result = await response.json().catch(() => null);
-      if (!response.ok || !result?.ok) {
-        setFeedback({ tone: "error", message: result?.error || result?.message || "تعذر رفع الملف" });
-        return;
-      }
+      await uploadArchiveFile({ category, title: fileTitle.trim() || file.name, notes: notes.trim(), file, onProgress: setProgress });
       setFeedback({ tone: "success", message: "تم رفع الملف" });
       setFileTitle("");
       setNotes("");
       if (fileRef.current) fileRef.current.value = "";
       await loadFiles();
-    } catch {
-      setFeedback({ tone: "error", message: "تعذر رفع الملف" });
+    } catch (error) {
+      setFeedback({ tone: "error", message: error instanceof Error ? error.message : "تعذر رفع الملف" });
     } finally {
       setSaving(false);
     }
@@ -115,7 +109,7 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
       <section className="mt-4 rounded-xl border bg-white shadow-sm">
         <div className="border-b p-4">
           <h2 className="text-base font-black text-slate-950">رفع ملف جديد</h2>
-          <p className="mt-1 text-xs leading-5 text-slate-600">اختر ملف PDF أو Excel من جهازك ليتم حفظه داخل الأرشيف.</p>
+          <p className="mt-1 text-xs leading-5 text-slate-600">اختر ملف PDF أو Excel من جهازك. الملفات الكبيرة تُرفع على أجزاء تلقائيًا.</p>
         </div>
         <div className="grid gap-3 p-4 lg:grid-cols-[1fr_1fr_1.4fr_auto]">
           <input value={fileTitle} onChange={(event) => setFileTitle(event.target.value)} placeholder="اسم الملف" className="h-9 rounded-md border px-3 text-sm outline-none focus:border-[#025EB8]" />
@@ -123,9 +117,10 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
           <input ref={fileRef} type="file" accept=".pdf,.xls,.xlsx,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="h-9 rounded-md border bg-white px-2 py-1.5 text-sm file:ml-2 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs file:font-bold file:text-slate-700" />
           <Button type="button" onClick={upload} disabled={saving} className="h-9 gap-2 font-bold">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            رفع
+            {saving ? `${progress}%` : "رفع"}
           </Button>
         </div>
+        {saving ? <div className="mx-4 mb-4 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-[#025EB8] transition-all" style={{ width: `${progress}%` }} /></div> : null}
       </section>
 
       {feedback ? (
@@ -154,6 +149,7 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
                   <th className="p-3 text-right">اسم الملف</th>
                   <th className="p-3 text-right">النوع</th>
                   <th className="p-3 text-right">الحجم</th>
+                  <th className="p-3 text-right">طريقة الحفظ</th>
                   <th className="p-3 text-right">تاريخ الرفع</th>
                   <th className="p-3 text-right">الإجراءات</th>
                 </tr>
@@ -167,6 +163,7 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
                     </td>
                     <td className="p-3 font-bold text-slate-700">{file.extension?.toUpperCase() || "FILE"}</td>
                     <td className="p-3 text-slate-700">{formatBytes(file.sizeBytes)}</td>
+                    <td className="p-3 text-slate-700">{file.storageMode === "CLIENT_CHUNKED" ? `${file.chunkCount || 1} أجزاء` : "مباشر"}</td>
                     <td className="p-3 text-slate-700">{formatDate(file.createdAt)}</td>
                     <td className="p-3">
                       <div className="flex flex-wrap gap-2">
