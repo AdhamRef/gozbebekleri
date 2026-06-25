@@ -30,11 +30,24 @@ export const DASHBOARD_PERMISSION_KEYS = [
   "brand",
   "generalSettings",
   // Action permissions — not tied to a sidebar route. Power-user only.
+  "archiveUpload",
+  "archiveDelete",
+  "archiveAnalyze",
+  "archiveDocuments",
   "donationsEdit",
   "reportsExport",
 ] as const;
 
 export type DashboardPermissionKey = (typeof DASHBOARD_PERMISSION_KEYS)[number];
+
+const ACTION_PERMISSION_KEYS: DashboardPermissionKey[] = [
+  "archiveUpload",
+  "archiveDelete",
+  "archiveAnalyze",
+  "archiveDocuments",
+  "donationsEdit",
+  "reportsExport",
+];
 
 export function isDashboardPermissionKey(
   k: string
@@ -61,7 +74,7 @@ function legacyUsersGrants(key: DashboardPermissionKey): boolean {
 export function isDashboardRoutePermissionKey(
   key: string
 ): key is DashboardPermissionKey {
-  return isDashboardPermissionKey(key) && key !== "donationsEdit" && key !== "reportsExport";
+  return isDashboardPermissionKey(key) && !ACTION_PERMISSION_KEYS.includes(key);
 }
 
 export function hasAnyDashboardRoutePermission(user: UserLike | undefined): boolean {
@@ -81,6 +94,9 @@ export function userHasDashboardPermission(
   if (user.role === "STAFF") {
     const perms = sanitizeDashboardPermissions(user.dashboardPermissions);
     if (perms.includes(key)) return true;
+    if (key === "archiveUpload" || key === "archiveDelete" || key === "archiveAnalyze") {
+      if (perms.includes("archive")) return true;
+    }
     if (hasLegacyUsersPermission(user) && legacyUsersGrants(key)) return true;
     return false;
   }
