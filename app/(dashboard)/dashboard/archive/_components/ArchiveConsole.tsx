@@ -9,6 +9,7 @@ import { ArchiveDriveLinkCreatePanel } from "./ArchiveDriveLinkCreatePanel";
 import { ArchiveDriveLinkManageActions } from "./ArchiveDriveLinkManageActions";
 import { ArchiveProjectCreatePanel } from "./ArchiveProjectCreatePanel";
 import { ArchiveProjectManageActions } from "./ArchiveProjectManageActions";
+import { ArchiveUploadCard } from "./ArchiveUploadCard";
 
 type Props = {
   activeTab?: ArchiveTabKey;
@@ -94,11 +95,21 @@ function RootExplorer({ snapshot, explorer }: { snapshot: ArchiveSnapshot; explo
         <CompactPanel title="إضافة مجموعة" description="مجموعة رئيسية مثل غزة، القدس أو الوقف.">
           <ArchiveCollectionCreatePanel />
         </CompactPanel>
-        <ArchiveFileQuickPanel title="إضافة ملفات مشاريع تسويقية" description="PDF أو Excel مثل تقارير الحملات وخطط المشاريع." category="MARKETING" />
-        <ArchiveFileQuickPanel title="أرشفة المستندات" description="عقود، أوراق المؤسسة، تراخيص أو ملفات رسمية." category="OFFICIAL" />
+        <ArchiveUploadCard
+          category="MARKETING"
+          title="إضافة ملفات مشاريع تسويقية"
+          description="رفع مباشر لملفات PDF أو Excel الخاصة بالتسويق."
+          openHref="/dashboard/archive/marketing-files"
+        />
+        <ArchiveUploadCard
+          category="DOCUMENTS"
+          title="أرشفة المستندات"
+          description="رفع مباشر للعقود، التراخيص، والملفات الرسمية."
+          openHref="/dashboard/archive/documents"
+        />
       </section>
 
-      <Panel title="المجموعات" description="الصف الأول: المجموعات الرئيسية للأرشيف.">
+      <Panel title="المجموعات" description="المجموعات المضافة داخل الأرشيف.">
         {explorer.length === 0 ? (
           <EmptyState title="لا توجد مجموعات بعد" text="أضف أول مجموعة للبدء في بناء الأرشيف." />
         ) : (
@@ -107,9 +118,6 @@ function RootExplorer({ snapshot, explorer }: { snapshot: ArchiveSnapshot; explo
           </div>
         )}
       </Panel>
-
-      <ArchiveFileRow title="المشاريع التسويقية" description="الصف الثاني: ملفات PDF وExcel المرتبطة بالتسويق والتقارير والخطط." items={marketingFilePlaceholders()} />
-      <ArchiveFileRow title="أرشفة المستندات" description="الصف الثالث: عقود، أوراق مؤسسة، تراخيص ومستندات رسمية." items={officialFilePlaceholders()} />
 
       <Panel title="ملخص المواد" description="إجمالي المواد المفهرسة داخل المشاريع.">
         <div className="grid gap-2 sm:grid-cols-4">
@@ -284,57 +292,6 @@ function CollectionCard({ item }: { item: CollectionBundle }) {
         <ArchiveCollectionManageActions collection={item.collection} />
       </div>
     </article>
-  );
-}
-
-function ArchiveFileQuickPanel({ title, description, category }: { title: string; description: string; category: string }) {
-  return (
-    <section className="rounded-xl border bg-white p-3 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-black text-slate-950">{title}</h2>
-          <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
-        </div>
-        <FileText className="h-4 w-4 text-[#025EB8]" />
-      </div>
-      <div className="mt-3 grid gap-2">
-        <input placeholder="اسم الملف" className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]" />
-        <div className="grid grid-cols-[0.8fr_1.2fr_auto] gap-2">
-          <select defaultValue="PDF" className="h-8 rounded-md border bg-white px-2 text-xs outline-none focus:border-[#025EB8]">
-            <option value="PDF">PDF</option>
-            <option value="EXCEL">Excel</option>
-          </select>
-          <input dir="ltr" placeholder="https://drive.google.com/..." className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]" />
-          <button type="button" className="h-8 rounded-md border px-3 text-xs font-bold text-slate-700 hover:border-[#025EB8] hover:text-[#025EB8]">حفظ</button>
-        </div>
-        <p className="text-[11px] text-slate-400">{category === "MARKETING" ? "سيتم ربطها لاحقًا بملفات المشاريع التسويقية." : "سيتم ربطها لاحقًا بأرشفة المستندات."}</p>
-      </div>
-    </section>
-  );
-}
-
-function ArchiveFileRow({ title, description, items }: { title: string; description: string; items: { title: string; type: string; count: number }[] }) {
-  return (
-    <Panel title={title} description={description}>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {items.map((item) => (
-          <article key={item.title} className="rounded-lg border bg-white p-3 shadow-sm">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-[11px] font-bold text-slate-500">{item.type}</p>
-                <h3 className="mt-1 text-sm font-black text-slate-950">{item.title}</h3>
-              </div>
-              <FileText className="h-4 w-4 text-[#025EB8]" />
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-              <SmallCounter label="ملفات" value={item.count} />
-              <SmallCounter label="روابط" value={item.count} />
-            </div>
-            <button type="button" className="mt-3 inline-flex h-8 items-center rounded-md border bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-[#025EB8] hover:text-[#025EB8]">فتح</button>
-          </article>
-        ))}
-      </div>
-    </Panel>
   );
 }
 
@@ -529,22 +486,6 @@ function archiveText(value?: string | null) {
 function cleanDriveUrl(value?: string | null) {
   if (!value || !/^https?:\/\//i.test(value)) return "لم يتم إدخال رابط صالح بعد";
   return value;
-}
-
-function marketingFilePlaceholders() {
-  return [
-    { title: "ملفات حملات PDF", type: "PDF", count: 0 },
-    { title: "جداول نتائج Excel", type: "Excel", count: 0 },
-    { title: "خطط مشاريع تسويقية", type: "PDF / Excel", count: 0 },
-  ];
-}
-
-function officialFilePlaceholders() {
-  return [
-    { title: "عقود وشراكات", type: "PDF", count: 0 },
-    { title: "أوراق المؤسسة", type: "PDF", count: 0 },
-    { title: "تراخيص وملفات قانونية", type: "PDF / Excel", count: 0 },
-  ];
 }
 
 function countYears(explorer: CollectionBundle[]) {
