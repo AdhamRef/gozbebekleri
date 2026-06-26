@@ -17,6 +17,7 @@ import {
   validArchiveCollectionId,
   validArchiveProjectId,
   type ArchiveUploadCategory,
+  type ArchiveUploadedFileItem,
 } from "@/lib/archive/uploaded-files";
 import { prisma } from "@/lib/prisma";
 import { jsonNoStore, requireArchiveActionAccess, requireArchiveUploadedFileListAccess } from "../_auth";
@@ -42,7 +43,7 @@ export async function GET(request: Request) {
 
   const files = rows
     .map((row) => toArchiveUploadedFileItem(row, references))
-    .filter((file): file is NonNullable<typeof file> => Boolean(file) && file.category === category);
+    .filter((file): file is ArchiveUploadedFileItem => Boolean(file) && file.category === category);
 
   return jsonNoStore({ ok: true, files, references, storage: { blobEnabled: archiveBlobEnabled() } });
 }
