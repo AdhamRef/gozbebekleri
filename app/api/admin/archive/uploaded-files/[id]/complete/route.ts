@@ -1,4 +1,5 @@
 import { archiveBlobEnabled, storeArchiveBlobFile } from "@/lib/archive/archive-blob-storage";
+import { metadataObject, numberField, stringField } from "@/lib/archive/uploaded-files";
 import { prisma } from "@/lib/prisma";
 import { jsonNoStore, requireArchiveActionAccess } from "../../../_auth";
 
@@ -18,43 +19,19 @@ export async function POST(_request: Request, context: Params) {
   }
 
   const metadata = metadataObject(parent.metadata);
+  const chunks = await readUploadChunks(id);
   const expected = numberField(metadata.chunkCount);
-  const chunks = await prisma.auditLog.findMany({
-    where: { action: "archive.uploadedFile.chunk", entityType: "ArchiveUploadedFileChunk", entityId: id },
-    select: { metadata: true },
-  });
-  const normalized = chunks.map((row) => metadataObject(row.metadata)).sort((a, b) => numberField(a.index) - numberField(b.index));
-  const indexes = new Set(normalized.map((item) => numberField(item.index)));
+  const receivedIndexes = new Set(chunks.map((item) => numberField(item.index)));
 
-  if (!expected || indexes.size < expected) {
+  if (!expected || receivedIndexes.size < expected) {
     return jsonNoStore({ ok: false, error: "لم تكتمل كل أجزاء الملف" }, { status: 400 });
   }
 
-  let storagePatch: Record<string, unknown> = { uploadStatus: "READY" };
-  if (archiveBlobEnabled()) {
-    const base64 = normalized.map((item) => stringField(item.base64)).join("");
-    try {
-      const buffer = Buffer.from(base64, "base64");
-      const blob = await storeArchiveBlobFile({
-        category: stringField(metadata.category),
-        fileName: stringField(metadata.fileName) || `archive-${id}`,
-        contentType: stringField(metadata.mimeType) || "application/octet-stream",
-        body: buffer,
-      });
-      storagePatch = { ...storagePatch, ...blob, chunkCount: 0, base64: undefined };
-      await prisma.auditLog.deleteMany({ where: { action: "archive.uploadedFile.chunk", entityType: "ArchiveUploadedFileChunk", entityId: id } });
-    } catch {
-      storagePatch = { ...storagePatch, storageMode: "CLIENT_CHUNKED" };
-    }
-  }
-
+  const storagePatch = await buildStoragePatch(id, metadata, chunks);
   await prisma.auditLog.update({
     where: { id },
     data: {
-      metadata: {
-        ...metadata,
-        ...storagePatch,
-      },
+      metadata: { ...metadata, ...storagePatch, uploadStatus: "READY" },
       messageAr: "تم رفع الملف داخل الأرشيف",
       messageEn: "Archive uploaded file completed",
     },
@@ -63,14 +40,28 @@ export async function POST(_request: Request, context: Params) {
   return jsonNoStore({ ok: true, message: "تم رفع الملف" });
 }
 
-function metadataObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+async function readUploadChunks(fileId: string) {
+  const rows = await prisma.auditLog.findMany({
+    where: { action: "archive.uploadedFile.chunk", entityType: "ArchiveUploadedFileChunk", entityId: fileId },
+    select: { metadata: true },
+  });
+  return rows.map((row) => metadataObject(row.metadata)).sort((a, b) => numberField(a.index) - numberField(b.index));
 }
 
-function numberField(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
+async function buildStoragePatch(fileId: string, metadata: Record<string, unknown>, chunks: Record<string, unknown>[]) {
+  if (!archiveBlobEnabled()) return { storageMode: "CLIENT_CHUNKED" };
 
-function stringField(value: unknown) {
-  return typeof value === "string" ? value : "";
+  try {
+    const base64 = chunks.map((item) => stringField(item.base64)).join("");
+    const blob = await storeArchiveBlobFile({
+      category: stringField(metadata.category),
+      fileName: stringField(metadata.fileName) || `archive-${fileId}`,
+      contentType: stringField(metadata.mimeType) || "application/octet-stream",
+      body: Buffer.from(base64, "base64"),
+    });
+    await prisma.auditLog.deleteMany({ where: { action: "archive.uploadedFile.chunk", entityType: "ArchiveUploadedFileChunk", entityId: fileId } });
+    return { ...blob, chunkCount: 0, base64: undefined };
+  } catch {
+    return { storageMode: "CLIENT_CHUNKED" };
+  }
 }
