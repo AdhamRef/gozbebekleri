@@ -1,3 +1,4 @@
+import { metadataObject, numberField, stringField } from "@/lib/archive/uploaded-files";
 import { prisma } from "@/lib/prisma";
 import { requireArchiveApiAccess, requireArchiveUploadedFileListAccess } from "../../../_auth";
 
@@ -12,9 +13,7 @@ export async function GET(_request: Request, context: Params) {
 
   const { id } = await Promise.resolve(context.params);
   const row = await prisma.auditLog.findUnique({ where: { id }, select: { id: true, metadata: true, action: true, entityType: true } });
-  if (!row || row.action !== "archive.uploadedFile.create" || row.entityType !== "ArchiveUploadedFile") {
-    return new Response("Not found", { status: 404 });
-  }
+  if (!isArchiveUploadedFile(row)) return new Response("Not found", { status: 404 });
 
   const metadata = metadataObject(row.metadata);
   if (stringField(metadata.category) === "DOCUMENTS") {
@@ -25,29 +24,39 @@ export async function GET(_request: Request, context: Params) {
   const fileName = safeFileName(stringField(metadata.fileName) || stringField(metadata.title) || "archive-file");
   const mimeType = stringField(metadata.mimeType) || "application/octet-stream";
   const blobDownloadUrl = stringField(metadata.blobDownloadUrl) || stringField(metadata.blobUrl);
+
   if (stringField(metadata.storageMode) === "BLOB" && blobDownloadUrl) {
-    const response = await fetch(blobDownloadUrl, { cache: "no-store" });
-    if (!response.ok || !response.body) return new Response("Not found", { status: 404 });
-    return new Response(response.body, {
-      headers: {
-        "Content-Type": response.headers.get("Content-Type") || mimeType,
-        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
-        "Cache-Control": "no-store",
-      },
-    });
+    return streamBlobFile(blobDownloadUrl, fileName, mimeType);
   }
 
   const base64 = await readStoredBase64(row.id, metadata);
   if (!base64) return new Response("Not found", { status: 404 });
 
-  const bytes = Buffer.from(base64, "base64");
-  return new Response(bytes, {
-    headers: {
-      "Content-Type": mimeType,
-      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
-      "Cache-Control": "no-store",
-    },
+  return fileResponse(Buffer.from(base64, "base64"), fileName, mimeType);
+}
+
+function isArchiveUploadedFile(row: { action: string; entityType: string } | null): row is { id: string; metadata: unknown; action: string; entityType: string } {
+  return Boolean(row && row.action === "archive.uploadedFile.create" && row.entityType === "ArchiveUploadedFile");
+}
+
+async function streamBlobFile(url: string, fileName: string, fallbackMimeType: string) {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok || !response.body) return new Response("Not found", { status: 404 });
+  return new Response(response.body, {
+    headers: downloadHeaders(fileName, response.headers.get("Content-Type") || fallbackMimeType),
   });
+}
+
+function fileResponse(bytes: Buffer, fileName: string, mimeType: string) {
+  return new Response(bytes, { headers: downloadHeaders(fileName, mimeType) });
+}
+
+function downloadHeaders(fileName: string, mimeType: string) {
+  return {
+    "Content-Type": mimeType,
+    "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+    "Cache-Control": "no-store",
+  };
 }
 
 async function readStoredBase64(id: string, metadata: Record<string, unknown>) {
@@ -71,10 +80,6 @@ async function readStoredBase64(id: string, metadata: Record<string, unknown>) {
     .join("");
 }
 
-function metadataObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+function safeFileName(value: string) {
+  return value.replace(/[\\/\u0000-\u001f]/g, "-");
 }
-
-function stringField(value: unknown) { return typeof value === "string" ? value : ""; }
-function numberField(value: unknown) { return typeof value === "number" && Number.isFinite(value) ? value : 0; }
-function safeFileName(value: string) { return value.replace(/[\\/\u0000-\u001f]/g, "-"); }
