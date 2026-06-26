@@ -6,48 +6,21 @@ import { Clock3, Download, Edit3, Loader2, Save, Search, Sparkles, Trash2, Uploa
 import { Button } from "@/components/ui/button";
 import { ArchiveFileActivityPanel, type ArchiveFileActivityItem } from "./ArchiveFileActivityPanel";
 import { ArchiveReferenceSelects } from "./ArchiveReferenceSelects";
+import {
+  emptyArchiveRefs,
+  fileCategoryOptions,
+  formatArchiveBytes,
+  formatArchiveDate,
+  reviewStatuses,
+  statusLabel,
+  storageLabel,
+  type Category,
+  type Feedback,
+  type FileAnalysis,
+  type ReviewStatus,
+  type UploadedFile,
+} from "./archiveUploadedFileTypes";
 import { uploadArchiveFile } from "./archiveUploadClient";
-
-type Category = "MARKETING" | "DOCUMENTS";
-type ReviewStatus = "NEW" | "REVIEWED" | "IMPORTANT";
-
-type FileAnalysis = {
-  summary: string;
-  suggestedCategory: string;
-  suggestedUse: string;
-  keywords: string[];
-  teamNotes: string[];
-  confidence: "metadata_only" | "ai_assisted" | string;
-};
-
-type ArchiveRefs = {
-  collections: { id: string; name: string }[];
-  projects: { id: string; title: string; collectionId: string; year: number }[];
-};
-
-type UploadedFile = {
-  id: string;
-  category: Category;
-  title: string;
-  notes?: string;
-  fileName: string;
-  mimeType: string;
-  sizeBytes: number;
-  extension: string;
-  fileCategory?: string;
-  reviewStatus?: ReviewStatus;
-  uploadStatus?: string;
-  storageMode?: string;
-  chunkCount?: number;
-  linkedCollectionId?: string;
-  linkedCollectionName?: string;
-  linkedProjectId?: string;
-  linkedProjectName?: string;
-  aiAnalysis?: FileAnalysis | null;
-  aiAnalyzedAt?: string;
-  createdAt: string;
-  uploadedBy: string;
-};
 
 type Props = {
   category: Category;
@@ -55,18 +28,10 @@ type Props = {
   description: string;
 };
 
-const emptyRefs: ArchiveRefs = { collections: [], projects: [] };
-
-const reviewStatuses: { value: ReviewStatus; label: string }[] = [
-  { value: "NEW", label: "جديد" },
-  { value: "REVIEWED", label: "تمت المراجعة" },
-  { value: "IMPORTANT", label: "مهم" },
-];
-
 export function ArchiveUploadedFilesManager({ category, title, description }: Props) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [archiveRefs, setArchiveRefs] = useState<ArchiveRefs>(emptyRefs);
+  const [archiveRefs, setArchiveRefs] = useState(emptyArchiveRefs);
   const [fileTitle, setFileTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [linkedCollectionId, setLinkedCollectionId] = useState("");
@@ -91,7 +56,7 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
     linkedCollectionId: "",
     linkedProjectId: "",
   });
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
 
   const categoryOptions = useMemo(() => fileCategoryOptions(category), [category]);
   const filteredFiles = useMemo(() => {
@@ -118,7 +83,7 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
       return;
     }
     setFiles(result.files ?? []);
-    setArchiveRefs(result.references ?? emptyRefs);
+    setArchiveRefs(result.references ?? emptyArchiveRefs);
   }
 
   useEffect(() => {
@@ -354,7 +319,7 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
                           <select value={draft.reviewStatus} onChange={(event) => setDraft((current) => ({ ...current, reviewStatus: event.target.value as ReviewStatus }))} className="h-8 rounded-md border bg-white px-2 text-xs outline-none focus:border-[#025EB8]">
                             {reviewStatuses.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                           </select>
-                        ) : <Badge>{statusLabel(file.reviewStatus || "NEW")}</Badge>}
+                        ) : <Badge>{statusLabel(file.reviewStatus)}</Badge>}
                       </td>
                       <td className="p-3 text-slate-700">
                         {isEditing ? (
@@ -373,9 +338,9 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
                           </div>
                         )}
                       </td>
-                      <td className="p-3 text-slate-700">{formatBytes(file.sizeBytes)}</td>
+                      <td className="p-3 text-slate-700">{formatArchiveBytes(file.sizeBytes)}</td>
                       <td className="p-3 text-slate-700">{storageLabel(file)}</td>
-                      <td className="p-3 text-slate-700">{formatDate(file.createdAt)}</td>
+                      <td className="p-3 text-slate-700">{formatArchiveDate(file.createdAt)}</td>
                       <td className="p-3">
                         <div className="flex flex-wrap gap-2">
                           {isEditing ? (
@@ -424,7 +389,7 @@ function AnalysisBox({ analysis, analyzedAt }: { analysis: FileAnalysis; analyze
       <div className="flex flex-wrap items-center gap-2">
         <span className="rounded-md bg-white px-2 py-1 font-black text-[#025EB8] ring-1 ring-slate-200">تحليل الملف</span>
         <span className="rounded-md bg-white px-2 py-1 font-bold text-slate-500 ring-1 ring-slate-200">{analysis.confidence === "ai_assisted" ? "مدعوم بالذكاء" : "اعتمادًا على بيانات الملف"}</span>
-        {analyzedAt ? <span className="text-[11px] text-slate-400">{formatDate(analyzedAt)}</span> : null}
+        {analyzedAt ? <span className="text-[11px] text-slate-400">{formatArchiveDate(analyzedAt)}</span> : null}
       </div>
       <p className="mt-2 font-semibold text-slate-800">{analysis.summary}</p>
       <p className="mt-1"><span className="font-bold">الاستخدام المقترح:</span> {analysis.suggestedUse}</p>
@@ -432,30 +397,4 @@ function AnalysisBox({ analysis, analyzedAt }: { analysis: FileAnalysis; analyze
       {analysis.teamNotes?.length ? <ul className="mt-2 list-disc space-y-1 pr-5">{analysis.teamNotes.map((note) => <li key={note}>{note}</li>)}</ul> : null}
     </div>
   );
-}
-
-function fileCategoryOptions(category: Category) {
-  return category === "MARKETING"
-    ? ["خطط حملات", "تقارير نتائج", "ملفات مشاريع", "محتوى إعلاني", "ميزانيات"]
-    : ["عقود", "تراخيص", "أوراق المؤسسة", "شراكات", "تقارير رسمية"];
-}
-
-function statusLabel(value: ReviewStatus) {
-  return reviewStatuses.find((status) => status.value === value)?.label ?? "جديد";
-}
-
-function storageLabel(file: UploadedFile) {
-  if (file.storageMode === "BLOB") return "Blob";
-  if (file.storageMode === "CLIENT_CHUNKED") return `${file.chunkCount || 1} أجزاء`;
-  return "مباشر";
-}
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("ar", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-}
-
-function formatBytes(value: number) {
-  if (!value) return "-";
-  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
-  return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
