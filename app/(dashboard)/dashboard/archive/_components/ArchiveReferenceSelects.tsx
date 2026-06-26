@@ -1,9 +1,6 @@
 "use client";
 
-type ArchiveRefs = {
-  collections: { id: string; name: string }[];
-  projects: { id: string; title: string; collectionId: string; year?: number }[];
-};
+import type { ArchiveRefs } from "./archiveUploadedFileTypes";
 
 type Props = {
   refs: ArchiveRefs;
