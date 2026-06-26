@@ -4,6 +4,7 @@ export type ArchiveReviewStatus = "NEW" | "REVIEWED" | "IMPORTANT";
 
 export const ARCHIVE_MAX_FILE_BYTES = 30 * 1024 * 1024;
 export const ARCHIVE_BASE64_CHUNK_SIZE = 3_500_000;
+export const ARCHIVE_CLIENT_CHUNK_MAX_BYTES = 2 * 1024 * 1024;
 export const ARCHIVE_ALLOWED_EXTENSIONS = ["pdf", "xls", "xlsx"];
 export const ARCHIVE_ALLOWED_MIME_TYPES = [
   "application/pdf",
