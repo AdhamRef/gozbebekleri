@@ -6,9 +6,9 @@ import { PlusCircle, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-const contentTypes = ["DESIGN", "VIDEO", "REEL", "CAROUSEL", "STORY", "SEO_ARTICLE", "EMAIL", "WHATSAPP", "SMS"];
+const contentTypes = ["DESIGN", "VIDEO", "REEL", "CAROUSEL", "STORY", "EMAIL", "MESSAGE"];
 const statuses = ["IDEA", "WRITING", "DESIGN", "REVIEW", "APPROVED"];
-const channels = ["Social", "Website", "Instagram / TikTok", "WhatsApp", "Email", "Meta Ads"];
+const channels = ["Social", "Website", "Short Video", "Message", "Email", "Campaign"];
 
 type FeedbackState = {
   tone: "success" | "error";
@@ -56,9 +56,9 @@ export function ContentItemCreatePanel() {
     <section className="rounded-2xl border bg-white p-4 shadow-sm" aria-label="إنشاء عنصر محتوى">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-[#025EB8]">Content authoring</p>
-          <h2 className="mt-1 text-lg font-black text-slate-950">إضافة عنصر محتوى عملي</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-500">يحفظ العنصر في سجل قاعدة البيانات ويظهر فورًا داخل مراحل الإنتاج. لا نشر تلقائي ولا إرسال تلقائي.</p>
+          <p className="text-xs font-bold text-[#025EB8]">إضافة محتوى</p>
+          <h2 className="mt-1 text-lg font-black text-slate-950">عنصر محتوى جديد</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-500">سجل فكرة أو مادة مطلوبة حتى تظهر داخل مراحل الإنتاج والمتابعة.</p>
         </div>
         <PlusCircle className="hidden h-8 w-8 text-[#025EB8] sm:block" aria-hidden="true" />
       </div>
@@ -67,7 +67,7 @@ export function ContentItemCreatePanel() {
         <Input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          placeholder="مثال: سكريبت Reel عن وقف القدس"
+          placeholder="مثال: فيديو قصير عن وقف القدس"
           minLength={2}
           maxLength={160}
           required
