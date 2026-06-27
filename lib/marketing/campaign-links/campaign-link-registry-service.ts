@@ -234,7 +234,7 @@ export async function createOrUpdateCampaignLink(input: CampaignLinkInput): Prom
 
   const result = await prisma.$runCommandRaw({
     findAndModify: "MarketingCampaignLink",
-    query: { urlHash: payload.urlHash },
+    query: { $or: [{ urlHash: payload.urlHash }, { url: payload.url }] },
     update: {
       $set: { ...payload, status: "ACTIVE", updatedAt: now },
       $setOnInsert: { createdAt: now, saveCount: 0 },
