@@ -13,6 +13,13 @@ export type WorkLinkCandidate = {
   reasons: string[];
 };
 
+export type WorkLinkBridgeSummary = {
+  candidates: number;
+  linkedWorkItems: number;
+  linkedLinks: number;
+  strongCandidates: number;
+};
+
 function text(value: unknown) {
   return typeof value === "string" ? value.toLowerCase() : "";
 }
@@ -51,6 +58,15 @@ function scorePair(work: WorkItem, link: CampaignLinkRecord) {
   return { score, reasons };
 }
 
+function summarize(candidates: WorkLinkCandidate[]): WorkLinkBridgeSummary {
+  return {
+    candidates: candidates.length,
+    linkedWorkItems: new Set(candidates.map((item) => item.workId)).size,
+    linkedLinks: new Set(candidates.map((item) => item.linkId)).size,
+    strongCandidates: candidates.filter((item) => item.score >= 8).length,
+  };
+}
+
 export async function getWorkLinkCandidates(limit = 100): Promise<WorkLinkCandidate[]> {
   const [work, links] = await Promise.all([
     getWorkRegistrySnapshot(),
@@ -70,4 +86,9 @@ export async function getWorkLinkCandidates(limit = 100): Promise<WorkLinkCandid
       reasons: match.reasons,
     };
   })).filter((item) => item.score >= 3).sort((a, b) => b.score - a.score).slice(0, limit);
+}
+
+export async function getWorkLinkBridge(limit = 100) {
+  const candidates = await getWorkLinkCandidates(limit);
+  return { summary: summarize(candidates), candidates };
 }
