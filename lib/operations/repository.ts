@@ -1,6 +1,7 @@
 import { archiveAssets } from "./archive/archive-data";
 import type { ArchiveAsset } from "./archive/archive-types";
 import { readAuditBackedContentItems } from "./content-item-repository";
+import { readRuntimeContentItems } from "./content-item-runtime-repository";
 import { readAuditBackedContentPublications } from "./content-publication-repository";
 import { createFallbackOperationsOverview } from "./mock-data";
 import { productionItems } from "./production/production-data";
@@ -40,6 +41,19 @@ function fromFoundation<T>(
   return {
     items: [...items],
     persistence: foundationPersistence(model, nextModel, options),
+  };
+}
+
+function runtimeContentPersistence(count: number): OperationsPersistenceInfo {
+  return {
+    mode: "prisma",
+    storage: "prisma",
+    readOnly: false,
+    model: "ContentItem",
+    nextModel: "ContentPublication",
+    readyForDb: true,
+    externalSideEffects: false,
+    note: `${count} content item(s) are read from the dedicated ContentItem runtime delegate. Publishing and sending remain manual-only.`,
   };
 }
 
@@ -130,6 +144,14 @@ export async function listArchiveAssets(): Promise<OperationsRepositoryResult<Ar
 
 export async function listContentItems(): Promise<OperationsRepositoryResult<OperationsContentItem>> {
   const overview = createFallbackOperationsOverview();
+  const runtimeItems = await readRuntimeContentItems();
+  if (runtimeItems) {
+    return {
+      items: await attachPublicationMarkers(runtimeItems.length > 0 ? runtimeItems : overview.items),
+      persistence: runtimeContentPersistence(runtimeItems.length),
+    };
+  }
+
   const auditItems = await readAuditBackedContentItems();
   const items = await attachPublicationMarkers(auditItems.length > 0 ? [...auditItems, ...overview.items] : overview.items);
 
@@ -161,8 +183,8 @@ export async function getContentOperationsOverview(): Promise<OperationsOverview
 
   return {
     ...overview,
-    source: contentItems.persistence.mode === "prisma" ? "content-operations-audit-backed" : "content-operations-repository",
-    version: contentItems.persistence.mode === "prisma" ? "operations-overview-audit-backed" : "operations-overview-foundation",
+    source: contentItems.persistence.model === "ContentItem" ? "content-operations-runtime" : contentItems.persistence.mode === "prisma" ? "content-operations-audit-backed" : "content-operations-repository",
+    version: contentItems.persistence.model === "ContentItem" ? "operations-overview-runtime" : contentItems.persistence.mode === "prisma" ? "operations-overview-audit-backed" : "operations-overview-foundation",
     kpis: {
       ...overview.kpis,
       contentItems: contentItems.items.length,
