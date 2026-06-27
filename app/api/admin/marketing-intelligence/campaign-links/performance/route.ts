@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
-import { buildCampaignLinkPerformanceReport } from "@/lib/marketing/campaign-links/campaign-link-performance-service";
+import { buildCampaignLinkPerformanceWorkReport } from "@/lib/marketing/campaign-links/campaign-link-performance-work-service";
 import { parseCampaignLinkStatusFilter, readString } from "@/lib/marketing/campaign-links/campaign-link-registry-service";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +24,6 @@ export async function GET(request: NextRequest) {
   const status = parseCampaignLinkStatusFilter(request.nextUrl.searchParams.get("status"));
   const id = readString(request.nextUrl.searchParams.get("id"));
 
-  const report = await buildCampaignLinkPerformanceReport({ days, limit, platform, status, id });
+  const report = await buildCampaignLinkPerformanceWorkReport({ days, limit, platform, status, id });
   return NextResponse.json(report, { headers: { "Cache-Control": "no-store" } });
 }
