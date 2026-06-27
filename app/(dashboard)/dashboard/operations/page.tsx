@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, CalendarDays, ClipboardList, FileText, GitBranch, Lightbulb, Send, Sparkles, UserRoundCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getOperationsHubOverview } from "@/lib/operations/hub/hub-service";
+import { getWorkRegistrySnapshot } from "@/lib/operations/content-registry/work-service";
 
 const iconMap = {
   calendar: CalendarDays,
@@ -15,7 +16,7 @@ const iconMap = {
 };
 
 export default async function OperationsHomePage() {
-  const overview = await getOperationsHubOverview();
+  const [overview, work] = await Promise.all([getOperationsHubOverview(), getWorkRegistrySnapshot()]);
   const primarySections = overview.sections.filter((section) => section.priority === "PRIMARY");
 
   return <main className="min-h-screen bg-[#FFFDF8] p-4 text-slate-950 sm:p-6" dir="rtl">
@@ -35,9 +36,9 @@ export default async function OperationsHomePage() {
 
     <section className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <Metric title="مهام اليوم" value={overview.today.tasks} note={overview.today.dateLabel} />
-      <Metric title="محتوى الشهر" value={overview.month.requiredContent} note={`${overview.month.completionRate}% مكتمل`} />
-      <Metric title="قيد التنفيذ" value={overview.month.inProgressContent} note="نصوص وتصاميم ومراجعات" />
-      <Metric title="متأخر" value={overview.month.delayedItems} note="يحتاج متابعة" />
+      <Metric title="محتوى الشهر" value={work.summary.total || overview.month.requiredContent} note={`${work.summary.averageProgress || overview.month.completionRate}% متوسط تقدم`} />
+      <Metric title="جاهز للنشر" value={work.summary.ready} note="مواد معتمدة أو مجدولة" />
+      <Metric title="يحتاج ملفات" value={work.summary.needsAsset} note="ينتظر تصميمًا أو فيديو" />
     </section>
 
     <section className="mt-4 grid gap-4 xl:grid-cols-[1fr_1fr]">
