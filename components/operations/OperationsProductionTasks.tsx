@@ -19,7 +19,7 @@ export function OperationsProductionTasks({ tasks, statusClass }: OperationsProd
           <CardTitle className="flex items-center gap-2">
             <UserRoundCheck className="h-5 w-5 text-[#025EB8]" /> مهام الإنتاج
           </CardTitle>
-          <CardDescription className="mt-2">مهام foundation يمكن حفظها الآن كـ OperationTask فعلية في صفحة مهام التشغيل.</CardDescription>
+          <CardDescription className="mt-2">حوّل المهام المقترحة إلى مهام فعلية وتابع المسؤول والموعد والحالة من صفحة مهام التشغيل.</CardDescription>
         </div>
         <Button asChild variant="outline" className="gap-2 font-bold">
           <Link href="/dashboard/operations/tasks"><PlusCircle className="h-4 w-4" /> فتح إنشاء مهمة</Link>
