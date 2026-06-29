@@ -5,10 +5,18 @@ import { useRouter } from "next/navigation";
 import { PlusCircle, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { operationsContentTypeLabel, operationsStatusLabel } from "@/lib/operations/display-labels";
 
 const contentTypes = ["DESIGN", "VIDEO", "REEL", "CAROUSEL", "STORY", "EMAIL", "MESSAGE"];
 const statuses = ["IDEA", "WRITING", "DESIGN", "REVIEW", "APPROVED"];
-const channels = ["Social", "Website", "Short Video", "Message", "Email", "Campaign"];
+const channels = [
+  ["Social", "السوشيال"],
+  ["Website", "الموقع"],
+  ["Short Video", "فيديو قصير"],
+  ["Message", "رسائل"],
+  ["Email", "إيميل"],
+  ["Campaign", "حملة"],
+] as const;
 
 type FeedbackState = {
   tone: "success" | "error";
@@ -74,13 +82,13 @@ export function ContentItemCreatePanel() {
           aria-label="عنوان عنصر المحتوى"
         />
         <select value={type} onChange={(event) => setType(event.target.value)} className="h-9 rounded-md border border-input bg-white px-3 text-sm shadow-sm" aria-label="نوع المحتوى">
-          {contentTypes.map((item) => <option key={item} value={item}>{item}</option>)}
+          {contentTypes.map((item) => <option key={item} value={item}>{operationsContentTypeLabel(item)}</option>)}
         </select>
         <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-9 rounded-md border border-input bg-white px-3 text-sm shadow-sm" aria-label="حالة المحتوى">
-          {statuses.map((item) => <option key={item} value={item}>{item}</option>)}
+          {statuses.map((item) => <option key={item} value={item}>{operationsStatusLabel(item)}</option>)}
         </select>
         <select value={channel} onChange={(event) => setChannel(event.target.value)} className="h-9 rounded-md border border-input bg-white px-3 text-sm shadow-sm" aria-label="قناة النشر">
-          {channels.map((item) => <option key={item} value={item}>{item}</option>)}
+          {channels.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
         <Input value={due} onChange={(event) => setDue(event.target.value)} type="date" aria-label="موعد التسليم" />
         <Button type="submit" disabled={saving} className="gap-2 font-bold">
