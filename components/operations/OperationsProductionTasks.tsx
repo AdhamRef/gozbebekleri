@@ -11,6 +11,20 @@ type OperationsProductionTasksProps = {
   statusClass: Record<string, string>;
 };
 
+function taskStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    IDEA: "فكرة",
+    WRITING: "كتابة",
+    DESIGN: "تصميم",
+    REVIEW: "مراجعة",
+    APPROVED: "معتمد",
+    SCHEDULED: "مجدول",
+    PUBLISHED: "منشور",
+    IN_PROGRESS: "قيد التنفيذ",
+  };
+  return labels[status] ?? status;
+}
+
 export function OperationsProductionTasks({ tasks, statusClass }: OperationsProductionTasksProps) {
   return (
     <Card>
@@ -34,7 +48,7 @@ export function OperationsProductionTasks({ tasks, statusClass }: OperationsProd
                   <h3 className="font-black text-slate-900">{task.title}</h3>
                   <p className="mt-1 text-sm leading-6 text-slate-600">مرتبط بـ: {task.item}</p>
                 </div>
-                <Badge variant="outline" className={statusClass[task.status]}>{task.status}</Badge>
+                <Badge variant="outline" className={statusClass[task.status]}>{taskStatusLabel(task.status)}</Badge>
               </div>
               <div className="mt-4 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
                 <span>المسؤول: <b>{task.owner}</b></span>
