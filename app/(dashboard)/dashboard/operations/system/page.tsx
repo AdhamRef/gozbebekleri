@@ -10,45 +10,48 @@ const completed = [
   "لوحة خطط المحتوى",
   "التقويم التشغيلي والمواسم",
   "خطة المحاور الأسبوعية",
-  "Kanban لمراحل الإنتاج",
+  "لوحة مراحل الإنتاج",
   "مهام الإنتاج",
-  "Placeholder للتسليم للتسويق",
+  "تجهيز التسليم للتسويق",
 ] as const;
 
 const active = [
-  "Package 4A: تأسيس نماذج البيانات",
-  "OperationSeason",
-  "OperationWeeklyTheme",
-  "ContentPlan",
-  "ContentItem",
-  "ContentTask",
+  "تثبيت نظام المحتوى كبيانات تشغيلية",
+  "تنظيم المواسم والخطط الشهرية",
+  "تجهيز عناصر المحتوى للتحديث المباشر",
+  "ربط المحتوى بالنشر والتسويق",
 ] as const;
 
 const next = [
-  "قراءة البيانات الحقيقية بدل البيانات الثابتة",
-  "CRUD للخطط والعناصر والمهام",
-  "التنبيهات والتذكير بالمواسم",
-  "جدولة WhatsApp / Email / SMS",
-  "AI Suggestions للمحتوى والحملات",
-  "Marketing Handoff مع روابط الحملات ونتائج الإعلانات",
+  "قراءة المحتوى والخطط من قاعدة التشغيل",
+  "إضافة وتعديل الخطط والعناصر والمهام من الواجهة",
+  "تنبيهات المواسم والتأخير",
+  "جدولة الرسائل يدويًا",
+  "تسليم المحتوى المعتمد للتسويق مع روابط الحملات",
 ] as const;
 
 const progress = [
-  ["UI Shell", 100, "مكتمل"],
-  ["Data Foundation", 10, "مفتوح"],
-  ["CRUD", 0, "لاحقًا"],
-  ["Automation", 0, "لاحقًا"],
-  ["AI", 0, "لاحقًا"],
+  ["واجهة العمليات", 100, "مكتمل"],
+  ["نظام المحتوى", 45, "قيد التجهيز"],
+  ["إدارة التحديثات", 25, "قيد التجهيز"],
+  ["الرسائل والتنبيهات", 10, "لاحقًا"],
+  ["المساعد الذكي", 10, "لاحقًا"],
 ] as const;
 
 const packages = [
-  ["Package 3A-3D", "واجهة النظام", "مكتمل", "تم بناء مركز العمليات، لوحة المحتوى، المواسم، المهام، وKanban."],
-  ["Package 4A", "نماذج البيانات", "مفتوح", "Issue #21 جاهز لتنفيذ نماذج Prisma بشكل آمن ومنفصل."],
-  ["Package 4B", "Read APIs", "التالي", "قراءة المواسم والخطط والعناصر والمهام من قاعدة البيانات."],
-  ["Package 4C", "ربط الواجهة بالبيانات", "التالي", "استبدال البيانات الثابتة داخل اللوحة ببيانات حقيقية."],
-  ["Package 4D", "CRUD", "لاحقًا", "إضافة وتعديل الخطط والعناصر والمهام من داخل لوحة التحكم."],
-  ["Package 4E", "Marketing Handoff", "لاحقًا", "تسليم المحتوى المعتمد للتسويق وربطه بروابط الحملات ونتائج الإعلانات."],
+  ["الحزمة 1", "نظام المحتوى التشغيلي", "قيد التنفيذ", "تجهيز المحتوى ليصبح سجلًا تشغيليًا قابلًا للربط بالنشر والإعلانات."],
+  ["الحزمة 2", "تنظيف تجربة العمليات", "قيد التنفيذ", "توحيد المسميات وإزالة أي تفاصيل تقنية من واجهة الفريق."],
+  ["الحزمة 3", "إنتاج المحتوى", "التالي", "تنظيم الخطة الشهرية وسير العمل ومتابعة المسؤوليات."],
+  ["الحزمة 4", "ربط المحتوى بالإعلانات", "التالي", "ربط كل محتوى بروابط الحملات ونتائج الإعلان."],
+  ["الحزمة 5", "الدروس المستفادة", "لاحقًا", "تحويل النتائج إلى مكتبة معرفة للفريق."],
+  ["الحزمة 6", "التتبع والنتائج", "لاحقًا", "توضيح حقيقة التحويلات ومشاكل التتبع."],
 ] as const;
+
+function readinessLabel(mode: string, readyForDb: boolean) {
+  if (mode === "prisma") return "يعمل من بيانات محفوظة";
+  if (readyForDb) return "جاهز للتحويل";
+  return "يحتاج ترتيبًا إضافيًا";
+}
 
 export default async function OperationsSystemPage() {
   const persistence = await getOperationsPersistenceSnapshot();
@@ -57,10 +60,10 @@ export default async function OperationsSystemPage() {
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
       <div className="flex flex-col gap-4 rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs text-white/70">Operations / System</p>
-          <h1 className="mt-1.5 text-2xl font-black">تنفيذ النظام</h1>
+          <p className="text-xs text-white/70">العمليات والمحتوى</p>
+          <h1 className="mt-1.5 text-2xl font-black">حالة تجهيز النظام</h1>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
-            هذه الصفحة تعرض حالة تنفيذ نظام العمليات داخل لوحة التحكم نفسها: ما تم، ما يجري الآن، وما سيتم بناؤه لاحقًا.
+            متابعة مبسطة لما تم إنجازه، وما يتم تجهيزه الآن، وما سيظهر للفريق في المراحل التالية.
           </p>
         </div>
         <Button asChild variant="secondary" className="gap-2 font-bold">
@@ -85,38 +88,40 @@ export default async function OperationsSystemPage() {
       <Card className="border-[#025EB8]/20 bg-blue-50/50">
         <CardHeader className="gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-[#025EB8]" /> Package 4A مفتوح الآن</CardTitle>
-            <CardDescription className="mt-2 leading-6">تم توثيق نماذج البيانات المطلوبة في Issue #21، والهدف التالي هو تنفيذها في Prisma ثم التحقق والبناء.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-[#025EB8]" /> الجاري الآن</CardTitle>
+            <CardDescription className="mt-2 leading-6">
+              نثبت نظام المحتوى التشغيلي خطوة بخطوة مع بقاء التسجيل الحالي يعمل كخطة أمان.
+            </CardDescription>
           </div>
-          <Link href="https://github.com/AdhamRef/gozbebekleri/issues/21" target="_blank" className="inline-flex rounded-md bg-[#025EB8] px-4 py-2 text-sm font-bold text-white hover:bg-[#024f99]">
-            فتح Issue #21
+          <Link href="/dashboard/operations/content" className="inline-flex rounded-md bg-[#025EB8] px-4 py-2 text-sm font-bold text-white hover:bg-[#024f99]">
+            فتح لوحة المحتوى
           </Link>
         </CardHeader>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-[#025EB8]" /> حالة بيانات التشغيل</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-[#025EB8]" /> جاهزية بيانات التشغيل</CardTitle>
           <CardDescription className="leading-6">
-            تم توحيد Scheduler وProduction وArchive وContent وTasks خلف Repository contracts، بدون migration وبدون تأثير خارجي.
+            هذا القسم يوضح للفريق أي أجزاء أصبحت محفوظة وقابلة للاستخدام، وأي أجزاء ما زالت في مرحلة التجهيز.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-4">
             <div className="rounded-2xl border bg-white p-4">
-              <p className="text-xs text-slate-500">إجمالي السجلات</p>
+              <p className="text-xs text-slate-500">إجمالي العناصر</p>
               <h3 className="mt-1 text-2xl font-black text-slate-900">{persistence.summary.totalRecords}</h3>
             </div>
             <div className="rounded-2xl border bg-white p-4">
-              <p className="text-xs text-slate-500">Foundation</p>
+              <p className="text-xs text-slate-500">أجزاء في التجهيز</p>
               <h3 className="mt-1 text-2xl font-black text-slate-900">{persistence.summary.foundationDatasets}</h3>
             </div>
             <div className="rounded-2xl border bg-white p-4">
-              <p className="text-xs text-slate-500">جاهز للتحويل لـ DB</p>
+              <p className="text-xs text-slate-500">جاهزة للحفظ الدائم</p>
               <h3 className="mt-1 text-2xl font-black text-slate-900">{persistence.summary.dbReadyDatasets}</h3>
             </div>
             <div className="rounded-2xl border bg-white p-4">
-              <p className="text-xs text-slate-500">مولد من Engine</p>
+              <p className="text-xs text-slate-500">تحتاج متابعة آلية</p>
               <h3 className="mt-1 text-2xl font-black text-slate-900">{persistence.summary.generatedDatasets}</h3>
             </div>
           </div>
@@ -128,12 +133,13 @@ export default async function OperationsSystemPage() {
                     <p className="text-xs font-bold text-[#025EB8]">{dataset.label}</p>
                     <h3 className="mt-1 text-2xl font-black text-slate-900">{dataset.total}</h3>
                   </div>
-                  <Badge variant="outline">{dataset.persistence.mode}</Badge>
+                  <Badge variant="outline">{readinessLabel(dataset.persistence.mode, dataset.persistence.readyForDb)}</Badge>
                 </div>
-                <p className="mt-3 text-xs leading-5 text-slate-600">Current: {dataset.persistence.model}</p>
-                <p className="text-xs leading-5 text-slate-600">Next: {dataset.persistence.nextModel}</p>
+                <p className="mt-3 text-xs leading-5 text-slate-600">
+                  المرحلة الحالية: {readinessLabel(dataset.persistence.mode, dataset.persistence.readyForDb)}
+                </p>
                 <p className="mt-2 text-xs font-bold leading-5 text-slate-700">
-                  {dataset.persistence.readyForDb ? "جاهز للتحويل لـ DB" : "يحتاج تثبيت workflow قبل DB"}
+                  {dataset.persistence.readyForDb ? "جاهز للمرحلة التالية" : "يحتاج مراجعة قبل التفعيل"}
                 </p>
               </div>
             ))}
@@ -144,7 +150,7 @@ export default async function OperationsSystemPage() {
       <Card>
         <CardHeader>
           <CardTitle>خارطة الحزم التنفيذية</CardTitle>
-          <CardDescription>تسلسل العمل من الواجهة الحالية إلى نظام بيانات وتشغيل كامل.</CardDescription>
+          <CardDescription>تسلسل العمل من لوحة تشغيل مبسطة إلى نظام متكامل للمحتوى والتسويق.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {packages.map(([code, title, state, description]) => (
@@ -180,7 +186,7 @@ export default async function OperationsSystemPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-[#025EB8]" /> الجاري الآن</CardTitle>
-            <CardDescription>المرحلة التالية لتحويل الواجهة إلى بيانات حقيقية.</CardDescription>
+            <CardDescription>المرحلة الحالية لتجهيز النظام للاستخدام اليومي.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             {active.map((item) => (
@@ -208,12 +214,12 @@ export default async function OperationsSystemPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Megaphone className="h-5 w-5 text-[#025EB8]" /> قاعدة العمل من الآن</CardTitle>
-          <CardDescription>أي مرحلة جديدة سيتم إظهارها داخل اللوحة قبل أو مع تنفيذها، حتى تكون المراجعة من داخل النظام نفسه.</CardDescription>
+          <CardTitle className="flex items-center gap-2"><Megaphone className="h-5 w-5 text-[#025EB8]" /> قاعدة العمل</CardTitle>
+          <CardDescription>كل مرحلة جديدة يجب أن تظهر داخل اللوحة بصورة مفهومة للفريق، وليس كشرح تقني.</CardDescription>
         </CardHeader>
         <CardContent className="text-sm leading-7 text-slate-700">
           <p>
-            لن نترك التنفيذ مخفيًا في GitHub فقط. كل حزمة قادمة سيكون لها أثر واضح داخل لوحة التحكم: إما صفحة، أو مؤشر تقدم، أو قسم متابعة، أو حالة تنفيذ.
+            أي حزمة قادمة سيكون لها أثر واضح داخل لوحة التحكم: صفحة، أو مؤشر تقدم، أو قسم متابعة، أو حالة تنفيذ، مع إبقاء التفاصيل التقنية خارج واجهة المستخدم اليومية.
           </p>
         </CardContent>
       </Card>
