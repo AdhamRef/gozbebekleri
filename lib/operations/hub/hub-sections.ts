@@ -11,5 +11,5 @@ export const operationsHubSections: OperationsHubSection[] = [
   { key: "workflow", title: "سير العمل", description: "من الفكرة إلى التعلم من النتائج.", href: "/dashboard/operations/workflow", priority: "PRIMARY" },
   { key: "donor-reactivation", title: "تنشيط المتبرعين", description: "شرائح التواصل وإعادة الاستهداف.", href: "/dashboard/operations/donor-reactivation", priority: "SECONDARY" },
   { key: "ai-assistant", title: "مساعد الذكاء الاصطناعي", description: "مساعد تشغيلي للتخطيط والتحليل.", href: "/dashboard/operations/ai-assistant", priority: "SECONDARY" },
-  { key: "learnings", title: "الدروس المستفادة", description: "ما نجح وما يجب تجنبه في المحتوى والحملات.", href: "/dashboard/operations/learnings", priority: "PRIMARY" },
+  { key: "learnings", title: "الدروس المستفادة", description: "ما نجح وما يجب تجنبه في المحتوى والحملات.", href: "/dashboard/operations/content", priority: "SECONDARY" },
 ];
