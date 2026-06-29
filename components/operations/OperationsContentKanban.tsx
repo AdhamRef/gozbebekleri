@@ -19,6 +19,17 @@ function formatDate(value?: string | null) {
   return date.toLocaleDateString("ar-EG", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function productionIndicator(status: string) {
+  if (status === "IDEA") return "يحتاج نص";
+  if (status === "WRITING") return "كتابة جارية";
+  if (status === "DESIGN") return "يحتاج تصميم";
+  if (status === "REVIEW") return "يحتاج مراجعة";
+  if (status === "APPROVED") return "جاهز للتسويق";
+  if (status === "SCHEDULED") return "مجدول";
+  if (status === "PUBLISHED") return "منشور يدويًا";
+  return "قيد المتابعة";
+}
+
 export function OperationsContentKanban({ items, boardColumns, statusClass }: OperationsContentKanbanProps) {
   return (
     <Card>
@@ -48,6 +59,9 @@ export function OperationsContentKanban({ items, boardColumns, statusClass }: Op
                         <div className="flex items-start justify-between gap-2">
                           <h4 className="text-sm font-bold leading-6 text-slate-900">{item.title}</h4>
                           <Badge variant="outline" className={statusClass[item.status]}>{operationsContentTypeLabel(item.type)}</Badge>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <span className="rounded-full border bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-600">{productionIndicator(item.status)}</span>
                         </div>
                         <div className="mt-3 space-y-1 text-xs text-slate-500">
                           <p>القناة: <b>{item.channel}</b></p>
