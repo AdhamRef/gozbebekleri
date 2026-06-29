@@ -1,7 +1,7 @@
 import { FileText, CalendarClock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { operationsStatusLabel } from "@/lib/operations/display-labels";
+import { operationsContentTypeLabel, operationsStatusLabel } from "@/lib/operations/display-labels";
 import type { OperationsOverview } from "@/lib/operations/types";
 import { OperationsContentPlanTaskAction } from "./OperationsContentPlanTaskAction";
 
@@ -14,6 +14,15 @@ type Props = {
 function progressValue(total: number, done: number) {
   if (!total) return 0;
   return Math.max(0, Math.min(100, Math.round((done / total) * 100)));
+}
+
+function contentLinks(item: OperationsOverview["items"][number]) {
+  return [
+    item.figmaUrl ? ["Figma", item.figmaUrl] : null,
+    item.driveUrl ? ["Drive", item.driveUrl] : null,
+    item.videoUrl ? ["Video", item.videoUrl] : null,
+    item.finalAssetUrl ? ["Final", item.finalAssetUrl] : null,
+  ].filter(Boolean) as string[][];
 }
 
 export function OperationsContentPlans({ plans, items, statusClass }: Props) {
@@ -62,14 +71,31 @@ export function OperationsContentPlans({ plans, items, statusClass }: Props) {
           <CardDescription>قائمة مختصرة بأهم عناصر المحتوى المرتبطة بالإنتاج.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {items.map((item) => (
-            <div key={item.id || item.title} className="rounded-2xl border p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-bold text-slate-900">{item.title}</h3>
-                <Badge variant="outline" className={statusClass[item.status]}>{operationsStatusLabel(item.status)}</Badge>
+          {items.map((item) => {
+            const links = contentLinks(item);
+            return (
+              <div key={item.id || item.title} className="rounded-2xl border p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-bold text-slate-900">{item.title}</h3>
+                  <Badge variant="outline" className={statusClass[item.status]}>{operationsStatusLabel(item.status)}</Badge>
+                </div>
+                <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-3">
+                  <span>النوع: <b>{operationsContentTypeLabel(item.type)}</b></span>
+                  <span>القناة: <b>{item.channel}</b></span>
+                  <span>الموعد: <b>{item.due || "غير محدد"}</b></span>
+                </div>
+                {links.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {links.map(([label, href]) => (
+                      <a key={label} href={href} target="_blank" rel="noreferrer" className="rounded-full border bg-slate-50 px-3 py-1 text-xs font-bold text-[#025EB8] hover:border-[#025EB8]">
+                        {label}
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
     </div>
