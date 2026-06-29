@@ -20,7 +20,7 @@ export function OperationsContentItemActions({ id, status }: OperationsContentIt
 
   async function updateStatus(nextStatus: string) {
     if (!id) return;
-    if (nextStatus === "PUBLISHED" && !window.confirm("تأكيد نشر يدوي؟ لن يتم إرسال أو نشر أي محتوى تلقائيًا؛ سيتم تحديث الحالة وتسجيل ContentPublication يدوي فقط.")) {
+    if (nextStatus === "PUBLISHED" && !window.confirm("تأكيد تسجيل النشر اليدوي؟ سيتم تحديث الحالة فقط.")) {
       return;
     }
 
@@ -34,7 +34,7 @@ export function OperationsContentItemActions({ id, status }: OperationsContentIt
       body: JSON.stringify({
         id,
         status: nextStatus,
-        publicationNotes: nextStatus === "PUBLISHED" ? "Manual publish confirmed from Operations content board. No automatic sending or publishing happened." : undefined,
+        publicationNotes: nextStatus === "PUBLISHED" ? "تم تسجيل النشر اليدوي من لوحة المحتوى." : undefined,
       }),
     });
     const result = await response.json().catch(() => null);
@@ -75,7 +75,7 @@ export function OperationsContentItemActions({ id, status }: OperationsContentIt
           </Button>
         ) : null}
       </div>
-      <p className="text-[11px] font-semibold leading-5 text-slate-500">النشر اليدوي يحدّث الحالة ويسجل ContentPublication فقط؛ لا يوجد إرسال أو نشر تلقائي.</p>
+      <p className="text-[11px] font-semibold leading-5 text-slate-500">النشر اليدوي يحدّث الحالة ويسجل العملية فقط.</p>
       {busy ? <p className="text-xs font-semibold text-slate-500">جاري التحديث...</p> : null}
       {success ? <p className="text-xs font-semibold text-emerald-600">{success}</p> : null}
       {error ? <p className="text-xs font-semibold text-rose-600">{error}</p> : null}
