@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { operationsContentTypeLabel } from "@/lib/operations/display-labels";
 import type { OperationsOverview } from "@/lib/operations/types";
 import { OperationsContentItemActions } from "./OperationsContentItemActions";
 
@@ -46,7 +47,7 @@ export function OperationsContentKanban({ items, boardColumns, statusClass }: Op
                       <div key={item.id || item.title} className="rounded-xl border bg-white p-3 shadow-sm">
                         <div className="flex items-start justify-between gap-2">
                           <h4 className="text-sm font-bold leading-6 text-slate-900">{item.title}</h4>
-                          <Badge variant="outline" className={statusClass[item.status]}>{item.type}</Badge>
+                          <Badge variant="outline" className={statusClass[item.status]}>{operationsContentTypeLabel(item.type)}</Badge>
                         </div>
                         <div className="mt-3 space-y-1 text-xs text-slate-500">
                           <p>القناة: <b>{item.channel}</b></p>
