@@ -27,9 +27,14 @@ type RuntimeContentItemInput = {
   notes?: string;
 };
 
+type RuntimeContentItemUpdateInput = Partial<RuntimeContentItemInput> & {
+  id: string;
+};
+
 type ContentItemDelegate = {
   findMany: (args: Record<string, unknown>) => Promise<RuntimeContentItem[]>;
   create?: (args: Record<string, unknown>) => Promise<RuntimeContentItem>;
+  update?: (args: Record<string, unknown>) => Promise<RuntimeContentItem>;
 };
 
 type PrismaWithContentItem = typeof prisma & {
@@ -63,6 +68,39 @@ function mapRuntimeContentItem(item: RuntimeContentItem): OperationsContentItem 
   };
 }
 
+function buildCreateData(input: RuntimeContentItemInput) {
+  return {
+    title: input.title.trim(),
+    format: input.format || input.type || "DESIGN",
+    status: input.status || "IDEA",
+    theme: input.channel || null,
+    dueAt: dateOrNull(input.due),
+    sourceType: input.sourceType || "MANUAL",
+    sourceAssetId: input.sourceAssetId || null,
+    sourceProjectId: input.sourceProjectId || null,
+    driveUrl: input.driveUrl || null,
+    finalAssetUrl: input.previewUrl || null,
+    proposedCopy: input.notes || null,
+    progress: 0,
+  };
+}
+
+function buildUpdateData(input: RuntimeContentItemUpdateInput) {
+  const data: Record<string, unknown> = {};
+  if (input.title !== undefined) data.title = input.title.trim();
+  if (input.format !== undefined || input.type !== undefined) data.format = input.format || input.type || "DESIGN";
+  if (input.status !== undefined) data.status = input.status || "IDEA";
+  if (input.channel !== undefined) data.theme = input.channel || null;
+  if (input.due !== undefined) data.dueAt = dateOrNull(input.due);
+  if (input.sourceType !== undefined) data.sourceType = input.sourceType || "MANUAL";
+  if (input.sourceAssetId !== undefined) data.sourceAssetId = input.sourceAssetId || null;
+  if (input.sourceProjectId !== undefined) data.sourceProjectId = input.sourceProjectId || null;
+  if (input.driveUrl !== undefined) data.driveUrl = input.driveUrl || null;
+  if (input.previewUrl !== undefined) data.finalAssetUrl = input.previewUrl || null;
+  if (input.notes !== undefined) data.proposedCopy = input.notes || null;
+  return data;
+}
+
 export async function readRuntimeContentItems(): Promise<OperationsContentItem[] | null> {
   const delegate = contentItemDelegate();
   if (!delegate) return null;
@@ -79,22 +117,18 @@ export async function createRuntimeContentItem(input: RuntimeContentItemInput): 
   const delegate = contentItemDelegate();
   if (!delegate?.create) return null;
 
-  const row = await delegate.create({
-    data: {
-      title: input.title.trim(),
-      format: input.format || input.type || "DESIGN",
-      status: input.status || "IDEA",
-      theme: input.channel || null,
-      dueAt: dateOrNull(input.due),
-      sourceType: input.sourceType || "MANUAL",
-      sourceAssetId: input.sourceAssetId || null,
-      sourceProjectId: input.sourceProjectId || null,
-      driveUrl: input.driveUrl || null,
-      finalAssetUrl: input.previewUrl || null,
-      proposedCopy: input.notes || null,
-      progress: 0,
-    },
-  });
-
+  const row = await delegate.create({ data: buildCreateData(input) });
   return mapRuntimeContentItem(row);
+}
+
+export async function updateRuntimeContentItem(input: RuntimeContentItemUpdateInput): Promise<OperationsContentItem | null> {
+  const delegate = contentItemDelegate();
+  if (!delegate?.update) return null;
+
+  try {
+    const row = await delegate.update({ where: { id: input.id }, data: buildUpdateData(input) });
+    return mapRuntimeContentItem(row);
+  } catch {
+    return null;
+  }
 }
