@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { auditActorFromDashboardSession } from "@/lib/audit-log";
 import { createAuditBackedContentItem, updateAuditBackedContentItem } from "@/lib/operations/content-item-repository";
+import { createRuntimeContentItem } from "@/lib/operations/content-item-runtime-repository";
 import { createAuditBackedContentPublication } from "@/lib/operations/content-publication-repository";
 import { listContentItems } from "@/lib/operations/repository";
 import { operationsNoStoreHeaders, requireOperationsApiAccess } from "../_auth";
@@ -66,6 +67,11 @@ export async function POST(request: Request) {
   const parsed = contentItemCreateSchema.safeParse(await readJson(request));
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: "Invalid content item payload", details: parsed.error.flatten() }, { status: 400, headers: operationsNoStoreHeaders });
+  }
+
+  const runtimeItem = await createRuntimeContentItem(parsed.data);
+  if (runtimeItem) {
+    return NextResponse.json({ ok: true, status: 201, data: runtimeItem, persistence: "ContentItem" }, { status: 201, headers: operationsNoStoreHeaders });
   }
 
   const result = await createAuditBackedContentItem(parsed.data, await dashboardActor());
