@@ -35,6 +35,18 @@ export type OperationsContentItem = {
   status: string;
   channel: string;
   due: string;
+  owner?: string | null;
+  language?: string | null;
+  theme?: string | null;
+  hook?: string | null;
+  cta?: string | null;
+  copy?: string | null;
+  figmaUrl?: string | null;
+  driveUrl?: string | null;
+  videoUrl?: string | null;
+  finalAssetUrl?: string | null;
+  campaignLinkId?: string | null;
+  adId?: string | null;
   publicationCount?: number;
   lastPublishedAt?: string | null;
   publishedPlatforms?: string[];
