@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PlusCircle } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OperationsContentWorkspace } from "@/components/operations/OperationsContentWorkspace";
 import { OperationsInfoCards } from "@/components/operations/OperationsInfoCards";
@@ -43,21 +43,15 @@ export default async function OperationsContentPage() {
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
       <div className="flex flex-col gap-4 rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs text-white/70">Operations / Content</p>
-          <h1 className="mt-1.5 text-2xl font-black">لوحة خطط المحتوى</h1>
+          <p className="text-xs text-white/70">العمليات والمحتوى</p>
+          <h1 className="mt-1.5 text-2xl font-black">لوحة إنتاج المحتوى</h1>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
-            مركز تشغيلي واحد للمواسم، الخطط، عناصر المحتوى، مهام الإنتاج، وتسليم المواد الجاهزة للتسويق. مصدر البيانات الحالي: {overview.source}.
+            مركز واحد للمواسم، الخطط، عناصر المحتوى، مهام الإنتاج، وتسليم المواد الجاهزة للتسويق.
           </p>
-          {overview.persistence ? (
-            <div className="mt-3 flex flex-wrap gap-2 text-xs">
-              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">{overview.persistence.mode}</span>
-              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">Next: {overview.persistence.nextModel}</span>
-            </div>
-          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="secondary" className="gap-2 font-bold">
-            <Link href="/dashboard/operations"><PlusCircle className="h-4 w-4" /> العودة لمركز العمليات</Link>
+            <Link href="/dashboard/operations">العودة لمركز العمليات <ArrowLeft className="h-4 w-4" /></Link>
           </Button>
         </div>
       </div>
