@@ -7,11 +7,11 @@ export function OperationsInfoCards() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-emerald-600" /> حدود الحزمة
+            <CheckCircle2 className="h-5 w-5 text-emerald-600" /> قاعدة العمل
           </CardTitle>
         </CardHeader>
         <CardContent className="text-sm leading-6 text-slate-700">
-          لا توجد كتابة في قاعدة البيانات. الصفحة تقرأ من API mock آمن فقط.
+          كل عنصر محتوى يتم تسجيله يدويًا ومراجعته قبل النشر أو التسويق. لا يوجد نشر أو إرسال تلقائي من هذه اللوحة.
         </CardContent>
       </Card>
       <Card>
@@ -21,17 +21,17 @@ export function OperationsInfoCards() {
           </CardTitle>
         </CardHeader>
         <CardContent className="text-sm leading-6 text-slate-700">
-          لاحقًا سيتم ربط العناصر المعتمدة بروابط الحملات ونتائج الأداء داخل Marketing.
+          العناصر المعتمدة ستكون جاهزة للربط بروابط الحملات ونتائج الإعلانات في مرحلة التسويق.
         </CardContent>
       </Card>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Clock3 className="h-5 w-5 text-amber-600" /> القادم
+            <Clock3 className="h-5 w-5 text-amber-600" /> الخطوة القادمة
           </CardTitle>
         </CardHeader>
         <CardContent className="text-sm leading-6 text-slate-700">
-          CRUD، صلاحيات التشغيل، سجل التغييرات، وجدولة النشر.
+          سنضيف متابعة أوضح للمسؤوليات، سجل التغييرات، وجدولة النشر اليدوي لكل منصة.
         </CardContent>
       </Card>
     </div>
