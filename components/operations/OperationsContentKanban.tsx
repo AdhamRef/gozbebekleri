@@ -39,6 +39,17 @@ function assetLinks(item: OperationsOverview["items"][number]) {
   ].filter(Boolean) as string[][];
 }
 
+function contentDetails(item: OperationsOverview["items"][number]) {
+  return [
+    item.owner ? ["المسؤول", item.owner] : null,
+    item.language ? ["اللغة", item.language] : null,
+    item.theme ? ["المحور", item.theme] : null,
+    item.hook ? ["الفكرة", item.hook] : null,
+    item.cta ? ["الدعوة", item.cta] : null,
+    item.copy ? ["النص", item.copy] : null,
+  ].filter(Boolean) as string[][];
+}
+
 export function OperationsContentKanban({ items, boardColumns, statusClass }: OperationsContentKanbanProps) {
   return (
     <Card>
@@ -64,6 +75,7 @@ export function OperationsContentKanban({ items, boardColumns, statusClass }: Op
                   {columnItems.map((item) => {
                     const lastPublishedAt = formatDate(item.lastPublishedAt);
                     const links = assetLinks(item);
+                    const details = contentDetails(item);
                     return (
                       <div key={item.id || item.title} className="rounded-xl border bg-white p-3 shadow-sm">
                         <div className="flex items-start justify-between gap-2">
@@ -80,6 +92,13 @@ export function OperationsContentKanban({ items, boardColumns, statusClass }: Op
                             <p>النشر: <b>{item.publicationCount}</b> سجل · <b>{item.publishedPlatforms?.join(" / ") || "تسجيل يدوي"}</b>{lastPublishedAt ? ` · ${lastPublishedAt}` : ""}</p>
                           ) : null}
                         </div>
+                        {details.length > 0 ? (
+                          <div className="mt-3 space-y-1 rounded-xl border bg-slate-50 p-2 text-[11px] leading-5 text-slate-600">
+                            {details.slice(0, 3).map(([label, value]) => (
+                              <p key={label}>{label}: <b>{value}</b></p>
+                            ))}
+                          </div>
+                        ) : null}
                         {links.length > 0 ? (
                           <div className="mt-3 flex flex-wrap gap-2">
                             {links.map(([label, href]) => (
