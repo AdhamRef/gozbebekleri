@@ -30,6 +30,15 @@ function productionIndicator(status: string) {
   return "قيد المتابعة";
 }
 
+function assetLinks(item: OperationsOverview["items"][number]) {
+  return [
+    item.figmaUrl ? ["Figma", item.figmaUrl] : null,
+    item.driveUrl ? ["Drive", item.driveUrl] : null,
+    item.videoUrl ? ["Video", item.videoUrl] : null,
+    item.finalAssetUrl ? ["Final", item.finalAssetUrl] : null,
+  ].filter(Boolean) as string[][];
+}
+
 export function OperationsContentKanban({ items, boardColumns, statusClass }: OperationsContentKanbanProps) {
   return (
     <Card>
@@ -54,6 +63,7 @@ export function OperationsContentKanban({ items, boardColumns, statusClass }: Op
                 <div className="space-y-2">
                   {columnItems.map((item) => {
                     const lastPublishedAt = formatDate(item.lastPublishedAt);
+                    const links = assetLinks(item);
                     return (
                       <div key={item.id || item.title} className="rounded-xl border bg-white p-3 shadow-sm">
                         <div className="flex items-start justify-between gap-2">
@@ -70,6 +80,15 @@ export function OperationsContentKanban({ items, boardColumns, statusClass }: Op
                             <p>النشر: <b>{item.publicationCount}</b> سجل · <b>{item.publishedPlatforms?.join(" / ") || "تسجيل يدوي"}</b>{lastPublishedAt ? ` · ${lastPublishedAt}` : ""}</p>
                           ) : null}
                         </div>
+                        {links.length > 0 ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {links.map(([label, href]) => (
+                              <a key={label} href={href} target="_blank" rel="noreferrer" className="rounded-full border bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-[#025EB8] hover:border-[#025EB8]">
+                                {label}
+                              </a>
+                            ))}
+                          </div>
+                        ) : null}
                         <OperationsContentItemActions id={item.id} status={item.status} />
                       </div>
                     );
