@@ -23,7 +23,7 @@ export function OperationsContentKanban({ items, boardColumns, statusClass }: Op
     <Card>
       <CardHeader>
         <CardTitle>مراحل إنتاج المحتوى</CardTitle>
-        <CardDescription>Kanban يقرأ من repository واحد. العناصر المحفوظة تبقى ظاهرة حتى بعد الجدولة أو تسجيل النشر اليدوي.</CardDescription>
+        <CardDescription>تابع انتقال كل عنصر محتوى من الفكرة إلى المراجعة والاعتماد والجدولة والنشر اليدوي.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">
@@ -52,7 +52,7 @@ export function OperationsContentKanban({ items, boardColumns, statusClass }: Op
                           <p>القناة: <b>{item.channel}</b></p>
                           <p>الموعد: <b>{item.due}</b></p>
                           {item.publicationCount ? (
-                            <p>النشر: <b>{item.publicationCount}</b> سجل · <b>{item.publishedPlatforms?.join(" / ") || "Manual"}</b>{lastPublishedAt ? ` · ${lastPublishedAt}` : ""}</p>
+                            <p>النشر: <b>{item.publicationCount}</b> سجل · <b>{item.publishedPlatforms?.join(" / ") || "تسجيل يدوي"}</b>{lastPublishedAt ? ` · ${lastPublishedAt}` : ""}</p>
                           ) : null}
                         </div>
                         <OperationsContentItemActions id={item.id} status={item.status} />
