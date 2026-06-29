@@ -14,15 +14,29 @@ type OperationsFiltersProps = {
   onQueryChange: (query: string) => void;
 };
 
+const filterLabels: Record<string, string> = {
+  IDEA: "أفكار",
+  WRITING: "كتابة",
+  DESIGN: "تصميم",
+  REVIEW: "مراجعة",
+  APPROVED: "معتمد",
+  SCHEDULED: "مجدول",
+  PUBLISHED: "منشور",
+};
+
+function labelForFilter(filter: string) {
+  return filterLabels[filter] ?? filter;
+}
+
 export function OperationsFilters({ filters, selectedFilter, query, resultCount, totalCount, onFilterChange, onQueryChange }: OperationsFiltersProps) {
   return (
     <Card>
       <CardHeader className="gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5 text-[#025EB8]" /> فلاتر التشغيل
+            <Filter className="h-5 w-5 text-[#025EB8]" /> فلاتر المحتوى
           </CardTitle>
-          <CardDescription className="mt-2">فلترة فعلية حسب الحالة والبحث داخل عناصر المحتوى المحفوظة.</CardDescription>
+          <CardDescription className="mt-2">فلترة حسب مرحلة العمل والبحث داخل عناصر المحتوى.</CardDescription>
         </div>
         <div className="flex flex-wrap gap-2">
           {filters.map((filter) => {
@@ -35,7 +49,7 @@ export function OperationsFilters({ filters, selectedFilter, query, resultCount,
                 onClick={() => onFilterChange(filter)}
                 className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${active ? "border-[#025EB8] bg-[#025EB8] text-white" : "bg-white text-slate-700 hover:border-[#025EB8] hover:text-[#025EB8]"}`}
               >
-                {filter}
+                {labelForFilter(filter)}
               </button>
             );
           })}
