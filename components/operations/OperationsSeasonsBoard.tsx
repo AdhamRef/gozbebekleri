@@ -2,6 +2,7 @@ import { CalendarClock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { OperationsOverview } from "@/lib/operations/types";
+import { OperationsFoundationItemActions } from "./OperationsFoundationItemActions";
 import { OperationsSeasonTaskAction } from "./OperationsSeasonTaskAction";
 import { OperationsWeeklyThemeTaskAction } from "./OperationsWeeklyThemeTaskAction";
 
@@ -10,6 +11,29 @@ type OperationsSeasonsBoardProps = {
   weeklyThemes: OperationsOverview["weeklyThemes"];
   statusClass: Record<string, string>;
 };
+
+const seasonStatusOptions = [
+  ["PLANNING", "تخطيط"],
+  ["ACTIVE", "نشط"],
+  ["UPCOMING", "قادم"],
+  ["DONE", "منتهي"],
+] as const;
+
+const seasonFields = [
+  { key: "title", label: "اسم الموسم" },
+  { key: "focus", label: "التركيز" },
+  { key: "status", label: "الحالة", type: "select", options: seasonStatusOptions },
+  { key: "period", label: "الفترة" },
+  { key: "required", label: "المطلوب", type: "number" },
+  { key: "ready", label: "الجاهز", type: "number" },
+  { key: "progress", label: "نسبة الإنجاز", type: "number" },
+] as const;
+
+const weeklyThemeFields = [
+  { key: "week", label: "الأسبوع" },
+  { key: "theme", label: "المحور" },
+  { key: "description", label: "الوصف" },
+] as const;
 
 export function OperationsSeasonsBoard({ seasons, weeklyThemes, statusClass }: OperationsSeasonsBoardProps) {
   return (
@@ -40,6 +64,7 @@ export function OperationsSeasonsBoard({ seasons, weeklyThemes, statusClass }: O
                 <p className="text-left font-bold text-slate-700">{season.progress}%</p>
               </div>
               <OperationsSeasonTaskAction season={season} />
+              <OperationsFoundationItemActions collection="seasons" item={season} fields={seasonFields} />
             </div>
           ))}
         </div>
@@ -53,6 +78,7 @@ export function OperationsSeasonsBoard({ seasons, weeklyThemes, statusClass }: O
                 <h4 className="mt-1 font-black text-slate-900">{theme.theme}</h4>
                 <p className="mt-1 text-xs leading-5 text-slate-500">{theme.description}</p>
                 <OperationsWeeklyThemeTaskAction theme={theme} />
+                <OperationsFoundationItemActions collection="weeklyThemes" item={theme} fields={weeklyThemeFields} compact />
               </div>
             ))}
           </div>
