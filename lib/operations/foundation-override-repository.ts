@@ -17,8 +17,9 @@ type FoundationActor = {
 type FoundationRecord = {
   id?: string;
   title?: string;
-  [key: string]: unknown;
 };
+
+type FoundationRecordPayload = Record<string, unknown> & FoundationRecord;
 
 type StoredFoundationEntry<T extends FoundationRecord> = {
   id: string;
@@ -41,6 +42,10 @@ function metadataObject(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
+function recordObject<T extends FoundationRecord>(value: T) {
+  return value as FoundationRecordPayload;
+}
+
 function stringField(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -50,7 +55,8 @@ function isFoundationCollection(value: unknown): value is FoundationCollection {
 }
 
 function itemId(item: FoundationRecord) {
-  return stringField(item.id) ?? stringField(item.title);
+  const record = recordObject(item);
+  return stringField(record.id) ?? stringField(record.title);
 }
 
 function storedEntryFromMetadata<T extends FoundationRecord>(metadata: unknown): StoredFoundationEntry<T> | null {
@@ -63,7 +69,7 @@ function storedEntryFromMetadata<T extends FoundationRecord>(metadata: unknown):
   return {
     id,
     collection,
-    item: { ...item, id } as T,
+    item: { ...recordObject(item), id } as T,
     deleted: root.deleted === true,
     metadata: root,
   };
@@ -137,7 +143,7 @@ async function writeFoundationRecord(params: {
       metadata: {
         collection: params.collection,
         id,
-        item: { ...params.item, id },
+        item: { ...recordObject(params.item), id },
         deleted: params.deleted === true,
         externalCall: false,
         autoPublish: false,
