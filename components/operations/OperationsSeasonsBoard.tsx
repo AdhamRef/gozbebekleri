@@ -5,6 +5,7 @@ import type { OperationsOverview } from "@/lib/operations/types";
 import { OperationsFoundationItemActions } from "./OperationsFoundationItemActions";
 import { OperationsSeasonCreateAction } from "./OperationsSeasonCreateAction";
 import { OperationsSeasonTaskAction } from "./OperationsSeasonTaskAction";
+import { OperationsWeeklyThemeCreateAction } from "./OperationsWeeklyThemeCreateAction";
 import { OperationsWeeklyThemeTaskAction } from "./OperationsWeeklyThemeTaskAction";
 
 type OperationsSeasonsBoardProps = {
@@ -72,7 +73,10 @@ export function OperationsSeasonsBoard({ seasons, weeklyThemes, statusClass }: O
         </div>
 
         <div className="rounded-2xl border bg-white p-4">
-          <h3 className="font-black text-slate-900">خطة المحاور الشهرية</h3>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <h3 className="font-black text-slate-900">خطة المحاور الشهرية</h3>
+            <OperationsWeeklyThemeCreateAction />
+          </div>
           <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {weeklyThemes.map((theme) => (
               <div key={theme.id || theme.week} className="rounded-xl border bg-slate-50 p-3">
