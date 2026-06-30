@@ -11,8 +11,9 @@ type EditableValue = string | number | null | undefined;
 type EditableItem = {
   id?: string;
   title?: string;
-  [key: string]: EditableValue;
 };
+
+type EditableRecord = Record<string, EditableValue>;
 
 type FieldConfig = {
   key: string;
@@ -28,9 +29,14 @@ type Props = {
   compact?: boolean;
 };
 
+function asEditableRecord(item: EditableItem) {
+  return item as EditableRecord;
+}
+
 function editableState(item: EditableItem, fields: readonly FieldConfig[]) {
+  const record = asEditableRecord(item);
   return fields.reduce<Record<string, EditableValue>>((state, field) => {
-    state[field.key] = item[field.key] ?? "";
+    state[field.key] = record[field.key] ?? "";
     return state;
   }, {});
 }
@@ -51,7 +57,7 @@ export function OperationsFoundationItemActions({ collection, item, fields, comp
 
   if (!item.id) return null;
 
-  async function sendPatch(payloadItem: EditableItem, operation: "SAVE" | "REMOVE") {
+  async function sendPatch(payloadItem: EditableRecord, operation: "SAVE" | "REMOVE") {
     setBusy(operation);
     setError(null);
     setSuccess(null);
@@ -75,17 +81,17 @@ export function OperationsFoundationItemActions({ collection, item, fields, comp
   }
 
   async function saveEdits() {
-    const nextItem = fields.reduce<EditableItem>((value, field) => {
+    const nextItem = fields.reduce<EditableRecord>((value, field) => {
       value[field.key] = normalizeFieldValue(form[field.key], field);
       return value;
-    }, { ...item, id: item.id });
+    }, { ...asEditableRecord(item), id: item.id });
     const saved = await sendPatch(nextItem, "SAVE");
     if (saved) setEditing(false);
   }
 
   async function removeItem() {
     if (!window.confirm("هل تريد حذف هذا العنصر من النظام؟")) return;
-    await sendPatch(item, "REMOVE");
+    await sendPatch({ ...asEditableRecord(item), id: item.id }, "REMOVE");
   }
 
   return (
