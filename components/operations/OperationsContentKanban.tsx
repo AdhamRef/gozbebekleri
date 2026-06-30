@@ -120,7 +120,7 @@ export function OperationsContentKanban({ items, boardColumns, statusClass }: Op
                             ))}
                           </div>
                         ) : null}
-                        <OperationsContentItemActions id={item.id} status={item.status} />
+                        <OperationsContentItemActions item={item} />
                       </div>
                     );
                   })}
