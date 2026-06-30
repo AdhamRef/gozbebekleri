@@ -1,6 +1,7 @@
 import { FileText, CalendarClock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { operationsContentProgress } from "@/lib/operations/content-progress";
 import { operationsContentTypeLabel, operationsStatusLabel } from "@/lib/operations/display-labels";
 import type { OperationsOverview } from "@/lib/operations/types";
 import { OperationsContentPlanTaskAction } from "./OperationsContentPlanTaskAction";
@@ -73,6 +74,7 @@ export function OperationsContentPlans({ plans, items, statusClass }: Props) {
         <CardContent className="space-y-3">
           {items.map((item) => {
             const links = contentLinks(item);
+            const progress = operationsContentProgress(item);
             return (
               <div key={item.id || item.title} className="rounded-2xl border p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -83,6 +85,15 @@ export function OperationsContentPlans({ plans, items, statusClass }: Props) {
                   <span>النوع: <b>{operationsContentTypeLabel(item.type)}</b></span>
                   <span>القناة: <b>{item.channel}</b></span>
                   <span>الموعد: <b>{item.due || "غير محدد"}</b></span>
+                </div>
+                <div className="mt-3">
+                  <div className="mb-1 flex items-center justify-between text-xs font-bold text-slate-500">
+                    <span>تقدم العنصر</span>
+                    <span>{progress}%</span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full rounded-full bg-[#025EB8]" style={{ width: `${progress}%` }} />
+                  </div>
                 </div>
                 {links.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-2">
