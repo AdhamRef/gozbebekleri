@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { operationsContentProgress } from "@/lib/operations/content-progress";
 import { operationsContentTypeLabel, operationsStatusLabel } from "@/lib/operations/display-labels";
 import type { OperationsOverview } from "@/lib/operations/types";
+import { OperationsContentPlanFoundationActions } from "./OperationsContentPlanFoundationActions";
 import { OperationsContentPlanTaskAction } from "./OperationsContentPlanTaskAction";
 
 type Props = {
@@ -61,6 +62,7 @@ export function OperationsContentPlans({ plans, items, statusClass }: Props) {
                   </div>
                 </div>
                 <OperationsContentPlanTaskAction plan={plan} />
+                <OperationsContentPlanFoundationActions plan={plan} />
               </div>
             );
           })}
