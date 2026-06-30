@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { OperationsOverview } from "@/lib/operations/types";
+import { OperationsProductionTaskFoundationActions } from "./OperationsProductionTaskFoundationActions";
 import { OperationsProductionTaskSaveAction } from "./OperationsProductionTaskSaveAction";
 
 type OperationsProductionTasksProps = {
@@ -55,6 +56,7 @@ export function OperationsProductionTasks({ tasks, statusClass }: OperationsProd
                 <span>موعد التسليم: <b>{task.due}</b></span>
               </div>
               <OperationsProductionTaskSaveAction task={task} />
+              <OperationsProductionTaskFoundationActions task={task} />
             </div>
           ))}
         </div>
