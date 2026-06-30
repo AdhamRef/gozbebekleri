@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { operationsContentProgress } from "@/lib/operations/content-progress";
 import { operationsContentTypeLabel, operationsStatusLabel } from "@/lib/operations/display-labels";
 import type { OperationsOverview } from "@/lib/operations/types";
+import { OperationsContentPlanCreateAction } from "./OperationsContentPlanCreateAction";
 import { OperationsContentPlanFoundationActions } from "./OperationsContentPlanFoundationActions";
 import { OperationsContentPlanTaskAction } from "./OperationsContentPlanTaskAction";
 
@@ -36,6 +37,7 @@ export function OperationsContentPlans({ plans, items, statusClass }: Props) {
           <CardDescription>تابع أهداف كل خطة، عدد المواد المطلوبة، وما تم إنجازه حتى الآن.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          <OperationsContentPlanCreateAction />
           {plans.map((plan) => {
             const progress = progressValue(plan.items, plan.published);
             return (
