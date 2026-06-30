@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { OperationsOverview } from "@/lib/operations/types";
+import { OperationsProductionTaskCreateAction } from "./OperationsProductionTaskCreateAction";
 import { OperationsProductionTaskFoundationActions } from "./OperationsProductionTaskFoundationActions";
 import { OperationsProductionTaskSaveAction } from "./OperationsProductionTaskSaveAction";
 
@@ -40,7 +41,8 @@ export function OperationsProductionTasks({ tasks, statusClass }: OperationsProd
           <Link href="/dashboard/operations/tasks"><PlusCircle className="h-4 w-4" /> فتح إنشاء مهمة</Link>
         </Button>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-3">
+        <OperationsProductionTaskCreateAction />
         <div className="grid gap-3 lg:grid-cols-2">
           {tasks.map((task) => (
             <div key={task.id || task.title} className="rounded-2xl border bg-slate-50 p-4">
