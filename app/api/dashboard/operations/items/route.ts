@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { auditActorFromDashboardSession } from "@/lib/audit-log";
-import { createAuditBackedContentItem, updateAuditBackedContentItem } from "@/lib/operations/content-item-repository";
+import { createAuditBackedContentItem, deleteAuditBackedContentItem as removeAuditBackedContentItem, updateAuditBackedContentItem } from "@/lib/operations/content-item-repository";
 import { createRuntimeContentItem } from "@/lib/operations/content-item-runtime-repository";
 import { createAuditBackedContentPublication } from "@/lib/operations/content-publication-repository";
 import { listContentItems } from "@/lib/operations/repository";
@@ -29,6 +29,7 @@ const contentItemCreateSchema = z.object({
 
 const contentItemUpdateSchema = contentItemCreateSchema.partial().extend({
   id: z.string().trim().min(1).max(120),
+  operation: z.literal("REMOVE").optional(),
   publishedUrl: z.string().trim().url().optional(),
   publicationPlatform: z.string().trim().max(80).optional(),
   publicationNotes: z.string().trim().max(500).optional(),
@@ -88,6 +89,11 @@ export async function PATCH(request: Request) {
   }
 
   const actor = await dashboardActor();
+  if (parsed.data.operation === "REMOVE") {
+    const result = await removeAuditBackedContentItem(parsed.data, actor);
+    return NextResponse.json(result, { status: result.status, headers: operationsNoStoreHeaders });
+  }
+
   const result = await updateAuditBackedContentItem(parsed.data, actor);
   const shouldRecordPublication = parsed.data.status?.toUpperCase() === "PUBLISHED" && result.ok && result.data;
 
@@ -101,7 +107,7 @@ export async function PATCH(request: Request) {
       platform: parsed.data.publicationPlatform || result.data?.channel,
       status: "PUBLISHED",
       publishedUrl: parsed.data.publishedUrl,
-      notes: parsed.data.publicationNotes || "Manual publish status update from Operations content board.",
+      notes: parsed.data.publicationNotes || "تم تسجيل النشر اليدوي من لوحة المحتوى.",
     },
     actor,
     result.data,
