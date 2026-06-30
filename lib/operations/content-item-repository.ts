@@ -6,7 +6,13 @@ const objectIdPattern = /^[a-f\d]{24}$/i;
 const archiveContentItemAction = "operations.content-item.create-from-archive-asset";
 const manualContentItemCreateAction = "operations.content-item.manual-create";
 const manualContentItemUpdateAction = "operations.content-item.manual-update";
-const contentItemActions = [archiveContentItemAction, manualContentItemCreateAction, manualContentItemUpdateAction];
+const manualContentItemDeleteAction = "operations.content-item.manual-delete";
+const contentItemActions = [
+  archiveContentItemAction,
+  manualContentItemCreateAction,
+  manualContentItemUpdateAction,
+  manualContentItemDeleteAction,
+];
 const allowedStatuses = new Set(["IDEA", "WRITING", "DESIGN", "REVIEW", "APPROVED", "COPY_NEEDED", "COPY_READY", "SCHEDULED", "PUBLISHED"]);
 
 export type ContentItemProposalActor = {
@@ -44,7 +50,13 @@ type StoredContentItemEntry = {
   item: OperationsContentItem;
   sourceAssetId: string | null;
   sourceProjectId: string | null;
+  deleted: boolean;
   metadata: Record<string, unknown>;
+};
+
+export type AuditBackedContentItemState = {
+  items: OperationsContentItem[];
+  deletedIds: string[];
 };
 
 function safeObjectId(value: string | null | undefined) {
@@ -139,6 +151,7 @@ function contentItemFromMetadata(metadata: unknown): StoredContentItemEntry | nu
     },
     sourceAssetId: stringField(root.sourceAssetId),
     sourceProjectId: stringField(root.sourceProjectId),
+    deleted: root.deleted === true,
     metadata: root,
   };
 }
@@ -169,9 +182,17 @@ async function readStoredContentItemEntries(): Promise<StoredContentItemEntry[]>
   }
 }
 
-export async function readAuditBackedContentItems(): Promise<OperationsContentItem[]> {
+export async function readAuditBackedContentItemState(): Promise<AuditBackedContentItemState> {
   const entries = await readStoredContentItemEntries();
-  return entries.map((entry) => entry.item);
+  return {
+    items: entries.filter((entry) => !entry.deleted).map((entry) => entry.item),
+    deletedIds: entries.filter((entry) => entry.deleted).map((entry) => entry.item.id).filter(Boolean) as string[],
+  };
+}
+
+export async function readAuditBackedContentItems(): Promise<OperationsContentItem[]> {
+  const state = await readAuditBackedContentItemState();
+  return state.items;
 }
 
 async function writeContentItemAuditRecord(params: {
@@ -251,16 +272,19 @@ export async function updateAuditBackedContentItem(
   }
 
   const entries = await readStoredContentItemEntries();
-  const existing = entries.find((entry) => entry.item.id === id);
-  if (!existing) return { ok: false, mode: "prisma", externalCall: false, status: 404, message: "Content item not found." };
+  const existing = entries.find((entry) => entry.item.id === id && !entry.deleted);
+  if (!existing && !stringField(input.title)) {
+    return { ok: false, mode: "prisma", externalCall: false, status: 404, message: "Content item not found." };
+  }
 
+  const base = existing?.item ?? buildManualContentItem({ ...input, id });
   const contentItem: OperationsContentItem = {
-    ...existing.item,
-    title: stringField(input.title) ?? existing.item.title,
-    type: (stringField(input.type) ?? stringField(input.format) ?? existing.item.type).toUpperCase(),
-    status: input.status ? sanitizeStatus(input.status, existing.item.status) : existing.item.status,
-    channel: stringField(input.channel) ?? existing.item.channel,
-    due: stringField(input.due) ?? existing.item.due,
+    ...base,
+    title: stringField(input.title) ?? base.title,
+    type: (stringField(input.type) ?? stringField(input.format) ?? base.type).toUpperCase(),
+    status: input.status ? sanitizeStatus(input.status, base.status) : base.status,
+    channel: stringField(input.channel) ?? base.channel,
+    due: stringField(input.due) ?? base.due,
   };
 
   try {
@@ -271,10 +295,11 @@ export async function updateAuditBackedContentItem(
       contentItem,
       actor,
       metadata: {
-        ...existing.metadata,
-        sourceAssetId: existing.sourceAssetId,
-        sourceProjectId: existing.sourceProjectId,
-        notes: stringField(input.notes) ?? stringField(existing.metadata.notes),
+        ...(existing?.metadata ?? {}),
+        sourceAssetId: existing?.sourceAssetId ?? stringField(input.sourceAssetId),
+        sourceProjectId: existing?.sourceProjectId ?? stringField(input.sourceProjectId),
+        sourceType: existing ? stringField(existing.metadata.sourceType) : "MANUAL_OVERRIDE",
+        notes: stringField(input.notes) ?? stringField(existing?.metadata.notes),
       },
     });
 
@@ -282,6 +307,48 @@ export async function updateAuditBackedContentItem(
   } catch (error) {
     console.error("Content item update failed", error);
     return { ok: false, mode: "prisma", externalCall: false, status: 503, message: "Content item update failed." };
+  }
+}
+
+export async function deleteAuditBackedContentItem(
+  input: ContentItemWriteInput,
+  actor?: ContentItemProposalActor | null,
+): Promise<ContentItemProposalResult> {
+  const id = stringField(input.id);
+  if (!id) return { ok: false, mode: "foundation", externalCall: false, status: 400, message: "Content item id is required." };
+  if (!process.env.DATABASE_URL) {
+    return { ok: false, mode: "foundation", externalCall: false, status: 503, message: "DATABASE_URL is not configured; content item was not removed." };
+  }
+
+  const entries = await readStoredContentItemEntries();
+  const existing = entries.find((entry) => entry.item.id === id && !entry.deleted);
+  const contentItem: OperationsContentItem = existing?.item ?? {
+    id,
+    title: stringField(input.title) ?? id,
+    type: stringField(input.type) ?? "DESIGN",
+    status: sanitizeStatus(input.status),
+    channel: stringField(input.channel) ?? "Social",
+    due: stringField(input.due) ?? "غير محدد",
+  };
+
+  try {
+    await writeContentItemAuditRecord({
+      action: manualContentItemDeleteAction,
+      messageAr: "تم حذف عنصر محتوى من لوحة العمليات",
+      messageEn: "Content item removed from operations board",
+      contentItem,
+      actor,
+      metadata: {
+        ...(existing?.metadata ?? {}),
+        deleted: true,
+        sourceType: stringField(existing?.metadata.sourceType) ?? "MANUAL_REMOVE",
+      },
+    });
+
+    return { ok: true, mode: "prisma", externalCall: false, status: 200, message: "Content item removed.", data: contentItem };
+  } catch (error) {
+    console.error("Content item delete failed", error);
+    return { ok: false, mode: "prisma", externalCall: false, status: 503, message: "Content item delete failed." };
   }
 }
 
