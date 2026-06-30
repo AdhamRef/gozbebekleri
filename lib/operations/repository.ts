@@ -3,6 +3,7 @@ import type { ArchiveAsset } from "./archive/archive-types";
 import { readAuditBackedContentItemState } from "./content-item-repository";
 import { readRuntimeContentItems } from "./content-item-runtime-repository";
 import { readAuditBackedContentPublications } from "./content-publication-repository";
+import { mergeFoundationRecords, readFoundationOverrideState } from "./foundation-override-repository";
 import { createFallbackOperationsOverview } from "./mock-data";
 import { productionItems } from "./production/production-data";
 import type { ProductionItem } from "./production/production-types";
@@ -11,7 +12,7 @@ import type { ScheduledContentItem, ScheduledManualStatus } from "./scheduler/sc
 import { listOperationTasksFromRepository } from "./tasks/task-repository";
 import type { OperationsTask } from "./tasks/task-types";
 import type { OperationsPersistenceInfo, OperationsRepositoryResult } from "./persistence-types";
-import type { OperationsContentItem, OperationsContentTask, OperationsOverview } from "./types";
+import type { OperationsContentItem, OperationsContentPlan, OperationsContentTask, OperationsOverview, OperationsSeason, OperationsWeeklyTheme } from "./types";
 
 const scheduledManualStatuses: ScheduledManualStatus[] = ["SCHEDULED", "READY_FOR_MANUAL_SEND", "PUBLISHED", "MANUALLY_SENT", "CANCELLED", "FAILED"];
 
@@ -196,11 +197,19 @@ export async function listOperationTasks(): Promise<OperationsRepositoryResult<O
 }
 
 export async function getContentOperationsOverview(): Promise<OperationsOverview> {
-  const [contentItems, contentTasks] = await Promise.all([
+  const [contentItems, contentTasks, seasonOverrides, weeklyThemeOverrides, planOverrides, taskOverrides] = await Promise.all([
     listContentItems(),
     listContentWorkflowTasks(),
+    readFoundationOverrideState<OperationsSeason>("seasons"),
+    readFoundationOverrideState<OperationsWeeklyTheme>("weeklyThemes"),
+    readFoundationOverrideState<OperationsContentPlan>("plans"),
+    readFoundationOverrideState<OperationsContentTask>("tasks"),
   ]);
   const overview = createFallbackOperationsOverview();
+  const seasons = mergeFoundationRecords(overview.seasons, seasonOverrides);
+  const weeklyThemes = mergeFoundationRecords(overview.weeklyThemes, weeklyThemeOverrides);
+  const plans = mergeFoundationRecords(overview.plans, planOverrides);
+  const tasks = mergeFoundationRecords(contentTasks.items, taskOverrides);
 
   return {
     ...overview,
@@ -208,12 +217,17 @@ export async function getContentOperationsOverview(): Promise<OperationsOverview
     version: contentItems.persistence.model === "ContentItem" ? "operations-overview-runtime" : contentItems.persistence.mode === "prisma" ? "operations-overview-audit-backed" : "operations-overview-foundation",
     kpis: {
       ...overview.kpis,
+      openSeasons: seasons.length,
+      activePlans: plans.filter((plan) => plan.status === "ACTIVE" || plan.status === "PLANNING").length,
       contentItems: contentItems.items.length,
-      openProductionTasks: contentTasks.items.length,
+      openProductionTasks: tasks.length,
       readyForMarketing: contentItems.items.filter((item) => item.status === "APPROVED").length,
     },
+    seasons,
+    weeklyThemes,
+    plans,
     items: contentItems.items,
-    tasks: contentTasks.items,
+    tasks,
     persistence: contentItems.persistence.mode === "prisma"
       ? contentItems.persistence
       : foundationPersistence("OperationsOverview", "OperationContentWorkspace", {
