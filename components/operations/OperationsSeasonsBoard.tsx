@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { OperationsOverview } from "@/lib/operations/types";
 import { OperationsFoundationItemActions } from "./OperationsFoundationItemActions";
+import { OperationsSeasonCreateAction } from "./OperationsSeasonCreateAction";
 import { OperationsSeasonTaskAction } from "./OperationsSeasonTaskAction";
 import { OperationsWeeklyThemeTaskAction } from "./OperationsWeeklyThemeTaskAction";
 
@@ -45,6 +46,7 @@ export function OperationsSeasonsBoard({ seasons, weeklyThemes, statusClass }: O
         <CardDescription>نظرة واحدة على المواسم والمحاور التي تقود إنتاج المحتوى، مع إمكانية تحويل كل موسم أو محور أسبوعي إلى مهمة محفوظة.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <OperationsSeasonCreateAction />
         <div className="grid gap-3 xl:grid-cols-5">
           {seasons.map((season) => (
             <div key={season.id || season.title} className="rounded-2xl border bg-slate-50 p-4">
