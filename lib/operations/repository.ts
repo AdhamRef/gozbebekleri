@@ -1,6 +1,6 @@
 import { archiveAssets } from "./archive/archive-data";
 import type { ArchiveAsset } from "./archive/archive-types";
-import { readAuditBackedContentItems } from "./content-item-repository";
+import { readAuditBackedContentItemState } from "./content-item-repository";
 import { readRuntimeContentItems } from "./content-item-runtime-repository";
 import { readAuditBackedContentPublications } from "./content-publication-repository";
 import { createFallbackOperationsOverview } from "./mock-data";
@@ -66,8 +66,23 @@ function auditBackedContentPersistence(count: number): OperationsPersistenceInfo
     nextModel: "ContentItem",
     readyForDb: true,
     externalSideEffects: false,
-    note: `${count} content item(s) are persisted through DB-backed AuditLog records until the dedicated ContentItem runtime model is appended. No publishing, sending, or AI approval is automatic.`,
+    note: `${count} content item change(s) are persisted through DB-backed AuditLog records until the dedicated ContentItem runtime model is appended. No publishing, sending, or AI approval is automatic.`,
   };
+}
+
+function mergeContentItemsWithFallback(params: {
+  fallbackItems: OperationsContentItem[];
+  savedItems: OperationsContentItem[];
+  deletedIds: string[];
+}) {
+  const deletedIds = new Set(params.deletedIds.filter(Boolean));
+  const savedIds = new Set(params.savedItems.map((item) => item.id).filter(Boolean));
+  const fallbackItems = params.fallbackItems.filter((item) => {
+    if (!item.id) return true;
+    return !deletedIds.has(item.id) && !savedIds.has(item.id);
+  });
+
+  return [...params.savedItems, ...fallbackItems];
 }
 
 function latestIso(values: Array<string | null>) {
@@ -152,13 +167,19 @@ export async function listContentItems(): Promise<OperationsRepositoryResult<Ope
     };
   }
 
-  const auditItems = await readAuditBackedContentItems();
-  const items = await attachPublicationMarkers(auditItems.length > 0 ? [...auditItems, ...overview.items] : overview.items);
+  const auditState = await readAuditBackedContentItemState();
+  const items = await attachPublicationMarkers(
+    mergeContentItemsWithFallback({
+      fallbackItems: overview.items,
+      savedItems: auditState.items,
+      deletedIds: auditState.deletedIds,
+    }),
+  );
 
-  if (auditItems.length > 0) {
+  if (auditState.items.length > 0 || auditState.deletedIds.length > 0) {
     return {
       items,
-      persistence: auditBackedContentPersistence(auditItems.length),
+      persistence: auditBackedContentPersistence(auditState.items.length + auditState.deletedIds.length),
     };
   }
 
