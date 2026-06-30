@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { operationsContentProgress, operationsContentProgressLabel } from "@/lib/operations/content-progress";
 import { operationsContentTypeLabel } from "@/lib/operations/display-labels";
 import type { OperationsOverview } from "@/lib/operations/types";
 import { OperationsContentItemActions } from "./OperationsContentItemActions";
@@ -76,6 +77,7 @@ export function OperationsContentKanban({ items, boardColumns, statusClass }: Op
                     const lastPublishedAt = formatDate(item.lastPublishedAt);
                     const links = assetLinks(item);
                     const details = contentDetails(item);
+                    const progress = operationsContentProgress(item);
                     return (
                       <div key={item.id || item.title} className="rounded-xl border bg-white p-3 shadow-sm">
                         <div className="flex items-start justify-between gap-2">
@@ -84,6 +86,16 @@ export function OperationsContentKanban({ items, boardColumns, statusClass }: Op
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <span className="rounded-full border bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-600">{productionIndicator(item.status)}</span>
+                          <span className="rounded-full border bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-[#025EB8]">{operationsContentProgressLabel(progress)}</span>
+                        </div>
+                        <div className="mt-3">
+                          <div className="mb-1 flex items-center justify-between text-[11px] font-bold text-slate-500">
+                            <span>التقدم</span>
+                            <span>{progress}%</span>
+                          </div>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-full rounded-full bg-[#025EB8]" style={{ width: `${progress}%` }} />
+                          </div>
                         </div>
                         <div className="mt-3 space-y-1 text-xs text-slate-500">
                           <p>القناة: <b>{item.channel}</b></p>
