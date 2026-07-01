@@ -1,4 +1,5 @@
 import { getOperationsOverview } from "../service";
+import { getMessagingOverview } from "../messaging/messaging-repository";
 import { getSeasonReadinessOverview } from "../seasons/season-service";
 import { getTaskOverview } from "../tasks/task-service";
 import { operationsHubSections } from "./hub-sections";
@@ -47,11 +48,7 @@ function buildTeam(tasks: { assignee: string; progress: number; status: string }
   }).sort((a, b) => b.openTasks - a.openTasks).slice(0, 5);
 }
 
-function buildAlerts(args: {
-  delayedItems: number;
-  criticalSeasons: { seasonId: string; title: string; missingAssets: number; requiredAssets: number }[];
-  highPriorityTasks: number;
-}): OperationsHubAlert[] {
+function buildAlerts(args: { delayedItems: number; criticalSeasons: { seasonId: string; title: string; missingAssets: number; requiredAssets: number }[]; highPriorityTasks: number; messageReview: number }): OperationsHubAlert[] {
   const alerts: OperationsHubAlert[] = args.criticalSeasons.slice(0, 3).map((season) => ({
     id: `season-${season.seasonId}`,
     title: `${season.title} يحتاج متابعة`,
@@ -59,6 +56,16 @@ function buildAlerts(args: {
     tone: season.missingAssets > 3 ? "danger" : "warning",
     href: "/dashboard/operations/calendar",
   }));
+
+  if (args.messageReview > 0) {
+    alerts.push({
+      id: "messaging-review",
+      title: "رسائل تحتاج مراجعة",
+      description: `${args.messageReview} قوالب أو حملات رسائل تنتظر اعتمادًا قبل التنفيذ اليدوي.`,
+      tone: "warning",
+      href: "/dashboard/operations/messaging",
+    });
+  }
 
   if (args.highPriorityTasks > 0) {
     alerts.push({
@@ -84,8 +91,9 @@ function buildAlerts(args: {
 }
 
 export async function getOperationsHubOverview(): Promise<OperationsHubOverview> {
-  const [operations, seasonOverview, taskOverview] = await Promise.all([
+  const [operations, messaging, seasonOverview, taskOverview] = await Promise.all([
     getOperationsOverview(),
+    getMessagingOverview(),
     Promise.resolve(getSeasonReadinessOverview()),
     getTaskOverview(),
   ]);
@@ -97,6 +105,7 @@ export async function getOperationsHubOverview(): Promise<OperationsHubOverview>
   const delayedItems = tasks.filter((task) => ["MISSED", "DELAYED", "BLOCKED"].includes(task.status)).length;
   const requiredContent = Math.max(operations.plans.reduce((sum, plan) => sum + plan.items, 0), items.length, operations.kpis.contentItems);
   const criticalSeasons = seasonOverview.seasons.filter((season) => season.status !== "ON_TRACK");
+  const openMessages = messaging.summary.needsReview + messaging.summary.scheduled;
 
   return {
     generatedAt: new Date().toISOString(),
@@ -104,7 +113,7 @@ export async function getOperationsHubOverview(): Promise<OperationsHubOverview>
       dateLabel: new Intl.DateTimeFormat("ar", { day: "numeric", month: "long" }).format(new Date()),
       tasks: taskOverview.summary.pending + taskOverview.summary.inProgress,
       scheduledPosts: items.filter((item) => normalizeStatus(item.status) === "SCHEDULED").length,
-      messages: 1,
+      messages: openMessages,
       adLaunches: items.filter((item) => normalizeStatus(item.status) === "APPROVED").length,
     },
     month: {
@@ -114,7 +123,7 @@ export async function getOperationsHubOverview(): Promise<OperationsHubOverview>
       delayedItems,
       completionRate: completionRate(requiredContent, completedContent),
     },
-    alerts: buildAlerts({ delayedItems, criticalSeasons, highPriorityTasks: taskOverview.summary.highPriority }),
+    alerts: buildAlerts({ delayedItems, criticalSeasons, highPriorityTasks: taskOverview.summary.highPriority, messageReview: messaging.summary.needsReview }),
     team: buildTeam(tasks),
     workflow: buildWorkflow(items),
     sections: operationsHubSections,
