@@ -1,6 +1,7 @@
 import { CalendarClock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { operationsStatusLabel } from "@/lib/operations/display-labels";
 import type { OperationsOverview } from "@/lib/operations/types";
 import { OperationsFoundationItemActions } from "./OperationsFoundationItemActions";
 import { OperationsSeasonCreateAction } from "./OperationsSeasonCreateAction";
@@ -56,7 +57,7 @@ export function OperationsSeasonsBoard({ seasons, weeklyThemes, statusClass }: O
                   <h3 className="font-black text-slate-900">{season.title}</h3>
                   <p className="mt-1 text-xs leading-5 text-slate-500">{season.focus}</p>
                 </div>
-                <Badge variant="outline" className={statusClass[season.status]}>{season.status}</Badge>
+                <Badge variant="outline" className={statusClass[season.status]}>{operationsStatusLabel(season.status)}</Badge>
               </div>
               <div className="mt-4 space-y-2 text-xs text-slate-600">
                 <p>الفترة: <b>{season.period}</b></p>
