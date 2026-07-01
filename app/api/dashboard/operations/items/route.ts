@@ -12,6 +12,8 @@ import { operationsNoStoreHeaders, requireOperationsApiAccess } from "../_auth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const optionalUrl = z.string().trim().url().optional();
+
 const contentItemCreateSchema = z.object({
   title: z.string().trim().min(2).max(160),
   type: z.string().trim().max(40).optional(),
@@ -19,18 +21,29 @@ const contentItemCreateSchema = z.object({
   status: z.string().trim().max(40).optional(),
   channel: z.string().trim().max(80).optional(),
   due: z.string().trim().max(40).optional(),
+  owner: z.string().trim().max(80).optional(),
+  language: z.string().trim().max(40).optional(),
+  theme: z.string().trim().max(120).optional(),
+  hook: z.string().trim().max(240).optional(),
+  cta: z.string().trim().max(160).optional(),
+  copy: z.string().trim().max(2000).optional(),
+  figmaUrl: optionalUrl,
+  driveUrl: optionalUrl,
+  videoUrl: optionalUrl,
+  finalAssetUrl: optionalUrl,
+  campaignLinkId: z.string().trim().max(120).optional(),
+  adId: z.string().trim().max(120).optional(),
   sourceType: z.string().trim().max(60).optional(),
   sourceAssetId: z.string().trim().max(120).optional(),
   sourceProjectId: z.string().trim().max(120).optional(),
-  driveUrl: z.string().trim().url().optional(),
-  previewUrl: z.string().trim().url().optional(),
+  previewUrl: optionalUrl,
   notes: z.string().trim().max(500).optional(),
 });
 
 const contentItemUpdateSchema = contentItemCreateSchema.partial().extend({
   id: z.string().trim().min(1).max(120),
   operation: z.literal("REMOVE").optional(),
-  publishedUrl: z.string().trim().url().optional(),
+  publishedUrl: optionalUrl,
   publicationPlatform: z.string().trim().max(80).optional(),
   publicationNotes: z.string().trim().max(500).optional(),
 });
