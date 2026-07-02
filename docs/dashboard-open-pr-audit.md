@@ -1,6 +1,6 @@
 # Dashboard Open PR Audit
 
-آخر تحديث: 2026-06-21
+آخر تحديث: 2026-07-02
 
 هذا الملف يوضح حالة PRs القديمة المفتوحة التي كانت تظهر في GitHub/Vercel كأنها أعمال ناقصة. تمت المراجعة ضد `main` بعد حزم Campaign, Operations, Archive, Brand, AI, Provider Catalog, وDashboard hardening.
 
@@ -16,7 +16,7 @@
 | #37 | Add operations season readiness engine | منطق Season Engine موجود الآن على `main` داخل `lib/operations/seasons` وتظهر نتائجه في `/dashboard/operations/calendar`. | إغلاق كـ already covered. |
 | #40 | Add operations planning engine foundation | Planning Engine موجود الآن على `main` داخل `lib/operations/planning` ومربوط بصفحة Calendar & Alerts. | إغلاق كـ already covered. |
 | #43 | Add operations production board foundation | Production Board أصبح repository-backed في `lib/operations/production` وصفحة `/dashboard/operations/production`. | إغلاق كـ already covered. |
-| #52 | Add executive system overview | Executive overview موجود الآن على `main` في `/dashboard/executive/system-overview`. | إغلاق كـ already covered. |
+| #52 | Add executive system overview | تم تجاوزه بواسطة مراكز القيادة الحالية؛ `/dashboard/system-overview` أصبح legacy redirect وليس مسارًا رئيسيًا. | إغلاق كـ superseded. |
 | #54 | Add integration provider foundation | provider standards/catalog تغيّرت ودخلت عبر حزم أحدث، وPR غير mergeable. | إغلاق أو تفكيك فقط إذا احتجنا diff محدد. |
 
 ## قواعد التعامل
