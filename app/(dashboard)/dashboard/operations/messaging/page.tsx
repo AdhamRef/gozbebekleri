@@ -6,27 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { MessagingCampaignCreate } from "@/components/operations/messaging/MessagingCampaignCreate";
 import { MessagingItemActions } from "@/components/operations/messaging/MessagingItemActions";
 import { MessagingTemplateCreate } from "@/components/operations/messaging/MessagingTemplateCreate";
+import { communicationProviderRegistry } from "@/lib/communication/provider-registry";
 import { getMessagingOverview } from "@/lib/operations/messaging/messaging-repository";
 
 function templateStatusLabel(status: string) {
-  const labels: Record<string, string> = {
-    DRAFT: "مسودة",
-    NEEDS_REVIEW: "تحتاج مراجعة",
-    APPROVED: "معتمد",
-    ARCHIVED: "مؤرشف",
-  };
+  const labels: Record<string, string> = { DRAFT: "مسودة", NEEDS_REVIEW: "تحتاج مراجعة", APPROVED: "معتمد", ARCHIVED: "مؤرشف" };
   return labels[status] ?? status;
 }
 
 function campaignStatusLabel(status: string) {
-  const labels: Record<string, string> = {
-    PLANNING: "تخطيط",
-    READY_FOR_REVIEW: "جاهزة للمراجعة",
-    APPROVED: "معتمدة",
-    SCHEDULED: "مجدولة",
-    MANUAL_SENT: "تم التنفيذ يدويًا",
-    CANCELLED: "ملغاة",
-  };
+  const labels: Record<string, string> = { PLANNING: "تخطيط", READY_FOR_REVIEW: "جاهزة للمراجعة", APPROVED: "معتمدة", SCHEDULED: "مجدولة", MANUAL_SENT: "تم التنفيذ يدويًا", CANCELLED: "ملغاة" };
   return labels[status] ?? status;
 }
 
@@ -37,6 +26,11 @@ function statusClass(status: string) {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
+function providerStatusLabel(status: string) {
+  const labels: Record<string, string> = { NOT_CONFIGURED: "غير مربوط", CONFIGURED: "مربوط", NEEDS_ATTENTION: "يحتاج متابعة", DISABLED: "مؤجل" };
+  return labels[status] ?? status;
+}
+
 export default async function OperationsMessagingPage() {
   const overview = await getMessagingOverview();
 
@@ -45,9 +39,9 @@ export default async function OperationsMessagingPage() {
       <section className="rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs text-white/70">العمليات والرسائل</p>
-            <h1 className="mt-1.5 text-2xl font-black">مركز واتساب والرسائل</h1>
-            <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">جهّز القوالب والحملات وجدولة المتابعة داخليًا بدون أي إرسال تلقائي أو اتصال خارجي.</p>
+            <p className="text-xs text-white/70">Communication Center</p>
+            <h1 className="mt-1.5 text-2xl font-black">مركز التواصل</h1>
+            <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">واجهة واحدة لقنوات واتساب، الإيميل، و SMS، مع مزودين قابلين للتبديل ومراجعة بشرية قبل أي إرسال.</p>
           </div>
           <Button asChild variant="secondary" className="gap-2 font-bold">
             <Link href="/dashboard/operations">العودة لمركز العمليات <ArrowLeft className="h-4 w-4" /></Link>
@@ -68,6 +62,21 @@ export default async function OperationsMessagingPage() {
         <CardContent className="p-4 text-sm font-semibold leading-6 text-amber-800">{overview.safety.note}</CardContent>
       </Card>
 
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {communicationProviderRegistry.map((provider) => (
+          <Card key={provider.key}>
+            <CardHeader>
+              <CardDescription>{provider.channel}</CardDescription>
+              <CardTitle className="text-base">{provider.name}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-xs leading-5 text-slate-500">
+              <Badge variant="outline" className={provider.status === "CONFIGURED" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600"}>{providerStatusLabel(provider.status)}</Badge>
+              <p>{provider.notes}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
       <section className="grid gap-4 xl:grid-cols-2">
         <MessagingTemplateCreate />
         <MessagingCampaignCreate />
@@ -77,7 +86,7 @@ export default async function OperationsMessagingPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><MessageCircle className="h-5 w-5 text-[#025EB8]" /> قوالب الرسائل</CardTitle>
-            <CardDescription>كل قالب قابل للتعديل أو الحذف، ولا يتم استخدامه إلا بعد مراجعة بشرية.</CardDescription>
+            <CardDescription>كل قالب قابل للتعديل أو الحذف، ولا يستخدم للإرسال الحقيقي إلا بعد ربط المزود والموافقة.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {overview.templates.map((template) => (
