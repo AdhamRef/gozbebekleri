@@ -1,6 +1,6 @@
 # Dashboard System Status
 
-آخر تحديث: 2026-06-22
+آخر تحديث: 2026-07-02
 
 ## ما تم إدخاله إلى main
 
@@ -51,6 +51,7 @@
 - Brand repository reads audit-backed BrandMessageFramework records and merges them with foundation/runtime frameworks.
 - `/dashboard/operations/content` content-item cards expose `SCHEDULED` and `PUBLISHED` status transitions in addition to `REVIEW` and `APPROVED`.
 - `PUBLISHED` is explicitly a manual status update only; the UI confirms that no automatic sending or publishing happens.
+- `/dashboard/system-overview` is deprecated as a standalone dashboard page and now redirects safely to `/dashboard`; it is no longer shown in the sidebar navigation.
 
 ## ما يتم تجهيزه في الحزمة الحالية
 
@@ -63,7 +64,6 @@
 
 ## المسارات الرئيسية
 
-- `/dashboard/system-overview`
 - `/dashboard/marketing`
 - `/dashboard/marketing/campaign-operating-center`
 - `/dashboard/marketing/campaign-links`
