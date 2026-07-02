@@ -51,7 +51,7 @@
 - Brand repository reads audit-backed BrandMessageFramework records and merges them with foundation/runtime frameworks.
 - `/dashboard/operations/content` content-item cards expose `SCHEDULED` and `PUBLISHED` status transitions in addition to `REVIEW` and `APPROVED`.
 - `PUBLISHED` is explicitly a manual status update only; the UI confirms that no automatic sending or publishing happens.
-- `/dashboard/system-overview` is deprecated as a standalone dashboard page and now redirects safely to `/dashboard`; it is no longer shown in the sidebar navigation.
+- `/dashboard/system-overview` has been removed from the dashboard routes and sidebar navigation.
 
 ## ما يتم تجهيزه في الحزمة الحالية
 
@@ -81,10 +81,6 @@
 - `/dashboard/operations/archive`
 - `/dashboard/operations/tasks`
 - `/dashboard/operations/content`
-- `/dashboard/operations/system`
-- `/dashboard/operations/system/db-contracts`
-- `/dashboard/operations/ai-assistant`
-- `/dashboard/operations/archive/ai-assistant`
 - `/dashboard/archive`
 - `/dashboard/archive/collections`
 - `/dashboard/archive/projects`
