@@ -55,7 +55,7 @@ import {
   createFormatDashboardMoney,
   donationDisplayTotalLocal,
 } from "@/lib/dashboard/format-dashboard-money";
-import { formatUtcCalendarMonthLong } from "@/lib/admin/current-calendar-month-utc";
+import { formatIstanbulCalendarMonthLong } from "@/lib/admin/current-calendar-month-utc";
 import { StatsMetricCard } from "@/components/dashboard/StatsMetricCard";
 import { getDashboardChartPeriodLabelAr } from "@/lib/dashboard/chart-period-label-ar";
 import { getPeriodDateKeys } from "@/lib/dashboard/period-date-range";
@@ -233,7 +233,7 @@ function getDonationsDateRange(
 
 export default function MonthlySubscriptionsDashboardPage() {
   const locale = useLocale() as string;
-  const thisMonthRevenueTitle = `إيرادات شهر ${formatUtcCalendarMonthLong(new Date(), locale || "ar")}`;
+  const thisMonthRevenueTitle = `إيرادات شهر ${formatIstanbulCalendarMonthLong(new Date(), locale || "ar")}`;
   const searchParams = useSearchParams();
   const { convertToCurrency, getSelectedCurrency } = useCurrency();
   const [stats, setStats] = useState<DashboardStats | null>(null);

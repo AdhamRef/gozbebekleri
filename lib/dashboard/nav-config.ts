@@ -7,7 +7,6 @@ export const DASHBOARD_NAV_GROUPS: {
   {
     group: "الإدارة العامة",
     items: [
-      { key: "revenue", title: "النظرة التنفيذية", href: "/dashboard/system-overview" },
       { key: "revenue", title: "تحليل الإيرادات", href: "/dashboard" },
       { key: "monthly", title: "التبرعات الشهرية", href: "/dashboard/monthly" },
       { key: "bankTransfers", title: "التحويلات البنكية", href: "/dashboard/bank-transfers" },
@@ -43,6 +42,7 @@ export const DASHBOARD_NAV_GROUPS: {
   {
     group: "التسويق والنمو",
     items: [
+      { key: "revenue", title: "النظرة التنفيذية", href: "/dashboard/system-overview" },
       { key: "ads", title: "مركز التسويق والنمو", href: "/dashboard/marketing" },
       { key: "referrals", title: "منشئ الحملات والروابط", href: "/dashboard/link-generator" },
       { key: "ads", title: "أحداث التحويل", href: "/dashboard/conversion-events" },

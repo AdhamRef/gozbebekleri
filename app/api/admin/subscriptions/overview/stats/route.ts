@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getCurrentCalendarMonthUtcRange } from "@/lib/admin/current-calendar-month-utc";
+import { getCurrentCalendarMonthIstanbulRange } from "@/lib/admin/current-calendar-month-utc";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
@@ -192,7 +192,7 @@ export async function GET(request: NextRequest) {
     const donationAllTimeBase = buildDonationChargeAllTimeBase(categoryId, campaignId, referralId);
     const donationPaidAllTime = { ...donationAllTimeBase, ...PAID_DONATION_FILTER };
 
-    const { monthStart, monthEnd } = getCurrentCalendarMonthUtcRange();
+    const { monthStart, monthEnd } = getCurrentCalendarMonthIstanbulRange();
     const thisMonthBase = buildDonationChargeBase(
       monthStart,
       monthEnd,

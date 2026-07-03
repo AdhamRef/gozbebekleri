@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCurrentCalendarMonthUtcRange } from '@/lib/admin/current-calendar-month-utc';
+import { getCurrentCalendarMonthIstanbulRange } from '@/lib/admin/current-calendar-month-utc';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { requireAdminOrDashboardPermission } from '@/lib/dashboard/api-auth';
@@ -175,7 +175,7 @@ export async function GET(request: NextRequest) {
     const oneTimeAllWhere = { ...donationWhere, subscriptionId: null };
     const monthlyAllWhere = { ...donationWhere, subscriptionId: { not: null } };
 
-    const { monthStart, monthEnd } = getCurrentCalendarMonthUtcRange();
+    const { monthStart, monthEnd } = getCurrentCalendarMonthIstanbulRange();
     const thisMonthDonationWhere = mergeFilters(
       buildDonationWhere(monthStart, monthEnd, categoryId, campaignId),
       locale,
