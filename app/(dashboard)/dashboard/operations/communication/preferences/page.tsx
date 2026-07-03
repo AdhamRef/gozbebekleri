@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { ArrowLeft, Ban, Mail, MessageCircle, Phone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -77,7 +78,7 @@ function Metric({ title, value }: { title: string; value: number }) {
   return <Card><CardHeader><CardDescription>{title}</CardDescription><CardTitle className="text-3xl">{value}</CardTitle></CardHeader></Card>;
 }
 
-function Channel({ icon, title, value, ok, reason }: { icon: React.ReactNode; title: string; value: string; ok: boolean; reason: string }) {
+function Channel({ icon, title, value, ok, reason }: { icon: ReactNode; title: string; value: string; ok: boolean; reason: string }) {
   return <div className="rounded-xl border bg-white p-3">
     <div className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-sm font-black text-slate-800">{icon}{title}</span><Badge variant="outline" className={badgeClass(ok)}>{value}</Badge></div>
     <p className="mt-2 text-xs leading-5 text-slate-500">{reason}</p>
