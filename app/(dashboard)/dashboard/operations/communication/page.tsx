@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, FileText, PlugZap, ShieldCheck } from "lucide-react";
+import { ArrowLeft, FileText, PlugZap, ShieldCheck, UsersRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,9 +42,10 @@ export default async function CommunicationCenterPage() {
 
     <Card className="border-amber-200 bg-amber-50"><CardContent className="p-4 text-sm font-semibold leading-6 text-amber-800">{overview.safety.note}</CardContent></Card>
 
-    <section className="grid gap-4 lg:grid-cols-3">
+    <section className="grid gap-4 lg:grid-cols-4">
       <Link href="/dashboard/operations/communication/providers" className="block h-full"><Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm"><CardHeader><PlugZap className="mb-2 h-6 w-6 text-[#025EB8]" /><CardTitle>ربط المزودين</CardTitle><CardDescription className="leading-6">حالة Meta WhatsApp و Brevo Email و Brevo SMS بدون عرض أسرار.</CardDescription></CardHeader></Card></Link>
       <Link href="/dashboard/operations/communication/templates" className="block h-full"><Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm"><CardHeader><FileText className="mb-2 h-6 w-6 text-[#025EB8]" /><CardTitle>القوالب والمتغيرات</CardTitle><CardDescription className="leading-6">قوالب موحدة، متغيرات، ومعاينة آمنة قبل أي إرسال.</CardDescription></CardHeader></Card></Link>
+      <Link href="/dashboard/operations/communication/preferences" className="block h-full"><Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm"><CardHeader><UsersRound className="mb-2 h-6 w-6 text-[#025EB8]" /><CardTitle>الموافقات والتفضيلات</CardTitle><CardDescription className="leading-6">موافقات القنوات، اللغة، الدولة، وحالة عدم التواصل.</CardDescription></CardHeader></Card></Link>
       <Card className="h-full"><CardHeader><ShieldCheck className="mb-2 h-6 w-6 text-[#025EB8]" /><CardTitle>الأمان أولًا</CardTitle><CardDescription className="leading-6">لا إرسال حقيقي، لا مفاتيح في الواجهة، ولا حملات بدون موافقات.</CardDescription></CardHeader></Card>
     </section>
 
