@@ -10,6 +10,8 @@
     "dashboard:schema:validate": "prisma validate --schema prisma/dashboard-foundation.schema.prisma",
     "i18n:audit": "node scripts/audit-i18n-messages.mjs",
     "i18n:audit:strict": "node scripts/audit-i18n-messages.mjs --strict",
+    "locale:audit": "node scripts/audit-locales.mjs",
+    "locale:audit:strict": "node scripts/audit-locales.mjs --strict",
     "content:audit": "node scripts/audit-content-localization.mjs",
     "content:audit:strict": "node scripts/audit-content-localization.mjs --strict",
     "backfill:slugs": "tsx prisma/backfill-slugs.ts",

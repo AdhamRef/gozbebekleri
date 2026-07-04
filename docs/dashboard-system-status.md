@@ -149,3 +149,47 @@
 - `Append Operations content workflow runtime models` كشرائح صغيرة.
 - `Append AiOperationRun runtime model` بعد تثبيت sanitization/retention policy.
 - تنفيذ Google Drive metadata sync لاحقًا فقط بعد readiness كاملة في provider catalog وMarketingPlatformConnection.
+
+---
+
+## 2026-07-04 — Phase 0 audit + Locale Foundation
+
+- Added `docs/dashboard-operating-system-audit.md` — full Phase 0 audit of the
+  dashboard operating system (schema truth, the two messaging systems, locale
+  duplication, nav, prior-plan reconciliation). No runtime change.
+- Added `docs/dashboard-operating-system.md` — target architecture + current→target
+  route map + package roadmap (north star; supersedes nothing, references prior docs).
+- Shipped **Locale Foundation** package (`docs/implementation-packages/locale-foundation.md`):
+  `lib/locales.ts` is now the single source of truth with `direction`, `nativeLabel`,
+  `fallbackLocale`, `enabled` metadata; `sq/it/nl/sv` registered `enabled:false`
+  (not publicly routed). Core routers (middleware, i18n routing, `[locale]/layout`
+  VALID_LOCALES) and direction helpers (SyncHtmlDir, DashboardLayoutClient) now derive
+  from the catalog. **Zero public behaviour change** — the enabled set is the exact
+  current 8 locales. No schema/payment/tracking/Twilio/SendGrid changes.
+- Reconciled duplication in-package: `lib/seo.ts` + `lib/campaign/share-labels.ts` now
+  derive their locale lists from the catalog (type-enforced drift guard), and the
+  `de`-missing 7-locale arrays in `cart/payment`, `donations`, `stripe/intent`, and
+  `verify-email` now use `isValidLocale` — latent bug fixed (German donors were losing
+  `donation.locale`; payment processing untouched).
+- Added `scripts/audit-locales.mjs` (`npm run locale:audit` / `:strict`) — runtime drift
+  guard for content-keyed / non-importable sources (static message map, marketing
+  locales, JSON-LD, `.mjs` audit, message-file existence). Currently passing.
+- Still hand-maintained (flagged by the guard/type system): static message import map,
+  date-fns maps, `subjects.ts` label chains, `country-to-locale` country sets.
+
+---
+
+## 2026-07-04 — Marketing Decision Surface (real data)
+
+- Audited the marketing subsystem (`docs/implementation-packages/marketing-decision-surface.md`).
+  Conversion/tracking truth layer is REAL (ConversionEvent ledger, Meta CAPI + GA4, status-based
+  retry) — left untouched as sensitive. Campaign-link registry + overview reconciliation are REAL.
+- **Insights page is now the real Marketing Overview**: surfaces platform revenue, the site-vs-platform
+  revenue gap (difference), and true ROAS (site) vs platform ROAS + a revenue-match %, plus a
+  gap-based recommendation. Pure additive UI over the existing `/marketing-intelligence/overview` API.
+- **Fixed campaign-link `locale`**: the Link Generator sent `locale` but the registry service/route
+  dropped it. Now threaded end-to-end and stored when it's a known catalog locale (`"auto"` → null).
+- Honest gap (next package): Results + Recommendations pages still render the hardcoded fixture
+  `lib/marketing/results/results-data.ts`; a real-data rebuild is a feature (ripples into
+  `command-center-service` + recommendation rules) and was scoped out to avoid a risky refactor.
+- Safety: no payment/tracking-sender/Twilio/SendGrid/schema changes. Build green (`next build` exit 0).

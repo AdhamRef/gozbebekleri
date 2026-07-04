@@ -14,6 +14,7 @@ import id from "../../i18n/messages/id.json";
 import pt from "../../i18n/messages/pt.json";
 import es from "../../i18n/messages/es.json";
 import de from "../../i18n/messages/de.json";
+import { SUPPORTED_LOCALES } from "@/lib/locales";
 import { buildNormalizedMessages } from "../../i18n/message-quality";
 import { Toaster } from "react-hot-toast";
 import SessionProvider from "@/components/providers/SessionProvider";
@@ -26,9 +27,12 @@ import { CurrencyProvider } from "@/context/CurrencyContext";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
+// NOTE: this map must stay static (bundled JSON imports). When promoting a future
+// locale from `lib/locales.ts` to public, add its `import` above + an entry here.
 const rawLocaleMessages: Record<string, Record<string, unknown>> = { ar, en, fr, tr, id, pt, es, de };
 const localeMessages = buildNormalizedMessages(rawLocaleMessages, "en") as Record<string, Record<string, unknown>>;
-const VALID_LOCALES = ["ar", "en", "fr", "tr", "id", "pt", "es", "de"] as const;
+// Valid public locales derive from the single source of truth (enabled set).
+const VALID_LOCALES = SUPPORTED_LOCALES;
 const DEFAULT_LOCALE = "ar";
 
 export async function generateMetadata({

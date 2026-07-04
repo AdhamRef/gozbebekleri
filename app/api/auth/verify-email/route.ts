@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyToken, createAutoSignInToken } from "@/lib/otp";
 import { dispatchEvent } from "@/lib/events/dispatch";
-
-const VALID_LOCALES = new Set(["ar", "en", "tr", "fr", "es", "pt", "id"]);
+import { isValidLocale } from "@/lib/locales";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -18,7 +17,7 @@ export async function GET(req: NextRequest) {
 
   // Only allow relative paths to prevent open-redirect
   const callbackPath = rawCallback && rawCallback.startsWith("/") ? rawCallback : "/";
-  const locale = VALID_LOCALES.has(rawLocale) ? rawLocale : "en";
+  const locale = isValidLocale(rawLocale) ? rawLocale : "en";
 
   const errorRedirect = (reason: string) =>
     NextResponse.redirect(

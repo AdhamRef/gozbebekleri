@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isValidLocale } from "@/lib/locales";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/options";
 import { resolveReferralId } from "@/lib/referral-server";
@@ -350,7 +351,7 @@ export async function POST(request: NextRequest) {
     }
 
     const validLocale =
-      donationLocale && ["ar", "en", "fr", "tr", "id", "pt", "es"].includes(String(donationLocale).toLowerCase())
+      donationLocale && isValidLocale(String(donationLocale).toLowerCase())
         ? String(donationLocale).toLowerCase()
         : null;
 

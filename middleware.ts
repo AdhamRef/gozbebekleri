@@ -6,10 +6,11 @@ import {
 } from '@/lib/currency-link';
 import { currencyForCountry } from '@/lib/geo/country-to-currency';
 import { localeForCountry } from '@/lib/geo/country-to-locale';
+import { SUPPORTED_LOCALES, DEFAULT_LOCALE } from '@/lib/locales';
 
-const LOCALES = ['ar', 'en', 'fr', 'tr', 'id', 'pt', 'es', 'de'] as const;
-const DEFAULT_LOCALE = 'ar';
-const LOCALE_IN_PATH_RE = /^\/(ar|en|fr|tr|id|pt|es|de)(\/|$)/;
+// Single source of truth (enabled/public locales) — see `lib/locales.ts`.
+const LOCALES = SUPPORTED_LOCALES;
+const LOCALE_IN_PATH_RE = new RegExp(`^/(${SUPPORTED_LOCALES.join('|')})(/|$)`);
 
 const intl = createIntlMiddleware({
   locales: LOCALES,

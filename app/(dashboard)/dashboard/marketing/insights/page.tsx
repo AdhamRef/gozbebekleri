@@ -10,7 +10,22 @@ import { MarketingPageHeader } from "../_components/MarketingPageHeader";
 import { MarketingQuickNav } from "../_components/MarketingQuickNav";
 
 type CampaignRow = { platform: string; campaignId: string | null; campaignName: string | null; spend: number; clicks: number; conversions: number; revenue: number; currency: string | null };
-type Overview = { ok: boolean; summary: { spend: number; siteRevenue: number; siteDonations: number; siteRoas: number; activeConnections: number; totalConnections: number; failedSyncs: number }; campaigns: CampaignRow[] };
+type Overview = {
+  ok: boolean;
+  summary: {
+    spend: number;
+    platformRevenue: number;
+    platformConversions: number;
+    siteRevenue: number;
+    siteDonations: number;
+    platformRoas: number;
+    siteRoas: number;
+    activeConnections: number;
+    totalConnections: number;
+    failedSyncs: number;
+  };
+  campaigns: CampaignRow[];
+};
 
 function money(value: number | null | undefined, currency = "USD") { return typeof value === "number" && Number.isFinite(value) ? `${currency} ${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "—"; }
 function roas(value: number | null | undefined, spend: number | null | undefined) { return typeof spend === "number" && spend > 0 && typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(2)}x` : "غير متاح"; }
@@ -23,6 +38,11 @@ function recommendations(data: Overview) {
   if (data.summary.spend === 0) out.push({ tone: "warn", title: "لا يوجد صرف ظاهر", body: "ROAS غير متاح الآن لأن بيانات الصرف غير مسحوبة أو غير مرتبطة. شغّل سحب البيانات أو راجع الحسابات المتصلة." });
   if (data.summary.spend > 0 && data.summary.siteRoas >= 2) out.push({ tone: "good", title: "الأداء جيد", body: "راجع أفضل الحملات ثم زِد الميزانية تدريجيًا." });
   if (data.summary.spend > 0 && data.summary.siteRoas > 0 && data.summary.siteRoas < 1) out.push({ tone: "bad", title: "العائد ضعيف", body: "راجع الروابط والحملات الأعلى صرفًا قبل الاستمرار." });
+  if (data.summary.platformRevenue > 0) {
+    const matchRatio = data.summary.siteRevenue / data.summary.platformRevenue;
+    if (matchRatio < 0.6) out.push({ tone: "warn", title: "فجوة في مطابقة الإيراد", body: "إيراد الموقع المنسوب أقل بوضوح من الإيراد الذي تبلّغ عنه المنصات — راجع دقة التتبع (Pixel/CAPI) وأحداث التحويل قبل الوثوق بأرقام المنصة." });
+    else if (matchRatio > 1.4) out.push({ tone: "good", title: "تتبع الموقع أقوى من المنصات", body: "الموقع يسجّل إيرادًا أعلى مما تبلّغه المنصات؛ اعتمد إيراد الموقع كمصدر الحقيقة في قرارات الميزانية." });
+  }
   if (!out.length) out.push({ tone: "good", title: "الوضع مستقر", body: "لا توجد مشكلة حرجة في البيانات الحالية." });
   return out;
 }
@@ -50,6 +70,9 @@ export default function MarketingInsightsPage() {
   React.useEffect(() => { void load(7); }, []);
   const topCampaigns = [...(data?.campaigns ?? [])].sort((a, b) => b.spend - a.spend).slice(0, 5);
   const hasSpend = (data?.summary.spend ?? 0) > 0;
+  const platformRevenue = data?.summary.platformRevenue ?? 0;
+  const revenueGap = platformRevenue - (data?.summary.siteRevenue ?? 0); // منصّات مقابل الموقع
+  const hasPlatformRevenue = platformRevenue > 0;
 
   return <div className="space-y-5 p-4 sm:p-6" dir="rtl">
     <MarketingPageHeader
@@ -61,7 +84,16 @@ export default function MarketingInsightsPage() {
     <MarketingQuickNav />
 
     {loading ? <div className="flex min-h-[18rem] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#025EB8]" /></div> : !data ? <Card><CardContent className="p-8 text-center text-sm text-slate-500">لا توجد بيانات.</CardContent></Card> : <>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5"><Kpi title="الصرف" value={money(data.summary.spend)} icon={<BarChart3 className="h-4 w-4" />} /><Kpi title="التبرعات" value={money(data.summary.siteRevenue)} hint={`${data.summary.siteDonations} تبرع`} icon={<TrendingUp className="h-4 w-4" />} /><Kpi title="ROAS" value={roas(data.summary.siteRoas, data.summary.spend)} hint={hasSpend ? undefined : "لا يوجد صرف مسحوب"} icon={<Brain className="h-4 w-4" />} /><Kpi title="الحسابات" value={`${data.summary.activeConnections}/${data.summary.totalConnections}`} /><Kpi title="أخطاء السحب" value={n(data.summary.failedSyncs)} icon={<AlertTriangle className="h-4 w-4" />} /></div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Kpi title="الصرف" value={money(data.summary.spend)} icon={<BarChart3 className="h-4 w-4" />} /><Kpi title="إيراد الموقع (تتبعنا)" value={money(data.summary.siteRevenue)} hint={`${data.summary.siteDonations} تبرع منسوب`} icon={<TrendingUp className="h-4 w-4" />} /><Kpi title="إيراد المنصات (تبليغها)" value={hasPlatformRevenue ? money(platformRevenue) : "غير متاح"} hint={hasPlatformRevenue ? `${n(data.summary.platformConversions)} تحويل مُبلَّغ` : "لا بيانات منصات"} icon={<BarChart3 className="h-4 w-4" />} /><Kpi title="الفرق (منصات − موقع)" value={hasPlatformRevenue ? money(revenueGap) : "—"} hint={hasPlatformRevenue ? "فجوة الإسناد" : undefined} icon={<AlertTriangle className="h-4 w-4" />} /><Kpi title="ROAS الموقع (الحقيقي)" value={roas(data.summary.siteRoas, data.summary.spend)} hint={hasSpend ? "إيراد الموقع ÷ الصرف" : "لا يوجد صرف مسحوب"} icon={<Brain className="h-4 w-4" />} /><Kpi title="ROAS المنصات" value={roas(data.summary.platformRoas, data.summary.spend)} hint={hasSpend ? "إيراد المنصات ÷ الصرف" : undefined} icon={<Brain className="h-4 w-4" />} /><Kpi title="الحسابات" value={`${data.summary.activeConnections}/${data.summary.totalConnections}`} /><Kpi title="أخطاء السحب" value={n(data.summary.failedSyncs)} icon={<AlertTriangle className="h-4 w-4" />} /></div>
+
+      {hasSpend && hasPlatformRevenue ? <Card className="border-slate-200">
+        <CardHeader className="pb-2"><CardTitle className="text-base">مطابقة الإيراد: الموقع مقابل المنصات</CardTitle><CardDescription>إيراد الموقع مصدر حقيقة أول (بيانات تبرعات فعلية). إيراد المنصات تقدير مبلَّغ منها. اعتمد أرقام الموقع في قرارات الميزانية.</CardDescription></CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-3 text-sm">
+          <div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-slate-500">ROAS الحقيقي (الموقع)</div><div className="mt-1 text-xl font-black text-slate-950">{roas(data.summary.siteRoas, data.summary.spend)}</div></div>
+          <div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-slate-500">ROAS المنصات</div><div className="mt-1 text-xl font-black text-slate-950">{roas(data.summary.platformRoas, data.summary.spend)}</div></div>
+          <div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-slate-500">مطابقة الإيراد</div><div className="mt-1 text-xl font-black text-slate-950">{platformRevenue > 0 ? `${Math.round((data.summary.siteRevenue / platformRevenue) * 100)}%` : "—"}</div></div>
+        </CardContent>
+      </Card> : null}
 
       {!hasSpend ? <Card className="border-amber-200 bg-amber-50">
         <CardContent className="p-4 text-sm leading-6 text-amber-900">

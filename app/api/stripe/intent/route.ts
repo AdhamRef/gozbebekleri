@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { isValidLocale } from "@/lib/locales";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 import Stripe from "stripe";
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
 
     const validLocale =
       donationLocale &&
-      ["ar", "en", "fr", "tr", "id", "pt", "es"].includes(String(donationLocale).toLowerCase())
+      isValidLocale(String(donationLocale).toLowerCase())
         ? String(donationLocale).toLowerCase()
         : null;
 

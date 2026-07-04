@@ -15,8 +15,10 @@
  * incomplete, callers fall back to the generic translation strings.
  */
 
-export const SHARE_LABEL_LOCALES = ["ar", "en", "fr", "tr", "id", "pt", "es", "de"] as const;
-export type ShareLabelLocale = (typeof SHARE_LABEL_LOCALES)[number];
+import { SUPPORTED_LOCALES, type SupportedLocale } from "@/lib/locales";
+
+export const SHARE_LABEL_LOCALES = SUPPORTED_LOCALES;
+export type ShareLabelLocale = SupportedLocale;
 
 export interface ShareLabelEntry {
   singular: string;

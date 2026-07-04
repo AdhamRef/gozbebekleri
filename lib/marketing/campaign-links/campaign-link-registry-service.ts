@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { isKnownLocale } from "@/lib/locales";
 
 export type JsonMap = Record<string, unknown>;
 export type CampaignLinkStatus = "ACTIVE" | "ARCHIVED" | "DELETED";
@@ -23,6 +24,7 @@ export type CampaignLinkPayload = {
   audienceSegment?: string;
   messageVariant?: string;
   targetCountry?: string;
+  locale?: string;
   objective?: string;
   internalNotes?: string;
   raw?: JsonMap;
@@ -47,6 +49,7 @@ export type CampaignLinkInput = {
   objective?: string | null;
   audienceSegment?: string | null;
   messageVariant?: string | null;
+  locale?: string | null;
   internalNotes?: string | null;
   createdBy?: string | null;
   raw?: JsonMap | null;
@@ -117,6 +120,7 @@ export function readCampaignLinkPayload(body: JsonMap): CampaignLinkPayload {
     audienceSegment: readString(body.audienceSegment) ?? readString(body.audience_segment) ?? undefined,
     messageVariant: readString(body.messageVariant) ?? readString(body.message_variant) ?? undefined,
     targetCountry: readString(body.targetCountry)?.toUpperCase() ?? readString(body.target_country)?.toUpperCase() ?? undefined,
+    locale: normalizeLinkLocale(readString(body.locale) ?? readString(body.lang)) ?? undefined,
     objective: readString(body.objective) ?? undefined,
     internalNotes: readOptionalString(body.internalNotes) ?? readOptionalString(body.internal_notes) ?? undefined,
     raw: isMap(body.raw) ? body.raw : undefined,
@@ -144,6 +148,12 @@ function toDateIso(value: unknown) {
 
 function stringOrNull(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+/** Keep a link's target locale only when it's a known catalog locale (lowercased). */
+function normalizeLinkLocale(value: string | null): string | null {
+  const code = value?.trim().toLowerCase();
+  return code && isKnownLocale(code) ? code : null;
 }
 
 function normalizePlatform(value: string) {
@@ -174,6 +184,7 @@ function cleanInput(input: CampaignLinkInput) {
     adsetId: stringOrNull(input.adsetId),
     adId: stringOrNull(input.adId),
     targetCountry: stringOrNull(input.targetCountry)?.toUpperCase() ?? null,
+    locale: normalizeLinkLocale(stringOrNull(input.locale)),
     objective: stringOrNull(input.objective),
     audienceSegment: stringOrNull(input.audienceSegment),
     messageVariant: stringOrNull(input.messageVariant),
@@ -201,6 +212,7 @@ function mapCampaignLink(doc: MongoDoc): CampaignLinkRecord {
     adsetId: stringOrNull(doc.adsetId),
     adId: stringOrNull(doc.adId),
     targetCountry: stringOrNull(doc.targetCountry),
+    locale: stringOrNull(doc.locale),
     objective: stringOrNull(doc.objective),
     audienceSegment: stringOrNull(doc.audienceSegment),
     messageVariant: stringOrNull(doc.messageVariant),

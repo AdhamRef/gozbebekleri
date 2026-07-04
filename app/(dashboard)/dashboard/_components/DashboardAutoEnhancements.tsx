@@ -6,8 +6,9 @@ import { usePathname } from "next/navigation";
 import { SaveStatusNotice, type SaveStatusState } from "./SaveStatusNotice";
 import { SmartSeoWorkbenchCard } from "./SmartSeoWorkbenchCard";
 import { SeoTextImproverCard } from "./SeoTextImproverCard";
+import { SUPPORTED_LOCALES, type SupportedLocale } from "@/lib/locales";
 
-type LocaleCode = "ar" | "en" | "fr" | "tr" | "id" | "pt" | "es" | "de";
+type LocaleCode = SupportedLocale;
 type SeoContentType = "campaign" | "category" | "blog";
 
 type SaveEventDetail = {
@@ -41,7 +42,7 @@ const localeByLabel: Record<string, LocaleCode> = {
   Deutsch: "de",
 };
 
-const supportedLocales: LocaleCode[] = ["ar", "en", "fr", "tr", "id", "pt", "es", "de"];
+const supportedLocales: LocaleCode[] = [...SUPPORTED_LOCALES];
 
 function isDashboardSaveRequest(method?: string, url?: string) {
   const m = String(method || "GET").toUpperCase();

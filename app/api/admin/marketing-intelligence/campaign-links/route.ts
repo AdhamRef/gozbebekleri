@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
     audienceSegment: payload.audienceSegment ?? null,
     messageVariant: payload.messageVariant ?? null,
     targetCountry: payload.targetCountry ?? null,
+    locale: payload.locale ?? null,
     objective: payload.objective ?? null,
     internalNotes: payload.internalNotes ?? null,
     createdBy: session?.user?.id ?? null,

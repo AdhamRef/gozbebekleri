@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { localeDirection } from "@/lib/locales";
 import SessionProvider from '@/components/providers/SessionProvider';
 import { NextIntlClientProvider } from "next-intl";
 import { Toaster } from "react-hot-toast";
@@ -52,7 +53,7 @@ function DashboardContent({
   const router = useRouter();
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const dir = locale === "ar" ? "rtl" : "ltr";
+  const dir = localeDirection(locale);
   const hasChecked = useRef(false);
 
   useEffect(() => {

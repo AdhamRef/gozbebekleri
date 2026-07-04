@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
+import { SUPPORTED_LOCALES, type SupportedLocale } from "@/lib/locales";
 
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.gozbebekleri.org").replace(/\/$/, "");
 export const SITE_NAME = "Gözbebekleri";
 export const OG_IMAGE = `${SITE_URL}/og-image.jpg`;
 
-export const LOCALES = ["ar", "en", "fr", "tr", "id", "pt", "es", "de"] as const;
-export type Locale = (typeof LOCALES)[number];
+// Locales derive from the single source of truth (`lib/locales.ts`). The
+// per-locale maps below are `Record<Locale, …>`, so enabling a new public locale
+// becomes a compile error here until its SEO/OG content is filled in — that is the
+// intended drift guard for translated content.
+export const LOCALES = SUPPORTED_LOCALES;
+export type Locale = SupportedLocale;
 
 export const OG_LOCALE_MAP: Record<Locale, string> = {
   ar: "ar_SA",
