@@ -49,7 +49,7 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   devIndicators: {
-    position: 'bottom-right',
+    position: "bottom-right",
   },
   reactStrictMode: true,
   // @usewaypoint/email-builder runs React.createContext at module init.
@@ -80,6 +80,11 @@ const nextConfig: NextConfig = {
    */
   async redirects() {
     return [
+      {
+        source: "/dashboard/executive/system-overview",
+        destination: "/dashboard",
+        permanent: false,
+      },
       {
         source: "/page/biz-kimiz",
         destination: "/tr/about-us",
