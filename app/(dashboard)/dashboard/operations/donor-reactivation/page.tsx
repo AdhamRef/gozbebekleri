@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getDonorReactivationOverview } from "@/lib/operations/donor-reactivation/donor-reactivation-service";
 import type { DonorReactivationCandidate } from "@/lib/operations/donor-reactivation/donor-reactivation-types";
 import { DonorReactivationActions } from "./_components/DonorReactivationActions";
+import { DonorReactivationCampaignDraft } from "./_components/DonorReactivationCampaignDraft";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,8 @@ export default async function DonorReactivationPage() {
         <Card><CardHeader><CardDescription>بدون قناة مناسبة</CardDescription><CardTitle className="text-3xl">{overview.summary.noChannel}</CardTitle></CardHeader></Card>
         <Card><CardHeader><CardDescription>تم التعامل آخر 30 يوم</CardDescription><CardTitle className="text-3xl">{overview.summary.recentlyHandled}</CardTitle></CardHeader></Card>
       </div>
+
+      <DonorReactivationCampaignDraft />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="border-emerald-200 bg-emerald-50/70">

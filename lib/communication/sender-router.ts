@@ -1,5 +1,5 @@
 import { isKnownLocale } from "@/lib/locales";
-import type { CommunicationChannel, CommunicationPurpose, CommunicationProviderKey } from "./communication-types";
+import type { CommunicationChannel, CommunicationPurpose } from "./communication-types";
 
 /**
  * Pure sender routing. Given a channel + recipient locale/country + message purpose,
@@ -16,11 +16,11 @@ export type SenderHealth = "HEALTHY" | "DEGRADED" | "UNKNOWN";
 export type CommunicationSenderConfig = {
   id: string;
   channel: CommunicationChannel;
-  provider: CommunicationProviderKey;
+  provider: string; // runtime provider id (META_WHATSAPP | TWILIO | SENDGRID | NETGSM | CUSTOM)
   name: string;
   supportedLocales?: string[] | null; // empty/undefined = any locale
   supportedCountries?: string[] | null; // empty/undefined = any country
-  supportedPurposes?: CommunicationPurpose[] | null; // empty/undefined = any purpose
+  supportedPurposes?: string[] | null; // empty/undefined = any purpose (MARKETING|UTILITY|TRANSACTIONAL|AUTHENTICATION)
   status: SenderStatus;
   health?: SenderHealth;
   isDefault?: boolean;
@@ -32,7 +32,7 @@ export type SenderRoutingRuleConfig = {
   channel: CommunicationChannel;
   locale?: string | null;
   country?: string | null;
-  purpose?: CommunicationPurpose | null;
+  purpose?: string | null; // MARKETING | UTILITY | TRANSACTIONAL | AUTHENTICATION
   senderId: string;
   fallbackSenderId?: string | null;
   priority?: number;

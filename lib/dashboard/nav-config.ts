@@ -48,8 +48,8 @@ export const DASHBOARD_NAV_GROUPS: {
       { key: "donors", title: "متبرعين", href: "/dashboard/users/donors" },
       { key: "team", title: "فريق العمل", href: "/dashboard/users/team" },
       { key: "badges", title: "الشارات", href: "/dashboard/badges" },
-      { key: "messages", title: "الرسائل", href: "/dashboard/messages" },
-      { key: "templates", title: "القوالب", href: "/dashboard/templates" },
+      { key: "messages", title: "الرسائل (قديم)", href: "/dashboard/messages" },
+      { key: "templates", title: "القوالب (قديم)", href: "/dashboard/templates" },
     ],
   },
   {

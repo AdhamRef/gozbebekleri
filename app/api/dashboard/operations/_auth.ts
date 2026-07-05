@@ -8,3 +8,10 @@ export async function requireOperationsApiAccess() {
   const session = await getServerSession(authOptions);
   return requireAdminOrDashboardPermission(session, "operations");
 }
+
+/** Same guard, but also returns the session so handlers can attribute audit actions. */
+export async function requireOperationsApiSession() {
+  const session = await getServerSession(authOptions);
+  const denied = requireAdminOrDashboardPermission(session, "operations");
+  return { session, denied };
+}

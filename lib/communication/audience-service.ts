@@ -28,7 +28,9 @@ export type LanguageAudienceSummary = {
   /** Marketing eligibility counts per channel. */
   emailEligible: number;
   smsEligible: number;
-  /** WhatsApp has no consent field → all phone-havers require human review. */
+  /** Donors with an explicit WhatsApp opt-in on their communication profile. */
+  whatsappEligible: number;
+  /** Phone contacts without an explicit WhatsApp opt-in — need human review before bulk send. */
   whatsappNeedsReview: number;
 };
 
@@ -48,18 +50,22 @@ export type AudienceOverview = {
 
 const DONOR_BASE = { role: "DONOR" as const };
 
-/** Count donors for a locale + optional channel-eligibility predicate. */
+/** Count donors for a locale + per-channel eligibility (legacy User flags + WhatsApp opt-in profiles). */
 async function localeCounts(locale: SupportedLocale) {
   const base = { ...DONOR_BASE, preferredLang: locale };
-  const [total, withEmail, withPhone, emailEligible, smsEligible] = await Promise.all([
+  const [total, withEmail, withPhone, emailEligible, smsEligible, whatsappEligible] = await Promise.all([
     prisma.user.count({ where: base }),
     prisma.user.count({ where: { ...base, email: { not: null } } }),
     prisma.user.count({ where: { ...base, phone: { not: null } } }),
+    // Email/SMS eligibility from the notification flags (the runtime profile mirrors these).
     prisma.user.count({ where: { ...base, email: { not: null }, emailNotifications: true } }),
     prisma.user.count({ where: { ...base, phone: { not: null }, smsNotifications: true } }),
+    // WhatsApp is only eligible with an explicit opt-in on the donor communication profile.
+    prisma.donorCommunicationProfile.count({ where: { preferredLocale: locale, whatsappOptIn: true, doNotContact: false } }).catch(() => 0),
   ]);
-  // No WhatsApp consent field exists — every phone-haver is NEEDS_REVIEW, never auto-eligible.
-  return { total, withEmail, withPhone, emailEligible, smsEligible, whatsappNeedsReview: withPhone };
+  // Phone contacts without an explicit opt-in still need human review before any bulk WhatsApp.
+  const whatsappNeedsReview = Math.max(0, withPhone - whatsappEligible);
+  return { total, withEmail, withPhone, emailEligible, smsEligible, whatsappEligible, whatsappNeedsReview };
 }
 
 export async function getAudienceOverview(): Promise<AudienceOverview> {
@@ -86,6 +92,7 @@ export async function getAudienceOverview(): Promise<AudienceOverview> {
     unspecifiedLanguage: Math.max(0, donors - withLanguage),
     emailEligible: languages.reduce((sum, l) => sum + l.emailEligible, 0),
     smsEligible: languages.reduce((sum, l) => sum + l.smsEligible, 0),
+    whatsappEligible: languages.reduce((sum, l) => sum + l.whatsappEligible, 0),
     whatsappNeedsReview: languages.reduce((sum, l) => sum + l.whatsappNeedsReview, 0),
   };
 
@@ -98,19 +105,33 @@ export async function getAudienceOverview(): Promise<AudienceOverview> {
   };
 }
 
-/** Whether a donor row is eligible on a channel for marketing (safe defaults). */
+/**
+ * Whether a donor is eligible on a channel for marketing. Prefers the runtime
+ * DonorCommunicationProfile when present, falling back to the legacy User flags.
+ */
 export function donorChannelEligibility(
   donor: { email?: string | null; phone?: string | null; emailNotifications?: boolean; smsNotifications?: boolean },
-  channel: CommunicationChannel
+  channel: CommunicationChannel,
+  profile?: {
+    doNotContact?: boolean;
+    emailOptIn?: boolean;
+    smsOptIn?: boolean;
+    whatsappOptIn?: boolean;
+  } | null
 ): ChannelEligibility {
+  if (profile?.doNotContact) return "UNAVAILABLE";
+
   if (channel === "EMAIL") {
     if (!donor.email) return "UNAVAILABLE";
-    return donor.emailNotifications === false ? "UNAVAILABLE" : "ELIGIBLE";
+    const optedIn = profile ? profile.emailOptIn === true : donor.emailNotifications !== false;
+    return optedIn ? "ELIGIBLE" : "UNAVAILABLE";
   }
   if (channel === "SMS") {
     if (!donor.phone) return "UNAVAILABLE";
-    return donor.smsNotifications === false ? "UNAVAILABLE" : "ELIGIBLE";
+    const optedIn = profile ? profile.smsOptIn === true : donor.smsNotifications !== false;
+    return optedIn ? "ELIGIBLE" : "UNAVAILABLE";
   }
-  // WHATSAPP — no consent field, never silently eligible.
+  // WHATSAPP — eligible only with an explicit opt-in; otherwise phone contacts need review.
+  if (profile?.whatsappOptIn) return "ELIGIBLE";
   return donor.phone ? "NEEDS_REVIEW" : "UNAVAILABLE";
 }

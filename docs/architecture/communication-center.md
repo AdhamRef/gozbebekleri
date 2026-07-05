@@ -27,9 +27,11 @@ Communication Center
 ├─ DeliveryLogService      (pending — extend SentMessage or add CommunicationDelivery)
 ├─ WebhookReceiver         (pending — idempotent provider events)
 ├─ ConversationService     (pending — Inbox)
-├─ MetaWhatsAppProvider    lib/communication/providers/meta-whatsapp/    (pending — server-only, tokens never exposed)
-├─ EmailProvider           reuses lib/email.ts (SendGrid)                (legacy, working)
-├─ SmsProvider             (pending — Netgsm TR / Twilio intl)
+├─ MetaWhatsAppProvider    lib/communication/providers/meta-whatsapp/    (done — adapter + webhooks + inbox; send config-gated)
+├─ WebhookReceiver         /api/webhooks/meta/whatsapp + webhook-service  (done — idempotent, signature-verified)
+├─ ConversationService     lib/communication/conversation-service.ts     (done — Inbox, phone-matched)
+├─ EmailProvider           lib/communication/providers/email/ → lib/email.ts (SendGrid) (done — behind ProviderRouter)
+├─ SmsProvider             lib/communication/providers/sms/ (Netgsm TR / Twilio intl)  (done — config-gated router)
 └─ LegacyTwilioProvider    lib/whatsapp.ts (Twilio)                      (legacy, working — do not break)
 ```
 

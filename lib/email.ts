@@ -260,8 +260,10 @@ export async function sendBulkEmail(
   if (recipients.length === 0) return out;
 
   if (!process.env.SENDGRID_API_KEY) {
-    console.log(`\n[BULK EMAIL - DEV] would send to ${recipients.length} recipients`);
-    out.sent = recipients.length;
+    // No provider configured — do NOT count as sent. Record the honest failure reason so
+    // callers archive SKIPPED/FAILED (never a fake success). Previews/renders are separate.
+    console.log(`\n[BULK EMAIL] SENDGRID_API_KEY missing; not sending to ${recipients.length} recipients`);
+    out.failed = recipients.map((r) => ({ to: r.to, error: "EMAIL_PROVIDER_NOT_CONFIGURED" }));
     return out;
   }
 

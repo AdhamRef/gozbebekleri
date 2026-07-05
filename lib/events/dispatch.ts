@@ -19,6 +19,7 @@ import type { TReaderDocument } from "@usewaypoint/email-builder";
 import { notifyDonationEvent } from "@/lib/telegram/notify";
 import { logSentMessage } from "@/lib/messaging/log-sent";
 import { sendDonationServerConversions } from "@/lib/tracking/donation-conversion-server";
+import { upsertProfileForUser } from "@/lib/communication/donor-communication-profile-service";
 import type { Prisma } from "@prisma/client";
 
 /** Keep in sync with prisma `enum MessageTriggerEvent`. */
@@ -236,9 +237,17 @@ export async function dispatchDonationPaid(donationId: string): Promise<void> {
         currency: true,
         type: true,
         provider: true,
+        locale: true,
       },
     });
     if (!d) return;
+    // Communication profile sync — best-effort, never blocks donation success, no sends.
+    // Places the donor into the correct language segment (locale resolved via the catalog).
+    try {
+      await upsertProfileForUser(d.donorId, { donationLocale: d.locale });
+    } catch (err) {
+      console.error("dispatchDonationPaid profile sync failed", { donationId, err });
+    }
     const paidCount = await prisma.donation.count({
       where: { donorId: d.donorId, status: "PAID" },
     });

@@ -241,3 +241,95 @@
   ("AI Foundation", "…AI Core later", "Results Loop").
 - Reused existing attribution engine (no duplication). No payment/tracking-sender/schema changes.
   Build green (`next build` exit 0), 0 new type errors. Marketing now shows only real data.
+
+---
+
+## 2026-07-05 — Communication Center runtime foundation (data + services, no sending)
+
+- Added 6 runtime Prisma models to `prisma/schema.prisma`: CommunicationSender, SenderRoutingRule,
+  DonorCommunicationProfile, CommunicationCampaign, CommunicationDelivery (new archive layer),
+  CommunicationProviderEvent (unique idempotencyKey). String fields for evolving enums; allowed
+  values documented inline + in `lib/communication/communication-runtime-types.ts`.
+- Added 5 server-side services: delivery-log-service (create-before-send, never fake SENT,
+  SKIPPED/FAILED with reason), sender-service (+toSenderConfig bridge to the router),
+  routing-rule-service (+toRoutingRuleConfig), donor-communication-profile-service (consent from
+  existing User flags, WhatsApp never auto-eligible), campaign-service (guarded DRAFT→…→SCHEDULED,
+  never SENDING/SENT). Create/update/transition write AuditLog.
+- Legacy untouched: SentMessage (still legacy archive), WhatsappTemplate, EmailTemplate,
+  MessageTrigger, Twilio (lib/whatsapp.ts), SendGrid (lib/email.ts), dispatch.ts. No payment/tracking changes.
+- `prisma validate` + `generate` OK; `next build` green (exit 0); new files add 0 type errors.
+
+---
+
+## 2026-07-05 — Communication senders, routing & donor profiles (UI + automation)
+
+- Pages: /communication/senders (CRUD + enable/disable + one-default-per-channel, no secret fields),
+  /communication/routing (rule CRUD + live routing preview via the pure sender-router),
+  /communication/preferences upgraded with a runtime DonorCommunicationProfile panel. Audiences
+  page + overview updated (WhatsApp-eligible count; senders/routing surfaced in nav).
+- APIs (operations-guarded, no-store, audited): senders GET/POST/PATCH, routing GET/POST/PATCH,
+  routing/preview POST, profiles GET/PATCH. Added `requireOperationsApiSession()` helper.
+- Automation: dispatchDonationPaid now best-effort upserts DonorCommunicationProfile on PAID
+  (locale via catalog: preferredLang→donation.locale→country→default; totalDonations/lastDonationAt;
+  phone/email/country from User). Never throws, no send, no payment change.
+- Audiences prefer the runtime profile: WhatsApp eligible only with explicit whatsappOptIn (else
+  NEEDS_REVIEW); email/SMS via profile opt-ins with legacy User-flag fallback.
+- Safety: no frontend secrets, no provider calls, no sends, no fake success. Legacy Twilio/SendGrid/
+  SentMessage/templates untouched. Build green (`next build` exit 0); new files add 0 type errors.
+
+---
+
+## 2026-07-05 — Communication campaigns & delivery archive (send-disabled)
+
+- Campaign workflow: /communication/campaigns (list+create) and /campaigns/[id] step builder
+  (basics → audience eligibility breakdown → template → language coverage w/ FALLBACK/EXCLUDE
+  decisions → sender routing → per-locale preview → test record → submit/approve/cancel).
+  Lifecycle DRAFT→REVIEW→APPROVED→SCHEDULED; SENDING/SENT unreachable (no adapter). Schedule/send disabled.
+- Delivery archive: CommunicationDelivery written for every test/prepared recipient (never SENT —
+  ProviderRouter always returns *_NOT_CONFIGURED → SKIPPED). /delivery-logs (filters + rendered
+  snapshot + reason + donor/campaign links) and /provider-events (sanitized payload only). SentMessage
+  untouched (legacy).
+- Services: provider-router, template-compat, campaign-recipient-service, campaign-render-service,
+  campaign-approval-service (coverage-gated approval); extended campaign-service (updateCampaign) +
+  delivery-log-service (filters, listProviderEvents). APIs: campaigns GET/POST, [id] GET/PATCH,
+  [id]/preview POST, delivery-logs GET, provider-events GET. Overview nav surfaces all.
+- Safety: no payment/tracking/Twilio/SendGrid changes, no sends, no fake SENT, no frontend secrets,
+  all mutations audited. Build green (`next build` exit 0); new files add 0 type errors.
+
+---
+
+## 2026-07-05 — Meta WhatsApp Cloud API adapter, webhooks & Inbox
+
+- Adapter lib/communication/providers/meta-whatsapp/ (client/types/messages/templates/webhooks/errors),
+  written to official Meta docs (docs/integrations/meta-whatsapp-cloud-api.md). Server-only; tokens never
+  logged/leaked (scrubSecrets, mapGraphError). Send = POST /<phoneNumberId>/messages (template) → wamid.
+- ProviderRouter: WhatsApp via adapter — NOT_CONFIGURED / SENDER_MISSING_PHONE_NUMBER_ID when unconfigured;
+  never fakes SENT. Email/SMS still not-configured.
+- Webhook /api/webhooks/meta/whatsapp: GET verify (hub.challenge), POST raw-body X-Hub-Signature-256
+  HMAC check; webhook-service stores idempotent CommunicationProviderEvent (unique idempotencyKey) and
+  updates CommunicationDelivery by providerMessageId. Status map sent/delivered/read/failed → SENT/DELIVERED/
+  READ/FAILED; inbound reply → REPLIED. Never throws unsafe errors.
+- Inbox /communication/inbox: conversations derived from delivery + provider events grouped by phone,
+  donor matched by phone (0/>1 = unresolved, never randomly attached); detail timeline + filters + safe
+  states; reply disabled until send enabled. conversation-service added.
+- Missing-config (no creds in .env): health/send/router return *_NOT_CONFIGURED; webhook GET 403; inbox shows
+  provider-not-configured. No message marked SENT. Build green (next build exit 0); 0 new type errors.
+
+---
+
+## 2026-07-05 — Communication Center final polish (Email/SMS, reactivation, reports, nav, safety)
+
+- Email behind ProviderRouter (providers/email wraps SendGrid; EMAIL_PROVIDER_NOT_CONFIGURED /
+  EMAIL_SENDER_MISSING_IDENTITY when unconfigured). SMS abstraction (providers/sms): TR→Netgsm,
+  else Twilio, config-gated (SMS_PROVIDER_NOT_CONFIGURED). Same audience/language/coverage/archive system.
+- Donor Reactivation: draft WhatsApp/Email/SMS campaign action → DRAFT CommunicationCampaign via campaigns
+  API, opens builder, no auto-send, audited.
+- Reports /communication/reports: by channel, by language, sender performance, failed/skipped w/ reason,
+  WhatsApp replies needing action, missing consent, missing template languages. Read-only, empty states.
+- Nav: reports/inbox surfaced in communication overview; legacy /dashboard/messages + /templates labelled
+  "(قديم)" (kept, not deleted).
+- SAFETY FIX (rule #9): lib/email.ts + lib/whatsapp.ts no longer fake sent=recipients.length when creds
+  missing — now record FAILED with *_PROVIDER_NOT_CONFIGURED so triggers archive the true state.
+  Previews + sendVerificationEmail untouched.
+- Build green (next build exit 0), locale audit passes, 0 new type errors. Legacy Twilio/SendGrid preserved.
+  Real sending remains config-gated (not production-ready without provider creds + live webhook testing).

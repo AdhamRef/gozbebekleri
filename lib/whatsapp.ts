@@ -44,10 +44,12 @@ export async function sendBulkWhatsapp(
   const client = getClient();
   const from = getFrom();
   if (!client || !from) {
+    // No provider configured — do NOT count as sent. Record the honest failure reason so
+    // callers archive SKIPPED/FAILED (never a fake success). Previews/renders are separate.
     console.log(
-      `\n[WHATSAPP - DEV] missing TWILIO_ACCOUNT_SID/AUTH_TOKEN/WHATSAPP_FROM, would send to ${recipients.length} recipients`
+      `\n[WHATSAPP] missing TWILIO_ACCOUNT_SID/AUTH_TOKEN/WHATSAPP_FROM; not sending to ${recipients.length} recipients`
     );
-    out.sent = recipients.length;
+    out.failed = recipients.map((r) => ({ to: r.to, error: "WHATSAPP_PROVIDER_NOT_CONFIGURED" }));
     return out;
   }
 

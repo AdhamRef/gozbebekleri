@@ -8,6 +8,13 @@ import { ContactPreferenceActions } from "@/components/communication/ContactPref
 import { ContactPreferenceCreate } from "@/components/communication/ContactPreferenceCreate";
 import { contactChannelEligibility } from "@/lib/communication/consent-eligibility";
 import { getContactPreferencesOverview } from "@/lib/communication/contact-preferences-repository";
+import { listProfiles } from "@/lib/communication/donor-communication-profile-service";
+
+export const dynamic = "force-dynamic";
+
+function optBadge(value: boolean) {
+  return value ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-500";
+}
 
 function yesNo(value: boolean) {
   return value ? "موافق" : "غير موافق";
@@ -18,7 +25,7 @@ function badgeClass(value: boolean) {
 }
 
 export default async function ContactPreferencesPage() {
-  const overview = await getContactPreferencesOverview();
+  const [overview, profiles] = await Promise.all([getContactPreferencesOverview(), listProfiles({ take: 50 })]);
 
   return <main className="space-y-5 p-4 sm:p-6" dir="rtl">
     <section className="rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm">
@@ -71,6 +78,48 @@ export default async function ContactPreferencesPage() {
         </Card>;
       })}
     </section>
+
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">ملفات تواصل المتبرعين</CardTitle>
+        <CardDescription>تُنشأ وتُحدَّث تلقائيًا بعد كل تبرع ناجح: اللغة المفضّلة، القنوات المتاحة، وحالة الموافقة. واتساب لا يُعدّ مؤهّلًا إلا بموافقة صريحة.</CardDescription>
+      </CardHeader>
+      <CardContent className="p-0">
+        {profiles.length === 0 ? (
+          <div className="p-8 text-center text-sm text-slate-500">لا توجد ملفات بعد. ستظهر تلقائيًا بعد أول تبرع ناجح.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[46rem] text-sm">
+              <thead className="border-b bg-slate-50 text-xs text-slate-500">
+                <tr>
+                  <th className="p-3 text-right font-semibold">المتبرع</th>
+                  <th className="p-3 text-right font-semibold">اللغة</th>
+                  <th className="p-3 text-center font-semibold">إيميل</th>
+                  <th className="p-3 text-center font-semibold">SMS</th>
+                  <th className="p-3 text-center font-semibold">واتساب</th>
+                  <th className="p-3 text-center font-semibold">تبرعات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {profiles.map((p) => (
+                  <tr key={p.id} className="border-b last:border-0">
+                    <td className="p-3">
+                      <div className="font-semibold text-slate-800">{p.email || p.phone || "متبرع"}</div>
+                      <div className="text-xs text-slate-400">{p.countryCode || "بلد غير محدد"}</div>
+                    </td>
+                    <td className="p-3">{p.preferredLocale || "—"}</td>
+                    <td className="p-3 text-center"><Badge variant="outline" className={optBadge(p.emailOptIn)}>{p.emailOptIn ? "موافق" : "لا"}</Badge></td>
+                    <td className="p-3 text-center"><Badge variant="outline" className={optBadge(p.smsOptIn)}>{p.smsOptIn ? "موافق" : "لا"}</Badge></td>
+                    <td className="p-3 text-center"><Badge variant="outline" className={p.whatsappOptIn ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}>{p.whatsappOptIn ? "موافق" : "يحتاج مراجعة"}</Badge></td>
+                    <td className="p-3 text-center font-bold">{p.totalDonations}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   </main>;
 }
 

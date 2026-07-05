@@ -1311,3 +1311,174 @@ model OperationTask {
   @@index([sourceType, sourceId])
   @@index([dueAt])
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMMUNICATION CENTER RUNTIME (Package 1 — data foundation, no real sending)
+// Channel/provider/status/purpose/origin use String fields (not Prisma enums) so
+// the lifecycle can evolve safely on MongoDB. Allowed values are documented inline.
+// New archive layer: CommunicationDelivery. Legacy SentMessage is preserved untouched.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model CommunicationSender {
+  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  channel            String // WHATSAPP | EMAIL | SMS
+  provider           String // META_WHATSAPP | TWILIO | SENDGRID | NETGSM | CUSTOM
+  name               String
+  displayName        String?
+  phoneNumberId      String? // Meta WhatsApp Cloud API phone number id
+  displayPhoneNumber String?
+  businessAccountId  String?
+  senderEmail        String?
+  smsSender          String?
+  supportedLocales   String[]
+  supportedCountries String[]
+  supportedPurposes  String[] // MARKETING | UTILITY | TRANSACTIONAL | AUTHENTICATION
+  qualityRating      String?
+  status             String    @default("NOT_CONFIGURED") // ACTIVE | DISABLED | NEEDS_ATTENTION | NOT_CONFIGURED
+  isDefault          Boolean   @default(false)
+  enabled            Boolean   @default(false)
+  priority           Int       @default(100)
+  lastHealthCheckAt  DateTime?
+  lastError          String?
+  metadata           Json?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([channel, enabled])
+  @@index([provider])
+}
+
+model SenderRoutingRule {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  channel          String // WHATSAPP | EMAIL | SMS
+  locale           String?
+  country          String?
+  purpose          String? // MARKETING | UTILITY | TRANSACTIONAL | AUTHENTICATION
+  senderId         String   @db.ObjectId
+  fallbackSenderId String?  @db.ObjectId
+  priority         Int      @default(100)
+  enabled          Boolean  @default(true)
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([channel, enabled])
+}
+
+model DonorCommunicationProfile {
+  id                  String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId              String    @unique @db.ObjectId
+  preferredLocale     String?
+  countryCode         String?
+  timezone            String?
+  phone               String?
+  email               String?
+  whatsappOptIn       Boolean   @default(false) // no explicit WhatsApp consent field on User → stays false until confirmed
+  emailOptIn          Boolean   @default(false)
+  smsOptIn            Boolean   @default(false)
+  doNotContact        Boolean   @default(false)
+  consentSource       String?
+  lastConsentAt       DateTime?
+  lastDonationAt      DateTime?
+  totalDonations      Int       @default(0)
+  lastCommunicationAt DateTime?
+  lastWhatsappAt      DateTime?
+  lastEmailAt         DateTime?
+  lastSmsAt           DateTime?
+  metadata            Json?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([preferredLocale])
+  @@index([countryCode])
+}
+
+model CommunicationCampaign {
+  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  name               String
+  channel            String // WHATSAPP | EMAIL | SMS
+  purpose            String    @default("MARKETING") // MARKETING | UTILITY | TRANSACTIONAL | AUTHENTICATION
+  audienceSegmentKey String?
+  templateGroupId    String?
+  senderRoutingMode  String    @default("AUTO") // AUTO | FIXED
+  status             String    @default("DRAFT") // DRAFT | REVIEW | APPROVED | SCHEDULED | SENDING | SENT | CANCELLED | FAILED
+  scheduledAt        DateTime?
+  approvedBy         String?   @db.ObjectId
+  approvedAt         DateTime?
+  sentCount          Int       @default(0)
+  deliveredCount     Int       @default(0)
+  readCount          Int       @default(0)
+  failedCount        Int       @default(0)
+  repliedCount       Int       @default(0)
+  clickedCount       Int       @default(0)
+  donationCount      Int       @default(0)
+  revenue            Float     @default(0)
+  metadata           Json?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([channel, status])
+  @@index([status])
+}
+
+model CommunicationDelivery {
+  id                     String    @id @default(auto()) @map("_id") @db.ObjectId
+  channel                String // WHATSAPP | EMAIL | SMS
+  provider               String? // META_WHATSAPP | TWILIO | SENDGRID | NETGSM | CUSTOM
+  senderId               String?   @db.ObjectId
+  campaignId             String?   @db.ObjectId
+  templateId             String?
+  templateName           String?
+  recipientUserId        String?   @db.ObjectId
+  recipientPhone         String?
+  recipientEmail         String?
+  recipientName          String?
+  locale                 String?
+  purpose                String    @default("TRANSACTIONAL") // MARKETING | UTILITY | TRANSACTIONAL | AUTHENTICATION
+  origin                 String    @default("SYSTEM") // MANUAL | CAMPAIGN | TRIGGER | TEST | REACTIVATION | SYSTEM
+  // Lifecycle: DRAFT | QUEUED | RENDERED | SKIPPED | SENT_TO_PROVIDER | SENT |
+  // DELIVERED | READ | OPENED | CLICKED | REPLIED | FAILED | BOUNCED | UNSUBSCRIBED | CANCELLED
+  status                 String    @default("DRAFT")
+  renderedSubject        String?
+  renderedBody           String?
+  variables              Json?
+  providerMessageId      String?
+  providerConversationId String?
+  errorMessage           String?
+  sentAt                 DateTime?
+  deliveredAt            DateTime?
+  readAt                 DateTime?
+  openedAt               DateTime?
+  clickedAt              DateTime?
+  repliedAt              DateTime?
+  failedAt               DateTime?
+  createdBy              String?   @db.ObjectId
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@index([campaignId])
+  @@index([channel, status])
+  @@index([recipientUserId])
+  @@index([providerMessageId])
+}
+
+model CommunicationProviderEvent {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  deliveryId        String?   @db.ObjectId
+  channel           String
+  provider          String
+  eventType         String
+  providerMessageId String?
+  senderId          String?   @db.ObjectId
+  recipient         String?
+  payloadSanitized  Json?
+  receivedAt        DateTime  @default(now())
+  processedAt       DateTime?
+  status            String?
+  errorMessage      String?
+  idempotencyKey    String    @unique
+  createdAt         DateTime  @default(now())
+
+  @@index([deliveryId])
+  @@index([providerMessageId])
+}

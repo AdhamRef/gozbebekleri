@@ -76,6 +76,7 @@ export default async function CommunicationAudiencesPage() {
                       <th className="p-3 text-center font-semibold">لديهم هاتف</th>
                       <th className="p-3 text-center font-semibold">إيميل مؤهّل</th>
                       <th className="p-3 text-center font-semibold">رسائل مؤهّلة</th>
+                      <th className="p-3 text-center font-semibold">واتساب مؤهّل</th>
                       <th className="p-3 text-center font-semibold">واتساب (مراجعة)</th>
                     </tr>
                   </thead>
@@ -91,6 +92,7 @@ export default async function CommunicationAudiencesPage() {
                         <td className="p-3 text-center text-slate-600">{num(lang.withPhone)}</td>
                         <td className="p-3 text-center"><Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">{num(lang.emailEligible)}</Badge></td>
                         <td className="p-3 text-center"><Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">{num(lang.smsEligible)}</Badge></td>
+                        <td className="p-3 text-center"><Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">{num(lang.whatsappEligible)}</Badge></td>
                         <td className="p-3 text-center"><Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">{num(lang.whatsappNeedsReview)}</Badge></td>
                       </tr>
                     ))}
