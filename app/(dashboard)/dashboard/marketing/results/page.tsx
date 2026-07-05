@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getMarketingResultsOverview } from "@/lib/marketing/results/results-service";
 
+export const dynamic = "force-dynamic";
+
 const statusClass: Record<string, string> = {
   WINNER: "border-emerald-200 bg-emerald-50 text-emerald-700",
   WATCH: "border-blue-200 bg-blue-50 text-blue-700",
@@ -26,14 +28,14 @@ const statusIcon: Record<string, typeof TrendingUp> = {
   LOSING: TrendingDown,
 };
 
-export default function MarketingResultsPage() {
-  const overview = getMarketingResultsOverview();
+export default async function MarketingResultsPage() {
+  const overview = await getMarketingResultsOverview();
 
   return (
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
       <div className="flex flex-col gap-4 rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs text-white/70">Marketing / Results Loop</p>
+          <p className="text-xs text-white/70">التسويق / النتائج</p>
           <h1 className="mt-1.5 text-2xl font-black">نتائج التسويق والتعلّم</h1>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
             ربط مواد الأرشيف بالحملات والنتائج والقرارات حتى نعرف ما الذي يجب تكراره أو تعديله أو إيقافه.
@@ -57,6 +59,9 @@ export default function MarketingResultsPage() {
         <Card><CardHeader><CardDescription>فائز/خاسر</CardDescription><CardTitle className="text-3xl">{overview.summary.winners}/{overview.summary.losing}</CardTitle></CardHeader></Card>
       </div>
 
+      {overview.results.length === 0 ? (
+        <Card><CardContent className="p-10 text-center text-sm text-slate-500">لا توجد نتائج حملات بعد لهذه الفترة. ستظهر النتائج تلقائيًا عند توفّر إنفاق إعلاني مسحوب أو تبرعات منسوبة لحملة.</CardContent></Card>
+      ) : (
       <div className="grid gap-4 xl:grid-cols-2">
         {overview.results.map((result) => {
           const Icon = statusIcon[result.status] ?? BarChart3;
@@ -99,6 +104,7 @@ export default function MarketingResultsPage() {
           );
         })}
       </div>
+      )}
     </div>
   );
 }

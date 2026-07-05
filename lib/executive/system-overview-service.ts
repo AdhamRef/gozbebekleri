@@ -34,7 +34,7 @@ export async function buildExecutiveSystemOverview(
 ): Promise<ExecutiveSystemOverview> {
   const operations = await getOperationsOverview();
   const providerHealth = buildProviderHealthOverview(connections.map(serializeConnection));
-  const marketing = buildMarketingCommandCenterOverview(providerHealth);
+  const marketing = await buildMarketingCommandCenterOverview(providerHealth);
   const operationsCommand = await buildOperationsCommandCenterOverview(operations);
 
   const risks: ExecutiveSystemOverview["risks"] = [];

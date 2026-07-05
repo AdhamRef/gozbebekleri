@@ -35,11 +35,13 @@ export type MarketingCommandCenterOverview = {
   actions: MarketingCommandAction[];
 };
 
-export function buildMarketingCommandCenterOverview(
+export async function buildMarketingCommandCenterOverview(
   providerHealth: ProviderHealthOverview,
-): MarketingCommandCenterOverview {
-  const results = getMarketingResultsOverview();
-  const recommendations = getRecommendationOverview();
+): Promise<MarketingCommandCenterOverview> {
+  const [results, recommendations] = await Promise.all([
+    getMarketingResultsOverview(),
+    getRecommendationOverview(),
+  ]);
 
   const actions: MarketingCommandAction[] = [];
 

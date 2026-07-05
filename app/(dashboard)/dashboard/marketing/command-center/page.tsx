@@ -34,7 +34,7 @@ async function getCommandCenter() {
     ],
   });
   const providerHealth = buildProviderHealthOverview(rows.map(serializeConnection));
-  return buildMarketingCommandCenterOverview(providerHealth);
+  return await buildMarketingCommandCenterOverview(providerHealth);
 }
 
 export default async function MarketingCommandCenterPage() {

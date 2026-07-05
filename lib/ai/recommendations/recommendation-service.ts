@@ -2,12 +2,12 @@ import { getMarketingResultsOverview } from "@/lib/marketing/results/results-ser
 import { buildMarketingResultRecommendations } from "./recommendation-rules";
 import type { RecommendationOverview } from "./recommendation-types";
 
-export function getRecommendationOverview(): RecommendationOverview {
-  const marketingResults = getMarketingResultsOverview();
+export async function getRecommendationOverview(): Promise<RecommendationOverview> {
+  const marketingResults = await getMarketingResultsOverview();
   const recommendations = buildMarketingResultRecommendations(marketingResults.results);
 
   return {
-    source: "rule-based-recommendation-foundation",
+    source: "rule-based-recommendation",
     generatedAt: new Date().toISOString(),
     summary: {
       total: recommendations.length,

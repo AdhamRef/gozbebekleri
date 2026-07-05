@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getRecommendationOverview } from "@/lib/ai/recommendations/recommendation-service";
 
+export const dynamic = "force-dynamic";
+
 const priorityClass: Record<string, string> = {
   HIGH: "border-rose-200 bg-rose-50 text-rose-700",
   MEDIUM: "border-amber-200 bg-amber-50 text-amber-700",
@@ -34,17 +36,17 @@ const typeIcon: Record<string, typeof TrendingUp> = {
   PREPARE_SEASON: BadgeCheck,
 };
 
-export default function MarketingRecommendationsPage() {
-  const overview = getRecommendationOverview();
+export default async function MarketingRecommendationsPage() {
+  const overview = await getRecommendationOverview();
 
   return (
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
       <div className="flex flex-col gap-4 rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs text-white/70">AI Foundation / Recommendations</p>
-          <h1 className="mt-1.5 text-2xl font-black">توصيات التسويق الذكية</h1>
+          <p className="text-xs text-white/70">التسويق / التوصيات</p>
+          <h1 className="mt-1.5 text-2xl font-black">توصيات التسويق</h1>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
-            طبقة توصيات أولية مبنية على القواعد ونتائج التسويق الحالية، تمهيدًا لربطها لاحقًا بـ AI Core مشترك.
+            توصيات مبنية على أداء حملاتك الفعلي: ماذا توسّع، وماذا تحسّن، وماذا توقف.
           </p>
         </div>
         <Link
@@ -64,6 +66,9 @@ export default function MarketingRecommendationsPage() {
         <Card><CardHeader><CardDescription>الأرشيف</CardDescription><CardTitle className="text-3xl">{overview.summary.archive}</CardTitle></CardHeader></Card>
       </div>
 
+      {overview.recommendations.length === 0 ? (
+        <Card><CardContent className="p-10 text-center text-sm text-slate-500">لا توجد توصيات حالية. ستظهر توصيات تلقائيًا عند توفّر بيانات حملات وتبرعات كافية.</CardContent></Card>
+      ) : (
       <div className="grid gap-4 xl:grid-cols-2">
         {overview.recommendations.map((recommendation) => {
           const Icon = typeIcon[recommendation.type] ?? BrainCircuit;
@@ -106,6 +111,7 @@ export default function MarketingRecommendationsPage() {
           );
         })}
       </div>
+      )}
     </div>
   );
 }

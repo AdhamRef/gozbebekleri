@@ -193,3 +193,51 @@
   `lib/marketing/results/results-data.ts`; a real-data rebuild is a feature (ripples into
   `command-center-service` + recommendation rules) and was scoped out to avoid a risky refactor.
 - Safety: no payment/tracking-sender/Twilio/SendGrid/schema changes. Build green (`next build` exit 0).
+
+---
+
+## 2026-07-04 — Communication domain foundation (audiences + sender routing)
+
+- Added pure/read-only Communication Center domain services (mission Package 3; no send,
+  no schema, no provider calls): `lib/communication/audience-service.ts` (dynamic language×
+  channel audiences from the real donor base with lawful-safe eligibility — WhatsApp is
+  always NEEDS_REVIEW, never silently bulk-eligible), `lib/communication/sender-router.ts`
+  (pure locale/country/purpose/priority/fallback routing → sender or SKIPPED reason), and
+  `lib/communication/language-coverage.ts` (per-locale EXISTS/FALLBACK/MISSING coverage +
+  block-before-wrong-language decision).
+- Added read-only Audiences page `/dashboard/operations/communication/audiences` (real
+  counts, summary, per-language table, empty/error states), linked from the Communication overview.
+- All catalog-driven (`lib/locales.ts`); no language hardcoded per channel. Reuses existing
+  User fields + communication types. Build green (`next build` exit 0), new files add 0 type errors.
+- Next: persist `CommunicationSender`/`SenderRoutingRule` (router already accepts them),
+  Senders + Routing pages, then Meta WhatsApp adapter + delivery archive + approval send flow.
+
+---
+
+## 2026-07-04 — Navigation aligned + Communication Center surfaced
+
+- Refactored `lib/dashboard/nav-config.ts` into architecture-aligned groups (عام / التسويق
+  والنمو / المحتوى والتشغيل / الأرشيف الذكي / المستخدمون والرسائل / الهوية / الإعدادات) and
+  **surfaced the Communication Center** ("مركز التواصل" → /dashboard/operations/communication),
+  which was previously unreachable from the sidebar. Every key is an existing permission and
+  every href an existing route — no permission keys added, no routes removed.
+- Deduped `DASHBOARD_PERMISSION_ROWS` by key so the permissions-management table shows each
+  permission once (revenue/ads/referrals/campaigns were already duplicated before).
+- Access control unchanged: route→permission resolution is driven by `PATH_RULES` in
+  permissions.ts, not the nav list. Build green (`next build` exit 0).
+- Added canonical `docs/architecture/communication-center.md` (mission-named deliverable).
+
+---
+
+## 2026-07-05 — Marketing Results & Recommendations on real data (no fixtures left)
+
+- Rebuilt `lib/marketing/results/results-service.ts` (now async, DB-backed): per-campaign
+  spend/clicks from `AdCampaignSnapshot` joined with first-party site donations/revenue from
+  donation attribution via `aggregateBreakdown(..., "campaign")` (+ shared `fetchAdsDonations`).
+  ROAS = site revenue ÷ spend; status/decision/learning rule-derived, no fabricated specifics.
+- **Deleted the fake fixture** `lib/marketing/results/results-data.ts`. Propagated async through
+  recommendation-service, command-center-service, executive system-overview, and the results/
+  recommendations pages (now `force-dynamic`, with empty states). Removed forbidden UI text
+  ("AI Foundation", "…AI Core later", "Results Loop").
+- Reused existing attribution engine (no duplication). No payment/tracking-sender/schema changes.
+  Build green (`next build` exit 0), 0 new type errors. Marketing now shows only real data.
