@@ -13,7 +13,7 @@ type LocaleBreakdown = { locale: string; label: string; total: number; eligible:
 type Coverage = { locales: { locale: string; label: string; status: string; fallbackLocale?: string; recipientCount: number }[]; missingWithRecipients: { locale: string; label: string; recipientCount: number }[]; canSendWithoutDecision: boolean };
 type CoverageGate = { ok: boolean; missingWithRecipients: { locale: string; label: string; recipientCount: number }[]; undecided: string[] };
 type Campaign = { id: string; name: string; channel: string; purpose: string; status: string; audienceSegmentKey: string | null; templateGroupId: string | null; senderRoutingMode: string; metadata: Record<string, unknown> | null };
-type Detail = { campaign: Campaign; breakdown: { locales: LocaleBreakdown[]; totals: LocaleBreakdown } | null; templates: { id: string; name: string; availableLocales: string[] }[]; senders: { id: string; name: string; displayName: string | null }[]; coverage: Coverage | null; coverageGate: CoverageGate | null };
+type Detail = { campaign: Campaign; breakdown: { locales: LocaleBreakdown[]; totals: LocaleBreakdown } | null; templates: { id: string; name: string; availableLocales: string[] }[]; senders: { id: string; name: string; displayName: string | null }[]; coverage: Coverage | null; coverageGate: CoverageGate | null; sendEnabled: boolean };
 
 const statusLabel: Record<string, string> = { DRAFT: "مسودة", REVIEW: "قيد المراجعة", APPROVED: "معتمدة", SCHEDULED: "مجدولة", SENDING: "جارٍ الإرسال", SENT: "أُرسلت", CANCELLED: "ملغاة", FAILED: "فشلت" };
 const covLabel: Record<string, string> = { EXISTS: "متوفّرة", FALLBACK: "بديل", MISSING: "ناقصة" };
@@ -27,6 +27,7 @@ export default function CampaignDetailPage() {
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [previewText, setPreviewText] = React.useState<{ locale: string; subject: string | null; body: string; usedFallback: boolean } | null>(null);
+  const [scheduleAt, setScheduleAt] = React.useState("");
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -83,6 +84,42 @@ export default function CampaignDetailPage() {
     }
   }
 
+  async function sendNow() {
+    if (!window.confirm("سيتم تنفيذ إرسال الحملة الآن للمؤهّلين فقط. متابعة؟")) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`${base}/send`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm: true }) });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error ?? "failed");
+      const s = json.summary;
+      toast.success(`اكتمل التنفيذ — أُرسل ${s.sent}، تخطّي ${s.skipped}، فشل ${s.failed}`);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "تعذّر الإرسال");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function schedule() {
+    if (!scheduleAt) {
+      toast.error("اختر موعدًا");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch(`${base}/schedule`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scheduledAt: new Date(scheduleAt).toISOString() }) });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error ?? "failed");
+      toast.success("تمت الجدولة");
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "تعذّرت الجدولة");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading || !data) {
     return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#025EB8]" /></div>;
   }
@@ -104,7 +141,9 @@ export default function CampaignDetailPage() {
         </div>
       </section>
 
-      <Card className="border-amber-200 bg-amber-50"><CardContent className="p-4 text-sm font-semibold leading-6 text-amber-800">الإرسال الفعلي معطّل حتى ربط المزود. كل الخطوات هنا للتجهيز والاعتماد فقط، وسجلات التجهيز لا تُرسل أي رسالة.</CardContent></Card>
+      {!data.sendEnabled ? (
+        <Card className="border-amber-200 bg-amber-50"><CardContent className="p-4 text-sm font-semibold leading-6 text-amber-800">الإرسال غير مفعّل بعد لهذه القناة — يحتاج إعداد المزود. يمكنك تجهيز الحملة واعتمادها الآن، وسيتم الإرسال بعد اكتمال الإعداد.</CardContent></Card>
+      ) : null}
 
       {/* 1 — Audience */}
       <Step n={1} title="الجمهور">
@@ -223,10 +262,20 @@ export default function CampaignDetailPage() {
         {coverageGate && !coverageGate.ok ? (
           <p className="mt-2 flex items-center gap-1 text-sm text-amber-700"><AlertTriangle className="h-4 w-4" /> لا يمكن الاعتماد قبل حسم اللغات الناقصة: {coverageGate.undecided.join(", ")}</p>
         ) : null}
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           {campaign.status === "DRAFT" ? <Button size="sm" disabled={busy} onClick={() => patch({ action: "submit_review" }, "أُرسلت للمراجعة")}>إرسال للمراجعة</Button> : null}
           {campaign.status === "REVIEW" ? <Button size="sm" disabled={busy || !!(coverageGate && !coverageGate.ok)} onClick={() => patch({ action: "approve" }, "تم الاعتماد")}>اعتماد</Button> : null}
-          {campaign.status === "APPROVED" ? <Button size="sm" variant="outline" disabled title="الجدولة/الإرسال تُفعّل بعد ربط المزود">جدولة (معطّلة حتى ربط المزود)</Button> : null}
+          {campaign.status === "APPROVED" ? (
+            <>
+              {data.sendEnabled ? (
+                <Button size="sm" disabled={busy} onClick={sendNow}>إرسال الآن</Button>
+              ) : (
+                <span className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">الإرسال غير مفعّل بعد — يحتاج إعداد المزود</span>
+              )}
+              <input type="datetime-local" value={scheduleAt} onChange={(e) => setScheduleAt(e.target.value)} className="rounded-md border border-slate-200 px-2 py-1.5 text-xs" />
+              <Button size="sm" variant="outline" disabled={busy || !scheduleAt} onClick={schedule}>جدولة</Button>
+            </>
+          ) : null}
           {editable || campaign.status === "APPROVED" || campaign.status === "SCHEDULED" ? <Button size="sm" variant="outline" disabled={busy} onClick={() => patch({ action: "cancel" }, "أُلغيت الحملة")}>إلغاء</Button> : null}
         </div>
       </Step>

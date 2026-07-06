@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { SUPPORTED_LOCALES, LOCALES, isValidLocale, type SupportedLocale } from "@/lib/locales";
+import { SUPPORTED_LOCALES, LOCALES, DEFAULT_LOCALE, isValidLocale, type SupportedLocale } from "@/lib/locales";
 import type { CommunicationChannelId } from "./communication-runtime-types";
+import { donorChannelEligibility } from "./audience-service";
 
 /**
  * Recipient counts + eligibility breakdown for a campaign, per locale, for one channel.
@@ -84,4 +85,66 @@ export async function getRecipientBreakdown(
   for (const l of locales) recipientLocaleCounts[l.locale] = l.eligible;
 
   return { channel, locales, totals, recipientLocaleCounts };
+}
+
+export type CampaignRecipient = {
+  userId: string;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  locale: SupportedLocale;
+  country: string | null;
+};
+
+export type RecipientLoadResult = {
+  recipients: CampaignRecipient[];
+  skipped: { userId: string; locale: string; reason: string }[];
+  truncated: boolean;
+};
+
+/**
+ * Load the individual eligible recipients for a campaign send (bounded batch). Applies channel
+ * eligibility per donor (prefers DonorCommunicationProfile, falls back to User notification flags).
+ * Ineligible donors are returned in `skipped` with a reason — the executor archives those as SKIPPED.
+ */
+export async function loadCampaignRecipients(
+  channel: CommunicationChannelId,
+  audienceSegmentKey: string | null,
+  opts: { limit?: number } = {}
+): Promise<RecipientLoadResult> {
+  const limit = Math.min(opts.limit ?? 500, 1000);
+  const targetLocales: SupportedLocale[] = audienceSegmentKey && isValidLocale(audienceSegmentKey) ? [audienceSegmentKey] : [...SUPPORTED_LOCALES];
+
+  const users = await prisma.user.findMany({
+    where: { role: "DONOR", preferredLang: { in: targetLocales } },
+    select: { id: true, name: true, email: true, phone: true, preferredLang: true, countryCode: true, emailNotifications: true, smsNotifications: true },
+    take: limit + 1,
+  });
+  const truncated = users.length > limit;
+  const page = users.slice(0, limit);
+
+  const profiles = await prisma.donorCommunicationProfile
+    .findMany({ where: { userId: { in: page.map((u) => u.id) } }, select: { userId: true, whatsappOptIn: true, emailOptIn: true, smsOptIn: true, doNotContact: true } })
+    .catch(() => []);
+  const profileMap = new Map(profiles.map((p) => [p.userId, p]));
+
+  const recipients: CampaignRecipient[] = [];
+  const skipped: { userId: string; locale: string; reason: string }[] = [];
+
+  for (const u of page) {
+    const locale = (u.preferredLang && isValidLocale(u.preferredLang) ? u.preferredLang : DEFAULT_LOCALE) as SupportedLocale;
+    const profile = profileMap.get(u.id) ?? null;
+    const eligibility = donorChannelEligibility(
+      { email: u.email, phone: u.phone, emailNotifications: u.emailNotifications, smsNotifications: u.smsNotifications },
+      channel,
+      profile
+    );
+    if (eligibility === "ELIGIBLE") {
+      recipients.push({ userId: u.id, name: u.name, email: u.email, phone: u.phone, locale, country: u.countryCode });
+    } else {
+      skipped.push({ userId: u.id, locale, reason: eligibility === "NEEDS_REVIEW" ? "NEEDS_CONSENT_REVIEW" : "NOT_ELIGIBLE" });
+    }
+  }
+
+  return { recipients, skipped, truncated };
 }

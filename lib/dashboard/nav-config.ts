@@ -8,63 +8,62 @@ export const DASHBOARD_NAV_GROUPS: {
   items: { key: DashboardPermissionKey; title: string; href: string }[];
 }[] = [
   {
-    group: "عام",
+    group: "الرئيسية",
     items: [
-      { key: "revenue", title: "تحليل الإيرادات", href: "/dashboard" },
-      { key: "revenue", title: "النظرة التنفيذية", href: "/dashboard/system-overview" },
-      { key: "monthly", title: "التبرعات الشهرية", href: "/dashboard/monthly" },
-      { key: "bankTransfers", title: "التحويلات البنكية", href: "/dashboard/bank-transfers" },
-      { key: "logs", title: "سجل النشاط", href: "/dashboard/logs" },
+      { key: "revenue", title: "نظرة عامة", href: "/dashboard" },
     ],
   },
   {
-    group: "التسويق والنمو",
+    group: "النمو والتسويق",
     items: [
-      { key: "ads", title: "مركز التسويق والنمو", href: "/dashboard/marketing" },
-      { key: "referrals", title: "منشئ الحملات والروابط", href: "/dashboard/link-generator" },
-      { key: "ads", title: "أحداث التحويل", href: "/dashboard/conversion-events" },
-      { key: "referrals", title: "روابط التتبع", href: "/dashboard/referrals" },
+      { key: "ads", title: "مركز التسويق", href: "/dashboard/marketing" },
+      { key: "referrals", title: "الحملات والروابط", href: "/dashboard/link-generator" },
+      { key: "ads", title: "التتبع والنتائج", href: "/dashboard/conversion-events" },
     ],
   },
   {
-    group: "المحتوى والتشغيل",
+    group: "التشغيل اليومي",
     items: [
-      { key: "operations", title: "مركز المحتوى والتشغيل", href: "/dashboard/operations" },
+      { key: "operations", title: "مركز التشغيل", href: "/dashboard/operations" },
+      { key: "operations", title: "المحتوى والمهام", href: "/dashboard/operations/tasks" },
+      { key: "operations", title: "التقويم", href: "/dashboard/operations/calendar" },
+    ],
+  },
+  {
+    group: "التواصل",
+    items: [
       { key: "operations", title: "مركز التواصل", href: "/dashboard/operations/communication" },
+      { key: "operations", title: "الحملات", href: "/dashboard/operations/communication/campaigns" },
+      { key: "operations", title: "المحادثات", href: "/dashboard/operations/communication/inbox" },
+      { key: "operations", title: "الجمهور", href: "/dashboard/operations/communication/audiences" },
+      { key: "operations", title: "القوالب", href: "/dashboard/operations/communication/templates" },
+      { key: "operations", title: "النتائج", href: "/dashboard/operations/communication/reports" },
+    ],
+  },
+  {
+    group: "المحتوى",
+    items: [
       { key: "campaigns", title: "المشاريع", href: "/dashboard/campaigns" },
-      { key: "categories", title: "الحملات", href: "/dashboard/categories" },
+      { key: "categories", title: "الحملات التبرعية", href: "/dashboard/categories" },
       { key: "blog", title: "المدونة", href: "/dashboard/blog" },
     ],
   },
   {
-    group: "الأرشيف الذكي",
+    group: "الأرشيف والهوية",
     items: [
       { key: "archive", title: "الأرشيف الذكي", href: "/dashboard/archive" },
+      { key: "brand", title: "الهوية", href: "/dashboard/brand" },
     ],
   },
   {
-    group: "المستخدمون والرسائل",
+    group: "الإدارة",
     items: [
-      { key: "donors", title: "متبرعين", href: "/dashboard/users/donors" },
-      { key: "team", title: "فريق العمل", href: "/dashboard/users/team" },
-      { key: "badges", title: "الشارات", href: "/dashboard/badges" },
-      { key: "messages", title: "الرسائل (قديم)", href: "/dashboard/messages" },
-      { key: "templates", title: "القوالب (قديم)", href: "/dashboard/templates" },
-    ],
-  },
-  {
-    group: "الهوية",
-    items: [
-      { key: "brand", title: "مركز الهوية", href: "/dashboard/brand" },
-      { key: "slides", title: "شرائح الهيرو", href: "/dashboard/slides" },
-      { key: "ticker", title: "إعدادات التيكر", href: "/dashboard/ticker" },
-    ],
-  },
-  {
-    group: "الإعدادات",
-    items: [
-      { key: "generalSettings", title: "بوابات الدفع", href: "/dashboard/general/payment-gateways" },
-      { key: "campaigns", title: "افتراضي دعم الفريق", href: "/dashboard/campaigns/team-support-defaults" },
+      { key: "donors", title: "المتبرعون", href: "/dashboard/users/donors" },
+      { key: "team", title: "الفريق", href: "/dashboard/users/team" },
+      { key: "monthly", title: "التبرعات الشهرية", href: "/dashboard/monthly" },
+      { key: "bankTransfers", title: "التحويلات البنكية", href: "/dashboard/bank-transfers" },
+      { key: "generalSettings", title: "الإعدادات", href: "/dashboard/general/payment-gateways" },
+      { key: "logs", title: "السجلات المتقدمة", href: "/dashboard/logs" },
     ],
   },
 ];

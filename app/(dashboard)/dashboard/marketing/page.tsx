@@ -1,144 +1,152 @@
+"use client";
+
+import * as React from "react";
 import Link from "next/link";
-import { BarChart3, Bot, CheckCircle2, Database, Link2, PlugZap, ShieldCheck, Sparkles } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MARKETING_OPERATING_FLOW, MARKETING_TRUTH_SOURCES } from "@/lib/marketing/operating-flow";
-import { MarketingHealthSummary } from "./_components/MarketingHealthSummary";
-import { MarketingPageHeader } from "./_components/MarketingPageHeader";
-import { MarketingQuickNav } from "./_components/MarketingQuickNav";
+import { TrendingUp, Wallet, Gauge, AlertTriangle, Megaphone, Radar, Loader2, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
-const toolIcons = [PlugZap, Link2, ShieldCheck, BarChart3, Sparkles] as const;
+type CampaignRow = { platform: string; campaignId: string | null; campaignName: string | null; spend: number; clicks: number; conversions: number; revenue: number; currency: string | null };
+type Overview = {
+  ok: boolean;
+  summary: { spend: number; siteRevenue: number; platformRevenue: number; siteRoas: number; platformRoas: number; siteDonations: number; activeConnections: number; totalConnections: number; failedSyncs: number };
+  campaigns: CampaignRow[];
+};
 
-const secondaryTools = [
-  {
-    title: "AI Assistant API",
-    href: "/dashboard/marketing/ai-assistant",
-    icon: Bot,
-    description: "إضافة مفاتيح الذكاء الاصطناعي وتجهيز تحليل الحملات والتوصيات.",
-    action: "فتح إعداد AI",
-  },
-  {
-    title: "سحب البيانات",
-    href: "/dashboard/marketing/data-sync",
-    icon: Database,
-    description: "تشغيل مزامنة Meta وGoogle وGA4 وTikTok وWhatsApp بفترات واضحة.",
-    action: "فتح Data Sync",
-  },
-  {
-    title: "Google Ads Deep Data",
-    href: "/dashboard/marketing/google-ads",
-    icon: BarChart3,
-    description: "الكلمات، عبارات البحث، العناوين، الأصول، وروابط الهبوط.",
-    action: "فتح Google Deep Data",
-  },
-];
-
-const nextActions = [
-  ["راجع الجاهزية", "ابدأ من الربط والتتبع إذا كانت المنصات أو البكسلات ناقصة."],
-  ["أنشئ رابط حملة", "استخدم Link Generator كـ Campaign Builder الرسمي ولا تنشئ روابط عشوائية."],
-  ["افحص التحويلات", "افتح Quality قبل قرارات الميزانية إذا ظهرت أخطاء أو تحويلات ناقصة."],
-  ["حلل الأداء", "استخدم Insights لمعرفة الصرف، التبرعات، ROAS، وأهم توصية اليوم."],
-] as const;
-
-const marketingBoundaries = [
-  ["يبقى داخل Marketing", "الربط، التتبع، الروابط، سحب البيانات، جودة التحويلات، الأداء والتوصيات الأولية."],
-  ["ينتقل لاحقًا إلى Operations", "خطة المحتوى، مهام الفريق، التقويم، النشر، الرسائل، وربط المحتوى بالأداء."],
-  ["ينتقل لاحقًا إلى Archive", "Google Drive، تحليل الصور والفيديو، مراجعة الأصول، واختيار مواد تصلح للتسويق."],
-] as const;
+function money(v: number | undefined, currency = "USD") {
+  return typeof v === "number" && Number.isFinite(v) ? `${currency} ${Math.round(v).toLocaleString()}` : "—";
+}
+function roas(v: number | undefined, spend: number | undefined) {
+  return typeof spend === "number" && spend > 0 && typeof v === "number" ? `${v.toFixed(2)}x` : "غير متاح";
+}
 
 export default function MarketingHomePage() {
-  return <div className="space-y-5 p-4 sm:p-6" dir="rtl">
-    <MarketingPageHeader
-      title="مركز التسويق والنمو"
-      description="رحلة واحدة لإدارة الربط، الروابط، التحويلات، الأداء، والتوصيات. الهدف هنا ترتيب الأدوات الحالية حتى يعرف الفريق من أين يبدأ وماذا يفعل بعد ذلك."
-    />
+  const [data, setData] = React.useState<Overview | null>(null);
+  const [loading, setLoading] = React.useState(true);
 
-    <MarketingQuickNav />
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/marketing-intelligence/overview?days=30", { cache: "no-store" });
+        const json = (await res.json().catch(() => null)) as Overview | null;
+        setData(json?.ok ? json : null);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
-    <MarketingHealthSummary />
+  const s = data?.summary;
+  const hasSpend = (s?.spend ?? 0) > 0;
+  const campaigns = [...(data?.campaigns ?? [])];
+  const best = [...campaigns].sort((a, b) => b.revenue - a.revenue).slice(0, 4);
+  const worst = [...campaigns].filter((c) => c.spend > 0).sort((a, b) => a.revenue / (a.spend || 1) - b.revenue / (b.spend || 1)).slice(0, 4);
 
-    <Card>
-      <CardHeader>
-        <CardTitle>رحلة التشغيل الرسمية</CardTitle>
-        <CardDescription>اتبع هذا الترتيب عند تشغيل أو مراجعة أي حملة. كل مرحلة تستخدم أدوات موجودة بالفعل.</CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-4 xl:grid-cols-5">
-        {MARKETING_OPERATING_FLOW.map((tool, index) => {
-          const Icon = toolIcons[index] ?? PlugZap;
-          return <Link key={tool.step} href={tool.href} className="block">
-            <Card className="h-full transition hover:border-blue-200 hover:shadow-sm">
-              <CardHeader>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{tool.step}</span>
-                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-[#025EB8]"><Icon className="h-5 w-5" /></span>
-                </div>
-                <CardTitle className="text-base">{tool.subtitle}</CardTitle>
-                <CardDescription className="leading-6">{tool.description}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">المصدر: {tool.source}</div>
-                <span className="inline-flex rounded-md bg-[#025EB8] px-3 py-2 text-sm font-semibold text-white">{tool.action}</span>
-              </CardContent>
-            </Card>
-          </Link>;
-        })}
-      </CardContent>
-    </Card>
+  const issues: { tone: string; text: string; href: string; cta: string }[] = [];
+  if ((s?.failedSyncs ?? 0) > 0) issues.push({ tone: "bad", text: "يوجد فشل في سحب البيانات — أصلح التتبع قبل قرارات الميزانية.", href: "/dashboard/conversion-events", cta: "فتح التتبع" });
+  if ((s?.totalConnections ?? 0) === 0) issues.push({ tone: "warn", text: "لا توجد منصات مربوطة — اربط الحسابات لبدء قياس الأداء.", href: "/dashboard/marketing/connections", cta: "ربط المنصات" });
+  if (hasSpend && (s?.siteRoas ?? 0) > 0 && (s?.siteRoas ?? 0) < 1) issues.push({ tone: "bad", text: "العائد الحقيقي أقل من الإنفاق — راجع الحملات الأعلى صرفًا.", href: "/dashboard/marketing/insights", cta: "مراجعة الأداء" });
 
-    <div className="grid gap-4 lg:grid-cols-2">
-      <Card>
-        <CardHeader>
-          <CardTitle>ماذا أفعل الآن؟</CardTitle>
-          <CardDescription>خطوات تشغيل مختصرة تمنع الانتقال بين الصفحات بشكل عشوائي.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {nextActions.map(([title, body]) => <div key={title} className="rounded-xl border bg-slate-50 p-4">
-            <div className="flex items-center gap-2 font-bold text-slate-900"><CheckCircle2 className="h-4 w-4 text-[#025EB8]" />{title}</div>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
-          </div>)}
-        </CardContent>
-      </Card>
+  const cards = [
+    { label: "الدخل الحقيقي", value: money(s?.siteRevenue), icon: TrendingUp, tone: "text-emerald-600" },
+    { label: "الإنفاق", value: money(s?.spend), icon: Wallet, tone: "text-slate-600" },
+    { label: "ROAS الحقيقي", value: roas(s?.siteRoas, s?.spend), icon: Gauge, tone: "text-[#025EB8]" },
+    { label: "مشاكل التتبع", value: String(s?.failedSyncs ?? 0), icon: AlertTriangle, tone: (s?.failedSyncs ?? 0) > 0 ? "text-rose-600" : "text-slate-400" },
+  ];
 
-      <Card>
-        <CardHeader>
-          <CardTitle>حدود نظام التسويق</CardTitle>
-          <CardDescription>هذه الحدود تمنع تضخم Marketing عند بناء Operations وArchive لاحقًا.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {marketingBoundaries.map(([title, body]) => <div key={title} className="rounded-xl border bg-slate-50 p-4">
-            <p className="text-sm font-bold text-slate-900">{title}</p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
-          </div>)}
-        </CardContent>
-      </Card>
-    </div>
+  return (
+    <main className="mx-auto max-w-6xl space-y-6 p-6" dir="rtl">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs text-slate-400">النمو / التسويق</p>
+          <h1 className="mt-1 text-2xl font-black text-slate-900">مركز التسويق والنمو</h1>
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500">راقب أداء الحملات، التتبع، والنتائج الحقيقية من مكان واحد.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button asChild className="gap-2"><Link href="/dashboard/link-generator"><Megaphone className="h-4 w-4" /> فتح الحملات</Link></Button>
+          <Button asChild variant="outline" className="gap-2"><Link href="/dashboard/conversion-events"><Radar className="h-4 w-4" /> فحص التتبع</Link></Button>
+        </div>
+      </div>
 
-    <div className="grid gap-4 lg:grid-cols-3">
-      {secondaryTools.map((tool) => {
-        const Icon = tool.icon;
-        return <Link key={tool.href} href={tool.href} className="block">
-          <Card className="h-full transition hover:border-blue-200 hover:shadow-sm">
-            <CardHeader>
-              <span className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-[#025EB8]"><Icon className="h-5 w-5" /></span>
-              <CardTitle>{tool.title}</CardTitle>
-              <CardDescription className="leading-6">{tool.description}</CardDescription>
-            </CardHeader>
-            <CardContent><span className="inline-flex rounded-md border px-3 py-2 text-sm hover:bg-slate-50">{tool.action}</span></CardContent>
-          </Card>
-        </Link>;
-      })}
-    </div>
+      {loading ? (
+        <div className="flex min-h-[12rem] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#025EB8]" /></div>
+      ) : (
+        <>
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {cards.map((c) => {
+              const Icon = c.icon;
+              return (
+                <Card key={c.label} className="border-slate-200"><CardContent className="p-5">
+                  <div className="flex items-center justify-between"><Icon className={`h-5 w-5 ${c.tone}`} /></div>
+                  <div className="mt-2 text-2xl font-black text-slate-900">{c.value}</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-500">{c.label}</div>
+                </CardContent></Card>
+              );
+            })}
+          </section>
 
-    <Card>
-      <CardHeader>
-        <CardTitle>مصادر الحقيقة داخل نظام التسويق</CardTitle>
-        <CardDescription>هذه القاعدة تمنع تكرار الجداول والداشبوردات عند ربط Operations وArchive لاحقًا.</CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-3 lg:grid-cols-5">
-        {MARKETING_TRUTH_SOURCES.map(([label, source]) => <div key={label} className="rounded-xl border bg-slate-50 p-4">
-          <p className="text-xs font-semibold text-slate-500">{label}</p>
-          <p className="mt-2 text-sm font-bold leading-6 text-slate-900">{source}</p>
-        </div>)}
-      </CardContent>
-    </Card>
-  </div>;
+          {!hasSpend ? (
+            <Card className="border-amber-200 bg-amber-50"><CardContent className="p-4 text-sm leading-6 text-amber-900">توجد تبرعات لكن لا توجد بيانات إنفاق مسحوبة لهذه الفترة، لذلك ROAS غير محسوب الآن. اربط المنصات أو شغّل سحب البيانات.</CardContent></Card>
+          ) : null}
+
+          {issues.length > 0 ? (
+            <section>
+              <h2 className="mb-3 text-sm font-bold text-slate-500">ما يحتاج تدخل الآن</h2>
+              <div className="space-y-2">
+                {issues.map((i, idx) => (
+                  <div key={idx} className={`flex items-center justify-between gap-3 rounded-xl border p-3 text-sm ${i.tone === "bad" ? "border-rose-200 bg-rose-50 text-rose-800" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+                    <span>{i.text}</span>
+                    <Link href={i.href} className="shrink-0 text-xs font-bold underline">{i.cta}</Link>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <CampaignList title="أفضل الحملات" rows={best} empty="لا توجد حملات مسحوبة بعد." />
+            <CampaignList title="أسوأ الحملات" rows={worst} empty="لا توجد بيانات كافية." />
+          </div>
+
+          <section>
+            <h2 className="mb-3 text-sm font-bold text-slate-500">أدوات</h2>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                { label: "الأداء والتوصيات", href: "/dashboard/marketing/insights" },
+                { label: "ربط المنصات", href: "/dashboard/marketing/connections" },
+                { label: "أحداث التحويل", href: "/dashboard/conversion-events" },
+                { label: "منشئ الحملات والروابط", href: "/dashboard/link-generator" },
+              ].map((t) => (
+                <Link key={t.href} href={t.href} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-700 transition hover:border-[#025EB8]/40 hover:shadow-sm">
+                  {t.label} <ArrowLeft className="h-4 w-4 text-slate-400" />
+                </Link>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
+    </main>
+  );
+}
+
+function CampaignList({ title, rows, empty }: { title: string; rows: CampaignRow[]; empty: string }) {
+  return (
+    <section>
+      <h2 className="mb-3 text-sm font-bold text-slate-500">{title}</h2>
+      <Card className="border-slate-200"><CardContent className="p-0">
+        {rows.length === 0 ? (
+          <div className="p-6 text-center text-sm text-slate-500">{empty}</div>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {rows.map((c, i) => (
+              <li key={`${c.platform}-${c.campaignId || c.campaignName || i}`} className="flex items-center justify-between gap-2 p-3 text-sm">
+                <span className="min-w-0 truncate font-semibold text-slate-800">{c.campaignName || c.campaignId || "حملة"}</span>
+                <span className="shrink-0 text-xs text-slate-400">{c.platform} · {money(c.revenue, c.currency || "USD")}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent></Card>
+    </section>
+  );
 }

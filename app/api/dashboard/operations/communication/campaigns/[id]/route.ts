@@ -8,11 +8,10 @@ import { computeLanguageCoverage } from "@/lib/communication/language-coverage";
 import { listSenders } from "@/lib/communication/sender-service";
 import { evaluateCoverageGate, submitForReview, approveCampaign, transitionCampaignSafe } from "@/lib/communication/campaign-approval-service";
 import { isCommunicationChannel } from "@/lib/communication/communication-runtime-types";
+import { isSendEnabled } from "@/lib/communication/provider-router";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const safety = { externalSideEffects: false, autoSend: false, secretsExposed: false, sendEnabled: false } as const;
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { denied } = await requireOperationsApiSession();
@@ -37,7 +36,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   return NextResponse.json(
-    { campaign, breakdown, templates, senders, coverage, coverageGate, safety },
+    { campaign, breakdown, templates, senders, coverage, coverageGate, sendEnabled: channel ? isSendEnabled(channel) : false },
     { headers: operationsNoStoreHeaders }
   );
 }

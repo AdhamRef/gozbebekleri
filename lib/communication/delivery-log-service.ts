@@ -127,12 +127,18 @@ export type DeliveryStatusPatch = {
   providerMessageId?: string | null;
   providerConversationId?: string | null;
   errorMessage?: string | null;
+  /**
+   * Set true only when the provider accepted the send but returns no external message id
+   * (e.g. SendGrid). The delivery may then advance to SENT with a null providerMessageId — this
+   * still reflects a real acceptance, never a fake success.
+   */
+  internalAccepted?: boolean;
 };
 
 /**
- * Advance a delivery's status after a provider response. Provider-success statuses require a
- * real `providerMessageId` — otherwise the update is rejected (never fake SENT). Timestamps
- * are set from the status.
+ * Advance a delivery's status after a provider response. Provider-success statuses require either a
+ * real `providerMessageId` or an explicit `internalAccepted` flag — otherwise the update is rejected
+ * (never fake SENT). Timestamps are set from the status.
  */
 export async function markDeliveryStatus(
   id: string,
@@ -140,8 +146,8 @@ export async function markDeliveryStatus(
   patch: DeliveryStatusPatch = {}
 ): Promise<ServiceResult> {
   if (!process.env.DATABASE_URL) return dbUnavailable();
-  if (isProviderSuccessStatus(status) && !patch.providerMessageId) {
-    return { ok: false, status: 400, error: `Cannot mark ${status} without a providerMessageId.` };
+  if (isProviderSuccessStatus(status) && !patch.providerMessageId && !patch.internalAccepted) {
+    return { ok: false, status: 400, error: `Cannot mark ${status} without provider acceptance.` };
   }
   const now = new Date();
   const timestamps: Record<string, Date> = {};

@@ -78,6 +78,7 @@ export default async function CommunicationAudiencesPage() {
                       <th className="p-3 text-center font-semibold">رسائل مؤهّلة</th>
                       <th className="p-3 text-center font-semibold">واتساب مؤهّل</th>
                       <th className="p-3 text-center font-semibold">واتساب (مراجعة)</th>
+                      <th className="p-3 text-center font-semibold"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -94,6 +95,7 @@ export default async function CommunicationAudiencesPage() {
                         <td className="p-3 text-center"><Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">{num(lang.smsEligible)}</Badge></td>
                         <td className="p-3 text-center"><Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">{num(lang.whatsappEligible)}</Badge></td>
                         <td className="p-3 text-center"><Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">{num(lang.whatsappNeedsReview)}</Badge></td>
+                        <td className="p-3 text-center"><Link href={`/dashboard/operations/communication/campaigns?locale=${lang.locale}`} className="text-xs font-bold text-[#025EB8]">إنشاء حملة ←</Link></td>
                       </tr>
                     ))}
                   </tbody>

@@ -333,3 +333,23 @@
   Previews + sendVerificationEmail untouched.
 - Build green (next build exit 0), locale audit passes, 0 new type errors. Legacy Twilio/SendGrid preserved.
   Real sending remains config-gated (not production-ready without provider creds + live webhook testing).
+
+---
+
+## 2026-07-06 — Send execution + dashboard UX finalization
+
+- Real campaign send: `lib/communication/campaign-send-executor.ts` (executeCampaignSend + runDueCampaigns)
+  with status/coverage/eligibility gates, idempotency per campaign+recipient+template, batching, counters,
+  audit. `provider-router.sendPreparedDelivery` (WhatsApp template / SendGrid email / SMS not-implemented);
+  email uses `internalAccepted` (SENT with null external id, documented — no fake id). APIs:
+  campaigns/[id]/send ({confirm:true}, APPROVED-only), [id]/schedule, campaigns/run-due (admin/manual).
+  Builder wires Send Now + Schedule gated on `sendEnabled`.
+- Webhook prod hardening: POST rejects unverifiable (missing app secret) with 401 in production; dev warns.
+- UX: sidebar simplified to 7 concise groups (Communication first-class; legacy messages/templates + low-value
+  pages dropped from nav, routes preserved). Communication overview rebuilt as a command center (4 action
+  cards + quick start + compact sending status + recent campaigns). Advanced pages (senders/routing/
+  delivery-logs/provider-events) moved under new `/communication/settings` hub + WhatsApp readiness checklist.
+- Safety: no payment/tracking changes; Twilio/SendGrid preserved; no fake SENT; no secrets in UI. Fixed the
+  legacy dev fake-"sent" (email.ts/whatsapp.ts now record *_NOT_CONFIGURED, not sent = recipients.length).
+- Pending: full campaign wizard, Inbox CRM redesign, Marketing/Operations home redesigns; live provider QA
+  (no real Meta credentials). Doc: docs/implementation-packages/ux-send-execution-finalization.md.

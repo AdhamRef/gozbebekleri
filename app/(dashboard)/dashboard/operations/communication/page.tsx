@@ -1,69 +1,127 @@
 import Link from "next/link";
-import { Activity, ArrowLeft, BarChart3, FileText, GitBranch, Inbox, Languages, Megaphone, PlugZap, Radio, Route, ScrollText, ShieldCheck, UsersRound } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ClipboardCheck, MessageSquareWarning, AlertOctagon, FileWarning, Megaphone, Inbox, Users, Settings2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCommunicationCenterOverview } from "@/lib/communication/communication-service";
-import { getProviderConnectionsReadiness } from "@/lib/communication/provider-connections";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { getCommunicationHome } from "@/lib/communication/home-service";
 
-function statusLabel(status: string) {
-  const labels: Record<string, string> = { CONFIGURED: "مكتمل", NEEDS_ATTENTION: "يحتاج استكمال", NOT_CONFIGURED: "غير مربوط", DISABLED: "مؤجل" };
-  return labels[status] ?? status;
+export const dynamic = "force-dynamic";
+
+const channelLabel: Record<string, string> = { WHATSAPP: "واتساب", EMAIL: "إيميل", SMS: "رسائل" };
+const statusLabel: Record<string, string> = { DRAFT: "مسودة", REVIEW: "بانتظار المراجعة", APPROVED: "معتمدة", SCHEDULED: "مجدولة", SENDING: "جارٍ الإرسال", SENT: "أُرسلت", CANCELLED: "ملغاة", FAILED: "فشلت" };
+
+function readiness(ok: boolean, sms = false) {
+  if (sms) return { text: "غير مفعّل", cls: "text-slate-400" };
+  return ok ? { text: "جاهز", cls: "text-emerald-600" } : { text: "يحتاج إعداد", cls: "text-amber-600" };
 }
 
-function statusClass(status: string) {
-  if (status === "CONFIGURED") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (status === "NEEDS_ATTENTION") return "border-amber-200 bg-amber-50 text-amber-700";
-  return "border-slate-200 bg-slate-50 text-slate-600";
-}
+export default async function CommunicationHomePage() {
+  const home = await getCommunicationHome();
 
-export default async function CommunicationCenterPage() {
-  const [overview, providers] = await Promise.all([getCommunicationCenterOverview(), Promise.resolve(getProviderConnectionsReadiness())]);
-  return <main className="space-y-5 p-4 sm:p-6" dir="rtl">
-    <section className="rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+  const actions = [
+    { n: home.campaignsInReview, label: "حملات بانتظار المراجعة", href: "/dashboard/operations/communication/campaigns", cta: "مراجعة", icon: ClipboardCheck, tone: "text-blue-600" },
+    { n: home.repliesNeedingAction, label: "محادثات تحتاج رد", href: "/dashboard/operations/communication/inbox", cta: "فتح المحادثات", icon: MessageSquareWarning, tone: "text-amber-600" },
+    { n: home.failedDeliveries, label: "رسائل فشلت وتحتاج متابعة", href: "/dashboard/operations/communication/reports", cta: "عرض التقارير", icon: AlertOctagon, tone: "text-rose-600" },
+    { n: home.incompleteTemplates, label: "قوالب ناقصة أو غير جاهزة", href: "/dashboard/operations/communication/templates", cta: "إكمال القوالب", icon: FileWarning, tone: "text-violet-600" },
+  ];
+
+  const quick = [
+    { label: "إنشاء حملة جديدة", href: "/dashboard/operations/communication/campaigns", icon: Megaphone },
+    { label: "مراجعة المحادثات", href: "/dashboard/operations/communication/inbox", icon: Inbox },
+    { label: "إدارة الجمهور", href: "/dashboard/operations/communication/audiences", icon: Users },
+    { label: "فحص إعدادات الإرسال", href: "/dashboard/operations/communication/settings", icon: Settings2 },
+  ];
+
+  return (
+    <main className="mx-auto max-w-6xl space-y-6 p-6" dir="rtl">
+      {/* Header */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs text-white/70">Communication Center</p>
-          <h1 className="mt-1.5 text-2xl font-black">مركز التواصل</h1>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">مركز موحد لقنوات واتساب، الإيميل، و SMS. المزودين في الخلف، والواجهة واحدة للفريق.</p>
+          <p className="text-xs text-slate-400">التشغيل / التواصل</p>
+          <h1 className="mt-1 text-2xl font-black text-slate-900">مركز التواصل</h1>
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500">أرسل حملات واتساب وإيميل ورسائل حسب اللغة، وتابع المحادثات والنتائج من مكان واحد.</p>
         </div>
-        <Button asChild variant="secondary" className="gap-2 font-bold"><Link href="/dashboard/operations">العودة لمركز العمليات <ArrowLeft className="h-4 w-4" /></Link></Button>
+        <div className="flex gap-2">
+          <Button asChild className="gap-2"><Link href="/dashboard/operations/communication/campaigns"><Megaphone className="h-4 w-4" /> إنشاء حملة</Link></Button>
+          <Button asChild variant="outline" className="gap-2"><Link href="/dashboard/operations/communication/inbox"><Inbox className="h-4 w-4" /> فتح المحادثات</Link></Button>
+        </div>
       </div>
-    </section>
 
-    <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-      <Metric title="المزودون" value={overview.summary.providers} />
-      <Metric title="القوالب" value={overview.summary.templates} />
-      <Metric title="الحملات" value={overview.summary.campaigns} />
-      <Metric title="تحتاج مراجعة" value={overview.summary.needsReview} />
-      <Metric title="معتمد" value={overview.summary.approved} />
-      <Metric title="مجدول" value={overview.summary.scheduled} />
-    </section>
+      {/* Four action cards */}
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {actions.map((a) => {
+          const Icon = a.icon;
+          return (
+            <Card key={a.label} className="border-slate-200">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between">
+                  <span className={`text-3xl font-black text-slate-900`}>{a.n}</span>
+                  <Icon className={`h-5 w-5 ${a.tone}`} />
+                </div>
+                <p className="mt-2 text-sm font-semibold text-slate-700">{a.label}</p>
+                <Link href={a.href} className="mt-2 inline-block text-xs font-bold text-[#025EB8]">{a.cta} ←</Link>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </section>
 
-    <Card className="border-amber-200 bg-amber-50"><CardContent className="p-4 text-sm font-semibold leading-6 text-amber-800">{overview.safety.note}</CardContent></Card>
+      {/* Quick start */}
+      <section>
+        <h2 className="mb-3 text-sm font-bold text-slate-500">ابدأ بسرعة</h2>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {quick.map((q) => {
+            const Icon = q.icon;
+            return (
+              <Link key={q.label} href={q.href} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-[#025EB8]/40 hover:shadow-sm">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-[#025EB8]"><Icon className="h-4 w-4" /></span>
+                <span className="text-sm font-semibold text-slate-700">{q.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
 
-    <section className="grid gap-4 lg:grid-cols-3">
-      <Link href="/dashboard/operations/communication/inbox" className="block h-full"><Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm"><CardHeader><Inbox className="mb-2 h-6 w-6 text-[#025EB8]" /><CardTitle>صندوق واتساب</CardTitle><CardDescription className="leading-6">محادثات واتساب الواردة والصادرة مربوطة بالمتبرع عند التطابق.</CardDescription></CardHeader></Card></Link>
-      <Link href="/dashboard/operations/communication/audiences" className="block h-full"><Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm"><CardHeader><Languages className="mb-2 h-6 w-6 text-[#025EB8]" /><CardTitle>الجماهير حسب اللغة</CardTitle><CardDescription className="leading-6">شرائح المتبرعين حسب اللغة وأهلية كل قناة، محسوبة مباشرة من البيانات.</CardDescription></CardHeader></Card></Link>
-      <Link href="/dashboard/operations/communication/senders" className="block h-full"><Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm"><CardHeader><Radio className="mb-2 h-6 w-6 text-[#025EB8]" /><CardTitle>المُرسِلون</CardTitle><CardDescription className="leading-6">أرقام واتساب ومُرسِلو الإيميل والرسائل، دون أي مفاتيح أو أسرار.</CardDescription></CardHeader></Card></Link>
-      <Link href="/dashboard/operations/communication/routing" className="block h-full"><Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm"><CardHeader><Route className="mb-2 h-6 w-6 text-[#025EB8]" /><CardTitle>قواعد التوجيه</CardTitle><CardDescription className="leading-6">اختيار المُرسِل حسب اللغة والدولة والغرض مع معاينة النتيجة.</CardDescription></CardHeader></Card></Link>
-      <Link href="/dashboard/operations/communication/campaigns" className="block h-full"><Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm"><CardHeader><Megaphone className="mb-2 h-6 w-6 text-[#025EB8]" /><CardTitle>الحملات</CardTitle><CardDescription className="leading-6">تجهيز حملات واتساب/إيميل/رسائل خطوة بخطوة مع تغطية اللغات والاعتماد.</CardDescription></CardHeader></Card></Link>
-      <Link href="/dashboard/operations/communication/delivery-logs" className="block h-full"><Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm"><CardHeader><ScrollText className="mb-2 h-6 w-6 text-[#025EB8]" /><CardTitle>سجل الإرسال</CardTitle><CardDescription className="leading-6">أرشيف كل رسالة مُجهّزة أو متخطّاة مع الحالة والسبب.</CardDescription></CardHeader></Card></Link>
-      <Link href="/dashboard/operations/communication/provider-events" className="block h-full"><Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm"><CardHeader><Activity className="mb-2 h-6 w-6 text-[#025EB8]" /><CardTitle>أحداث المزودين</CardTitle><CardDescription className="leading-6">أحداث التسليم والقراءة والفشل بنسختها الآمنة فقط.</CardDescription></CardHeader></Card></Link>
-      <Link href="/dashboard/operations/communication/reports" className="block h-full"><Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm"><CardHeader><BarChart3 className="mb-2 h-6 w-6 text-[#025EB8]" /><CardTitle>التقارير</CardTitle><CardDescription className="leading-6">أداء الإرسال حسب القناة واللغة والمُرسِل، والإخفاقات، والردود بحاجة إجراء.</CardDescription></CardHeader></Card></Link>
-      <Link href="/dashboard/operations/communication/providers" className="block h-full"><Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm"><CardHeader><PlugZap className="mb-2 h-6 w-6 text-[#025EB8]" /><CardTitle>ربط المزودين</CardTitle><CardDescription className="leading-6">حالة Meta WhatsApp و Brevo Email و Brevo SMS بدون عرض أسرار.</CardDescription></CardHeader></Card></Link>
-      <Link href="/dashboard/operations/communication/templates" className="block h-full"><Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm"><CardHeader><FileText className="mb-2 h-6 w-6 text-[#025EB8]" /><CardTitle>القوالب والمتغيرات</CardTitle><CardDescription className="leading-6">قوالب موحدة، متغيرات، ومعاينة آمنة قبل أي إرسال.</CardDescription></CardHeader></Card></Link>
-      <Link href="/dashboard/operations/communication/preferences" className="block h-full"><Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm"><CardHeader><UsersRound className="mb-2 h-6 w-6 text-[#025EB8]" /><CardTitle>الموافقات والتفضيلات</CardTitle><CardDescription className="leading-6">موافقات القنوات، اللغة، الدولة، وحالة عدم التواصل.</CardDescription></CardHeader></Card></Link>
-      <Link href="/dashboard/operations/communication/flows" className="block h-full"><Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm"><CardHeader><GitBranch className="mb-2 h-6 w-6 text-[#025EB8]" /><CardTitle>التدفقات التشغيلية</CardTitle><CardDescription className="leading-6">محاكاة داخلية لأحداث التبرع والدفع والإيصالات.</CardDescription></CardHeader></Card></Link>
-      <Card className="h-full"><CardHeader><ShieldCheck className="mb-2 h-6 w-6 text-[#025EB8]" /><CardTitle>الأمان أولًا</CardTitle><CardDescription className="leading-6">لا إرسال حقيقي، لا مفاتيح في الواجهة، ولا حملات بدون موافقات.</CardDescription></CardHeader></Card>
-    </section>
+      <div className="grid gap-6 lg:grid-cols-[1fr_18rem]">
+        {/* Recent activity */}
+        <section>
+          <h2 className="mb-3 text-sm font-bold text-slate-500">آخر الحملات</h2>
+          <Card className="border-slate-200">
+            <CardContent className="p-0">
+              {home.recentCampaigns.length === 0 ? (
+                <div className="p-8 text-center text-sm text-slate-500">لا توجد حملات بعد. ابدأ بإنشاء حملة واتساب أو إيميل حسب لغة المتبرعين.</div>
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {home.recentCampaigns.map((c) => (
+                    <li key={c.id}>
+                      <Link href={`/dashboard/operations/communication/campaigns/${c.id}`} className="flex items-center justify-between gap-2 p-4 hover:bg-slate-50">
+                        <span className="font-semibold text-slate-800">{c.name}</span>
+                        <span className="flex items-center gap-2 text-xs text-slate-400">{channelLabel[c.channel] ?? c.channel}<Badge variant="outline" className="text-xs">{statusLabel[c.status] ?? c.status}</Badge></span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </section>
 
-    <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-      {providers.map((provider) => <Card key={provider.key}><CardHeader><CardDescription>{provider.channel}</CardDescription><CardTitle className="text-base">{provider.name}</CardTitle></CardHeader><CardContent className="space-y-3"><Badge variant="outline" className={statusClass(provider.status)}>{statusLabel(provider.status)}</Badge><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#025EB8]" style={{ width: `${provider.readinessPercent}%` }} /></div><p className="text-xs leading-5 text-slate-500">{provider.actionLabel}</p></CardContent></Card>)}
-    </section>
-  </main>;
-}
-
-function Metric({ title, value }: { title: string; value: number }) {
-  return <Card><CardHeader><CardDescription>{title}</CardDescription><CardTitle className="text-3xl">{value}</CardTitle></CardHeader></Card>;
+        {/* Sending status (compact) */}
+        <section>
+          <h2 className="mb-3 text-sm font-bold text-slate-500">حالة الإرسال</h2>
+          <Card className="border-slate-200">
+            <CardContent className="space-y-2 p-4 text-sm">
+              {([["واتساب", readiness(home.providers.whatsapp)], ["الإيميل", readiness(home.providers.email)], ["الرسائل القصيرة", readiness(false, true)]] as const).map(([label, r]) => (
+                <div key={label} className="flex items-center justify-between">
+                  <span className="text-slate-600">{label}</span>
+                  <span className={`font-bold ${r.cls}`}>{r.text}</span>
+                </div>
+              ))}
+              <Link href="/dashboard/operations/communication/settings" className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-[#025EB8]">الإعدادات المتقدمة <ArrowLeft className="h-3 w-3" /></Link>
+            </CardContent>
+          </Card>
+        </section>
+      </div>
+    </main>
+  );
 }

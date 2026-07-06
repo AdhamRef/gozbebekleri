@@ -25,7 +25,14 @@ export async function POST(req: NextRequest) {
   if (verdict === "invalid") {
     return NextResponse.json({ ok: false, error: "invalid signature" }, { status: 401 });
   }
-  // verdict === "unconfigured" → no app secret set; accept (dev) but note we could not verify.
+  if (verdict === "unconfigured") {
+    // In production the app secret MUST be set — reject unverifiable payloads. In development we
+    // accept but warn, so the flow can be exercised without a signature.
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json({ ok: false, error: "signature verification not configured" }, { status: 401 });
+    }
+    console.warn("[whatsapp webhook] META_WHATSAPP_APP_SECRET missing — accepting unverified payload (development only)");
+  }
 
   try {
     const payload = JSON.parse(rawBody);
