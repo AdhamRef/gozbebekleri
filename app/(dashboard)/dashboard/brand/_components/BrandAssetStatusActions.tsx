@@ -48,20 +48,20 @@ export function BrandAssetStatusActions({ assetId, status, downloadable, hasFile
     <div className="rounded-md border bg-slate-50 p-3">
       <div className="flex flex-wrap gap-2">
         {status !== "ACTIVE" ? (
-          <Button type="button" size="sm" variant="outline" disabled={busy !== null || !hasFileUrl} onClick={() => updateAsset("activate", { status: "ACTIVE", downloadable, notes: "Human verified Brand Asset. No automatic publish or external call." })} className="gap-2 font-bold">
-            <CheckCircle2 className="h-3.5 w-3.5" /> Activate verified
+          <Button type="button" size="sm" variant="outline" disabled={busy !== null || !hasFileUrl} onClick={() => updateAsset("activate", { status: "ACTIVE", downloadable, notes: "تم اعتماده بعد مراجعة بشرية. بدون نشر تلقائي أو اتصال خارجي." })} className="gap-2 font-bold">
+            <CheckCircle2 className="h-3.5 w-3.5" /> اعتماد بعد المراجعة
           </Button>
         ) : (
-          <Button type="button" size="sm" variant="outline" disabled={busy !== null} onClick={() => updateAsset("verify", { status: "TO_VERIFY", downloadable: false, notes: "Returned to verification. Public/internal use should pause until reviewed." })} className="gap-2 font-bold">
-            <RotateCcw className="h-3.5 w-3.5" /> Back to verify
+          <Button type="button" size="sm" variant="outline" disabled={busy !== null} onClick={() => updateAsset("verify", { status: "TO_VERIFY", downloadable: false, notes: "أُعيد للمراجعة. يُوقف استخدامه حتى تتم مراجعته." })} className="gap-2 font-bold">
+            <RotateCcw className="h-3.5 w-3.5" /> إرجاع للمراجعة
           </Button>
         )}
-        <Button type="button" size="sm" variant="outline" disabled={busy !== null || !hasFileUrl} onClick={() => updateAsset("downloadable", { downloadable: !downloadable, notes: downloadable ? "Download disabled manually." : "Download enabled manually after human review." })} className="gap-2 font-bold">
+        <Button type="button" size="sm" variant="outline" disabled={busy !== null || !hasFileUrl} onClick={() => updateAsset("downloadable", { downloadable: !downloadable, notes: downloadable ? "تم منع التحميل يدويًا." : "تم السماح بالتحميل يدويًا بعد المراجعة." })} className="gap-2 font-bold">
           {downloadable ? <LockKeyhole className="h-3.5 w-3.5" /> : <UnlockKeyhole className="h-3.5 w-3.5" />}
-          {downloadable ? "Lock download" : "Allow download"}
+          {downloadable ? "منع التحميل" : "السماح بالتحميل"}
         </Button>
       </div>
-      {!hasFileUrl ? <p className="mt-2 text-xs font-semibold text-amber-700">لا يمكن الاعتماد أو السماح بالتحميل بدون File URL موثق.</p> : null}
+      {!hasFileUrl ? <p className="mt-2 text-xs font-semibold text-amber-700">لا يمكن الاعتماد أو السماح بالتحميل بدون رابط ملف موثق.</p> : null}
       {busy ? <p className="mt-2 text-xs font-semibold text-slate-500">جاري التحديث...</p> : null}
       {feedback ? <p className={`mt-2 text-xs font-semibold ${feedback.tone === "success" ? "text-emerald-700" : "text-rose-700"}`}>{feedback.message}</p> : null}
     </div>

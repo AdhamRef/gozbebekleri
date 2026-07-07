@@ -10,10 +10,12 @@ import { ArchiveDriveLinkManageActions } from "./ArchiveDriveLinkManageActions";
 import { ArchiveProjectCreatePanel } from "./ArchiveProjectCreatePanel";
 import { ArchiveProjectManageActions } from "./ArchiveProjectManageActions";
 import { ArchiveUploadCard } from "./ArchiveUploadCard";
+import { ArchiveDailyWork, ArchivePrimaryCtas, type ArchiveWorkKey } from "./ArchiveDailyWork";
 
 type Props = {
   activeTab?: ArchiveTabKey;
   snapshot: ArchiveSnapshot;
+  work?: ArchiveWorkKey;
   selection?: {
     collectionId?: string;
     year?: number;
@@ -37,7 +39,7 @@ type CollectionBundle = {
   years: YearBundle[];
 };
 
-export function ArchiveConsole({ snapshot, selection }: Props) {
+export function ArchiveConsole({ snapshot, selection, work = "latest" }: Props) {
   const explorer = buildExplorer(snapshot);
   const activeCollection = explorer.find((item) => item.collection.id === selection?.collectionId);
   const activeProject = selection?.projectId ? findProject(explorer, selection.projectId) : null;
@@ -50,7 +52,7 @@ export function ArchiveConsole({ snapshot, selection }: Props) {
       <Breadcrumb collection={activeCollection?.collection} year={selectedYear} project={activeProject?.bundle.project} />
 
       {!activeCollection ? (
-        <RootExplorer snapshot={snapshot} explorer={explorer} />
+        <RootExplorer snapshot={snapshot} explorer={explorer} work={work} />
       ) : activeProject ? (
         <ProjectDetail bundle={activeProject.bundle} collections={snapshot.collections} projects={snapshot.projects} />
       ) : activeYear ? (
@@ -71,8 +73,9 @@ function Hero({ snapshot, explorer }: { snapshot: ArchiveSnapshot; explorer: Col
           <p className="mt-2 max-w-3xl text-xs leading-6 text-slate-600">
             تصفح المواد خطوة بخطوة: المجموعة، ثم السنة، ثم المشروع، ثم جدول المواد. رابط Google Drive يضاف داخل المشروع فقط.
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Link href="/dashboard/archive/settings" className="inline-flex h-8 items-center gap-2 rounded-md border bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-[#025EB8] hover:text-[#025EB8]">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <ArchivePrimaryCtas />
+            <Link href="/dashboard/archive/settings" className="inline-flex h-9 items-center gap-2 rounded-md border bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-[#025EB8] hover:text-[#025EB8]">
               <Settings2 className="h-3.5 w-3.5" /> إعدادات الأرشيف
             </Link>
           </div>
@@ -88,10 +91,12 @@ function Hero({ snapshot, explorer }: { snapshot: ArchiveSnapshot; explorer: Col
   );
 }
 
-function RootExplorer({ snapshot, explorer }: { snapshot: ArchiveSnapshot; explorer: CollectionBundle[] }) {
+function RootExplorer({ snapshot, explorer, work }: { snapshot: ArchiveSnapshot; explorer: CollectionBundle[]; work: ArchiveWorkKey }) {
   return (
     <div className="mt-4 space-y-4">
-      <section className="grid gap-3 xl:grid-cols-3">
+      {snapshot.assets.length > 0 ? <ArchiveDailyWork snapshot={snapshot} work={work} /> : null}
+
+      <section id="new-collection" className="grid gap-3 xl:grid-cols-3">
         <CompactPanel title="إضافة مجموعة" description="مجموعة رئيسية مثل غزة، القدس أو الوقف.">
           <ArchiveCollectionCreatePanel />
         </CompactPanel>

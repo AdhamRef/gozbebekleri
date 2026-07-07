@@ -34,6 +34,21 @@ const statusClass: Record<string, string> = {
   FAILED: "border-rose-200 bg-rose-50 text-rose-700",
 };
 
+const channelLabel: Record<string, string> = { WHATSAPP: "واتساب", EMAIL: "إيميل", SMS: "رسائل قصيرة" };
+const statusLabel: Record<string, string> = {
+  RENDERED: "تجهيز",
+  SKIPPED: "لم تُرسل",
+  SENT: "أُرسلت",
+  SENT_TO_PROVIDER: "أُرسلت",
+  DELIVERED: "وصلت",
+  READ: "تمت القراءة",
+  OPENED: "فُتحت",
+  CLICKED: "نقر",
+  REPLIED: "رد المتبرع",
+  FAILED: "فشلت",
+  BOUNCED: "مرتدة",
+};
+
 export default function DeliveryLogsPage() {
   const [items, setItems] = React.useState<Delivery[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -75,7 +90,7 @@ export default function DeliveryLogsPage() {
       <Card>
         <CardContent className="flex flex-wrap items-end gap-3 p-4">
           <label className="text-sm"><span className="mb-1 block text-xs font-bold text-slate-500">القناة</span>
-            <select value={channel} onChange={(e) => setChannel(e.target.value)} className="rounded-md border border-slate-200 px-3 py-2 text-sm"><option value="">الكل</option><option value="WHATSAPP">واتساب</option><option value="EMAIL">إيميل</option><option value="SMS">SMS</option></select></label>
+            <select value={channel} onChange={(e) => setChannel(e.target.value)} className="rounded-md border border-slate-200 px-3 py-2 text-sm"><option value="">الكل</option><option value="WHATSAPP">واتساب</option><option value="EMAIL">إيميل</option><option value="SMS">رسائل قصيرة</option></select></label>
           <label className="text-sm"><span className="mb-1 block text-xs font-bold text-slate-500">الحالة</span>
             <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-md border border-slate-200 px-3 py-2 text-sm"><option value="">الكل</option><option value="RENDERED">تجهيز</option><option value="SKIPPED">متخطّى</option><option value="SENT">أُرسل</option><option value="DELIVERED">وصل</option><option value="FAILED">فشل</option></select></label>
           <Button variant="outline" className="gap-2" onClick={() => load()}><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> تحديث</Button>
@@ -92,16 +107,16 @@ export default function DeliveryLogsPage() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[52rem] text-sm">
                 <thead className="border-b bg-slate-50 text-xs text-slate-500"><tr>
-                  <th className="p-3 text-right">القناة</th><th className="p-3 text-right">المستلم</th><th className="p-3 text-right">اللغة</th><th className="p-3 text-center">الحالة</th><th className="p-3 text-right">معرّف المزود</th><th className="p-3 text-right">السبب</th><th className="p-3"></th>
+                  <th className="p-3 text-right">القناة</th><th className="p-3 text-right">المستلم</th><th className="p-3 text-right">اللغة</th><th className="p-3 text-center">الحالة</th><th className="p-3 text-right">رقم تتبع المزود</th><th className="p-3 text-right">السبب</th><th className="p-3"></th>
                 </tr></thead>
                 <tbody>
                   {items.map((d) => (
                     <React.Fragment key={d.id}>
                       <tr className="border-b last:border-0">
-                        <td className="p-3">{d.channel}</td>
+                        <td className="p-3">{channelLabel[d.channel] ?? d.channel}</td>
                         <td className="p-3">{d.recipientEmail || d.recipientPhone || (d.recipientUserId ? "متبرع" : "—")}</td>
                         <td className="p-3">{d.locale ?? "—"}</td>
-                        <td className="p-3 text-center"><Badge variant="outline" className={statusClass[d.status] ?? "border-slate-200 bg-slate-50 text-slate-600"}>{d.status}</Badge></td>
+                        <td className="p-3 text-center"><Badge variant="outline" className={statusClass[d.status] ?? "border-slate-200 bg-slate-50 text-slate-600"}>{statusLabel[d.status] ?? d.status}</Badge></td>
                         <td className="p-3 font-mono text-xs">{d.providerMessageId ?? "—"}</td>
                         <td className="p-3 text-xs text-rose-600">{d.errorMessage ?? "—"}</td>
                         <td className="p-3 text-left"><button className="text-xs text-[#025EB8] underline" onClick={() => setOpen(open === d.id ? null : d.id)}>{open === d.id ? "إخفاء" : "المحتوى"}</button></td>

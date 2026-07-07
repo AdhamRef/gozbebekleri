@@ -8,7 +8,7 @@ import { getCommunicationHome } from "@/lib/communication/home-service";
 export const dynamic = "force-dynamic";
 
 const channelLabel: Record<string, string> = { WHATSAPP: "واتساب", EMAIL: "إيميل", SMS: "رسائل" };
-const statusLabel: Record<string, string> = { DRAFT: "مسودة", REVIEW: "بانتظار المراجعة", APPROVED: "معتمدة", SCHEDULED: "مجدولة", SENDING: "جارٍ الإرسال", SENT: "أُرسلت", CANCELLED: "ملغاة", FAILED: "فشلت" };
+const statusLabel: Record<string, string> = { DRAFT: "مسودة", REVIEW: "بانتظار المراجعة", APPROVED: "معتمدة", SCHEDULED: "مجدولة", SENDING: "جارٍ الإرسال", SENT: "أُرسلت", SENT_WITH_ISSUES: "أُرسلت مع ملاحظات", BLOCKED: "محجوبة", CANCELLED: "ملغاة", FAILED: "فشلت" };
 
 function readiness(ok: boolean, sms = false) {
   if (sms) return { text: "غير مفعّل", cls: "text-slate-400" };
@@ -33,7 +33,7 @@ export default async function CommunicationHomePage() {
   ];
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6 p-6" dir="rtl">
+    <main className="mx-auto max-w-6xl space-y-6" dir="rtl">
       {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>

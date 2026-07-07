@@ -102,30 +102,30 @@ export default function MarketingAiAssistantPage() {
     <div className="rounded-3xl border bg-gradient-to-l from-[#025EB8] to-[#01396f] p-6 text-white shadow-sm">
       <p className="text-sm text-white/75">Marketing Operating System</p>
       <h1 className="mt-2 text-3xl font-black">إعداد AI Assistant</h1>
-      <p className="mt-3 max-w-3xl text-sm leading-7 text-white/85">AI Core واحد لسياق التسويق. يقرأ بيانات الأداء والتتبع فقط، ولا يغير ميزانية أو تتبع أو حملات بدون موافقة بشرية.</p>
+      <p className="mt-3 max-w-3xl text-sm leading-7 text-white/85">مساعد ذكي واحد لسياق التسويق. يقرأ بيانات الأداء والتتبع فقط، ولا يغير ميزانية أو تتبع أو حملات بدون موافقة بشرية.</p>
     </div>
 
     {loading ? <div className="flex min-h-[16rem] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#025EB8]" /></div> : <>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Bot className="h-5 w-5 text-[#025EB8]" />بيانات الاتصال</CardTitle>
-          <CardDescription>إعدادات تعريفية فقط. مفاتيح OpenAI الحقيقية يجب أن تبقى في server env ولا توضع في الواجهة.</CardDescription>
+          <CardDescription>إعدادات تعريفية فقط. تُحفظ المفاتيح الحقيقية في إعدادات السيرفر ولا توضع في الواجهة.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="AI Provider" required><Input value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="OpenAI" /></Field>
-            <Field label="Model" required><Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="gpt-4.1" /></Field>
-            <Field label="OpenAI Key" hint={keyPreview ? `يوجد مفتاح قديم محفوظ كـ ${keyPreview}. AI Core الجديد يعتمد على OPENAI_API_KEY في السيرفر.` : "لا تضع المفتاح هنا. استخدم OPENAI_API_KEY في بيئة السيرفر."}><Input value={core?.provider.mode || "safe-fallback"} readOnly /></Field>
-            <Field label="Base URL" hint="اختياري"><Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" /></Field>
-            <Field label="Assistant ID" hint="اختياري"><Input value={assistantId} onChange={(e) => setAssistantId(e.target.value)} placeholder="asst_..." /></Field>
-            <Field label="Daily Budget Limit" hint="اختياري"><Input value={dailyBudgetLimit} onChange={(e) => setDailyBudgetLimit(e.target.value)} placeholder="10 USD/day" /></Field>
+            <Field label="مزود الخدمة" required><Input value={provider} onChange={(e) => setProvider(e.target.value)} placeholder="OpenAI" /></Field>
+            <Field label="النموذج" required><Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="gpt-4.1" /></Field>
+            <Field label="المفتاح" hint={keyPreview ? `يوجد مفتاح محفوظ سابقًا (${keyPreview}). يُضبط المفتاح في إعدادات السيرفر.` : "لا تضع المفتاح هنا. يُضبط في إعدادات السيرفر."}><Input value={core?.provider.mode || "الوضع الآمن"} readOnly /></Field>
+            <Field label="رابط الخدمة" hint="اختياري"><Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" /></Field>
+            <Field label="معرّف المساعد" hint="اختياري"><Input value={assistantId} onChange={(e) => setAssistantId(e.target.value)} placeholder="asst_..." /></Field>
+            <Field label="حد الميزانية اليومي" hint="اختياري"><Input value={dailyBudgetLimit} onChange={(e) => setDailyBudgetLimit(e.target.value)} placeholder="10 USD/day" /></Field>
           </div>
-          <Button onClick={save} disabled={saving} className="gap-2">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}حفظ إعدادات AI</Button>
+          <Button onClick={save} disabled={saving} className="gap-2">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}حفظ الإعدادات</Button>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>ما الذي يستطيع قراءته؟</CardTitle><CardDescription>{core?.provider.reason || "AI Core يعمل بوضع fallback آمن حتى يتم ضبط env."}</CardDescription></CardHeader>
+        <CardHeader><CardTitle>ما الذي يستطيع قراءته؟</CardTitle><CardDescription>{core?.provider.reason || "يعمل المساعد بوضع آمن حتى يكتمل الإعداد."}</CardDescription></CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {(core?.tools ?? []).map((tool) => <div key={tool.name} className="rounded-xl border bg-slate-50 p-3 text-sm font-semibold text-slate-800"><CheckCircle2 className="mb-2 h-4 w-4 text-[#025EB8]" />{tool.name}<p className="mt-2 text-xs font-normal leading-5 text-slate-500">{tool.dataSource}</p></div>)}
         </CardContent>
@@ -139,7 +139,7 @@ export default function MarketingAiAssistantPage() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Prompts مفيدة</CardTitle><CardDescription>استخدمه كمحلل تسويق مرتبط بالبيانات، لا كشات عام.</CardDescription></CardHeader>
+        <CardHeader><CardTitle>أوامر مفيدة</CardTitle><CardDescription>استخدمه كمحلل تسويق مرتبط بالبيانات، لا كمحادثة عامة.</CardDescription></CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
           {(core?.promptExamples ?? []).map((prompt) => <div key={prompt} className="rounded-xl border bg-white p-3 text-sm font-semibold leading-6 text-slate-700">{prompt}</div>)}
         </CardContent>

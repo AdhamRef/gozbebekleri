@@ -23,7 +23,7 @@ export default async function CommunicationAudiencesPage() {
   const hasDonors = (overview?.totals.donors ?? 0) > 0;
 
   return (
-    <main className="space-y-5 p-4 sm:p-6" dir="rtl">
+    <main className="space-y-5" dir="rtl">
       <section className="rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -106,6 +106,10 @@ export default async function CommunicationAudiencesPage() {
 
           <Card className="border-amber-200 bg-amber-50">
             <CardContent className="p-4 text-sm leading-6 text-amber-900">{overview.consentNote}</CardContent>
+          </Card>
+
+          <Card className="border-slate-200">
+            <CardContent className="p-4 text-xs leading-6 text-slate-500">أهلية «الرسائل القصيرة» معروضة للتخطيط فقط — الإرسال غير مفعّل بعد حتى ربط مزوّد الرسائل.</CardContent>
           </Card>
         </>
       ) : null}

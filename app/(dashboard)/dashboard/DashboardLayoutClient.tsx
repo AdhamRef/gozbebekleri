@@ -53,6 +53,9 @@ function DashboardContent({
   const router = useRouter();
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // Less-used groups start collapsed to keep the sidebar short.
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({ "المحتوى": true, "الإدارة": true });
+  const toggleGroup = (g: string) => setCollapsedGroups((prev) => ({ ...prev, [g]: !prev[g] }));
   const dir = localeDirection(locale);
   const hasChecked = useRef(false);
 
@@ -75,25 +78,25 @@ function DashboardContent({
   }, [status, session, pathname, router]);
 
   const iconByKey: Partial<Record<DashboardPermissionKey, React.ReactNode>> = useMemo(() => ({
-    revenue:    <PieChart    className="w-[18px] h-[18px] shrink-0" />,
-    monthly:    <Repeat      className="w-[18px] h-[18px] shrink-0" />,
-    referrals:  <Link2       className="w-[18px] h-[18px] shrink-0" />,
-    bankTransfers: <CreditCard className="w-[18px] h-[18px] shrink-0" />,
-    donors:     <Users       className="w-[18px] h-[18px] shrink-0" />,
-    team:       <UserCircle  className="w-[18px] h-[18px] shrink-0" />,
-    logs:       <ScrollText  className="w-[18px] h-[18px] shrink-0" />,
-    badges:     <Award       className="w-[18px] h-[18px] shrink-0" />,
-    messages:   <MessageSquare className="w-[18px] h-[18px] shrink-0" />,
-    templates:  <FileText      className="w-[18px] h-[18px] shrink-0" />,
-    campaigns:  <Heart       className="w-[18px] h-[18px] shrink-0" />,
-    categories: <FolderOpen  className="w-[18px] h-[18px] shrink-0" />,
-    blog:       <PenLine     className="w-[18px] h-[18px] shrink-0" />,
-    slides:     <ImageIcon   className="w-[18px] h-[18px] shrink-0" />,
-    ticker:     <Ticket      className="w-[18px] h-[18px] shrink-0" />,
-    pixels:     <BarChart3   className="w-[18px] h-[18px] shrink-0" />,
-    ads:        <Megaphone   className="w-[18px] h-[18px] shrink-0" />,
-    platformConnections: <Plug className="w-[18px] h-[18px] shrink-0" />,
-    generalSettings: <CreditCard className="w-[18px] h-[18px] shrink-0" />,
+    revenue:    <PieChart    className="w-4 h-4 shrink-0" />,
+    monthly:    <Repeat      className="w-4 h-4 shrink-0" />,
+    referrals:  <Link2       className="w-4 h-4 shrink-0" />,
+    bankTransfers: <CreditCard className="w-4 h-4 shrink-0" />,
+    donors:     <Users       className="w-4 h-4 shrink-0" />,
+    team:       <UserCircle  className="w-4 h-4 shrink-0" />,
+    logs:       <ScrollText  className="w-4 h-4 shrink-0" />,
+    badges:     <Award       className="w-4 h-4 shrink-0" />,
+    messages:   <MessageSquare className="w-4 h-4 shrink-0" />,
+    templates:  <FileText      className="w-4 h-4 shrink-0" />,
+    campaigns:  <Heart       className="w-4 h-4 shrink-0" />,
+    categories: <FolderOpen  className="w-4 h-4 shrink-0" />,
+    blog:       <PenLine     className="w-4 h-4 shrink-0" />,
+    slides:     <ImageIcon   className="w-4 h-4 shrink-0" />,
+    ticker:     <Ticket      className="w-4 h-4 shrink-0" />,
+    pixels:     <BarChart3   className="w-4 h-4 shrink-0" />,
+    ads:        <Megaphone   className="w-4 h-4 shrink-0" />,
+    platformConnections: <Plug className="w-4 h-4 shrink-0" />,
+    generalSettings: <CreditCard className="w-4 h-4 shrink-0" />,
   }), []);
 
   const navigation = useMemo(() => {
@@ -124,48 +127,55 @@ function DashboardContent({
 
   const SidebarInner = () => (
     <div className="flex flex-col h-full">
-      <div className="h-16 lg:h-20 flex items-center px-5 lg:px-6 border-b border-white/10 shrink-0">
-        <Link href="/" className="flex items-center gap-3">
-          <img src="/logo-white.png" alt="Logo" className="h-16 w-auto object-contain brightness-0 invert" />
+      <div className="h-14 flex items-center px-4 border-b border-white/10 shrink-0">
+        <Link href="/" className="flex items-center gap-2">
+          <img src="/logo-white.png" alt="Logo" className="h-8 w-auto object-contain brightness-0 invert" />
         </Link>
         <button className="lg:hidden ms-auto text-white/60 hover:text-white" onClick={() => setIsSidebarOpen(false)}>
           <X className="w-5 h-5" />
         </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-5 px-3 space-y-6 sidebar-scroll">
-        {navigation.map((section) => (
-          <div key={section.group}>
-            <p className="text-[10px] uppercase tracking-widest px-3 mb-2 font-semibold text-white/35">{section.group}</p>
-            <div className="space-y-0.5">
-              {section.items.map((item) => {
-                const active = isActiveHref(item.href);
-                return (
-                  <Link key={item.href} href={item.href} onClick={() => setIsSidebarOpen(false)} className={cn("group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150", active ? "bg-white/10 text-white" : "text-white/80 hover:bg-white/8 hover:text-white")}>
-                    <span className={cn("shrink-0 transition-colors", active ? "text-white" : "text-white/80 group-hover:text-white")}>{item.icon}</span>
-                    <span className="truncate flex-1">{item.title}</span>
-                  </Link>
-                );
-              })}
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2.5 space-y-3 sidebar-scroll">
+        {navigation.map((section) => {
+          const collapsed = collapsedGroups[section.group];
+          return (
+            <div key={section.group}>
+              <button onClick={() => toggleGroup(section.group)} className="flex w-full items-center justify-between px-3 py-1 mb-1 text-[10px] uppercase tracking-widest font-semibold text-white/35 hover:text-white/60">
+                <span>{section.group}</span>
+                <ChevronLeft className={cn("h-3 w-3 transition-transform", collapsed ? "" : "-rotate-90")} />
+              </button>
+              {!collapsed ? (
+                <div className="space-y-0.5">
+                  {section.items.map((item) => {
+                    const active = isActiveHref(item.href);
+                    return (
+                      <Link key={item.href} href={item.href} onClick={() => setIsSidebarOpen(false)} className={cn("group flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors", active ? "bg-white/12 text-white" : "text-white/75 hover:bg-white/8 hover:text-white")}>
+                        <span className={cn("shrink-0", active ? "text-white" : "text-white/70 group-hover:text-white")}>{item.icon}</span>
+                        <span className="truncate flex-1">{item.title}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
-      <div className="border-t border-white/10 p-3 shrink-0 space-y-2">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/8">
-          <div className="w-8 h-8 rounded-full bg-[#FA5D17] flex items-center justify-center text-white text-xs font-bold shrink-0">
+      <div className="border-t border-white/10 p-2.5 shrink-0 space-y-1.5">
+        <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-white/8">
+          <div className="w-7 h-7 rounded-full bg-[#FA5D17] flex items-center justify-center text-white text-[11px] font-bold shrink-0">
             {user?.image ? <img src={user.image} alt="" className="w-full h-full rounded-full object-cover" /> : userInitials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white text-sm font-semibold truncate">{user?.name || 'Admin'}</p>
-            <p className="text-white/80 text-[10px] truncate">{user?.email || ''}</p>
+            <p className="text-white text-[13px] font-semibold truncate">{user?.name || 'Admin'}</p>
+            <p className="text-white/70 text-[10px] truncate">{user?.email || ''}</p>
           </div>
+          <button onClick={() => signOut({ callbackUrl: '/' })} title="تسجيل خروج" className="shrink-0 text-white/50 hover:text-white transition-colors">
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
-        <button onClick={() => signOut({ callbackUrl: '/' })} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-white/60 hover:bg-white/8 hover:text-white text-sm font-medium transition-all">
-          <LogOut className="w-4 h-4 shrink-0" />
-          <span>تسجيل خروج</span>
-        </button>
       </div>
     </div>
   );
@@ -177,7 +187,7 @@ function DashboardContent({
       <BankTransfersExportPanel />
       {isSidebarOpen && <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 lg:hidden" onClick={() => setIsSidebarOpen(false)} aria-hidden />}
 
-      <aside className={cn("fixed top-0 z-40 h-full w-[260px] lg:w-[260px] flex flex-col transition-transform duration-300 ease-out", "bg-[#025EB8]", dir === "rtl" ? "right-0 border-l border-white/10" : "left-0 border-r border-white/10", "lg:translate-x-0", isSidebarOpen ? "translate-x-0" : dir === "rtl" ? "translate-x-full" : "-translate-x-full")}>
+      <aside className={cn("fixed top-0 z-40 h-full w-[240px] flex flex-col transition-transform duration-300 ease-out", "bg-[#025EB8]", dir === "rtl" ? "right-0 border-l border-white/10" : "left-0 border-r border-white/10", "lg:translate-x-0", isSidebarOpen ? "translate-x-0" : dir === "rtl" ? "translate-x-full" : "-translate-x-full")}>
         <SidebarInner />
       </aside>
 
@@ -189,7 +199,7 @@ function DashboardContent({
         </div>
       </div>
 
-      <main className={cn("flex-1 min-w-0 transition-all duration-300", "pt-14 lg:pt-0", dir === "rtl" ? "lg:mr-[260px]" : "lg:ml-[260px]")}>
+      <main className={cn("flex-1 min-w-0 transition-all duration-300", "pt-14 lg:pt-0", dir === "rtl" ? "lg:mr-[240px]" : "lg:ml-[240px]")}>
         <div className="hidden lg:flex items-center justify-between h-14 px-6 bg-white border-b border-gray-200">
           <div className="flex items-center gap-1.5 text-sm text-gray-500">
             <Link href="/dashboard" className="hover:text-[#025EB8] transition-colors font-medium">لوحة التحكم</Link>
@@ -201,8 +211,8 @@ function DashboardContent({
           </div>
         </div>
 
-        <div className="p-4 sm:p-6 lg:p-8 min-h-[calc(100vh-3.5rem)]">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-6 lg:p-8 min-h-full">{children}</div>
+        <div className="p-3 sm:p-4 lg:p-6 min-h-[calc(100vh-3.5rem)]">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 min-h-full">{children}</div>
         </div>
       </main>
     </div>

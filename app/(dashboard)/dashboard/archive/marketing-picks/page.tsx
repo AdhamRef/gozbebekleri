@@ -6,5 +6,5 @@ export const dynamic = "force-dynamic";
 
 export default async function ArchiveMarketingPicksPage() {
   const snapshot = await getArchiveSnapshotDbBacked();
-  return <ArchiveConsole activeTab="marketing-picks" snapshot={snapshot} />;
+  return <ArchiveConsole activeTab="marketing-picks" snapshot={snapshot} work="marketing" />;
 }

@@ -9,6 +9,8 @@ import { listSenders } from "@/lib/communication/sender-service";
 import { evaluateCoverageGate, submitForReview, approveCampaign, transitionCampaignSafe } from "@/lib/communication/campaign-approval-service";
 import { isCommunicationChannel } from "@/lib/communication/communication-runtime-types";
 import { isSendEnabled } from "@/lib/communication/provider-router";
+import { planCampaignSend } from "@/lib/communication/campaign-send-planner";
+import { isSchedulerConfigured } from "@/lib/communication/scheduler-status";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,8 +37,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     coverageGate = await evaluateCoverageGate(id);
   }
 
+  // Dry-run plan for the review step (no send, no delivery created). Omit the heavy recipient list.
+  const plan = await planCampaignSend(id);
+  const planSummary = { total: plan.total, eligible: plan.eligible, skipped: plan.skipped, reasons: plan.reasons, providerReady: plan.providerReady, senderReady: plan.senderReady, willSend: plan.willSend, blocked: plan.blocked ?? null };
+
   return NextResponse.json(
-    { campaign, breakdown, templates, senders, coverage, coverageGate, sendEnabled: channel ? isSendEnabled(channel) : false },
+    { campaign, breakdown, templates, senders, coverage, coverageGate, plan: planSummary, sendEnabled: channel ? isSendEnabled(channel) : false, schedulerConfigured: isSchedulerConfigured() },
     { headers: operationsNoStoreHeaders }
   );
 }

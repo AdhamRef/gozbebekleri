@@ -19,6 +19,8 @@ type ProviderEvent = {
   receivedAt: string;
 };
 
+const channelLabel: Record<string, string> = { WHATSAPP: "واتساب", EMAIL: "إيميل", SMS: "رسائل قصيرة" };
+
 export default function ProviderEventsPage() {
   const [items, setItems] = React.useState<ProviderEvent[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -73,14 +75,14 @@ export default function ProviderEventsPage() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[48rem] text-sm">
                 <thead className="border-b bg-slate-50 text-xs text-slate-500"><tr>
-                  <th className="p-3 text-right">المزود</th><th className="p-3 text-right">القناة</th><th className="p-3 text-right">الحدث</th><th className="p-3 text-center">الحالة</th><th className="p-3 text-right">معرّف الرسالة</th><th className="p-3"></th>
+                  <th className="p-3 text-right">المزود</th><th className="p-3 text-right">القناة</th><th className="p-3 text-right">الحدث</th><th className="p-3 text-center">الحالة</th><th className="p-3 text-right">رقم تتبع المزود</th><th className="p-3"></th>
                 </tr></thead>
                 <tbody>
                   {items.map((e) => (
                     <React.Fragment key={e.id}>
                       <tr className="border-b last:border-0">
                         <td className="p-3">{e.provider}</td>
-                        <td className="p-3">{e.channel}</td>
+                        <td className="p-3">{channelLabel[e.channel] ?? e.channel}</td>
                         <td className="p-3">{e.eventType}</td>
                         <td className="p-3 text-center"><Badge variant="outline">{e.status ?? "—"}</Badge></td>
                         <td className="p-3 font-mono text-xs">{e.providerMessageId ?? "—"}</td>

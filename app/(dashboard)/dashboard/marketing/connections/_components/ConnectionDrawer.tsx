@@ -349,7 +349,7 @@ export function ConnectionDrawer({
             </div>
 
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600 leading-relaxed">
-              يتم إخفاء الأسرار في الواجهة وعدم تسجيلها في AuditLog. ملاحظة تقنية: التشفير داخل قاعدة البيانات غير مفعّل بعد وسيُضاف في خطوة أمان مستقلة.
+              يتم إخفاء الأسرار في الواجهة ولا تُسجَّل في سجل المراجعة. التشفير داخل قاعدة البيانات غير مفعّل بعد وسيُضاف في خطوة أمان مستقلة.
             </div>
 
             <div className="flex justify-end gap-2 pt-2 sticky bottom-0 bg-white">

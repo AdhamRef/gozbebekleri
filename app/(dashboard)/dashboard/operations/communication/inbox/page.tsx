@@ -2,27 +2,44 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, RefreshCw, MessageCircle, AlertTriangle, UserX } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, ArrowRight, Loader2, RefreshCw, Search, MessageCircle, AlertTriangle, UserX, Phone, Globe, MapPin, Heart } from "lucide-react";
+import { toast } from "react-hot-toast";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
-type Donor = { userId: string | null; email: string | null; locale: string | null; country: string | null; totalDonations: number | null; lastDonationAt: string | null; whatsappOptIn: boolean; doNotContact: boolean };
-type Conversation = { phone: string; donor: Donor | null; unresolved: boolean; lastMessageAt: string | null; lastInboundText: string | null; needsReply: boolean; inboundCount: number; outboundCount: number };
+type Donor = { userId: string | null; name: string | null; email: string | null; locale: string | null; country: string | null; totalDonations: number | null; lastDonationAt: string | null; whatsappOptIn: boolean; doNotContact: boolean };
+type Conversation = { phone: string; donor: Donor | null; unresolved: boolean; handled: boolean; lastMessageAt: string | null; lastInboundText: string | null; needsReply: boolean; inboundCount: number; outboundCount: number };
 type TimelineItem = { kind: string; at: string | null; text: string | null; status: string | null };
 type Detail = { phone: string; donor: Donor | null; unresolved: boolean; timeline: TimelineItem[] };
 
-type Filter = "all" | "needsReply" | "unresolved";
+type Filter = "all" | "needsReply" | "unresolved" | "handled";
+
+const statusNote: Record<string, string> = { SENT: "تم الإرسال", SENT_TO_PROVIDER: "تم الإرسال", DELIVERED: "تم التسليم", READ: "تمت القراءة", FAILED: "فشل", BOUNCED: "فشل", REPLIED: "رد المتبرع", SKIPPED: "لم يُرسل", RENDERED: "تم التجهيز" };
+
+function fmt(at: string | null) {
+  if (!at) return "";
+  try {
+    return new Date(at).toLocaleString("ar", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
+function displayName(d: Donor | null, phone: string) {
+  return d?.name || d?.email || phone;
+}
 
 export default function InboxPage() {
   const [items, setItems] = React.useState<Conversation[]>([]);
   const [providerConfigured, setProviderConfigured] = React.useState(true);
   const [loading, setLoading] = React.useState(true);
   const [filter, setFilter] = React.useState<Filter>("all");
-  const [locale, setLocale] = React.useState("");
+  const [search, setSearch] = React.useState("");
   const [selected, setSelected] = React.useState<string | null>(null);
   const [detail, setDetail] = React.useState<Detail | null>(null);
   const [detailLoading, setDetailLoading] = React.useState(false);
+  const [showDonor, setShowDonor] = React.useState(false);
+  const [acting, setActing] = React.useState(false);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -44,6 +61,7 @@ export default function InboxPage() {
     setSelected(phone);
     setDetailLoading(true);
     setDetail(null);
+    setShowDonor(false);
     try {
       const res = await fetch(`/api/dashboard/operations/communication/inbox?phone=${encodeURIComponent(phone)}`, { cache: "no-store" });
       const json = await res.json().catch(() => null);
@@ -53,117 +71,213 @@ export default function InboxPage() {
     }
   }, []);
 
+  async function conversationAction(action: "handled" | "followup" | "link", phone: string, okMsg: string) {
+    setActing(true);
+    try {
+      const res = await fetch("/api/dashboard/operations/communication/inbox", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, phone }) });
+      if (!res.ok) throw new Error();
+      toast.success(okMsg);
+      await load();
+    } catch {
+      toast.error("تعذّر تنفيذ الإجراء");
+    } finally {
+      setActing(false);
+    }
+  }
+
   const filtered = items.filter((c) => {
     if (filter === "needsReply" && !c.needsReply) return false;
     if (filter === "unresolved" && !c.unresolved) return false;
-    if (locale && c.donor?.locale !== locale) return false;
+    if (filter === "handled" && !c.handled) return false;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      const hay = `${c.donor?.name ?? ""} ${c.donor?.email ?? ""} ${c.phone}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
     return true;
   });
 
+  const needsReplyCount = items.filter((c) => c.needsReply).length;
+
+  const donor = detail?.donor ?? null;
+  const consent = donor?.doNotContact ? { text: "عدم التواصل", cls: "border-rose-200 bg-rose-50 text-rose-700" } : donor?.whatsappOptIn ? { text: "موافق", cls: "border-emerald-200 bg-emerald-50 text-emerald-700" } : { text: "يحتاج مراجعة", cls: "border-amber-200 bg-amber-50 text-amber-700" };
+
   return (
-    <main className="space-y-5 p-4 sm:p-6" dir="rtl">
-      <section className="rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-xs text-white/70">مركز التواصل</p>
-            <h1 className="mt-1.5 text-2xl font-black">صندوق واتساب</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-white/85">محادثات واتساب الواردة والصادرة، مربوطة بالمتبرع حسب رقم الهاتف عند التطابق.</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="secondary" className="gap-2" onClick={() => load()} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> تحديث</Button>
-            <Button asChild variant="secondary" className="gap-2 font-bold"><Link href="/dashboard/operations/communication">العودة <ArrowLeft className="h-4 w-4" /></Link></Button>
-          </div>
+    <main dir="rtl">
+      {/* Clean header */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs text-slate-400">التواصل / المحادثات</p>
+          <h1 className="mt-0.5 text-xl font-black text-slate-900">صندوق واتساب {needsReplyCount > 0 ? <span className="text-sm font-bold text-amber-600">({needsReplyCount} بحاجة رد)</span> : null}</h1>
         </div>
-      </section>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => load()} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> تحديث</Button>
+          <Button asChild variant="outline" size="sm" className="gap-2"><Link href="/dashboard/operations/communication">العودة <ArrowLeft className="h-4 w-4" /></Link></Button>
+        </div>
+      </div>
 
       {!providerConfigured ? (
-        <Card className="border-amber-200 bg-amber-50"><CardContent className="p-4 text-sm font-semibold leading-6 text-amber-800">مزود واتساب غير مُعدّ بعد. عند إكمال الإعداد واستقبال الأحداث، ستظهر المحادثات هنا. لا يمكن الرد من هنا حتى تفعيل الإرسال.</CardContent></Card>
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">مزود واتساب غير مُعد بعد. ستظهر المحادثات هنا بعد اكتمال الإعداد واستقبال الرسائل.</div>
       ) : null}
 
-      <Card>
-        <CardContent className="flex flex-wrap items-center gap-2 p-3 text-sm">
-          {(["all", "needsReply", "unresolved"] as Filter[]).map((f) => (
-            <button key={f} onClick={() => setFilter(f)} className={`rounded-md border px-3 py-1.5 ${filter === f ? "border-[#025EB8] bg-blue-50 text-[#025EB8]" : "border-slate-200 text-slate-600"}`}>
-              {f === "all" ? "الكل" : f === "needsReply" ? "بحاجة لرد" : "غير محدد المتبرع"}
-            </button>
-          ))}
-          <input value={locale} onChange={(e) => setLocale(e.target.value)} placeholder="لغة (مثل ar)" className="ml-auto w-28 rounded-md border border-slate-200 px-2 py-1.5 text-sm" />
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 lg:grid-cols-[20rem_1fr]">
-        <Card className="h-fit">
-          <CardContent className="p-0">
+      <div className="grid gap-4 lg:grid-cols-[20rem_1fr_18rem]">
+        {/* ── Column 1: conversation list ── */}
+        <aside className={cn("rounded-2xl border border-slate-200 bg-white", selected && "hidden lg:block")}>
+          <div className="border-b border-slate-100 p-3">
+            <div className="relative">
+              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث بالاسم أو الهاتف أو البريد" className="w-full rounded-lg border border-slate-200 py-2 pr-9 pl-3 text-sm outline-none focus:border-[#025EB8]" />
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {([["all", "الكل"], ["needsReply", "يحتاج رد"], ["unresolved", "غير مربوط"], ["handled", "تم التعامل"]] as [Filter, string][]).map(([f, label]) => (
+                <button key={f} onClick={() => setFilter(f)} className={cn("rounded-full border px-3 py-1 text-xs font-semibold", filter === f ? "border-[#025EB8] bg-blue-50 text-[#025EB8]" : "border-slate-200 text-slate-500")}>{label}</button>
+              ))}
+            </div>
+          </div>
+          <div className="max-h-[70vh] overflow-y-auto">
             {loading ? (
-              <div className="flex min-h-[10rem] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#025EB8]" /></div>
+              <div className="flex min-h-[12rem] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#025EB8]" /></div>
             ) : filtered.length === 0 ? (
-              <div className="p-8 text-center text-sm text-slate-500">لا توجد محادثات بعد.</div>
+              <div className="p-8 text-center text-sm text-slate-500">لا توجد محادثات مطابقة.</div>
             ) : (
-              <ul className="divide-y">
+              <ul className="divide-y divide-slate-100">
                 {filtered.map((c) => (
                   <li key={c.phone}>
-                    <button onClick={() => openConversation(c.phone)} className={`flex w-full flex-col items-start gap-1 p-3 text-right hover:bg-slate-50 ${selected === c.phone ? "bg-blue-50/60" : ""}`}>
+                    <button onClick={() => openConversation(c.phone)} className={cn("flex w-full flex-col items-start gap-1 p-3 text-right hover:bg-slate-50", selected === c.phone && "bg-blue-50/60")}>
                       <div className="flex w-full items-center justify-between gap-2">
-                        <span className="font-bold text-slate-800">{c.donor?.email || c.phone}</span>
-                        {c.needsReply ? <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">بحاجة لرد</Badge> : null}
+                        <span className="truncate font-bold text-slate-800">{displayName(c.donor, c.phone)}</span>
+                        <span className="shrink-0 text-[10px] text-slate-400">{fmt(c.lastMessageAt)}</span>
                       </div>
+                      {c.donor?.email && c.donor?.name ? <span className="text-[11px] text-slate-400">{c.donor.email}</span> : null}
                       <span className="line-clamp-1 text-xs text-slate-500">{c.lastInboundText ?? "—"}</span>
-                      <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                        {c.donor?.locale ? <span>{c.donor.locale}</span> : null}
-                        {c.unresolved ? <span className="flex items-center gap-0.5 text-amber-600"><UserX className="h-3 w-3" /> غير محدد</span> : null}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {c.donor?.locale ? <Badge variant="outline" className="border-slate-200 text-[10px] text-slate-500">{c.donor.locale}</Badge> : null}
+                        {c.needsReply ? <Badge variant="outline" className="border-amber-200 bg-amber-50 text-[10px] text-amber-700">يحتاج رد</Badge> : null}
+                        {c.unresolved ? <span className="flex items-center gap-0.5 text-[10px] text-amber-600"><UserX className="h-3 w-3" /> غير مربوط</span> : null}
+                        {c.handled ? <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-[10px] text-emerald-700">تم التعامل</Badge> : null}
                       </div>
                     </button>
                   </li>
                 ))}
               </ul>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </aside>
 
-        <Card className="min-h-[24rem]">
-          <CardContent className="p-4">
-            {!selected ? (
-              <div className="flex min-h-[20rem] items-center justify-center text-sm text-slate-400"><MessageCircle className="ml-2 h-5 w-5" /> اختر محادثة لعرض التفاصيل</div>
-            ) : detailLoading ? (
-              <div className="flex min-h-[20rem] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#025EB8]" /></div>
-            ) : !detail ? (
-              <div className="p-6 text-center text-sm text-slate-500">تعذّر تحميل المحادثة.</div>
-            ) : (
-              <div className="space-y-4">
-                <div className="rounded-xl border bg-slate-50 p-3 text-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-black text-slate-800">{detail.donor?.email || detail.phone}</span>
-                    {detail.unresolved ? <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700"><AlertTriangle className="ml-1 h-3.5 w-3.5" /> متبرع غير محدد</Badge> : <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">متبرع مطابق</Badge>}
-                  </div>
-                  {detail.donor ? (
-                    <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-slate-500 md:grid-cols-4">
-                      <span>اللغة: {detail.donor.locale ?? "—"}</span>
-                      <span>الدولة: {detail.donor.country ?? "—"}</span>
-                      <span>التبرعات: {detail.donor.totalDonations ?? 0}</span>
-                      <span>واتساب: {detail.donor.whatsappOptIn ? "موافق" : "يحتاج مراجعة"}</span>
-                    </div>
-                  ) : null}
+        {/* ── Column 2: timeline ── */}
+        <section className={cn("rounded-2xl border border-slate-200 bg-white", !selected && "hidden lg:block")}>
+          {!selected ? (
+            <div className="flex min-h-[24rem] flex-col items-center justify-center gap-2 text-sm text-slate-400"><MessageCircle className="h-6 w-6" /> اختر محادثة لعرضها</div>
+          ) : detailLoading ? (
+            <div className="flex min-h-[24rem] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#025EB8]" /></div>
+          ) : !detail ? (
+            <div className="p-8 text-center text-sm text-slate-500">تعذّر تحميل المحادثة.</div>
+          ) : (
+            <div className="flex h-full flex-col">
+              {/* mobile back + header */}
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 p-3">
+                <button onClick={() => setSelected(null)} className="flex items-center gap-1 text-sm text-slate-500 lg:hidden"><ArrowRight className="h-4 w-4" /> رجوع</button>
+                <div className="min-w-0">
+                  <p className="truncate font-bold text-slate-800">{displayName(detail.donor, detail.phone)}</p>
+                  {detail.unresolved ? <span className="text-[11px] text-amber-600">متبرع غير محدد</span> : null}
                 </div>
-
-                <div className="space-y-2">
-                  {detail.timeline.length === 0 ? (
-                    <p className="text-center text-sm text-slate-400">لا توجد رسائل في هذه المحادثة.</p>
-                  ) : detail.timeline.map((t, i) => (
-                    <div key={i} className={`max-w-[80%] rounded-2xl border p-2 text-sm ${t.kind === "inbound" ? "mr-auto bg-white" : t.kind === "outbound" ? "ml-auto bg-blue-50 border-blue-100" : "mx-auto bg-slate-50 text-xs text-slate-500"}`}>
-                      {t.kind === "status" ? <span>حالة: {t.status}</span> : <span className="whitespace-pre-wrap leading-6 text-slate-700">{t.text ?? "—"}</span>}
-                      {t.at ? <div className="mt-0.5 text-[10px] text-slate-400">{new Date(t.at).toLocaleString("ar")}</div> : null}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
-                  الرد المباشر معطّل حتى تفعيل الإرسال عبر المزود. عند التفعيل، سيتم الرد عبر قالب معتمد وتسجيل الرسالة في الأرشيف.
-                </div>
+                <button onClick={() => setShowDonor((v) => !v)} className="text-xs font-bold text-[#025EB8] lg:hidden">التفاصيل</button>
               </div>
-            )}
-          </CardContent>
-        </Card>
+
+              {/* mobile donor drawer */}
+              {showDonor ? <div className="border-b border-slate-100 lg:hidden"><DonorPanel donor={donor} phone={detail.phone} consent={consent} unresolved={detail.unresolved} acting={acting} onAction={conversationAction} /></div> : null}
+
+              {/* timeline */}
+              <div className="flex-1 space-y-2 overflow-y-auto p-4">
+                {detail.timeline.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-slate-400">لا توجد رسائل في هذه المحادثة بعد.</p>
+                ) : detail.timeline.map((t, i) => (
+                  t.kind === "status" ? (
+                    <div key={i} className="text-center text-[11px] text-slate-400">{statusNote[t.status ?? ""] ?? "تحديث"}{t.at ? ` · ${fmt(t.at)}` : ""}</div>
+                  ) : (
+                    <div key={i} className={cn("max-w-[78%] rounded-2xl px-3 py-2 text-sm", t.kind === "inbound" ? "ml-auto bg-slate-100 text-slate-800" : "mr-auto bg-blue-50 text-slate-800")}>
+                      <p className="whitespace-pre-wrap leading-6">{t.text ?? "—"}</p>
+                      {t.at ? <div className="mt-0.5 text-[10px] text-slate-400">{fmt(t.at)}</div> : null}
+                    </div>
+                  )
+                ))}
+              </div>
+
+              {/* reply area */}
+              <div className="border-t border-slate-100 p-3">
+                {!providerConfigured ? (
+                  <input disabled placeholder="الرد المباشر غير مفعّل حتى تكتمل إعدادات واتساب." className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400" />
+                ) : (
+                  <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                    <span>الرد يتم عبر قالب معتمد حاليًا.</span>
+                    <Button size="sm" variant="outline" disabled>رد بقالب</Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* ── Column 3: donor panel (desktop) ── */}
+        <aside className={cn("hidden rounded-2xl border border-slate-200 bg-white lg:block", !selected && "lg:hidden xl:block xl:opacity-60")}>
+          {detail ? <DonorPanel donor={donor} phone={detail.phone} consent={consent} unresolved={detail.unresolved} acting={acting} onAction={conversationAction} /> : <div className="flex min-h-[24rem] items-center justify-center p-4 text-center text-xs text-slate-400">تفاصيل المتبرع تظهر عند اختيار محادثة</div>}
+        </aside>
       </div>
     </main>
+  );
+}
+
+function DonorPanel({
+  donor,
+  phone,
+  consent,
+  unresolved,
+  acting,
+  onAction,
+}: {
+  donor: Donor | null;
+  phone: string;
+  consent: { text: string; cls: string };
+  unresolved: boolean;
+  acting: boolean;
+  onAction: (action: "handled" | "followup" | "link", phone: string, okMsg: string) => void;
+}) {
+  return (
+    <div className="space-y-4 p-4">
+      <div>
+        <p className="font-black text-slate-900">{donor?.name || donor?.email || "متبرع غير محدد"}</p>
+        {unresolved ? <Badge variant="outline" className="mt-1 border-amber-200 bg-amber-50 text-amber-700"><AlertTriangle className="ml-1 h-3 w-3" /> غير مربوط بمتبرع</Badge> : <Badge variant="outline" className="mt-1 border-emerald-200 bg-emerald-50 text-emerald-700">متبرع مطابق</Badge>}
+      </div>
+
+      <dl className="space-y-2 text-sm">
+        <Info icon={<Phone className="h-4 w-4" />} label="الهاتف" value={phone} />
+        <Info icon={<Globe className="h-4 w-4" />} label="اللغة" value={donor?.locale ?? "—"} />
+        <Info icon={<MapPin className="h-4 w-4" />} label="الدولة" value={donor?.country ?? "—"} />
+        <Info icon={<Heart className="h-4 w-4" />} label="عدد التبرعات" value={String(donor?.totalDonations ?? 0)} />
+        <Info label="آخر تبرع" value={donor?.lastDonationAt ? new Date(donor.lastDonationAt).toLocaleDateString("ar") : "—"} />
+        <div className="flex items-center justify-between">
+          <span className="text-slate-500">موافقة واتساب</span>
+          <Badge variant="outline" className={consent.cls}>{consent.text}</Badge>
+        </div>
+      </dl>
+
+      <div className="space-y-2 border-t border-slate-100 pt-3">
+        {unresolved ? (
+          <Button size="sm" variant="outline" className="w-full" disabled={acting} onClick={() => onAction("link", phone, "تم تسجيل طلب الربط بمتبرع")}>ربط بمتبرع</Button>
+        ) : null}
+        <Button size="sm" variant="outline" className="w-full" disabled={acting} onClick={() => onAction("followup", phone, "تم تسجيل طلب مهمة متابعة")}>إنشاء مهمة متابعة</Button>
+        <Button size="sm" className="w-full" disabled={acting} onClick={() => onAction("handled", phone, "تم وضع علامة: تم التعامل")}>تم التعامل</Button>
+        {donor?.userId ? <Button asChild size="sm" variant="ghost" className="w-full text-slate-500"><Link href="/dashboard/users/donors">فتح ملف المتبرع</Link></Button> : null}
+      </div>
+    </div>
+  );
+}
+
+function Info({ icon, label, value }: { icon?: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="flex items-center gap-1.5 text-slate-500">{icon}{label}</span>
+      <span className="truncate font-semibold text-slate-800">{value}</span>
+    </div>
   );
 }

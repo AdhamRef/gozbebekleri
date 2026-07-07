@@ -15,10 +15,10 @@ export default function ContentAiAssistantPage() {
   return (
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
       <div className="rounded-2xl border bg-gradient-to-l from-slate-950 via-[#025EB8] to-slate-900 p-5 text-white shadow-sm">
-        <p className="text-xs text-white/70">Shared AI Core / Content Context</p>
-        <h1 className="mt-1.5 text-2xl font-black">مساعد المحتوى AI</h1>
+        <p className="text-xs text-white/70">المساعد الذكي / سياق المحتوى</p>
+        <h1 className="mt-1.5 text-2xl font-black">مساعد المحتوى الذكي</h1>
         <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
-          نسخة آمنة لمساعد المحتوى. لا تستدعي مزود AI خارجي إلا إذا كانت مفاتيح السيرفر مفعلة صراحة، وتحدد الصلاحيات والمصادر قبل أي استخدام حقيقي.
+          نسخة آمنة لمساعد المحتوى. لا يتصل بأي مزود خارجي إلا عند تفعيل مفاتيح السيرفر صراحةً، ويحدد الصلاحيات والمصادر قبل أي استخدام حقيقي.
         </p>
       </div>
 

@@ -19,6 +19,8 @@ const statusLabel: Record<string, string> = {
   SCHEDULED: "مجدولة",
   SENDING: "جارٍ الإرسال",
   SENT: "أُرسلت",
+  SENT_WITH_ISSUES: "أُرسلت مع ملاحظات",
+  BLOCKED: "محجوبة",
   CANCELLED: "ملغاة",
   FAILED: "فشلت",
 };
@@ -27,6 +29,8 @@ const statusClass: Record<string, string> = {
   REVIEW: "border-blue-200 bg-blue-50 text-blue-700",
   APPROVED: "border-emerald-200 bg-emerald-50 text-emerald-700",
   SCHEDULED: "border-violet-200 bg-violet-50 text-violet-700",
+  SENT_WITH_ISSUES: "border-amber-200 bg-amber-50 text-amber-700",
+  BLOCKED: "border-amber-200 bg-amber-50 text-amber-700",
   CANCELLED: "border-slate-200 bg-slate-50 text-slate-500",
   FAILED: "border-rose-200 bg-rose-50 text-rose-700",
 };
@@ -85,7 +89,7 @@ export default function CampaignsPage() {
   }
 
   return (
-    <main className="space-y-5 p-4 sm:p-6" dir="rtl">
+    <main className="space-y-5" dir="rtl">
       <section className="rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -95,7 +99,7 @@ export default function CampaignsPage() {
               جهّز حملات واتساب أو إيميل أو رسائل خطوة بخطوة: الجمهور، القالب، تغطية اللغات، التوجيه، ثم الاعتماد. لا إرسال فعلي بعد.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="secondary" className="gap-2" onClick={() => load()} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> تحديث
             </Button>
@@ -120,7 +124,7 @@ export default function CampaignsPage() {
               <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#025EB8]" /></label>
             <label className="block text-sm"><span className="mb-1 block text-xs font-bold text-slate-500">القناة</span>
               <select value={channel} onChange={(e) => setChannel(e.target.value)} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm">
-                <option value="WHATSAPP">واتساب</option><option value="EMAIL">إيميل</option><option value="SMS">رسائل SMS</option></select></label>
+                <option value="WHATSAPP">واتساب</option><option value="EMAIL">إيميل</option><option value="SMS" disabled>رسائل SMS (قريبًا)</option></select></label>
             <label className="block text-sm"><span className="mb-1 block text-xs font-bold text-slate-500">الغرض</span>
               <select value={purpose} onChange={(e) => setPurpose(e.target.value)} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm">
                 <option value="MARKETING">تسويقي</option><option value="UTILITY">خدمي</option><option value="TRANSACTIONAL">تشغيلي</option><option value="AUTHENTICATION">تحقق</option></select></label>

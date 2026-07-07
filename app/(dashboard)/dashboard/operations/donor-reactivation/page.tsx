@@ -33,15 +33,13 @@ export default async function DonorReactivationPage() {
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
       <div className="flex flex-col gap-4 rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs text-white/70">Operations / Donor Reactivation</p>
+          <p className="text-xs text-white/70">العمليات / تنشيط المتبرعين</p>
           <h1 className="mt-1.5 text-2xl font-black">تنشيط المتبرعين</h1>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
             ترشيح المتبرعين الذين لم يتبرعوا منذ 30 يومًا أو أكثر، مع إجراءات يدوية فقط: تسجيل تواصل، تخطي، استبعاد، أو إنشاء مهمة متابعة.
           </p>
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
-            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">{overview.persistence.mode}</span>
-            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">Model: {overview.persistence.model}</span>
-            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">No auto-send</span>
+            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">بدون إرسال تلقائي</span>
           </div>
         </div>
         <Link href="/dashboard/operations/tasks" className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-bold text-[#025EB8] shadow-sm hover:bg-white/90">
@@ -70,7 +68,7 @@ export default async function DonorReactivationPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-[#025EB8]" /> قاعدة الترشيح</CardTitle>
-            <CardDescription className="leading-6">آخر تبرع PAID منذ 30+ يوم، ولا يوجد marker حديث في AuditLog خلال آخر 30 يوم.</CardDescription>
+            <CardDescription className="leading-6">آخر تبرع ناجح منذ 30 يومًا أو أكثر، ولا يوجد تواصل مسجّل خلال آخر 30 يومًا.</CardDescription>
           </CardHeader>
         </Card>
         <Card>

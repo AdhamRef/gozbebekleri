@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Archive, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OperationsContentWorkspace } from "@/components/operations/OperationsContentWorkspace";
 import { OperationsInfoCards } from "@/components/operations/OperationsInfoCards";
@@ -50,6 +50,12 @@ export default async function OperationsContentPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button asChild variant="secondary" className="gap-2 font-bold">
+            <Link href="/dashboard/archive"><Archive className="h-4 w-4" /> أصول الأرشيف</Link>
+          </Button>
+          <Button asChild variant="secondary" className="gap-2 font-bold">
+            <Link href="/dashboard/brand"><Palette className="h-4 w-4" /> دليل الهوية</Link>
+          </Button>
           <Button asChild variant="secondary" className="gap-2 font-bold">
             <Link href="/dashboard/operations">العودة لمركز العمليات <ArrowLeft className="h-4 w-4" /></Link>
           </Button>

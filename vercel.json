@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/marketing-platform-sync",
       "schedule": "15 */3 * * *"
+    },
+    {
+      "path": "/api/cron/communication-run-due",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

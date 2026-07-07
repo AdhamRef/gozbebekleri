@@ -29,15 +29,11 @@ export default async function OperationsArchivePage() {
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
       <div className="flex flex-col gap-4 rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs text-white/70">Operations / Archive Center</p>
+          <p className="text-xs text-white/70">العمليات / مركز الأرشيف</p>
           <h1 className="mt-1.5 text-2xl font-black">مركز الأرشيف</h1>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
             ذاكرة المواد المنتجة: فيديوهات، تصاميم، رسائل، كاروسيل، وإعلانات مع ربطها بالموسم والحملة والنتيجة.
           </p>
-          <div className="mt-3 flex flex-wrap gap-2 text-xs">
-            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">{overview.persistence.mode}</span>
-            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">Next: {overview.persistence.nextModel}</span>
-          </div>
         </div>
         <Link href="/dashboard/operations/production" className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-bold text-[#025EB8] shadow-sm hover:bg-white/90">
           فتح لوحة الإنتاج
@@ -58,7 +54,7 @@ export default async function OperationsArchivePage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Archive className="h-5 w-5 text-[#025EB8]" /> مكتبة المواد</CardTitle>
-            <CardDescription>Foundation static data الآن، وقابل لاحقًا للتحول إلى Prisma-backed archive.</CardDescription>
+            <CardDescription>كل المواد المنتجة في مكان واحد، جاهزة للربط بالحملات والإعلانات.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 lg:grid-cols-2">
             {overview.assets.map((asset) => {

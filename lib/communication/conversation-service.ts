@@ -1,4 +1,7 @@
 import { prisma } from "@/lib/prisma";
+import { writeAuditLog } from "@/lib/audit-log";
+
+type Actor = { actorId?: string | null; actorName?: string | null; actorRole?: string | null } | null;
 
 /**
  * Derives WhatsApp conversations from the existing archive — outbound CommunicationDelivery rows
@@ -27,12 +30,15 @@ export type ConversationSummary = {
   phone: string;
   donor: ConversationDonor | null;
   unresolved: boolean;
+  handled: boolean;
   lastMessageAt: string | null;
   lastInboundText: string | null;
   needsReply: boolean;
   inboundCount: number;
   outboundCount: number;
 };
+
+const HANDLED_ACTION = "communication.conversation.handled";
 
 type Bucket = {
   phone: string;
@@ -53,11 +59,15 @@ async function matchDonors(phoneDigits: string[]): Promise<Map<string, Conversat
       select: { userId: true, phone: true, email: true, preferredLocale: true, countryCode: true, totalDonations: true, lastDonationAt: true, whatsappOptIn: true, doNotContact: true },
       take: 1000,
     });
+    // Names live on the User row, not the profile — join them in.
+    const userIds = Array.from(new Set(profiles.map((p) => p.userId).filter(Boolean) as string[]));
+    const users = userIds.length ? await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } }).catch(() => []) : [];
+    const nameById = new Map(users.map((u) => [u.id, u.name]));
     for (const p of profiles) {
       const key = digits(p.phone);
       const donor: ConversationDonor = {
         userId: p.userId,
-        name: null,
+        name: p.userId ? nameById.get(p.userId) ?? null : null,
         email: p.email,
         locale: p.preferredLocale,
         country: p.countryCode,
@@ -114,20 +124,26 @@ export async function listConversations(): Promise<ConversationSummary[]> {
     b.lastOutboundAt = Math.max(b.lastOutboundAt, d.createdAt?.getTime() ?? 0);
   }
 
-  const donorMap = await matchDonors([...buckets.keys()]);
+  const [donorMap, handledMap] = await Promise.all([matchDonors([...buckets.keys()]), loadHandledMarkers()]);
 
   const summaries: ConversationSummary[] = [...buckets.values()].map((b) => {
-    const matches = donorMap.get(digits(b.phone)) ?? [];
+    const key = digits(b.phone);
+    const matches = donorMap.get(key) ?? [];
     const unresolved = matches.length !== 1;
     const donor = matches.length === 1 ? matches[0] : null;
     const lastAt = Math.max(b.lastInboundAt, b.lastOutboundAt);
+    // A conversation is "handled" only if a handled marker is newer than the last inbound message
+    // (a new inbound reply automatically re-opens it).
+    const handledAt = handledMap.get(key) ?? 0;
+    const handled = handledAt > 0 && handledAt >= b.lastInboundAt;
     return {
       phone: b.phone,
       donor,
       unresolved,
+      handled,
       lastMessageAt: lastAt ? new Date(lastAt).toISOString() : null,
       lastInboundText: b.lastInboundText,
-      needsReply: b.lastInboundAt > b.lastOutboundAt,
+      needsReply: b.lastInboundAt > b.lastOutboundAt && !handled,
       inboundCount: b.inboundCount,
       outboundCount: b.outboundCount,
     };
@@ -178,4 +194,65 @@ export async function getConversation(phone: string): Promise<ConversationDetail
 
   const matches = donorMap.get(target) ?? [];
   return { phone, donor: matches.length === 1 ? matches[0] : null, unresolved: matches.length !== 1, timeline };
+}
+
+/** Latest handled-marker time per phone (digits key). */
+async function loadHandledMarkers(): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (!process.env.DATABASE_URL) return map;
+  try {
+    const rows = await prisma.auditLog.findMany({
+      where: { entityType: "CommunicationConversation", action: HANDLED_ACTION },
+      orderBy: { createdAt: "desc" },
+      take: 800,
+      select: { entityId: true, createdAt: true },
+    });
+    for (const r of rows) {
+      const key = digits(r.entityId);
+      if (key && !map.has(key)) map.set(key, r.createdAt?.getTime() ?? 0); // desc → first seen is latest
+    }
+  } catch (error) {
+    console.error("loadHandledMarkers failed", error);
+  }
+  return map;
+}
+
+/** Mark a conversation handled (audit-backed; a new inbound reply re-opens it automatically). */
+export async function markConversationHandled(phone: string, actor?: Actor): Promise<{ ok: boolean }> {
+  const key = digits(phone);
+  await writeAuditLog({
+    actorId: actor?.actorId ?? undefined,
+    actorName: actor?.actorName ?? undefined,
+    actorRole: actor?.actorRole ?? "ADMIN",
+    action: HANDLED_ACTION,
+    messageAr: `تم التعامل مع محادثة واتساب`,
+    messageEn: `WhatsApp conversation marked handled`,
+    entityType: "CommunicationConversation",
+    entityId: key,
+    metadata: { phone, externalCall: false },
+    stream: "TEAM",
+  });
+  return { ok: true };
+}
+
+/** Record a follow-up or link request against a conversation (audit-backed, no DB attach faked). */
+export async function logConversationAction(phone: string, action: "followup" | "link", actor?: Actor): Promise<{ ok: boolean }> {
+  const key = digits(phone);
+  const meta =
+    action === "followup"
+      ? { a: "communication.conversation.followup", ar: "طلب مهمة متابعة لمحادثة واتساب", en: "WhatsApp conversation follow-up requested" }
+      : { a: "communication.conversation.link-requested", ar: "طلب ربط محادثة واتساب بمتبرع", en: "WhatsApp conversation link-to-donor requested" };
+  await writeAuditLog({
+    actorId: actor?.actorId ?? undefined,
+    actorName: actor?.actorName ?? undefined,
+    actorRole: actor?.actorRole ?? "ADMIN",
+    action: meta.a,
+    messageAr: meta.ar,
+    messageEn: meta.en,
+    entityType: "CommunicationConversation",
+    entityId: key,
+    metadata: { phone, externalCall: false },
+    stream: "TEAM",
+  });
+  return { ok: true };
 }

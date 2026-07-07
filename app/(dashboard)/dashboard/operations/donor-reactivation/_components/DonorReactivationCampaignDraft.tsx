@@ -54,7 +54,7 @@ export function DonorReactivationCampaignDraft() {
       </CardHeader>
       <CardContent className="flex flex-wrap items-end gap-3">
         <label className="text-sm"><span className="mb-1 block text-xs font-bold text-slate-500">القناة</span>
-          <select value={channel} onChange={(e) => setChannel(e.target.value)} className="rounded-md border border-slate-200 px-3 py-2 text-sm"><option value="WHATSAPP">واتساب</option><option value="EMAIL">إيميل</option><option value="SMS">رسائل SMS</option></select></label>
+          <select value={channel} onChange={(e) => setChannel(e.target.value)} className="rounded-md border border-slate-200 px-3 py-2 text-sm"><option value="WHATSAPP">واتساب</option><option value="EMAIL">إيميل</option><option value="SMS" disabled>رسائل SMS (قريبًا)</option></select></label>
         <label className="text-sm"><span className="mb-1 block text-xs font-bold text-slate-500">اللغة</span>
           <select value={locale} onChange={(e) => setLocale(e.target.value)} className="rounded-md border border-slate-200 px-3 py-2 text-sm"><option value="">كل اللغات</option>{LOCALE_OPTIONS.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}</select></label>
         <Button onClick={draft} disabled={saving} className="gap-2">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} إنشاء مسودة وفتحها</Button>

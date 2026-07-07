@@ -15,6 +15,12 @@ const priorityClass: Record<string, string> = {
   LOW: "border-slate-200 bg-slate-50 text-slate-700",
 };
 
+const priorityLabel: Record<string, string> = {
+  HIGH: "أولوية عالية",
+  MEDIUM: "أولوية متوسطة",
+  LOW: "أولوية منخفضة",
+};
+
 const statusLabel: Record<string, string> = {
   PENDING: "بانتظار التنفيذ",
   IN_PROGRESS: "قيد التنفيذ",
@@ -46,16 +52,11 @@ export default async function OperationsTasksPage() {
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
       <div className="flex flex-col gap-4 rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs text-white/70">Operations / Production Tasks</p>
+          <p className="text-xs text-white/70">العمليات / مهام الإنتاج</p>
           <h1 className="mt-1.5 text-2xl font-black">مهام الإنتاج</h1>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
-            تحويل الخطة المقترحة إلى مهام تشغيل قابلة للمتابعة. مصدر البيانات: {overview.source}.
+            حوّل الخطة المقترحة إلى مهام تشغيل قابلة للمتابعة.
           </p>
-          <div className="mt-3 flex flex-wrap gap-2 text-xs">
-            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">{overview.persistence.mode}</span>
-            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">Storage: {overview.persistence.storage}</span>
-            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">Model: {overview.persistence.model}</span>
-          </div>
         </div>
         <Link href="/dashboard/operations/calendar" className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-bold text-[#025EB8] shadow-sm hover:bg-white/90">
           فتح التقويم والتنبيهات
@@ -76,7 +77,7 @@ export default async function OperationsTasksPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><PlusCircle className="h-5 w-5 text-[#025EB8]" /> إنشاء مهمة تشغيل</CardTitle>
           <CardDescription className="leading-6">
-            أضف مهمة يدوية للفريق بدون إرسال أو نشر تلقائي. الحفظ الحقيقي يتم عبر OperationTask API، وأي غياب لقاعدة البيانات يرجع فشلًا آمنًا.
+            أضف مهمة يدوية للفريق بدون إرسال أو نشر تلقائي.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -89,8 +90,8 @@ export default async function OperationsTasksPage() {
           <CardTitle className="flex items-center gap-2"><ListChecks className="h-5 w-5 text-[#025EB8]" /> قائمة مهام الإنتاج</CardTitle>
           <CardDescription>
             {isDbBacked
-              ? "تقرأ هذه الصفحة مهام OperationTask من قاعدة البيانات عبر repository آمن، وتدعم الانتقالات والتعديل السريع من الواجهة مع AuditLog."
-              : "لا توجد مهام OperationTask جاهزة في قاعدة البيانات بعد؛ يتم استخدام مهام محسوبة من Planning Engine كـ foundation fallback."}
+              ? "متابعة مهام الفريق مع تحديث الحالة والتعديل السريع من الواجهة."
+              : "لا توجد مهام محفوظة بعد؛ تُعرض هنا مهام مقترحة من الخطة حتى تُضاف أول مهمة."}
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 lg:grid-cols-2">
@@ -102,8 +103,8 @@ export default async function OperationsTasksPage() {
                   <p className="mt-1 text-sm leading-6 text-slate-600">{task.sourceReason}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline" className={priorityClass[task.priority]}>{task.priority}</Badge>
-                  <Badge variant="outline" className={statusClass[task.status]}>{statusLabel[task.status]}</Badge>
+                  <Badge variant="outline" className={priorityClass[task.priority]}>{priorityLabel[task.priority] ?? task.priority}</Badge>
+                  <Badge variant="outline" className={statusClass[task.status]}>{statusLabel[task.status] ?? task.status}</Badge>
                 </div>
               </div>
 
@@ -128,7 +129,7 @@ export default async function OperationsTasksPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-[#025EB8]" /> القادم</CardTitle>
           <CardDescription className="leading-6">
-            المهام الآن تقبل إنشاء وتعديلًا سريعًا وانتقالات يومية. الخطوة التالية هي ربط المهام بعناصر ContentItem وArchiveAsset عندما تدخل هذه الموديلات إلى DB-backed runtime.
+            المهام تقبل الإنشاء والتعديل السريع والانتقالات اليومية. قريبًا: ربط المهام مباشرة بعناصر المحتوى ومواد الأرشيف.
           </CardDescription>
         </CardHeader>
       </Card>

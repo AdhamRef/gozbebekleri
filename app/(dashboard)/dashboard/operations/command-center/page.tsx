@@ -31,7 +31,7 @@ export default async function OperationsCommandCenterPage() {
       <div className="rounded-2xl border bg-gradient-to-l from-slate-950 via-[#025EB8] to-slate-900 p-5 text-white shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs text-white/70">Content & Operations Command Center</p>
+            <p className="text-xs text-white/70">مركز قيادة المحتوى والعمليات</p>
             <h1 className="mt-1.5 text-2xl font-black">مركز قيادة المحتوى والتشغيل</h1>
             <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
               صفحة تنفيذية تجمع المواسم، المهام، الإنتاج، والأرشيف في قائمة إجراءات واحدة تساعد الفريق يعرف ماذا ينتج وماذا يسلّم بعد ذلك.

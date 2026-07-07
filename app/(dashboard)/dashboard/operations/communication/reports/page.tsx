@@ -1,114 +1,284 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MessageCircle, Mail, MessageSquare, Inbox, AlertTriangle, ClipboardCheck, ScrollText, Megaphone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCommunicationReport, type CommunicationReport } from "@/lib/communication/reports-service";
+import {
+  getCommunicationReport,
+  reachedCount,
+  engagedCount,
+  sentOutCount,
+  type CommunicationReport,
+  type ReportRange,
+  type StatusCounts,
+} from "@/lib/communication/reports-service";
+import { getSchedulerStatus } from "@/lib/communication/scheduler-status";
 
 export const dynamic = "force-dynamic";
 
-const channelLabel: Record<string, string> = { WHATSAPP: "واتساب", EMAIL: "إيميل", SMS: "رسائل SMS" };
+const RANGES: { key: ReportRange; label: string }[] = [
+  { key: "today", label: "اليوم" },
+  { key: "7d", label: "آخر 7 أيام" },
+  { key: "30d", label: "آخر 30 يوم" },
+  { key: "all", label: "الكل" },
+];
 
-function StatusRow({ label, counts }: { label: string; counts: CommunicationReport["byChannel"][number]["counts"] }) {
+const CHANNELS: { key: string; label: string; icon: typeof MessageCircle; color: string }[] = [
+  { key: "WHATSAPP", label: "واتساب", icon: MessageCircle, color: "text-emerald-600" },
+  { key: "EMAIL", label: "الإيميل", icon: Mail, color: "text-[#025EB8]" },
+  { key: "SMS", label: "الرسائل القصيرة", icon: MessageSquare, color: "text-amber-600" },
+];
+
+const INBOX = "/dashboard/operations/communication/inbox";
+const NEW_CAMPAIGN = "/dashboard/operations/communication/campaigns";
+const ADVANCED_LOGS = "/dashboard/operations/communication/delivery-logs";
+
+function pct(value: number, total: number) {
+  return total > 0 ? Math.round((value / total) * 100) : 0;
+}
+
+function Bar({ label, value, total, color }: { label: string; value: number; total: number; color: string }) {
+  const p = pct(value, total);
   return (
-    <tr className="border-b last:border-0">
-      <td className="p-3 font-semibold">{label}</td>
-      <td className="p-3 text-center">{counts.total}</td>
-      <td className="p-3 text-center text-emerald-700">{counts.delivered}</td>
-      <td className="p-3 text-center text-blue-700">{counts.read}</td>
-      <td className="p-3 text-center text-slate-500">{counts.sent}</td>
-      <td className="p-3 text-center text-amber-700">{counts.skipped}</td>
-      <td className="p-3 text-center text-rose-700">{counts.failed}</td>
-    </tr>
+    <div>
+      <div className="mb-1 flex items-center justify-between text-xs">
+        <span className="text-slate-500">{label}</span>
+        <span className="font-bold text-slate-700">{value.toLocaleString("ar")}{total > 0 ? <span className="text-slate-400"> · {p}%</span> : null}</span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${p}%` }} />
+      </div>
+    </div>
   );
 }
 
-export default async function CommunicationReportsPage() {
+function ChannelCard({ label, icon: Icon, color, counts }: { label: string; icon: typeof MessageCircle; color: string; counts: StatusCounts }) {
+  const prepared = counts.total;
+  const sentOut = sentOutCount(counts);
+  const reached = reachedCount(counts);
+  const engaged = engagedCount(counts);
+  return (
+    <Card className="border-slate-200">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base"><Icon className={`h-4 w-4 ${color}`} /> {label}</CardTitle>
+        <CardDescription>{prepared > 0 ? <>تم تجهيز <b className="text-slate-700">{prepared.toLocaleString("ar")}</b> رسالة في هذه الفترة.</> : "لا رسائل في هذه الفترة."}</CardDescription>
+      </CardHeader>
+      {prepared > 0 ? (
+        <CardContent className="space-y-2.5">
+          <Bar label="أُرسلت" value={sentOut} total={prepared} color="bg-slate-400" />
+          <Bar label="وصلت" value={reached} total={prepared} color="bg-emerald-500" />
+          <Bar label="تمت القراءة / فُتحت" value={engaged} total={prepared} color="bg-[#025EB8]" />
+          <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-xs">
+            {counts.replied > 0 ? <span className="text-emerald-700">رد المتبرع: <b>{counts.replied.toLocaleString("ar")}</b></span> : null}
+            <span className="text-rose-700">فشلت: <b>{counts.failed.toLocaleString("ar")}</b></span>
+            <span className="text-amber-700">لم تُرسل: <b>{counts.skipped.toLocaleString("ar")}</b></span>
+          </div>
+        </CardContent>
+      ) : null}
+    </Card>
+  );
+}
+
+function HeadlineCard({ label, value, caption, tone, href, cta }: { label: string; value: number; caption: string; tone?: "bad" | "warn" | "ok"; href?: string; cta?: string }) {
+  const valueColor = tone === "bad" ? "text-rose-700" : tone === "warn" ? "text-amber-700" : tone === "ok" ? "text-emerald-700" : "text-slate-900";
+  return (
+    <Card className="border-slate-200">
+      <CardContent className="p-4">
+        <div className="text-xs text-slate-500">{label}</div>
+        <div className={`mt-1 text-2xl font-black ${valueColor}`}>{value.toLocaleString("ar")}</div>
+        <div className="mt-0.5 text-[11px] text-slate-400">{caption}</div>
+        {href && cta ? <Link href={href} className="mt-1.5 inline-block text-xs font-semibold text-[#025EB8] underline">{cta}</Link> : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+export default async function CommunicationReportsPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
+  const sp = await searchParams;
+  const range: ReportRange = RANGES.some((r) => r.key === sp.range) ? (sp.range as ReportRange) : "30d";
+
   let report: CommunicationReport | null = null;
   try {
-    report = await getCommunicationReport();
+    report = await getCommunicationReport(range);
   } catch {
     report = null;
   }
-
+  const scheduler = await getSchedulerStatus().catch(() => null);
   const empty = !report || report.totalDeliveries === 0;
 
   return (
-    <main className="space-y-5 p-4 sm:p-6" dir="rtl">
+    <main className="space-y-5" dir="rtl">
+      {/* Header */}
       <section className="rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs text-white/70">مركز التواصل</p>
-            <h1 className="mt-1.5 text-2xl font-black">تقارير التواصل</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-white/85">أداء الإرسال حسب القناة واللغة والمُرسِل، الإخفاقات، الموافقات الناقصة، واللغات بلا قوالب.</p>
+            <h1 className="mt-1.5 text-2xl font-black">نتائج التواصل</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-white/85">أداء رسائل واتساب، الإيميل، والرسائل القصيرة حسب القناة واللغة.</p>
           </div>
           <Button asChild variant="secondary" className="gap-2 font-bold"><Link href="/dashboard/operations/communication">العودة <ArrowLeft className="h-4 w-4" /></Link></Button>
         </div>
+        {/* Date filter */}
+        <div className="mt-4 inline-flex flex-wrap gap-1 rounded-xl bg-white/10 p-1">
+          {RANGES.map((r) => {
+            const active = r.key === range;
+            return (
+              <Link key={r.key} href={`?range=${r.key}`} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${active ? "bg-white text-slate-900" : "text-white/80 hover:bg-white/10"}`}>{r.label}</Link>
+            );
+          })}
+        </div>
       </section>
-
-      {/* Action signals */}
-      <section className="grid gap-3 md:grid-cols-3">
-        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">ردود واتساب بحاجة إجراء</div><div className="mt-1 text-2xl font-black">{report?.repliesNeedingAction ?? 0}</div><Link href="/dashboard/operations/communication/inbox" className="mt-1 inline-block text-xs text-[#025EB8] underline">فتح الصندوق</Link></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">واتساب بلا موافقة (يحتاج مراجعة)</div><div className="mt-1 text-2xl font-black">{report?.missingConsentWhatsApp ?? 0}</div><Link href="/dashboard/operations/communication/audiences" className="mt-1 inline-block text-xs text-[#025EB8] underline">فتح الجماهير</Link></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">إجمالي سجلات الإرسال</div><div className="mt-1 text-2xl font-black">{report?.totalDeliveries ?? 0}</div></CardContent></Card>
-      </section>
-
-      {report && report.missingTemplateLanguages.length > 0 ? (
-        <Card className="border-amber-200 bg-amber-50">
-          <CardContent className="p-4 text-sm leading-6 text-amber-900">
-            <b>لغات لها متبرعون بلا قالب:</b>{" "}
-            {report.missingTemplateLanguages.map((m) => `${channelLabel[m.channel] ?? m.channel}: ${m.locales.join(", ")}`).join(" · ")}
-          </CardContent>
-        </Card>
-      ) : null}
 
       {empty ? (
-        <Card><CardContent className="p-10 text-center text-sm text-slate-500">لا توجد بيانات كافية بعد. ستظهر التقارير بعد تجهيز حملات ووصول أحداث المزودين.</CardContent></Card>
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 p-12 text-center">
+            <p className="text-sm text-slate-500">لا توجد رسائل في هذه الفترة بعد.</p>
+            <Button asChild className="gap-2"><Link href={NEW_CAMPAIGN}><Megaphone className="h-4 w-4" /> إنشاء حملة</Link></Button>
+          </CardContent>
+        </Card>
       ) : (
         <>
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-base">الأداء حسب القناة</CardTitle></CardHeader>
-            <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full min-w-[44rem] text-sm">
-              <thead className="border-b bg-slate-50 text-xs text-slate-500"><tr><th className="p-3 text-right">القناة</th><th className="p-3 text-center">الكل</th><th className="p-3 text-center">وصل</th><th className="p-3 text-center">قُرئ</th><th className="p-3 text-center">أُرسل</th><th className="p-3 text-center">متخطّى</th><th className="p-3 text-center">فشل</th></tr></thead>
-              <tbody>{report!.byChannel.map((c) => <StatusRow key={c.channel} label={channelLabel[c.channel] ?? c.channel} counts={c.counts} />)}</tbody>
-            </table></div></CardContent>
-          </Card>
+          {/* Headline metrics */}
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <HeadlineCard label="تم التجهيز/الإرسال" value={report!.headline.prepared} caption="كل الرسائل المُجهّزة" />
+            <HeadlineCard label="وصل / قُبل" value={report!.headline.reached} caption="وصلت إلى المستلمين" tone="ok" />
+            <HeadlineCard label="قرأ / فتح" value={report!.headline.engaged} caption="قرأها أو فتحها المستلمون" />
+            <HeadlineCard label="فشل" value={report!.headline.failed} caption="لم تنجح" tone={report!.headline.failed > 0 ? "bad" : undefined} />
+            <HeadlineCard label="ردود تحتاج متابعة" value={report!.headline.repliesNeedingAction} caption="محادثات واتساب بانتظار الرد" tone={report!.headline.repliesNeedingAction > 0 ? "warn" : undefined} href={INBOX} cta="فتح الصندوق" />
+          </section>
 
+          {scheduler && scheduler.dueCount > 0 ? (
+            <Card className={scheduler.configured ? "border-slate-200" : "border-amber-200 bg-amber-50"}>
+              <CardContent className="p-4 text-sm leading-6">
+                <b>{scheduler.dueCount.toLocaleString("ar")}</b> حملة مجدولة فات موعدها ولم تُرسل بعد.{" "}
+                {scheduler.configured ? "سيتم تنفيذها في الدورة التلقائية القادمة." : <span className="text-amber-900">التنفيذ التلقائي غير مفعّل — فعّل Cron أو شغّلها يدويًا من صفحة الحملة.</span>}
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {/* 1. Performance by channel */}
+          <section>
+            <h2 className="mb-3 text-sm font-bold text-slate-500">الأداء حسب القناة</h2>
+            <div className="grid gap-3 lg:grid-cols-3">
+              {CHANNELS.map((ch) => {
+                const row = report!.byChannel.find((c) => c.channel === ch.key);
+                return <ChannelCard key={ch.key} label={ch.label} icon={ch.icon} color={ch.color} counts={row?.counts ?? { total: 0, sent: 0, delivered: 0, read: 0, opened: 0, clicked: 0, replied: 0, failed: 0, skipped: 0 }} />;
+              })}
+            </div>
+          </section>
+
+          {/* 2. Performance by language */}
           {report!.byLanguage.length > 0 ? (
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-base">الأداء حسب اللغة</CardTitle></CardHeader>
-              <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full min-w-[44rem] text-sm">
-                <thead className="border-b bg-slate-50 text-xs text-slate-500"><tr><th className="p-3 text-right">اللغة</th><th className="p-3 text-center">الكل</th><th className="p-3 text-center">وصل</th><th className="p-3 text-center">قُرئ</th><th className="p-3 text-center">أُرسل</th><th className="p-3 text-center">متخطّى</th><th className="p-3 text-center">فشل</th></tr></thead>
-                <tbody>{report!.byLanguage.map((l) => <StatusRow key={l.locale} label={l.label} counts={l.counts} />)}</tbody>
+              <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full min-w-[40rem] text-sm">
+                <thead className="border-b bg-slate-50 text-xs text-slate-500"><tr>
+                  <th className="p-3 text-right">اللغة</th><th className="p-3 text-center">المجموع</th><th className="p-3 text-center">أُرسلت</th><th className="p-3 text-center">وصلت</th><th className="p-3 text-center">تمت القراءة/فُتحت</th><th className="p-3 text-center">فشلت</th><th className="p-3 text-center">لم تُرسل</th>
+                </tr></thead>
+                <tbody>{report!.byLanguage.map((l) => (
+                  <tr key={l.locale} className="border-b last:border-0">
+                    <td className="p-3 font-semibold">{l.label}</td>
+                    <td className="p-3 text-center">{l.counts.total.toLocaleString("ar")}</td>
+                    <td className="p-3 text-center text-slate-600">{sentOutCount(l.counts).toLocaleString("ar")}</td>
+                    <td className="p-3 text-center text-emerald-700">{reachedCount(l.counts).toLocaleString("ar")}</td>
+                    <td className="p-3 text-center text-blue-700">{engagedCount(l.counts).toLocaleString("ar")}</td>
+                    <td className="p-3 text-center text-rose-700">{l.counts.failed.toLocaleString("ar")}</td>
+                    <td className="p-3 text-center text-amber-700">{l.counts.skipped.toLocaleString("ar")}</td>
+                  </tr>
+                ))}</tbody>
               </table></div></CardContent>
             </Card>
           ) : null}
 
-          {report!.bySender.length > 0 ? (
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-base">أداء المُرسِلين</CardTitle></CardHeader>
-              <CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full min-w-[44rem] text-sm">
-                <thead className="border-b bg-slate-50 text-xs text-slate-500"><tr><th className="p-3 text-right">المُرسِل</th><th className="p-3 text-center">الكل</th><th className="p-3 text-center">وصل</th><th className="p-3 text-center">قُرئ</th><th className="p-3 text-center">أُرسل</th><th className="p-3 text-center">متخطّى</th><th className="p-3 text-center">فشل</th></tr></thead>
-                <tbody>{report!.bySender.map((s) => <StatusRow key={s.senderId} label={s.name} counts={s.counts} />)}</tbody>
-              </table></div></CardContent>
-            </Card>
-          ) : null}
-
+          {/* 3. Top failure reasons */}
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-base">إخفاقات ومتخطّى حديثة</CardTitle><CardDescription>آخر السجلات غير المُرسَلة مع السبب.</CardDescription></CardHeader>
-            <CardContent className="p-0">
-              {report!.failedRecent.length === 0 ? (
-                <div className="p-6 text-center text-sm text-emerald-700">لا توجد إخفاقات حديثة.</div>
+            <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><AlertTriangle className="h-4 w-4 text-rose-600" /> أكثر أسباب الفشل</CardTitle></CardHeader>
+            <CardContent>
+              {report!.failureReasons.length === 0 ? (
+                <p className="py-4 text-center text-sm text-emerald-700">لا توجد رسائل فاشلة في هذه الفترة.</p>
               ) : (
-                <div className="overflow-x-auto"><table className="w-full min-w-[40rem] text-sm">
-                  <thead className="border-b bg-slate-50 text-xs text-slate-500"><tr><th className="p-3 text-right">القناة</th><th className="p-3 text-right">اللغة</th><th className="p-3 text-right">السبب</th><th className="p-3 text-right">التاريخ</th></tr></thead>
-                  <tbody>{report!.failedRecent.map((f) => (
-                    <tr key={f.id} className="border-b last:border-0"><td className="p-3">{channelLabel[f.channel] ?? f.channel}</td><td className="p-3">{f.locale ?? "—"}</td><td className="p-3"><Badge variant="outline" className="border-rose-200 bg-rose-50 text-rose-700">{f.reason ?? "—"}</Badge></td><td className="p-3 text-xs text-slate-400">{new Date(f.at).toLocaleString("ar")}</td></tr>
-                  ))}</tbody>
-                </table></div>
+                <ul className="space-y-2">{report!.failureReasons.map((f) => (
+                  <li key={f.reason} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+                    <span className="text-slate-700">{f.reason}</span>
+                    <Badge variant="outline" className="border-rose-200 bg-rose-50 text-rose-700">{f.count.toLocaleString("ar")}</Badge>
+                  </li>
+                ))}</ul>
               )}
             </CardContent>
           </Card>
+
+          <div className="grid gap-5 lg:grid-cols-2">
+            {/* 4. Conversations needing reply */}
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><Inbox className="h-4 w-4 text-amber-600" /> محادثات تحتاج رد</CardTitle></CardHeader>
+              <CardContent>
+                {report!.conversationsNeedingReply.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-slate-500">لا توجد محادثات تنتظر الرد.</p>
+                ) : (
+                  <ul className="space-y-2">{report!.conversationsNeedingReply.map((c) => (
+                    <li key={c.phone} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-slate-800">{c.name ?? "متبرع غير معروف"}</span>
+                        <span dir="ltr" className="text-xs text-slate-400">{c.phone}</span>
+                      </div>
+                      {c.lastInboundText ? <p className="mt-0.5 truncate text-xs text-slate-500">{c.lastInboundText}</p> : null}
+                    </li>
+                  ))}</ul>
+                )}
+                <Link href={INBOX} className="mt-3 inline-block text-xs font-semibold text-[#025EB8] underline">فتح صندوق الوارد</Link>
+              </CardContent>
+            </Card>
+
+            {/* 5. Campaigns needing review */}
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><ClipboardCheck className="h-4 w-4 text-[#025EB8]" /> حملات تحتاج مراجعة</CardTitle></CardHeader>
+              <CardContent>
+                {report!.campaignsNeedingReview.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-slate-500">لا توجد حملات تنتظر إجراءً.</p>
+                ) : (
+                  <ul className="space-y-2">{report!.campaignsNeedingReview.map((c) => (
+                    <li key={c.id} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+                      <Link href={`${NEW_CAMPAIGN}/${c.id}`} className="flex items-center justify-between gap-2">
+                        <span className="truncate font-semibold text-slate-800">{c.name}</span>
+                        <Badge variant="outline" className="shrink-0 border-amber-200 bg-amber-50 text-amber-700">{c.reason}</Badge>
+                      </Link>
+                    </li>
+                  ))}</ul>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 6. Skipped due to missing setup / approval */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">رسائل لم تُرسل — تحتاج إعدادًا أو موافقة</CardTitle>
+              <CardDescription>رسائل تخطّاها النظام بأمان بدل إرسالها ناقصة. عالِج السبب ثم أعد المحاولة.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {report!.skippedReasons.length === 0 ? (
+                <p className="py-4 text-center text-sm text-emerald-700">لا توجد رسائل متخطاة في هذه الفترة.</p>
+              ) : (
+                <ul className="space-y-2">{report!.skippedReasons.map((s) => (
+                  <li key={s.reason} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+                    <span className="text-slate-700">{s.reason}</span>
+                    <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">{s.count.toLocaleString("ar")}</Badge>
+                  </li>
+                ))}</ul>
+              )}
+              {report!.missingTemplateLanguages.length > 0 ? (
+                <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-6 text-amber-900">
+                  <b>لغات لها متبرعون بلا قالب:</b>{" "}
+                  {report!.missingTemplateLanguages.map((m) => `${CHANNELS.find((c) => c.key === m.channel)?.label ?? m.channel}: ${m.locales.join(", ")}`).join(" · ")}
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          {/* Advanced logs link — kept out of the way, not the primary view */}
+          <div className="flex justify-center pt-1">
+            <Button asChild variant="outline" className="gap-2"><Link href={ADVANCED_LOGS}><ScrollText className="h-4 w-4" /> فتح سجل الرسائل المتقدم</Link></Button>
+          </div>
         </>
       )}
     </main>

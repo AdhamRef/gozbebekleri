@@ -133,7 +133,7 @@ export function OperationTaskCreateForm({ isFoundationMode }: { isFoundationMode
           className="min-h-20"
         />
         {isFoundationMode ? (
-          <p className="text-xs leading-5 text-amber-700">القائمة الحالية foundation fallback. سيحاول النموذج إنشاء OperationTask حقيقية، وإن لم تكن قاعدة البيانات متاحة سيظهر فشل آمن.</p>
+          <p className="text-xs leading-5 text-amber-700">القائمة الحالية مؤقتة. سيتم حفظ المهمة، وإن تعذّر الحفظ سيظهر تنبيه واضح.</p>
         ) : null}
       </div>
 

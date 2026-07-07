@@ -2,21 +2,30 @@ import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
 import type { CommunicationCampaign } from "@prisma/client";
 import { getCampaign } from "./campaign-service";
-import { loadCampaignRecipients } from "./campaign-recipient-service";
-import { evaluateCoverageGate } from "./campaign-approval-service";
+import { planCampaignSend, type SendPlan } from "./campaign-send-planner";
 import { renderChannelTemplate } from "./template-compat";
 import { createDeliveryRecord, recordSkippedDelivery, markDeliveryStatus } from "./delivery-log-service";
 import { sendPreparedDelivery } from "./provider-router";
 import { listSenders, toSenderConfig } from "./sender-service";
 import { listRoutingRules, toRoutingRuleConfig } from "./routing-rule-service";
 import { resolveSender } from "./sender-router";
-import { isCommunicationChannel, type CommunicationChannelId, type CommunicationPurposeId } from "./communication-runtime-types";
+import { type CommunicationChannelId, type CommunicationPurposeId } from "./communication-runtime-types";
 
 /**
  * Campaign send executor. Turns an APPROVED (Send Now) or due SCHEDULED campaign into real,
  * archived deliveries. Every recipient gets a CommunicationDelivery BEFORE any provider call;
- * nothing is marked SENT unless the provider accepted. Missing config / ineligible / no-sender →
- * SKIPPED with a reason. Idempotent per (campaign + recipient + template). Batched and audited.
+ * nothing is marked SENT unless the provider accepted.
+ *
+ * SAFETY:
+ * - All pre-send gates (planCampaignSend) must pass BEFORE the campaign is moved to SENDING.
+ *   If blocked (no template, coverage incomplete, no eligible recipients, provider/sender not
+ *   ready, …) the campaign is NOT moved to SENDING and a `communication.campaign.send.blocked`
+ *   audit is written.
+ * - Final status can never be SENT with 0 sent (see `computeFinalStatus`). Allowed CommunicationCampaign
+ *   status values (String): DRAFT · REVIEW · APPROVED · SCHEDULED · SENDING · SENT · SENT_WITH_ISSUES ·
+ *   BLOCKED · CANCELLED · FAILED.
+ * - Idempotent per (campaign + template + channel + origin=CAMPAIGN + recipient); a recipient with an
+ *   existing processed delivery (or a providerMessageId) is never sent again.
  */
 
 type Actor = { actorId?: string | null; actorName?: string | null; actorRole?: string | null } | null;
@@ -36,6 +45,8 @@ export type ExecutionSummary = {
   blocked?: string;
 };
 
+const PROCESSED_STATUSES = ["RENDERED", "QUEUED", "SENT_TO_PROVIDER", "SENT", "DELIVERED", "READ", "FAILED", "SKIPPED"];
+
 function bump(reasons: Record<string, number>, key: string) {
   reasons[key] = (reasons[key] ?? 0) + 1;
 }
@@ -44,39 +55,91 @@ function coverageDecisions(campaign: CommunicationCampaign): Record<string, stri
   return ((campaign.metadata as Record<string, unknown> | null)?.coverageDecisions ?? {}) as Record<string, string>;
 }
 
+/**
+ * Safe final campaign status. NEVER returns SENT unless at least one message was actually sent with
+ * nothing skipped/failed.
+ */
+export function computeFinalStatus(total: number, sent: number, skipped: number, failed: number): string {
+  if (total === 0) return "BLOCKED";
+  if (sent > 0 && failed === 0 && skipped === 0) return "SENT";
+  if (sent > 0) return "SENT_WITH_ISSUES";
+  if (failed > 0) return "FAILED";
+  if (skipped > 0) return "BLOCKED";
+  return "BLOCKED";
+}
+
+async function auditBlocked(campaign: CommunicationCampaign, reason: string, actor: Actor, mode: SendMode, plan?: SendPlan) {
+  await writeAuditLog({
+    actorId: actor?.actorId ?? undefined,
+    actorName: actor?.actorName ?? undefined,
+    actorRole: actor?.actorRole ?? "ADMIN",
+    action: "communication.campaign.send.blocked",
+    messageAr: `تعذّر إرسال حملة «${campaign.name}» — السبب: ${reason}`,
+    messageEn: `Campaign send blocked: ${campaign.name} — ${reason}`,
+    entityType: "CommunicationCampaign",
+    entityId: campaign.id,
+    metadata: { mode, reason, summary: plan ? { total: plan.total, eligible: plan.eligible, skipped: plan.skipped, reasons: plan.reasons } : undefined, externalCall: false, autoSend: false },
+    stream: "TEAM",
+  });
+}
+
+/** Merge lastRun into campaign metadata without clobbering other keys (e.g. coverageDecisions). */
+function mergedMetadata(campaign: CommunicationCampaign, lastRun: Record<string, unknown>) {
+  return { ...(campaign.metadata as Record<string, unknown> | null), lastRun } as never;
+}
+
 export async function executeCampaignSend(
   campaignId: string,
   opts: { actor?: Actor; mode?: SendMode; batchSize?: number } = {}
 ): Promise<ExecutionSummary> {
   const mode = opts.mode ?? "SEND_NOW";
   const batchSize = Math.min(opts.batchSize ?? 200, 1000);
+  const actor = opts.actor ?? null;
   const base: ExecutionSummary = { ok: false, campaignId, status: "", total: 0, sent: 0, skipped: 0, failed: 0, truncated: false, reasons: {} };
 
   const campaign = await getCampaign(campaignId);
   if (!campaign) return { ...base, blocked: "NOT_FOUND" };
   base.status = campaign.status;
 
-  // Status gate.
-  if (mode === "SEND_NOW" && campaign.status !== "APPROVED") return { ...base, blocked: "NOT_APPROVED" };
-  if (mode === "DUE") {
-    if (campaign.status !== "SCHEDULED") return { ...base, blocked: "NOT_SCHEDULED" };
-    if (!campaign.scheduledAt || campaign.scheduledAt.getTime() > Date.now()) return { ...base, blocked: "NOT_DUE" };
+  // Status/mode gate (before any content gate).
+  if (mode === "SEND_NOW" && campaign.status !== "APPROVED") {
+    await auditBlocked(campaign, "NOT_APPROVED", actor, mode);
+    return { ...base, blocked: "NOT_APPROVED" };
   }
-  if (!isCommunicationChannel(campaign.channel)) return { ...base, blocked: "INVALID_CHANNEL" };
-  if (!campaign.templateGroupId) return { ...base, blocked: "NO_TEMPLATE" };
-  const channel: CommunicationChannelId = campaign.channel;
+  if (mode === "DUE") {
+    if (campaign.status !== "SCHEDULED") {
+      await auditBlocked(campaign, "NOT_SCHEDULED", actor, mode);
+      return { ...base, blocked: "NOT_SCHEDULED" };
+    }
+    if (!campaign.scheduledAt || campaign.scheduledAt.getTime() > Date.now()) {
+      await auditBlocked(campaign, "NOT_DUE", actor, mode);
+      return { ...base, blocked: "NOT_DUE" };
+    }
+  }
 
-  // Language coverage gate — never silently send the wrong language.
-  const gate = await evaluateCoverageGate(campaignId);
-  if (!gate.ok) return { ...base, blocked: "LANGUAGE_COVERAGE_INCOMPLETE" };
+  // Content/readiness gates — must ALL pass before we move to SENDING.
+  const plan = await planCampaignSend(campaignId, { batchSize });
+  base.total = plan.total;
+  base.truncated = plan.truncated;
+  base.reasons = { ...plan.reasons };
+  if (plan.blocked) {
+    await auditBlocked(campaign, plan.blocked, actor, mode, plan);
+    // Record the blocked run in metadata without changing status away from APPROVED/SCHEDULED.
+    await prisma.communicationCampaign
+      .update({ where: { id: campaignId }, data: { metadata: mergedMetadata(campaign, { ranAt: new Date().toISOString(), mode, total: plan.total, sent: 0, skipped: plan.skipped, failed: 0, blocked: plan.blocked, reasons: plan.reasons, truncated: plan.truncated }) } })
+      .catch(() => {});
+    return { ...base, blocked: plan.blocked };
+  }
 
-  // Move to SENDING.
-  await prisma.communicationCampaign.update({ where: { id: campaignId }, data: { status: "SENDING" } }).catch(() => {});
-
+  const channel: CommunicationChannelId = campaign.channel as CommunicationChannelId;
+  const templateId = campaign.templateGroupId as string; // guaranteed by the NO_TEMPLATE gate above
   const decisions = coverageDecisions(campaign);
   const purpose = campaign.purpose as CommunicationPurposeId;
 
-  // Load senders/rules once for routing (WhatsApp/SMS). Email uses its own identity.
+  // All gates passed → NOW move to SENDING.
+  await prisma.communicationCampaign.update({ where: { id: campaignId }, data: { status: "SENDING" } }).catch(() => {});
+
+  // Load senders/rules for routing (WhatsApp/SMS). Email uses its own identity.
   const senders = await listSenders();
   const rules = await listRoutingRules(channel);
   const senderConfigs = senders.filter((s) => s.channel === channel).map(toSenderConfig);
@@ -85,21 +148,26 @@ export async function executeCampaignSend(
   const defaultEmailIdentity =
     senders.find((s) => s.channel === "EMAIL" && s.enabled)?.senderEmail || process.env.SENDGRID_FROM || null;
 
-  // Idempotency: recipients already archived for this campaign+template.
+  // Idempotency: recipients already processed for this campaign+template+channel+origin CAMPAIGN,
+  // or any recipient with a providerMessageId already assigned.
   const existing = await prisma.communicationDelivery
-    .findMany({ where: { campaignId, templateId: campaign.templateGroupId }, select: { recipientUserId: true } })
+    .findMany({ where: { campaignId, templateId: templateId, channel, origin: "CAMPAIGN" }, select: { recipientUserId: true, status: true, providerMessageId: true } })
     .catch(() => []);
-  const alreadyDone = new Set(existing.map((d) => d.recipientUserId).filter(Boolean) as string[]);
+  const alreadyDone = new Set(
+    existing
+      .filter((d) => (d.status && PROCESSED_STATUSES.includes(d.status)) || !!d.providerMessageId)
+      .map((d) => d.recipientUserId)
+      .filter(Boolean) as string[]
+  );
 
-  const { recipients, skipped, truncated } = await loadCampaignRecipients(channel, campaign.audienceSegmentKey, { limit: batchSize });
-  base.total = recipients.length + skipped.length;
-  base.truncated = truncated;
+  const recipients = plan.recipients;
+  const skipped = plan.skippedList;
 
-  // Archive ineligible recipients as SKIPPED (bounded).
+  // Archive ineligible recipients as SKIPPED (bounded, idempotent).
   for (const s of skipped.slice(0, batchSize)) {
     if (alreadyDone.has(s.userId)) continue;
     await recordSkippedDelivery(
-      { channel, campaignId, templateId: campaign.templateGroupId, recipientUserId: s.userId, locale: s.locale, purpose, origin: "CAMPAIGN", createdBy: opts.actor?.actorId ?? null },
+      { channel, campaignId, templateId: templateId, recipientUserId: s.userId, locale: s.locale, purpose, origin: "CAMPAIGN", createdBy: actor?.actorId ?? null },
       s.reason
     );
     base.skipped += 1;
@@ -113,15 +181,15 @@ export async function executeCampaignSend(
     }
 
     // Coverage decision: excluded language → skip.
-    const rendered = await renderChannelTemplate(channel, campaign.templateGroupId, r.locale);
+    const rendered = await renderChannelTemplate(channel, templateId, r.locale);
     if (!rendered) {
-      await recordSkippedDelivery({ channel, campaignId, templateId: campaign.templateGroupId, recipientUserId: r.userId, locale: r.locale, purpose, origin: "CAMPAIGN" }, "TEMPLATE_RENDER_FAILED");
+      await recordSkippedDelivery({ channel, campaignId, templateId: templateId, recipientUserId: r.userId, locale: r.locale, purpose, origin: "CAMPAIGN" }, "TEMPLATE_RENDER_FAILED");
       base.skipped += 1;
       bump(base.reasons, "TEMPLATE_RENDER_FAILED");
       continue;
     }
     if (rendered.usedFallback && decisions[r.locale] === "EXCLUDE") {
-      await recordSkippedDelivery({ channel, campaignId, templateId: campaign.templateGroupId, recipientUserId: r.userId, locale: r.locale, purpose, origin: "CAMPAIGN", templateName: rendered.templateName }, "LANGUAGE_EXCLUDED");
+      await recordSkippedDelivery({ channel, campaignId, templateId: templateId, recipientUserId: r.userId, locale: r.locale, purpose, origin: "CAMPAIGN", templateName: rendered.templateName }, "LANGUAGE_EXCLUDED");
       base.skipped += 1;
       bump(base.reasons, "LANGUAGE_EXCLUDED");
       continue;
@@ -143,7 +211,7 @@ export async function executeCampaignSend(
     const created = await createDeliveryRecord({
       channel,
       campaignId,
-      templateId: campaign.templateGroupId,
+      templateId: templateId,
       templateName: rendered.templateName,
       recipientUserId: r.userId,
       recipientEmail: channel === "EMAIL" ? r.email : null,
@@ -155,7 +223,7 @@ export async function executeCampaignSend(
       renderedSubject: rendered.subject,
       renderedBody: rendered.body,
       senderId: routerSender?.id ?? null,
-      createdBy: opts.actor?.actorId ?? null,
+      createdBy: actor?.actorId ?? null,
       status: "RENDERED",
     });
     if (!created.ok) {
@@ -199,8 +267,8 @@ export async function executeCampaignSend(
     bump(base.reasons, "SENT");
   }
 
-  // Finalize campaign status + counters.
-  const finalStatus = base.failed > 0 && base.sent === 0 ? "FAILED" : "SENT";
+  // Finalize campaign status + counters. NEVER SENT with 0 sent.
+  const finalStatus = computeFinalStatus(base.total, base.sent, base.skipped, base.failed);
   await prisma.communicationCampaign
     .update({
       where: { id: campaignId },
@@ -208,15 +276,15 @@ export async function executeCampaignSend(
         status: finalStatus,
         sentCount: { increment: base.sent },
         failedCount: { increment: base.failed },
-        metadata: { ...(campaign.metadata as Record<string, unknown> | null), lastRun: { sent: base.sent, skipped: base.skipped, failed: base.failed, truncated: base.truncated } } as never,
+        metadata: mergedMetadata(campaign, { ranAt: new Date().toISOString(), mode, total: base.total, sent: base.sent, skipped: base.skipped, failed: base.failed, blocked: null, reasons: base.reasons, truncated: base.truncated }),
       },
     })
     .catch(() => {});
 
   await writeAuditLog({
-    actorId: opts.actor?.actorId ?? undefined,
-    actorName: opts.actor?.actorName ?? undefined,
-    actorRole: opts.actor?.actorRole ?? "ADMIN",
+    actorId: actor?.actorId ?? undefined,
+    actorName: actor?.actorName ?? undefined,
+    actorRole: actor?.actorRole ?? "ADMIN",
     action: "communication.campaign.send",
     messageAr: `تنفيذ إرسال حملة «${campaign.name}» — أُرسل ${base.sent}، تخطّي ${base.skipped}، فشل ${base.failed}`,
     messageEn: `Campaign send executed: ${campaign.name} — sent ${base.sent}, skipped ${base.skipped}, failed ${base.failed}`,

@@ -2,15 +2,16 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   AlertTriangle,
-  Bot,
   CheckCircle2,
   Download,
   FileText,
   Layers3,
   Palette,
-  ShieldCheck,
-  Sparkles,
-  Type,
+  PenLine,
+  Building2,
+  ThumbsUp,
+  ThumbsDown,
+  ArrowLeft,
 } from "lucide-react";
 import type {
   BrandAsset,
@@ -35,30 +36,48 @@ type Props = {
   snapshot: BrandCenterSnapshot;
 };
 
+const STATUS_LABELS_AR: Record<string, string> = {
+  ACTIVE: "نشط",
+  TO_VERIFY: "بحاجة تأكيد",
+  FOUNDATION: "قيد الإعداد",
+};
+const statusAr = (s: string) => STATUS_LABELS_AR[s] ?? s;
+
+const TAB_LABELS_AR: Record<BrandCenterTabKey, string> = {
+  overview: "نظرة عامة",
+  organizations: "المؤسسات",
+  assets: "الشعارات والأصول",
+  colors: "الألوان",
+  typography: "الخطوط",
+  voice: "قواعد الكتابة",
+  frameworks: "قوالب الرسائل",
+  downloads: "التنزيلات",
+};
+
 export function BrandCenterView({ activeTab, snapshot }: Props) {
   return (
     <main className="min-h-screen bg-[#FFFDF8] p-4 text-slate-950 sm:p-6" dir="rtl">
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-4xl">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#025EB8]">Brand Center</p>
-            <h1 className="mt-2 text-2xl font-black text-slate-950 sm:text-3xl">مركز الهوية</h1>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#025EB8]">مركز الهوية</p>
+            <h1 className="mt-2 text-2xl font-black text-slate-950 sm:text-3xl">دليل الهوية للفريق</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              مصدر واحد للهوية الرسمية، الأصول، الألوان، قواعد الكتابة، ورسائل الحملات. كل مخرجات AI هنا Draft وتحتاج مراجعة بشرية.
+              مرجع واحد لكتّاب المحتوى والمصممين: نبرة الخطاب، قواعد كتابة المنشورات، الألوان، الشعارات، وقوالب الرسائل الجاهزة.
             </p>
           </div>
           <div className="rounded-lg border bg-slate-50 p-4 text-sm text-slate-700 lg:min-w-72">
-            <p className="font-black text-slate-950">{snapshot.activeProfile.name}</p>
+            <p className="text-xs font-bold text-slate-500">الهوية النشطة</p>
+            <p className="mt-1 font-black text-slate-950">{snapshot.activeProfile.name}</p>
             <p className="mt-1 leading-6">{snapshot.activeProfile.contentVoice}</p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Badge>{snapshot.persistence.mode}</Badge>
-              <Badge>{snapshot.activeProfile.primaryLocale.toUpperCase()}</Badge>
-              <Badge>{snapshot.summary.toVerify} to verify</Badge>
+              <Badge>اللغة الأساسية: {snapshot.activeProfile.primaryLocale.toUpperCase()}</Badge>
+              {snapshot.summary.toVerify > 0 ? <Badge>{snapshot.summary.toVerify} بحاجة تأكيد</Badge> : null}
             </div>
           </div>
         </div>
 
-        <nav className="mt-5 flex gap-2 overflow-x-auto border-t pt-4" aria-label="Brand Center tabs">
+        <nav className="mt-5 flex gap-2 overflow-x-auto border-t pt-4" aria-label="أقسام مركز الهوية">
           {snapshot.tabs.map((tab) => (
             <Link
               key={tab.key}
@@ -67,18 +86,17 @@ export function BrandCenterView({ activeTab, snapshot }: Props) {
                 activeTab === tab.key ? "bg-[#10212B] text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
               }`}
             >
-              {tab.title}
+              {TAB_LABELS_AR[tab.key] ?? tab.title}
             </Link>
           ))}
         </nav>
       </section>
 
-      <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <Metric icon={<Layers3 />} label="Profiles" value={snapshot.summary.profiles} />
-        <Metric icon={<FileText />} label="Assets" value={snapshot.summary.assets} />
-        <Metric icon={<Palette />} label="Colors" value={snapshot.summary.colors} />
-        <Metric icon={<ShieldCheck />} label="Rules" value={snapshot.summary.guidelines} />
-        <Metric icon={<Sparkles />} label="Frameworks" value={snapshot.summary.frameworks} />
+      <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Metric icon={<Building2 />} label="المؤسسات" value={snapshot.summary.profiles} href="/dashboard/brand/organizations" />
+        <Metric icon={<FileText />} label="الشعارات والأصول" value={snapshot.summary.assets} href="/dashboard/brand/assets" />
+        <Metric icon={<Palette />} label="الألوان" value={snapshot.summary.colors} href="/dashboard/brand/colors" />
+        <Metric icon={<Layers3 />} label="قوالب الرسائل" value={snapshot.summary.frameworks} href="/dashboard/brand/frameworks" />
       </section>
 
       <section className="mt-5 grid gap-3 lg:grid-cols-3">
@@ -112,32 +130,107 @@ function renderTab(activeTab: BrandCenterTabKey, snapshot: BrandCenterSnapshot) 
 }
 
 function Overview({ snapshot }: { snapshot: BrandCenterSnapshot }) {
+  const profile = snapshot.activeProfile;
+  const writingRules = snapshot.guidelines
+    .filter((g) => g.section === "voice" || g.section === "copy" || g.section === "cta")
+    .sort((a, b) => a.order - b.order);
+  const preferred = uniqueList(snapshot.messageFrameworks.flatMap((f) => f.doList));
+  const forbidden = uniqueList(snapshot.messageFrameworks.flatMap((f) => f.dontList));
+
   return (
-    <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-      <Panel title="Brand operating brief" description="ما يحتاجه الكاتب والمصمم قبل أي رسالة أو تصميم.">
-        <div className="grid gap-3 md:grid-cols-2">
-          <InfoBlock title="Mission" text={snapshot.activeProfile.mission} />
-          <InfoBlock title="Vision" text={snapshot.activeProfile.vision} />
-          <InfoBlock title="Voice" text={snapshot.activeProfile.contentVoice} />
-          <InfoBlock title="Message philosophy" text={snapshot.activeProfile.messagePhilosophy} />
+    <div className="space-y-5">
+      {/* Workflow links */}
+      <div className="flex flex-wrap gap-2">
+        <Link href="/dashboard/operations/content" className="inline-flex h-10 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#024a92]">
+          استخدام الهوية في المحتوى <ArrowLeft className="h-4 w-4" />
+        </Link>
+        <Link href="/dashboard/brand/frameworks" className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 transition hover:border-[#025EB8] hover:text-[#025EB8]">
+          مراجعة القوالب
+        </Link>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+        {/* Tone of voice */}
+        <Panel title="نبرة الخطاب" description="كيف نتحدث مع المتبرعين في كل منشور ورسالة.">
+          <div className="space-y-3">
+            <div className="rounded-lg border bg-slate-50 p-4">
+              <p className="text-sm leading-7 text-slate-700">{profile.contentVoice}</p>
+            </div>
+            {profile.messagePhilosophy ? <InfoBlock title="فلسفة الرسالة" text={profile.messagePhilosophy} /> : null}
+            <div className="grid gap-3 md:grid-cols-2">
+              <InfoBlock title="الرسالة" text={profile.mission} />
+              <InfoBlock title="الرؤية" text={profile.vision} />
+            </div>
+          </div>
+        </Panel>
+
+        {/* Preferred / forbidden words */}
+        <div className="space-y-5">
+          <Panel title="كلمات مفضلة" description="عبارات موصى بها في كتابة المحتوى." compact>
+            {preferred.length === 0 ? (
+              <EmptyState title="لا توجد كلمات مفضلة بعد" text="ستظهر هنا من قوالب الرسائل المعتمدة." />
+            ) : (
+              <ul className="space-y-2">
+                {preferred.map((w) => (
+                  <li key={w} className="flex items-start gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                    <ThumbsUp className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> {w}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+          <Panel title="كلمات ممنوعة" description="عبارات يجب تجنّبها حفاظًا على كرامة المتبرع والمصداقية." compact>
+            {forbidden.length === 0 ? (
+              <EmptyState title="لا توجد كلمات ممنوعة بعد" text="ستظهر هنا من قوالب الرسائل المعتمدة." />
+            ) : (
+              <ul className="space-y-2">
+                {forbidden.map((w) => (
+                  <li key={w} className="flex items-start gap-2 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-900">
+                    <ThumbsDown className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" /> {w}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
         </div>
-      </Panel>
-      <Panel title="What do I do now?" description="قائمة قصيرة للفريق بدون ازدحام.">
-        <ActionLine title="Verify production logo" text="ارفع ملف الشعار المعتمد قبل تفعيل downloads العامة." />
-        <ActionLine title="Complete CTA colors" text="راجع لون CTA لكل هوية حتى لا تختلط حملات التبرع." />
-        <ActionLine title="Add missing language examples" text="خصوصًا قواعد التركية والزكاة والوقف قبل استخدام AI للترجمة." />
-        <ActionLine title="Use AI as draft guard" text="راجع copy أو message framework، ثم اعتمده يدويًا فقط." />
-      </Panel>
-      <Panel title="AI guardrails" description="Shared AI Core يقرأ قواعد الهوية ولا يرسل أو ينشر تلقائيًا.">
-        <div className="grid gap-3 md:grid-cols-2">
-          {snapshot.qa.aiOutputsAreDraftOnly && <StateLine title="Draft only" text="كل المخرجات مقترحات تحتاج human approval." />}
-          {snapshot.qa.noAutoPublish && <StateLine title="No auto publish" text="لا نشر محتوى، لا إرسال رسائل، لا تعديل ميزانيات." />}
-          {snapshot.qa.noFrontendSecrets && <StateLine title="No frontend secrets" text="لا مفاتيح أو tokens داخل واجهة Brand Center." />}
-          {snapshot.qa.brandAssetSeparatedFromArchiveAsset && <StateLine title="BrandAsset separated" text="الشعار والقوالب غير مختلطة مع ArchiveAsset الميداني." />}
+      </div>
+
+      {/* Writing rules for posts */}
+      <Panel title="قواعد كتابة المنشورات" description="راجعها قبل كتابة أي منشور أو رسالة حملة.">
+        {writingRules.length === 0 ? (
+          <EmptyState title="لا توجد قواعد كتابة بعد" text="أضف قواعد النبرة والنص من قسم قواعد الكتابة." />
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            {writingRules.map((rule) => (
+              <div key={rule.id} className="rounded-lg border bg-white p-4">
+                <div className="flex items-center gap-2">
+                  <PenLine className="h-4 w-4 text-[#025EB8]" />
+                  <p className="font-black text-slate-950">{rule.title}</p>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{rule.body}</p>
+                {rule.examples[0] ? <p className="mt-2 rounded-md bg-slate-50 p-2 text-xs leading-6 text-slate-700">مثال: {rule.examples[0]}</p> : null}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="mt-4">
+          <Link href="/dashboard/brand/voice" className="text-sm font-bold text-[#025EB8] hover:underline">كل قواعد الكتابة ←</Link>
         </div>
       </Panel>
     </div>
   );
+}
+
+function uniqueList(items: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of items) {
+    const key = item.trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(key);
+  }
+  return out;
 }
 
 function Organizations({ profiles, activeProfileId }: { profiles: BrandProfile[]; activeProfileId: string }) {
@@ -150,8 +243,8 @@ function Organizations({ profiles, activeProfileId }: { profiles: BrandProfile[]
             <p>{profile.mission}</p>
             <div className="flex flex-wrap gap-2">
               {profile.supportedLocales.map((locale) => <Badge key={locale}>{locale.toUpperCase()}</Badge>)}
-              {profile.id === activeProfileId && <Badge>Active</Badge>}
-              <Badge>{profile.status}</Badge>
+              {profile.id === activeProfileId && <Badge>الهوية النشطة</Badge>}
+              <Badge>{statusAr(profile.status)}</Badge>
             </div>
             <p className="rounded-md bg-amber-50 p-3 text-amber-900">{profile.verificationNote}</p>
           </div>
@@ -178,8 +271,8 @@ function Assets({ assets, activeProfileId }: { assets: BrandAsset[]; activeProfi
                 <p className="rounded-md bg-slate-50 p-3">{asset.notes}</p>
                 <div className="flex flex-wrap gap-2">
                   <Badge>{asset.locale.toUpperCase()}</Badge>
-                  <Badge>{asset.status}</Badge>
-                  <Badge>{asset.downloadable ? "Downloadable" : "Locked"}</Badge>
+                  <Badge>{statusAr(asset.status)}</Badge>
+                  <Badge>{asset.downloadable ? "متاح للتحميل" : "مقفل"}</Badge>
                 </div>
                 <BrandAssetStatusActions assetId={asset.id} status={asset.status} downloadable={asset.downloadable} hasFileUrl={Boolean(asset.fileUrl)} />
                 <div className="flex flex-wrap gap-2">
@@ -233,8 +326,8 @@ function Typography({ fonts, activeProfileId }: { fonts: BrandFont[]; activeProf
           <Panel key={font.id} title={font.name} description={font.usage} compact>
             <div className="space-y-3">
               <p className="text-2xl font-black text-slate-950">Minber-i Aksa / Gözbebekleri</p>
-              <p className="text-sm leading-6 text-slate-600">Fallback: {font.fallback}</p>
-              <p className="text-sm leading-6 text-slate-600">Source: {font.source}</p>
+              <p className="text-sm leading-6 text-slate-600">الخط البديل: {font.fallback}</p>
+              <p className="text-sm leading-6 text-slate-600">المصدر: {font.source}</p>
               <p className="rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-600">{font.notes}</p>
             </div>
           </Panel>
@@ -311,18 +404,20 @@ function Downloads({ snapshot }: { snapshot: BrandCenterSnapshot }) {
   );
 }
 
-function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
-  return (
-    <div className="rounded-lg border bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{label}</p>
-          <p className="mt-2 text-2xl font-black text-slate-950">{value}</p>
-        </div>
-        <span className="text-[#025EB8] [&>svg]:h-5 [&>svg]:w-5">{icon}</span>
+function Metric({ icon, label, value, href }: { icon: ReactNode; label: string; value: number; href?: string }) {
+  const inner = (
+    <div className="flex items-center justify-between gap-3">
+      <div>
+        <p className="text-xs font-bold text-slate-500">{label}</p>
+        <p className="mt-2 text-2xl font-black text-slate-950">{value}</p>
       </div>
+      <span className="text-[#025EB8] [&>svg]:h-5 [&>svg]:w-5">{icon}</span>
     </div>
   );
+  if (href) {
+    return <Link href={href} className="block rounded-lg border bg-white p-4 shadow-sm transition hover:border-[#025EB8]/50">{inner}</Link>;
+  }
+  return <div className="rounded-lg border bg-white p-4 shadow-sm">{inner}</div>;
 }
 
 function Panel({ title, description, children, compact = false }: { title: string; description?: string; children: ReactNode; compact?: boolean }) {
@@ -339,14 +434,6 @@ function Panel({ title, description, children, compact = false }: { title: strin
 
 function InfoBlock({ title, text }: { title: string; text: string }) {
   return <div className="rounded-lg border bg-slate-50 p-4"><p className="font-black text-slate-950">{title}</p><p className="mt-2 text-sm leading-6 text-slate-600">{text}</p></div>;
-}
-
-function ActionLine({ title, text }: { title: string; text: string }) {
-  return <div className="rounded-lg border bg-white p-3"><p className="font-black text-slate-950">{title}</p><p className="mt-1 text-sm leading-6 text-slate-600">{text}</p></div>;
-}
-
-function StateLine({ title, text }: { title: string; text: string }) {
-  return <div className="rounded-lg border bg-emerald-50 p-3"><p className="font-black text-emerald-950">{title}</p><p className="mt-1 text-sm leading-6 text-emerald-800">{text}</p></div>;
 }
 
 function List({ title, items }: { title: string; items: string[] }) {
