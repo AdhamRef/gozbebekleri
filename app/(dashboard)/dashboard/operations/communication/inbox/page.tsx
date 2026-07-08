@@ -9,9 +9,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 type Donor = { userId: string | null; name: string | null; email: string | null; locale: string | null; country: string | null; totalDonations: number | null; lastDonationAt: string | null; whatsappOptIn: boolean; doNotContact: boolean };
-type Conversation = { phone: string; donor: Donor | null; unresolved: boolean; handled: boolean; lastMessageAt: string | null; lastInboundText: string | null; needsReply: boolean; inboundCount: number; outboundCount: number };
+type Sender = { id: string; name: string; phone: string | null };
+type Conversation = { phone: string; donor: Donor | null; unresolved: boolean; handled: boolean; lastMessageAt: string | null; lastInboundText: string | null; needsReply: boolean; inboundCount: number; outboundCount: number; sender: Sender | null };
 type TimelineItem = { kind: string; at: string | null; text: string | null; status: string | null };
-type Detail = { phone: string; donor: Donor | null; unresolved: boolean; timeline: TimelineItem[] };
+type Detail = { phone: string; donor: Donor | null; unresolved: boolean; timeline: TimelineItem[]; sender: Sender | null };
+
+function senderLabel(s: Sender | null) {
+  if (!s) return "رقم غير محدد";
+  return s.phone ? `${s.name} · ${s.phone}` : s.name;
+}
 
 type Filter = "all" | "needsReply" | "unresolved" | "handled";
 
@@ -31,6 +37,8 @@ function displayName(d: Donor | null, phone: string) {
 
 export default function InboxPage() {
   const [items, setItems] = React.useState<Conversation[]>([]);
+  const [senders, setSenders] = React.useState<Sender[]>([]);
+  const [senderId, setSenderId] = React.useState<string>("all");
   const [providerConfigured, setProviderConfigured] = React.useState(true);
   const [loading, setLoading] = React.useState(true);
   const [filter, setFilter] = React.useState<Filter>("all");
@@ -44,14 +52,16 @@ export default function InboxPage() {
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/dashboard/operations/communication/inbox", { cache: "no-store" });
+      const qs = senderId !== "all" ? `?senderId=${encodeURIComponent(senderId)}` : "";
+      const res = await fetch(`/api/dashboard/operations/communication/inbox${qs}`, { cache: "no-store" });
       const json = await res.json().catch(() => null);
       setItems(json?.conversations ?? []);
+      if (json?.senders) setSenders(json.senders);
       setProviderConfigured(json?.providerConfigured ?? false);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [senderId]);
 
   React.useEffect(() => {
     void load();
@@ -128,6 +138,12 @@ export default function InboxPage() {
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث بالاسم أو الهاتف أو البريد" className="w-full rounded-lg border border-slate-200 py-2 pr-9 pl-3 text-sm outline-none focus:border-[#025EB8]" />
             </div>
+            {senders.length > 0 ? (
+              <select value={senderId} onChange={(e) => setSenderId(e.target.value)} className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-[#025EB8]">
+                <option value="all">كل الأرقام</option>
+                {senders.map((s) => <option key={s.id} value={s.id}>{senderLabel(s)}</option>)}
+              </select>
+            ) : null}
             <div className="mt-2 flex flex-wrap gap-1">
               {([["all", "الكل"], ["needsReply", "يحتاج رد"], ["unresolved", "غير مربوط"], ["handled", "تم التعامل"]] as [Filter, string][]).map(([f, label]) => (
                 <button key={f} onClick={() => setFilter(f)} className={cn("rounded-full border px-3 py-1 text-xs font-semibold", filter === f ? "border-[#025EB8] bg-blue-50 text-[#025EB8]" : "border-slate-200 text-slate-500")}>{label}</button>
@@ -150,6 +166,7 @@ export default function InboxPage() {
                       </div>
                       {c.donor?.email && c.donor?.name ? <span className="text-[11px] text-slate-400">{c.donor.email}</span> : null}
                       <span className="line-clamp-1 text-xs text-slate-500">{c.lastInboundText ?? "—"}</span>
+                      <span className="flex items-center gap-1 text-[10px] text-slate-400"><Phone className="h-2.5 w-2.5" /> وصلت على: {senderLabel(c.sender)}</span>
                       <div className="flex flex-wrap items-center gap-1.5">
                         {c.donor?.locale ? <Badge variant="outline" className="border-slate-200 text-[10px] text-slate-500">{c.donor.locale}</Badge> : null}
                         {c.needsReply ? <Badge variant="outline" className="border-amber-200 bg-amber-50 text-[10px] text-amber-700">يحتاج رد</Badge> : null}
@@ -185,7 +202,7 @@ export default function InboxPage() {
               </div>
 
               {/* mobile donor drawer */}
-              {showDonor ? <div className="border-b border-slate-100 lg:hidden"><DonorPanel donor={donor} phone={detail.phone} consent={consent} unresolved={detail.unresolved} acting={acting} onAction={conversationAction} /></div> : null}
+              {showDonor ? <div className="border-b border-slate-100 lg:hidden"><DonorPanel donor={donor} phone={detail.phone} sender={detail.sender} consent={consent} unresolved={detail.unresolved} acting={acting} onAction={conversationAction} /></div> : null}
 
               {/* timeline */}
               <div className="flex-1 space-y-2 overflow-y-auto p-4">
@@ -220,7 +237,7 @@ export default function InboxPage() {
 
         {/* ── Column 3: donor panel (desktop) ── */}
         <aside className={cn("hidden rounded-2xl border border-slate-200 bg-white lg:block", !selected && "lg:hidden xl:block xl:opacity-60")}>
-          {detail ? <DonorPanel donor={donor} phone={detail.phone} consent={consent} unresolved={detail.unresolved} acting={acting} onAction={conversationAction} /> : <div className="flex min-h-[24rem] items-center justify-center p-4 text-center text-xs text-slate-400">تفاصيل المتبرع تظهر عند اختيار محادثة</div>}
+          {detail ? <DonorPanel donor={donor} phone={detail.phone} sender={detail.sender} consent={consent} unresolved={detail.unresolved} acting={acting} onAction={conversationAction} /> : <div className="flex min-h-[24rem] items-center justify-center p-4 text-center text-xs text-slate-400">تفاصيل المتبرع تظهر عند اختيار محادثة</div>}
         </aside>
       </div>
     </main>
@@ -230,6 +247,7 @@ export default function InboxPage() {
 function DonorPanel({
   donor,
   phone,
+  sender,
   consent,
   unresolved,
   acting,
@@ -237,6 +255,7 @@ function DonorPanel({
 }: {
   donor: Donor | null;
   phone: string;
+  sender: Sender | null;
   consent: { text: string; cls: string };
   unresolved: boolean;
   acting: boolean;
@@ -250,6 +269,8 @@ function DonorPanel({
       </div>
 
       <dl className="space-y-2 text-sm">
+        <Info icon={<MessageCircle className="h-4 w-4" />} label="وصلت على" value={senderLabel(sender)} />
+        <Info label="القناة" value="واتساب" />
         <Info icon={<Phone className="h-4 w-4" />} label="الهاتف" value={phone} />
         <Info icon={<Globe className="h-4 w-4" />} label="اللغة" value={donor?.locale ?? "—"} />
         <Info icon={<MapPin className="h-4 w-4" />} label="الدولة" value={donor?.country ?? "—"} />

@@ -110,6 +110,21 @@ function DashboardContent({
     })).filter((s) => s.items.length > 0);
   }, [session?.user, iconByKey]);
 
+  // Live inbox badge (WhatsApp conversations needing a reply). Fetched client-side so SSR is not
+  // blocked, and only when the user can see the inbox item. Fails gracefully to no badge.
+  const INBOX_HREF = "/dashboard/operations/communication/inbox";
+  const showInboxBadge = useMemo(() => navigation.some((s) => s.items.some((i) => i.href === INBOX_HREF)), [navigation]);
+  const [inboxCount, setInboxCount] = useState(0);
+  useEffect(() => {
+    if (!showInboxBadge) return;
+    let cancelled = false;
+    fetch("/api/dashboard/operations/communication/inbox/badge", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (!cancelled && j && typeof j.count === "number") setInboxCount(j.count); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [showInboxBadge]);
+
   const isActiveHref = (href: string) => {
     if (href === '/dashboard/referrals') return pathname === href || pathname.startsWith('/dashboard/referrals/');
     if (href === '/dashboard/link-generator') return pathname === href || pathname.startsWith('/dashboard/link-generator/');
@@ -153,6 +168,9 @@ function DashboardContent({
                       <Link key={item.href} href={item.href} onClick={() => setIsSidebarOpen(false)} className={cn("group flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors", active ? "bg-white/12 text-white" : "text-white/75 hover:bg-white/8 hover:text-white")}>
                         <span className={cn("shrink-0", active ? "text-white" : "text-white/70 group-hover:text-white")}>{item.icon}</span>
                         <span className="truncate flex-1">{item.title}</span>
+                        {item.href === INBOX_HREF && inboxCount > 0 ? (
+                          <span className="inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-bold text-white" aria-label={`${inboxCount} محادثات تحتاج رد`}>{inboxCount > 99 ? "99+" : inboxCount}</span>
+                        ) : null}
                       </Link>
                     );
                   })}

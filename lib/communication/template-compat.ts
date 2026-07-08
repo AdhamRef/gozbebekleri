@@ -32,23 +32,45 @@ function usesWhatsappStore(channel: CommunicationChannelId): boolean {
   return channel === "WHATSAPP" || channel === "SMS";
 }
 
-export async function listChannelTemplates(channel: CommunicationChannelId): Promise<ChannelTemplateSummary[]> {
+/**
+ * Ids of templates that are SYSTEM (platform-event) templates — either flagged `kind = "SYSTEM"`
+ * or referenced by a MessageTrigger. Campaign Builder must not offer these by default.
+ */
+async function systemTemplateIds(): Promise<Set<string>> {
+  const ids = new Set<string>();
+  const triggers = await prisma.messageTrigger.findMany({ select: { templateId: true } }).catch(() => []);
+  for (const t of triggers) ids.add(t.templateId);
+  return ids;
+}
+
+/**
+ * List CAMPAIGN templates for the given channel (SYSTEM templates are excluded by default so they
+ * never appear in Campaign Builder). Pass `{ includeSystem: true }` only for admin/template tooling.
+ */
+export async function listChannelTemplates(
+  channel: CommunicationChannelId,
+  opts: { includeSystem?: boolean } = {}
+): Promise<ChannelTemplateSummary[]> {
   if (!process.env.DATABASE_URL) return [];
   try {
+    const systemIds = opts.includeSystem ? new Set<string>() : await systemTemplateIds();
+    const keep = (row: { id: string; kind?: string | null }) =>
+      opts.includeSystem || (row.kind !== "SYSTEM" && !systemIds.has(row.id));
+
     if (usesWhatsappStore(channel)) {
       const rows = await prisma.whatsappTemplate.findMany({
-        select: { id: true, name: true, translations: true },
+        select: { id: true, name: true, translations: true, kind: true },
         orderBy: { createdAt: "desc" },
         take: 200,
       });
-      return rows.map((t) => ({ id: t.id, name: t.name, availableLocales: localesFromTranslations(DEFAULT_LOCALE, t.translations) }));
+      return rows.filter(keep).map((t) => ({ id: t.id, name: t.name, availableLocales: localesFromTranslations(DEFAULT_LOCALE, t.translations) }));
     }
     const rows = await prisma.emailTemplate.findMany({
-      select: { id: true, name: true, translations: true },
+      select: { id: true, name: true, translations: true, kind: true },
       orderBy: { createdAt: "desc" },
       take: 200,
     });
-    return rows.map((t) => ({ id: t.id, name: t.name, availableLocales: localesFromTranslations(DEFAULT_LOCALE, t.translations) }));
+    return rows.filter(keep).map((t) => ({ id: t.id, name: t.name, availableLocales: localesFromTranslations(DEFAULT_LOCALE, t.translations) }));
   } catch (error) {
     console.error("listChannelTemplates failed", error);
     return [];

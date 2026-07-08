@@ -9,6 +9,7 @@ import { sendPreparedDelivery } from "./provider-router";
 import { listSenders, toSenderConfig } from "./sender-service";
 import { listRoutingRules, toRoutingRuleConfig } from "./routing-rule-service";
 import { resolveSender } from "./sender-router";
+import { resolveAudienceOrigin } from "./audience-list-service";
 import { type CommunicationChannelId, type CommunicationPurposeId } from "./communication-runtime-types";
 
 /**
@@ -135,6 +136,9 @@ export async function executeCampaignSend(
   const templateId = campaign.templateGroupId as string; // guaranteed by the NO_TEMPLATE gate above
   const decisions = coverageDecisions(campaign);
   const purpose = campaign.purpose as CommunicationPurposeId;
+  // A campaign whose audience is a TEST list archives its deliveries as origin TEST so they are clearly
+  // marked and can be excluded from normal campaign performance reporting.
+  const origin = await resolveAudienceOrigin(campaign.audienceSegmentKey);
 
   // All gates passed → NOW move to SENDING.
   await prisma.communicationCampaign.update({ where: { id: campaignId }, data: { status: "SENDING" } }).catch(() => {});
@@ -151,7 +155,7 @@ export async function executeCampaignSend(
   // Idempotency: recipients already processed for this campaign+template+channel+origin CAMPAIGN,
   // or any recipient with a providerMessageId already assigned.
   const existing = await prisma.communicationDelivery
-    .findMany({ where: { campaignId, templateId: templateId, channel, origin: "CAMPAIGN" }, select: { recipientUserId: true, status: true, providerMessageId: true } })
+    .findMany({ where: { campaignId, templateId: templateId, channel, origin }, select: { recipientUserId: true, status: true, providerMessageId: true } })
     .catch(() => []);
   const alreadyDone = new Set(
     existing
@@ -167,7 +171,7 @@ export async function executeCampaignSend(
   for (const s of skipped.slice(0, batchSize)) {
     if (alreadyDone.has(s.userId)) continue;
     await recordSkippedDelivery(
-      { channel, campaignId, templateId: templateId, recipientUserId: s.userId, locale: s.locale, purpose, origin: "CAMPAIGN", createdBy: actor?.actorId ?? null },
+      { channel, campaignId, templateId: templateId, recipientUserId: s.userId, locale: s.locale, purpose, origin, createdBy: actor?.actorId ?? null },
       s.reason
     );
     base.skipped += 1;
@@ -183,13 +187,13 @@ export async function executeCampaignSend(
     // Coverage decision: excluded language → skip.
     const rendered = await renderChannelTemplate(channel, templateId, r.locale);
     if (!rendered) {
-      await recordSkippedDelivery({ channel, campaignId, templateId: templateId, recipientUserId: r.userId, locale: r.locale, purpose, origin: "CAMPAIGN" }, "TEMPLATE_RENDER_FAILED");
+      await recordSkippedDelivery({ channel, campaignId, templateId: templateId, recipientUserId: r.userId, locale: r.locale, purpose, origin }, "TEMPLATE_RENDER_FAILED");
       base.skipped += 1;
       bump(base.reasons, "TEMPLATE_RENDER_FAILED");
       continue;
     }
     if (rendered.usedFallback && decisions[r.locale] === "EXCLUDE") {
-      await recordSkippedDelivery({ channel, campaignId, templateId: templateId, recipientUserId: r.userId, locale: r.locale, purpose, origin: "CAMPAIGN", templateName: rendered.templateName }, "LANGUAGE_EXCLUDED");
+      await recordSkippedDelivery({ channel, campaignId, templateId: templateId, recipientUserId: r.userId, locale: r.locale, purpose, origin, templateName: rendered.templateName }, "LANGUAGE_EXCLUDED");
       base.skipped += 1;
       bump(base.reasons, "LANGUAGE_EXCLUDED");
       continue;
@@ -219,7 +223,7 @@ export async function executeCampaignSend(
       recipientName: r.name,
       locale: r.locale,
       purpose,
-      origin: "CAMPAIGN",
+      origin,
       renderedSubject: rendered.subject,
       renderedBody: rendered.body,
       senderId: routerSender?.id ?? null,

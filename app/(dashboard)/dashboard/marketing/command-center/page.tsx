@@ -12,6 +12,9 @@ export const metadata = {
   title: "مركز قيادة التسويق | لوحة التحكم",
 };
 
+// Live admin dashboard (per-request Prisma aggregation + provider health) — never statically prerendered.
+export const dynamic = "force-dynamic";
+
 const priorityLabel: Record<MarketingCommandPriority, string> = {
   HIGH: "عالي",
   MEDIUM: "متوسط",

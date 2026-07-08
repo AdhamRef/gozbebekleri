@@ -141,6 +141,7 @@ export function userCanExportReports(user: UserLike | undefined): boolean {
 
 /** Longer prefixes first — first match wins */
 const PATH_RULES: { prefix: string; key: DashboardPermissionKey }[] = [
+  { prefix: "/dashboard/platform-connections", key: "platformConnections" },
   { prefix: "/dashboard/marketing/connections", key: "platformConnections" },
   { prefix: "/dashboard/marketing/tracking-hub", key: "pixels" },
   { prefix: "/dashboard/marketing", key: "ads" },

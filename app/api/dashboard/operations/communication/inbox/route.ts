@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { operationsNoStoreHeaders, requireOperationsApiSession } from "../../_auth";
-import { listConversations, getConversation, markConversationHandled, logConversationAction } from "@/lib/communication/conversation-service";
+import { listConversations, getConversation, markConversationHandled, logConversationAction, listInboxSenders } from "@/lib/communication/conversation-service";
 import { isMetaConfigured } from "@/lib/communication/providers/meta-whatsapp/client";
 import { auditActorFromDashboardSession } from "@/lib/audit-log";
 
@@ -17,8 +17,9 @@ export async function GET(req: NextRequest) {
     const conversation = await getConversation(phone);
     return NextResponse.json({ conversation, providerConfigured }, { headers: operationsNoStoreHeaders });
   }
-  const conversations = await listConversations();
-  return NextResponse.json({ conversations, providerConfigured }, { headers: operationsNoStoreHeaders });
+  const senderId = req.nextUrl.searchParams.get("senderId");
+  const [conversations, senders] = await Promise.all([listConversations({ senderId }), listInboxSenders()]);
+  return NextResponse.json({ conversations, senders, providerConfigured }, { headers: operationsNoStoreHeaders });
 }
 
 /** Conversation actions (audit-backed, no send, no fake DB attach): handled / followup / link. */

@@ -13,6 +13,7 @@ import {
   type StatusCounts,
 } from "@/lib/communication/reports-service";
 import { getSchedulerStatus } from "@/lib/communication/scheduler-status";
+import { getCommunicationDonationOverview } from "@/lib/communication/campaign-attribution-service";
 
 export const dynamic = "force-dynamic";
 
@@ -104,7 +105,9 @@ export default async function CommunicationReportsPage({ searchParams }: { searc
     report = null;
   }
   const scheduler = await getSchedulerStatus().catch(() => null);
+  const donations = await getCommunicationDonationOverview().catch(() => null);
   const empty = !report || report.totalDeliveries === 0;
+  const money = (n: number) => `${n.toLocaleString("ar")}$`;
 
   return (
     <main className="space-y-5" dir="rtl">
@@ -274,6 +277,87 @@ export default async function CommunicationReportsPage({ searchParams }: { searc
               ) : null}
             </CardContent>
           </Card>
+
+          {/* ── Donation attribution (real data via tracking links) ── */}
+          <section className="space-y-3">
+            <h2 className="text-sm font-bold text-slate-500">التبرعات المنسوبة لحملات التواصل</h2>
+            {!donations || !donations.hasData ? (
+              <Card><CardContent className="p-6 text-center text-sm text-slate-500">لا توجد تبرعات منسوبة بعد. اربط روابط تتبع بحملاتك ليُحسب أثرها على التبرعات. الزيارات غير مُسجّلة (غير متاحة).</CardContent></Card>
+            ) : (
+              <div className="grid gap-4 lg:grid-cols-2">
+                {/* 1. By channel */}
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-base">التبرعات حسب القناة</CardTitle></CardHeader>
+                  <CardContent>
+                    {donations.byChannel.length === 0 ? <p className="py-3 text-center text-sm text-slate-400">غير متاح</p> : (
+                      <ul className="space-y-2">{donations.byChannel.map((c) => (
+                        <li key={c.source} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+                          <span className="font-semibold text-slate-700">{c.label}</span>
+                          <span className="text-slate-500">{c.count.toLocaleString("ar")} تبرع · <b className="text-emerald-700">{money(c.valueUSD)}</b></span>
+                        </li>
+                      ))}</ul>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* 2. By language */}
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-base">التبرعات حسب اللغة</CardTitle></CardHeader>
+                  <CardContent>
+                    {donations.byLanguage.length === 0 ? <p className="py-3 text-center text-sm text-slate-400">غير متاح</p> : (
+                      <ul className="space-y-2">{donations.byLanguage.map((l) => (
+                        <li key={l.locale} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+                          <span className="font-semibold text-slate-700">{l.label}</span>
+                          <span className="text-slate-500">{l.count.toLocaleString("ar")} تبرع · <b className="text-emerald-700">{money(l.valueUSD)}</b></span>
+                        </li>
+                      ))}</ul>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* 3. Best campaigns */}
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-base">أفضل حملات التواصل</CardTitle></CardHeader>
+                  <CardContent>
+                    {donations.bestCampaigns.length === 0 ? <p className="py-3 text-center text-sm text-slate-400">غير متاح</p> : (
+                      <ul className="space-y-2">{donations.bestCampaigns.map((c) => (
+                        <li key={c.campaignId} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+                          <Link href={`/dashboard/operations/communication/campaigns/${c.campaignId}`} className="flex items-center justify-between gap-2">
+                            <span className="truncate font-semibold text-slate-800">{c.name}</span>
+                            <span className="shrink-0 text-slate-500">{c.count.toLocaleString("ar")} · <b className="text-emerald-700">{money(c.valueUSD)}</b></span>
+                          </Link>
+                        </li>
+                      ))}</ul>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* 4. Campaigns without tracking links + 5. Failed attempts */}
+                <div className="space-y-4">
+                  <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-base">حملات بدون روابط تتبع</CardTitle><CardDescription>لا يمكن حساب تبرعاتها بدقة حتى تُربط برابط تتبع.</CardDescription></CardHeader>
+                    <CardContent>
+                      {donations.campaignsWithoutLinks.length === 0 ? <p className="py-3 text-center text-sm text-emerald-700">كل الحملات مرتبطة بروابط تتبع.</p> : (
+                        <ul className="space-y-1.5">{donations.campaignsWithoutLinks.map((c) => (
+                          <li key={c.id}><Link href={`/dashboard/operations/communication/campaigns/${c.id}`} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-xs"><span className="truncate font-semibold text-slate-700">{c.name}</span><span className="shrink-0 text-slate-400">ربط رابط ←</span></Link></li>
+                        ))}</ul>
+                      )}
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-base">محاولات دفع فاشلة</CardTitle></CardHeader>
+                    <CardContent>
+                      {donations.failed ? (
+                        <p className="text-sm text-slate-600"><b className="text-rose-700">{donations.failed.count.toLocaleString("ar")}</b> محاولة فاشلة منسوبة · قيمة تقديرية <b>{money(donations.failed.valueUSD)}</b></p>
+                      ) : (
+                        <p className="text-sm text-slate-400">لا يوجد محاولات دفع فاشلة منسوبة في هذه البيانات.</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            )}
+          </section>
 
           {/* Advanced logs link — kept out of the way, not the primary view */}
           <div className="flex justify-center pt-1">

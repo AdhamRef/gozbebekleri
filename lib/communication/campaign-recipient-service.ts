@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { SUPPORTED_LOCALES, LOCALES, DEFAULT_LOCALE, isValidLocale, type SupportedLocale } from "@/lib/locales";
 import type { CommunicationChannelId } from "./communication-runtime-types";
 import { donorChannelEligibility } from "./audience-service";
+import { parseListKey, loadListMembers, memberEligibleForChannel, type ResolvedListMember } from "./audience-list-service";
 
 /**
  * Recipient counts + eligibility breakdown for a campaign, per locale, for one channel.
@@ -60,10 +61,45 @@ async function localeBreakdown(channel: CommunicationChannelId, locale: Supporte
   return { locale, label: LOCALES[locale].label, total, eligible, needsReview, missingContact: Math.max(0, total - withPhone), optedOut: 0, doNotContact: dnc };
 }
 
+/** Load a custom/test list's members with per-member channel eligibility (donors use consent). */
+async function resolveListMembersWithEligibility(channel: CommunicationChannelId, listId: string): Promise<{ m: ResolvedListMember; eligible: boolean }[]> {
+  const members = await loadListMembers(listId);
+  const donorIds = members.filter((m) => m.contactType === "DONOR" && m.userId).map((m) => m.userId!) as string[];
+  const profiles = donorIds.length
+    ? await prisma.donorCommunicationProfile.findMany({ where: { userId: { in: donorIds } }, select: { userId: true, whatsappOptIn: true, emailOptIn: true, smsOptIn: true, doNotContact: true } }).catch(() => [])
+    : [];
+  const pMap = new Map(profiles.map((p) => [p.userId, p]));
+  return members.map((m) => ({ m, eligible: memberEligibleForChannel(m, channel, m.userId ? pMap.get(m.userId) ?? null : null) }));
+}
+
 export async function getRecipientBreakdown(
   channel: CommunicationChannelId,
   opts: { locale?: string | null } = {}
 ): Promise<CampaignRecipientBreakdown> {
+  // Custom / test list audience — compute the breakdown from the list's members.
+  const listId = parseListKey(opts.locale);
+  if (listId) {
+    const resolved = await resolveListMembersWithEligibility(channel, listId);
+    const byLocale = new Map<SupportedLocale, { total: number; eligible: number }>();
+    for (const { m, eligible } of resolved) {
+      const cur = byLocale.get(m.locale) ?? { total: 0, eligible: 0 };
+      cur.total += 1;
+      if (eligible) cur.eligible += 1;
+      byLocale.set(m.locale, cur);
+    }
+    const locales: LocaleRecipientBreakdown[] = SUPPORTED_LOCALES.filter((l) => byLocale.has(l)).map((l) => {
+      const c = byLocale.get(l)!;
+      return { locale: l, label: LOCALES[l].label, total: c.total, eligible: c.eligible, needsReview: 0, missingContact: c.total - c.eligible, optedOut: 0, doNotContact: 0 };
+    });
+    const totals = locales.reduce(
+      (acc, l) => ({ total: acc.total + l.total, eligible: acc.eligible + l.eligible, needsReview: 0, missingContact: acc.missingContact + l.missingContact, optedOut: 0, doNotContact: 0 }),
+      { total: 0, eligible: 0, needsReview: 0, missingContact: 0, optedOut: 0, doNotContact: 0 }
+    );
+    const recipientLocaleCounts: Record<string, number> = {};
+    for (const l of locales) recipientLocaleCounts[l.locale] = l.eligible;
+    return { channel, locales, totals, recipientLocaleCounts };
+  }
+
   const targetLocales: SupportedLocale[] =
     opts.locale && isValidLocale(opts.locale) ? [opts.locale] : [...SUPPORTED_LOCALES];
 
@@ -113,6 +149,23 @@ export async function loadCampaignRecipients(
   opts: { limit?: number } = {}
 ): Promise<RecipientLoadResult> {
   const limit = Math.min(opts.limit ?? 500, 1000);
+
+  // Custom / test list audience — send to the list's DONOR members (test contacts are NOT sent via the
+  // campaign executor; they are reserved for the dedicated test-send tooling).
+  const listId = parseListKey(audienceSegmentKey);
+  if (listId) {
+    const resolved = await resolveListMembersWithEligibility(channel, listId);
+    const recipients: CampaignRecipient[] = [];
+    const skipped: { userId: string; locale: string; reason: string }[] = [];
+    for (const { m, eligible } of resolved) {
+      if (m.contactType !== "DONOR" || !m.userId) continue;
+      if (recipients.length >= limit) break;
+      if (eligible) recipients.push({ userId: m.userId, name: m.name, email: m.email, phone: m.phone, locale: m.locale, country: m.country });
+      else skipped.push({ userId: m.userId, locale: m.locale, reason: "NOT_ELIGIBLE" });
+    }
+    return { recipients, skipped, truncated: false };
+  }
+
   const targetLocales: SupportedLocale[] = audienceSegmentKey && isValidLocale(audienceSegmentKey) ? [audienceSegmentKey] : [...SUPPORTED_LOCALES];
 
   const users = await prisma.user.findMany({

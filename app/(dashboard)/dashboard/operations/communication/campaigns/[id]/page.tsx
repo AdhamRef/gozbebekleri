@@ -8,13 +8,25 @@ import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { CampaignActionsMenu } from "../_components/CampaignActionsMenu";
+import { TrackingLinksPanel } from "../_components/TrackingLinksPanel";
 
 type LocaleBreakdown = { locale: string; label: string; total: number; eligible: number; needsReview: number; missingContact: number; optedOut: number; doNotContact: number };
 type Coverage = { locales: { locale: string; label: string; status: string; fallbackLocale?: string; recipientCount: number }[]; missingWithRecipients: { locale: string; label: string; recipientCount: number }[]; canSendWithoutDecision: boolean };
 type CoverageGate = { ok: boolean; missingWithRecipients: { locale: string; label: string; recipientCount: number }[]; undecided: string[] };
 type Campaign = { id: string; name: string; channel: string; purpose: string; status: string; audienceSegmentKey: string | null; templateGroupId: string | null; senderRoutingMode: string; scheduledAt: string | null; metadata: Record<string, unknown> | null };
 type SendPlanSummary = { total: number; eligible: number; skipped: number; reasons: Record<string, number>; providerReady: boolean; senderReady: boolean; willSend: boolean; blocked: string | null };
-type Detail = { campaign: Campaign; breakdown: { locales: LocaleBreakdown[]; totals: LocaleBreakdown } | null; templates: { id: string; name: string; availableLocales: string[] }[]; senders: { id: string; name: string; displayName: string | null }[]; coverage: Coverage | null; coverageGate: CoverageGate | null; plan: SendPlanSummary; sendEnabled: boolean; schedulerConfigured: boolean };
+type TrackingReport = {
+  hasTrackingLink: boolean;
+  confidence: "دقيق" | "جزئي" | "غير متاح";
+  successful: { count: number; valueUSD: number };
+  failed: { count: number; valueUSD: number } | null;
+  averageUSD: number | null;
+  bestLanguage: { locale: string; label: string; valueUSD: number } | null;
+  visits: null;
+  links: { id: string; url: string; source: string; locale: string | null }[];
+} | null;
+type Detail = { campaign: Campaign; breakdown: { locales: LocaleBreakdown[]; totals: LocaleBreakdown } | null; templates: { id: string; name: string; availableLocales: string[] }[]; senders: { id: string; name: string; displayName: string | null }[]; coverage: Coverage | null; coverageGate: CoverageGate | null; plan: SendPlanSummary; sendEnabled: boolean; schedulerConfigured: boolean; trackingReport?: TrackingReport };
 
 // All internal reason/error codes mapped to human Arabic — nothing technical reaches the UI.
 const reasonAr: Record<string, string> = {
@@ -50,6 +62,14 @@ export default function CampaignWizardPage() {
   const [showDetails, setShowDetails] = React.useState(false);
   const [previewText, setPreviewText] = React.useState<{ locale: string; subject: string | null; body: string; usedFallback: boolean } | null>(null);
   const [scheduleAt, setScheduleAt] = React.useState("");
+  const [audienceLists, setAudienceLists] = React.useState<{ id: string; name: string; type: string }[]>([]);
+
+  React.useEffect(() => {
+    fetch("/api/dashboard/operations/communication/audience-lists", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setAudienceLists((j?.lists ?? []).filter((l: { status: string }) => l.status !== "ARCHIVED").map((l: { id: string; name: string; type: string }) => ({ id: l.id, name: l.name, type: l.type }))))
+      .catch(() => {});
+  }, []);
 
   const load = React.useCallback(async () => {
     try {
@@ -165,7 +185,11 @@ export default function CampaignWizardPage() {
   const totals = breakdown?.totals;
   const excluded = (totals?.optedOut ?? 0) + (totals?.doNotContact ?? 0);
   const templateName = templates.find((t) => t.id === campaign.templateGroupId)?.name ?? null;
-  const audienceLabel = campaign.audienceSegmentKey ? breakdown?.locales.find((l) => l.locale === campaign.audienceSegmentKey)?.label ?? campaign.audienceSegmentKey : "كل اللغات";
+  const audienceLabel = campaign.audienceSegmentKey
+    ? campaign.audienceSegmentKey.startsWith("list:")
+      ? audienceLists.find((l) => `list:${l.id}` === campaign.audienceSegmentKey)?.name ?? "قائمة"
+      : breakdown?.locales.find((l) => l.locale === campaign.audienceSegmentKey)?.label ?? campaign.audienceSegmentKey
+    : "كل اللغات";
   const topReason = Object.entries(plan.reasons).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
   const providerStatus = campaign.channel === "SMS" ? { text: "غير مفعّل", cls: "text-slate-400" } : plan.providerReady && plan.senderReady ? { text: "جاهز للإرسال", cls: "text-emerald-600" } : { text: "يحتاج إعداد", cls: "text-amber-600" };
   const previewLocales = (breakdown?.locales.filter((l) => l.total > 0) ?? []).slice(0, 8);
@@ -181,8 +205,14 @@ export default function CampaignWizardPage() {
             <Badge variant="outline" className="border-slate-200 text-slate-600">{statusLabel[campaign.status] ?? campaign.status}</Badge>
           </div>
         </div>
-        <Button asChild variant="outline" className="gap-2"><Link href="/dashboard/operations/communication/campaigns">كل الحملات <ArrowLeft className="h-4 w-4" /></Link></Button>
+        <div className="flex flex-col items-start gap-2 lg:items-end">
+          <Button asChild variant="outline" className="gap-2"><Link href="/dashboard/operations/communication/campaigns">كل الحملات <ArrowLeft className="h-4 w-4" /></Link></Button>
+          <CampaignActionsMenu id={id} status={campaign.status} variant="buttons" />
+        </div>
       </div>
+      {campaign.status === "SENDING" ? (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800">الحملة قيد الإرسال — العرض فقط، لا تعديل ولا حذف.</div>
+      ) : null}
 
       {/* Progress bar — 2×2 on phones, single row from sm up */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -217,9 +247,26 @@ export default function CampaignWizardPage() {
             <label className="text-sm">
               <span className="mb-1 block text-xs font-bold text-slate-500">الجمهور</span>
               <select disabled={!editable} value={campaign.audienceSegmentKey ?? "all"} onChange={(e) => patch({ audienceSegmentKey: e.target.value === "all" ? null : e.target.value }, "تم تحديث الجمهور")} className="rounded-md border border-slate-200 px-3 py-2 text-sm">
-                <option value="all">كل اللغات</option>
-                {breakdown?.locales.map((l) => <option key={l.locale} value={l.locale}>{l.label}</option>)}
+                <optgroup label="شريحة تلقائية">
+                  <option value="all">كل اللغات</option>
+                  {breakdown?.locales.map((l) => <option key={l.locale} value={l.locale}>{l.label}</option>)}
+                </optgroup>
+                {audienceLists.some((l) => l.type === "CUSTOM") ? (
+                  <optgroup label="قائمة مخصصة">
+                    {audienceLists.filter((l) => l.type === "CUSTOM").map((l) => <option key={l.id} value={`list:${l.id}`}>{l.name}</option>)}
+                  </optgroup>
+                ) : null}
+                {audienceLists.some((l) => l.type === "TEST") ? (
+                  <optgroup label="قائمة اختبار">
+                    {audienceLists.filter((l) => l.type === "TEST").map((l) => <option key={l.id} value={`list:${l.id}`}>{l.name}</option>)}
+                  </optgroup>
+                ) : null}
               </select>
+              {campaign.audienceSegmentKey?.startsWith("list:") ? (
+                <span className="mt-1 block text-[11px] font-semibold text-amber-700">
+                  {audienceLists.find((l) => `list:${l.id}` === campaign.audienceSegmentKey)?.type === "TEST" ? "قائمة اختبار — سيُرسل كاختبار (origin TEST)." : "قائمة مخصصة."}
+                </span>
+              ) : null}
             </label>
           </div>
 
@@ -339,6 +386,8 @@ export default function CampaignWizardPage() {
             </div>
             <p className="mt-2 text-xs leading-5 text-slate-500">سيتم اختيار رقم الإرسال تلقائيًا حسب اللغة والدولة. <Link href="/dashboard/operations/communication/settings" className="font-bold text-[#025EB8]">تعديل الإعدادات</Link></p>
           </div>
+
+          <TrackingLinksPanel campaignId={id} report={data.trackingReport ?? null} onChanged={load} />
 
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline" className="gap-1" disabled={!campaign.templateGroupId} onClick={test}>

@@ -26,6 +26,9 @@ export type ConversationDonor = {
   doNotContact: boolean;
 };
 
+/** Which real WhatsApp number a conversation arrived on (never a raw phoneNumberId in the UI). */
+export type ConversationSender = { id: string; name: string; phone: string | null };
+
 export type ConversationSummary = {
   phone: string;
   donor: ConversationDonor | null;
@@ -36,6 +39,7 @@ export type ConversationSummary = {
   needsReply: boolean;
   inboundCount: number;
   outboundCount: number;
+  sender: ConversationSender | null;
 };
 
 const HANDLED_ACTION = "communication.conversation.handled";
@@ -47,7 +51,33 @@ type Bucket = {
   lastInboundText: string | null;
   inboundCount: number;
   outboundCount: number;
+  senderId: string | null;
+  senderAt: number; // timestamp of the event that set senderId (prefer the most recent inbound)
 };
+
+/**
+ * Real WhatsApp senders for the inbox number filter. Returns display info only — never a raw
+ * phoneNumberId. Uses CommunicationSender data (no fake/demo numbers).
+ */
+export async function listInboxSenders(): Promise<ConversationSender[]> {
+  if (!process.env.DATABASE_URL) return [];
+  try {
+    const rows = await prisma.communicationSender.findMany({
+      where: { channel: "WHATSAPP" },
+      select: { id: true, name: true, displayName: true, displayPhoneNumber: true },
+      orderBy: [{ isDefault: "desc" }, { name: "asc" }],
+    });
+    return rows.map((s) => ({ id: s.id, name: s.displayName || s.name, phone: s.displayPhoneNumber ?? null }));
+  } catch (error) {
+    console.error("listInboxSenders failed", error);
+    return [];
+  }
+}
+
+async function senderMap(): Promise<Map<string, ConversationSender>> {
+  const senders = await listInboxSenders();
+  return new Map(senders.map((s) => [s.id, s]));
+}
 
 async function matchDonors(phoneDigits: string[]): Promise<Map<string, ConversationDonor[]>> {
   const map = new Map<string, ConversationDonor[]>();
@@ -84,14 +114,14 @@ async function matchDonors(phoneDigits: string[]): Promise<Map<string, Conversat
   return map;
 }
 
-export async function listConversations(): Promise<ConversationSummary[]> {
+export async function listConversations(opts: { senderId?: string | null } = {}): Promise<ConversationSummary[]> {
   if (!process.env.DATABASE_URL) return [];
   const [inbound, outbound] = await Promise.all([
     prisma.communicationProviderEvent
-      .findMany({ where: { channel: "WHATSAPP", eventType: "inbound_message" }, orderBy: { receivedAt: "desc" }, take: 500, select: { recipient: true, receivedAt: true, payloadSanitized: true } })
+      .findMany({ where: { channel: "WHATSAPP", eventType: "inbound_message" }, orderBy: { receivedAt: "desc" }, take: 500, select: { recipient: true, receivedAt: true, payloadSanitized: true, senderId: true } })
       .catch(() => []),
     prisma.communicationDelivery
-      .findMany({ where: { channel: "WHATSAPP", recipientPhone: { not: null } }, orderBy: { createdAt: "desc" }, take: 500, select: { recipientPhone: true, createdAt: true } })
+      .findMany({ where: { channel: "WHATSAPP", recipientPhone: { not: null } }, orderBy: { createdAt: "desc" }, take: 500, select: { recipientPhone: true, createdAt: true, senderId: true } })
       .catch(() => []),
   ]);
 
@@ -100,7 +130,7 @@ export async function listConversations(): Promise<ConversationSummary[]> {
     const key = digits(phone);
     let b = buckets.get(key);
     if (!b) {
-      b = { phone: phone, lastInboundAt: 0, lastOutboundAt: 0, lastInboundText: null, inboundCount: 0, outboundCount: 0 };
+      b = { phone: phone, lastInboundAt: 0, lastOutboundAt: 0, lastInboundText: null, inboundCount: 0, outboundCount: 0, senderId: null, senderAt: 0 };
       buckets.set(key, b);
     }
     return b;
@@ -116,17 +146,28 @@ export async function listConversations(): Promise<ConversationSummary[]> {
       const p = ev.payloadSanitized as { text?: unknown } | null;
       b.lastInboundText = p && typeof p.text === "string" ? p.text : b.lastInboundText;
     }
+    // "Received on" is attributed to the most recent event that carries a senderId (inbound preferred).
+    if (ev.senderId && at >= b.senderAt) {
+      b.senderId = ev.senderId;
+      b.senderAt = at;
+    }
   }
   for (const d of outbound) {
     if (!d.recipientPhone) continue;
     const b = ensure(d.recipientPhone);
+    const at = d.createdAt?.getTime() ?? 0;
     b.outboundCount += 1;
-    b.lastOutboundAt = Math.max(b.lastOutboundAt, d.createdAt?.getTime() ?? 0);
+    b.lastOutboundAt = Math.max(b.lastOutboundAt, at);
+    // Fallback sender attribution from outbound only when no inbound sender is known yet.
+    if (d.senderId && b.senderAt === 0) {
+      b.senderId = d.senderId;
+      b.senderAt = at;
+    }
   }
 
-  const [donorMap, handledMap] = await Promise.all([matchDonors([...buckets.keys()]), loadHandledMarkers()]);
+  const [donorMap, handledMap, senders] = await Promise.all([matchDonors([...buckets.keys()]), loadHandledMarkers(), senderMap()]);
 
-  const summaries: ConversationSummary[] = [...buckets.values()].map((b) => {
+  let summaries: ConversationSummary[] = [...buckets.values()].map((b) => {
     const key = digits(b.phone);
     const matches = donorMap.get(key) ?? [];
     const unresolved = matches.length !== 1;
@@ -146,8 +187,12 @@ export async function listConversations(): Promise<ConversationSummary[]> {
       needsReply: b.lastInboundAt > b.lastOutboundAt && !handled,
       inboundCount: b.inboundCount,
       outboundCount: b.outboundCount,
+      sender: b.senderId ? senders.get(b.senderId) ?? null : null,
     };
   });
+
+  // Optional filter by the real WhatsApp number the conversation arrived on.
+  if (opts.senderId) summaries = summaries.filter((c) => c.sender?.id === opts.senderId);
 
   summaries.sort((a, b) => (b.lastMessageAt ?? "").localeCompare(a.lastMessageAt ?? ""));
   return summaries;
@@ -165,6 +210,7 @@ export type ConversationDetail = {
   donor: ConversationDonor | null;
   unresolved: boolean;
   timeline: TimelineItem[];
+  sender: ConversationSender | null;
 };
 
 export async function getConversation(phone: string): Promise<ConversationDetail | null> {
@@ -172,16 +218,20 @@ export async function getConversation(phone: string): Promise<ConversationDetail
   const target = digits(phone);
   const variants = [target, `+${target}`];
 
-  const [events, deliveries, donorMap] = await Promise.all([
-    prisma.communicationProviderEvent.findMany({ where: { channel: "WHATSAPP", recipient: { in: variants } }, orderBy: { receivedAt: "asc" }, take: 500, select: { eventType: true, receivedAt: true, status: true, payloadSanitized: true } }).catch(() => []),
-    prisma.communicationDelivery.findMany({ where: { channel: "WHATSAPP", recipientPhone: { in: variants } }, orderBy: { createdAt: "asc" }, take: 500, select: { createdAt: true, renderedBody: true, status: true } }).catch(() => []),
+  const [events, deliveries, donorMap, senders] = await Promise.all([
+    prisma.communicationProviderEvent.findMany({ where: { channel: "WHATSAPP", recipient: { in: variants } }, orderBy: { receivedAt: "asc" }, take: 500, select: { eventType: true, receivedAt: true, status: true, payloadSanitized: true, senderId: true } }).catch(() => []),
+    prisma.communicationDelivery.findMany({ where: { channel: "WHATSAPP", recipientPhone: { in: variants } }, orderBy: { createdAt: "asc" }, take: 500, select: { createdAt: true, renderedBody: true, status: true, senderId: true } }).catch(() => []),
     matchDonors([target]),
+    senderMap(),
   ]);
 
   const timeline: TimelineItem[] = [];
   for (const d of deliveries) {
     timeline.push({ kind: "outbound", at: d.createdAt?.toISOString() ?? null, text: d.renderedBody ?? null, status: d.status });
   }
+  // Resolve the number this conversation arrived on: most recent inbound event with a senderId, else outbound.
+  let senderId: string | null = null;
+  let senderAt = 0;
   for (const ev of events) {
     if (ev.eventType === "inbound_message") {
       const p = ev.payloadSanitized as { text?: unknown } | null;
@@ -189,11 +239,16 @@ export async function getConversation(phone: string): Promise<ConversationDetail
     } else {
       timeline.push({ kind: "status", at: ev.receivedAt?.toISOString() ?? null, text: null, status: ev.status ?? ev.eventType });
     }
+    const at = ev.receivedAt?.getTime() ?? 0;
+    if (ev.senderId && at >= senderAt) { senderId = ev.senderId; senderAt = at; }
+  }
+  if (!senderId) {
+    for (const d of deliveries) if (d.senderId) { senderId = d.senderId; break; }
   }
   timeline.sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
 
   const matches = donorMap.get(target) ?? [];
-  return { phone, donor: matches.length === 1 ? matches[0] : null, unresolved: matches.length !== 1, timeline };
+  return { phone, donor: matches.length === 1 ? matches[0] : null, unresolved: matches.length !== 1, timeline, sender: senderId ? senders.get(senderId) ?? null : null };
 }
 
 /** Latest handled-marker time per phone (digits key). */

@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2, Plus, RefreshCw, Megaphone } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CampaignActionsMenu } from "./_components/CampaignActionsMenu";
 
 type Campaign = { id: string; name: string; channel: string; purpose: string; status: string; updatedAt: string };
 
@@ -37,6 +38,8 @@ const statusClass: Record<string, string> = {
 
 export default function CampaignsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const prefillListId = searchParams.get("list");
   const [items, setItems] = React.useState<Campaign[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [failed, setFailed] = React.useState(false);
@@ -75,7 +78,7 @@ export default function CampaignsPage() {
       const res = await fetch("/api/dashboard/operations/communication/campaigns", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, channel, purpose }),
+        body: JSON.stringify({ name, channel, purpose, ...(prefillListId ? { audienceSegmentKey: `list:${prefillListId}` } : {}) }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error ?? "failed");
@@ -145,17 +148,22 @@ export default function CampaignsPage() {
       ) : (
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {items.map((c) => (
-            <Link key={c.id} href={`/dashboard/operations/communication/campaigns/${c.id}`} className="block h-full">
-              <Card className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm">
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="flex items-center gap-2 text-base"><Megaphone className="h-4 w-4 text-[#025EB8]" /> {c.name}</CardTitle>
+            <Card key={c.id} className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm">
+              <CardHeader className="pb-2">
+                <div className="flex items-start justify-between gap-2">
+                  <Link href={`/dashboard/operations/communication/campaigns/${c.id}`} className="min-w-0 flex-1">
+                    <CardTitle className="flex items-center gap-2 text-base"><Megaphone className="h-4 w-4 shrink-0 text-[#025EB8]" /> <span className="truncate">{c.name}</span></CardTitle>
+                  </Link>
+                  <div className="flex shrink-0 items-center gap-2">
                     <Badge variant="outline" className={statusClass[c.status] ?? "border-slate-200 bg-slate-50 text-slate-600"}>{statusLabel[c.status] ?? c.status}</Badge>
+                    <CampaignActionsMenu id={c.id} status={c.status} />
                   </div>
+                </div>
+                <Link href={`/dashboard/operations/communication/campaigns/${c.id}`}>
                   <CardDescription>{channelLabel[c.channel] ?? c.channel} · {c.purpose}</CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
+                </Link>
+              </CardHeader>
+            </Card>
           ))}
         </section>
       )}

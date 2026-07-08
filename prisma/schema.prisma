@@ -774,7 +774,49 @@ model EmailTemplate {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // ── Template Center taxonomy (all optional / defaulted for back-compat)
+  /// "SYSTEM" (platform-event templates) | "CAMPAIGN" (reusable marketing). Unset = CAMPAIGN.
+  kind        String?  @default("CAMPAIGN")
+  /// "DRAFT" | "READY" | "NEEDS_REVIEW" | "ARCHIVED". Unset = DRAFT.
+  status      String?  @default("DRAFT")
+  /// "MARKETING" | "UTILITY" | "TRANSACTIONAL" | "AUTHENTICATION" (optional).
+  purpose     String?
+  /// Short pre-header line shown after the subject in inboxes (optional).
+  preheader   String?
+  /// Optional reusable EmailLayout this template renders inside (additive — the
+  /// existing @usewaypoint `document` path is unaffected when this is null).
+  layoutId    String?  @db.ObjectId
+  /// Content-mode fields for the layout builder: Record<locale, { title?, body?, ctaText?, ctaUrl?, footerNote? }>.
+  content     Json?
+
   @@index([name])
+  @@index([kind])
+}
+
+/// Reusable fixed email layout (shell) that many email templates render inside.
+/// Additive — does not replace the @usewaypoint document pipeline; it powers the
+/// new content-based Template Center email builder.
+model EmailLayout {
+  id                    String   @id @default(auto()) @map("_id") @db.ObjectId
+  name                  String
+  description           String?
+  /// HTML shell containing a `{{content}}` slot where the template body is injected.
+  htmlShell             String
+  /// Token used inside htmlShell for the content slot (default "{{content}}").
+  contentSlot           String   @default("{{content}}")
+  headerHtml            String?
+  footerHtml            String?
+  ctaSection            String?
+  /// Whether an unsubscribe placeholder must be present (marketing layouts).
+  unsubscribePlaceholder Boolean @default(false)
+  /// "DRAFT" | "READY" | "ARCHIVED".
+  status                String   @default("DRAFT")
+  isDefault             Boolean  @default(false)
+  createdById           String?  @db.ObjectId
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([status])
 }
 
 model WhatsappTemplate {
@@ -821,9 +863,18 @@ model WhatsappTemplate {
   /// Sanitized provider payload — handy for debugging mapping issues.
   providerRaw        Json?
 
+  // ── Template Center taxonomy (optional / defaulted for back-compat)
+  /// "SYSTEM" (platform-event) | "CAMPAIGN" (reusable marketing). Unset = CAMPAIGN.
+  kind               String?  @default("CAMPAIGN")
+  /// "DRAFT" | "READY" | "NEEDS_REVIEW" | "ARCHIVED". Unset = DRAFT.
+  status             String?  @default("DRAFT")
+  /// "MARKETING" | "UTILITY" | "TRANSACTIONAL" | "AUTHENTICATION" (optional).
+  purpose            String?
+
   @@index([name])
   @@index([externalTemplateId])
   @@index([provider])
+  @@index([kind])
 }
 
 enum MessageTriggerEvent {
@@ -1481,4 +1532,75 @@ model CommunicationProviderEvent {
 
   @@index([deliveryId])
   @@index([providerMessageId])
+}
+
+/// A reusable audience list — a custom manual list or a TEST list used to try
+/// campaigns/templates before real sending. Automatic language segments are computed live and are
+/// NOT stored here. Never seeded with demo data.
+model CommunicationAudienceList {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?
+  /// "CUSTOM" | "TEST".
+  type        String    @default("CUSTOM")
+  /// "ACTIVE" | "ARCHIVED".
+  status      String    @default("ACTIVE")
+  locale      String?
+  /// Channels this list targets: any of "WHATSAPP" | "EMAIL" | "SMS".
+  channels    String[]
+  createdBy   String?   @db.ObjectId
+  createdByName String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  metadata    Json?
+
+  @@index([type, status])
+  @@index([status])
+}
+
+/// One member of a CommunicationAudienceList. DONOR members reference a real User (contact data is
+/// read live from the donor). TEST_CONTACT members hold ad-hoc contact info used ONLY for test sends
+/// — they never become donors and never appear in donation reports or normal donor counts.
+model CommunicationAudienceMember {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  listId      String   @db.ObjectId
+  userId      String?  @db.ObjectId
+  /// "DONOR" | "TEST_CONTACT".
+  contactType String   @default("DONOR")
+  name        String?
+  email       String?
+  phone       String?
+  locale      String?
+  /// "ACTIVE" | "REMOVED".
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([listId, status])
+  @@index([userId])
+}
+
+/// Associates a CommunicationCampaign with a real tracking link (from the existing Link Generator /
+/// MarketingCampaignLink collection) so donations can be attributed back to the campaign via the
+/// donation `attribution` UTM snapshot. Never fabricates attribution — it only records the link + the
+/// UTM values used, and reports match real donations against them.
+model CommunicationCampaignTrackingLink {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  campaignId  String   @db.ObjectId
+  /// Id / urlHash of the underlying MarketingCampaignLink (raw collection), when created via the generator.
+  linkId      String?
+  url         String
+  /// "whatsapp" | "email" | "sms" — auto-selected from the campaign channel.
+  source      String
+  medium      String   @default("communication")
+  /// The value used as utm_campaign (the CommunicationCampaign id) — the campaign-level match key.
+  utmCampaign String
+  locale      String?
+  templateId  String?
+  status      String   @default("ACTIVE") // ACTIVE | ARCHIVED
+  createdBy   String?  @db.ObjectId
+  createdAt   DateTime @default(now())
+  metadata    Json?
+
+  @@index([campaignId, status])
 }

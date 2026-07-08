@@ -20,7 +20,7 @@ export default async function CommunicationHomePage() {
 
   const actions = [
     { n: home.campaignsInReview, label: "حملات بانتظار المراجعة", href: "/dashboard/operations/communication/campaigns", cta: "مراجعة", icon: ClipboardCheck, tone: "text-blue-600" },
-    { n: home.repliesNeedingAction, label: "محادثات تحتاج رد", href: "/dashboard/operations/communication/inbox", cta: "فتح المحادثات", icon: MessageSquareWarning, tone: "text-amber-600" },
+    { n: home.repliesNeedingAction, label: "محادثات تحتاج رد", href: "/dashboard/operations/communication/inbox", cta: "فتح المحادثات", icon: MessageSquareWarning, tone: "text-amber-600", alert: true },
     { n: home.failedDeliveries, label: "رسائل فشلت وتحتاج متابعة", href: "/dashboard/operations/communication/reports", cta: "عرض التقارير", icon: AlertOctagon, tone: "text-rose-600" },
     { n: home.incompleteTemplates, label: "قوالب ناقصة أو غير جاهزة", href: "/dashboard/operations/communication/templates", cta: "إكمال القوالب", icon: FileWarning, tone: "text-violet-600" },
   ];
@@ -51,15 +51,19 @@ export default async function CommunicationHomePage() {
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {actions.map((a) => {
           const Icon = a.icon;
+          const urgent = "alert" in a && a.alert && a.n > 0;
           return (
-            <Card key={a.label} className="border-slate-200">
+            <Card key={a.label} className={urgent ? "border-rose-300 ring-1 ring-rose-200" : "border-slate-200"}>
               <CardContent className="p-5">
                 <div className="flex items-center justify-between">
-                  <span className={`text-3xl font-black text-slate-900`}>{a.n}</span>
-                  <Icon className={`h-5 w-5 ${a.tone}`} />
+                  <span className={`flex items-center gap-2 text-3xl font-black ${urgent ? "text-rose-600" : "text-slate-900"}`}>
+                    {urgent ? <span className="inline-block h-2.5 w-2.5 rounded-full bg-rose-500" aria-hidden /> : null}
+                    {a.n}
+                  </span>
+                  <Icon className={`h-5 w-5 ${urgent ? "text-rose-500" : a.tone}`} />
                 </div>
                 <p className="mt-2 text-sm font-semibold text-slate-700">{a.label}</p>
-                <Link href={a.href} className="mt-2 inline-block text-xs font-bold text-[#025EB8]">{a.cta} ←</Link>
+                <Link href={a.href} className={`mt-2 inline-block text-xs font-bold ${urgent ? "text-rose-600" : "text-[#025EB8]"}`}>{a.cta} ←</Link>
               </CardContent>
             </Card>
           );

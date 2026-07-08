@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk '/^model CommunicationAudienceMember \\\\{/,/^\\\\}/' prisma/schema.prisma)",
+      "Bash(npx next *)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(grep -viE \"//|/\\\\*\")",
+      "Bash(grep -viE \"^\\\\s*//|/\\\\*|sampleVariablesMap|no sample|non-visible|without.*sample\")",
+      "Bash(grep -viE \"//\")",
+      "Bash(grep -viE \"No sample|non-visible|without.*sample|//|sampleVariablesMap\")"
+    ]
+  }
+}

@@ -124,7 +124,7 @@ export function ProviderTestPanel({
           ) : (
             <>
               <Field label="المُرسِل"><select value={senderId} onChange={(e) => setSenderId(e.target.value)} className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm">{senders.map((s) => <option key={s.id} value={s.id}>{s.displayName || s.name}</option>)}</select></Field>
-              <Field label="رقم المستلم (اختبار)"><input value={waTo} onChange={(e) => setWaTo(e.target.value)} placeholder="+90..." className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" /></Field>
+              <Field label="رقم المستلم (اختبار)"><input value={waTo} onChange={(e) => setWaTo(e.target.value)} placeholder="أدخل رقم المستلم مع رمز الدولة" className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" /></Field>
               <div className="grid grid-cols-2 gap-2">
                 <Field label="اسم القالب"><input value={templateName} onChange={(e) => setTemplateName(e.target.value)} className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" /></Field>
                 <Field label="اللغة"><input value={lang} onChange={(e) => setLang(e.target.value)} className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" /></Field>
@@ -143,7 +143,7 @@ export function ProviderTestPanel({
       <Card className="border-slate-200">
         <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><Mail className="h-4 w-4 text-[#025EB8]" /> اختبار إيميل</CardTitle><CardDescription>يرسل رسالة اختبار واحدة عبر مزوّد الإيميل.</CardDescription></CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <Field label="بريد المستلم"><input value={emailTo} onChange={(e) => setEmailTo(e.target.value)} placeholder="test@example.com" className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" /></Field>
+          <Field label="بريد المستلم"><input value={emailTo} onChange={(e) => setEmailTo(e.target.value)} placeholder="أدخل بريد المستلم" className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" /></Field>
           <Field label="العنوان (اختياري)"><input value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" /></Field>
           <div className="pt-1"><Button size="sm" disabled={emailBusy} onClick={testEmail} className="gap-1">{emailBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} إرسال اختبار إيميل</Button></div>
           {emailResult ? <p className={`pt-1 text-xs font-semibold ${resultCls(emailResult)}`}>{emailResult.text}</p> : null}

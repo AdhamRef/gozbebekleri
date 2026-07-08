@@ -9,6 +9,9 @@ export const metadata = {
   title: "نظرة تنفيذية على النظام | لوحة التحكم",
 };
 
+// Live admin dashboard (per-request Prisma aggregation) — never statically prerendered.
+export const dynamic = "force-dynamic";
+
 const riskLabel: Record<ExecutiveRiskLevel, string> = {
   HIGH: "عالي",
   MEDIUM: "متوسط",

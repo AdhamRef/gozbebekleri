@@ -56,6 +56,18 @@ export const DASHBOARD_NAV_GROUPS: {
     ],
   },
   {
+    group: "ربط المنصات والإرسال",
+    items: [
+      { key: "platformConnections", title: "نظرة عامة", href: "/dashboard/platform-connections" },
+      { key: "platformConnections", title: "بكسلات التتبع", href: "/dashboard/platform-connections/tracking" },
+      { key: "platformConnections", title: "الحسابات الإعلانية", href: "/dashboard/platform-connections/ad-accounts" },
+      { key: "platformConnections", title: "مركز التواصل", href: "/dashboard/platform-connections/communication" },
+      { key: "platformConnections", title: "Webhooks", href: "/dashboard/platform-connections/webhooks" },
+      { key: "platformConnections", title: "فحص الاتصال", href: "/dashboard/platform-connections/health" },
+      { key: "platformConnections", title: "السجلات المتقدمة", href: "/dashboard/platform-connections/logs" },
+    ],
+  },
+  {
     group: "الإدارة",
     items: [
       { key: "donors", title: "المتبرعون", href: "/dashboard/users/donors" },

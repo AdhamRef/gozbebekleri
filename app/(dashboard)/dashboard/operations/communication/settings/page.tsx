@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { prisma } from "@/lib/prisma";
 import { getSchedulerStatus } from "@/lib/communication/scheduler-status";
 import { ProviderTestPanel } from "./_components/ProviderTestPanel";
+import { PlatformConnectionsMovedNotice } from "@/components/dashboard/PlatformConnectionsMovedNotice";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,7 @@ export default async function CommunicationSettingsPage() {
 
   return (
     <main className="mx-auto max-w-5xl space-y-6" dir="rtl">
+      <PlatformConnectionsMovedNotice href="/dashboard/platform-connections/communication" label="فتح ربط المنصات والإرسال" />
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-xs text-slate-400">التواصل / الإعدادات المتقدمة</p>
