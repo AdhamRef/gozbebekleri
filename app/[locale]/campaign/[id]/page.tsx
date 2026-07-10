@@ -11,9 +11,49 @@ import {
   buildLocalizedAlternates,
 } from "@/lib/seo";
 import type { Locale } from "@/lib/seo";
+import { buildSeoFallback, compactSeoFields, type ProjectSeoFields } from "@/lib/campaign/project-seo";
 
 interface Props {
   params: Promise<{ id: string; locale: string }>;
+}
+
+type MongoDocument = Record<string, unknown>;
+
+function firstBatch(result: unknown): MongoDocument[] {
+  const cursor = (result as { cursor?: { firstBatch?: MongoDocument[] } })?.cursor;
+  return Array.isArray(cursor?.firstBatch) ? cursor.firstBatch : [];
+}
+
+function getSeoFieldsFromDocument(doc?: MongoDocument | null): ProjectSeoFields {
+  return compactSeoFields({
+    seoTitle: typeof doc?.seoTitle === "string" ? doc.seoTitle : null,
+    seoDescription: typeof doc?.seoDescription === "string" ? doc.seoDescription : null,
+    ogTitle: typeof doc?.ogTitle === "string" ? doc.ogTitle : null,
+    ogDescription: typeof doc?.ogDescription === "string" ? doc.ogDescription : null,
+    ogImage: typeof doc?.ogImage === "string" ? doc.ogImage : null,
+  });
+}
+
+async function fetchCampaignSeoDocuments(campaignId: string, locale: string) {
+  const [campaignResult, translationResult] = await Promise.all([
+    prisma.$runCommandRaw({
+      find: "Campaign",
+      filter: { _id: { $oid: campaignId } },
+      limit: 1,
+    }),
+    locale === "ar"
+      ? Promise.resolve(null)
+      : prisma.$runCommandRaw({
+          find: "CampaignTranslation",
+          filter: { campaignId: { $oid: campaignId }, locale },
+          limit: 1,
+        }),
+  ]);
+
+  return {
+    campaignSeo: getSeoFieldsFromDocument(firstBatch(campaignResult)[0]),
+    translationSeo: translationResult ? getSeoFieldsFromDocument(firstBatch(translationResult)[0]) : null,
+  };
 }
 
 async function fetchCampaignForSeo(idOrSlug: string) {
@@ -26,7 +66,13 @@ async function fetchCampaignForSeo(idOrSlug: string) {
       description: true,
       images: true,
       translations: {
-        select: { locale: true, title: true, description: true, slug: true },
+        select: {
+          locale: true,
+          title: true,
+          description: true,
+          image: true,
+          slug: true,
+        },
       },
     },
   });
@@ -46,9 +92,6 @@ const URGENCY_PREFIX: Record<string, string> = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id, locale } = await params;
   const seo = LOCALE_SEO[locale as Locale] ?? LOCALE_SEO.en;
-  // Always anchor canonical to the actual requested URL so the parent
-  // `[locale]/layout` canonical (`/{locale}`) can never leak through if the
-  // DB lookup throws or returns null on this render.
   const requestedCanonical = `${SITE_URL}/${locale}/campaign/${encodeURIComponent(id)}`;
 
   let campaign: Awaited<ReturnType<typeof fetchCampaignForSeo>> = null;
@@ -68,11 +111,34 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const t = pickTranslation(campaign.translations, locale);
-  const title = t?.title || campaign.title || seo.campaigns.title;
-  const rawDescription = t?.description || campaign.description || seo.campaigns.description;
-  const description = String(rawDescription).slice(0, 160);
-  const longDescription = String(rawDescription).slice(0, 200);
-  const image = campaign.images?.[0] || `${SITE_URL}/og-image.jpg`;
+  const localeTitle = t?.title || campaign.title || seo.campaigns.title;
+  const localeDescription = t?.description || campaign.description || seo.campaigns.description;
+  const localeImage = (t as { image?: string | null } | undefined)?.image || campaign.images?.[0] || `${SITE_URL}/og-image.jpg`;
+
+  let storedSeo: { campaignSeo: ProjectSeoFields; translationSeo: ProjectSeoFields | null } = {
+    campaignSeo: {},
+    translationSeo: null,
+  };
+  try {
+    storedSeo = await fetchCampaignSeoDocuments(campaign.id, locale);
+  } catch (err) {
+    console.error("Failed to fetch campaign SEO fields", err);
+  }
+
+  const resolvedSeo = buildSeoFallback({
+    localeFields: locale === "ar" ? storedSeo.campaignSeo : storedSeo.translationSeo,
+    localeTitle,
+    localeDescription,
+    localeImage,
+    campaignFields: storedSeo.campaignSeo,
+    campaignTitle: campaign.title,
+    campaignDescription: campaign.description,
+    campaignImage: campaign.images?.[0] || `${SITE_URL}/og-image.jpg`,
+  });
+
+  const description = String(resolvedSeo.seoDescription || seo.campaigns.description).slice(0, 160);
+  const longDescription = String(resolvedSeo.ogDescription || resolvedSeo.seoDescription || seo.campaigns.description).slice(0, 200);
+  const image = resolvedSeo.ogImage || localeImage || `${SITE_URL}/og-image.jpg`;
 
   let alternates: { canonical: string; languages: Record<string, string> } | { canonical: string };
   try {
@@ -89,7 +155,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const prefix = URGENCY_PREFIX[locale] ?? "";
+  const title = String(resolvedSeo.seoTitle || localeTitle || seo.campaigns.title);
+  const ogTitle = String(resolvedSeo.ogTitle || resolvedSeo.seoTitle || localeTitle || seo.campaigns.title);
   const fullTitle = `${prefix}${title} | ${seo.siteName}`;
+  const fullOgTitle = `${prefix}${ogTitle} | ${seo.siteName}`;
 
   return {
     title: fullTitle,
@@ -97,17 +166,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     keywords: seo.keywords,
     alternates,
     openGraph: {
-      title: fullTitle,
+      title: fullOgTitle,
       description: longDescription,
       url: alternates.canonical,
       siteName: seo.siteName,
       locale: OG_LOCALE_MAP[locale as Locale] ?? "en_US",
       type: "website",
-      images: [{ url: image, width: 1200, height: 630, alt: title }],
+      images: [{ url: image, width: 1200, height: 630, alt: ogTitle }],
     },
     twitter: {
       card: "summary_large_image",
-      title: fullTitle,
+      title: fullOgTitle,
       description: longDescription,
       images: [image],
     },
@@ -118,10 +187,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function CampaignPage({ params }: Props) {
   const { id, locale } = await params;
 
-  // If the URL slug doesn't match the canonical slug for this locale (e.g. the
-  // language switcher kept the previous locale's slug, or someone shared a link
-  // using the wrong locale's slug), redirect to the right one. ObjectId URLs are
-  // also rewritten to their slug form here.
   try {
     const campaign = await prisma.campaign.findFirst({
       where: whereByIdOrAnyLocaleSlug(id),
@@ -138,8 +203,6 @@ export default async function CampaignPage({ params }: Props) {
       }
     }
   } catch (err) {
-    // `redirect()` throws a NEXT_REDIRECT error — let it propagate. Only swallow
-    // real DB errors so a transient failure doesn't break the page render.
     if (err && typeof err === "object" && "digest" in err) throw err;
     console.error("Failed to resolve canonical campaign slug", err);
   }
