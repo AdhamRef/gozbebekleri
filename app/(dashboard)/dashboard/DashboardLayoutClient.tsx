@@ -40,6 +40,7 @@ import {
 } from "@/lib/dashboard/nav-config";
 import { DashboardAutoEnhancements } from "./_components/DashboardAutoEnhancements";
 import { ProjectEditorSectionsEnhancer } from "./_components/ProjectEditorSectionsEnhancer";
+import { ProjectLocaleSlugEditor } from "./_components/ProjectLocaleSlugEditor";
 import { BankTransfersExportPanel } from "./_components/BankTransfersExportPanel";
 
 function DashboardContent({
@@ -118,65 +119,61 @@ function DashboardContent({
   useEffect(() => {
     if (!showInboxBadge) return;
     let cancelled = false;
-    fetch("/api/dashboard/operations/communication/inbox/badge", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => { if (!cancelled && j && typeof j.count === "number") setInboxCount(j.count); })
-      .catch(() => {});
-    return () => { cancelled = true; };
+    const run = async () => {
+      try {
+        const r = await fetch('/api/communication/inbox/summary', { cache: 'no-store' });
+        const data = await r.json();
+        if (!cancelled) setInboxCount(Number(data?.unreadCount ?? 0));
+      } catch { if (!cancelled) setInboxCount(0); }
+    };
+    run();
+    const t = setInterval(run, 60000);
+    return () => { cancelled = true; clearInterval(t); };
   }, [showInboxBadge]);
 
-  const isActiveHref = (href: string) => {
-    if (href === '/dashboard/referrals') return pathname === href || pathname.startsWith('/dashboard/referrals/');
-    if (href === '/dashboard/link-generator') return pathname === href || pathname.startsWith('/dashboard/link-generator/');
-    if (href === '/dashboard/monthly') return pathname === href || pathname.startsWith('/dashboard/monthly/');
-    if (href === '/dashboard/bank-transfers') return pathname === href || pathname.startsWith('/dashboard/bank-transfers/');
-    return pathname === href;
+  const handleNavigation = (href: string) => {
+    setIsSidebarOpen(false);
+    router.push(href);
   };
 
+  if (status === 'loading') return <LoadingSkeleton />;
   const user = session?.user;
-  const userInitials = user?.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'A';
-
-  if (status === "loading" || status === "unauthenticated" || !session || !userCanEnterDashboard(session.user)) {
-    return <LoadingSkeleton />;
-  }
+  const userInitials = (user?.name || user?.email || 'U').slice(0, 2).toUpperCase();
 
   const SidebarInner = () => (
-    <div className="flex flex-col h-full">
-      <div className="h-14 flex items-center px-4 border-b border-white/10 shrink-0">
-        <Link href="/" className="flex items-center gap-2">
-          <img src="/logo-white.png" alt="Logo" className="h-8 w-auto object-contain brightness-0 invert" />
+    <div className="flex h-full flex-col">
+      <div className="p-4 border-b border-white/10 shrink-0">
+        <Link href="/dashboard" className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-lg">
+            <Heart className="w-6 h-6 text-[#025EB8]" />
+          </div>
+          <div>
+            <h2 className="text-white font-bold text-lg leading-tight">Gözbebekleri</h2>
+            <p className="text-white/70 text-[11px]">لوحة الإدارة</p>
+          </div>
         </Link>
-        <button className="lg:hidden ms-auto text-white/60 hover:text-white" onClick={() => setIsSidebarOpen(false)}>
-          <X className="w-5 h-5" />
-        </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2.5 space-y-3 sidebar-scroll">
+      <nav className="flex-1 overflow-y-auto p-2.5 space-y-1 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
         {navigation.map((section) => {
-          const collapsed = collapsedGroups[section.group];
+          const collapsed = collapsedGroups[section.group] ?? false;
           return (
-            <div key={section.group}>
-              <button onClick={() => toggleGroup(section.group)} className="flex w-full items-center justify-between px-3 py-1 mb-1 text-[10px] uppercase tracking-widest font-semibold text-white/35 hover:text-white/60">
-                <span>{section.group}</span>
-                <ChevronLeft className={cn("h-3 w-3 transition-transform", collapsed ? "" : "-rotate-90")} />
-              </button>
-              {!collapsed ? (
-                <div className="space-y-0.5">
-                  {section.items.map((item) => {
-                    const active = isActiveHref(item.href);
-                    return (
-                      <Link key={item.href} href={item.href} onClick={() => setIsSidebarOpen(false)} className={cn("group flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors", active ? "bg-white/12 text-white" : "text-white/75 hover:bg-white/8 hover:text-white")}>
-                        <span className={cn("shrink-0", active ? "text-white" : "text-white/70 group-hover:text-white")}>{item.icon}</span>
-                        <span className="truncate flex-1">{item.title}</span>
-                        {item.href === INBOX_HREF && inboxCount > 0 ? (
-                          <span className="inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-bold text-white" aria-label={`${inboxCount} محادثات تحتاج رد`}>{inboxCount > 99 ? "99+" : inboxCount}</span>
-                        ) : null}
-                      </Link>
-                    );
-                  })}
-                </div>
-              ) : null}
-            </div>
+          <div key={section.group} className="space-y-1">
+            <button type="button" onClick={() => toggleGroup(section.group)} className="w-full px-3 py-1.5 flex items-center justify-between text-[11px] font-semibold text-white/60 uppercase tracking-wider hover:text-white/80">
+              <span>{section.group}</span>
+              <ChevronLeft className={cn("w-3 h-3 transition-transform", collapsed ? "rotate-0" : "-rotate-90")} />
+            </button>
+            {!collapsed && section.items.map((item) => {
+              const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+              const isInbox = item.href === INBOX_HREF;
+              return (
+                <button key={item.href} onClick={() => handleNavigation(item.href)} className={cn("w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200", active ? "bg-white text-[#025EB8] shadow-lg" : "text-white/80 hover:bg-white/10 hover:text-white")}>
+                  <span className="flex items-center gap-3 min-w-0">{item.icon}<span className="truncate">{item.title}</span></span>
+                  {isInbox && inboxCount > 0 && <span className={cn("min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center", active ? "bg-[#025EB8] text-white" : "bg-red-500 text-white")}>{inboxCount > 99 ? '99+' : inboxCount}</span>}
+                </button>
+              );
+            })}
+          </div>
           );
         })}
       </nav>
@@ -202,6 +199,7 @@ function DashboardContent({
     <div className="min-h-screen flex bg-gray-50" dir={dir}>
       <DashboardAutoEnhancements />
       <ProjectEditorSectionsEnhancer />
+      <ProjectLocaleSlugEditor />
       <BankTransfersExportPanel />
       {isSidebarOpen && <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 lg:hidden" onClick={() => setIsSidebarOpen(false)} aria-hidden />}
 
