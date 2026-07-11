@@ -44,7 +44,6 @@ export const DASHBOARD_NAV_GROUPS: {
     group: "المحتوى",
     items: [
       { key: "campaigns", title: "المشاريع", href: "/dashboard/campaigns" },
-      { key: "campaigns", title: "أدوات المشاريع المتقدمة", href: "/dashboard/campaigns/advanced-tools" },
       { key: "categories", title: "الحملات التبرعية", href: "/dashboard/categories" },
       { key: "blog", title: "المدونة", href: "/dashboard/blog" },
     ],
