@@ -2,9 +2,11 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { SeoPanel } from "@/components/dashboard/campaigns/SeoPanel";
 
 const ROOT_ID = "dashboard-project-locale-slug-editor";
 const TARGET_SECTION_ID = "dashboard-project-locale-links";
+const SEO_PORTAL_ID = "dashboard-project-seo-workbench";
 
 const LANGUAGE_LABELS: Record<string, string> = {
   ar: "العربية",
@@ -210,5 +212,11 @@ export function ProjectLocaleSlugEditor() {
     };
   }, [isProjectEdit, pathname, projectId]);
 
-  return null;
+  if (!isProjectEdit || !projectId) return null;
+
+  return (
+    <div id={SEO_PORTAL_ID} className="mt-3">
+      <SeoPanel campaignId={projectId} />
+    </div>
+  );
 }
