@@ -2,15 +2,19 @@ import type { CommunicationChannelId } from "./communication-runtime-types";
 import { isMetaConfigured } from "./providers/meta-whatsapp/client";
 import { META_REASONS } from "./providers/meta-whatsapp/errors";
 import { isEmailConfigured, EMAIL_REASONS } from "./providers/email/client";
-import { resolveSmsProvider } from "./providers/sms/client";
+import { resolveSmsProvider, sendSmsMessage } from "./providers/sms/client";
 
 /**
  * ProviderRouter — the single gate for turning a prepared delivery into a real provider send.
  *
- * WhatsApp is wired to the Meta WhatsApp Cloud API adapter. Email/SMS adapters are not built yet,
- * so those channels remain not-configured. Real sending only happens when credentials AND a sender
- * with a phoneNumberId are present; otherwise the caller must record SKIPPED/FAILED with the reason
- * and must never mark a delivery SENT.
+ * FINAL ARCHITECTURE:
+ *   - WhatsApp → Meta WhatsApp Cloud API (only). Never Twilio.
+ *   - Email    → Brevo (primary). SendGrid legacy only (behind a flag, never primary).
+ *   - SMS      → Turkish (+90 / TR) → Netgsm; all others → Brevo SMS. Never Twilio.
+ *
+ * No silent cross-provider fallback. Real sending only happens with credentials (and a WhatsApp
+ * sender with a phoneNumberId); otherwise the caller must record SKIPPED/FAILED with the reason and
+ * must NEVER mark a delivery SENT.
  */
 
 export type ProviderSendDecision =
@@ -18,7 +22,7 @@ export type ProviderSendDecision =
   | { canSend: true; providerId: string };
 
 export type RouterSender = { provider?: string | null; phoneNumberId?: string | null; senderEmail?: string | null; smsSender?: string | null };
-export type RouterContext = { country?: string | null };
+export type RouterContext = { country?: string | null; phone?: string | null };
 
 export function providerNotConfiguredReason(channel: CommunicationChannelId): string {
   if (channel === "WHATSAPP") return META_REASONS.NOT_CONFIGURED;
@@ -35,11 +39,11 @@ export function resolveProviderForSend(channel: CommunicationChannelId, sender?:
   }
   if (channel === "EMAIL") {
     if (!isEmailConfigured()) return { canSend: false, reason: EMAIL_REASONS.NOT_CONFIGURED };
-    if (!sender?.senderEmail) return { canSend: false, reason: EMAIL_REASONS.SENDER_MISSING_IDENTITY };
-    return { canSend: true, providerId: "SENDGRID" };
+    if (!sender?.senderEmail && !process.env.BREVO_EMAIL_SENDER_EMAIL?.trim()) return { canSend: false, reason: EMAIL_REASONS.SENDER_MISSING_IDENTITY };
+    return { canSend: true, providerId: "BREVO_EMAIL" };
   }
-  // SMS — country-routed (TR → Netgsm, else Twilio), config-gated.
-  const sms = resolveSmsProvider(ctx?.country);
+  // SMS — country/phone-routed (TR → Netgsm, else Brevo), config-gated. Never Twilio.
+  const sms = resolveSmsProvider(ctx?.country, ctx?.phone);
   if (!sms.configured) return { canSend: false, reason: sms.reason };
   return { canSend: true, providerId: sms.provider };
 }
@@ -48,7 +52,8 @@ export function resolveProviderForSend(channel: CommunicationChannelId, sender?:
 export function isSendEnabled(channel: CommunicationChannelId): boolean {
   if (channel === "WHATSAPP") return isMetaConfigured();
   if (channel === "EMAIL") return isEmailConfigured();
-  return resolveSmsProvider(null).configured;
+  // SMS is "enabled" if either provider is configured (per-recipient routing decides which).
+  return resolveSmsProvider("", "").configured || resolveSmsProvider("TR", "+90").configured;
 }
 
 export type PreparedSendInput = {
@@ -63,20 +68,21 @@ export type PreparedSendInput = {
   // Email
   subject?: string | null;
   html?: string | null;
+  text?: string | null;
 };
 
 export type PreparedSendResult =
-  | { ok: true; providerId: string; providerMessageId: string | null; internalAccepted: boolean }
-  | { ok: false; reason: string; detail?: string };
+  | { ok: true; provider: string; providerMessageId: string | null; internalAccepted: boolean }
+  | { ok: false; provider?: string; reason: string; detail?: string };
 
 /**
  * Send a single prepared delivery through the real provider. Only reachable after the caller has
- * already created the CommunicationDelivery record. Never marks anything sent itself — it returns
- * the provider outcome for the caller to archive. WhatsApp = approved template only; Email = SendGrid
- * (no external id → internalAccepted); SMS = not implemented yet.
+ * already created the CommunicationDelivery record. Never marks anything sent itself — it returns the
+ * provider outcome for the caller to archive. WhatsApp = approved template only; Email = Brevo;
+ * SMS = Netgsm (TR) / Brevo (international). No Twilio anywhere; no silent fallback.
  */
 export async function sendPreparedDelivery(input: PreparedSendInput): Promise<PreparedSendResult> {
-  const decision = resolveProviderForSend(input.channel, input.sender, { country: input.country });
+  const decision = resolveProviderForSend(input.channel, input.sender, { country: input.country, phone: input.to });
   if (!decision.canSend) return { ok: false, reason: decision.reason };
 
   if (input.channel === "WHATSAPP") {
@@ -91,18 +97,19 @@ export async function sendPreparedDelivery(input: PreparedSendInput): Promise<Pr
       languageCode: input.languageCode,
       components: input.components,
     });
-    if (!res.ok) return { ok: false, reason: res.reason, detail: res.detail };
-    return { ok: true, providerId: "META_WHATSAPP", providerMessageId: res.providerMessageId, internalAccepted: false };
+    if (!res.ok) return { ok: false, provider: "META_WHATSAPP", reason: res.reason, detail: res.detail };
+    return { ok: true, provider: "META_WHATSAPP", providerMessageId: res.providerMessageId, internalAccepted: false };
   }
 
   if (input.channel === "EMAIL") {
     const { sendEmailMessage } = await import("./providers/email/client");
-    const res = await sendEmailMessage({ to: input.to, subject: input.subject ?? "", html: input.html ?? "" });
-    if (!res.ok) return { ok: false, reason: res.reason };
-    // SendGrid returns no per-message id here → accepted marker, providerMessageId stays null.
-    return { ok: true, providerId: "SENDGRID", providerMessageId: null, internalAccepted: true };
+    const res = await sendEmailMessage({ to: input.to, subject: input.subject ?? "", html: input.html ?? "", text: input.text, senderEmail: input.sender?.senderEmail });
+    if (!res.ok) return { ok: false, provider: "BREVO_EMAIL", reason: res.reason };
+    return { ok: true, provider: res.providerId, providerMessageId: res.providerMessageId, internalAccepted: res.internalAccepted };
   }
 
-  // SMS send executor is not implemented yet.
-  return { ok: false, reason: "SMS_SEND_NOT_IMPLEMENTED" };
+  // SMS — content is the rendered body; country/phone decides Netgsm vs Brevo.
+  const res = await sendSmsMessage({ to: input.to, content: input.html ?? input.subject ?? "", country: input.country, sender: input.sender?.smsSender, tag: "communication" });
+  if (!res.ok) return { ok: false, provider: res.provider, reason: res.reason, detail: res.detail };
+  return { ok: true, provider: res.provider, providerMessageId: res.providerMessageId, internalAccepted: res.internalAccepted };
 }

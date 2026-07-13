@@ -73,7 +73,7 @@ export function AudienceListDetail({ list, members }: { list: ListSummary; membe
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="truncate font-semibold text-slate-800">{m.name ?? (m.contactType === "TEST_CONTACT" ? "جهة اختبار" : "متبرع")}</span>
-                      {m.contactType === "TEST_CONTACT" ? <span className="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">اختبار</span> : <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">متبرع</span>}
+                      {m.contactType === "TEST_CONTACT" ? <span className="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">جهة اختبار</span> : <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">متبرع</span>}
                       {m.locale ? <span className="text-[10px] text-slate-400">{LOCALES[m.locale as keyof typeof LOCALES]?.label ?? m.locale}</span> : null}
                     </div>
                     <div className="truncate text-xs text-slate-400" dir="ltr">{m.email || m.phone || "—"}</div>

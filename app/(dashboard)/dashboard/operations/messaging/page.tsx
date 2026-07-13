@@ -39,7 +39,7 @@ export default async function OperationsMessagingPage() {
       <section className="rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs text-white/70">Communication Center</p>
+            <p className="text-xs text-white/70">مركز التواصل</p>
             <h1 className="mt-1.5 text-2xl font-black">مركز التواصل</h1>
             <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">واجهة واحدة لقنوات واتساب، الإيميل، و SMS، مع مزودين قابلين للتبديل ومراجعة بشرية قبل أي إرسال.</p>
           </div>

@@ -109,3 +109,11 @@ Donor matching is by phone number only; ambiguous/absent matches are shown as **
 - 24-hour customer-service window rules, template pacing/quality limits, and pricing are enforced by
   Meta, not re-implemented here.
 - Media messages, interactive messages, and flows are out of scope for this package (template + text only).
+
+## Final architecture status
+Meta WhatsApp Cloud API is the **sole active WhatsApp provider** (Twilio is legacy-disabled and never
+used for WhatsApp). Adapter files: `lib/communication/providers/meta-whatsapp/{client,messages,webhooks,errors,templates,types}.ts`.
+Router: WhatsApp always resolves to `META_WHATSAPP`; multi-number sends use `sender.phoneNumberId`;
+webhooks store inbound as `CommunicationProviderEvent` (with `senderId`) and advance
+`CommunicationDelivery` statuses (SENT/DELIVERED/READ/FAILED). Signature verification is required in
+production.

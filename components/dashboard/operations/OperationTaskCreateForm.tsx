@@ -12,17 +12,17 @@ import { Textarea } from "@/components/ui/textarea";
 import type { PlanningActionPriority, PlanningActionType } from "@/lib/operations/planning/planning-types";
 
 const taskTypes: { value: PlanningActionType; label: string }[] = [
-  { value: "WRITING", label: "Writing" },
-  { value: "DESIGN", label: "Design" },
-  { value: "VIDEO", label: "Video" },
-  { value: "CAROUSEL", label: "Carousel" },
-  { value: "MESSAGING", label: "Messaging" },
+  { value: "WRITING", label: "كتابة" },
+  { value: "DESIGN", label: "تصميم" },
+  { value: "VIDEO", label: "فيديو" },
+  { value: "CAROUSEL", label: "كاروسيل" },
+  { value: "MESSAGING", label: "رسائل" },
 ];
 
 const priorities: { value: PlanningActionPriority; label: string }[] = [
-  { value: "HIGH", label: "High" },
-  { value: "MEDIUM", label: "Medium" },
-  { value: "LOW", label: "Low" },
+  { value: "HIGH", label: "عالية" },
+  { value: "MEDIUM", label: "متوسطة" },
+  { value: "LOW", label: "منخفضة" },
 ];
 
 function dateToIso(value: string) {
@@ -123,7 +123,7 @@ export function OperationTaskCreateForm({ isFoundationMode }: { isFoundationMode
       </div>
 
       <div className="space-y-1.5 lg:col-span-4">
-        <label htmlFor="operation-task-description" className="text-xs font-bold text-slate-600">ملاحظات مختصرة</label>
+        <label htmlFor="operation-task-description" className="text-xs font-bold text-slate-600">ملاحظات</label>
         <Textarea
           id="operation-task-description"
           value={description}
@@ -140,7 +140,7 @@ export function OperationTaskCreateForm({ isFoundationMode }: { isFoundationMode
       <div className="flex items-end">
         <Button type="submit" disabled={isSubmitting || isRefreshing} className="w-full">
           {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
-          إنشاء
+          إنشاء مهمة
         </Button>
       </div>
     </form>

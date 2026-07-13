@@ -8,10 +8,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Send ONE test email to a single recipient. Requires { confirm: true }. Archives a
- * CommunicationDelivery (origin TEST) BEFORE sending. SendGrid returns no external message id, so on
- * acceptance the delivery advances to SENT via `internalAccepted` (never a fake external id). Missing
- * config / failure → SKIPPED / FAILED. The recipient is NOT saved as a donor.
+ * Send ONE test email to a single recipient via Brevo. Requires { confirm: true }. Archives a
+ * CommunicationDelivery (origin TEST) BEFORE sending. On acceptance the delivery advances to SENT with
+ * Brevo's messageId (or internalAccepted when Brevo returns 2xx without an id — never a fake external
+ * id). Missing config / failure → SKIPPED / FAILED. The recipient is NOT saved as a donor.
  */
 export async function POST(req: NextRequest) {
   const { session, denied } = await requireOperationsApiSession();
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
   const created = await createDeliveryRecord({
     channel: "EMAIL",
-    provider: "SENDGRID",
+    provider: "BREVO_EMAIL",
     recipientEmail: to,
     locale: "ar",
     purpose: "UTILITY",
@@ -49,6 +49,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ status: terminal ? "SKIPPED" : "FAILED", reason: result.reason, deliveryId }, { headers: operationsNoStoreHeaders });
   }
 
-  await markDeliveryStatus(deliveryId, "SENT", { internalAccepted: true });
-  return NextResponse.json({ status: "SENT", deliveryId }, { headers: operationsNoStoreHeaders });
+  await markDeliveryStatus(deliveryId, "SENT", { providerMessageId: result.providerMessageId, internalAccepted: result.internalAccepted });
+  return NextResponse.json({ status: "SENT", provider: result.providerId, providerMessageId: result.providerMessageId, deliveryId }, { headers: operationsNoStoreHeaders });
 }

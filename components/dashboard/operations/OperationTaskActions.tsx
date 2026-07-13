@@ -28,31 +28,31 @@ const transitionIcon = {
 function transitionsFor(status: OperationsTaskStatus): TaskTransition[] {
   if (status === "PENDING" || status === "DELAYED" || status === "MISSED") {
     return [
-      { status: "IN_PROGRESS", label: "Start", success: "بدأ تنفيذ المهمة" },
-      { status: "BLOCKED", label: "Block", success: "تم حجب المهمة", requiresBlockReason: true },
+      { status: "IN_PROGRESS", label: "بدء", success: "بدأ تنفيذ المهمة" },
+      { status: "BLOCKED", label: "إيقاف", success: "تم إيقاف المهمة", requiresBlockReason: true },
     ];
   }
 
   if (status === "IN_PROGRESS") {
     return [
-      { status: "NEEDS_REVIEW", label: "Ready for review", success: "تم إرسال المهمة للمراجعة" },
-      { status: "DONE", label: "Complete", success: "تم إكمال المهمة", confirm: "تأكيد إكمال هذه المهمة؟" },
-      { status: "BLOCKED", label: "Block", success: "تم حجب المهمة", requiresBlockReason: true },
+      { status: "NEEDS_REVIEW", label: "جاهزة للمراجعة", success: "تم إرسال المهمة للمراجعة" },
+      { status: "DONE", label: "إكمال", success: "تم إكمال المهمة", confirm: "تأكيد إكمال هذه المهمة؟" },
+      { status: "BLOCKED", label: "إيقاف", success: "تم إيقاف المهمة", requiresBlockReason: true },
     ];
   }
 
   if (status === "NEEDS_REVIEW") {
     return [
-      { status: "DONE", label: "Approve complete", success: "تم اعتماد اكتمال المهمة", confirm: "تأكيد اعتماد اكتمال هذه المهمة؟" },
-      { status: "IN_PROGRESS", label: "Return to progress", success: "تمت إعادة المهمة للتنفيذ" },
-      { status: "BLOCKED", label: "Block", success: "تم حجب المهمة", requiresBlockReason: true },
+      { status: "DONE", label: "اعتماد الإكمال", success: "تم اعتماد اكتمال المهمة", confirm: "تأكيد اعتماد اكتمال هذه المهمة؟" },
+      { status: "IN_PROGRESS", label: "إعادة للتنفيذ", success: "تمت إعادة المهمة للتنفيذ" },
+      { status: "BLOCKED", label: "إيقاف", success: "تم إيقاف المهمة", requiresBlockReason: true },
     ];
   }
 
   if (status === "BLOCKED") {
     return [
-      { status: "IN_PROGRESS", label: "Resume", success: "تم استئناف المهمة" },
-      { status: "PENDING", label: "Back to pending", success: "تمت إعادة المهمة للانتظار" },
+      { status: "IN_PROGRESS", label: "استئناف", success: "تم استئناف المهمة" },
+      { status: "PENDING", label: "إعادة للانتظار", success: "تمت إعادة المهمة للانتظار" },
     ];
   }
 
@@ -88,9 +88,9 @@ export function OperationTaskActions({
 
     let blockedReason: string | undefined;
     if (action.requiresBlockReason) {
-      const reason = window.prompt("سبب الحجب أو ما الذي يمنع إكمال المهمة؟", "");
+      const reason = window.prompt("سبب الإيقاف أو ما الذي يمنع إكمال المهمة؟", "");
       if (reason === null) return;
-      blockedReason = reason.trim() || "Blocked manually from operations task board.";
+      blockedReason = reason.trim() || "تم الإيقاف يدويًا من لوحة مهام المحتوى.";
     }
 
     setPendingStatus(action.status);

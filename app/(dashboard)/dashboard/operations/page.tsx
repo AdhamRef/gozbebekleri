@@ -40,9 +40,9 @@ export default async function OperationsDailyPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs text-slate-400">لوحة التحكم / التشغيل</p>
-          <h1 className="mt-1 text-2xl font-black text-slate-900">مركز التشغيل اليومي</h1>
-          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500">تابع مهام اليوم، المحتوى، التقويم، وحالة التواصل اليومي.</p>
+          <p className="text-xs text-slate-400">لوحة التحكم / المحتوى والتشغيل</p>
+          <h1 className="mt-1 text-2xl font-black text-slate-900">مركز المحتوى والتشغيل</h1>
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500">تابع مهام المحتوى، التقويم، الحملات، وحالة التواصل اليومي من مكان واحد.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild className="gap-2"><Link href="/dashboard/operations/tasks"><Plus className="h-4 w-4" /> إنشاء مهمة</Link></Button>
@@ -71,8 +71,9 @@ export default async function OperationsDailyPage() {
         <h2 className="mb-3 text-sm font-bold text-slate-500">قائمة عمل اليوم</h2>
         <Card className="border-slate-200"><CardContent className="p-0">
           {workList.length === 0 ? (
-            <div className="p-8 text-center text-sm text-slate-500">
-              لا توجد مهام أو متابعات لليوم. <Link href="/dashboard/operations/tasks" className="font-bold text-[#025EB8]">أنشئ مهمة جديدة</Link>.
+            <div className="p-8 text-center">
+              <p className="text-sm text-slate-500">لا توجد مهام أو متابعات اليوم.</p>
+              <Button asChild size="sm" className="mt-3 gap-2"><Link href="/dashboard/operations/tasks"><Plus className="h-4 w-4" /> إنشاء مهمة جديدة</Link></Button>
             </div>
           ) : (
             <ul className="divide-y divide-slate-100">
@@ -127,11 +128,11 @@ export default async function OperationsDailyPage() {
         <h2 className="mb-3 text-sm font-bold text-slate-500">روابط سريعة</h2>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {[
-            { label: "المحتوى والمهام", href: "/dashboard/operations/tasks" },
+            { label: "مركز المحتوى", href: "/dashboard/operations/content" },
             { label: "التقويم", href: "/dashboard/operations/calendar" },
             { label: "مركز التواصل", href: "/dashboard/operations/communication" },
-            { label: "الأرشيف", href: "/dashboard/archive" },
-            { label: "الهوية", href: "/dashboard/brand" },
+            { label: "مركز الأرشيف", href: "/dashboard/archive" },
+            { label: "دليل الهوية", href: "/dashboard/brand" },
           ].map((t) => (
             <Link key={t.href} href={t.href} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-700 transition hover:border-[#025EB8]/40 hover:shadow-sm">
               {t.label} <ArrowLeft className="h-4 w-4 text-slate-400" />

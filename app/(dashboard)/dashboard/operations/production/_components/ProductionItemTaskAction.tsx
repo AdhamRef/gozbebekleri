@@ -90,7 +90,7 @@ export function ProductionItemTaskAction({
         onClick={createTask}
       >
         {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
-        Create task
+        إنشاء مهمة
       </Button>
       {createdTaskId ? (
         <Link href="/dashboard/operations/tasks" className="text-xs font-bold text-[#025EB8] underline-offset-4 hover:underline">

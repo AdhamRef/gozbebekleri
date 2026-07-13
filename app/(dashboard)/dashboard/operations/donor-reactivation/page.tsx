@@ -50,8 +50,8 @@ export default async function DonorReactivationPage() {
 
       <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
         <Card><CardHeader><CardDescription>مرشحون للتنشيط</CardDescription><CardTitle className="text-3xl">{overview.summary.candidates}</CardTitle></CardHeader></Card>
-        <Card><CardHeader><CardDescription>WhatsApp / SMS</CardDescription><CardTitle className="text-3xl">{overview.summary.whatsappOrSms}</CardTitle></CardHeader></Card>
-        <Card><CardHeader><CardDescription>Email</CardDescription><CardTitle className="text-3xl">{overview.summary.email}</CardTitle></CardHeader></Card>
+        <Card><CardHeader><CardDescription>واتساب / رسائل</CardDescription><CardTitle className="text-3xl">{overview.summary.whatsappOrSms}</CardTitle></CardHeader></Card>
+        <Card><CardHeader><CardDescription>الإيميل</CardDescription><CardTitle className="text-3xl">{overview.summary.email}</CardTitle></CardHeader></Card>
         <Card><CardHeader><CardDescription>بدون قناة مناسبة</CardDescription><CardTitle className="text-3xl">{overview.summary.noChannel}</CardTitle></CardHeader></Card>
         <Card><CardHeader><CardDescription>تم التعامل آخر 30 يوم</CardDescription><CardTitle className="text-3xl">{overview.summary.recentlyHandled}</CardTitle></CardHeader></Card>
       </div>

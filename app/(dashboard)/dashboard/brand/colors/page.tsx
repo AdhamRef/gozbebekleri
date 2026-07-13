@@ -3,7 +3,7 @@ import { getBrandCenterSnapshot } from "@/lib/brand/brand-service";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Brand Colors | لوحة التحكم" };
+export const metadata = { title: "الألوان | لوحة التحكم" };
 
 export default async function BrandColorsPage() {
   const snapshot = await getBrandCenterSnapshot();

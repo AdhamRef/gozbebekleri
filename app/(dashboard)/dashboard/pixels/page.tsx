@@ -229,7 +229,7 @@ export default function PixelsSettingsPage() {
   if (loading) return <div className="flex min-h-[200px] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
 
   return <div className="space-y-6" dir="rtl">
-    <PlatformConnectionsMovedNotice href="/dashboard/platform-connections/tracking" label="فتح بكسلات التتبع" />
+    <PlatformConnectionsMovedNotice href="/dashboard/platform-connections/tracking" label="فتح بكسلات التتبع" text="تم نقل إعدادات البكسلات إلى ربط المنصات والإرسال." />
     <div className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-bold">إعدادات البكسلات والتتبع</h1><p className="mt-1 text-muted-foreground">إدارة معرفات البكسل وواجهات التحويل من الخادم، واختبار جاهزية التتبع لكل منصة.</p></div><Button variant="outline" onClick={loadDiagnostics} disabled={refreshingDiagnostics} className="gap-2">{refreshingDiagnostics ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}تحديث التشخيص</Button></div>
     <div className="grid gap-3 md:grid-cols-5"><Status label="Meta" status={status.meta} /><Status label="GA4" status={status.ga4} /><Status label="Google Ads" status={status.google_ads} /><Status label="TikTok" status={status.tiktok} /><Status label="X" status={status.x} /></div>
 

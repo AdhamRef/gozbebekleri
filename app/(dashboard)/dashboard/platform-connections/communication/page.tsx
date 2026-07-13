@@ -3,7 +3,7 @@ import { MessageCircle, Mail, MessageSquare, Route, FlaskConical } from "lucide-
 import { getCommunicationReadiness, STATUS_LABEL } from "@/lib/platform-connections/readiness";
 import { PageHeader, Card, CardHeader, StatusBadge, EnvOnlyNote } from "../_components/ui";
 
-export const metadata = { title: "مركز التواصل | ربط المنصات والإرسال" };
+export const metadata = { title: "مزودو التواصل والإرسال | ربط المنصات والإرسال" };
 export const dynamic = "force-dynamic";
 
 const SETTINGS = "/dashboard/operations/communication/settings";
@@ -49,9 +49,9 @@ export default async function CommunicationConnectionsPage() {
   return (
     <main className="space-y-5 p-4 sm:p-6" dir="rtl">
       <PageHeader
-        eyebrow="ربط المنصات والإرسال / مركز التواصل"
+        eyebrow="ربط المنصات والإرسال / المزودون"
         title="مزودو التواصل والإرسال"
-        subtitle="جاهزية واتساب والإيميل والرسائل القصيرة وقواعد اختيار المُرسِل. الإدارة الكاملة داخل مركز التواصل."
+        subtitle="جاهزية واتساب والإيميل والرسائل القصيرة وقواعد اختيار المُرسِل. حملات ومحادثات التواصل تُدار من مركز التواصل."
       />
 
       <div className="grid gap-3 lg:grid-cols-3">

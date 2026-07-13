@@ -10,6 +10,7 @@ import {
   Award, BarChart3, MessageSquare, Repeat, ScrollText,
   UserCircle,
   ChevronLeft, FileText, Megaphone, Plug, CreditCard,
+  Archive, Palette,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -53,8 +54,8 @@ function DashboardContent({
   const router = useRouter();
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  // Less-used groups start collapsed to keep the sidebar short.
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({ "المحتوى": true, "الإدارة": true });
+  // Daily-use groups start open; setup/identity/admin groups start collapsed to keep the sidebar short.
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({ "ربط المنصات والإرسال": true, "الهوية": true, "الإدارة": true });
   const toggleGroup = (g: string) => setCollapsedGroups((prev) => ({ ...prev, [g]: !prev[g] }));
   const dir = localeDirection(locale);
   const hasChecked = useRef(false);
@@ -97,6 +98,9 @@ function DashboardContent({
     ads:        <Megaphone   className="w-4 h-4 shrink-0" />,
     platformConnections: <Plug className="w-4 h-4 shrink-0" />,
     generalSettings: <CreditCard className="w-4 h-4 shrink-0" />,
+    operations: <MessageSquare className="w-4 h-4 shrink-0" />,
+    archive:    <Archive     className="w-4 h-4 shrink-0" />,
+    brand:      <Palette     className="w-4 h-4 shrink-0" />,
   }), []);
 
   const navigation = useMemo(() => {
@@ -144,7 +148,7 @@ function DashboardContent({
     <div className="flex flex-col h-full">
       <div className="h-14 flex items-center px-4 border-b border-white/10 shrink-0">
         <Link href="/" className="flex items-center gap-2">
-          <img src="/logo-white.png" alt="Logo" className="h-8 w-auto object-contain brightness-0 invert" />
+          <img src="/logo-white.png" alt="Logo" className="h-6 w-auto object-contain brightness-0 invert" />
         </Link>
         <button className="lg:hidden ms-auto text-white/60 hover:text-white" onClick={() => setIsSidebarOpen(false)}>
           <X className="w-5 h-5" />

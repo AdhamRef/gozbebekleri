@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 
-export function BrandCopyButton({ value, label = "Copy URL" }: { value: string | null; label?: string }) {
+export function BrandCopyButton({ value, label = "نسخ الرابط" }: { value: string | null; label?: string }) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
@@ -21,7 +21,7 @@ export function BrandCopyButton({ value, label = "Copy URL" }: { value: string |
       className="inline-flex min-h-9 items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
     >
       {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-      {copied ? "Copied" : label}
+      {copied ? "تم النسخ" : label}
     </button>
   );
 }

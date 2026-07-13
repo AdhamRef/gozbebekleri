@@ -1,37 +1,57 @@
+import { isNetgsmConfigured, sendNetgsmSms } from "../netgsm/client";
+import { isTurkishNumber } from "../netgsm/types";
+import { isBrevoSmsConfigured, sendBrevoSms } from "../brevo/sms-client";
+
 /**
- * SMS provider routing for the Communication Center. Turkey (TR) routes to Netgsm; other countries
- * route to Twilio international SMS. Both are config-gated — with no credentials, SMS is not
- * configured and nothing is sent (SMS_PROVIDER_NOT_CONFIGURED). Server-only; no secrets exposed.
+ * SMS provider routing for the Communication Center (final architecture):
+ *   - Turkish numbers (+90 / countryCode TR)  → Netgsm
+ *   - All other (international) numbers         → Brevo SMS
  *
- * Adapters are intentionally thin config resolvers for this package: sending SMS is not enabled
- * until credentials exist and a send executor is wired, so no external SMS call is made here.
+ * Twilio is LEGACY_DISABLED and is NEVER used here. There is no silent fallback: if the routed
+ * provider is not configured or fails, we return a safe reason and send nothing.
  */
 
 export const SMS_REASONS = {
-  NOT_CONFIGURED: "SMS_PROVIDER_NOT_CONFIGURED",
+  NETGSM_NOT_CONFIGURED: "NETGSM_NOT_CONFIGURED",
+  BREVO_NOT_CONFIGURED: "BREVO_SMS_NOT_CONFIGURED",
 } as const;
 
-export type SmsProviderId = "NETGSM" | "TWILIO";
+export type SmsProviderId = "NETGSM_SMS" | "BREVO_SMS";
 
-export function isNetgsmConfigured(): boolean {
-  return !!(process.env.NETGSM_USERCODE && (process.env.NETGSM_PASSWORD || process.env.NETGSM_APIKEY));
-}
+export type SmsRouteResult = { configured: true; provider: SmsProviderId } | { configured: false; provider: SmsProviderId; reason: string };
 
-export function isTwilioSmsConfigured(): boolean {
-  return !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && (process.env.TWILIO_SMS_FROM || process.env.TWILIO_MESSAGING_SERVICE_SID));
-}
-
-export type SmsRouteResult = { configured: true; provider: SmsProviderId } | { configured: false; reason: string };
-
-/** Pick the SMS provider for a recipient country: TR → Netgsm, otherwise Twilio international. */
-export function resolveSmsProvider(country?: string | null): SmsRouteResult {
-  const c = (country ?? "").trim().toUpperCase();
-  if (c === "TR") {
-    return isNetgsmConfigured() ? { configured: true, provider: "NETGSM" } : { configured: false, reason: SMS_REASONS.NOT_CONFIGURED };
+/** Pick the SMS provider by country/phone: TR → Netgsm, otherwise Brevo. Config-gated. */
+export function resolveSmsProvider(country?: string | null, phone?: string | null): SmsRouteResult {
+  if (isTurkishNumber(phone, country)) {
+    return isNetgsmConfigured() ? { configured: true, provider: "NETGSM_SMS" } : { configured: false, provider: "NETGSM_SMS", reason: SMS_REASONS.NETGSM_NOT_CONFIGURED };
   }
-  return isTwilioSmsConfigured() ? { configured: true, provider: "TWILIO" } : { configured: false, reason: SMS_REASONS.NOT_CONFIGURED };
+  return isBrevoSmsConfigured() ? { configured: true, provider: "BREVO_SMS" } : { configured: false, provider: "BREVO_SMS", reason: SMS_REASONS.BREVO_NOT_CONFIGURED };
 }
 
-export function isSmsConfigured(country?: string | null): boolean {
-  return resolveSmsProvider(country).configured;
+/** Is at least one SMS provider configured (for readiness — ignores per-recipient routing). */
+export function isSmsConfigured(country?: string | null, phone?: string | null): boolean {
+  return resolveSmsProvider(country, phone).configured;
+}
+
+export type SmsSendInput = { to: string; content: string; country?: string | null; sender?: string | null; type?: "transactional" | "marketing"; tag?: string | null };
+export type SmsSendResult =
+  | { ok: true; provider: SmsProviderId; providerMessageId: string | null; internalAccepted: boolean }
+  | { ok: false; provider: SmsProviderId; reason: string; detail?: string };
+
+/** Send one SMS through the country-routed provider. No Twilio, no silent cross-provider fallback. */
+export async function sendSmsMessage(input: SmsSendInput): Promise<SmsSendResult> {
+  const route = resolveSmsProvider(input.country, input.to);
+  if (!route.configured) return { ok: false, provider: route.provider, reason: route.reason };
+
+  if (route.provider === "NETGSM_SMS") {
+    const res = await sendNetgsmSms({ to: input.to, content: input.content }, input.country);
+    return res.ok
+      ? { ok: true, provider: "NETGSM_SMS", providerMessageId: res.providerMessageId, internalAccepted: res.internalAccepted }
+      : { ok: false, provider: "NETGSM_SMS", reason: res.reason, detail: res.detail };
+  }
+
+  const res = await sendBrevoSms({ to: input.to, content: input.content, sender: input.sender, type: input.type, tag: input.tag });
+  return res.ok
+    ? { ok: true, provider: "BREVO_SMS", providerMessageId: res.providerMessageId, internalAccepted: res.internalAccepted }
+    : { ok: false, provider: "BREVO_SMS", reason: res.reason, detail: res.detail };
 }

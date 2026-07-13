@@ -3,7 +3,7 @@ import { getBrandCenterSnapshot } from "@/lib/brand/brand-service";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Brand Voice | لوحة التحكم" };
+export const metadata = { title: "نبرة الخطاب | لوحة التحكم" };
 
 export default async function BrandVoicePage() {
   const snapshot = await getBrandCenterSnapshot();

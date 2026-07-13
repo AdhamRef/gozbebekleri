@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, CircleAlert, Radio, Route, ScrollText, Activity, Mail, MessageSquare, Clock } from "lucide-react";
+import { ArrowLeft, CheckCircle2, CircleAlert, Radio, Route, ScrollText, Activity, MessageSquare, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { getSchedulerStatus } from "@/lib/communication/scheduler-status";
 import { ProviderTestPanel } from "./_components/ProviderTestPanel";
 import { PlatformConnectionsMovedNotice } from "@/components/dashboard/PlatformConnectionsMovedNotice";
+import { getBrevoEmailConfig, getBrevoSmsConfig, getNetgsmSmsConfig, getMetaWhatsappConfig } from "@/lib/communication/provider-env";
 
 export const dynamic = "force-dynamic";
 
@@ -41,14 +42,30 @@ export default async function CommunicationSettingsPage() {
   const checklist = wa.checklist;
   const ready = checklist.filter((c) => c.ok).length;
 
+  // Final provider architecture readiness (server-computed; no secret values leave here).
+  const meta = getMetaWhatsappConfig();
+  const brevoEmail = getBrevoEmailConfig();
+  const brevoSms = getBrevoSmsConfig();
+  const netgsm = getNetgsmSmsConfig();
+  const providerCards = [
+    { key: "META_WHATSAPP", label: "Meta WhatsApp", desc: "واتساب — المزود الوحيد", cfg: meta },
+    { key: "BREVO_EMAIL", label: "Brevo Email", desc: "الإيميل — المزود الأساسي", cfg: brevoEmail },
+    { key: "BREVO_SMS", label: "Brevo SMS", desc: "الرسائل القصيرة — الأرقام الدولية", cfg: brevoSms },
+    { key: "NETGSM_SMS", label: "Netgsm SMS", desc: "الرسائل القصيرة — أرقام تركيا (+90)", cfg: netgsm },
+  ];
+
   return (
     <main className="mx-auto max-w-5xl space-y-6" dir="rtl">
-      <PlatformConnectionsMovedNotice href="/dashboard/platform-connections/communication" label="فتح ربط المنصات والإرسال" />
+      <PlatformConnectionsMovedNotice
+        href="/dashboard/platform-connections/communication"
+        label="فتح ربط المنصات والإرسال"
+        text="الإعداد الرئيسي للمزودين موجود في ربط المنصات والإرسال."
+      />
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs text-slate-400">التواصل / الإعدادات المتقدمة</p>
-          <h1 className="mt-1 text-2xl font-black text-slate-900">إعدادات الإرسال</h1>
-          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500">جاهزية الإرسال، أرقام واتساب، مُرسلو الإيميل، وقواعد اختيار رقم الإرسال.</p>
+          <p className="text-xs text-slate-400">التواصل / إعدادات متقدمة</p>
+          <h1 className="mt-1 text-2xl font-black text-slate-900">إعدادات متقدمة للتواصل</h1>
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500">إعدادات إضافية للإرسال: أرقام واتساب، مُرسلو الإيميل، وقواعد اختيار رقم الإرسال. الإعداد الرئيسي للمزودين موجود في ربط المنصات والإرسال.</p>
         </div>
         <Button asChild variant="outline" className="gap-2"><Link href="/dashboard/operations/communication">العودة <ArrowLeft className="h-4 w-4" /></Link></Button>
       </div>
@@ -73,7 +90,14 @@ export default async function CommunicationSettingsPage() {
       <section>
         <h2 className="mb-1 text-sm font-bold text-slate-500">اختبار المزوّدين مباشرة</h2>
         <p className="mb-3 text-xs leading-6 text-slate-400">إرسال رسالة اختبار واحدة فقط لتأكيد جاهزية القناة. تُؤرشَف كل رسالة اختبار في السجل، ولا تُسجَّل جهة المستلم كمتبرّع.</p>
-        <ProviderTestPanel webhookPath="/api/webhooks/meta/whatsapp" signatureConfigured={wa.signatureConfigured} lastWebhookAt={wa.lastWebhookAt ? wa.lastWebhookAt.toISOString() : null} />
+        <ProviderTestPanel
+          webhookPath="/api/webhooks/meta/whatsapp"
+          signatureConfigured={wa.signatureConfigured}
+          lastWebhookAt={wa.lastWebhookAt ? wa.lastWebhookAt.toISOString() : null}
+          emailReady={brevoEmail.configured}
+          smsInternationalReady={brevoSms.configured}
+          smsTurkeyReady={netgsm.configured}
+        />
       </section>
 
       {/* Scheduler readiness */}
@@ -93,21 +117,29 @@ export default async function CommunicationSettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Email note */}
+      {/* Provider architecture readiness */}
       <Card className="border-slate-200">
-        <CardContent className="flex items-center gap-3 p-4 text-sm">
-          <Mail className="h-5 w-5 text-[#025EB8]" />
-          <span className="text-slate-600">مُرسلو الإيميل يُدارون من صفحة المُرسِلين.</span>
-        </CardContent>
-      </Card>
-
-      {/* SMS status */}
-      <Card className="border-amber-200 bg-amber-50">
-        <CardContent className="flex items-start gap-3 p-4 text-sm">
-          <MessageSquare className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-          <div>
-            <p className="font-bold text-amber-900">الرسائل القصيرة — غير مفعّلة</p>
-            <p className="mt-0.5 leading-6 text-amber-800">الرسائل القصيرة غير مفعّلة بعد. سيتم تفعيلها بعد ربط مزوّد الرسائل (Netgsm لتركيا / Twilio للدولي). حتى ذلك الحين لا يمكن إنشاء حملة رسائل أو إرسالها.</p>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">جاهزية مزوّدي الإرسال</CardTitle>
+          <CardDescription>واتساب: Meta · الإيميل: Brevo · الرسائل الدولية: Brevo · رسائل تركيا (+90): Netgsm. لا يُستخدم Twilio ولا SendGrid.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-2 sm:grid-cols-2">
+          {providerCards.map((p) => (
+            <div key={p.key} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold text-slate-800">{p.label}</span>
+                {p.cfg.configured ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" /> جاهز</span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700"><CircleAlert className="h-3.5 w-3.5" /> يحتاج إعداد</span>
+                )}
+              </div>
+              <p className="mt-0.5 text-xs text-slate-500">{p.desc}</p>
+              {!p.cfg.configured && p.cfg.missing.length > 0 ? <p className="mt-1 text-[11px] text-amber-700">ينقص: {p.cfg.missing.join("، ")}</p> : null}
+            </div>
+          ))}
+          <div className="rounded-lg border border-slate-100 bg-slate-100 px-3 py-2 text-xs text-slate-500 sm:col-span-2">
+            <MessageSquare className="me-1 inline h-3.5 w-3.5" /> مزوّدون قديمون (غير مستخدمين في الإرسال): Twilio، SendGrid.
           </div>
         </CardContent>
       </Card>

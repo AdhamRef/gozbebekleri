@@ -70,32 +70,32 @@ export function BrandAssetCreatePanel({ profileId }: { profileId: string }) {
     <section className="rounded-lg border bg-white p-4 shadow-sm" aria-label="إضافة أصل هوية">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#025EB8]">Brand asset authoring</p>
-          <h2 className="mt-1 text-lg font-black text-slate-950">إضافة أصل هوية برابط موثق</h2>
+          <p className="text-xs font-bold text-[#025EB8]">أصول الهوية</p>
+          <h2 className="mt-1 text-lg font-black text-slate-950">إضافة أصل معتمد</h2>
           <p className="mt-1 text-sm leading-6 text-slate-600">يحفظ الرابط كسجل يدوي يحتاج تحقق. لا رفع ملفات، لا تحميل تلقائي، ولا اتصال خارجي.</p>
         </div>
         <FilePlus2 className="hidden h-7 w-7 text-[#025EB8] sm:block" aria-hidden="true" />
       </div>
 
       <form onSubmit={submit} className="mt-4 grid gap-3 lg:grid-cols-[1fr_0.6fr_0.6fr_1.2fr_0.6fr_auto]">
-        <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="مثال: Minber-i Aksa primary logo" minLength={2} maxLength={160} required aria-label="عنوان أصل الهوية" />
+        <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="أدخل اسم الأصل" minLength={2} maxLength={160} required aria-label="اسم الأصل" />
         <select value={type} onChange={(event) => setType(event.target.value)} className="h-9 rounded-md border border-input bg-white px-3 text-sm shadow-sm" aria-label="نوع الأصل">
           {assetTypes.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
         <select value={format} onChange={(event) => setFormat(event.target.value)} className="h-9 rounded-md border border-input bg-white px-3 text-sm shadow-sm" aria-label="صيغة الأصل">
           {assetFormats.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
-        <Input value={fileUrl} onChange={(event) => setFileUrl(event.target.value)} type="url" placeholder="https://..." required aria-label="رابط الملف" dir="ltr" />
+        <Input value={fileUrl} onChange={(event) => setFileUrl(event.target.value)} type="url" placeholder="أدخل رابط الملف" required aria-label="رابط الملف" dir="ltr" />
         <select value={locale} onChange={(event) => setLocale(event.target.value)} className="h-9 rounded-md border border-input bg-white px-3 text-sm shadow-sm" aria-label="لغة الأصل">
           {locales.map((item) => <option key={item} value={item}>{item.toUpperCase()}</option>)}
         </select>
         <Button type="submit" disabled={saving} className="gap-2 font-bold">
           <Save className="h-4 w-4" /> {saving ? "جاري الحفظ" : "حفظ"}
         </Button>
-        <Input value={previewUrl} onChange={(event) => setPreviewUrl(event.target.value)} type="url" placeholder="Preview URL اختياري" aria-label="رابط المعاينة" dir="ltr" />
-        <Input value={usage} onChange={(event) => setUsage(event.target.value)} placeholder="الاستخدام: website header / certificate / social" className="lg:col-span-3" aria-label="الاستخدام" />
+        <Input value={previewUrl} onChange={(event) => setPreviewUrl(event.target.value)} type="url" placeholder="رابط المعاينة (اختياري)" aria-label="رابط المعاينة" dir="ltr" />
+        <Input value={usage} onChange={(event) => setUsage(event.target.value)} placeholder="وصف الاستخدام" className="lg:col-span-3" aria-label="الاستخدام" />
         <label className="flex min-h-9 items-center gap-2 rounded-md border px-3 text-sm font-bold text-slate-700">
-          <input type="checkbox" checked={downloadable} onChange={(event) => setDownloadable(event.target.checked)} /> Downloadable
+          <input type="checkbox" checked={downloadable} onChange={(event) => setDownloadable(event.target.checked)} /> قابل للتحميل
         </label>
       </form>
 

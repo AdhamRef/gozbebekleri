@@ -9,7 +9,7 @@ export default function MarketingConnectionsPage() {
   return (
     <>
       <div className="px-4 pt-4 sm:px-6">
-        <PlatformConnectionsMovedNotice href="/dashboard/platform-connections/ad-accounts" label="فتح الحسابات الإعلانية" />
+        <PlatformConnectionsMovedNotice href="/dashboard/platform-connections/ad-accounts" label="فتح الحسابات الإعلانية" text="تم نقل ربط الحسابات والمنصات إلى قسم ربط المنصات والإرسال." />
       </div>
       <ConnectionsPageClient />
     </>

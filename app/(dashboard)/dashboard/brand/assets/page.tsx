@@ -3,7 +3,7 @@ import { getBrandCenterSnapshot } from "@/lib/brand/brand-service";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Brand Assets | لوحة التحكم" };
+export const metadata = { title: "الأصول والشعارات | لوحة التحكم" };
 
 export default async function BrandAssetsPage() {
   const snapshot = await getBrandCenterSnapshot();

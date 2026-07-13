@@ -34,6 +34,7 @@ const STATUSES = ["NOT_CONFIGURED", "ACTIVE", "NEEDS_ATTENTION", "DISABLED"] as 
 const PURPOSES = ["MARKETING", "UTILITY", "TRANSACTIONAL", "AUTHENTICATION"] as const;
 
 const channelLabel: Record<string, string> = { WHATSAPP: "واتساب", EMAIL: "إيميل", SMS: "رسائل SMS" };
+const purposeLabel: Record<string, string> = { MARKETING: "تسويقي", UTILITY: "تشغيلي", TRANSACTIONAL: "معاملات", AUTHENTICATION: "مصادقة" };
 const statusLabel: Record<string, string> = {
   ACTIVE: "نشط",
   NEEDS_ATTENTION: "يحتاج مراجعة",
@@ -179,20 +180,20 @@ export default function SendersPage() {
 
   return (
     <main className="space-y-5 p-4 sm:p-6" dir="rtl">
-      <section className="rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs text-white/70">مركز التواصل</p>
-            <h1 className="mt-1.5 text-2xl font-black">مُرسِلو التواصل</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-white/85">
+            <p className="text-xs font-bold text-[#025EB8]">مركز التواصل / المُرسِلون</p>
+            <h1 className="mt-1 text-xl font-black text-slate-900">مُرسِلو التواصل</h1>
+            <p className="mt-1.5 max-w-3xl text-sm leading-6 text-slate-600">
               أرقام واتساب، مُرسِلو الإيميل والرسائل. إعداد فقط — لا يوجد إرسال ولا تظهر أي مفاتيح أو أسرار.
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="secondary" className="gap-2" onClick={() => load()} disabled={loading}>
+            <Button variant="outline" className="gap-2" onClick={() => load()} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> تحديث
             </Button>
-            <Button variant="secondary" className="gap-2 font-bold" onClick={startCreate}>
+            <Button className="gap-2 font-bold" onClick={startCreate}>
               <Plus className="h-4 w-4" /> مُرسِل جديد
             </Button>
           </div>
@@ -248,7 +249,7 @@ export default function SendersPage() {
                   {s.supportedLocales.length ? s.supportedLocales.map((l) => <Badge key={l} variant="outline" className="text-xs">{l}</Badge>) : <span className="text-xs text-slate-400">كل اللغات</span>}
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {s.supportedPurposes.map((p) => <Badge key={p} variant="outline" className="border-blue-200 bg-blue-50 text-xs text-blue-700">{p}</Badge>)}
+                  {s.supportedPurposes.map((p) => <Badge key={p} variant="outline" className="border-blue-200 bg-blue-50 text-xs text-blue-700">{purposeLabel[p] ?? p}</Badge>)}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   <Button size="sm" variant="outline" onClick={() => startEdit(s)}>تعديل</Button>
@@ -315,7 +316,7 @@ function SenderForm({
           <p className="mb-1 text-xs font-bold text-slate-500">الأغراض المدعومة</p>
           <div className="flex flex-wrap gap-2">
             {PURPOSES.map((p) => (
-              <button key={p} type="button" onClick={() => toggleArr("supportedPurposes", p)} className={`rounded-md border px-2 py-1 text-xs ${form.supportedPurposes.includes(p) ? "border-[#025EB8] bg-blue-50 text-[#025EB8]" : "border-slate-200 text-slate-600"}`}>{p}</button>
+              <button key={p} type="button" onClick={() => toggleArr("supportedPurposes", p)} className={`rounded-md border px-2 py-1 text-xs ${form.supportedPurposes.includes(p) ? "border-[#025EB8] bg-blue-50 text-[#025EB8]" : "border-slate-200 text-slate-600"}`}>{purposeLabel[p] ?? p}</button>
             ))}
           </div>
         </div>

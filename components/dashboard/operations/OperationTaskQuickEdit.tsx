@@ -14,9 +14,9 @@ import type { PlanningActionPriority } from "@/lib/operations/planning/planning-
 const objectIdPattern = /^[a-f\d]{24}$/i;
 
 const priorities: { value: PlanningActionPriority; label: string }[] = [
-  { value: "HIGH", label: "High" },
-  { value: "MEDIUM", label: "Medium" },
-  { value: "LOW", label: "Low" },
+  { value: "HIGH", label: "عالية" },
+  { value: "MEDIUM", label: "متوسطة" },
+  { value: "LOW", label: "منخفضة" },
 ];
 
 function dueLabelToDate(value: string) {
@@ -105,7 +105,7 @@ export function OperationTaskQuickEdit({
       <div className="mt-3">
         <Button type="button" size="sm" variant="ghost" className="text-slate-600" onClick={() => setIsEditing(true)}>
           <Pencil className="h-4 w-4" />
-          Quick edit
+          تعديل سريع
         </Button>
       </div>
     );

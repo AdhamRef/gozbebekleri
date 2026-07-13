@@ -1,11 +1,11 @@
-import { BrandCenterView } from "../_components/BrandCenterView";
-import { getBrandCenterSnapshot } from "@/lib/brand/brand-service";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Brand Organizations | لوحة التحكم" };
-
-export default async function BrandOrganizationsPage() {
-  const snapshot = await getBrandCenterSnapshot();
-  return <BrandCenterView activeTab="organizations" snapshot={snapshot} />;
+/**
+ * The "المؤسسات" (organizations) section was removed from the user-facing Brand Center. The route is
+ * kept (not deleted) but redirects to the brand guide so old links keep working.
+ */
+export default function BrandOrganizationsPage() {
+  redirect("/dashboard/brand");
 }

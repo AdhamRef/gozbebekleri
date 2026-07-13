@@ -151,16 +151,16 @@ export default async function CommunicationAudiencesPage({ searchParams }: { sea
 
   return (
     <main className="space-y-5 p-4 sm:p-6" dir="rtl">
-      <section className="rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs text-white/70">مركز التواصل / الجمهور</p>
-            <h1 className="mt-1.5 text-2xl font-black">الجمهور</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-white/85">أنشئ شرائح تلقائية أو قوائم مخصصة لاختبار الحملات والقوالب قبل الإرسال.</p>
+            <p className="text-xs font-bold text-[#025EB8]">مركز التواصل / الجمهور</p>
+            <h1 className="mt-1 text-xl font-black text-slate-900">الجمهور</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">أنشئ شرائح تلقائية أو قوائم مخصصة لاختبار الحملات والقوالب قبل الإرسال.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href={`${BASE}/new`} className="inline-flex h-10 items-center gap-2 rounded-md bg-white px-4 text-sm font-bold text-[#025EB8] shadow-sm hover:bg-white/90"><Plus className="h-4 w-4" /> إنشاء قائمة</Link>
-            <Link href={`${BASE}/new?type=test`} className="inline-flex h-10 items-center gap-2 rounded-md border border-white/30 bg-white/10 px-4 text-sm font-bold text-white hover:bg-white/20"><FlaskConical className="h-4 w-4" /> إنشاء قائمة اختبار</Link>
+            <Link href={`${BASE}/new`} className="inline-flex h-10 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white shadow-sm hover:bg-[#024a92]"><Plus className="h-4 w-4" /> إنشاء قائمة</Link>
+            <Link href={`${BASE}/new?type=test`} className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-[#025EB8]/50 hover:text-[#025EB8]"><FlaskConical className="h-4 w-4" /> إنشاء قائمة اختبار</Link>
           </div>
         </div>
       </section>

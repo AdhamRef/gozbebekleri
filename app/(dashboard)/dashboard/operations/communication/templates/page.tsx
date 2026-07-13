@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Plus, LayoutTemplate, MessageCircle, Mail, MessageSquare, Cpu } from "lucide-react";
 import { getTemplateCenter, LOCALE_LABEL, type TemplateGroup } from "@/lib/communication/template-center-service";
-import { VariableLibrary } from "./_components/VariableLibrary";
 import { TemplateRowActions } from "./_components/TemplateRowActions";
 
 export const metadata = { title: "القوالب | مركز التواصل" };
@@ -11,10 +10,10 @@ const BASE = "/dashboard/operations/communication/templates";
 
 const TABS = [
   { key: "all", label: "الكل" },
-  { key: "system", label: "تلقائية" },
   { key: "campaign", label: "حملات" },
-  { key: "email", label: "إيميل" },
+  { key: "system", label: "تلقائية" },
   { key: "whatsapp", label: "واتساب" },
+  { key: "email", label: "إيميل" },
   { key: "sms", label: "رسائل قصيرة" },
   { key: "review", label: "تحتاج مراجعة" },
 ] as const;
@@ -91,10 +90,10 @@ function GroupCard({ g }: { g: TemplateGroup }) {
       ) : null}
 
       {g.channel === "WHATSAPP" ? (
-        <p className="mt-2 text-[11px] leading-5 text-slate-500">هذا القالب محفوظ داخليًا. اعتماد واتساب يتم من Meta حتى تفعيل المزامنة.{g.approvalStatus ? ` (حالة الاعتماد: ${g.approvalStatus})` : ""}</p>
+        <p className="mt-2 text-[11px] leading-5 text-slate-500">هذا القالب محفوظ داخليًا. اعتماد واتساب يتم من Meta حتى تفعيل المزامنة.</p>
       ) : null}
       {g.channel === "SMS" ? (
-        <p className="mt-2 text-[11px] leading-5 text-slate-500">الرسائل القصيرة غير مفعّلة للإرسال بعد، لكن يمكنك تجهيز القوالب.</p>
+        <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] leading-5 text-amber-800">الرسائل القصيرة غير مفعّلة للإرسال بعد، ويمكن تجهيز القوالب فقط.</p>
       ) : null}
     </div>
   );
@@ -108,23 +107,24 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
 
   return (
     <main className="space-y-5 p-4 sm:p-6" dir="rtl">
-      <section className="rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs text-white/70">مركز التواصل / القوالب</p>
-            <h1 className="mt-1.5 text-2xl font-black">القوالب</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-white/85">أنشئ وأدر قوالب واتساب، إيميل، ورسائل قصيرة حسب اللغة والاستخدام.</p>
+            <p className="text-xs font-bold text-[#025EB8]">مركز التواصل / القوالب</p>
+            <h1 className="mt-1 text-2xl font-black text-slate-900">القوالب</h1>
+            <p className="mt-1.5 max-w-3xl text-sm leading-6 text-slate-600">قوالب واتساب، الإيميل، والرسائل القصيرة المستخدمة في الحملات والرسائل التلقائية.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href={`${BASE}/new`} className="inline-flex h-10 items-center gap-2 rounded-md bg-white px-4 text-sm font-bold text-[#025EB8] shadow-sm hover:bg-white/90"><Plus className="h-4 w-4" /> إنشاء قالب</Link>
-            <Link href={`${BASE}/layouts`} className="inline-flex h-10 items-center gap-2 rounded-md border border-white/30 bg-white/10 px-4 text-sm font-bold text-white hover:bg-white/20"><LayoutTemplate className="h-4 w-4" /> إنشاء تصميم إيميل ثابت</Link>
+            <Link href={`${BASE}/new`} className="inline-flex h-10 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white shadow-sm hover:bg-[#024a92]"><Plus className="h-4 w-4" /> إنشاء قالب</Link>
+            <Link href="/dashboard/brand/frameworks" className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:border-[#025EB8]/50 hover:text-[#025EB8]">قوالب الرسائل في دليل الهوية</Link>
+            <Link href={`${BASE}/layouts`} className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:border-[#025EB8]/50 hover:text-[#025EB8]"><LayoutTemplate className="h-4 w-4" /> تصميم إيميل ثابت</Link>
           </div>
         </div>
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard label="قوالب الحملات" value={summary.campaignCount} />
         <SummaryCard label="قوالب تلقائية" value={summary.systemCount} />
-        <SummaryCard label="قوالب حملات" value={summary.campaignCount} />
         <SummaryCard label="لغات ناقصة" value={summary.missingLanguageGroups} tone="warn" />
         <SummaryCard label="تحتاج مراجعة" value={summary.needsReviewCount} tone="warn" />
       </section>
@@ -137,8 +137,6 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
           );
         })}
       </nav>
-
-      <VariableLibrary />
 
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">

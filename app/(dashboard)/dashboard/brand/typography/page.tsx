@@ -3,7 +3,7 @@ import { getBrandCenterSnapshot } from "@/lib/brand/brand-service";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Brand Typography | لوحة التحكم" };
+export const metadata = { title: "الخطوط | لوحة التحكم" };
 
 export default async function BrandTypographyPage() {
   const snapshot = await getBrandCenterSnapshot();

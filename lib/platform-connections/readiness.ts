@@ -239,14 +239,21 @@ export async function getOverview() {
   for (const a of ads.rows) {
     if (a.status === "FAILED") issues.push({ title: `فشل آخر مزامنة: ${a.label}`, severity: "FAILED", href: `${base}/ad-accounts`, action: "مراجعة" });
   }
-  if (ads.connectedCount === 0)
+  if (ads.connectedCount === 0) {
     issues.push({ title: "لا توجد حسابات إعلانية مربوطة", severity: "NEEDS_SETUP", href: `${base}/ad-accounts`, action: "ربط" });
+  } else {
+    // Partially connected — surface the specific platforms that still need setup (e.g. Google Ads, TikTok).
+    for (const a of ads.rows) {
+      if (a.connected && a.status === "NEEDS_SETUP")
+        issues.push({ title: `${a.label} يحتاج إعداد`, severity: "NEEDS_SETUP", href: `${base}/ad-accounts`, action: "إعداد" });
+    }
+  }
   if (comm.whatsapp.status !== "READY")
     issues.push({ title: "إعداد واتساب غير مكتمل", severity: "NEEDS_SETUP", href: `${base}/communication`, action: "إعداد" });
   if (comm.whatsapp.sendersMissingNumber > 0)
     issues.push({ title: "يوجد مُرسِل واتساب بلا رقم مُعرّف", severity: "NEEDS_SETUP", href: `${base}/communication`, action: "مراجعة" });
   if (!webhooks.signatureConfigured)
-    issues.push({ title: "Webhook غير مؤمّن — بدون توقيع", severity: "FAILED", href: `${base}/webhooks`, action: "تأمين" });
+    issues.push({ title: "توقيع Webhook غير مفعّل", severity: "FAILED", href: `${base}/webhooks`, action: "تأمين" });
   if (comm.sms.status === "DISABLED")
     issues.push({ title: "الرسائل القصيرة غير مفعّلة", severity: "DISABLED", href: `${base}/communication`, action: "تفاصيل" });
 

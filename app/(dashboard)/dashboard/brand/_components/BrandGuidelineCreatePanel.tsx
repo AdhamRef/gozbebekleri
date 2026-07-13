@@ -66,9 +66,9 @@ export function BrandGuidelineCreatePanel({ profileId }: { profileId: string }) 
     <section className="rounded-lg border bg-white p-4 shadow-sm" aria-label="إضافة قاعدة هوية">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#025EB8]">Brand rule authoring</p>
-          <h2 className="mt-1 text-lg font-black text-slate-950">إضافة قاعدة صوت وكتابة</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600">يحفظ القاعدة في BrandGuideline الحقيقي. كل قاعدة تحتاج مراجعة بشرية قبل استخدامها كمرجع نهائي.</p>
+          <p className="text-xs font-bold text-[#025EB8]">قواعد الكتابة</p>
+          <h2 className="mt-1 text-lg font-black text-slate-950">إضافة قاعدة نبرة وكتابة</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-600">تُحفظ القاعدة كمسودة تحتاج مراجعة بشرية قبل اعتمادها مرجعًا نهائيًا.</p>
         </div>
         <FileText className="hidden h-7 w-7 text-[#025EB8] sm:block" aria-hidden="true" />
       </div>

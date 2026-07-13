@@ -17,15 +17,16 @@ import type {
   BrandReadinessAlert,
 } from "./brand-types";
 
+// Team-facing brand guide tabs (Arabic). "المؤسسات" (organizations) is intentionally NOT listed — it
+// was removed from the user-facing Brand Center; the /dashboard/brand/organizations route redirects.
 export const BRAND_CENTER_TABS: BrandCenterTab[] = [
-  { key: "overview", title: "Overview", href: "/dashboard/brand" },
-  { key: "organizations", title: "Organizations", href: "/dashboard/brand/organizations" },
-  { key: "assets", title: "Logos & Assets", href: "/dashboard/brand/assets" },
-  { key: "colors", title: "Colors", href: "/dashboard/brand/colors" },
-  { key: "typography", title: "Typography", href: "/dashboard/brand/typography" },
-  { key: "voice", title: "Voice & Copy Rules", href: "/dashboard/brand/voice" },
-  { key: "frameworks", title: "Message Frameworks", href: "/dashboard/brand/frameworks" },
-  { key: "downloads", title: "Downloads", href: "/dashboard/brand/downloads" },
+  { key: "overview", title: "دليل الهوية", href: "/dashboard/brand" },
+  { key: "assets", title: "الأصول والشعارات", href: "/dashboard/brand/assets" },
+  { key: "colors", title: "الألوان", href: "/dashboard/brand/colors" },
+  { key: "typography", title: "الخطوط", href: "/dashboard/brand/typography" },
+  { key: "voice", title: "نبرة الخطاب", href: "/dashboard/brand/voice" },
+  { key: "frameworks", title: "قوالب الرسائل", href: "/dashboard/brand/frameworks" },
+  { key: "downloads", title: "التنزيلات", href: "/dashboard/brand/downloads" },
 ];
 
 const nextModels = [
@@ -50,10 +51,10 @@ function buildDownloads(profile: BrandProfile, assets: BrandAsset[]): BrandDownl
   return [
     {
       id: `${profile.id}_profile_download`,
-      title: `${profile.name} brand profile`,
+      title: `${profile.name} — ملف الهوية`,
       type: "PROFILE",
       url: null,
-      note: "Foundation summary is ready; export/download file is to be generated after DB-backed BrandProfile.",
+      note: "ملخص الهوية جاهز؛ يُنشأ ملف التصدير/التحميل بعد اعتماد بيانات الهوية.",
       ready: false,
     },
     ...profileAssets.map((asset) => ({
@@ -71,30 +72,16 @@ function buildAlerts(repository: BrandRepositorySnapshot, profile: BrandProfile)
   const profileAssets = scoped(repository.assets, profile.id);
   const profileColors = scoped(repository.colors, profile.id);
   const profileFrameworks = scoped(repository.messageFrameworks, profile.id);
+  // Team-facing readiness notes — Arabic only. These are actionable brand-setup reminders; the UI
+  // shows them under a collapsible "تنبيهات متقدمة" so they are never the first thing on the page.
   const alerts: BrandReadinessAlert[] = [];
-
-  if (repository.mode === "db-backed") {
-    alerts.push({
-      id: `${profile.id}_db_backed`,
-      severity: "success",
-      title: "Brand core is DB-backed",
-      detail: repository.reason,
-    });
-  } else {
-    alerts.push({
-      id: `${profile.id}_foundation_fallback`,
-      severity: "info",
-      title: "Brand core is using foundation fallback",
-      detail: repository.reason,
-    });
-  }
 
   if (!profileAssets.some((asset) => asset.type === "LOGO" && asset.fileUrl)) {
     alerts.push({
       id: `${profile.id}_missing_logo`,
       severity: "warning",
-      title: "Primary logo needs verification",
-      detail: "Upload or connect the approved production logo before public downloads are enabled.",
+      title: "الشعار الأساسي يحتاج اعتماد",
+      detail: "ارفع أو اربط ملف الشعار المعتمد قبل تفعيل التنزيلات العامة.",
     });
   }
 
@@ -102,8 +89,8 @@ function buildAlerts(repository: BrandRepositorySnapshot, profile: BrandProfile)
     alerts.push({
       id: `${profile.id}_missing_cta_color`,
       severity: "warning",
-      title: "CTA color not finalized",
-      detail: "A clear donation CTA color should be approved for donor-facing pages.",
+      title: "لون زر التبرع غير محدد",
+      detail: "حدّد لونًا واضحًا لزر التبرع في الصفحات الموجّهة للمتبرعين.",
     });
   }
 
@@ -111,8 +98,8 @@ function buildAlerts(repository: BrandRepositorySnapshot, profile: BrandProfile)
     alerts.push({
       id: `${profile.id}_missing_zakat_framework`,
       severity: "info",
-      title: "Zakat framework missing",
-      detail: "Add a zakat message framework before AI writes or reviews zakat copy for this profile.",
+      title: "إطار الزكاة غير مكتمل",
+      detail: "أضف قالب رسائل للزكاة قبل كتابة أو مراجعة محتوى الزكاة.",
     });
   }
 
@@ -120,8 +107,8 @@ function buildAlerts(repository: BrandRepositorySnapshot, profile: BrandProfile)
     alerts.push({
       id: `${profile.id}_missing_tr_rules`,
       severity: "info",
-      title: "Turkish writing rules need expansion",
-      detail: "Add Turkish-specific voice examples before translating or sending donor reactivation drafts.",
+      title: "قواعد الكتابة التركية تحتاج توسّعًا",
+      detail: "أضف أمثلة نبرة تركية قبل الترجمة أو إرسال رسائل إعادة التفعيل.",
     });
   }
 

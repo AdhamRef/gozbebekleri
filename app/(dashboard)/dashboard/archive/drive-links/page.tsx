@@ -32,7 +32,7 @@ export default async function ArchiveDriveLinksPage() {
         <div className="rounded-2xl border bg-white shadow-sm">
           <div className="grid gap-0 xl:grid-cols-[1.15fr_0.85fr]">
             <div className="border-b p-5 xl:border-b-0 xl:border-l">
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-[#025EB8]">File Links</p>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-[#025EB8]">روابط الملفات</p>
               <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                   <h1 className="text-2xl font-black">إدارة روابط الملفات</h1>

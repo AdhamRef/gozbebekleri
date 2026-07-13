@@ -50,15 +50,15 @@ export default async function OperationsTasksPage() {
 
   return (
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
-      <div className="flex flex-col gap-4 rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-xs text-white/70">العمليات / مهام الإنتاج</p>
-          <h1 className="mt-1.5 text-2xl font-black">مهام الإنتاج</h1>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
-            حوّل الخطة المقترحة إلى مهام تشغيل قابلة للمتابعة.
+          <p className="text-xs font-bold text-[#025EB8]">المحتوى والتشغيل / مهام المحتوى</p>
+          <h1 className="mt-1 text-xl font-black text-slate-900">مهام المحتوى</h1>
+          <p className="mt-1.5 max-w-3xl text-sm leading-6 text-slate-600">
+            حوّل الأفكار والحملات إلى مهام واضحة قابلة للمتابعة.
           </p>
         </div>
-        <Link href="/dashboard/operations/calendar" className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-bold text-[#025EB8] shadow-sm hover:bg-white/90">
+        <Link href="/dashboard/operations/calendar" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-[#025EB8]/50 hover:text-[#025EB8]">
           فتح التقويم والتنبيهات
           <ArrowLeft className="h-4 w-4" />
         </Link>
@@ -75,7 +75,7 @@ export default async function OperationsTasksPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><PlusCircle className="h-5 w-5 text-[#025EB8]" /> إنشاء مهمة تشغيل</CardTitle>
+          <CardTitle className="flex items-center gap-2"><PlusCircle className="h-5 w-5 text-[#025EB8]" /> إنشاء مهمة</CardTitle>
           <CardDescription className="leading-6">
             أضف مهمة يدوية للفريق بدون إرسال أو نشر تلقائي.
           </CardDescription>
@@ -87,7 +87,7 @@ export default async function OperationsTasksPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><ListChecks className="h-5 w-5 text-[#025EB8]" /> قائمة مهام الإنتاج</CardTitle>
+          <CardTitle className="flex items-center gap-2"><ListChecks className="h-5 w-5 text-[#025EB8]" /> قائمة مهام المحتوى</CardTitle>
           <CardDescription>
             {isDbBacked
               ? "متابعة مهام الفريق مع تحديث الحالة والتعديل السريع من الواجهة."
@@ -120,6 +120,11 @@ export default async function OperationsTasksPage() {
 
               <OperationTaskActions taskId={task.id} status={task.status} canMutate={canMutateTasks} />
               <OperationTaskQuickEdit taskId={task.id} title={task.title} priority={task.priority} dueLabel={task.dueLabel} canMutate={canMutateTasks} />
+
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-200 pt-3 text-xs font-bold">
+                <Link href="/dashboard/archive" className="text-[#025EB8] underline-offset-4 hover:underline">اختيار ملفات من الأرشيف</Link>
+                <Link href="/dashboard/brand" className="text-[#025EB8] underline-offset-4 hover:underline">مراجعة دليل الهوية</Link>
+              </div>
             </div>
           ))}
         </CardContent>

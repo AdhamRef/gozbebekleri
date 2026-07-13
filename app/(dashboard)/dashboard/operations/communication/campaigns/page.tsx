@@ -93,20 +93,20 @@ export default function CampaignsPage() {
 
   return (
     <main className="space-y-5" dir="rtl">
-      <section className="rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs text-white/70">مركز التواصل</p>
-            <h1 className="mt-1.5 text-2xl font-black">حملات التواصل</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-white/85">
+            <p className="text-xs font-bold text-[#025EB8]">مركز التواصل</p>
+            <h1 className="mt-1 text-xl font-black text-slate-900">حملات التواصل</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
               جهّز حملات واتساب أو إيميل أو رسائل خطوة بخطوة: الجمهور، القالب، تغطية اللغات، التوجيه، ثم الاعتماد. لا إرسال فعلي بعد.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" className="gap-2" onClick={() => load()} disabled={loading}>
+            <Button variant="outline" className="gap-2" onClick={() => load()} disabled={loading}>
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> تحديث
             </Button>
-            <Button variant="secondary" className="gap-2 font-bold" onClick={() => setCreating((v) => !v)}>
+            <Button className="gap-2 font-bold" onClick={() => setCreating((v) => !v)}>
               <Plus className="h-4 w-4" /> حملة جديدة
             </Button>
           </div>

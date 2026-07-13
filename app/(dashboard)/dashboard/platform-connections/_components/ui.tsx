@@ -30,15 +30,15 @@ export function PageHeader({
   backLabel?: string;
 }) {
   return (
-    <section className="rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          {eyebrow ? <p className="text-xs text-white/70">{eyebrow}</p> : null}
-          <h1 className="mt-1.5 text-2xl font-black">{title}</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-white/85">{subtitle}</p>
+          {eyebrow ? <p className="text-xs font-bold text-[#025EB8]">{eyebrow}</p> : null}
+          <h1 className="mt-1 text-xl font-black text-slate-900">{title}</h1>
+          <p className="mt-1.5 max-w-3xl text-sm leading-6 text-slate-600">{subtitle}</p>
         </div>
         {backHref ? (
-          <Link href={backHref} className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md bg-white px-4 text-sm font-bold text-[#025EB8] shadow-sm hover:bg-white/90">
+          <Link href={backHref} className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-[#025EB8]/50 hover:text-[#025EB8]">
             {backLabel} <ArrowLeft className="h-4 w-4" />
           </Link>
         ) : null}
@@ -50,7 +50,7 @@ export function PageHeader({
 
 export function PrimaryLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} className="inline-flex h-10 items-center gap-2 rounded-md bg-white px-4 text-sm font-bold text-[#025EB8] shadow-sm transition hover:bg-white/90">
+    <Link href={href} className="inline-flex h-10 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#024a92]">
       {children}
     </Link>
   );
@@ -58,7 +58,7 @@ export function PrimaryLink({ href, children }: { href: string; children: ReactN
 
 export function GhostLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} className="inline-flex h-10 items-center gap-2 rounded-md border border-white/30 bg-white/10 px-4 text-sm font-bold text-white transition hover:bg-white/20">
+    <Link href={href} className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-[#025EB8]/50 hover:text-[#025EB8]">
       {children}
     </Link>
   );
@@ -80,7 +80,7 @@ export function CardHeader({ title, description, action }: { title: ReactNode; d
   );
 }
 
-/** Status card for the overview "حالة عامة" band. */
+/** Status card for the overview setup band. `detail` may be a single string or several lines. */
 export function StatusCard({
   title,
   status,
@@ -94,7 +94,7 @@ export function StatusCard({
   lastCheck?: string | null;
   actionHref: string;
   actionLabel: string;
-  detail?: string;
+  detail?: ReactNode;
 }) {
   return (
     <div className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -102,9 +102,9 @@ export function StatusCard({
         <span className="text-sm font-bold text-slate-700">{title}</span>
         <StatusBadge status={status} />
       </div>
-      {detail ? <p className="mt-2 text-xs text-slate-500">{detail}</p> : null}
-      <p className="mt-2 text-[11px] text-slate-400">آخر فحص: {fmtDate(lastCheck)}</p>
-      <Link href={actionHref} className="mt-3 inline-block text-xs font-bold text-[#025EB8] hover:underline">{actionLabel} ←</Link>
+      {detail ? <div className="mt-2 space-y-0.5 text-xs text-slate-500">{detail}</div> : null}
+      {lastCheck ? <p className="mt-2 text-[11px] text-slate-400">آخر فحص: {fmtDate(lastCheck)}</p> : null}
+      <Link href={actionHref} className="mt-auto pt-3 inline-block text-xs font-bold text-[#025EB8] hover:underline">{actionLabel} ←</Link>
     </div>
   );
 }

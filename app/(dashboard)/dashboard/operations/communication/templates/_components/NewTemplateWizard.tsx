@@ -108,6 +108,12 @@ export function NewTemplateWizard() {
 
   const canNext = step === 0 ? name.trim().length > 0 : step === 1 ? (channel === "EMAIL" ? subject.trim() && body.trim() : body.trim().length > 0) : true;
 
+  const missingRequired = [
+    ...(name.trim() ? [] : ["اسم القالب"]),
+    ...(channel === "EMAIL" && !subject.trim() ? ["الموضوع"] : []),
+    ...(body.trim() ? [] : [channel === "EMAIL" ? "النص" : "نص القالب"]),
+  ];
+
   return (
     <div className="space-y-5">
       {/* step indicator */}
@@ -126,8 +132,12 @@ export function NewTemplateWizard() {
             <Field label="نوع القالب">
               <div className="flex gap-2">
                 {(["CAMPAIGN", "SYSTEM"] as const).map((k) => (
-                  <button key={k} type="button" onClick={() => setKind(k)} className={`flex-1 rounded-md border px-3 py-2 text-sm font-bold ${kind === k ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]" : "border-slate-200 text-slate-600"}`}>{k === "CAMPAIGN" ? "حملة" : "تلقائي (نظام)"}</button>
+                  <button key={k} type="button" onClick={() => setKind(k)} className={`flex-1 rounded-md border px-3 py-2 text-sm font-bold ${kind === k ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]" : "border-slate-200 text-slate-600"}`}>{k === "CAMPAIGN" ? "حملة" : "تلقائي"}</button>
                 ))}
+              </div>
+              <div className="mt-2 space-y-1 rounded-lg bg-slate-50 p-2.5 text-[11px] leading-5 text-slate-600">
+                <p><b className="text-slate-800">حملة:</b> يُستخدم داخل حملات التواصل.</p>
+                <p><b className="text-slate-800">تلقائي:</b> يُستخدم في رسائل النظام مثل نجاح التبرع أو فشل الدفع.</p>
               </div>
             </Field>
             <Field label="القناة">
@@ -137,6 +147,9 @@ export function NewTemplateWizard() {
                   return <button key={c.key} type="button" onClick={() => setChannel(c.key)} className={`flex flex-1 items-center justify-center gap-1.5 rounded-md border px-2 py-2 text-xs font-bold ${channel === c.key ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]" : "border-slate-200 text-slate-600"}`}><Icon className="h-3.5 w-3.5" /> {c.label}</button>;
                 })}
               </div>
+              {channel === "SMS" ? (
+                <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] leading-5 text-amber-800">يمكنك حفظ القالب، لكن إرسال الرسائل القصيرة غير مفعّل بعد.</p>
+              ) : null}
             </Field>
             <Field label="اسم القالب"><input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="اسم داخلي واضح" /></Field>
             <Field label="لغة النسخة الأساسية">
@@ -202,6 +215,15 @@ export function NewTemplateWizard() {
         {/* STEP 4 */}
         {step === 3 ? (
           <div className="space-y-3">
+            <div className="grid gap-2 rounded-xl border bg-slate-50 p-3 text-sm sm:grid-cols-2">
+              <div><span className="text-slate-500">القناة:</span> <b className="text-slate-900">{CHANNELS.find((c) => c.key === channel)?.label}</b></div>
+              <div><span className="text-slate-500">النوع:</span> <b className="text-slate-900">{kind === "CAMPAIGN" ? "حملة" : "تلقائي"}</b></div>
+              <div><span className="text-slate-500">الغرض:</span> <b className="text-slate-900">{PURPOSES.find((p) => p.key === purpose)?.label}</b></div>
+              <div><span className="text-slate-500">اللغة:</span> <b className="text-slate-900">{LOCALES[language as keyof typeof LOCALES]?.label ?? language}</b></div>
+            </div>
+            {missingRequired.length > 0 ? (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">حقول مطلوبة ناقصة: {missingRequired.join("، ")}</p>
+            ) : null}
             <button type="button" onClick={runPreview} className="inline-flex h-9 items-center rounded-md border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 hover:bg-slate-50">تحديث المعاينة</button>
             <div className="rounded-xl border bg-slate-50 p-4">
               <p className="mb-2 text-xs font-black text-slate-500">المعاينة</p>

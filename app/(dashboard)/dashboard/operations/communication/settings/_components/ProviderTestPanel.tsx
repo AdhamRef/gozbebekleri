@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, Copy, Check, MessageCircle, Mail, Webhook } from "lucide-react";
+import { Loader2, Copy, Check, MessageCircle, Mail, Webhook, MessageSquare } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,15 @@ const reasonAr: Record<string, string> = {
   META_WHATSAPP_NOT_CONFIGURED: "إعداد واتساب غير مكتمل",
   META_WHATSAPP_SENDER_MISSING_PHONE_NUMBER_ID: "المُرسِل بلا رقم",
   EMAIL_PROVIDER_NOT_CONFIGURED: "إعداد الإيميل غير مكتمل",
+  BREVO_EMAIL_NOT_CONFIGURED: "إعداد Brevo للإيميل غير مكتمل",
+  BREVO_EMAIL_SENDER_NOT_CONFIGURED: "بريد المُرسِل غير مُعد في Brevo",
+  BREVO_EMAIL_REQUEST_FAILED: "فشل الطلب لدى Brevo",
+  BREVO_SMS_NOT_CONFIGURED: "إعداد Brevo للرسائل غير مكتمل",
+  BREVO_SMS_REQUEST_FAILED: "فشل الطلب لدى Brevo",
+  NETGSM_NOT_CONFIGURED: "إعداد Netgsm غير مكتمل",
+  NETGSM_REQUEST_FAILED: "فشل الطلب لدى Netgsm",
+  NETGSM_REJECTED: "رفض المزود الرسالة",
+  NETGSM_RECIPIENT_NOT_TURKISH: "الرقم ليس تركيًا",
   META_WHATSAPP_REQUEST_FAILED: "فشل الطلب لدى المزود",
   META_WHATSAPP_UNAUTHORIZED: "رمز الوصول غير صالح",
   META_WHATSAPP_INVALID_RESPONSE: "رد غير متوقع من المزود",
@@ -29,10 +38,16 @@ export function ProviderTestPanel({
   webhookPath,
   signatureConfigured,
   lastWebhookAt,
+  emailReady = true,
+  smsInternationalReady = false,
+  smsTurkeyReady = false,
 }: {
   webhookPath: string;
   signatureConfigured: boolean;
   lastWebhookAt: string | null;
+  emailReady?: boolean;
+  smsInternationalReady?: boolean;
+  smsTurkeyReady?: boolean;
 }) {
   const [senders, setSenders] = React.useState<Sender[]>([]);
   const [senderId, setSenderId] = React.useState("");
@@ -46,8 +61,25 @@ export function ProviderTestPanel({
   const [emailSubject, setEmailSubject] = React.useState("");
   const [emailResult, setEmailResult] = React.useState<Result>(null);
   const [emailBusy, setEmailBusy] = React.useState(false);
+
+  const [smsTo, setSmsTo] = React.useState("");
+  const [smsMessage, setSmsMessage] = React.useState("");
+  const [smsType, setSmsType] = React.useState<"transactional" | "marketing">("transactional");
+  const [smsResult, setSmsResult] = React.useState<Result>(null);
+  const [smsBusy, setSmsBusy] = React.useState(false);
+
   const [copied, setCopied] = React.useState(false);
   const [webhookUrl, setWebhookUrl] = React.useState(webhookPath);
+
+  // Show which provider a test SMS will use, based on the recipient number (+90 → Netgsm, else Brevo).
+  const smsIsTurkish = (() => {
+    const raw = smsTo.trim();
+    if (raw.startsWith("+90") || raw.startsWith("0090")) return true;
+    const d = raw.replace(/\D/g, "");
+    return d.startsWith("90") && d.length === 12;
+  })();
+  const smsProviderLabel = smsIsTurkish ? "Netgsm (تركيا)" : "Brevo (دولي)";
+  const smsProviderReady = smsIsTurkish ? smsTurkeyReady : smsInternationalReady;
 
   React.useEffect(() => {
     setWebhookUrl(`${window.location.origin}${webhookPath}`);
@@ -111,6 +143,23 @@ export function ProviderTestPanel({
     }
   }
 
+  async function testSms() {
+    if (!smsTo.trim()) return toast.error("أدخل رقمًا");
+    setSmsBusy(true);
+    try {
+      const res = await fetch("/api/dashboard/operations/communication/providers/sms/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: true, to: smsTo.trim(), message: smsMessage.trim() || undefined, type: smsType }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) setSmsResult({ tone: "bad", text: json?.error ? ar(json.error) : "تعذّر الاختبار" });
+      else setSmsResult(statusResult(json.status, json.reason));
+    } finally {
+      setSmsBusy(false);
+    }
+  }
+
   const resultCls = (t: Result) => (!t ? "" : t.tone === "ok" ? "text-emerald-700" : t.tone === "warn" ? "text-amber-700" : "text-rose-700");
 
   return (
@@ -139,14 +188,34 @@ export function ProviderTestPanel({
         </CardContent>
       </Card>
 
-      {/* Email test */}
+      {/* Email test (Brevo) */}
       <Card className="border-slate-200">
-        <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><Mail className="h-4 w-4 text-[#025EB8]" /> اختبار إيميل</CardTitle><CardDescription>يرسل رسالة اختبار واحدة عبر مزوّد الإيميل.</CardDescription></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><Mail className="h-4 w-4 text-[#025EB8]" /> اختبار إيميل (Brevo)</CardTitle><CardDescription>يرسل رسالة اختبار واحدة عبر Brevo.{!emailReady ? " — يحتاج إعداد Brevo." : ""}</CardDescription></CardHeader>
         <CardContent className="space-y-2 text-sm">
           <Field label="بريد المستلم"><input value={emailTo} onChange={(e) => setEmailTo(e.target.value)} placeholder="أدخل بريد المستلم" className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" /></Field>
           <Field label="العنوان (اختياري)"><input value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" /></Field>
           <div className="pt-1"><Button size="sm" disabled={emailBusy} onClick={testEmail} className="gap-1">{emailBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} إرسال اختبار إيميل</Button></div>
           {emailResult ? <p className={`pt-1 text-xs font-semibold ${resultCls(emailResult)}`}>{emailResult.text}</p> : null}
+        </CardContent>
+      </Card>
+
+      {/* SMS test (Netgsm TR / Brevo international) */}
+      <Card className="border-slate-200 lg:col-span-2">
+        <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><MessageSquare className="h-4 w-4 text-[#025EB8]" /> اختبار رسالة قصيرة</CardTitle><CardDescription>يختار المزوّد تلقائيًا حسب الرقم: أرقام تركيا (+90) عبر Netgsm، وبقية الأرقام عبر Brevo. رسالة واحدة فقط.</CardDescription></CardHeader>
+        <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
+          <Field label="رقم المستلم"><input value={smsTo} onChange={(e) => setSmsTo(e.target.value)} placeholder="أدخل الرقم مع رمز الدولة" dir="ltr" className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" /></Field>
+          <Field label="النوع">
+            <select value={smsType} onChange={(e) => setSmsType(e.target.value as "transactional" | "marketing")} className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm">
+              <option value="transactional">تشغيلي (transactional)</option>
+              <option value="marketing">تسويقي (marketing)</option>
+            </select>
+          </Field>
+          <div className="sm:col-span-2"><Field label="نص الرسالة"><textarea value={smsMessage} onChange={(e) => setSmsMessage(e.target.value)} rows={2} placeholder="اكتب نص رسالة الاختبار" className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" /></Field></div>
+          {smsTo.trim() ? (
+            <p className="sm:col-span-2 text-xs">المزوّد المختار: <b className={smsProviderReady ? "text-emerald-700" : "text-amber-700"}>{smsProviderLabel}</b>{!smsProviderReady ? " — يحتاج إعداد" : ""}</p>
+          ) : null}
+          <div className="sm:col-span-2 pt-1"><Button size="sm" disabled={smsBusy} onClick={testSms} className="gap-1">{smsBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} إرسال اختبار رسالة</Button></div>
+          {smsResult ? <p className={`sm:col-span-2 pt-1 text-xs font-semibold ${resultCls(smsResult)}`}>{smsResult.text}</p> : null}
         </CardContent>
       </Card>
 

@@ -16,14 +16,14 @@ export default async function AudienceListDetailPage({ params }: { params: Promi
 
   return (
     <main className="space-y-5 p-4 sm:p-6" dir="rtl">
-      <section className="rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs text-white/70">الجمهور / {TYPE_LABEL[list.type] ?? list.type}</p>
-            <h1 className="mt-1.5 text-2xl font-black">{list.name}</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-white/85">{list.description || "أدر أعضاء القائمة والقنوات، وأنشئ حملة أو جرّب قالبًا قبل الإرسال الحقيقي."}</p>
+            <p className="text-xs font-bold text-[#025EB8]">الجمهور / {TYPE_LABEL[list.type] ?? list.type}</p>
+            <h1 className="mt-1 text-xl font-black text-slate-900">{list.name}</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{list.description || "أدر أعضاء القائمة والقنوات، وأنشئ حملة أو جرّب قالبًا قبل الإرسال الحقيقي."}</p>
           </div>
-          <Link href="/dashboard/operations/communication/audiences" className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md bg-white px-4 text-sm font-bold text-[#025EB8] shadow-sm hover:bg-white/90">العودة للجمهور <ArrowLeft className="h-4 w-4" /></Link>
+          <Link href="/dashboard/operations/communication/audiences" className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-[#025EB8]/50 hover:text-[#025EB8]">العودة للجمهور <ArrowLeft className="h-4 w-4" /></Link>
         </div>
       </section>
 

@@ -59,9 +59,9 @@ export function BrandColorCreatePanel({ profileId }: { profileId: string }) {
     <section className="rounded-lg border bg-white p-4 shadow-sm" aria-label="إضافة لون هوية">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#025EB8]">Brand color authoring</p>
-          <h2 className="mt-1 text-lg font-black text-slate-950">إضافة لون هوية معتمد</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600">يحفظ اللون في BrandColor الحقيقي مع سجل مراجعة. لا اتصال خارجي، ولا AI، ولا نشر تلقائي.</p>
+          <p className="text-xs font-bold text-[#025EB8]">ألوان الهوية</p>
+          <h2 className="mt-1 text-lg font-black text-slate-950">إضافة لون معتمد</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-600">يُحفظ اللون في سجل الهوية مع مراجعة بشرية قبل اعتماده.</p>
         </div>
         <Palette className="hidden h-7 w-7 text-[#025EB8] sm:block" aria-hidden="true" />
       </div>

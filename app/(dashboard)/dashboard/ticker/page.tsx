@@ -300,7 +300,7 @@ export default function TickerAdminPanel() {
           {config.amountRanges.map((range, index) => (
             <div
               key={index}
-              className="grid grid-cols-6 gap-4 p-4 border rounded-lg bg-muted/50"
+              className="grid grid-cols-1 gap-4 p-4 border rounded-lg bg-muted/50 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
             >
               <div>
                 <Label>الحد الأدنى ($)</Label>

@@ -21,6 +21,13 @@ const statusClass: Record<string, string> = {
   LOSING: "border-rose-200 bg-rose-50 text-rose-700",
 };
 
+const statusLabel: Record<string, string> = {
+  WINNER: "ناجحة",
+  WATCH: "قيد المتابعة",
+  LEARNING: "قيد التعلّم",
+  LOSING: "متعثّرة",
+};
+
 const statusIcon: Record<string, typeof TrendingUp> = {
   WINNER: TrendingUp,
   WATCH: BarChart3,
@@ -33,17 +40,17 @@ export default async function MarketingResultsPage() {
 
   return (
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
-      <div className="flex flex-col gap-4 rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs text-white/70">التسويق / النتائج</p>
-          <h1 className="mt-1.5 text-2xl font-black">نتائج التسويق والتعلّم</h1>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
+          <p className="text-xs font-bold text-[#025EB8]">التسويق / النتائج</p>
+          <h1 className="mt-1 text-xl font-black text-slate-900">نتائج التسويق والتعلّم</h1>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
             ربط مواد الأرشيف بالحملات والنتائج والقرارات حتى نعرف ما الذي يجب تكراره أو تعديله أو إيقافه.
           </p>
         </div>
         <Link
           href="/dashboard/operations/archive"
-          className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-bold text-[#025EB8] shadow-sm hover:bg-white/90"
+          className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-[#025EB8]/50 hover:text-[#025EB8]"
         >
           فتح الأرشيف
           <ArrowLeft className="h-4 w-4" />
@@ -78,16 +85,16 @@ export default async function MarketingResultsPage() {
                       <CardDescription className="mt-1">{result.campaignTitle} · {result.channel}</CardDescription>
                     </div>
                   </div>
-                  <Badge variant="outline" className={statusClass[result.status]}>{result.status}</Badge>
+                  <Badge variant="outline" className={statusClass[result.status]}>{statusLabel[result.status] ?? result.status}</Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4 p-4">
                 <div className="grid gap-3 sm:grid-cols-5">
-                  <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">Spend</p><p className="font-black">${result.spend}</p></div>
-                  <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">Revenue</p><p className="font-black">${result.revenue}</p></div>
-                  <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">Donations</p><p className="font-black">{result.donations}</p></div>
-                  <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">Clicks</p><p className="font-black">{result.clicks}</p></div>
-                  <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">ROAS</p><p className="font-black">{result.roas}x</p></div>
+                  <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">الإنفاق</p><p className="font-black">${result.spend}</p></div>
+                  <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">الإيراد</p><p className="font-black">${result.revenue}</p></div>
+                  <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">التبرعات</p><p className="font-black">{result.donations}</p></div>
+                  <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">النقرات</p><p className="font-black">{result.clicks}</p></div>
+                  <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">العائد على الإنفاق</p><p className="font-black">{result.roas}x</p></div>
                 </div>
                 <div className="grid gap-3 lg:grid-cols-2">
                   <div className="rounded-2xl border bg-white p-3">

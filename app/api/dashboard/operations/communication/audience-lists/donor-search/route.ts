@@ -29,5 +29,20 @@ export async function GET(req: NextRequest) {
     })
     .catch(() => []);
 
-  return NextResponse.json({ donors }, { headers: operationsNoStoreHeaders });
+  // Best-effort, read-only: attach the last successful donation date so the picker can show context.
+  // Never affects donation logic; failures degrade gracefully to no date.
+  const ids = donors.map((d) => d.id);
+  const lastDonationMap = new Map<string, string>();
+  if (ids.length) {
+    const grouped = await prisma.donation
+      .groupBy({ by: ["donorId"], where: { donorId: { in: ids }, status: "PAID" }, _max: { paidAt: true, createdAt: true } })
+      .catch(() => [] as { donorId: string; _max: { paidAt: Date | null; createdAt: Date | null } }[]);
+    for (const g of grouped) {
+      const when = g._max.paidAt ?? g._max.createdAt;
+      if (when) lastDonationMap.set(g.donorId, when.toISOString());
+    }
+  }
+
+  const enriched = donors.map((d) => ({ ...d, lastDonationAt: lastDonationMap.get(d.id) ?? null }));
+  return NextResponse.json({ donors: enriched }, { headers: operationsNoStoreHeaders });
 }

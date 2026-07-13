@@ -21,10 +21,30 @@ const priorityClass: Record<string, string> = {
   LOW: "border-slate-200 bg-slate-50 text-slate-700",
 };
 
+const priorityLabel: Record<string, string> = {
+  HIGH: "عالية",
+  MEDIUM: "متوسطة",
+  LOW: "منخفضة",
+};
+
+const typeLabel: Record<string, string> = {
+  WRITING: "كتابة",
+  DESIGN: "تصميم",
+  VIDEO: "فيديو",
+  CAROUSEL: "كاروسيل",
+  MESSAGING: "رسائل",
+};
+
 const statusClass: Record<string, string> = {
   ON_TRACK: "border-emerald-200 bg-emerald-50 text-emerald-700",
   NEEDS_ATTENTION: "border-amber-200 bg-amber-50 text-amber-700",
   LATE: "border-rose-200 bg-rose-50 text-rose-700",
+};
+
+const statusLabel: Record<string, string> = {
+  ON_TRACK: "على المسار",
+  NEEDS_ATTENTION: "يحتاج انتباه",
+  LATE: "متأخر",
 };
 
 export default function OperationsCalendarPage() {
@@ -35,15 +55,15 @@ export default function OperationsCalendarPage() {
 
   return (
     <div className="space-y-5 p-4 sm:p-6" dir="rtl">
-      <div className="flex flex-col gap-4 rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-xs text-white/70">العمليات / التقويم والتنبيهات</p>
-          <h1 className="mt-1.5 text-2xl font-black">التقويم والتنبيهات</h1>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
-            جهّز المواسم الدينية والحملات قبل موعدها، واربط كل مناسبة بما تحتاجه من فيديوهات وتصاميم ورسائل.
+          <p className="text-xs font-bold text-[#025EB8]">المحتوى والتشغيل / التقويم والتنبيهات</p>
+          <h1 className="mt-1 text-xl font-black text-slate-900">التقويم والتنبيهات</h1>
+          <p className="mt-1.5 max-w-3xl text-sm leading-6 text-slate-600">
+            خطط للمواسم، المواعيد، والحملات القادمة.
           </p>
         </div>
-        <Link href="/dashboard/operations/content" className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-bold text-[#025EB8] shadow-sm hover:bg-white/90">
+        <Link href="/dashboard/operations/content" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-[#025EB8]/50 hover:text-[#025EB8]">
           فتح لوحة المحتوى
           <ArrowLeft className="h-4 w-4" />
         </Link>
@@ -61,7 +81,7 @@ export default function OperationsCalendarPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-[#025EB8]" /> الخطة المقترحة</CardTitle>
-          <CardDescription>إجراءات إنتاجية مقترحة بناءً على نقص المواد في المواسم القادمة. يمكن تحويل أي إجراء إلى مهمة محفوظة.</CardDescription>
+          <CardDescription>اقتراحات إنتاجية بناءً على نقص المواد في المواسم القادمة. يمكنك تحويل أي اقتراح إلى مهمة لفريق المحتوى.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 lg:grid-cols-2">
           {planningOverview.actions.map((action) => (
@@ -71,12 +91,14 @@ export default function OperationsCalendarPage() {
                   <h2 className="font-black text-slate-900">{action.title}</h2>
                   <p className="mt-1 text-sm leading-6 text-slate-600">{action.reason}</p>
                 </div>
-                <Badge variant="outline" className={priorityClass[action.priority]}>{action.priority}</Badge>
+                <Badge variant="outline" className={priorityClass[action.priority]}>{priorityLabel[action.priority] ?? action.priority}</Badge>
               </div>
-              <div className="mt-4 grid gap-2 text-sm text-slate-600 md:grid-cols-3">
-                <span>النوع: <b>{action.type}</b></span>
-                <span>المسؤول: <b>{action.suggestedOwner}</b></span>
+              <div className="mt-4 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                <span>الموسم/الحملة: <b>{action.seasonTitle}</b></span>
                 <span>الموعد: <b>{action.dueLabel}</b></span>
+                <span>النوع: <b>{typeLabel[action.type] ?? action.type}</b></span>
+                <span>المسؤول: <b>{action.suggestedOwner}</b></span>
+                <span>المواد المقترحة: <b>{action.quantity}</b></span>
               </div>
               <PlanningActionTaskAction
                 actionId={action.id}
@@ -107,7 +129,7 @@ export default function OperationsCalendarPage() {
                   <h2 className="font-black text-slate-900">{season.title}</h2>
                   <p className="mt-1 text-sm leading-6 text-slate-600">{season.focus}</p>
                 </div>
-                <Badge variant="outline" className={statusClass[season.status]}>{season.status}</Badge>
+                <Badge variant="outline" className={statusClass[season.status]}>{statusLabel[season.status] ?? season.status}</Badge>
               </div>
               <div className="mt-4 grid gap-3 text-sm text-slate-600 md:grid-cols-4">
                 <span>الجاهزية: <b>{season.readinessScore}%</b></span>
@@ -148,7 +170,7 @@ export default function OperationsCalendarPage() {
                     </div>
                     <p className="mt-2 text-sm leading-6 text-slate-600">{event.focus}</p>
                   </div>
-                  <Badge variant="outline" className={priorityClass[event.priority]}>{event.priority}</Badge>
+                  <Badge variant="outline" className={priorityClass[event.priority]}>{priorityLabel[event.priority] ?? event.priority}</Badge>
                 </div>
                 <div className="mt-4 grid gap-3 text-sm text-slate-600 md:grid-cols-3">
                   <span className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-[#025EB8]" /> {event.dateLabel}</span>
