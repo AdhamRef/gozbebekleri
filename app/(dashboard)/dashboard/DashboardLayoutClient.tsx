@@ -145,23 +145,10 @@ function DashboardContent({
   const userInitials = (user?.name || user?.email || 'U').slice(0, 2).toUpperCase();
 
   const SidebarInner = () => (
-<<<<<<< HEAD
     <div className="flex flex-col h-full">
       <div className="h-14 flex items-center px-4 border-b border-white/10 shrink-0">
         <Link href="/" className="flex items-center gap-2">
           <img src="/logo-white.png" alt="Logo" className="h-6 w-auto object-contain brightness-0 invert" />
-=======
-    <div className="flex h-full flex-col">
-      <div className="p-4 border-b border-white/10 shrink-0">
-        <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-lg">
-            <Heart className="w-6 h-6 text-[#025EB8]" />
-          </div>
-          <div>
-            <h2 className="text-white font-bold text-lg leading-tight">Gözbebekleri</h2>
-            <p className="text-white/70 text-[11px]">لوحة الإدارة</p>
-          </div>
->>>>>>> b0c6b7800ce00b1c3c716626813509b146fbf931
         </Link>
       </div>
 
