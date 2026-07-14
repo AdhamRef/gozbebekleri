@@ -1,19 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2, RefreshCw } from "lucide-react";
 
 export function RecheckConnectionsButton({ providers }: { providers: string[] }) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function recheck() {
-    if (!window.confirm("سيتم الاتصال بجميع المزودين الخارجيين للتحقق من الإعدادات الحالية. هل تريد المتابعة؟")) return;
+    if (!window.confirm("سيتم فحص التكوين العامل لجميع المزودين دون اختبار التغييرات أو تشغيل الحملات. هل تريد المتابعة؟")) return;
     setLoading(true);
     setMessage(null);
     try {
       const results = await Promise.all(providers.map(async (provider) => {
-        const response = await fetch(`/api/admin/integration-settings/${provider}/test`, {
+        const response = await fetch(`/api/admin/integration-settings/${provider}/test-active`, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: "{}",
@@ -21,7 +23,8 @@ export function RecheckConnectionsButton({ providers }: { providers: string[] })
         const body = await response.json().catch(() => ({}));
         return response.ok && body.success;
       }));
-      setMessage(`اكتمل الفحص: ${results.filter(Boolean).length} من ${results.length} اتصال ناجح. حدّث الصفحة لعرض آخر النتائج.`);
+      setMessage(`اكتمل الفحص: ${results.filter(Boolean).length} من ${results.length} اتصال ناجح.`);
+      router.refresh();
     } catch {
       setMessage("تعذر إكمال فحص جميع الاتصالات.");
     } finally {
