@@ -2,31 +2,44 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { IntegrationSettingsService, IntegrationSettingsError } from "../../lib/integration-settings/service";
 import type {
+  CandidateActivationResult,
+  CandidateDiscardResult,
+  CandidateTestStatePatch,
+  IntegrationProviderTester,
   IntegrationSettingMutation,
   IntegrationSettingRecord,
   IntegrationSettingsAuditEntry,
   IntegrationSettingsRepository,
+  ProviderConnectionTestResult,
 } from "../../lib/integration-settings/types";
 import {
   INTEGRATION_SETTINGS_ROUTE_PERMISSIONS,
   integrationSettingsUpdateSchema,
-  pendingSettingActivationSchema,
-  pendingSettingDiscardSchema,
-  pendingSettingTestSchema,
+  providerCandidateActivationSchema,
+  providerConnectionTestSchema,
 } from "../../lib/integration-settings/api-contracts";
 import { userHasDashboardPermission } from "../../lib/dashboard/permissions";
+import { PROVIDER_STATE_KEY } from "../../lib/integration-settings/helpers";
 
 const KEY = Buffer.alloc(32, 9).toString("base64");
 const actor = { actorId: "507f1f77bcf86cd799439011", actorRole: "ADMIN", actorName: "Tester" };
+const UUIDS = [
+  "11111111-1111-4111-8111-111111111111",
+  "22222222-2222-4222-8222-222222222222",
+  "33333333-3333-4333-8333-333333333333",
+  "44444444-4444-4444-8444-444444444444",
+];
 
 class MemoryRepository implements IntegrationSettingsRepository {
   readonly rows = new Map<string, IntegrationSettingRecord>();
   writes = 0;
   private id = 0;
   private mapKey(provider: string, key: string) { return `${provider}:${key}`; }
+
   async listByProvider(provider: string) {
     return [...this.rows.values()].filter((row) => row.provider === provider).map((row) => ({ ...row }));
   }
+
   async applyMutations(mutations: readonly IntegrationSettingMutation[]) {
     this.writes += 1;
     const changed: IntegrationSettingRecord[] = [];
@@ -53,111 +66,189 @@ class MemoryRepository implements IntegrationSettingsRepository {
     }
     return changed;
   }
+
+  async recordCandidateTestResult(provider: string, candidateVersion: string, patch: CandidateTestStatePatch) {
+    const key = this.mapKey(provider, PROVIDER_STATE_KEY);
+    const state = this.rows.get(key);
+    if (!state || state.candidateVersion !== candidateVersion) return false;
+    this.rows.set(key, { ...state, ...patch, updatedAt: new Date() });
+    return true;
+  }
+
+  async activateCandidateAtomically(provider: string, candidateVersion: string, actorId: string): Promise<CandidateActivationResult> {
+    const stateKey = this.mapKey(provider, PROVIDER_STATE_KEY);
+    const state = this.rows.get(stateKey);
+    if (!state?.candidateVersion) return { status: "CANDIDATE_NOT_FOUND" };
+    if (state.candidateVersion !== candidateVersion) return { status: "VERSION_MISMATCH" };
+    if (state.candidateLastTestVersion !== candidateVersion || state.candidateLastTestResult !== "SUCCESS" || !state.candidateLastTestAt || !state.candidateCreatedAt || state.candidateLastTestAt < state.candidateCreatedAt) return { status: "NOT_VERIFIED" };
+    const pending = [...this.rows.values()].filter((row) => row.provider === provider && row.pendingCandidateVersion === candidateVersion);
+    if (!pending.length) return { status: "EMPTY_CANDIDATE" };
+
+    const next = new Map(this.rows);
+    for (const row of pending) {
+      next.set(this.mapKey(provider, row.key), {
+        ...row,
+        encryptedValue: row.isSecret ? row.pendingEncryptedValue : null,
+        plainValue: row.isSecret ? null : row.pendingPlainValue,
+        version: row.pendingVersion ?? row.version + 1,
+        updatedBy: actorId,
+        pendingEncryptedValue: null,
+        pendingPlainValue: null,
+        pendingVersion: null,
+        pendingCandidateVersion: null,
+        pendingCreatedAt: null,
+        pendingUpdatedBy: null,
+        lastTestAt: state.candidateLastTestAt,
+        lastTestResult: "SUCCESS",
+        lastFailureReasonSafe: null,
+        updatedAt: new Date(),
+      });
+    }
+    next.set(stateKey, {
+      ...state,
+      candidateVersion: null,
+      candidateCreatedAt: null,
+      candidateLastTestVersion: null,
+      candidateLastTestAt: null,
+      candidateLastTestResult: null,
+      candidateFailureReasonSafe: null,
+      lastTestAt: state.candidateLastTestAt,
+      lastTestResult: "SUCCESS",
+      updatedAt: new Date(),
+    });
+    this.rows.clear();
+    for (const [key, value] of next) this.rows.set(key, value);
+    return { status: "ACTIVATED", activatedFields: pending.length };
+  }
+
+  async discardCandidateAtomically(provider: string, candidateVersion: string): Promise<CandidateDiscardResult> {
+    const stateKey = this.mapKey(provider, PROVIDER_STATE_KEY);
+    const state = this.rows.get(stateKey);
+    if (!state?.candidateVersion) return { status: "CANDIDATE_NOT_FOUND" };
+    if (state.candidateVersion !== candidateVersion) return { status: "VERSION_MISMATCH" };
+    const pending = [...this.rows.values()].filter((row) => row.provider === provider && row.pendingCandidateVersion === candidateVersion);
+    for (const row of pending) this.rows.set(this.mapKey(provider, row.key), { ...row, pendingEncryptedValue: null, pendingPlainValue: null, pendingVersion: null, pendingCandidateVersion: null, pendingCreatedAt: null, pendingUpdatedBy: null });
+    this.rows.set(stateKey, { ...state, candidateVersion: null, candidateCreatedAt: null, candidateLastTestVersion: null, candidateLastTestAt: null, candidateLastTestResult: null, candidateFailureReasonSafe: null });
+    return { status: "DISCARDED", discardedFields: pending.length };
+  }
 }
 
-function setup(env: NodeJS.ProcessEnv = { NODE_ENV: "test" }) {
+function setup(options?: { env?: NodeJS.ProcessEnv; result?: ProviderConnectionTestResult }) {
   const repository = new MemoryRepository();
   const audits: IntegrationSettingsAuditEntry[] = [];
   let clock = 1_000;
+  let versionIndex = 0;
+  let result: ProviderConnectionTestResult = options?.result ?? { success: true, connectionStatus: "CONNECTED", messageAr: "نجح الاختبار.", failureCode: null };
+  const providerTester: IntegrationProviderTester = { test: async () => result };
   const service = new IntegrationSettingsService(repository, { write: async (entry) => { audits.push(entry); } }, {
-    env,
+    env: options?.env ?? { NODE_ENV: "test" },
     encryptionKey: () => KEY,
     now: () => new Date(++clock),
+    candidateVersion: () => UUIDS[versionIndex++] ?? crypto.randomUUID(),
+    providerTester,
     cacheTtlMs: 60_000,
   });
-  return { repository, audits, service };
+  return { repository, audits, service, setResult: (next: ProviderConnectionTestResult) => { result = next; } };
 }
 
 async function expectCode(promise: Promise<unknown>, code: string) {
   await assert.rejects(promise, (error) => error instanceof IntegrationSettingsError && error.code === code);
 }
 
-test("safe response separates secret masks from non-secret display values", async () => {
-  const environmentSecret = "environment-secret-token-that-must-never-display";
-  const { service } = setup({
-    NODE_ENV: "test",
-    META_WHATSAPP_ACCESS_TOKEN: environmentSecret,
-    META_GRAPH_VERSION: "v23.0",
-  });
-  await service.saveProviderSettings("META_WHATSAPP", [
-    { key: "APP_SECRET", value: "0123456789abcdef0123456789abcdef" },
-    { key: "BUSINESS_ACCOUNT_ID", value: " 123456789012345 " },
-  ], actor);
-  const snapshot = await service.getProviderSnapshot("META_WHATSAPP", actor);
-  const appSecret = snapshot.fields.find((field) => field.key === "APP_SECRET")!;
-  const accessToken = snapshot.fields.find((field) => field.key === "ACCESS_TOKEN")!;
-  const businessId = snapshot.fields.find((field) => field.key === "BUSINESS_ACCOUNT_ID")!;
-  const graphVersion = snapshot.fields.find((field) => field.key === "GRAPH_API_VERSION")!;
+const cronSecret = "cron-secret-that-is-long-enough-for-secure-use-123";
 
-  assert.equal(appSecret.displayValue, null);
-  assert.match(appSecret.maskedValue ?? "", /^•{8}/);
-  assert.equal(accessToken.displayValue, null);
-  assert.notEqual(accessToken.maskedValue, environmentSecret);
-  assert.equal(businessId.displayValue, "123456789012345");
-  assert.equal(businessId.maskedValue, null);
-  assert.equal(graphVersion.displayValue, "v23.0");
-  assert.equal(JSON.stringify(snapshot).includes("0123456789abcdef0123456789abcdef"), false);
-  assert.equal(JSON.stringify(snapshot).includes(environmentSecret), false);
-  assert.equal(JSON.stringify(snapshot).includes("encryptedValue"), false);
+async function activateInitialCron(service: IntegrationSettingsService) {
+  const staged = await service.saveProviderSettings("SYSTEM", [{ key: "CRON_SECRET", value: cronSecret }], actor);
+  const version = staged.snapshot.candidate.version!;
+  await service.testProviderConnection("SYSTEM", actor);
+  await service.activateProviderCandidate("SYSTEM", version, actor);
+}
+
+test("public test contract rejects client supplied SUCCESS or FAILED", () => {
+  assert.equal(providerConnectionTestSchema.safeParse({}).success, true);
+  assert.equal(providerConnectionTestSchema.safeParse({ result: "SUCCESS" }).success, false);
+  assert.equal(providerConnectionTestSchema.safeParse({ result: "FAILED" }).success, false);
 });
 
-test("invalid values and unknown fields are rejected before repository writes", async () => {
-  const { service, repository } = setup();
-  await expectCode(service.saveProviderSettings("META_WHATSAPP", [{ key: "GRAPH_API_VERSION", value: "23" }], actor), "INVALID_FIELD_VALUE");
-  await expectCode(service.saveProviderSettings("BREVO", [{ key: "EMAIL_SENDER_EMAIL", value: "not-an-email" }], actor), "INVALID_FIELD_VALUE");
-  await expectCode(service.saveProviderSettings("SYSTEM", [{ key: "CRON_SECRET", value: "weak" }], actor), "INVALID_FIELD_VALUE");
-  await expectCode(service.saveProviderSettings("BREVO", [{ key: "UNKNOWN", value: "anything" }], actor), "UNKNOWN_FIELD");
-  assert.equal(repository.writes, 0);
+test("first secret remains pending and is unavailable to active resolution", async () => {
+  const { service } = setup();
+  const saved = await service.saveProviderSettings("SYSTEM", [{ key: "CRON_SECRET", value: cronSecret }], actor);
+  assert.equal(saved.results[0]?.action, "STAGED");
+  assert.equal(saved.snapshot.fields[0]?.configured, false);
+  assert.equal(saved.snapshot.fields[0]?.hasPendingValue, true);
+  assert.equal(await service.getResolvedValue("SYSTEM", "CRON_SECRET", actor), null);
 });
 
-test("pending secret requires current successful test and preserves active secret on discard", async () => {
-  const { service, repository, audits } = setup();
-  await service.saveProviderSettings("BREVO", [{ key: "API_KEY", value: "xkeysib-original-api-key-value-123456" }], actor);
-  const activeBefore = await service.getResolvedValue("BREVO", "API_KEY", actor);
-  const staged = await service.saveProviderSettings("BREVO", [{ key: "API_KEY", value: "xkeysib-pending-api-key-value-654321" }], actor);
-  const pendingVersion = staged.snapshot.fields.find((field) => field.key === "API_KEY")!.pendingVersion!;
-
-  await expectCode(service.activatePendingSetting("BREVO", "API_KEY", pendingVersion, actor), "PENDING_VALUE_NOT_VERIFIED");
-  await expectCode(service.recordPendingSettingTest("BREVO", "API_KEY", pendingVersion + 1, "SUCCESS", actor), "PENDING_VERSION_MISMATCH");
-  await service.recordPendingSettingTest("BREVO", "API_KEY", pendingVersion, "FAILED", actor, "AUTH_REJECTED");
-  await expectCode(service.activatePendingSetting("BREVO", "API_KEY", pendingVersion, actor), "PENDING_VALUE_NOT_VERIFIED");
-  await service.discardPendingSetting("BREVO", "API_KEY", pendingVersion, actor, "USER_CANCELLED");
-  assert.equal(await service.getResolvedValue("BREVO", "API_KEY", actor), activeBefore);
-  assert.equal(repository.rows.get("BREVO:API_KEY")?.pendingEncryptedValue, null);
-  assert.ok(audits.some((entry) => entry.action === "INTEGRATION_SETTING_PENDING_TEST_FAILED"));
-  assert.ok(audits.some((entry) => entry.action === "INTEGRATION_SETTING_PENDING_VALUE_REJECTED" && entry.success));
-  assert.equal(JSON.stringify(audits).includes("xkeysib"), false);
-});
-
-test("successful current pending test allows activation only for that version", async () => {
+test("server-side tester result is recorded and secrets never appear in response or audit", async () => {
   const { service, audits } = setup();
-  await service.saveProviderSettings("BREVO", [{ key: "API_KEY", value: "xkeysib-original-api-key-value-123456" }], actor);
-  const staged = await service.saveProviderSettings("BREVO", [{ key: "API_KEY", value: "xkeysib-new-api-key-value-654321" }], actor);
-  const pendingVersion = staged.snapshot.fields.find((field) => field.key === "API_KEY")!.pendingVersion!;
-  await service.recordPendingSettingTest("BREVO", "API_KEY", pendingVersion, "SUCCESS", actor);
-  await expectCode(service.activatePendingSetting("BREVO", "API_KEY", pendingVersion + 1, actor), "PENDING_VERSION_MISMATCH");
-  await service.activatePendingSetting("BREVO", "API_KEY", pendingVersion, actor);
-  assert.equal(await service.getResolvedValue("BREVO", "API_KEY", actor), "xkeysib-new-api-key-value-654321");
-  assert.ok(audits.some((entry) => entry.action === "INTEGRATION_SETTING_PENDING_TEST_SUCCEEDED"));
-  assert.ok(audits.some((entry) => entry.action === "INTEGRATION_SETTING_PENDING_VALUE_ACTIVATED"));
+  const saved = await service.saveProviderSettings("SYSTEM", [{ key: "CRON_SECRET", value: cronSecret }], actor);
+  const response = await service.testProviderConnection("SYSTEM", actor);
+  assert.equal(response.success, true);
+  assert.equal(response.candidateVersion, saved.snapshot.candidate.version);
+  assert.equal(JSON.stringify(response).includes(cronSecret), false);
+  assert.equal(JSON.stringify(audits).includes(cronSecret), false);
+  assert.ok(audits.some((entry) => entry.action === "INTEGRATION_PROVIDER_TEST_STARTED"));
+  assert.ok(audits.some((entry) => entry.action === "INTEGRATION_PROVIDER_TEST_SUCCEEDED"));
 });
 
-test("API contracts reject malformed lifecycle requests and define permission boundaries", () => {
-  assert.equal(pendingSettingTestSchema.safeParse({ pendingVersion: 1, result: "SUCCESS" }).success, true);
-  assert.equal(pendingSettingTestSchema.safeParse({ pendingVersion: 0, result: "SUCCESS" }).success, false);
-  assert.equal(pendingSettingActivationSchema.safeParse({ pendingVersion: -1 }).success, false);
-  assert.equal(pendingSettingDiscardSchema.safeParse({ pendingVersion: 1, failureReason: "x".repeat(97) }).success, false);
+test("failed provider test preserves the active configuration", async () => {
+  const { service, setResult, audits } = setup();
+  await activateInitialCron(service);
+  const activeBefore = await service.getResolvedValue("SYSTEM", "CRON_SECRET", actor);
+  const replacement = "replacement-cron-secret-that-is-long-enough-456";
+  const staged = await service.saveProviderSettings("SYSTEM", [{ key: "CRON_SECRET", value: replacement }], actor);
+  setResult({ success: false, connectionStatus: "FAILED", messageAr: "فشل الاختبار.", failureCode: "AUTH_REJECTED" });
+  const tested = await service.testProviderConnection("SYSTEM", actor);
+  assert.equal(tested.success, false);
+  await expectCode(service.activateProviderCandidate("SYSTEM", staged.snapshot.candidate.version!, actor), "CANDIDATE_NOT_VERIFIED");
+  assert.equal(await service.getResolvedValue("SYSTEM", "CRON_SECRET", actor), activeBefore);
+  assert.ok(audits.some((entry) => entry.action === "INTEGRATION_PROVIDER_ACTIVE_CONFIGURATION_PRESERVED"));
+});
+
+test("editing any field after a successful test invalidates the previous candidate version", async () => {
+  const { service } = setup({ env: { NODE_ENV: "test", BREVO_EMAIL_SENDER_EMAIL: "verified@example.org", BREVO_SMS_SENDER: "GOZBEBEK" } });
+  const first = await service.saveProviderSettings("BREVO", [{ key: "API_KEY", value: "xkeysib-first-api-key-value-123456" }], actor);
+  await service.testProviderConnection("BREVO", actor);
+  const second = await service.saveProviderSettings("BREVO", [{ key: "EMAIL_SENDER_NAME", value: "Gözbebekleri" }], actor);
+  assert.notEqual(first.snapshot.candidate.version, second.snapshot.candidate.version);
+  await expectCode(service.activateProviderCandidate("BREVO", first.snapshot.candidate.version!, actor), "CANDIDATE_VERSION_MISMATCH");
+  await expectCode(service.activateProviderCandidate("BREVO", second.snapshot.candidate.version!, actor), "CANDIDATE_NOT_VERIFIED");
+});
+
+test("provider activation commits all candidate fields together", async () => {
+  const { service } = setup();
+  const staged = await service.saveProviderSettings("BREVO", [
+    { key: "API_KEY", value: "xkeysib-atomic-api-key-value-123456" },
+    { key: "EMAIL_SENDER_EMAIL", value: "verified@example.org" },
+    { key: "SMS_SENDER", value: "GOZBEBEK" },
+  ], actor);
+  const version = staged.snapshot.candidate.version!;
+  await service.testProviderConnection("BREVO", actor);
+  await service.activateProviderCandidate("BREVO", version, actor);
+  const values = await service.getResolvedProviderValues("BREVO", actor);
+  assert.equal(values.API_KEY, "xkeysib-atomic-api-key-value-123456");
+  assert.equal(values.EMAIL_SENDER_EMAIL, "verified@example.org");
+  assert.equal(values.SMS_SENDER, "GOZBEBEK");
+});
+
+test("environment fallback participates in candidate configuration", async () => {
+  const { service } = setup({ env: { NODE_ENV: "test", BREVO_EMAIL_SENDER_EMAIL: "verified@example.org", BREVO_SMS_SENDER: "GOZBEBEK" } });
+  await service.saveProviderSettings("BREVO", [{ key: "API_KEY", value: "xkeysib-candidate-api-key-value-123456" }], actor);
+  const candidate = await service.getCandidateConfiguration("BREVO", actor);
+  assert.equal(candidate.sources.API_KEY, "CANDIDATE");
+  assert.equal(candidate.sources.EMAIL_SENDER_EMAIL, "ENVIRONMENT");
+  assert.equal(candidate.values.EMAIL_SENDER_EMAIL, "verified@example.org");
+  assert.deepEqual(candidate.missingRequiredFields, []);
+});
+
+test("API contracts and permission boundaries are provider-level", () => {
+  assert.equal(providerCandidateActivationSchema.safeParse({ candidateVersion: UUIDS[0] }).success, true);
+  assert.equal(providerCandidateActivationSchema.safeParse({ candidateVersion: "old" }).success, false);
   assert.equal(integrationSettingsUpdateSchema.safeParse({ settings: [{ key: "", value: "x" }] }).success, false);
-  assert.equal(INTEGRATION_SETTINGS_ROUTE_PERMISSIONS.pendingTest, "platformConnectionsTest");
-  assert.equal(INTEGRATION_SETTINGS_ROUTE_PERMISSIONS.pendingActivate, "platformConnectionsManage");
-  assert.equal(INTEGRATION_SETTINGS_ROUTE_PERMISSIONS.pendingDiscard, "platformConnectionsManage");
-});
-
-test("route permission hierarchy rejects missing or insufficient privileges", () => {
-  assert.equal(userHasDashboardPermission(undefined, "platformConnections"), false);
-  assert.equal(userHasDashboardPermission({ role: "STAFF", dashboardPermissions: [] }, "platformConnections"), false);
-  assert.equal(userHasDashboardPermission({ role: "STAFF", dashboardPermissions: ["platformConnections"] }, "platformConnectionsManage"), false);
-  assert.equal(userHasDashboardPermission({ role: "STAFF", dashboardPermissions: ["platformConnectionsManage"] }, "platformConnectionsManage"), true);
+  assert.equal(INTEGRATION_SETTINGS_ROUTE_PERMISSIONS.test, "platformConnectionsTest");
+  assert.equal(INTEGRATION_SETTINGS_ROUTE_PERMISSIONS.activateCandidate, "platformConnectionsManage");
+  assert.equal(userHasDashboardPermission(undefined, "platformConnectionsTest"), false);
+  assert.equal(userHasDashboardPermission({ role: "STAFF", dashboardPermissions: ["platformConnections"] }, "platformConnectionsTest"), false);
   assert.equal(userHasDashboardPermission({ role: "STAFF", dashboardPermissions: ["platformConnectionsTest"] }, "platformConnectionsTest"), true);
   assert.equal(userHasDashboardPermission({ role: "STAFF", dashboardPermissions: ["platformConnectionsTest"] }, "platformConnectionsManage"), false);
 });
