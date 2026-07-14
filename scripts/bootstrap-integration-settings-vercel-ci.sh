@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# تشغيل إعداد Vercel
 set -Eeuo pipefail
 
 TMP_DIR="$(mktemp -d)"
