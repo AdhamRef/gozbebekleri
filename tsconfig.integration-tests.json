@@ -11,11 +11,14 @@
     "types": ["node"]
   },
   "include": [
+    "lib/integration-settings/api-contracts.ts",
     "lib/integration-settings/catalog.ts",
     "lib/integration-settings/crypto.ts",
     "lib/integration-settings/helpers.ts",
     "lib/integration-settings/resolver.ts",
     "lib/integration-settings/service.ts",
+    "lib/integration-settings/types.ts",
+    "lib/integration-settings/validation.ts",
     "lib/dashboard/permissions.ts",
     "tests/integration-settings/**/*.ts"
   ]
