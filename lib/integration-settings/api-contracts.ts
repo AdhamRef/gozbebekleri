@@ -16,27 +16,23 @@ export const integrationProviderActionSchema = z.object({
   action: z.enum(["ENABLE", "DISABLE"]),
 });
 
-export const pendingSettingTestSchema = z.object({
-  pendingVersion: z.number().int().positive(),
-  result: z.enum(["SUCCESS", "FAILED"]),
-  failureReason: z.string().max(96).optional().nullable(),
+export const providerConnectionTestSchema = z.object({}).strict();
+
+export const providerCandidateActivationSchema = z.object({
+  candidateVersion: z.string().uuid(),
 });
 
-export const pendingSettingActivationSchema = z.object({
-  pendingVersion: z.number().int().positive(),
-});
-
-export const pendingSettingDiscardSchema = z.object({
-  pendingVersion: z.number().int().positive(),
+export const providerCandidateDiscardSchema = z.object({
+  candidateVersion: z.string().uuid(),
   failureReason: z.string().max(96).optional().nullable(),
 });
 
 export const INTEGRATION_SETTINGS_ROUTE_PERMISSIONS = {
   read: "platformConnections",
   save: "platformConnectionsManage",
-  pendingTest: "platformConnectionsTest",
-  pendingActivate: "platformConnectionsManage",
-  pendingDiscard: "platformConnectionsManage",
+  test: "platformConnectionsTest",
+  activateCandidate: "platformConnectionsManage",
+  discardCandidate: "platformConnectionsManage",
   delete: "platformConnectionsAdmin",
   providerStatus: "platformConnectionsAdmin",
 } as const;
