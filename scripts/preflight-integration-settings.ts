@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { inspectEnvironment, overallStatus, type ReleaseCheck } from "../lib/integration-settings/release-readiness";
 import { inspectIntegrationSettingsDatabase } from "./integration-settings-db-inspection";
 
@@ -5,8 +6,30 @@ function print(check: ReleaseCheck) {
   console.log(`[${check.status}] ${check.id}: ${check.message}`);
 }
 
+function inspectNodeRuntimeContracts(): ReleaseCheck {
+  const requiredNodeRoutes = [
+    "app/api/webhooks/meta/whatsapp/route.ts",
+    "app/api/webhooks/brevo/transactional/route.ts",
+    "app/api/cron/communication-run-due/route.ts",
+    "app/api/admin/integration-settings/[provider]/route.ts",
+    "app/api/admin/integration-settings/[provider]/test-active/route.ts",
+    "app/api/admin/integration-settings/[provider]/test-candidate/route.ts",
+    "app/api/admin/integration-settings/[provider]/activate-candidate/route.ts",
+  ];
+  const invalid = requiredNodeRoutes.filter((path) => {
+    try {
+      return !/export\s+const\s+runtime\s*=\s*["']nodejs["']/.test(readFileSync(path, "utf8"));
+    } catch {
+      return true;
+    }
+  });
+  return invalid.length
+    ? { id: "node-runtime", status: "BLOCKED", message: `Required Node.js runtime declarations are missing from ${invalid.length} route(s).` }
+    : { id: "node-runtime", status: "PASS", message: "Crypto, Prisma, webhook, integration, and Cron routes explicitly use the Node.js runtime." };
+}
+
 async function main() {
-  const checks = inspectEnvironment(process.env);
+  const checks = [...inspectEnvironment(process.env), inspectNodeRuntimeContracts()];
   for (const check of checks) print(check);
 
   if (!process.env.DATABASE_URL?.trim()) {
@@ -25,8 +48,7 @@ async function main() {
       { id: "stale-candidates", status: db.staleCandidates.length ? "WARNING" : "PASS", message: db.staleCandidates.length ? `Stale pending provider candidates detected: ${db.staleCandidates.length}.` : "No stale pending provider candidates detected." },
       { id: "encrypted-values", status: db.unreadableSecrets.length ? "BLOCKED" : "PASS", message: db.unreadableSecrets.length ? `Unreadable encrypted settings detected: ${db.unreadableSecrets.map((item) => `${item.provider}/${item.key}`).join(", ")}.` : "All stored active encrypted settings are decryptable with the configured key." },
       { id: "transactions", status: db.transactions.status === "SUPPORTED" ? "PASS" : "WARNING", message: db.transactions.message },
-      { id: "cron-route", status: "PASS", message: "Cron protection contract was validated without invoking the route or executing campaigns." },
-      { id: "node-runtime", status: "PASS", message: "Crypto, Prisma, webhook, and integration routes are configured for Node.js runtime by source contract." },
+      { id: "cron-route", status: "PASS", message: "Cron protection was validated from configuration and source without invoking the route or executing campaigns." },
       ...db.indexChecks.map((item) => db.collectionExists ? item : { ...item, status: "WARNING" as const }),
     ];
     dbChecks.forEach(print);
