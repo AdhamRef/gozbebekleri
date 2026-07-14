@@ -1,10 +1,11 @@
 import type { IntegrationProvider } from "@/lib/integration-settings/catalog";
+import type { SafeIntegrationProviderSnapshotWithTests } from "@/lib/integration-settings/safe-snapshot";
 
+export type IntegrationUiSnapshot = SafeIntegrationProviderSnapshotWithTests;
 export const PROVIDER_ORDER: IntegrationProvider[] = ["META_WHATSAPP", "BREVO", "NETGSM", "SYSTEM"];
 
 export const WEBHOOKS: Partial<Record<IntegrationProvider, { label: string; path: string }>> = {
   META_WHATSAPP: { label: "رابط Meta Webhook", path: "/api/webhooks/meta/whatsapp" },
-  BREVO: { label: "رابط Brevo Webhook", path: "/api/webhooks/brevo/transactional" },
   SYSTEM: { label: "رابط Cron", path: "/api/cron/communication-run-due" },
 };
 
@@ -27,6 +28,7 @@ export type SchedulerUiStatus = {
   scheduledCount: number;
   dueCount: number;
   lastRunAt: string | null;
+  lastSuccessfulRunAt: string | null;
 };
 
 export function sourceLabel(source: string): string {
