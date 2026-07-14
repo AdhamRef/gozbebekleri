@@ -10,12 +10,12 @@ export async function GET() {
   if (denied) return denied;
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
-    providers: getProviderConnectionsReadiness(),
+    providers: await getProviderConnectionsReadiness(),
     safety: {
       externalSideEffects: false,
       autoSend: false,
       secretsExposed: false,
-      note: "Provider readiness is calculated on the server. No API keys or tokens are returned to the frontend.",
+      note: "Provider readiness is calculated from active database settings with environment fallback. No secrets are returned.",
     },
   }, { headers: operationsNoStoreHeaders });
 }
