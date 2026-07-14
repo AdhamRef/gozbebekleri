@@ -26,4 +26,307 @@ jobs:
       SAFE_REPORT: ${{ runner.temp }}/temporary-vercel-integration-bootstrap-report.md
 
     steps:
-     
+      - name: Checkout reviewed target commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_COMMIT_SHA }}
+          fetch-depth: 1
+
+      - name: Setup project Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install project dependencies
+        run: npm ci
+
+      - name: Install pinned Vercel CLI
+        run: npm install --global vercel@56.1.0
+
+      - name: Bootstrap Vercel integration settings safely
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -Eeuo pipefail
+
+          TMP_DIR="$(mktemp -d)"
+          PREVIEW_ENV="$TMP_DIR/preview.env"
+          PRODUCTION_ENV="$TMP_DIR/production.env"
+          PARSER="$TMP_DIR/env-reader.cjs"
+          PREVIEW_URL=""
+          DATABASE_RELATION="UNABLE_TO_VERIFY"
+          PREVIEW_KEY_STATUS="INVALID"
+          PRODUCTION_KEY_STATUS="INVALID"
+          DATABASE_STATUS="MISSING"
+          CRON_STATUS="MISSING"
+          CANONICAL_STATUS="MISSING"
+          PREVIEW_DEPLOYMENT="FAILED"
+          PREFLIGHT_RESULT="BLOCKED"
+          MIGRATION_RESULT="BLOCKED"
+          TRANSACTIONS_RESULT="UNVERIFIED"
+          WORKFLOW_RESULT="BLOCKED"
+          BLOCKER=""
+          REPORT_WRITTEN=0
+
+          write_report() {
+            {
+              echo "## Temporary Vercel integration bootstrap"
+              echo
+              echo "| Check | Result |"
+              echo "|---|---|"
+              echo "| Workflow result | $WORKFLOW_RESULT |"
+              echo "| Target Commit SHA | $TARGET_COMMIT_SHA |"
+              echo "| Vercel Project | $VERCEL_PROJECT_NAME |"
+              echo "| Database relation | $DATABASE_RELATION |"
+              echo "| Preview encryption key | $PREVIEW_KEY_STATUS |"
+              echo "| Production encryption key | $PRODUCTION_KEY_STATUS |"
+              echo "| DATABASE_URL | $DATABASE_STATUS |"
+              echo "| CRON_SECRET | $CRON_STATUS |"
+              echo "| Canonical URL | $CANONICAL_STATUS |"
+              echo "| Preview Deployment | $PREVIEW_DEPLOYMENT |"
+              echo "| Preflight | $PREFLIGHT_RESULT |"
+              echo "| Migration Verify | $MIGRATION_RESULT |"
+              echo "| Transactions | $TRANSACTIONS_RESULT |"
+              echo "| Remaining blockers | ${BLOCKER:-NONE} |"
+            } > "$SAFE_REPORT"
+            cat "$SAFE_REPORT" >> "$GITHUB_STEP_SUMMARY"
+            REPORT_WRITTEN=1
+          }
+
+          cleanup() {
+            unset PREVIEW_KEY PRODUCTION_KEY GENERATED_KEY PREVIEW_DB PRODUCTION_DB PREVIEW_CRON PRODUCTION_CRON
+            rm -rf "$TMP_DIR" "$GITHUB_WORKSPACE/.vercel"
+            if [[ $REPORT_WRITTEN -eq 0 ]]; then
+              BLOCKER="UNEXPECTED_WORKFLOW_FAILURE"
+              write_report
+            fi
+          }
+          trap cleanup EXIT
+
+          block() {
+            BLOCKER="$1"
+            WORKFLOW_RESULT="BLOCKED"
+            write_report
+            exit 1
+          }
+
+          [[ -n "${VERCEL_TOKEN:-}" ]] || block "VERCEL_TOKEN_MISSING"
+
+          cat > "$PARSER" <<'NODE'
+          const fs = require('node:fs');
+          const crypto = require('node:crypto');
+
+          function parse(file) {
+            const result = {};
+            for (const raw of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+              const line = raw.trim();
+              if (!line || line.startsWith('#')) continue;
+              const index = line.indexOf('=');
+              if (index < 1) continue;
+              const key = line.slice(0, index).trim();
+              let value = line.slice(index + 1).trim();
+              if (value.startsWith('"') && value.endsWith('"')) {
+                try { value = JSON.parse(value); } catch { value = value.slice(1, -1); }
+              } else if (value.startsWith("'") && value.endsWith("'")) {
+                value = value.slice(1, -1);
+              }
+              result[key] = value;
+            }
+            return result;
+          }
+
+          const command = process.argv[2];
+          if (command === 'get') {
+            process.stdout.write(parse(process.argv[3])[process.argv[4]] || '');
+          } else if (command === 'db-relation') {
+            const preview = parse(process.argv[3]).DATABASE_URL || '';
+            const production = parse(process.argv[4]).DATABASE_URL || '';
+            if (!preview || !production) process.stdout.write('UNABLE_TO_VERIFY');
+            else {
+              const left = crypto.createHash('sha256').update(preview).digest();
+              const right = crypto.createHash('sha256').update(production).digest();
+              process.stdout.write(crypto.timingSafeEqual(left, right) ? 'SAME_DATABASE' : 'DIFFERENT_DATABASE');
+            }
+          } else if (command === 'key-valid') {
+            const value = fs.readFileSync(0, 'utf8').trim();
+            let valid = /^[a-fA-F0-9]{64}$/.test(value) && Buffer.from(value, 'hex').length === 32;
+            if (!valid) try { valid = Buffer.from(value, 'base64url').length === 32; } catch {}
+            if (!valid) try { valid = Buffer.from(value, 'base64').length === 32; } catch {}
+            process.stdout.write(valid ? 'VALID' : 'INVALID');
+          } else if (command === 'cron-valid') {
+            const value = fs.readFileSync(0, 'utf8').trim();
+            process.stdout.write(value.length >= 32 && !/[\r\n]/.test(value) ? 'VALID' : 'INVALID');
+          } else if (command === 'canonical') {
+            const env = parse(process.argv[3]);
+            const raw = env.APP_URL || env.NEXTAUTH_URL || env.NEXT_PUBLIC_APP_URL || env.NEXT_PUBLIC_SITE_URL || '';
+            if (!raw) process.stdout.write('MISSING');
+            else {
+              try {
+                const url = new URL(raw);
+                const production = process.argv[4] === 'production';
+                process.stdout.write(production && url.protocol !== 'https:' ? 'INVALID' : 'VALID');
+              } catch { process.stdout.write('INVALID'); }
+            }
+          }
+          NODE
+
+          vercel whoami > "$TMP_DIR/whoami.log" 2>&1 || block "VERCEL_AUTHENTICATION_FAILED"
+          vercel link --yes --project "$VERCEL_PROJECT_NAME" --scope "$VERCEL_TEAM_SCOPE" > "$TMP_DIR/link.log" 2>&1 || block "VERCEL_PROJECT_LINK_FAILED"
+
+          if ! node - <<'NODE'
+          const fs = require('node:fs');
+          const project = JSON.parse(fs.readFileSync('.vercel/project.json', 'utf8'));
+          if (project.projectId !== process.env.VERCEL_PROJECT_ID || project.orgId !== process.env.VERCEL_TEAM_ID) process.exit(1);
+          NODE
+          then
+            block "VERCEL_PROJECT_IDENTITY_MISMATCH"
+          fi
+
+          vercel env pull "$PREVIEW_ENV" --yes --environment=preview --git-branch="$TARGET_BRANCH" --scope "$VERCEL_TEAM_SCOPE" > "$TMP_DIR/pull-preview.log" 2>&1 || block "PREVIEW_ENV_PULL_FAILED"
+          vercel env pull "$PRODUCTION_ENV" --yes --environment=production --scope "$VERCEL_TEAM_SCOPE" > "$TMP_DIR/pull-production.log" 2>&1 || block "PRODUCTION_ENV_PULL_FAILED"
+
+          PREVIEW_DB="$(node "$PARSER" get "$PREVIEW_ENV" DATABASE_URL)"
+          PRODUCTION_DB="$(node "$PARSER" get "$PRODUCTION_ENV" DATABASE_URL)"
+          [[ -n "$PREVIEW_DB" && -n "$PRODUCTION_DB" ]] || block "DATABASE_URL_MISSING"
+          DATABASE_STATUS="PRESENT"
+          DATABASE_RELATION="$(node "$PARSER" db-relation "$PREVIEW_ENV" "$PRODUCTION_ENV")"
+          [[ "$DATABASE_RELATION" != "UNABLE_TO_VERIFY" ]] || block "DATABASE_RELATION_UNVERIFIED"
+          unset PREVIEW_DB PRODUCTION_DB
+
+          PREVIEW_CRON="$(node "$PARSER" get "$PREVIEW_ENV" CRON_SECRET)"
+          PRODUCTION_CRON="$(node "$PARSER" get "$PRODUCTION_ENV" CRON_SECRET)"
+          [[ -n "$PREVIEW_CRON" && -n "$PRODUCTION_CRON" ]] || block "CRON_SECRET_MISSING"
+          CRON_STATUS="PRESENT"
+          [[ "$(printf '%s' "$PREVIEW_CRON" | node "$PARSER" cron-valid)" == "VALID" ]] || block "PREVIEW_CRON_SECRET_INVALID"
+          [[ "$(printf '%s' "$PRODUCTION_CRON" | node "$PARSER" cron-valid)" == "VALID" ]] || block "PRODUCTION_CRON_SECRET_INVALID"
+          unset PREVIEW_CRON PRODUCTION_CRON
+
+          PREVIEW_CANONICAL="$(node "$PARSER" canonical "$PREVIEW_ENV" preview)"
+          PRODUCTION_CANONICAL="$(node "$PARSER" canonical "$PRODUCTION_ENV" production)"
+          [[ "$PREVIEW_CANONICAL" != "MISSING" && "$PRODUCTION_CANONICAL" != "MISSING" ]] || block "CANONICAL_URL_MISSING"
+          [[ "$PREVIEW_CANONICAL" == "VALID" && "$PRODUCTION_CANONICAL" == "VALID" ]] || { CANONICAL_STATUS="INVALID"; block "CANONICAL_URL_INVALID"; }
+          CANONICAL_STATUS="VALID"
+
+          PREVIEW_KEY="$(node "$PARSER" get "$PREVIEW_ENV" INTEGRATION_SETTINGS_ENCRYPTION_KEY)"
+          PRODUCTION_KEY="$(node "$PARSER" get "$PRODUCTION_ENV" INTEGRATION_SETTINGS_ENCRYPTION_KEY)"
+
+          if [[ -n "$PREVIEW_KEY" ]]; then
+            [[ "$(printf '%s' "$PREVIEW_KEY" | node "$PARSER" key-valid)" == "VALID" ]] || block "PREVIEW_ENCRYPTION_KEY_INVALID"
+            PREVIEW_KEY_STATUS="PRESENT"
+          fi
+          if [[ -n "$PRODUCTION_KEY" ]]; then
+            [[ "$(printf '%s' "$PRODUCTION_KEY" | node "$PARSER" key-valid)" == "VALID" ]] || block "PRODUCTION_ENCRYPTION_KEY_INVALID"
+            PRODUCTION_KEY_STATUS="PRESENT"
+          fi
+
+          add_preview_key() {
+            printf '%s' "$1" | vercel env add INTEGRATION_SETTINGS_ENCRYPTION_KEY preview --git-branch="$TARGET_BRANCH" --sensitive --scope "$VERCEL_TEAM_SCOPE" > "$TMP_DIR/add-preview-key.log" 2>&1 || block "PREVIEW_ENCRYPTION_KEY_ADD_FAILED"
+            PREVIEW_KEY_STATUS="ADDED"
+          }
+          add_production_key() {
+            printf '%s' "$1" | vercel env add INTEGRATION_SETTINGS_ENCRYPTION_KEY production --sensitive --scope "$VERCEL_TEAM_SCOPE" > "$TMP_DIR/add-production-key.log" 2>&1 || block "PRODUCTION_ENCRYPTION_KEY_ADD_FAILED"
+            PRODUCTION_KEY_STATUS="ADDED"
+          }
+          new_key() {
+            node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('base64url'))"
+          }
+
+          if [[ "$DATABASE_RELATION" == "SAME_DATABASE" ]]; then
+            if [[ -n "$PREVIEW_KEY" && -n "$PRODUCTION_KEY" ]]; then
+              [[ "$PREVIEW_KEY" == "$PRODUCTION_KEY" ]] || block "ENCRYPTION_KEYS_DIFFER_FOR_SHARED_DATABASE"
+            elif [[ -n "$PREVIEW_KEY" ]]; then
+              add_production_key "$PREVIEW_KEY"
+            elif [[ -n "$PRODUCTION_KEY" ]]; then
+              add_preview_key "$PRODUCTION_KEY"
+            else
+              GENERATED_KEY="$(new_key)"
+              add_preview_key "$GENERATED_KEY"
+              add_production_key "$GENERATED_KEY"
+              unset GENERATED_KEY
+            fi
+          else
+            if [[ -z "$PREVIEW_KEY" ]]; then
+              GENERATED_KEY="$(new_key)"
+              add_preview_key "$GENERATED_KEY"
+              unset GENERATED_KEY
+            fi
+            if [[ -z "$PRODUCTION_KEY" ]]; then
+              GENERATED_KEY="$(new_key)"
+              add_production_key "$GENERATED_KEY"
+              unset GENERATED_KEY
+            fi
+          fi
+          unset PREVIEW_KEY PRODUCTION_KEY
+
+          set +e
+          vercel deploy --yes --scope "$VERCEL_TEAM_SCOPE" > "$TMP_DIR/deploy.log" 2>&1
+          DEPLOY_EXIT=$?
+          set -e
+          [[ $DEPLOY_EXIT -eq 0 ]] || block "PREVIEW_DEPLOYMENT_FAILED"
+
+          PREVIEW_URL="$(grep -Eo 'https://[^[:space:]]+\.vercel\.app' "$TMP_DIR/deploy.log" | tail -n 1 || true)"
+          [[ -n "$PREVIEW_URL" ]] || block "PREVIEW_URL_NOT_FOUND"
+          vercel inspect "$PREVIEW_URL" --wait --timeout 20m --scope "$VERCEL_TEAM_SCOPE" > "$TMP_DIR/inspect.log" 2>&1 || block "PREVIEW_NOT_READY"
+          PREVIEW_DEPLOYMENT="READY"
+
+          set +e
+          vercel env run -e preview --git-branch="$TARGET_BRANCH" -- npm run preflight:integration-settings > "$TMP_DIR/preflight.log" 2>&1
+          PREFLIGHT_EXIT=$?
+          vercel env run -e preview --git-branch="$TARGET_BRANCH" -- npm run verify:integration-settings-migration > "$TMP_DIR/migration-verify.log" 2>&1
+          MIGRATION_EXIT=$?
+          set -e
+
+          PREFLIGHT_RESULT="$(grep -Eo 'INTEGRATION SETTINGS PREFLIGHT: (PASS|WARNING|BLOCKED)' "$TMP_DIR/preflight.log" | tail -n 1 | awk '{print $4}' || true)"
+          [[ -n "$PREFLIGHT_RESULT" ]] || PREFLIGHT_RESULT="BLOCKED"
+
+          MIGRATION_RESULT="$(grep -Eo 'MIGRATION STATUS: (FULLY_APPLIED|PARTIALLY_APPLIED|NOT_APPLIED|UNKNOWN)' "$TMP_DIR/migration-verify.log" | tail -n 1 | awk '{print $3}' || true)"
+          [[ "$MIGRATION_RESULT" != "UNKNOWN" && -n "$MIGRATION_RESULT" ]] || MIGRATION_RESULT="BLOCKED"
+
+          if grep -q '^\[PASS\] transactions:' "$TMP_DIR/preflight.log"; then
+            TRANSACTIONS_RESULT="SUPPORTED"
+          elif grep -q '^\[WARNING\] transactions:' "$TMP_DIR/preflight.log"; then
+            TRANSACTIONS_RESULT="WARNING"
+          fi
+
+          [[ $PREFLIGHT_EXIT -eq 0 && "$PREFLIGHT_RESULT" != "BLOCKED" ]] || block "PREFLIGHT_BLOCKED"
+          [[ $MIGRATION_EXIT -eq 0 && "$MIGRATION_RESULT" != "BLOCKED" ]] || block "MIGRATION_VERIFY_BLOCKED"
+
+          if [[ "$PREFLIGHT_RESULT" == "WARNING" || "$TRANSACTIONS_RESULT" != "SUPPORTED" || "$MIGRATION_RESULT" != "FULLY_APPLIED" ]]; then
+            WORKFLOW_RESULT="WARNING"
+          else
+            WORKFLOW_RESULT="PASS"
+          fi
+          write_report
+
+      - name: Publish sanitized report to PR 127
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          if [[ ! -f "$SAFE_REPORT" ]]; then
+            cat > "$SAFE_REPORT" <<'REPORT'
+          ## Temporary Vercel integration bootstrap
+
+          | Check | Result |
+          |---|---|
+          | Workflow result | BLOCKED |
+          | Target Commit SHA | 4df82817f55e146a150b7b479124f700e0cdf488 |
+          | Vercel Project | gozbebekleri |
+          | Database relation | UNABLE_TO_VERIFY |
+          | Preview encryption key | INVALID |
+          | Production encryption key | INVALID |
+          | DATABASE_URL | MISSING |
+          | CRON_SECRET | MISSING |
+          | Canonical URL | MISSING |
+          | Preview Deployment | FAILED |
+          | Preflight | BLOCKED |
+          | Migration Verify | BLOCKED |
+          | Transactions | UNVERIFIED |
+          | Remaining blockers | WORKFLOW_FAILED_BEFORE_SANITIZED_REPORT |
+          REPORT
+          fi
+          gh pr comment 127 --repo AdhamRef/gozbebekleri --body-file "$SAFE_REPORT"
