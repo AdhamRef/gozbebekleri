@@ -1,32 +1,30 @@
+import { getActiveMetaWhatsappRuntimeConfig, RUNTIME_FAILURE, type ActiveRuntimeConfig, type MetaWhatsappRuntimeValues } from "../../runtime-config";
 import { mapGraphError, META_REASONS } from "./errors";
 import type { HealthResult, MetaGraphConfig } from "./types";
 
-/**
- * Meta WhatsApp Cloud API client — server-only credential resolution + Graph fetch.
- * Credentials come from the environment; tokens are never returned to callers, logged, or thrown.
- */
+export type MetaRuntimeConfig = ActiveRuntimeConfig<MetaWhatsappRuntimeValues>;
 
-export function getMetaConfig(): MetaGraphConfig | null {
-  const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN?.trim();
-  if (!accessToken) return null;
-  return {
-    accessToken,
-    graphVersion: process.env.META_GRAPH_VERSION?.trim() || "v25.0",
-    appSecret: process.env.META_WHATSAPP_APP_SECRET?.trim() || null,
-    verifyToken: process.env.META_WHATSAPP_WEBHOOK_VERIFY_TOKEN?.trim() || null,
-    defaultPhoneNumberId: process.env.META_WHATSAPP_PHONE_NUMBER_ID?.trim() || null,
-    businessAccountId: process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID?.trim() || null,
-  };
+export async function getMetaConfig(runtime?: MetaRuntimeConfig): Promise<MetaGraphConfig | null> {
+  const resolved = runtime ?? await getActiveMetaWhatsappRuntimeConfig();
+  if (!resolved.configured) return null;
+  return resolved.values;
 }
 
-export function isMetaConfigured(): boolean {
-  return getMetaConfig() !== null;
+export async function isMetaConfigured(runtime?: MetaRuntimeConfig): Promise<boolean> {
+  return (runtime ?? await getActiveMetaWhatsappRuntimeConfig()).configured;
+}
+
+export function metaRuntimeFailure(runtime: MetaRuntimeConfig): string {
+  if (runtime.configured) return META_REASONS.NOT_CONFIGURED;
+  if (runtime.reason === RUNTIME_FAILURE.PROVIDER_DISABLED) return "PROVIDER_DISABLED";
+  if (runtime.reason === RUNTIME_FAILURE.INTEGRATION_DECRYPTION_FAILED) return "INTEGRATION_DECRYPTION_FAILED";
+  if (runtime.reason === RUNTIME_FAILURE.INTEGRATION_DATABASE_UNAVAILABLE) return "INTEGRATION_DATABASE_UNAVAILABLE";
+  return META_REASONS.NOT_CONFIGURED;
 }
 
 type GraphOk = { ok: true; data: unknown };
 type GraphErr = { ok: false; reason: string; detail: string };
 
-/** Low-level Graph API call. Adds the Bearer token; maps failures to safe reasons. */
 export async function graphFetch(config: MetaGraphConfig, path: string, init?: RequestInit): Promise<GraphOk | GraphErr> {
   const url = `https://graph.facebook.com/${config.graphVersion}/${path}`;
   try {
@@ -45,15 +43,14 @@ export async function graphFetch(config: MetaGraphConfig, path: string, init?: R
     }
     return { ok: true, data: body };
   } catch {
-    // Never include the token or raw error object.
     return { ok: false, reason: META_REASONS.REQUEST_FAILED, detail: "network error" };
   }
 }
 
-/** Sender readiness check. Uses the sender's phoneNumberId (multi-number aware). */
-export async function healthCheck(phoneNumberId?: string | null): Promise<HealthResult> {
-  const config = getMetaConfig();
-  if (!config) return { ok: false, reason: META_REASONS.NOT_CONFIGURED };
+export async function healthCheck(phoneNumberId?: string | null, runtime?: MetaRuntimeConfig): Promise<HealthResult> {
+  const resolved = runtime ?? await getActiveMetaWhatsappRuntimeConfig();
+  if (!resolved.configured) return { ok: false, reason: metaRuntimeFailure(resolved) };
+  const config = resolved.values;
   const pnid = phoneNumberId || config.defaultPhoneNumberId;
   if (!pnid) return { ok: false, reason: META_REASONS.SENDER_MISSING_PHONE_NUMBER_ID };
   const result = await graphFetch(config, `${pnid}?fields=verified_name,quality_rating,display_phone_number`, { method: "GET" });
