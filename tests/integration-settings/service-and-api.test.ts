@@ -55,7 +55,7 @@ class MemoryRepository implements IntegrationSettingsRepository {
   }
 }
 
-function setup(env: NodeJS.ProcessEnv = {}) {
+function setup(env: NodeJS.ProcessEnv = { NODE_ENV: "test" }) {
   const repository = new MemoryRepository();
   const audits: IntegrationSettingsAuditEntry[] = [];
   let clock = 1_000;
@@ -73,8 +73,10 @@ async function expectCode(promise: Promise<unknown>, code: string) {
 }
 
 test("safe response separates secret masks from non-secret display values", async () => {
+  const environmentSecret = "environment-secret-token-that-must-never-display";
   const { service } = setup({
-    META_WHATSAPP_ACCESS_TOKEN: "environment-secret-token-that-must-never-display",
+    NODE_ENV: "test",
+    META_WHATSAPP_ACCESS_TOKEN: environmentSecret,
     META_GRAPH_VERSION: "v23.0",
   });
   await service.saveProviderSettings("META_WHATSAPP", [
@@ -90,12 +92,12 @@ test("safe response separates secret masks from non-secret display values", asyn
   assert.equal(appSecret.displayValue, null);
   assert.match(appSecret.maskedValue ?? "", /^•{8}/);
   assert.equal(accessToken.displayValue, null);
-  assert.notEqual(accessToken.maskedValue, process.env.META_WHATSAPP_ACCESS_TOKEN);
+  assert.notEqual(accessToken.maskedValue, environmentSecret);
   assert.equal(businessId.displayValue, "123456789012345");
   assert.equal(businessId.maskedValue, null);
   assert.equal(graphVersion.displayValue, "v23.0");
   assert.equal(JSON.stringify(snapshot).includes("0123456789abcdef0123456789abcdef"), false);
-  assert.equal(JSON.stringify(snapshot).includes("environment-secret-token-that-must-never-display"), false);
+  assert.equal(JSON.stringify(snapshot).includes(environmentSecret), false);
   assert.equal(JSON.stringify(snapshot).includes("encryptedValue"), false);
 });
 
