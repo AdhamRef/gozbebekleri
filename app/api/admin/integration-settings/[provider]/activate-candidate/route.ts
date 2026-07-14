@@ -6,6 +6,9 @@ import { requireIntegrationSettingsManage } from "@/lib/integration-settings/aut
 import { integrationActorFromSession, integrationProviderFromParam, integrationSettingsErrorResponse } from "@/lib/integration-settings/http";
 import { integrationSettingsService } from "@/lib/integration-settings/prisma-service";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 type RouteContext = { params: Promise<{ provider: string }> };
 
 export async function POST(request: NextRequest, context: RouteContext) {
