@@ -1,7 +1,10 @@
 import type { Prisma } from "@/generated/integration-settings-client";
 import { PrismaClient } from "@/generated/integration-settings-client";
 import { writeAuditLog } from "@/lib/audit-log";
+import type { IntegrationProvider } from "./catalog";
 import { PROVIDER_STATE_KEY } from "./helpers";
+import type { ActiveRuntimeResolution } from "./resolver";
+import { IntegrationSettingsResolver } from "./resolver";
 import {
   IntegrationSettingsService,
   type CandidateActivationResult,
@@ -9,6 +12,7 @@ import {
   type CandidateTestStatePatch,
   type IntegrationSettingMutation,
   type IntegrationSettingRecord,
+  type IntegrationSettingsActor,
   type IntegrationSettingsAuditEntry,
   type IntegrationSettingsAuditWriter,
   type IntegrationSettingsRepository,
@@ -16,7 +20,7 @@ import {
 
 const globalForIntegrationSettings = globalThis as unknown as { integrationSettingsPrisma?: PrismaClient };
 const integrationSettingsPrisma = globalForIntegrationSettings.integrationSettingsPrisma ?? new PrismaClient({
-  log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+  log: process.env.NODE_ENV === "development" ? ["error", "warn"] : [],
 });
 if (process.env.NODE_ENV !== "production") globalForIntegrationSettings.integrationSettingsPrisma = integrationSettingsPrisma;
 
@@ -50,10 +54,8 @@ class PrismaIntegrationSettingsRepository implements IntegrationSettingsReposito
       if (!state?.candidateVersion) return { status: "CANDIDATE_NOT_FOUND" };
       if (state.candidateVersion !== candidateVersion) return { status: "VERSION_MISMATCH" };
       if (state.candidateLastTestVersion !== candidateVersion || state.candidateLastTestResult !== "SUCCESS" || !state.candidateLastTestAt || !state.candidateCreatedAt || state.candidateLastTestAt < state.candidateCreatedAt) return { status: "NOT_VERIFIED" };
-
       const pending = await tx.integrationSetting.findMany({ where: { provider, pendingCandidateVersion: candidateVersion } });
       if (!pending.length) return { status: "EMPTY_CANDIDATE" };
-
       for (const row of pending) {
         await tx.integrationSetting.update({
           where: { provider_key: { provider, key: row.key } },
@@ -75,7 +77,6 @@ class PrismaIntegrationSettingsRepository implements IntegrationSettingsReposito
           },
         });
       }
-
       await tx.integrationSetting.update({
         where: { provider_key: { provider, key: PROVIDER_STATE_KEY } },
         data: {
@@ -132,7 +133,16 @@ class AuditLogIntegrationSettingsWriter implements IntegrationSettingsAuditWrite
   }
 }
 
-export const integrationSettingsService = new IntegrationSettingsService(
-  new PrismaIntegrationSettingsRepository(),
-  new AuditLogIntegrationSettingsWriter()
-);
+const repository = new PrismaIntegrationSettingsRepository();
+const auditWriter = new AuditLogIntegrationSettingsWriter();
+const runtimeResolver = new IntegrationSettingsResolver(repository, auditWriter, { cacheTtlMs: 30_000 });
+
+export const integrationSettingsService = new IntegrationSettingsService(repository, auditWriter, { cacheTtlMs: 30_000 });
+
+export function getActiveIntegrationRuntimeResolution(provider: IntegrationProvider, actor?: IntegrationSettingsActor): Promise<ActiveRuntimeResolution> {
+  return runtimeResolver.getActiveRuntimeResolution(provider, actor);
+}
+
+export function clearActiveIntegrationRuntimeCache(provider: IntegrationProvider): void {
+  runtimeResolver.clearProviderCache(provider);
+}
