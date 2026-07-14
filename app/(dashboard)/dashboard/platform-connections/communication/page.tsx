@@ -1,93 +1,44 @@
-import Link from "next/link";
-import { MessageCircle, Mail, MessageSquare, Route, FlaskConical } from "lucide-react";
-import { getCommunicationReadiness, STATUS_LABEL } from "@/lib/platform-connections/readiness";
-import { PageHeader, Card, CardHeader, StatusBadge, EnvOnlyNote } from "../_components/ui";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { PageHeader } from "../_components/ui";
+import { userHasDashboardPermission } from "@/lib/dashboard/permissions";
+import { INTEGRATION_PROVIDERS } from "@/lib/integration-settings/catalog";
+import { integrationSettingsService } from "@/lib/integration-settings/prisma-service";
+import { getSchedulerStatus } from "@/lib/communication/scheduler-status";
+import { IntegrationSettingsManager } from "./_components/IntegrationSettingsManager";
 
 export const metadata = { title: "مزودو التواصل والإرسال | ربط المنصات والإرسال" };
 export const dynamic = "force-dynamic";
 
-const SETTINGS = "/dashboard/operations/communication/settings";
-const SENDERS = "/dashboard/operations/communication/senders";
-const ROUTING = "/dashboard/operations/communication/routing";
-
 export default async function CommunicationConnectionsPage() {
-  const c = await getCommunicationReadiness();
+  const session = await getServerSession(authOptions);
+  const user = session?.user;
+  const permissions = {
+    canView: userHasDashboardPermission(user, "platformConnections"),
+    canTest: userHasDashboardPermission(user, "platformConnectionsTest"),
+    canManage: userHasDashboardPermission(user, "platformConnectionsManage"),
+    canAdmin: userHasDashboardPermission(user, "platformConnectionsAdmin"),
+  };
 
-  const providers = [
-    {
-      key: "whatsapp",
-      icon: <MessageCircle className="h-4 w-4 text-emerald-600" />,
-      label: "واتساب (Meta WhatsApp Cloud API)",
-      status: c.whatsapp.status,
-      lines: [
-        `أرقام جاهزة: ${c.whatsapp.sendersWithNumber}`,
-        c.whatsapp.sendersMissingNumber > 0 ? `أرقام بلا مُعرّف: ${c.whatsapp.sendersMissingNumber}` : null,
-      ].filter(Boolean) as string[],
-      links: [{ href: SENDERS, label: "إدارة الأرقام" }, { href: SETTINGS, label: "الإعدادات والاختبار" }],
-      envOnly: true,
-    },
-    {
-      key: "email",
-      icon: <Mail className="h-4 w-4 text-[#025EB8]" />,
-      label: "الإيميل",
-      status: c.email.status,
-      lines: [`مُرسِلون مفعّلون: ${c.email.enabledSenders}`],
-      links: [{ href: SENDERS, label: "إدارة المُرسِلين" }, { href: SETTINGS, label: "الإعدادات والاختبار" }],
-      envOnly: true,
-    },
-    {
-      key: "sms",
-      icon: <MessageSquare className="h-4 w-4 text-amber-600" />,
-      label: "الرسائل القصيرة",
-      status: c.sms.status,
-      lines: ["غير مفعّلة بعد — سيتم تفعيلها بعد ربط مزوّد الرسائل."],
-      links: [{ href: SETTINGS, label: "التفاصيل" }],
-      envOnly: false,
-    },
-  ];
+  const actor = {
+    actorId: String((user as { id?: string } | undefined)?.id ?? "dashboard-user"),
+    actorName: user?.name ?? null,
+    actorRole: String((user as { role?: string } | undefined)?.role ?? "STAFF"),
+  };
+
+  const [initialProviders, scheduler] = await Promise.all([
+    Promise.all(INTEGRATION_PROVIDERS.map((provider) => integrationSettingsService.getProviderSnapshot(provider, actor))),
+    getSchedulerStatus(),
+  ]);
 
   return (
     <main className="space-y-5 p-4 sm:p-6" dir="rtl">
       <PageHeader
         eyebrow="ربط المنصات والإرسال / المزودون"
         title="مزودو التواصل والإرسال"
-        subtitle="جاهزية واتساب والإيميل والرسائل القصيرة وقواعد اختيار المُرسِل. حملات ومحادثات التواصل تُدار من مركز التواصل."
+        subtitle="إدارة بيانات واتساب والإيميل والرسائل القصيرة والجدولة من مكان واحد. احفظ التغييرات ثم اختبرها من السيرفر قبل اعتمادها."
       />
-
-      <div className="grid gap-3 lg:grid-cols-3">
-        {providers.map((p) => (
-          <Card key={p.key}>
-            <CardHeader title={<span className="flex items-center gap-2">{p.icon} {p.label}</span>} />
-            <div className="space-y-2 p-4 text-sm">
-              <StatusBadge status={p.status} />
-              <ul className="mt-1 space-y-1 text-xs text-slate-500">
-                {p.lines.map((l, i) => <li key={i}>{l}</li>)}
-              </ul>
-              <div className="flex flex-wrap gap-3 pt-1 text-xs font-bold text-[#025EB8]">
-                {p.links.map((l) => <Link key={l.href + l.label} href={l.href} className="hover:underline">{l.label}</Link>)}
-              </div>
-              {p.envOnly ? <EnvOnlyNote /> : null}
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid gap-3 lg:grid-cols-2">
-        <Card>
-          <CardHeader title={<span className="flex items-center gap-2"><Route className="h-4 w-4 text-[#025EB8]" /> قواعد اختيار المُرسِل</span>} description="اختيار رقم/مُرسِل الإرسال حسب اللغة والدولة والغرض." />
-          <div className="flex items-center justify-between p-4 text-sm">
-            <span className="text-slate-600">قواعد مُعرّفة: <b className="text-slate-900">{c.routingRules}</b></span>
-            <Link href={ROUTING} className="text-xs font-bold text-[#025EB8] hover:underline">فتح القواعد</Link>
-          </div>
-        </Card>
-        <Card>
-          <CardHeader title={<span className="flex items-center gap-2"><FlaskConical className="h-4 w-4 text-[#025EB8]" /> أدوات اختبار المزودين</span>} description="إرسال رسالة اختبار واحدة لتأكيد الجاهزية — من داخل الإعدادات." />
-          <div className="flex items-center justify-between p-4 text-sm">
-            <span className="text-slate-600">الجدولة التلقائية: <b className="text-slate-900">{STATUS_LABEL[c.scheduler.configured ? "READY" : "NEEDS_SETUP"]}</b></span>
-            <Link href={SETTINGS} className="text-xs font-bold text-[#025EB8] hover:underline">فتح أدوات الاختبار</Link>
-          </div>
-        </Card>
-      </div>
+      <IntegrationSettingsManager initialProviders={initialProviders} permissions={permissions} scheduler={scheduler} />
     </main>
   );
 }
