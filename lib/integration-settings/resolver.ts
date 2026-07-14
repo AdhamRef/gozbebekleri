@@ -1,8 +1,4 @@
-import type {
-  IntegrationProvider,
-  IntegrationTestResult,
-  IntegrationValueSource,
-} from "./catalog";
+import type { IntegrationProvider, IntegrationTestResult, IntegrationValueSource } from "./catalog";
 import { getFieldDefinition, getProviderDefinition } from "./catalog";
 import {
   decryptIntegrationSecret,
@@ -11,12 +7,7 @@ import {
   integrationSecretContext,
   maskIntegrationValue,
 } from "./crypto";
-import {
-  DEFAULT_CACHE_TTL_MS,
-  PROVIDER_STATE_KEY,
-  recordHasPendingValue,
-  trimEnvValue,
-} from "./helpers";
+import { DEFAULT_CACHE_TTL_MS, PROVIDER_STATE_KEY, recordHasPendingValue, trimEnvValue } from "./helpers";
 import type {
   IntegrationSettingRecord,
   IntegrationSettingsActor,
@@ -45,10 +36,7 @@ type ResolvedIntegrationProvider = {
   fields: ResolvedIntegrationField[];
 };
 
-type CachedProvider = {
-  expiresAt: number;
-  value: ResolvedIntegrationProvider;
-};
+type CachedProvider = { expiresAt: number; value: ResolvedIntegrationProvider };
 
 function isTestResult(value: string | null): value is IntegrationTestResult {
   return value === "SUCCESS" || value === "FAILED";
@@ -69,58 +57,31 @@ export class IntegrationSettingsResolver {
     this.env = options.env ?? process.env;
     this.cacheTtlMs = options.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS;
     this.now = options.now ?? (() => new Date());
-    this.encryptionKey =
-      options.encryptionKey ??
-      (() => process.env.INTEGRATION_SETTINGS_ENCRYPTION_KEY);
+    this.encryptionKey = options.encryptionKey ?? (() => process.env.INTEGRATION_SETTINGS_ENCRYPTION_KEY);
   }
 
-  clearProviderCache(provider: IntegrationProvider): void {
-    this.cache.delete(provider);
+  clearProviderCache(provider: IntegrationProvider): void { this.cache.delete(provider); }
+
+  async auditFailure(actor: IntegrationSettingsActor, provider: IntegrationProvider, key: string | undefined, action: string, reasonCode: string): Promise<void> {
+    await this.auditWriter.write({ actor, provider, key, action, success: false, metadata: { reasonCode } });
   }
 
-  async auditFailure(
-    actor: IntegrationSettingsActor,
-    provider: IntegrationProvider,
-    key: string | undefined,
-    action: string,
-    reasonCode: string
-  ): Promise<void> {
-    await this.auditWriter.write({
-      actor,
-      provider,
-      key,
-      action,
-      success: false,
-      metadata: { reasonCode },
-    });
-  }
-
-  private async resolveProvider(
-    provider: IntegrationProvider,
-    actor?: IntegrationSettingsActor
-  ): Promise<ResolvedIntegrationProvider> {
+  private async resolveProvider(provider: IntegrationProvider, actor?: IntegrationSettingsActor): Promise<ResolvedIntegrationProvider> {
     const cached = this.cache.get(provider);
     if (cached && cached.expiresAt > Date.now()) return cached.value;
 
     let records: IntegrationSettingRecord[] = [];
     let databaseAvailable = true;
-    try {
-      records = await this.repository.listByProvider(provider);
-    } catch {
-      databaseAvailable = false;
-    }
+    try { records = await this.repository.listByProvider(provider); }
+    catch { databaseAvailable = false; }
 
-    const stateRecord =
-      records.find((row) => row.key === PROVIDER_STATE_KEY) ?? null;
+    const stateRecord = records.find((row) => row.key === PROVIDER_STATE_KEY) ?? null;
     const providerEnabled = stateRecord?.enabled ?? true;
     const definition = getProviderDefinition(provider);
     const fields: ResolvedIntegrationField[] = [];
 
     for (const field of definition.fields) {
-      const record = databaseAvailable
-        ? records.find((row) => row.key === field.key) ?? null
-        : null;
-
+      const record = databaseAvailable ? records.find((row) => row.key === field.key) ?? null : null;
       if (record) {
         if (!record.enabled) {
           fields.push({ definition: field, record, configured: false, enabled: false, value: null, source: "DATABASE", decryptionFailed: false });
@@ -149,7 +110,7 @@ export class IntegrationSettingsResolver {
       fields.push({ definition: field, record: null, configured: !!envValue, enabled: true, value: envValue, source: envValue ? "ENVIRONMENT" : "NONE", decryptionFailed: false });
     }
 
-    const resolved: ResolvedIntegrationProvider = { provider, enabled: providerEnabled, databaseAvailable, stateRecord, fields };
+    const resolved = { provider, enabled: providerEnabled, databaseAvailable, stateRecord, fields };
     this.cache.set(provider, { expiresAt: Date.now() + this.cacheTtlMs, value: resolved });
     return resolved;
   }
@@ -169,6 +130,7 @@ export class IntegrationSettingsResolver {
       fields: resolved.fields.map((field) => {
         const testRecord = field.record?.lastTestAt ? field.record : resolved.stateRecord;
         const lastTestResult = testRecord?.lastTestResult ?? null;
+        const pendingResult = field.record?.pendingLastTestResult ?? null;
         return {
           key: field.definition.key,
           labelAr: field.definition.labelAr,
@@ -176,10 +138,15 @@ export class IntegrationSettingsResolver {
           required: field.definition.required,
           configured: field.configured,
           enabled: field.enabled,
-          maskedValue: maskIntegrationValue(field.value),
+          maskedValue: field.definition.secret ? maskIntegrationValue(field.value) : null,
+          displayValue: field.definition.secret ? null : field.value,
           source: field.source,
           version: field.record?.version ?? null,
           hasPendingValue: recordHasPendingValue(field.record),
+          pendingVersion: field.record?.pendingVersion ?? null,
+          pendingCreatedAt: field.record?.pendingCreatedAt?.toISOString() ?? null,
+          pendingLastTestAt: field.record?.pendingLastTestAt?.toISOString() ?? null,
+          pendingLastTestResult: isTestResult(pendingResult) ? pendingResult : null,
           updatedAt: field.record?.updatedAt.toISOString() ?? null,
           updatedBy: field.record?.updatedBy ?? null,
           lastTestAt: testRecord?.lastTestAt?.toISOString() ?? null,
