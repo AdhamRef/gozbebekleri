@@ -4,38 +4,32 @@ import { Activity, MessageCircle, Webhook, BarChart3, Megaphone, CheckCircle2 } 
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { getOverview, STATUS_CLASS, STATUS_LABEL, type ConnStatus } from "@/lib/platform-connections/readiness";
 import { integrationSettingsService } from "@/lib/integration-settings/prisma-service";
-import { uiStatus } from "@/lib/integration-settings/ui";
+import { integrationActorFromSession } from "@/lib/integration-settings/http";
+import { getSchedulerStatus } from "@/lib/communication/scheduler-status";
 import { PageHeader, PrimaryLink, GhostLink, StatusCard, QuickLink } from "./_components/ui";
 
 export const metadata = { title: "ربط المنصات والإرسال | لوحة التحكم" };
 export const dynamic = "force-dynamic";
-
 const BASE = "/dashboard/platform-connections";
 
-function toConnStatus(status: ReturnType<typeof uiStatus>): ConnStatus {
-  if (status === "READY" || status === "PENDING_ACTIVATION") return "READY";
-  if (status === "DISABLED") return "DISABLED";
-  if (status === "TEST_FAILED" || status === "ENCRYPTION_ERROR") return "FAILED";
-  return "NEEDS_SETUP";
+function activeStatus(snapshot: Awaited<ReturnType<typeof integrationSettingsService.getProviderSnapshot>>): ConnStatus {
+  if (!snapshot.enabled) return "DISABLED";
+  if (snapshot.status === "ERROR") return "FAILED";
+  return snapshot.status === "READY" ? "READY" : "NEEDS_SETUP";
 }
 
 export default async function PlatformConnectionsOverview() {
   const session = await getServerSession(authOptions);
-  const user = session?.user;
-  const actor = {
-    actorId: String((user as { id?: string } | undefined)?.id ?? "dashboard-user"),
-    actorName: user?.name ?? null,
-    actorRole: String((user as { role?: string } | undefined)?.role ?? "STAFF"),
-  };
-  const [{ tracking, ads, webhooks, issues }, meta, brevo, netgsm, cron] = await Promise.all([
+  const actor = integrationActorFromSession(session!);
+  const [{ tracking, ads, webhooks, issues }, scheduler, meta, brevo, netgsm] = await Promise.all([
     getOverview(),
+    getSchedulerStatus(),
     integrationSettingsService.getProviderSnapshot("META_WHATSAPP", actor),
     integrationSettingsService.getProviderSnapshot("BREVO", actor),
     integrationSettingsService.getProviderSnapshot("NETGSM", actor),
-    integrationSettingsService.getProviderSnapshot("SYSTEM", actor),
   ]);
   const adsNeedSetup = ads.rows.filter((row) => row.status === "NEEDS_SETUP").length;
-  const communicationStatuses = [meta, brevo, netgsm, cron].map((snapshot) => toConnStatus(uiStatus(snapshot)));
+  const communicationStatuses = [activeStatus(meta), activeStatus(brevo), activeStatus(netgsm), scheduler.configured ? "READY" as ConnStatus : "NEEDS_SETUP" as ConnStatus];
   const communicationStatus: ConnStatus = communicationStatuses.includes("FAILED") ? "FAILED" : communicationStatuses.includes("NEEDS_SETUP") ? "NEEDS_SETUP" : communicationStatuses.every((status) => status === "DISABLED") ? "DISABLED" : "READY";
 
   return (
@@ -56,9 +50,9 @@ export default async function PlatformConnectionsOverview() {
             status={communicationStatus}
             actionHref={`${BASE}/communication`}
             actionLabel="فتح المزودين"
-            detail={<><p>واتساب: {STATUS_LABEL[toConnStatus(uiStatus(meta))]}</p><p>الإيميل: {STATUS_LABEL[toConnStatus(uiStatus(brevo))]}</p><p>SMS تركيا: {STATUS_LABEL[toConnStatus(uiStatus(netgsm))]}</p><p>SMS الدولي: {STATUS_LABEL[toConnStatus(uiStatus(brevo))]}</p><p>Cron: {STATUS_LABEL[toConnStatus(uiStatus(cron))]}</p></>}
+            detail={<><p>واتساب: {STATUS_LABEL[activeStatus(meta)]}</p><p>الإيميل: {STATUS_LABEL[activeStatus(brevo)]}</p><p>SMS تركيا: {STATUS_LABEL[activeStatus(netgsm)]}</p><p>SMS الدولي: {STATUS_LABEL[activeStatus(brevo)]}</p><p>Cron: {scheduler.configured ? "مُفعّل" : "يحتاج إعداد داخل Vercel"}</p></>}
           />
-          <StatusCard title="Webhooks وCron" status={webhooks.status} lastCheck={webhooks.lastWebhookAt} actionHref={`${BASE}/webhooks`} actionLabel="فتح Webhooks" detail={<><p>توقيع Webhook: {webhooks.signatureConfigured ? "مُفعّل" : "غير مفعّل"}</p><p>Cron: {toConnStatus(uiStatus(cron)) === "READY" ? "مُفعّل" : "يحتاج إعداد"}</p></>} />
+          <StatusCard title="Webhooks وCron" status={webhooks.status} lastCheck={webhooks.lastWebhookAt} actionHref={`${BASE}/webhooks`} actionLabel="فتح Webhooks" detail={<><p>توقيع Webhook: {webhooks.signatureConfigured ? "مُفعّل" : "غير مفعّل"}</p><p>Cron: {scheduler.configured ? "مُفعّل" : "يحتاج إعداد داخل Vercel"}</p></>} />
         </div>
       </section>
 
