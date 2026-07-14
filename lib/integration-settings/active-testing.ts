@@ -1,10 +1,9 @@
 import type { IntegrationProvider } from "./catalog";
-import { getProviderDefinition } from "./catalog";
+import { runActiveProviderTest, type ActiveTestCoreDependencies } from "./active-test-core";
 import { PROVIDER_STATE_KEY, safeFailureCode } from "./helpers";
 import { integrationSettingsService } from "./prisma-service";
 import { IntegrationProviderTesterRegistry } from "./provider-testing";
 import type {
-  IntegrationProviderTester,
   IntegrationSettingsActor,
   ProviderConnectionTestResult,
   SafeProviderConnectionTestResponse,
@@ -18,13 +17,7 @@ export type ActiveTestState = {
   lastFailureReasonSafe: string | null;
 };
 
-type ActiveTestDependencies = {
-  resolveValues?: (provider: IntegrationProvider, actor: IntegrationSettingsActor) => Promise<Record<string, string>>;
-  tester?: IntegrationProviderTester;
-  record?: (provider: IntegrationProvider, testedAt: Date, result: ProviderConnectionTestResult, actorId: string) => Promise<void>;
-  env?: NodeJS.ProcessEnv;
-  now?: () => Date;
-};
+type ActiveTestDependencies = Partial<ActiveTestCoreDependencies>;
 
 const globalForActiveTests = globalThis as unknown as { integrationSettingsPrisma?: PrismaClient };
 const activeTestPrisma = globalForActiveTests.integrationSettingsPrisma ?? new PrismaClient({ log: process.env.NODE_ENV === "development" ? ["error", "warn"] : [] });
@@ -84,40 +77,18 @@ export async function getActiveProviderTestState(provider: IntegrationProvider):
   };
 }
 
-function cronResult(env: NodeJS.ProcessEnv): ProviderConnectionTestResult {
-  const secret = env.CRON_SECRET;
-  if (!secret) return { success: false, connectionStatus: "NOT_CONFIGURED", messageAr: "مفتاح Cron غير مضبوط في إعدادات السيرفر.", failureCode: "CRON_SECRET_MISSING" };
-  if (secret.length < 32 || /[\r\n]/.test(secret)) return { success: false, connectionStatus: "FAILED", messageAr: "مفتاح Cron لا يحقق متطلبات الأمان.", failureCode: "CRON_SECRET_INVALID" };
-  return { success: true, connectionStatus: "CONNECTED", messageAr: "حماية Route الجدولة مضبوطة داخل البنية التحتية، ولم يتم تشغيل أي حملة.", failureCode: null };
-}
-
 export async function testActiveProviderConnection(
   provider: IntegrationProvider,
   actor: IntegrationSettingsActor,
   dependencies: ActiveTestDependencies = {}
 ): Promise<SafeProviderConnectionTestResponse> {
-  const testedAt = (dependencies.now ?? (() => new Date()))();
-  const env = dependencies.env ?? process.env;
-  let result: ProviderConnectionTestResult;
-  let missingRequiredFields: string[] = [];
-
-  if (provider === "SYSTEM") {
-    result = cronResult(env);
-  } else {
-    const resolveValues = dependencies.resolveValues ?? ((p, a) => integrationSettingsService.getResolvedProviderValues(p, a));
-    const values = await resolveValues(provider, actor);
-    missingRequiredFields = getProviderDefinition(provider).fields.filter((field) => field.required && !values[field.key]).map((field) => field.key);
-    if (missingRequiredFields.length) {
-      result = { success: false, connectionStatus: "NOT_CONFIGURED", messageAr: "بيانات التكوين العامل المطلوبة غير مكتملة.", failureCode: "MISSING_REQUIRED_FIELDS" };
-    } else {
-      const tester = dependencies.tester ?? new IntegrationProviderTesterRegistry();
-      try { result = await tester.test({ provider, values, candidateVersion: null }); }
-      catch { result = { success: false, connectionStatus: "FAILED", messageAr: "تعذر تنفيذ فحص الإعدادات الحالية.", failureCode: "PROVIDER_TEST_REQUEST_FAILED" }; }
-    }
-  }
-
-  const record = dependencies.record ?? recordActiveProviderTest;
-  await record(provider, testedAt, result, actor.actorId);
+  const response = await runActiveProviderTest(provider, actor, {
+    resolveActiveValues: dependencies.resolveActiveValues ?? ((p, a) => integrationSettingsService.getResolvedProviderValues(p, a)),
+    tester: dependencies.tester ?? new IntegrationProviderTesterRegistry(),
+    record: dependencies.record ?? recordActiveProviderTest,
+    env: dependencies.env ?? process.env,
+    now: dependencies.now,
+  });
   integrationSettingsService.clearProviderCache(provider);
-  return { ...result, provider, testedAt: testedAt.toISOString(), candidateVersion: null, missingRequiredFields };
+  return response;
 }
