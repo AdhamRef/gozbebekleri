@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -15,11 +16,26 @@ function response(status: number, body: unknown): Response {
   });
 }
 
-test("Meta tester validates WABA and phone relationship without sending a message", async () => {
+const metaValues = {
+  ACCESS_TOKEN: "valid-meta-access-token-for-testing-123456",
+  APP_SECRET: "0123456789abcdef0123456789abcdef",
+  WEBHOOK_VERIFY_TOKEN: "local-webhook-verify-token-123456",
+  GRAPH_API_VERSION: "v23.0",
+  BUSINESS_ACCOUNT_ID: "123",
+  DEFAULT_PHONE_NUMBER_ID: "456",
+};
+
+function expectedProof(values = metaValues): string {
+  return createHmac("sha256", values.APP_SECRET).update(values.ACCESS_TOKEN).digest("hex");
+}
+
+test("Meta tester validates app secret proof, WABA and phone relationship without sending a message", async () => {
   const calls: string[] = [];
+  const proof = expectedProof();
   const fakeFetch: ProviderFetch = async (input) => {
     const url = String(input);
     calls.push(url);
+    if (url.includes("appsecret_proof=") && !url.includes(`appsecret_proof=${proof}`)) return response(400, { error: { code: 100 } });
     if (url.includes("/123/phone_numbers")) return response(200, { data: [{ id: "456" }] });
     if (url.includes("/456?")) return response(200, { id: "456", verified_name: "Gozbebekleri" });
     return response(200, { id: "123", name: "Gozbebekleri" });
@@ -27,24 +43,89 @@ test("Meta tester validates WABA and phone relationship without sending a messag
   const result = await new MetaWhatsAppConnectionTester(fakeFetch).test({
     provider: "META_WHATSAPP",
     candidateVersion: "candidate",
-    values: { ACCESS_TOKEN: "token", GRAPH_API_VERSION: "v23.0", BUSINESS_ACCOUNT_ID: "123", DEFAULT_PHONE_NUMBER_ID: "456" },
+    values: metaValues,
   });
   assert.equal(result.success, true);
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 4);
   assert.equal(calls.some((url) => url.endsWith("/messages")), false);
+  assert.equal(calls.filter((url) => url.includes("appsecret_proof=")).length, 3);
+  assert.match(result.messageAr, /توافق App Secret/);
+  assert.match(result.messageAr, /صالح محليًا/);
+  assert.doesNotMatch(result.messageAr, /تحققت Meta من.*Webhook/i);
+  const safe = JSON.stringify(result);
+  assert.equal(safe.includes(metaValues.ACCESS_TOKEN), false);
+  assert.equal(safe.includes(metaValues.APP_SECRET), false);
+  assert.equal(safe.includes(proof), false);
 });
 
-test("Meta tester rejects a phone number outside the configured business account", async () => {
-  const fakeFetch: ProviderFetch = async (input) => String(input).includes("phone_numbers")
-    ? response(200, { data: [{ id: "999" }] })
-    : response(200, { id: "123" });
+test("Meta tester fails when app secret proof does not match a valid access token", async () => {
+  const correctSecret = "fedcba9876543210fedcba9876543210";
+  const acceptedProof = createHmac("sha256", correctSecret).update(metaValues.ACCESS_TOKEN).digest("hex");
+  const observedUrls: string[] = [];
+  const fakeFetch: ProviderFetch = async (input) => {
+    const url = String(input);
+    observedUrls.push(url);
+    if (!url.includes("appsecret_proof=")) return response(200, { id: "123" });
+    return url.includes(`appsecret_proof=${acceptedProof}`) ? response(200, { id: "123" }) : response(400, { error: { code: 100 } });
+  };
+  const result = await new MetaWhatsAppConnectionTester(fakeFetch).test({
+    provider: "META_WHATSAPP",
+    candidateVersion: "candidate",
+    values: metaValues,
+  });
+  assert.equal(result.success, false);
+  assert.equal(result.failureCode, "META_APP_SECRET_MISMATCH");
+  assert.equal(observedUrls.length, 2);
+  const safe = JSON.stringify(result);
+  assert.equal(safe.includes(metaValues.ACCESS_TOKEN), false);
+  assert.equal(safe.includes(metaValues.APP_SECRET), false);
+  assert.equal(safe.includes(expectedProof()), false);
+});
+
+test("Meta tester rejects an invalid access token before app secret proof validation", async () => {
+  const calls: string[] = [];
+  const fakeFetch: ProviderFetch = async (input) => {
+    calls.push(String(input));
+    return response(401, { error: { code: 190 } });
+  };
   const result = await new MetaWhatsAppConnectionTester(fakeFetch).test({
     provider: "META_WHATSAPP",
     candidateVersion: null,
-    values: { ACCESS_TOKEN: "token", GRAPH_API_VERSION: "v23.0", BUSINESS_ACCOUNT_ID: "123", DEFAULT_PHONE_NUMBER_ID: "456" },
+    values: metaValues,
+  });
+  assert.equal(result.success, false);
+  assert.equal(result.failureCode, "META_UNAUTHORIZED");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0]?.includes("appsecret_proof="), false);
+});
+
+test("Meta tester rejects a phone number outside the configured business account", async () => {
+  const fakeFetch: ProviderFetch = async (input) => {
+    const url = String(input);
+    if (url.includes("phone_numbers")) return response(200, { data: [{ id: "999" }] });
+    return response(200, { id: "123" });
+  };
+  const result = await new MetaWhatsAppConnectionTester(fakeFetch).test({
+    provider: "META_WHATSAPP",
+    candidateVersion: null,
+    values: metaValues,
   });
   assert.equal(result.success, false);
   assert.equal(result.failureCode, "META_PHONE_NUMBER_MISMATCH");
+});
+
+test("Meta tester requires a locally valid webhook verify token", async () => {
+  let called = false;
+  const fakeFetch: ProviderFetch = async () => { called = true; return response(200, {}); };
+  const result = await new MetaWhatsAppConnectionTester(fakeFetch).test({
+    provider: "META_WHATSAPP",
+    candidateVersion: null,
+    values: { ...metaValues, WEBHOOK_VERIFY_TOKEN: "bad token" },
+  });
+  assert.equal(result.success, false);
+  assert.equal(result.failureCode, "META_WEBHOOK_VERIFY_TOKEN_INVALID");
+  assert.equal(called, false);
+  assert.match(result.messageAr, /محليًا/);
 });
 
 test("Brevo tester validates account and verified email sender without sending", async () => {
@@ -96,8 +177,8 @@ test("Netgsm tester checks account and header without sending SMS", async () => 
 test("System Cron tester validates the decrypted candidate locally", async () => {
   const tester = new SystemCronConnectionTester();
   const success = await tester.test({ provider: "SYSTEM", candidateVersion: null, values: { CRON_SECRET: "secure-cron-secret-that-is-at-least-thirty-two-characters" } });
-  const failed = await tester.test({ provider: "SYSTEM", candidateVersion: null, values: { CRON_SECRET: "weak" } });
+  const failedResult = await tester.test({ provider: "SYSTEM", candidateVersion: null, values: { CRON_SECRET: "weak" } });
   assert.equal(success.success, true);
-  assert.equal(failed.success, false);
+  assert.equal(failedResult.success, false);
   assert.equal(JSON.stringify(success).includes("secure-cron-secret"), false);
 });
