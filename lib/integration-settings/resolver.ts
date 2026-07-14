@@ -9,6 +9,7 @@ import {
 } from "./crypto";
 import { DEFAULT_CACHE_TTL_MS, PROVIDER_STATE_KEY, recordHasPendingValue, trimEnvValue } from "./helpers";
 import type {
+  IntegrationCandidateConfiguration,
   IntegrationSettingRecord,
   IntegrationSettingsActor,
   IntegrationSettingsAuditWriter,
@@ -33,6 +34,7 @@ type ResolvedIntegrationProvider = {
   enabled: boolean;
   databaseAvailable: boolean;
   stateRecord: IntegrationSettingRecord | null;
+  records: IntegrationSettingRecord[];
   fields: ResolvedIntegrationField[];
 };
 
@@ -66,6 +68,10 @@ export class IntegrationSettingsResolver {
     await this.auditWriter.write({ actor, provider, key, action, success: false, metadata: { reasonCode } });
   }
 
+  private decrypt(provider: IntegrationProvider, key: string, encrypted: string): string {
+    return decryptIntegrationSecret(encrypted, integrationSecretContext(provider, key), this.encryptionKey());
+  }
+
   private async resolveProvider(provider: IntegrationProvider, actor?: IntegrationSettingsActor): Promise<ResolvedIntegrationProvider> {
     const cached = this.cache.get(provider);
     if (cached && cached.expiresAt > Date.now()) return cached.value;
@@ -89,11 +95,12 @@ export class IntegrationSettingsResolver {
         }
         if (field.secret) {
           if (!record.encryptedValue) {
-            fields.push({ definition: field, record, configured: false, enabled: true, value: null, source: "DATABASE", decryptionFailed: false });
+            const envValue = trimEnvValue(this.env[field.envKey]);
+            fields.push({ definition: field, record, configured: !!envValue, enabled: true, value: envValue, source: envValue ? "ENVIRONMENT" : "NONE", decryptionFailed: false });
             continue;
           }
           try {
-            const value = decryptIntegrationSecret(record.encryptedValue, integrationSecretContext(provider, field.key), this.encryptionKey());
+            const value = this.decrypt(provider, field.key, record.encryptedValue);
             fields.push({ definition: field, record, configured: true, enabled: true, value, source: "DATABASE", decryptionFailed: false });
           } catch (error) {
             const code = error instanceof IntegrationEncryptionError ? error.code : "DECRYPTION_FAILED";
@@ -103,16 +110,63 @@ export class IntegrationSettingsResolver {
           continue;
         }
         const value = record.plainValue?.trim() || null;
-        fields.push({ definition: field, record, configured: !!value, enabled: true, value, source: "DATABASE", decryptionFailed: false });
+        if (value) fields.push({ definition: field, record, configured: true, enabled: true, value, source: "DATABASE", decryptionFailed: false });
+        else {
+          const envValue = trimEnvValue(this.env[field.envKey]);
+          fields.push({ definition: field, record, configured: !!envValue, enabled: true, value: envValue, source: envValue ? "ENVIRONMENT" : "NONE", decryptionFailed: false });
+        }
         continue;
       }
       const envValue = trimEnvValue(this.env[field.envKey]);
       fields.push({ definition: field, record: null, configured: !!envValue, enabled: true, value: envValue, source: envValue ? "ENVIRONMENT" : "NONE", decryptionFailed: false });
     }
 
-    const resolved = { provider, enabled: providerEnabled, databaseAvailable, stateRecord, fields };
+    const resolved = { provider, enabled: providerEnabled, databaseAvailable, stateRecord, records, fields };
     this.cache.set(provider, { expiresAt: Date.now() + this.cacheTtlMs, value: resolved });
     return resolved;
+  }
+
+  async getCandidateConfiguration(provider: IntegrationProvider, actor?: IntegrationSettingsActor): Promise<IntegrationCandidateConfiguration> {
+    const resolved = await this.resolveProvider(provider, actor);
+    const candidateVersion = resolved.stateRecord?.candidateVersion ?? null;
+    const values: Record<string, string> = {};
+    const sources: IntegrationCandidateConfiguration["sources"] = {};
+    const missingRequiredFields: string[] = [];
+
+    for (const field of getProviderDefinition(provider).fields) {
+      const record = resolved.records.find((row) => row.key === field.key) ?? null;
+      let value: string | null = null;
+      if (candidateVersion && record?.pendingCandidateVersion === candidateVersion) {
+        try {
+          value = field.secret && record.pendingEncryptedValue
+            ? this.decrypt(provider, field.key, record.pendingEncryptedValue)
+            : record.pendingPlainValue?.trim() || null;
+        } catch (error) {
+          const code = error instanceof IntegrationEncryptionError ? error.code : "DECRYPTION_FAILED";
+          if (actor) await this.auditFailure(actor, provider, field.key, "INTEGRATION_CANDIDATE_DECRYPT_FAILED", code);
+          throw new IntegrationSettingsError(code, "Unable to decrypt candidate integration value");
+        }
+        if (value) sources[field.key] = "CANDIDATE";
+      }
+
+      if (!value) {
+        const active = resolved.fields.find((item) => item.definition.key === field.key);
+        value = active?.value ?? null;
+        sources[field.key] = active?.source ?? "NONE";
+      }
+
+      if (value) values[field.key] = value;
+      else if (field.required) missingRequiredFields.push(field.key);
+    }
+
+    return {
+      provider,
+      candidateVersion,
+      hasPendingChanges: !!candidateVersion && resolved.records.some((row) => row.pendingCandidateVersion === candidateVersion && recordHasPendingValue(row)),
+      values,
+      sources,
+      missingRequiredFields,
+    };
   }
 
   async getProviderSnapshot(provider: IntegrationProvider, actor?: IntegrationSettingsActor): Promise<SafeIntegrationProviderSnapshot> {
@@ -120,6 +174,8 @@ export class IntegrationSettingsResolver {
     const definition = getProviderDefinition(provider);
     const missingRequiredFields = resolved.fields.filter((field) => field.definition.required && !field.configured).map((field) => field.definition.key);
     const hasDecryptionError = resolved.fields.some((field) => field.decryptionFailed);
+    const state = resolved.stateRecord;
+    const candidateVersion = state?.candidateVersion ?? null;
     return {
       provider,
       labelAr: definition.labelAr,
@@ -127,33 +183,35 @@ export class IntegrationSettingsResolver {
       status: !resolved.enabled ? "DISABLED" : hasDecryptionError ? "ERROR" : missingRequiredFields.length === 0 ? "READY" : "NOT_CONFIGURED",
       encryptionKeyConfigured: integrationEncryptionKeyIsConfigured(this.encryptionKey()),
       missingRequiredFields,
-      fields: resolved.fields.map((field) => {
-        const testRecord = field.record?.lastTestAt ? field.record : resolved.stateRecord;
-        const lastTestResult = testRecord?.lastTestResult ?? null;
-        const pendingResult = field.record?.pendingLastTestResult ?? null;
-        return {
-          key: field.definition.key,
-          labelAr: field.definition.labelAr,
-          isSecret: field.definition.secret,
-          required: field.definition.required,
-          configured: field.configured,
-          enabled: field.enabled,
-          maskedValue: field.definition.secret ? maskIntegrationValue(field.value) : null,
-          displayValue: field.definition.secret ? null : field.value,
-          source: field.source,
-          version: field.record?.version ?? null,
-          hasPendingValue: recordHasPendingValue(field.record),
-          pendingVersion: field.record?.pendingVersion ?? null,
-          pendingCreatedAt: field.record?.pendingCreatedAt?.toISOString() ?? null,
-          pendingLastTestAt: field.record?.pendingLastTestAt?.toISOString() ?? null,
-          pendingLastTestResult: isTestResult(pendingResult) ? pendingResult : null,
-          updatedAt: field.record?.updatedAt.toISOString() ?? null,
-          updatedBy: field.record?.updatedBy ?? null,
-          lastTestAt: testRecord?.lastTestAt?.toISOString() ?? null,
-          lastTestResult: isTestResult(lastTestResult) ? lastTestResult : null,
-          lastFailureReasonSafe: testRecord?.lastFailureReasonSafe ?? null,
-        };
-      }),
+      candidate: {
+        version: candidateVersion,
+        hasChanges: !!candidateVersion && resolved.records.some((row) => row.pendingCandidateVersion === candidateVersion && recordHasPendingValue(row)),
+        createdAt: state?.candidateCreatedAt?.toISOString() ?? null,
+        lastTestAt: state?.candidateLastTestAt?.toISOString() ?? null,
+        lastTestResult: isTestResult(state?.candidateLastTestResult ?? null) ? state!.candidateLastTestResult as IntegrationTestResult : null,
+        lastFailureReasonSafe: state?.candidateFailureReasonSafe ?? null,
+      },
+      fields: resolved.fields.map((field) => ({
+        key: field.definition.key,
+        labelAr: field.definition.labelAr,
+        isSecret: field.definition.secret,
+        required: field.definition.required,
+        configured: field.configured,
+        enabled: field.enabled,
+        maskedValue: field.definition.secret ? maskIntegrationValue(field.value) : null,
+        displayValue: field.definition.secret ? null : field.value,
+        source: field.source,
+        version: field.record?.version ?? null,
+        hasPendingValue: !!candidateVersion && field.record?.pendingCandidateVersion === candidateVersion && recordHasPendingValue(field.record),
+        pendingVersion: field.record?.pendingVersion ?? null,
+        pendingCandidateVersion: field.record?.pendingCandidateVersion ?? null,
+        pendingCreatedAt: field.record?.pendingCreatedAt?.toISOString() ?? null,
+        updatedAt: field.record?.updatedAt.toISOString() ?? null,
+        updatedBy: field.record?.updatedBy ?? null,
+        lastTestAt: field.record?.lastTestAt?.toISOString() ?? null,
+        lastTestResult: isTestResult(field.record?.lastTestResult ?? null) ? field.record!.lastTestResult as IntegrationTestResult : null,
+        lastFailureReasonSafe: field.record?.lastFailureReasonSafe ?? null,
+      })),
     };
   }
 
