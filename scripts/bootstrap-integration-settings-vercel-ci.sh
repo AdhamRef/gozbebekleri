@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# تشغيل إعداد Vercel
+# تشغيل إعداد Vercel بعد تفعيل GitHub Actions
 set -Eeuo pipefail
 
 TMP_DIR="$(mktemp -d)"
