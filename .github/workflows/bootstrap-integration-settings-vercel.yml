@@ -68,13 +68,7 @@ jobs:
           CANONICAL_STATUS="MISSING"
           OVERALL_RESULT="BLOCKED"
           BLOCKER=""
-
-          cleanup() {
-            unset PREVIEW_KEY PRODUCTION_KEY GENERATED_KEY
-            rm -rf "$TMP_DIR"
-            rm -rf "$GITHUB_WORKSPACE/.vercel"
-          }
-          trap cleanup EXIT
+          SUMMARY_WRITTEN=0
 
           write_summary() {
             {
@@ -100,7 +94,20 @@ jobs:
                 echo "| Blocker | $BLOCKER |"
               fi
             } >> "$GITHUB_STEP_SUMMARY"
+            SUMMARY_WRITTEN=1
           }
+
+          cleanup() {
+            if [[ $SUMMARY_WRITTEN -eq 0 ]]; then
+              BLOCKER="UNEXPECTED_WORKFLOW_FAILURE"
+              OVERALL_RESULT="BLOCKED"
+              write_summary
+            fi
+            unset PREVIEW_KEY PRODUCTION_KEY GENERATED_KEY
+            rm -rf "$TMP_DIR"
+            rm -rf "$GITHUB_WORKSPACE/.vercel"
+          }
+          trap cleanup EXIT
 
           block() {
             BLOCKER="$1"
@@ -183,12 +190,12 @@ jobs:
           vercel project inspect "$VERCEL_PROJECT_NAME" --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$TMP_DIR/project.log" 2>&1 || block "VERCEL_PROJECT_INSPECTION_FAILED"
           vercel env ls --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$TMP_DIR/env-list.log" 2>&1 || block "VERCEL_ENVIRONMENT_LIST_FAILED"
 
-          node - <<'NODE' || exit 41
+          if ! node - <<'NODE'
           const fs = require('node:fs');
           const project = JSON.parse(fs.readFileSync('.vercel/project.json', 'utf8'));
           if (project.projectId !== process.env.VERCEL_PROJECT_ID || project.orgId !== process.env.VERCEL_TEAM_ID) process.exit(1);
           NODE
-          if [[ $? -ne 0 ]]; then
+          then
             block "VERCEL_PROJECT_IDENTITY_MISMATCH"
           fi
 
