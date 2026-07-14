@@ -3,8 +3,9 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { PageHeader } from "../_components/ui";
 import { userHasDashboardPermission } from "@/lib/dashboard/permissions";
 import { INTEGRATION_PROVIDERS } from "@/lib/integration-settings/catalog";
-import { integrationActorFromSession } from "@/lib/integration-settings/http";
 import { integrationSettingsService } from "@/lib/integration-settings/prisma-service";
+import { integrationActorFromSession } from "@/lib/integration-settings/http";
+import { withActiveTestState } from "@/lib/integration-settings/safe-snapshot";
 import { getSchedulerStatus } from "@/lib/communication/scheduler-status";
 import { IntegrationSettingsManager } from "./_components/IntegrationSettingsManager";
 
@@ -22,7 +23,7 @@ export default async function CommunicationConnectionsPage() {
   };
   const actor = integrationActorFromSession(session!);
   const [initialProviders, scheduler] = await Promise.all([
-    Promise.all(INTEGRATION_PROVIDERS.map((provider) => integrationSettingsService.getProviderSnapshot(provider, actor))),
+    Promise.all(INTEGRATION_PROVIDERS.map(async (provider) => withActiveTestState(await integrationSettingsService.getProviderSnapshot(provider, actor)))),
     getSchedulerStatus(),
   ]);
 
@@ -31,7 +32,7 @@ export default async function CommunicationConnectionsPage() {
       <PageHeader
         eyebrow="ربط المنصات والإرسال / المزودون"
         title="مزودو التواصل والإرسال"
-        subtitle="إدارة بيانات واتساب والإيميل والرسائل القصيرة والجدولة من مكان واحد. احفظ التغييرات ثم اختبرها من السيرفر قبل اعتمادها."
+        subtitle="إدارة بيانات واتساب والإيميل والرسائل القصيرة من مكان واحد، مع فصل فحص التكوين العامل عن اختبار التغييرات قبل اعتمادها."
       />
       <IntegrationSettingsManager initialProviders={initialProviders} permissions={permissions} scheduler={scheduler} />
     </main>
