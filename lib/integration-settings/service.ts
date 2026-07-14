@@ -3,6 +3,7 @@ import { getFieldDefinition } from "./catalog";
 import { encryptIntegrationSecret, IntegrationEncryptionError, integrationSecretContext } from "./crypto";
 import { createDataToPatch, PROVIDER_STATE_KEY, safeFailureCode, sourceBeforeWrite, trimEnvValue } from "./helpers";
 import { IntegrationSettingsResolver } from "./resolver";
+import { validateIntegrationSettingValue } from "./validation";
 import type {
   IntegrationSettingCreateData, IntegrationSettingInput, IntegrationSettingMutation,
   IntegrationSettingRecord, IntegrationSettingSaveResult, IntegrationSettingsActor,
@@ -64,6 +65,7 @@ export class IntegrationSettingsService {
       }
       seen.add(input.key);
     }
+
     const existingRows = await this.rows(provider, actor, "INTEGRATION_SETTING_SAVE_FAILED");
     const byKey = new Map(existingRows.map((row) => [row.key, row]));
     const mutations: IntegrationSettingMutation[] = [];
@@ -74,11 +76,19 @@ export class IntegrationSettingsService {
       const field = getFieldDefinition(provider, input.key)!;
       const existing = byKey.get(input.key) ?? null;
       if (!input.value.trim()) { results.push({ key: input.key, action: "UNCHANGED" }); continue; }
+
+      let normalized: string;
+      try { normalized = validateIntegrationSettingValue(provider, input.key, input.value); }
+      catch (error) {
+        await this.fail(ctx, "INTEGRATION_SETTING_SAVE_FAILED", "INVALID_FIELD_VALUE", input.key);
+        throw error;
+      }
+
       const previousSource = sourceBeforeWrite(existing, trimEnvValue(this.resolver.env[field.envKey]));
       const data = this.base(ctx, input.key, existing, field.secret);
       if (field.secret) {
         let encrypted: string;
-        try { encrypted = encryptIntegrationSecret(input.value, integrationSecretContext(provider, input.key), this.resolver.encryptionKey()); }
+        try { encrypted = encryptIntegrationSecret(normalized, integrationSecretContext(provider, input.key), this.resolver.encryptionKey()); }
         catch (error) {
           const code = error instanceof IntegrationEncryptionError ? error.code : "ENCRYPTION_KEY_INVALID";
           await this.fail(ctx, "INTEGRATION_SETTING_SAVE_FAILED", code, input.key);
@@ -95,7 +105,7 @@ export class IntegrationSettingsService {
           continue;
         }
         data.encryptedValue = encrypted;
-      } else data.plainValue = input.value;
+      } else data.plainValue = normalized;
 
       mutations.push(existing ? { type: "UPDATE", provider, key: input.key, patch: createDataToPatch(data) } : { type: "CREATE", data });
       const action = existing ? "UPDATED" : "CREATED";
@@ -103,9 +113,13 @@ export class IntegrationSettingsService {
       audits.push({ ...ctx, key: input.key, action: `INTEGRATION_SETTING_${action}`, success: true, metadata: { isSecret: field.secret, version: data.version } });
       if (previousSource !== "DATABASE") audits.push({ ...ctx, key: input.key, action: "INTEGRATION_SETTING_SOURCE_CHANGED", success: true, metadata: { sourceBefore: previousSource, sourceAfter: "DATABASE" } });
     }
+
     if (mutations.length) {
       try { await this.repository.applyMutations(mutations); }
-      catch { await this.fail(ctx, "INTEGRATION_SETTING_SAVE_FAILED", "REPOSITORY_FAILURE"); throw new IntegrationSettingsError("REPOSITORY_FAILURE", "Unable to store integration settings"); }
+      catch {
+        await this.fail(ctx, "INTEGRATION_SETTING_SAVE_FAILED", "REPOSITORY_FAILURE");
+        throw new IntegrationSettingsError("REPOSITORY_FAILURE", "Unable to store integration settings");
+      }
       this.clearProviderCache(provider);
       for (const entry of audits) await this.audit(entry);
     }
@@ -147,20 +161,25 @@ export class IntegrationSettingsService {
     await this.audit({ ...ctx, action: result === "SUCCESS" ? "INTEGRATION_PROVIDER_TEST_SUCCEEDED" : "INTEGRATION_PROVIDER_TEST_FAILED", success: result === "SUCCESS", metadata: data.lastFailureReasonSafe ? { failureReasonCode: data.lastFailureReasonSafe } : undefined });
   }
 
-  async recordPendingSettingTest(provider: IntegrationProvider, key: string, result: IntegrationTestResult, actor: IntegrationSettingsActor, failureReason?: string | null) {
+  async recordPendingSettingTest(provider: IntegrationProvider, key: string, pendingVersion: number, result: IntegrationTestResult, actor: IntegrationSettingsActor, failureReason?: string | null) {
     const existing = (await this.rows(provider, actor, "INTEGRATION_SETTING_PENDING_TEST_FAILED")).find((r) => r.key === key);
     if (!existing) throw new IntegrationSettingsError("SETTING_NOT_FOUND", "Integration setting was not found");
     if (!existing.pendingEncryptedValue || !existing.pendingVersion) throw new IntegrationSettingsError("PENDING_VALUE_NOT_FOUND", "No pending value exists");
+    if (existing.pendingVersion !== pendingVersion) throw new IntegrationSettingsError("PENDING_VERSION_MISMATCH", "Pending value version does not match");
     const reason = result === "FAILED" ? safeFailureCode(failureReason) : null;
     await this.repository.applyMutations([{ type: "UPDATE", provider, key, patch: { pendingLastTestAt: this.resolver.now(), pendingLastTestResult: result, pendingFailureReasonSafe: reason } }]);
     this.clearProviderCache(provider);
-    await this.audit({ provider, actor, key, action: result === "SUCCESS" ? "INTEGRATION_SETTING_PENDING_TEST_SUCCEEDED" : "INTEGRATION_SETTING_PENDING_TEST_FAILED", success: result === "SUCCESS", metadata: reason ? { failureReasonCode: reason } : undefined });
+    await this.audit({ provider, actor, key, action: result === "SUCCESS" ? "INTEGRATION_SETTING_PENDING_TEST_SUCCEEDED" : "INTEGRATION_SETTING_PENDING_TEST_FAILED", success: result === "SUCCESS", metadata: { pendingVersion, ...(reason ? { failureReasonCode: reason } : {}) } });
+    return this.getProviderSnapshot(provider, actor);
   }
 
-  async activatePendingSetting(provider: IntegrationProvider, key: string, actor: IntegrationSettingsActor) {
-    const existing = (await this.rows(provider, actor, "INTEGRATION_SETTING_PENDING_VALUE_ACTIVATED")).find((r) => r.key === key);
+  async activatePendingSetting(provider: IntegrationProvider, key: string, pendingVersion: number, actor: IntegrationSettingsActor) {
+    const existing = (await this.rows(provider, actor, "INTEGRATION_SETTING_PENDING_VALUE_ACTIVATION_FAILED")).find((r) => r.key === key);
     if (!existing?.pendingEncryptedValue || !existing.pendingVersion) throw new IntegrationSettingsError("PENDING_VALUE_NOT_FOUND", "No pending value exists");
-    if (existing.pendingLastTestResult !== "SUCCESS" || !existing.pendingLastTestAt || !existing.pendingCreatedAt || existing.pendingLastTestAt < existing.pendingCreatedAt) throw new IntegrationSettingsError("PENDING_VALUE_NOT_VERIFIED", "Pending value must pass a test before activation");
+    if (existing.pendingVersion !== pendingVersion) throw new IntegrationSettingsError("PENDING_VERSION_MISMATCH", "Pending value version does not match");
+    if (existing.pendingLastTestResult !== "SUCCESS" || !existing.pendingLastTestAt || !existing.pendingCreatedAt || existing.pendingLastTestAt < existing.pendingCreatedAt) {
+      throw new IntegrationSettingsError("PENDING_VALUE_NOT_VERIFIED", "Pending value must pass a test before activation");
+    }
     await this.repository.applyMutations([{ type: "UPDATE", provider, key, patch: {
       encryptedValue: existing.pendingEncryptedValue, plainValue: null, version: existing.pendingVersion,
       pendingEncryptedValue: null, pendingVersion: null, pendingCreatedAt: null, pendingUpdatedBy: null,
@@ -168,16 +187,19 @@ export class IntegrationSettingsService {
       updatedBy: actor.actorId, lastTestAt: existing.pendingLastTestAt, lastTestResult: "SUCCESS", lastFailureReasonSafe: null,
     }}]);
     this.clearProviderCache(provider);
-    await this.audit({ provider, actor, key, action: "INTEGRATION_SETTING_PENDING_VALUE_ACTIVATED", success: true, metadata: { version: existing.pendingVersion } });
+    await this.audit({ provider, actor, key, action: "INTEGRATION_SETTING_PENDING_VALUE_ACTIVATED", success: true, metadata: { version: pendingVersion } });
     return this.getProviderSnapshot(provider, actor);
   }
 
-  async discardPendingSetting(provider: IntegrationProvider, key: string, actor: IntegrationSettingsActor, failureReason?: string | null) {
-    const existing = (await this.rows(provider, actor, "INTEGRATION_SETTING_PENDING_VALUE_REJECTED")).find((r) => r.key === key);
+  async discardPendingSetting(provider: IntegrationProvider, key: string, pendingVersion: number, actor: IntegrationSettingsActor, failureReason?: string | null) {
+    const existing = (await this.rows(provider, actor, "INTEGRATION_SETTING_PENDING_VALUE_REJECTION_FAILED")).find((r) => r.key === key);
     if (!existing) throw new IntegrationSettingsError("SETTING_NOT_FOUND", "Integration setting was not found");
+    if (!existing.pendingEncryptedValue || !existing.pendingVersion) throw new IntegrationSettingsError("PENDING_VALUE_NOT_FOUND", "No pending value exists");
+    if (existing.pendingVersion !== pendingVersion) throw new IntegrationSettingsError("PENDING_VERSION_MISMATCH", "Pending value version does not match");
     await this.repository.applyMutations([{ type: "UPDATE", provider, key, patch: { pendingEncryptedValue: null, pendingVersion: null, pendingCreatedAt: null, pendingUpdatedBy: null, pendingLastTestAt: null, pendingLastTestResult: null, pendingFailureReasonSafe: null } }]);
     this.clearProviderCache(provider);
-    await this.audit({ provider, actor, key, action: "INTEGRATION_SETTING_PENDING_VALUE_REJECTED", success: false, metadata: { failureReasonCode: safeFailureCode(failureReason) } });
+    const reason = safeFailureCode(failureReason);
+    await this.audit({ provider, actor, key, action: "INTEGRATION_SETTING_PENDING_VALUE_REJECTED", success: true, metadata: { pendingVersion, ...(reason ? { failureReasonCode: reason } : {}) } });
     return this.getProviderSnapshot(provider, actor);
   }
 }
