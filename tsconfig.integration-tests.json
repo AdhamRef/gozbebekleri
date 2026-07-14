@@ -19,6 +19,7 @@
     "lib/integration-settings/resolver.ts",
     "lib/integration-settings/service.ts",
     "lib/integration-settings/types.ts",
+    "lib/integration-settings/ui-contracts.ts",
     "lib/integration-settings/validation.ts",
     "lib/dashboard/permissions.ts",
     "tests/integration-settings/**/*.ts"
