@@ -1,9 +1,8 @@
-import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireIntegrationSettingsManage } from "@/lib/integration-settings/auth";
-import { getCanonicalApplicationUrl } from "@/lib/integration-settings/canonical-url";
+import { buildBrevoWebhookUrl, generateBrevoWebhookToken } from "@/lib/integration-settings/brevo-webhook";
 import { integrationActorFromSession, integrationSettingsErrorResponse } from "@/lib/integration-settings/http";
 import { integrationSettingsService } from "@/lib/integration-settings/prisma-service";
 
@@ -15,17 +14,15 @@ export async function POST() {
   if (denied) return denied;
 
   try {
-    const token = randomBytes(32).toString("base64url");
+    const token = generateBrevoWebhookToken();
     const result = await integrationSettingsService.saveProviderSettings(
       "BREVO",
       [{ key: "WEBHOOK_SECRET", value: token }],
       integrationActorFromSession(session!)
     );
-    const base = getCanonicalApplicationUrl();
-    const webhookUrl = `${base}/api/webhooks/brevo/transactional?token=${encodeURIComponent(token)}`;
     return NextResponse.json({
       ok: true,
-      webhookUrl,
+      webhookUrl: buildBrevoWebhookUrl(token),
       candidateVersion: result.snapshot.candidate.version,
       message: "انسخ الرابط الآن وأضفه داخل Brevo. لن يظهر رمز الحماية كاملًا مرة أخرى.",
     });
