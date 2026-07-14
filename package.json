@@ -9,6 +9,8 @@
     "lint": "next lint",
     "test:integration-settings": "rm -rf .integration-test-build && tsc -p tsconfig.integration-tests.json && node --test .integration-test-build/tests/integration-settings/*.test.js",
     "typecheck:communication-runtime": "tsc -p tsconfig.communication-runtime.json",
+    "preflight:integration-settings": "prisma generate --schema prisma/integration-settings.schema.prisma && tsx scripts/preflight-integration-settings.ts",
+    "verify:integration-settings-migration": "prisma generate --schema prisma/integration-settings.schema.prisma && tsx scripts/verify-integration-settings-migration.ts",
     "dashboard:schema:validate": "prisma validate --schema prisma/dashboard-foundation.schema.prisma",
     "i18n:audit": "node scripts/audit-i18n-messages.mjs",
     "i18n:audit:strict": "node scripts/audit-i18n-messages.mjs --strict",
