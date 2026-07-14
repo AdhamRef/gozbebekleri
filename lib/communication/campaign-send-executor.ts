@@ -5,323 +5,129 @@ import { getCampaign } from "./campaign-service";
 import { planCampaignSend, type SendPlan } from "./campaign-send-planner";
 import { renderChannelTemplate } from "./template-compat";
 import { createDeliveryRecord, recordSkippedDelivery, markDeliveryStatus } from "./delivery-log-service";
-import { sendPreparedDelivery } from "./provider-router";
+import { resolveProviderForSendWithRuntime, sendPreparedDelivery } from "./provider-router";
+import { getActiveCommunicationRuntimeBundle } from "./runtime-config";
 import { listSenders, toSenderConfig } from "./sender-service";
 import { listRoutingRules, toRoutingRuleConfig } from "./routing-rule-service";
 import { resolveSender } from "./sender-router";
 import { resolveAudienceOrigin } from "./audience-list-service";
 import { type CommunicationChannelId, type CommunicationPurposeId } from "./communication-runtime-types";
 
-/**
- * Campaign send executor. Turns an APPROVED (Send Now) or due SCHEDULED campaign into real,
- * archived deliveries. Every recipient gets a CommunicationDelivery BEFORE any provider call;
- * nothing is marked SENT unless the provider accepted.
- *
- * SAFETY:
- * - All pre-send gates (planCampaignSend) must pass BEFORE the campaign is moved to SENDING.
- *   If blocked (no template, coverage incomplete, no eligible recipients, provider/sender not
- *   ready, …) the campaign is NOT moved to SENDING and a `communication.campaign.send.blocked`
- *   audit is written.
- * - Final status can never be SENT with 0 sent (see `computeFinalStatus`). Allowed CommunicationCampaign
- *   status values (String): DRAFT · REVIEW · APPROVED · SCHEDULED · SENDING · SENT · SENT_WITH_ISSUES ·
- *   BLOCKED · CANCELLED · FAILED.
- * - Idempotent per (campaign + template + channel + origin=CAMPAIGN + recipient); a recipient with an
- *   existing processed delivery (or a providerMessageId) is never sent again.
- */
-
-type Actor = { actorId?: string | null; actorName?: string | null; actorRole?: string | null } | null;
-
-export type SendMode = "SEND_NOW" | "DUE";
-
-export type ExecutionSummary = {
-  ok: boolean;
-  campaignId: string;
-  status: string;
-  total: number;
-  sent: number;
-  skipped: number;
-  failed: number;
-  truncated: boolean;
-  reasons: Record<string, number>;
-  blocked?: string;
-};
-
 const PROCESSED_STATUSES = ["RENDERED", "QUEUED", "SENT_TO_PROVIDER", "SENT", "DELIVERED", "READ", "FAILED", "SKIPPED"];
+type Actor = { actorId?: string | null; actorName?: string | null; actorRole?: string | null } | null;
+export type SendMode = "SEND_NOW" | "DUE";
+export type ExecutionSummary = { ok: boolean; campaignId: string; status: string; total: number; sent: number; skipped: number; failed: number; truncated: boolean; reasons: Record<string, number>; blocked?: string };
 
-function bump(reasons: Record<string, number>, key: string) {
-  reasons[key] = (reasons[key] ?? 0) + 1;
-}
-
-function coverageDecisions(campaign: CommunicationCampaign): Record<string, string> {
-  return ((campaign.metadata as Record<string, unknown> | null)?.coverageDecisions ?? {}) as Record<string, string>;
-}
-
-/**
- * Safe final campaign status. NEVER returns SENT unless at least one message was actually sent with
- * nothing skipped/failed.
- */
+function bump(reasons: Record<string, number>, key: string) { reasons[key] = (reasons[key] ?? 0) + 1; }
+function coverageDecisions(campaign: CommunicationCampaign): Record<string, string> { return ((campaign.metadata as Record<string, unknown> | null)?.coverageDecisions ?? {}) as Record<string, string>; }
 export function computeFinalStatus(total: number, sent: number, skipped: number, failed: number): string {
   if (total === 0) return "BLOCKED";
   if (sent > 0 && failed === 0 && skipped === 0) return "SENT";
   if (sent > 0) return "SENT_WITH_ISSUES";
   if (failed > 0) return "FAILED";
-  if (skipped > 0) return "BLOCKED";
   return "BLOCKED";
 }
-
+function mergedMetadata(campaign: CommunicationCampaign, lastRun: Record<string, unknown>) { return { ...(campaign.metadata as Record<string, unknown> | null), lastRun } as never; }
 async function auditBlocked(campaign: CommunicationCampaign, reason: string, actor: Actor, mode: SendMode, plan?: SendPlan) {
-  await writeAuditLog({
-    actorId: actor?.actorId ?? undefined,
-    actorName: actor?.actorName ?? undefined,
-    actorRole: actor?.actorRole ?? "ADMIN",
-    action: "communication.campaign.send.blocked",
-    messageAr: `تعذّر إرسال حملة «${campaign.name}» — السبب: ${reason}`,
-    messageEn: `Campaign send blocked: ${campaign.name} — ${reason}`,
-    entityType: "CommunicationCampaign",
-    entityId: campaign.id,
-    metadata: { mode, reason, summary: plan ? { total: plan.total, eligible: plan.eligible, skipped: plan.skipped, reasons: plan.reasons } : undefined, externalCall: false, autoSend: false },
-    stream: "TEAM",
-  });
+  await writeAuditLog({ actorId: actor?.actorId ?? undefined, actorName: actor?.actorName ?? undefined, actorRole: actor?.actorRole ?? "ADMIN", action: "communication.campaign.send.blocked", messageAr: `تعذّر إرسال حملة «${campaign.name}» — السبب: ${reason}`, messageEn: `Campaign send blocked: ${campaign.name} — ${reason}`, entityType: "CommunicationCampaign", entityId: campaign.id, metadata: { mode, reason, summary: plan ? { total: plan.total, eligible: plan.eligible, skipped: plan.skipped, reasons: plan.reasons } : undefined, externalCall: false, autoSend: false }, stream: "TEAM" });
 }
 
-/** Merge lastRun into campaign metadata without clobbering other keys (e.g. coverageDecisions). */
-function mergedMetadata(campaign: CommunicationCampaign, lastRun: Record<string, unknown>) {
-  return { ...(campaign.metadata as Record<string, unknown> | null), lastRun } as never;
-}
-
-export async function executeCampaignSend(
-  campaignId: string,
-  opts: { actor?: Actor; mode?: SendMode; batchSize?: number } = {}
-): Promise<ExecutionSummary> {
+export async function executeCampaignSend(campaignId: string, opts: { actor?: Actor; mode?: SendMode; batchSize?: number } = {}): Promise<ExecutionSummary> {
   const mode = opts.mode ?? "SEND_NOW";
   const batchSize = Math.min(opts.batchSize ?? 200, 1000);
   const actor = opts.actor ?? null;
   const base: ExecutionSummary = { ok: false, campaignId, status: "", total: 0, sent: 0, skipped: 0, failed: 0, truncated: false, reasons: {} };
-
   const campaign = await getCampaign(campaignId);
   if (!campaign) return { ...base, blocked: "NOT_FOUND" };
   base.status = campaign.status;
-
-  // Status/mode gate (before any content gate).
-  if (mode === "SEND_NOW" && campaign.status !== "APPROVED") {
-    await auditBlocked(campaign, "NOT_APPROVED", actor, mode);
-    return { ...base, blocked: "NOT_APPROVED" };
-  }
-  if (mode === "DUE") {
-    if (campaign.status !== "SCHEDULED") {
-      await auditBlocked(campaign, "NOT_SCHEDULED", actor, mode);
-      return { ...base, blocked: "NOT_SCHEDULED" };
-    }
-    if (!campaign.scheduledAt || campaign.scheduledAt.getTime() > Date.now()) {
-      await auditBlocked(campaign, "NOT_DUE", actor, mode);
-      return { ...base, blocked: "NOT_DUE" };
-    }
+  if (mode === "SEND_NOW" && campaign.status !== "APPROVED") { await auditBlocked(campaign, "NOT_APPROVED", actor, mode); return { ...base, blocked: "NOT_APPROVED" }; }
+  if (mode === "DUE" && (campaign.status !== "SCHEDULED" || !campaign.scheduledAt || campaign.scheduledAt.getTime() > Date.now())) {
+    const reason = campaign.status !== "SCHEDULED" ? "NOT_SCHEDULED" : "NOT_DUE";
+    await auditBlocked(campaign, reason, actor, mode);
+    return { ...base, blocked: reason };
   }
 
-  // Content/readiness gates — must ALL pass before we move to SENDING.
   const plan = await planCampaignSend(campaignId, { batchSize });
-  base.total = plan.total;
-  base.truncated = plan.truncated;
-  base.reasons = { ...plan.reasons };
+  base.total = plan.total; base.truncated = plan.truncated; base.reasons = { ...plan.reasons };
   if (plan.blocked) {
     await auditBlocked(campaign, plan.blocked, actor, mode, plan);
-    // Record the blocked run in metadata without changing status away from APPROVED/SCHEDULED.
-    await prisma.communicationCampaign
-      .update({ where: { id: campaignId }, data: { metadata: mergedMetadata(campaign, { ranAt: new Date().toISOString(), mode, total: plan.total, sent: 0, skipped: plan.skipped, failed: 0, blocked: plan.blocked, reasons: plan.reasons, truncated: plan.truncated }) } })
-      .catch(() => {});
+    await prisma.communicationCampaign.update({ where: { id: campaignId }, data: { metadata: mergedMetadata(campaign, { ranAt: new Date().toISOString(), mode, total: plan.total, sent: 0, skipped: plan.skipped, failed: 0, blocked: plan.blocked, reasons: plan.reasons, truncated: plan.truncated }) } }).catch(() => {});
     return { ...base, blocked: plan.blocked };
   }
 
-  const channel: CommunicationChannelId = campaign.channel as CommunicationChannelId;
-  const templateId = campaign.templateGroupId as string; // guaranteed by the NO_TEMPLATE gate above
+  const runtime = await getActiveCommunicationRuntimeBundle();
+  const channel = campaign.channel as CommunicationChannelId;
+  const templateId = campaign.templateGroupId as string;
   const decisions = coverageDecisions(campaign);
   const purpose = campaign.purpose as CommunicationPurposeId;
-  // A campaign whose audience is a TEST list archives its deliveries as origin TEST so they are clearly
-  // marked and can be excluded from normal campaign performance reporting.
   const origin = await resolveAudienceOrigin(campaign.audienceSegmentKey);
-
-  // All gates passed → NOW move to SENDING.
   await prisma.communicationCampaign.update({ where: { id: campaignId }, data: { status: "SENDING" } }).catch(() => {});
-
-  // Load senders/rules for routing (WhatsApp/SMS). Email uses its own identity.
-  const senders = await listSenders();
-  const rules = await listRoutingRules(channel);
-  const senderConfigs = senders.filter((s) => s.channel === channel).map(toSenderConfig);
+  const [senders, rules] = await Promise.all([listSenders(), listRoutingRules(channel)]);
+  const senderConfigs = senders.filter((sender) => sender.channel === channel).map(toSenderConfig);
   const ruleConfigs = rules.map(toRoutingRuleConfig);
-  const rawSenderById = new Map(senders.map((s) => [s.id, s]));
-  // Email identity (final architecture): enabled EMAIL sender email → BREVO_EMAIL_SENDER_EMAIL →
-  // (legacy SendGrid ONLY when EMAIL_LEGACY_SENDGRID_FALLBACK=true). Never SendGrid as normal identity.
-  const legacySendgridFrom = process.env.EMAIL_LEGACY_SENDGRID_FALLBACK === "true" ? process.env.SENDGRID_FROM || null : null;
-  const defaultEmailIdentity =
-    senders.find((s) => s.channel === "EMAIL" && s.enabled)?.senderEmail || process.env.BREVO_EMAIL_SENDER_EMAIL || legacySendgridFrom || null;
+  const rawSenderById = new Map(senders.map((sender) => [sender.id, sender]));
+  const defaultEmailIdentity = senders.find((sender) => sender.channel === "EMAIL" && sender.enabled)?.senderEmail || (runtime.brevoEmail.configured ? runtime.brevoEmail.values.senderEmail : null);
+  const existing = await prisma.communicationDelivery.findMany({ where: { campaignId, templateId, channel, origin }, select: { recipientUserId: true, status: true, providerMessageId: true } }).catch(() => []);
+  const alreadyDone = new Set(existing.filter((delivery) => (delivery.status && PROCESSED_STATUSES.includes(delivery.status)) || !!delivery.providerMessageId).map((delivery) => delivery.recipientUserId).filter(Boolean) as string[]);
 
-  // Idempotency: recipients already processed for this campaign+template+channel+origin CAMPAIGN,
-  // or any recipient with a providerMessageId already assigned.
-  const existing = await prisma.communicationDelivery
-    .findMany({ where: { campaignId, templateId: templateId, channel, origin }, select: { recipientUserId: true, status: true, providerMessageId: true } })
-    .catch(() => []);
-  const alreadyDone = new Set(
-    existing
-      .filter((d) => (d.status && PROCESSED_STATUSES.includes(d.status)) || !!d.providerMessageId)
-      .map((d) => d.recipientUserId)
-      .filter(Boolean) as string[]
-  );
-
-  const recipients = plan.recipients;
-  const skipped = plan.skippedList;
-
-  // Archive ineligible recipients as SKIPPED (bounded, idempotent).
-  for (const s of skipped.slice(0, batchSize)) {
-    if (alreadyDone.has(s.userId)) continue;
-    await recordSkippedDelivery(
-      { channel, campaignId, templateId: templateId, recipientUserId: s.userId, locale: s.locale, purpose, origin, createdBy: actor?.actorId ?? null },
-      s.reason
-    );
-    base.skipped += 1;
-    bump(base.reasons, s.reason);
+  for (const skipped of plan.skippedList.slice(0, batchSize)) {
+    if (alreadyDone.has(skipped.userId)) continue;
+    await recordSkippedDelivery({ channel, campaignId, templateId, recipientUserId: skipped.userId, locale: skipped.locale, purpose, origin, createdBy: actor?.actorId ?? null }, skipped.reason);
+    base.skipped += 1; bump(base.reasons, skipped.reason);
   }
 
-  for (const r of recipients) {
-    if (alreadyDone.has(r.userId)) {
-      bump(base.reasons, "ALREADY_PROCESSED");
-      continue;
-    }
-
-    // Coverage decision: excluded language → skip.
-    const rendered = await renderChannelTemplate(channel, templateId, r.locale);
+  for (const recipient of plan.recipients) {
+    if (alreadyDone.has(recipient.userId)) { bump(base.reasons, "ALREADY_PROCESSED"); continue; }
+    const rendered = await renderChannelTemplate(channel, templateId, recipient.locale);
     if (!rendered) {
-      await recordSkippedDelivery({ channel, campaignId, templateId: templateId, recipientUserId: r.userId, locale: r.locale, purpose, origin }, "TEMPLATE_RENDER_FAILED");
-      base.skipped += 1;
-      bump(base.reasons, "TEMPLATE_RENDER_FAILED");
-      continue;
+      await recordSkippedDelivery({ channel, campaignId, templateId, recipientUserId: recipient.userId, locale: recipient.locale, purpose, origin }, "TEMPLATE_RENDER_FAILED");
+      base.skipped += 1; bump(base.reasons, "TEMPLATE_RENDER_FAILED"); continue;
     }
-    if (rendered.usedFallback && decisions[r.locale] === "EXCLUDE") {
-      await recordSkippedDelivery({ channel, campaignId, templateId: templateId, recipientUserId: r.userId, locale: r.locale, purpose, origin, templateName: rendered.templateName }, "LANGUAGE_EXCLUDED");
-      base.skipped += 1;
-      bump(base.reasons, "LANGUAGE_EXCLUDED");
-      continue;
+    if (rendered.usedFallback && decisions[recipient.locale] === "EXCLUDE") {
+      await recordSkippedDelivery({ channel, campaignId, templateId, recipientUserId: recipient.userId, locale: recipient.locale, purpose, origin, templateName: rendered.templateName }, "LANGUAGE_EXCLUDED");
+      base.skipped += 1; bump(base.reasons, "LANGUAGE_EXCLUDED"); continue;
     }
 
-    // Resolve sender (WhatsApp/SMS). Email uses the default identity.
-    let routerSender: { id?: string; provider?: string | null; phoneNumberId?: string | null; senderEmail?: string | null; smsSender?: string | null } | null = null;
-    if (channel === "EMAIL") {
-      routerSender = defaultEmailIdentity ? { senderEmail: defaultEmailIdentity } : null;
-    } else if (channel === "SMS") {
-      // SMS identity is env-based (Netgsm header / Brevo SMS sender). A CommunicationSender is OPTIONAL:
-      // if one matches routing we use its smsSender, otherwise the provider clients fall back to env.
-      const routed = resolveSender({ channel, locale: r.locale, country: r.country, purpose: purpose === "MARKETING" ? "MARKETING" : "TRANSACTIONAL" }, senderConfigs, ruleConfigs);
+    let sender: { id?: string; provider?: string | null; phoneNumberId?: string | null; senderEmail?: string | null; smsSender?: string | null } | null = null;
+    if (channel === "EMAIL") sender = defaultEmailIdentity ? { senderEmail: defaultEmailIdentity } : null;
+    else {
+      const routed = resolveSender({ channel, locale: recipient.locale, country: recipient.country, purpose: purpose === "MARKETING" ? "MARKETING" : "TRANSACTIONAL" }, senderConfigs, ruleConfigs);
       const raw = "sender" in routed ? rawSenderById.get(routed.sender.id) : null;
-      routerSender = { id: raw?.id, provider: raw?.provider, smsSender: raw?.smsSender ?? null };
-    } else {
-      // WhatsApp — requires a Meta sender with a phoneNumberId.
-      const routed = resolveSender({ channel, locale: r.locale, country: r.country, purpose: purpose === "MARKETING" ? "MARKETING" : "TRANSACTIONAL" }, senderConfigs, ruleConfigs);
-      if ("sender" in routed) {
-        const raw = rawSenderById.get(routed.sender.id);
-        routerSender = raw ? { id: raw.id, provider: raw.provider, phoneNumberId: raw.phoneNumberId, smsSender: raw.smsSender } : null;
-      }
+      if (channel === "SMS") sender = { id: raw?.id, provider: raw?.provider, smsSender: raw?.smsSender ?? null };
+      else if (raw) sender = { id: raw.id, provider: raw.provider, phoneNumberId: raw.phoneNumberId, smsSender: raw.smsSender };
+      else if (runtime.meta.configured) sender = { phoneNumberId: runtime.meta.values.defaultPhoneNumberId };
     }
-
-    // Create the delivery record BEFORE sending.
-    const created = await createDeliveryRecord({
-      channel,
-      campaignId,
-      templateId: templateId,
-      templateName: rendered.templateName,
-      recipientUserId: r.userId,
-      recipientEmail: channel === "EMAIL" ? r.email : null,
-      recipientPhone: channel !== "EMAIL" ? r.phone : null,
-      recipientName: r.name,
-      locale: r.locale,
-      purpose,
-      origin,
-      renderedSubject: rendered.subject,
-      renderedBody: rendered.body,
-      senderId: routerSender?.id ?? null,
-      createdBy: actor?.actorId ?? null,
-      status: "RENDERED",
-    });
-    if (!created.ok) {
-      base.failed += 1;
-      bump(base.reasons, "ARCHIVE_FAILED");
-      continue;
-    }
+    const to = channel === "EMAIL" ? recipient.email ?? "" : recipient.phone ?? "";
+    const decision = resolveProviderForSendWithRuntime(runtime, channel, sender, { country: recipient.country, phone: to });
+    const provider = decision.canSend ? decision.providerId : channel === "WHATSAPP" ? "META_WHATSAPP" : channel === "EMAIL" ? "BREVO_EMAIL" : undefined;
+    const created = await createDeliveryRecord({ channel, provider: provider as never, campaignId, templateId, templateName: rendered.templateName, recipientUserId: recipient.userId, recipientEmail: channel === "EMAIL" ? recipient.email : null, recipientPhone: channel !== "EMAIL" ? recipient.phone : null, recipientName: recipient.name, locale: recipient.locale, purpose, origin, renderedSubject: rendered.subject, renderedBody: rendered.body, senderId: sender?.id ?? null, createdBy: actor?.actorId ?? null, status: "RENDERED" });
+    if (!created.ok) { base.failed += 1; bump(base.reasons, "ARCHIVE_FAILED"); continue; }
     const deliveryId = created.data.id;
-
-    if (!routerSender) {
+    if (!sender && channel !== "SMS") {
       await markDeliveryStatus(deliveryId, "SKIPPED", { errorMessage: "NO_SENDER_AVAILABLE" });
-      base.skipped += 1;
-      bump(base.reasons, "NO_SENDER_AVAILABLE");
-      continue;
+      base.skipped += 1; bump(base.reasons, "NO_SENDER_AVAILABLE"); continue;
     }
-
-    // Send through the provider router.
-    const to = channel === "EMAIL" ? r.email ?? "" : r.phone ?? "";
-    const result = await sendPreparedDelivery({
-      channel,
-      sender: routerSender,
-      country: r.country,
-      to,
-      templateName: rendered.templateName,
-      languageCode: r.locale,
-      subject: rendered.subject,
-      html: rendered.body,
-    });
-
+    const result = await sendPreparedDelivery({ channel, sender, country: recipient.country, to, templateName: rendered.templateName, languageCode: recipient.locale, subject: rendered.subject, html: rendered.body }, runtime);
     if (!result.ok) {
-      const terminal = result.reason.endsWith("_NOT_CONFIGURED") || result.reason.endsWith("_NOT_IMPLEMENTED") || result.reason.includes("SENDER_MISSING");
+      const terminal = result.reason.endsWith("_NOT_CONFIGURED") || result.reason.endsWith("_NOT_IMPLEMENTED") || result.reason.includes("SENDER_MISSING") || result.reason === "PROVIDER_DISABLED" || result.reason === "INTEGRATION_DECRYPTION_FAILED" || result.reason === "INTEGRATION_DATABASE_UNAVAILABLE";
       await markDeliveryStatus(deliveryId, terminal ? "SKIPPED" : "FAILED", { errorMessage: result.reason });
-      if (terminal) base.skipped += 1;
-      else base.failed += 1;
-      bump(base.reasons, result.reason);
-      continue;
+      if (terminal) base.skipped += 1; else base.failed += 1;
+      bump(base.reasons, result.reason); continue;
     }
-
     await markDeliveryStatus(deliveryId, "SENT", { providerMessageId: result.providerMessageId, internalAccepted: result.internalAccepted });
-    base.sent += 1;
-    bump(base.reasons, "SENT");
+    base.sent += 1; bump(base.reasons, "SENT");
   }
 
-  // Finalize campaign status + counters. NEVER SENT with 0 sent.
   const finalStatus = computeFinalStatus(base.total, base.sent, base.skipped, base.failed);
-  await prisma.communicationCampaign
-    .update({
-      where: { id: campaignId },
-      data: {
-        status: finalStatus,
-        sentCount: { increment: base.sent },
-        failedCount: { increment: base.failed },
-        metadata: mergedMetadata(campaign, { ranAt: new Date().toISOString(), mode, total: base.total, sent: base.sent, skipped: base.skipped, failed: base.failed, blocked: null, reasons: base.reasons, truncated: base.truncated }),
-      },
-    })
-    .catch(() => {});
-
-  await writeAuditLog({
-    actorId: actor?.actorId ?? undefined,
-    actorName: actor?.actorName ?? undefined,
-    actorRole: actor?.actorRole ?? "ADMIN",
-    action: "communication.campaign.send",
-    messageAr: `تنفيذ إرسال حملة «${campaign.name}» — أُرسل ${base.sent}، تخطّي ${base.skipped}، فشل ${base.failed}`,
-    messageEn: `Campaign send executed: ${campaign.name} — sent ${base.sent}, skipped ${base.skipped}, failed ${base.failed}`,
-    entityType: "CommunicationCampaign",
-    entityId: campaignId,
-    metadata: { mode, sent: base.sent, skipped: base.skipped, failed: base.failed, truncated: base.truncated, externalCall: base.sent > 0 },
-    stream: "TEAM",
-  });
-
-  base.ok = true;
-  base.status = finalStatus;
-  return base;
+  await prisma.communicationCampaign.update({ where: { id: campaignId }, data: { status: finalStatus, sentCount: { increment: base.sent }, failedCount: { increment: base.failed }, metadata: mergedMetadata(campaign, { ranAt: new Date().toISOString(), mode, total: base.total, sent: base.sent, skipped: base.skipped, failed: base.failed, blocked: null, reasons: base.reasons, truncated: base.truncated }) } }).catch(() => {});
+  await writeAuditLog({ actorId: actor?.actorId ?? undefined, actorName: actor?.actorName ?? undefined, actorRole: actor?.actorRole ?? "ADMIN", action: "communication.campaign.send", messageAr: `تنفيذ إرسال حملة «${campaign.name}» — أُرسل ${base.sent}، تخطّي ${base.skipped}، فشل ${base.failed}`, messageEn: `Campaign send executed: ${campaign.name} — sent ${base.sent}, skipped ${base.skipped}, failed ${base.failed}`, entityType: "CommunicationCampaign", entityId: campaignId, metadata: { mode, sent: base.sent, skipped: base.skipped, failed: base.failed, truncated: base.truncated, externalCall: base.sent > 0 }, stream: "TEAM" });
+  base.ok = true; base.status = finalStatus; return base;
 }
 
-/** Execute all due scheduled campaigns (admin/cron). Returns per-campaign summaries. */
 export async function runDueCampaigns(opts: { actor?: Actor; max?: number } = {}): Promise<ExecutionSummary[]> {
   if (!process.env.DATABASE_URL) return [];
-  const due = await prisma.communicationCampaign
-    .findMany({ where: { status: "SCHEDULED", scheduledAt: { lte: new Date() } }, select: { id: true }, take: Math.min(opts.max ?? 10, 50) })
-    .catch(() => []);
+  const due = await prisma.communicationCampaign.findMany({ where: { status: "SCHEDULED", scheduledAt: { lte: new Date() } }, select: { id: true }, take: Math.min(opts.max ?? 10, 50) }).catch(() => []);
   const results: ExecutionSummary[] = [];
-  for (const c of due) {
-    results.push(await executeCampaignSend(c.id, { actor: opts.actor, mode: "DUE" }));
-  }
+  for (const campaign of due) results.push(await executeCampaignSend(campaign.id, { actor: opts.actor, mode: "DUE" }));
   return results;
 }
