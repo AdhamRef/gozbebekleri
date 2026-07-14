@@ -73,7 +73,7 @@ export const ERROR_MESSAGES_AR: Record<string, string> = {
 };
 
 export function uiStatus(snapshot: SafeIntegrationProviderSnapshot): IntegrationUiStatus {
-  if (!snapshot.encryptionKeyConfigured && snapshot.fields.some((field) => field.isSecret && !field.configured)) return "ENCRYPTION_KEY_MISSING";
+  if (!snapshot.encryptionKeyConfigured) return "ENCRYPTION_KEY_MISSING";
   if (!snapshot.enabled) return "DISABLED";
   if (snapshot.status === "ERROR") return "ENCRYPTION_ERROR";
   if (snapshot.candidate.hasChanges) {
