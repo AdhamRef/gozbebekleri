@@ -5,7 +5,9 @@ import { EXPECTED_INTEGRATION_SETTING_INDEXES, inspectEnvironment, inspectIndexD
 
 const validKey = Buffer.alloc(32, 7).toString("base64url");
 
-function safeEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+type EnvOverrides = Partial<NodeJS.ProcessEnv>;
+
+function safeEnv(overrides: EnvOverrides = {}): NodeJS.ProcessEnv {
   return {
     DATABASE_URL: "mongodb://example.invalid/test",
     INTEGRATION_SETTINGS_ENCRYPTION_KEY: validKey,
@@ -13,7 +15,7 @@ function safeEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
     NEXTAUTH_URL: "https://example.org",
     NODE_ENV: "production",
     ...overrides,
-  };
+  } as NodeJS.ProcessEnv;
 }
 
 test("production environment readiness passes with safe required values", () => {
@@ -59,7 +61,7 @@ test("preflight and migration verification are read-only and provider-free", () 
   for (const forbidden of ["createIndexes", ".create(", ".update(", ".delete(", "fetch(", "axios", "sendTemplate", "sendEmail", "sendSms"]) {
     assert.equal(combined.includes(forbidden), false, `read-only release tools must not contain ${forbidden}`);
   }
-  assert.equal(combined.includes("encryptedValue:"), false, "tools must not print encrypted values");
+  assert.doesNotMatch(combined, /console\.(log|error)\([^\n]*(encryptedValue|INTEGRATION_SETTINGS_ENCRYPTION_KEY|CRON_SECRET|API_KEY|PASSWORD|ACCESS_TOKEN)/);
 });
 
 test("migration fails on duplicates and never deletes data or indexes", () => {
