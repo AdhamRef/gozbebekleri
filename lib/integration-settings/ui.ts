@@ -26,7 +26,7 @@ export const PROVIDER_USAGE: Record<IntegrationProvider, string> = {
   META_WHATSAPP: "إرسال واتساب عبر Meta Cloud API",
   BREVO: "إرسال الإيميل وSMS للأرقام الدولية",
   NETGSM: "إرسال SMS إلى أرقام تركيا +90",
-  SYSTEM: "حماية وتشغيل الجدولة التلقائية",
+  SYSTEM: "بنية Cron التحتية وحماية الجدولة",
 };
 
 export const PROVIDER_UI_LABEL: Record<IntegrationProvider, string> = {
@@ -47,11 +47,11 @@ export const FIELD_HELP: Record<string, string> = {
   EMAIL_SENDER_NAME: "الاسم الذي يظهر للمستلم في رسائل البريد.",
   EMAIL_SENDER_EMAIL: "بريد مرسل موثّق ومفعّل داخل Brevo.",
   SMS_SENDER: "اسم المرسل الدولي المسجل أو المسموح به داخل Brevo.",
-  WEBHOOK_SECRET: "مفتاح داخلي للتحقق من أحداث Webhook الواردة من Brevo.",
+  WEBHOOK_SECRET: "رمز حماية Webhook يتم إنشاؤه وتدويره داخل السيرفر.",
   USERCODE: "رمز مستخدم Netgsm الخاص بالحساب.",
   PASSWORD: "كلمة مرور API لحساب Netgsm.",
   HEADER: "اسم المرسل المعتمد داخل حساب Netgsm.",
-  CRON_SECRET: "مفتاح قوي لحماية مسار Cron باستخدام Authorization Bearer.",
+  CRON_SECRET: "إعداد بنية تحتية يُحفظ داخل Vercel فقط.",
 };
 
 export const ERROR_MESSAGES_AR: Record<string, string> = {
@@ -65,14 +65,18 @@ export const ERROR_MESSAGES_AR: Record<string, string> = {
   NETGSM_AUTH_REJECTED: "بيانات دخول Netgsm غير صحيحة.",
   NETGSM_HEADER_NOT_AVAILABLE: "اسم المرسل غير متاح في حساب Netgsm.",
   CRON_SECRET_INVALID: "مفتاح الجدولة لا يحقق متطلبات الأمان.",
-  CANDIDATE_NOT_VERIFIED: "يجب نجاح اختبار الاتصال قبل اعتماد الإعدادات.",
+  CRON_SECRET_MISSING: "مفتاح Cron غير مضبوط داخل Vercel.",
+  CANDIDATE_NOT_VERIFIED: "يجب نجاح اختبار التغييرات قبل اعتماد الإعدادات.",
   CANDIDATE_VERSION_MISMATCH: "تم تغيير الإعدادات منذ آخر اختبار. أعد الاختبار من جديد.",
+  CANDIDATE_NOT_FOUND: "لا توجد تغييرات محفوظة تحتاج إلى اختبار.",
   ENCRYPTION_KEY_MISSING: "مفتاح تشفير إعدادات التكاملات غير مضبوط على السيرفر.",
   ENCRYPTION_KEY_INVALID: "مفتاح تشفير إعدادات التكاملات غير صالح.",
   MISSING_REQUIRED_FIELDS: "بعض البيانات المطلوبة غير مكتملة.",
+  CANONICAL_URL_MISSING: "تعذر تحديد النطاق الرسمي للموقع من إعدادات السيرفر.",
 };
 
 export function uiStatus(snapshot: SafeIntegrationProviderSnapshot): IntegrationUiStatus {
+  if (snapshot.provider === "SYSTEM") return snapshot.status === "READY" ? "READY" : "NEEDS_SETUP";
   if (!snapshot.encryptionKeyConfigured) return "ENCRYPTION_KEY_MISSING";
   if (!snapshot.enabled) return "DISABLED";
   if (snapshot.status === "ERROR") return "ENCRYPTION_ERROR";
