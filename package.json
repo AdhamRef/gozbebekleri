@@ -19,7 +19,7 @@
     "backfill:donation-countries": "tsx scripts/backfill-donation-donor-country.ts",
     "backfill:monthly-paid": "tsx scripts/backfill-stripe-monthly-paid.ts",
     "exchange-rates:refresh": "tsx scripts/refresh-exchange-rates.ts",
-    "cleanup:orphan-donation-items": "tsx scripts/cleanup-orphan-donation-items.mjs",
+    "cleanup:orphan-donation-items": "tsx scripts/cleanup-orphan-donation-items.ts",
     "migrate:integration-settings": "prisma generate --schema prisma/integration-settings.schema.prisma && tsx prisma/mongodb-migrations/20260714-integration-settings.ts"
   },
   "prisma": { "seed": "tsx prisma/seed.ts" },
