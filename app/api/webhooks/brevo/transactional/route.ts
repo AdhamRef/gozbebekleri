@@ -1,6 +1,6 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { brevoWebhookTokenMatches, resolveBrevoWebhookSecret } from "@/lib/integration-settings/brevo-webhook";
 import { integrationSettingsService } from "@/lib/integration-settings/prisma-service";
 
 export const runtime = "nodejs";
@@ -25,17 +25,9 @@ function timestampField(status: string): Record<string, Date> {
   return {};
 }
 
-function safeTokenMatch(received: string | null, expected: string): boolean {
-  if (!received) return false;
-  const left = Buffer.from(received, "utf8");
-  const right = Buffer.from(expected, "utf8");
-  if (left.length !== right.length) return false;
-  return timingSafeEqual(left, right);
-}
-
 async function activeWebhookSecret(): Promise<string | null> {
   const active = await integrationSettingsService.getResolvedValue("BREVO", "WEBHOOK_SECRET").catch(() => null);
-  return active || process.env.BREVO_SMS_WEBHOOK_SECRET?.trim() || null;
+  return resolveBrevoWebhookSecret(active);
 }
 
 export async function POST(req: NextRequest) {
@@ -43,7 +35,7 @@ export async function POST(req: NextRequest) {
   const isProduction = process.env.NODE_ENV === "production";
   if (!secret) {
     if (isProduction) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  } else if (!safeTokenMatch(req.nextUrl.searchParams.get("token"), secret)) {
+  } else if (!brevoWebhookTokenMatches(req.nextUrl.searchParams.get("token"), secret)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
