@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { brevoWebhookTokenMatches, resolveBrevoWebhookSecret } from "@/lib/integration-settings/brevo-webhook";
-import { integrationSettingsService } from "@/lib/integration-settings/prisma-service";
+import { brevoWebhookTokenMatches } from "@/lib/integration-settings/brevo-webhook";
+import { getActiveBrevoWebhookSecret } from "@/lib/communication/runtime-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,23 +25,17 @@ function timestampField(status: string): Record<string, Date> {
   return {};
 }
 
-async function activeWebhookSecret(): Promise<string | null> {
-  const active = await integrationSettingsService.getResolvedValue("BREVO", "WEBHOOK_SECRET").catch(() => null);
-  return resolveBrevoWebhookSecret(active);
-}
-
 export async function POST(req: NextRequest) {
-  const secret = await activeWebhookSecret();
+  const runtimeSecret = await getActiveBrevoWebhookSecret();
   const isProduction = process.env.NODE_ENV === "production";
-  if (!secret) {
+  if (!runtimeSecret.configured) {
     if (isProduction) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  } else if (!brevoWebhookTokenMatches(req.nextUrl.searchParams.get("token"), secret)) {
+  } else if (!brevoWebhookTokenMatches(req.nextUrl.searchParams.get("token"), runtimeSecret.values.secret)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return NextResponse.json({ ok: true }, { status: 200 });
-
   try {
     const event = String(body.event ?? "").trim();
     const messageId = String(body["message-id"] ?? body.messageId ?? "").trim();
@@ -60,5 +54,6 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
-  return NextResponse.json({ ok: true, provider: "brevo", webhookProtected: !!(await activeWebhookSecret()) }, { status: 200 });
+  const runtimeSecret = await getActiveBrevoWebhookSecret();
+  return NextResponse.json({ ok: true, provider: "brevo", webhookProtected: runtimeSecret.configured }, { status: 200 });
 }
