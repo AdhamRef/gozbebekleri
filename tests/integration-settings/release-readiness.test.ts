@@ -64,6 +64,21 @@ test("preflight and migration verification are read-only and provider-free", () 
   assert.doesNotMatch(combined, /console\.(log|error)\([^\n]*(encryptedValue|INTEGRATION_SETTINGS_ENCRYPTION_KEY|CRON_SECRET|API_KEY|PASSWORD|ACCESS_TOKEN)/);
 });
 
+test("crypto Prisma webhook integration and Cron routes explicitly use Node runtime", () => {
+  const routes = [
+    "app/api/webhooks/meta/whatsapp/route.ts",
+    "app/api/webhooks/brevo/transactional/route.ts",
+    "app/api/cron/communication-run-due/route.ts",
+    "app/api/admin/integration-settings/[provider]/route.ts",
+    "app/api/admin/integration-settings/[provider]/test-active/route.ts",
+    "app/api/admin/integration-settings/[provider]/test-candidate/route.ts",
+    "app/api/admin/integration-settings/[provider]/activate-candidate/route.ts",
+  ];
+  for (const route of routes) {
+    assert.match(readFileSync(route, "utf8"), /export\s+const\s+runtime\s*=\s*["']nodejs["']/i, `${route} must use Node.js runtime`);
+  }
+});
+
 test("migration fails on duplicates and never deletes data or indexes", () => {
   const migration = readFileSync("prisma/mongodb-migrations/20260714-integration-settings.ts", "utf8");
   assert.match(migration, /DUPLICATE_PROVIDER_KEY/);
