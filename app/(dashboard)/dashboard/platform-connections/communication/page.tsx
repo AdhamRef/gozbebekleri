@@ -3,6 +3,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { PageHeader } from "../_components/ui";
 import { userHasDashboardPermission } from "@/lib/dashboard/permissions";
 import { INTEGRATION_PROVIDERS } from "@/lib/integration-settings/catalog";
+import { integrationActorFromSession } from "@/lib/integration-settings/http";
 import { integrationSettingsService } from "@/lib/integration-settings/prisma-service";
 import { getSchedulerStatus } from "@/lib/communication/scheduler-status";
 import { IntegrationSettingsManager } from "./_components/IntegrationSettingsManager";
@@ -19,13 +20,7 @@ export default async function CommunicationConnectionsPage() {
     canManage: userHasDashboardPermission(user, "platformConnectionsManage"),
     canAdmin: userHasDashboardPermission(user, "platformConnectionsAdmin"),
   };
-
-  const actor = {
-    actorId: String((user as { id?: string } | undefined)?.id ?? "dashboard-user"),
-    actorName: user?.name ?? null,
-    actorRole: String((user as { role?: string } | undefined)?.role ?? "STAFF"),
-  };
-
+  const actor = integrationActorFromSession(session!);
   const [initialProviders, scheduler] = await Promise.all([
     Promise.all(INTEGRATION_PROVIDERS.map((provider) => integrationSettingsService.getProviderSnapshot(provider, actor))),
     getSchedulerStatus(),
