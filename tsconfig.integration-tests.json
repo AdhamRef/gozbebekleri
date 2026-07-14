@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": ".integration-test-build",
+    "rootDir": ".",
+    "types": ["node"]
+  },
+  "include": [
+    "lib/integration-settings/catalog.ts",
+    "lib/integration-settings/crypto.ts",
+    "lib/integration-settings/helpers.ts",
+    "lib/integration-settings/resolver.ts",
+    "lib/integration-settings/service.ts",
+    "lib/dashboard/permissions.ts",
+    "tests/integration-settings/**/*.ts"
+  ]
+}
