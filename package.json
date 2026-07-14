@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "TSC_COMPILE_ON_ERROR=true prisma generate && next build",
+    "build": "TSC_COMPILE_ON_ERROR=true prisma generate && prisma generate --schema prisma/integration-settings.schema.prisma && next build",
     "start": "next start",
     "lint": "next lint",
+    "test:integration-settings": "rm -rf .integration-test-build && tsc -p tsconfig.integration-tests.json && node --test .integration-test-build/tests/integration-settings/*.test.js",
     "dashboard:schema:validate": "prisma validate --schema prisma/dashboard-foundation.schema.prisma",
     "i18n:audit": "node scripts/audit-i18n-messages.mjs",
     "i18n:audit:strict": "node scripts/audit-i18n-messages.mjs --strict",
@@ -18,11 +19,10 @@
     "backfill:donation-countries": "tsx scripts/backfill-donation-donor-country.ts",
     "backfill:monthly-paid": "tsx scripts/backfill-stripe-monthly-paid.ts",
     "exchange-rates:refresh": "tsx scripts/refresh-exchange-rates.ts",
-    "cleanup:orphan-donation-items": "tsx scripts/cleanup-orphan-donation-items.ts"
+    "cleanup:orphan-donation-items": "tsx scripts/cleanup-orphan-donation-items.ts",
+    "migrate:integration-settings": "prisma generate --schema prisma/integration-settings.schema.prisma && tsx prisma/mongodb-migrations/20260714-integration-settings.ts"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
+  "prisma": { "seed": "tsx prisma/seed.ts" },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",
     "@emotion/react": "^11.14.0",
