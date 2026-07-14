@@ -114,7 +114,7 @@ export function userCanEnterDashboard(user: UserLike | undefined): boolean {
   return user?.role === "ADMIN" || (user?.role === "STAFF" && hasAnyDashboardRoutePermission(user));
 }
 export function sessionHasDashboardPermission(session: Session | null, key: DashboardPermissionKey): boolean {
-  return userHasDashboardPermission(session?.user, key);
+  return userHasDashboardPermission(session?.user as UserLike | undefined, key);
 }
 export function sanitizeDashboardPermissions(raw: unknown): DashboardPermissionKey[] {
   if (!Array.isArray(raw)) return [];
