@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import type { IntegrationProvider } from "@/lib/integration-settings/catalog";
-import type { SafeIntegrationProviderSnapshot, SafeProviderConnectionTestResponse } from "@/lib/integration-settings/types";
+import type { SafeProviderConnectionTestResponse } from "@/lib/integration-settings/types";
 import { safeErrorMessage } from "@/lib/integration-settings/ui";
+import type { IntegrationUiSnapshot } from "./model";
 
 type Notice = { kind: "success" | "error"; text: string } | null;
 type Drafts = Record<string, string>;
+
+type BrevoWebhookReveal = { url: string; candidateVersion: string | null } | null;
 
 async function json(response: Response): Promise<Record<string, any>> {
   const body = await response.json().catch(() => ({}));
@@ -14,14 +17,20 @@ async function json(response: Response): Promise<Record<string, any>> {
   return body;
 }
 
-export function useIntegrationSettings(initialProviders: SafeIntegrationProviderSnapshot[]) {
+function cleanDrafts(snapshot: IntegrationUiSnapshot): Drafts {
+  return Object.fromEntries(snapshot.fields.map((field) => [field.key, field.isSecret ? "" : field.displayValue ?? ""]));
+}
+
+export function useIntegrationSettings(initialProviders: IntegrationUiSnapshot[]) {
   const [providers, setProviders] = useState(initialProviders);
   const [active, setActive] = useState<IntegrationProvider>("META_WHATSAPP");
-  const [drafts, setDrafts] = useState<Drafts>({});
+  const [drafts, setDrafts] = useState<Drafts>(() => cleanDrafts(initialProviders[0]));
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
-  const [lastTest, setLastTest] = useState<SafeProviderConnectionTestResponse | null>(null);
+  const [lastCandidateTest, setLastCandidateTest] = useState<SafeProviderConnectionTestResponse | null>(null);
+  const [lastActiveTest, setLastActiveTest] = useState<SafeProviderConnectionTestResponse | null>(null);
+  const [brevoWebhookReveal, setBrevoWebhookReveal] = useState<BrevoWebhookReveal>(null);
   const snapshot = providers.find((item) => item.provider === active)!;
   const hasDirty = dirty.size > 0;
 
@@ -36,15 +45,17 @@ export function useIntegrationSettings(initialProviders: SafeIntegrationProvider
   }, [hasDirty]);
 
   useEffect(() => {
-    const next: Drafts = {};
-    for (const field of snapshot.fields) next[field.key] = field.isSecret ? "" : field.displayValue ?? "";
-    setDrafts(next);
+    const selected = providers.find((item) => item.provider === active);
+    if (!selected) return;
+    setDrafts(cleanDrafts(selected));
     setDirty(new Set());
-    setLastTest(null);
+    setLastCandidateTest(null);
+    setLastActiveTest(null);
+    setBrevoWebhookReveal(null);
     setNotice(null);
-  }, [active, snapshot.provider, snapshot.candidate.version]);
+  }, [active]);
 
-  function replaceSnapshot(next: SafeIntegrationProviderSnapshot) {
+  function replaceSnapshot(next: IntegrationUiSnapshot) {
     setProviders((current) => current.map((item) => item.provider === next.provider ? next : item));
   }
 
@@ -60,13 +71,14 @@ export function useIntegrationSettings(initialProviders: SafeIntegrationProvider
     setNotice(null);
   }
 
-  async function refreshProvider() {
-    const body = await json(await fetch(`/api/admin/integration-settings/${active}`, { cache: "no-store" }));
-    replaceSnapshot(body.provider);
-    return body.provider as SafeIntegrationProviderSnapshot;
+  async function refreshProvider(provider: IntegrationProvider = active) {
+    const body = await json(await fetch(`/api/admin/integration-settings/${provider}`, { cache: "no-store" }));
+    replaceSnapshot(body.provider as IntegrationUiSnapshot);
+    return body.provider as IntegrationUiSnapshot;
   }
 
   async function saveChanges() {
+    if (active === "SYSTEM") return;
     const settings = snapshot.fields
       .filter((field) => dirty.has(field.key))
       .filter((field) => !field.isSecret || drafts[field.key]?.length > 0)
@@ -82,11 +94,11 @@ export function useIntegrationSettings(initialProviders: SafeIntegrationProvider
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ settings }),
       }));
-      replaceSnapshot(body.snapshot);
-      const clean: Drafts = {};
-      for (const field of body.snapshot.fields as SafeIntegrationProviderSnapshot["fields"]) clean[field.key] = field.isSecret ? "" : field.displayValue ?? "";
-      setDrafts(clean);
+      const next = body.snapshot as IntegrationUiSnapshot;
+      replaceSnapshot(next);
+      setDrafts(cleanDrafts(next));
       setDirty(new Set());
+      setLastCandidateTest(null);
       setNotice({ kind: "success", text: "تم حفظ التغييرات بأمان، ويجب اختبار الاتصال قبل اعتمادها." });
     } catch (error) {
       const e = error as Error & { code?: string };
@@ -94,18 +106,32 @@ export function useIntegrationSettings(initialProviders: SafeIntegrationProvider
     } finally { setBusy(null); }
   }
 
-  async function testConnection() {
-    setBusy("test");
+  async function testCandidate() {
+    setBusy("test-candidate");
     setNotice(null);
     try {
-      const body = await json(await fetch(`/api/admin/integration-settings/${active}/test`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: "{}",
+      const body = await json(await fetch(`/api/admin/integration-settings/${active}/test-candidate`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: "{}",
       }));
-      setLastTest(body as unknown as SafeProviderConnectionTestResponse);
+      setLastCandidateTest(body as unknown as SafeProviderConnectionTestResponse);
       await refreshProvider();
-      setNotice({ kind: body.success ? "success" : "error", text: body.success ? "نجح الاتصال. يمكنك الآن اعتماد الإعدادات." : `${safeErrorMessage(body.failureCode, body.messageAr)} الإعدادات الحالية العاملة لم تتغير.` });
+      setNotice({ kind: body.success ? "success" : "error", text: body.success ? "نجح اختبار التغييرات. يمكنك الآن اعتماد الإعدادات." : `${safeErrorMessage(body.failureCode, body.messageAr)} التكوين العامل لم يتغير.` });
+    } catch (error) {
+      const e = error as Error & { code?: string };
+      setNotice({ kind: "error", text: safeErrorMessage(e.code, e.message) });
+    } finally { setBusy(null); }
+  }
+
+  async function testActive() {
+    setBusy("test-active");
+    setNotice(null);
+    try {
+      const body = await json(await fetch(`/api/admin/integration-settings/${active}/test-active`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+      }));
+      setLastActiveTest(body as unknown as SafeProviderConnectionTestResponse);
+      await refreshProvider();
+      setNotice({ kind: body.success ? "success" : "error", text: body.success ? "نجح فحص الإعدادات الحالية." : safeErrorMessage(body.failureCode, body.messageAr) });
     } catch (error) {
       const e = error as Error & { code?: string };
       setNotice({ kind: "error", text: safeErrorMessage(e.code, e.message) });
@@ -118,14 +144,13 @@ export function useIntegrationSettings(initialProviders: SafeIntegrationProvider
     setBusy("activate");
     try {
       const body = await json(await fetch(`/api/admin/integration-settings/${active}/activate-candidate`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ candidateVersion }),
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ candidateVersion }),
       }));
-      replaceSnapshot(body.provider);
-      setDrafts(Object.fromEntries(body.provider.fields.map((field: any) => [field.key, field.isSecret ? "" : field.displayValue ?? ""])));
+      const next = await refreshProvider();
+      setDrafts(cleanDrafts(next));
       setDirty(new Set());
-      setLastTest(null);
+      setLastCandidateTest(null);
+      setBrevoWebhookReveal(null);
       setNotice({ kind: "success", text: "تم اعتماد الإعدادات بنجاح." });
     } catch (error) {
       const e = error as Error & { code?: string };
@@ -139,15 +164,29 @@ export function useIntegrationSettings(initialProviders: SafeIntegrationProvider
     if (!candidateVersion || !window.confirm("سيتم حذف التغييرات غير المعتمدة، وستظل الإعدادات الحالية تعمل. هل تريد المتابعة؟")) return;
     setBusy("discard");
     try {
-      const body = await json(await fetch(`/api/admin/integration-settings/${active}/discard-candidate`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ candidateVersion }),
+      await json(await fetch(`/api/admin/integration-settings/${active}/discard-candidate`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ candidateVersion }),
       }));
-      replaceSnapshot(body.provider);
+      const next = await refreshProvider();
+      setDrafts(cleanDrafts(next));
       setDirty(new Set());
-      setLastTest(null);
-      setNotice({ kind: "success", text: "تم إلغاء التغييرات، ولم تتأثر الإعدادات الحالية." });
+      setLastCandidateTest(null);
+      setBrevoWebhookReveal(null);
+      setNotice({ kind: "success", text: "تم إلغاء التغييرات، ولم يتأثر التكوين العامل." });
+    } catch (error) {
+      const e = error as Error & { code?: string };
+      setNotice({ kind: "error", text: safeErrorMessage(e.code, e.message) });
+    } finally { setBusy(null); }
+  }
+
+  async function rotateBrevoWebhook() {
+    setBusy("brevo-webhook");
+    setNotice(null);
+    try {
+      const body = await json(await fetch("/api/admin/integration-settings/BREVO/webhook-token", { method: "POST" }));
+      setBrevoWebhookReveal({ url: String(body.webhookUrl), candidateVersion: body.candidateVersion ?? null });
+      await refreshProvider("BREVO");
+      setNotice({ kind: "success", text: "تم إنشاء رابط جديد بانتظار اعتماد إعدادات Brevo." });
     } catch (error) {
       const e = error as Error & { code?: string };
       setNotice({ kind: "error", text: safeErrorMessage(e.code, e.message) });
@@ -155,15 +194,12 @@ export function useIntegrationSettings(initialProviders: SafeIntegrationProvider
   }
 
   async function deleteField(key: string, label: string) {
+    if (active === "SYSTEM") return;
     if (!window.confirm(`سيتم حذف إعداد «${label}». قد يعود النظام إلى قيمة إعدادات السيرفر إن كانت موجودة. هل تريد المتابعة؟`)) return;
     setBusy(`delete:${key}`);
     try {
-      const body = await json(await fetch(`/api/admin/integration-settings/${active}`, {
-        method: "DELETE",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ key, confirm: true }),
-      }));
-      replaceSnapshot(body.provider);
+      await json(await fetch(`/api/admin/integration-settings/${active}`, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ key, confirm: true }) }));
+      await refreshProvider();
       setNotice({ kind: "success", text: `تم حذف إعداد ${label}.` });
     } catch (error) {
       const e = error as Error & { code?: string };
@@ -172,17 +208,14 @@ export function useIntegrationSettings(initialProviders: SafeIntegrationProvider
   }
 
   async function toggleProvider() {
+    if (active === "SYSTEM") return;
     const action = snapshot.enabled ? "DISABLE" : "ENABLE";
     const warning = active === "BREVO" ? "تعطيل Brevo قد يوقف الإيميل وSMS الدولي." : "تعطيل المزود قد يوقف إرسال الرسائل المرتبطة به.";
     if (!window.confirm(`${warning} هل تريد المتابعة؟`)) return;
     setBusy("toggle");
     try {
-      const body = await json(await fetch(`/api/admin/integration-settings/${active}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action }),
-      }));
-      replaceSnapshot(body.provider);
+      await json(await fetch(`/api/admin/integration-settings/${active}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action }) }));
+      await refreshProvider();
       setNotice({ kind: "success", text: action === "ENABLE" ? "تم تفعيل المزود." : "تم تعطيل المزود." });
     } catch (error) {
       const e = error as Error & { code?: string };
@@ -190,5 +223,9 @@ export function useIntegrationSettings(initialProviders: SafeIntegrationProvider
     } finally { setBusy(null); }
   }
 
-  return { providers, active, snapshot, drafts, dirty, busy, notice, lastTest, hasDirty, chooseProvider, updateDraft, saveChanges, testConnection, activateCandidate, discardCandidate, deleteField, toggleProvider, setNotice };
+  return {
+    providers, active, snapshot, drafts, dirty, busy, notice, lastCandidateTest, lastActiveTest,
+    brevoWebhookReveal, hasDirty, chooseProvider, updateDraft, saveChanges, testCandidate, testActive,
+    activateCandidate, discardCandidate, rotateBrevoWebhook, deleteField, toggleProvider, setNotice,
+  };
 }
