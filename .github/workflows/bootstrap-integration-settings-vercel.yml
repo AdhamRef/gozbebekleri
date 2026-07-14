@@ -1,0 +1,21 @@
+name: Bootstrap Integration Settings on Vercel
+
+on:
+  push:
+    branches:
+      - agent/secure-integration-settings-backend
+    paths:
+      - .github/workflows/bootstrap-integration-settings-vercel.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bootstrap-integration-settings-vercel-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    if: github.ref == 'refs/heads/agent/secure-integration-settings-backend'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
