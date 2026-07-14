@@ -31,13 +31,18 @@ export function createDataToPatch(
 export function recordHasPendingValue(
   record: IntegrationSettingRecord | null
 ): boolean {
-  return !!(record?.pendingEncryptedValue || record?.pendingVersion);
+  return !!(
+    record?.pendingEncryptedValue ||
+    record?.pendingPlainValue ||
+    record?.pendingVersion ||
+    record?.pendingCandidateVersion
+  );
 }
 
 export function sourceBeforeWrite(
   record: IntegrationSettingRecord | null,
   envValue: string | null
 ): IntegrationValueSource {
-  if (record) return "DATABASE";
+  if (record && (record.encryptedValue || record.plainValue)) return "DATABASE";
   return envValue ? "ENVIRONMENT" : "NONE";
 }
