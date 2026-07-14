@@ -11,6 +11,9 @@ import { integrationActorFromSession, integrationProviderFromParam, integrationS
 import { integrationSettingsService } from "@/lib/integration-settings/prisma-service";
 import { withActiveTestState } from "@/lib/integration-settings/safe-snapshot";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 type RouteContext = { params: Promise<{ provider: string }> };
 async function resolveProvider(context: RouteContext) { return integrationProviderFromParam((await context.params).provider); }
 function cronReadOnly(provider: string) {
