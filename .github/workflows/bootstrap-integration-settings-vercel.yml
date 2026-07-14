@@ -1,17 +1,10 @@
 name: Bootstrap Integration Settings on Vercel
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - agent/secure-integration-settings-backend
-    paths:
-      - .github/workflows/bootstrap-integration-settings-vercel.yml
-      - scripts/bootstrap-integration-settings-vercel-ci.sh
-  pull_request:
-    branches:
-      - main
-    types:
-      - synchronize
     paths:
       - .github/workflows/bootstrap-integration-settings-vercel.yml
       - scripts/bootstrap-integration-settings-vercel-ci.sh
@@ -28,7 +21,7 @@ jobs:
   bootstrap:
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/agent/secure-integration-settings-backend') ||
-      (github.event_name == 'pull_request' && github.event.pull_request.number == 127 && github.head_ref == 'agent/secure-integration-settings-backend')
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/agent/secure-integration-settings-backend')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
