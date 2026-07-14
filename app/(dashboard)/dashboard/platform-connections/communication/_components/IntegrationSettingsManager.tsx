@@ -1,23 +1,18 @@
 "use client";
 
 import { ShieldAlert } from "lucide-react";
-import type { SafeIntegrationProviderSnapshot } from "@/lib/integration-settings/types";
 import { IntegrationProviderCards } from "./IntegrationProviderCards";
 import { ProviderFieldsPanel } from "./ProviderFieldsPanel";
-import type { IntegrationUiPermissions, SchedulerUiStatus } from "./model";
+import type { IntegrationUiPermissions, IntegrationUiSnapshot, SchedulerUiStatus } from "./model";
 import { useIntegrationSettings } from "./useIntegrationSettings";
 
-export function IntegrationSettingsManager({
-  initialProviders,
-  permissions,
-  scheduler,
-}: {
-  initialProviders: SafeIntegrationProviderSnapshot[];
+export function IntegrationSettingsManager({ initialProviders, permissions, scheduler }: {
+  initialProviders: IntegrationUiSnapshot[];
   permissions: IntegrationUiPermissions;
   scheduler: SchedulerUiStatus;
 }) {
   const state = useIntegrationSettings(initialProviders);
-  const encryptionMissing = !state.providers.every((item) => item.encryptionKeyConfigured);
+  const encryptionMissing = !state.providers.filter((item) => item.provider !== "SYSTEM").every((item) => item.encryptionKeyConfigured);
 
   return (
     <div className="space-y-5">
@@ -35,7 +30,6 @@ export function IntegrationSettingsManager({
       )}
 
       <IntegrationProviderCards providers={state.providers} active={state.active} onOpen={state.chooseProvider} />
-
       <ProviderFieldsPanel
         snapshot={state.snapshot}
         permissions={permissions}
@@ -44,12 +38,16 @@ export function IntegrationSettingsManager({
         dirty={state.dirty}
         busy={state.busy}
         notice={state.notice}
-        lastTest={state.lastTest}
+        lastCandidateTest={state.lastCandidateTest}
+        lastActiveTest={state.lastActiveTest}
+        brevoWebhookReveal={state.brevoWebhookReveal}
         onDraft={state.updateDraft}
         onSave={state.saveChanges}
-        onTest={state.testConnection}
+        onTestCandidate={state.testCandidate}
+        onTestActive={state.testActive}
         onActivate={state.activateCandidate}
         onDiscard={state.discardCandidate}
+        onRotateBrevoWebhook={state.rotateBrevoWebhook}
         onDelete={state.deleteField}
         onToggle={state.toggleProvider}
         onNotice={state.setNotice}
