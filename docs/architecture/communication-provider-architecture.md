@@ -43,3 +43,25 @@ Brevo is not configured.
 
 ## Return shape
 `sendPreparedDelivery` → `{ ok, provider, providerMessageId?, internalAccepted?, reason?, detail? }`.
+
+## Automatic (trigger) messages
+Automatic donation confirmation / failed-payment / subscription messages are dispatched by
+`lib/events/dispatch.ts` → `lib/communication/automatic-message-dispatcher.ts`. They now use the same
+Communication Center runtime — a `CommunicationDelivery` (origin `TRIGGER`) is created **before** any
+provider call, then advanced to SENT/SKIPPED/FAILED on the real provider outcome. A `SentMessage` row is
+written afterwards as a **secondary mirror** (best-effort, not source of truth).
+
+- **Automatic Email → Brevo** through `sendPreparedDelivery`. Never SendGrid unless
+  `EMAIL_LEGACY_SENDGRID_FALLBACK=true`.
+- **Automatic WhatsApp → Meta** using an approved template. **Exact remaining exception:** the stored
+  `WhatsappTemplate` model has no Meta-approved template-name mapping yet (existing rows are Twilio-imported
+  or MANUAL free-text). Until a template is genuinely Meta-approved (`provider = META`, `approvalStatus =
+  approved`, with a name + language), automatic WhatsApp is **SKIPPED** with
+  `META_TEMPLATE_REQUIRED_FOR_AUTOMATIC_WHATSAPP` — never sent via Twilio, never faked.
+- **Automatic SMS** is implemented (`sendAutomaticSmsMessage`, TR→Netgsm / intl→Brevo) but currently
+  **unreachable**: Prisma `enum MessageChannel` is `EMAIL | WHATSAPP` only, so no trigger emits SMS. Adding
+  an SMS trigger channel is a future schema change (intentionally not done here).
+
+Twilio is disabled by default (`lib/whatsapp.ts` requires `WHATSAPP_LEGACY_TWILIO_ENABLED=true`). The old
+manual route `app/api/templates/whatsapp/send` returns **410** and no longer imports the Twilio path.
+Remaining legacy (not Twilio): `app/api/templates/email/send` still uses SendGrid + SentMessage-only.

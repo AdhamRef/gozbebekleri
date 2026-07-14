@@ -149,8 +149,11 @@ export async function executeCampaignSend(
   const senderConfigs = senders.filter((s) => s.channel === channel).map(toSenderConfig);
   const ruleConfigs = rules.map(toRoutingRuleConfig);
   const rawSenderById = new Map(senders.map((s) => [s.id, s]));
+  // Email identity (final architecture): enabled EMAIL sender email → BREVO_EMAIL_SENDER_EMAIL →
+  // (legacy SendGrid ONLY when EMAIL_LEGACY_SENDGRID_FALLBACK=true). Never SendGrid as normal identity.
+  const legacySendgridFrom = process.env.EMAIL_LEGACY_SENDGRID_FALLBACK === "true" ? process.env.SENDGRID_FROM || null : null;
   const defaultEmailIdentity =
-    senders.find((s) => s.channel === "EMAIL" && s.enabled)?.senderEmail || process.env.SENDGRID_FROM || null;
+    senders.find((s) => s.channel === "EMAIL" && s.enabled)?.senderEmail || process.env.BREVO_EMAIL_SENDER_EMAIL || legacySendgridFrom || null;
 
   // Idempotency: recipients already processed for this campaign+template+channel+origin CAMPAIGN,
   // or any recipient with a providerMessageId already assigned.
@@ -203,7 +206,14 @@ export async function executeCampaignSend(
     let routerSender: { id?: string; provider?: string | null; phoneNumberId?: string | null; senderEmail?: string | null; smsSender?: string | null } | null = null;
     if (channel === "EMAIL") {
       routerSender = defaultEmailIdentity ? { senderEmail: defaultEmailIdentity } : null;
+    } else if (channel === "SMS") {
+      // SMS identity is env-based (Netgsm header / Brevo SMS sender). A CommunicationSender is OPTIONAL:
+      // if one matches routing we use its smsSender, otherwise the provider clients fall back to env.
+      const routed = resolveSender({ channel, locale: r.locale, country: r.country, purpose: purpose === "MARKETING" ? "MARKETING" : "TRANSACTIONAL" }, senderConfigs, ruleConfigs);
+      const raw = "sender" in routed ? rawSenderById.get(routed.sender.id) : null;
+      routerSender = { id: raw?.id, provider: raw?.provider, smsSender: raw?.smsSender ?? null };
     } else {
+      // WhatsApp — requires a Meta sender with a phoneNumberId.
       const routed = resolveSender({ channel, locale: r.locale, country: r.country, purpose: purpose === "MARKETING" ? "MARKETING" : "TRANSACTIONAL" }, senderConfigs, ruleConfigs);
       if ("sender" in routed) {
         const raw = rawSenderById.get(routed.sender.id);

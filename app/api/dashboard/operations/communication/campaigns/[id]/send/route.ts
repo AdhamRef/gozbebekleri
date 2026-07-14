@@ -22,7 +22,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const summary = await executeCampaignSend(id, { actor: auditActorFromDashboardSession(session!), mode: "SEND_NOW" });
   if (summary.blocked) {
     // Clear, specific block reason (NOT_APPROVED / NO_TEMPLATE / LANGUAGE_COVERAGE_INCOMPLETE /
-    // NO_ELIGIBLE_RECIPIENTS / PROVIDER_NOT_CONFIGURED / NO_SENDER_AVAILABLE / SMS_SEND_NOT_IMPLEMENTED / …).
+    // NO_ELIGIBLE_RECIPIENTS / PROVIDER_NOT_CONFIGURED / NO_SENDER_AVAILABLE /
+    // NETGSM_NOT_CONFIGURED / BREVO_SMS_NOT_CONFIGURED / SMS_PROVIDER_NOT_CONFIGURED / …).
     const status = summary.blocked === "NOT_FOUND" ? 404 : 409;
     return NextResponse.json({ error: summary.blocked, reason: summary.blocked, blocked: true, summary }, { status, headers: operationsNoStoreHeaders });
   }

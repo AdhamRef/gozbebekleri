@@ -1,12 +1,26 @@
-import twilio from "twilio";
+/**
+ * LEGACY ONLY — disabled by default. Active WhatsApp sending uses Meta WhatsApp Cloud API through
+ * Communication Center ProviderRouter (lib/communication/provider-router.ts → providers/meta-whatsapp).
+ *
+ * This Twilio-backed path is retained ONLY for emergency/manual migration and is HARD-DISABLED unless
+ * `WHATSAPP_LEGACY_TWILIO_ENABLED === "true"`. When disabled it initializes no Twilio client, sends
+ * nothing, and returns a failed result (`TWILIO_LEGACY_DISABLED`) for every recipient so callers
+ * archive SKIPPED/FAILED — never a fake success. No active Communication Center route relies on this.
+ */
 
-let cachedClient: ReturnType<typeof twilio> | null = null;
+const LEGACY_TWILIO_ENABLED = () => process.env.WHATSAPP_LEGACY_TWILIO_ENABLED === "true";
 
-function getClient() {
+// Lazily-imported Twilio client (only ever loaded when the legacy flag is explicitly on).
+let cachedClient: unknown = null;
+
+async function getClient() {
+  if (!LEGACY_TWILIO_ENABLED()) return null;
   if (cachedClient) return cachedClient;
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
   if (!sid || !token) return null;
+  // Dynamic import so `twilio` is never initialized in the default (disabled) path.
+  const { default: twilio } = await import("twilio");
   cachedClient = twilio(sid, token);
   return cachedClient;
 }
@@ -35,20 +49,28 @@ export interface WhatsappResult {
   failed: { to: string; error: string }[];
 }
 
+/**
+ * LEGACY Twilio bulk WhatsApp. Disabled by default — returns `TWILIO_LEGACY_DISABLED` for every
+ * recipient unless `WHATSAPP_LEGACY_TWILIO_ENABLED=true`. Even with the flag on this is emergency-only
+ * and is not wired into any active Communication Center send path.
+ */
 export async function sendBulkWhatsapp(
   recipients: WhatsappRecipient[]
 ): Promise<WhatsappResult> {
   const out: WhatsappResult = { sent: 0, failed: [] };
   if (recipients.length === 0) return out;
 
-  const client = getClient();
+  // HARD GUARD: Twilio WhatsApp is legacy-disabled. Never sends unless the explicit flag is set.
+  if (!LEGACY_TWILIO_ENABLED()) {
+    out.failed = recipients.map((r) => ({ to: r.to, error: "TWILIO_LEGACY_DISABLED" }));
+    return out;
+  }
+
+  type TwilioLike = { messages: { create: (a: { from: string; to: string; body: string }) => Promise<unknown> } };
+  const client = (await getClient()) as TwilioLike | null;
   const from = getFrom();
   if (!client || !from) {
-    // No provider configured — do NOT count as sent. Record the honest failure reason so
-    // callers archive SKIPPED/FAILED (never a fake success). Previews/renders are separate.
-    console.log(
-      `\n[WHATSAPP] missing TWILIO_ACCOUNT_SID/AUTH_TOKEN/WHATSAPP_FROM; not sending to ${recipients.length} recipients`
-    );
+    // Flag on but credentials missing — do NOT count as sent. Honest failure reason.
     out.failed = recipients.map((r) => ({ to: r.to, error: "WHATSAPP_PROVIDER_NOT_CONFIGURED" }));
     return out;
   }

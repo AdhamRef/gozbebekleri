@@ -7,10 +7,15 @@ export const dynamic = "force-dynamic";
 /**
  * Brevo transactional webhook (email + SMS delivery events). Public endpoint (Brevo calls it).
  *
- * Brevo does not sign transactional webhooks, so — when `BREVO_SMS_WEBHOOK_SECRET` is configured — we
- * require a matching `?token=` on the URL as a shared secret; otherwise processing is a safe no-op.
+ * Brevo does not sign transactional webhooks, so we require a matching `?token=` on the URL as a shared
+ * secret (`BREVO_SMS_WEBHOOK_SECRET`). Security posture:
+ *   - PRODUCTION: fail-closed. If the secret is missing → 401 and NO processing / NO DB write. If the
+ *     secret is set → the `?token=` must match.
+ *   - DEVELOPMENT: if the secret is missing, allow a safe no-op for local testing (still only advances
+ *     an existing delivery); if set, the token must match.
  * We only ADVANCE an already-accepted delivery (matched by providerMessageId) to DELIVERED/READ/
- * OPENED/CLICKED/FAILED — we never create or fake a SENT here. Always 200 so Brevo does not retry.
+ * OPENED/CLICKED/FAILED — we never create or fake a SENT here. Always 200 (once authorized) so Brevo
+ * does not retry.
  */
 
 const EMAIL_STATUS: Record<string, string> = {
@@ -47,9 +52,14 @@ function timestampField(status: string): Record<string, Date> {
 }
 
 export async function POST(req: NextRequest) {
-  // Optional shared-secret gate.
+  // Shared-secret gate — fail-closed in production.
   const secret = process.env.BREVO_SMS_WEBHOOK_SECRET?.trim();
-  if (secret) {
+  const isProduction = process.env.NODE_ENV === "production";
+  if (!secret) {
+    // Production without a configured secret must never process events (no DB writes).
+    if (isProduction) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    // Development: allow a safe no-op path for local testing (still only advances existing deliveries).
+  } else {
     const token = req.nextUrl.searchParams.get("token");
     if (token !== secret) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }

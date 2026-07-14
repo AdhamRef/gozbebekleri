@@ -7,8 +7,6 @@ import {
   type TemplateContext,
 } from "@/lib/templates/variables";
 import { renderEmailHtml, renderEmailSubject } from "@/lib/templates/render";
-import { sendBulkEmail } from "@/lib/email";
-import { sendBulkWhatsapp } from "@/lib/whatsapp";
 import { writeAuditLog } from "@/lib/audit-log";
 import {
   pickLocale,
@@ -17,10 +15,15 @@ import {
 } from "@/lib/templates/locale-resolver";
 import type { TReaderDocument } from "@usewaypoint/email-builder";
 import { notifyDonationEvent } from "@/lib/telegram/notify";
-import { logSentMessage } from "@/lib/messaging/log-sent";
 import { sendDonationServerConversions } from "@/lib/tracking/donation-conversion-server";
 import { upsertProfileForUser } from "@/lib/communication/donor-communication-profile-service";
-import type { Prisma } from "@prisma/client";
+import {
+  sendAutomaticEmailMessage,
+  sendAutomaticWhatsappMessage,
+  resolveMetaTemplateMapping,
+} from "@/lib/communication/automatic-message-dispatcher";
+import { listSenders } from "@/lib/communication/sender-service";
+import { metaDefaultPhoneNumberId } from "@/lib/communication/provider-env";
 
 /** Keep in sync with prisma `enum MessageTriggerEvent`. */
 export type MessageTriggerEvent =
@@ -92,7 +95,23 @@ export async function dispatchEvent(
     // have is the recipient's preferredLang. Falls back to ar when missing.
     const locale = pickLocale({ recipientLang: ctx.user.preferredLang });
 
-    const variablesSnapshot = ctx as unknown as Prisma.InputJsonValue;
+    const variablesSnapshot = ctx as unknown as Record<string, unknown>;
+
+    // Resolve provider identities once (Communication Center final architecture):
+    //   EMAIL    → enabled EMAIL sender email → BREVO_EMAIL_SENDER_EMAIL → (legacy SendGrid only if flag)
+    //   WHATSAPP → enabled Meta sender with a phoneNumberId → META_WHATSAPP_PHONE_NUMBER_ID env
+    const senders = await listSenders().catch(() => []);
+    const emailIdentity =
+      senders.find((s) => s.channel === "EMAIL" && s.enabled)?.senderEmail ||
+      process.env.BREVO_EMAIL_SENDER_EMAIL?.trim() ||
+      (process.env.EMAIL_LEGACY_SENDGRID_FALLBACK === "true" ? process.env.SENDGRID_FROM?.trim() || null : null) ||
+      null;
+    const metaSenderRow = senders.find((s) => s.channel === "WHATSAPP" && s.enabled && s.phoneNumberId);
+    const whatsappSender: { id: string | null; phoneNumberId: string | null } | null = metaSenderRow
+      ? { id: metaSenderRow.id, phoneNumberId: metaSenderRow.phoneNumberId }
+      : metaDefaultPhoneNumberId()
+        ? { id: null, phoneNumberId: metaDefaultPhoneNumberId() }
+        : null;
 
     for (const trigger of triggers) {
       try {
@@ -102,91 +121,47 @@ export async function dispatchEvent(
           const variant = resolveEmailVariant(tpl, locale);
           const html = await renderEmailHtml(variant.document as TReaderDocument, ctx);
           const subject = renderEmailSubject(variant.subject, ctx);
-          if (!ctx.user.email) {
-            await logSentMessage({
-              channel: "EMAIL",
-              origin: "TRIGGER",
-              status: "SKIPPED",
-              templateId: tpl.id,
-              templateName: tpl.name,
-              triggerEvent: event,
-              locale,
-              recipientUserId: ctx.user.id,
-              recipientEmail: null,
-              recipientName: ctx.user.name || null,
-              renderedSubject: subject,
-              renderedBody: html,
-              variables: variablesSnapshot,
-              errorMessage: "Recipient has no email address",
-              donationId: input.donationId ?? null,
-            });
-            continue;
-          }
-          const r = await sendBulkEmail([{ to: ctx.user.email, subject, html }]);
-          result.emailsSent += r.sent;
-          if (r.failed.length > 0) result.errors += r.failed.length;
-          const failure = r.failed[0]?.error;
-          await logSentMessage({
-            channel: "EMAIL",
-            origin: "TRIGGER",
-            status: failure ? "FAILED" : "SENT",
+          // Brevo through CommunicationDelivery + ProviderRouter. Never SendGrid unless legacy flag.
+          const r = await sendAutomaticEmailMessage({
+            triggerEvent: event,
             templateId: tpl.id,
             templateName: tpl.name,
-            triggerEvent: event,
             locale,
             recipientUserId: ctx.user.id,
-            recipientEmail: ctx.user.email,
             recipientName: ctx.user.name || null,
+            recipientEmail: ctx.user.email ?? null,
             renderedSubject: subject,
             renderedBody: html,
+            senderEmail: emailIdentity,
             variables: variablesSnapshot,
-            errorMessage: failure ?? null,
             donationId: input.donationId ?? null,
           });
+          if (r.outcome === "SENT") result.emailsSent += 1;
+          else if (r.outcome === "FAILED") result.errors += 1;
         } else if (trigger.channel === "WHATSAPP") {
           const tpl = await prisma.whatsappTemplate.findUnique({ where: { id: trigger.templateId } });
           if (!tpl) continue;
           const variant = resolveWhatsappBody(tpl, locale);
           const body = mergeText(variant.body, ctx);
-          if (!ctx.user.phone) {
-            await logSentMessage({
-              channel: "WHATSAPP",
-              origin: "TRIGGER",
-              status: "SKIPPED",
-              templateId: tpl.id,
-              templateName: tpl.name,
-              triggerEvent: event,
-              locale,
-              recipientUserId: ctx.user.id,
-              recipientPhone: null,
-              recipientName: ctx.user.name || null,
-              renderedBody: body,
-              variables: variablesSnapshot,
-              errorMessage: "Recipient has no phone number",
-              donationId: input.donationId ?? null,
-            });
-            continue;
-          }
-          const r = await sendBulkWhatsapp([{ to: ctx.user.phone, body }]);
-          result.whatsappSent += r.sent;
-          if (r.failed.length > 0) result.errors += r.failed.length;
-          const failure = r.failed[0]?.error;
-          await logSentMessage({
-            channel: "WHATSAPP",
-            origin: "TRIGGER",
-            status: failure ? "FAILED" : "SENT",
+          // Meta Cloud API through CommunicationDelivery. Requires an approved Meta template mapping;
+          // otherwise the delivery is SKIPPED (META_TEMPLATE_REQUIRED_FOR_AUTOMATIC_WHATSAPP). No Twilio.
+          const metaTemplate = resolveMetaTemplateMapping(tpl, locale);
+          const r = await sendAutomaticWhatsappMessage({
+            triggerEvent: event,
             templateId: tpl.id,
             templateName: tpl.name,
-            triggerEvent: event,
             locale,
             recipientUserId: ctx.user.id,
-            recipientPhone: ctx.user.phone,
             recipientName: ctx.user.name || null,
+            recipientPhone: ctx.user.phone ?? null,
             renderedBody: body,
+            metaTemplate,
+            sender: whatsappSender,
             variables: variablesSnapshot,
-            errorMessage: failure ?? null,
             donationId: input.donationId ?? null,
           });
+          if (r.outcome === "SENT") result.whatsappSent += 1;
+          else if (r.outcome === "FAILED") result.errors += 1;
         }
       } catch (err) {
         result.errors += 1;

@@ -1,57 +1,19 @@
-import type { ProviderConnection } from "./communication-types";
-
-export const communicationProviderRegistry: ProviderConnection[] = [
-  {
-    key: "META_WHATSAPP",
-    channel: "WHATSAPP",
-    name: "Meta WhatsApp Cloud API",
-    status: "NOT_CONFIGURED",
-    isPrimary: true,
-    supportsTransactional: true,
-    supportsMarketing: true,
-    notes: "Direct WhatsApp provider. Template approval and webhook handling should stay provider-specific behind the adapter.",
-  },
-  {
-    key: "BREVO_EMAIL",
-    channel: "EMAIL",
-    name: "Brevo Email",
-    status: "NOT_CONFIGURED",
-    isPrimary: true,
-    supportsTransactional: true,
-    supportsMarketing: true,
-    notes: "Primary email provider for transactional email and campaigns.",
-  },
-  {
-    key: "BREVO_SMS",
-    channel: "SMS",
-    name: "Brevo SMS",
-    status: "NOT_CONFIGURED",
-    isPrimary: true,
-    supportsTransactional: true,
-    supportsMarketing: false,
-    notes: "Initial SMS provider for critical transactional messages only.",
-  },
-  {
-    key: "SMS_FALLBACK",
-    channel: "SMS",
-    name: "SMS fallback provider",
-    status: "DISABLED",
-    isPrimary: false,
-    supportsTransactional: true,
-    supportsMarketing: false,
-    notes: "Reserved for ClickSend, Infobip, or a local provider when country coverage requires fallback.",
-  },
-];
-
-export function providerForChannel(channel: ProviderConnection["channel"]) {
-  return communicationProviderRegistry.find((provider) => provider.channel === channel && provider.isPrimary);
-}
+import type { CommunicationProviderKey, ProviderConnection } from "./communication-types";
 
 /* ============================================================================
- * OFFICIAL FINAL PROVIDER REGISTRY (single source of truth)
- * Used by: ProviderRouter, settings/readiness UI, platform-connections page,
- * provider test tools, and docs. Inactive/legacy providers must NOT be shown as
- * normal active options in user-facing UI.
+ * OFFICIAL FINAL PROVIDER REGISTRY — SINGLE SOURCE OF TRUTH
+ *
+ * Used by: ProviderRouter, settings/readiness UI, platform-connections page, provider test tools,
+ * and docs. Inactive/legacy providers (Twilio, SendGrid) must NEVER be shown as normal active
+ * options in user-facing UI — surface them only via legacyProviders() under a "قديم" section.
+ *
+ * FINAL ARCHITECTURE:
+ *   WhatsApp → Meta WhatsApp Cloud API   (active)
+ *   Email    → Brevo Email               (active)
+ *   SMS TR   → Netgsm                     (active)
+ *   SMS int'l→ Brevo SMS                  (active)
+ *   Twilio   → LEGACY_DISABLED
+ *   SendGrid → LEGACY_DISABLED
  * ==========================================================================*/
 
 export type ProviderChannel = "WHATSAPP" | "EMAIL" | "SMS";
@@ -76,7 +38,7 @@ export const PROVIDER_REGISTRY: OfficialProvider[] = [
   // SMS
   { key: "BREVO_SMS", channel: "SMS", labelAr: "Brevo SMS", active: true, legacy: false, scope: "INTERNATIONAL", status: "ACTIVE" },
   { key: "NETGSM_SMS", channel: "SMS", labelAr: "Netgsm SMS", active: true, legacy: false, scope: "TR", status: "ACTIVE" },
-  // Legacy
+  // Legacy (disabled — never an active send path)
   { key: "TWILIO", channel: "SMS", labelAr: "Twilio", active: false, legacy: true, status: "DISABLED" },
 ];
 
@@ -106,3 +68,33 @@ export const OFFICIAL_PROVIDER_MATRIX = {
   smsTurkey: "NETGSM_SMS",
   legacyDisabled: ["TWILIO", "SENDGRID"],
 } as const;
+
+/* ============================================================================
+ * Compatibility export derived from the final provider registry; do not edit separately.
+ *
+ * Kept only for the older readiness/overview screens (provider-connections readiness,
+ * communication-service overview, operations/messaging page) that consumed the previous
+ * `ProviderConnection[]` shape. It is derived from PROVIDER_REGISTRY and contains ONLY the active,
+ * user-facing providers whose keys are valid `CommunicationProviderKey` values (Meta / Brevo Email /
+ * Brevo SMS). The retired `SMS_FALLBACK` pseudo-provider has been removed; Twilio/SendGrid are never
+ * included here (they live in PROVIDER_REGISTRY as legacy-disabled and surface via legacyProviders()).
+ * ==========================================================================*/
+
+const COMPAT_KEYS: readonly CommunicationProviderKey[] = ["META_WHATSAPP", "BREVO_EMAIL", "BREVO_SMS"];
+
+export const communicationProviderRegistry: ProviderConnection[] = PROVIDER_REGISTRY.filter(
+  (p): p is OfficialProvider & { key: CommunicationProviderKey } => (COMPAT_KEYS as readonly string[]).includes(p.key)
+).map((p) => ({
+  key: p.key,
+  channel: p.channel,
+  name: p.labelAr,
+  status: "NOT_CONFIGURED",
+  isPrimary: true,
+  supportsTransactional: true,
+  supportsMarketing: p.channel !== "SMS",
+  notes: null,
+}));
+
+export function providerForChannel(channel: ProviderConnection["channel"]) {
+  return communicationProviderRegistry.find((provider) => provider.channel === channel && provider.isPrimary);
+}

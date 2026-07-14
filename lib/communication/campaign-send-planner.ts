@@ -3,6 +3,7 @@ import { loadCampaignRecipients, type CampaignRecipient } from "./campaign-recip
 import { evaluateCoverageGate } from "./campaign-approval-service";
 import { listSenders } from "./sender-service";
 import { isSendEnabled } from "./provider-router";
+import { resolveSmsProvider } from "./providers/sms/client";
 import { isCommunicationChannel, type CommunicationChannelId } from "./communication-runtime-types";
 
 /**
@@ -13,7 +14,8 @@ import { isCommunicationChannel, type CommunicationChannelId } from "./communica
  *
  * Blocked reasons (precedence order):
  *   NOT_FOUND · NO_TEMPLATE · INVALID_CHANNEL · LANGUAGE_COVERAGE_INCOMPLETE ·
- *   NO_ELIGIBLE_RECIPIENTS · PROVIDER_NOT_CONFIGURED · SMS_SEND_NOT_IMPLEMENTED · NO_SENDER_AVAILABLE
+ *   NO_ELIGIBLE_RECIPIENTS · (SMS) NETGSM_NOT_CONFIGURED / BREVO_SMS_NOT_CONFIGURED /
+ *   SMS_PROVIDER_NOT_CONFIGURED · PROVIDER_NOT_CONFIGURED · NO_SENDER_AVAILABLE
  */
 
 export type SendPlan = {
@@ -68,16 +70,46 @@ export async function planCampaignSend(campaignId: string, opts: { batchSize?: n
 
   if (recipients.length === 0) return { ...partial, blocked: "NO_ELIGIBLE_RECIPIENTS" };
 
-  // Provider readiness.
-  if (channel === "SMS") return { ...partial, providerReady: false, blocked: "SMS_SEND_NOT_IMPLEMENTED" };
+  // SMS provider readiness — routed per recipient (TR → Netgsm, international → Brevo SMS). No Twilio.
+  // Sender identity for SMS comes from env (NETGSM_HEADER / BREVO_SMS_SENDER); no phoneNumberId and no
+  // CommunicationSender row are required. A missing provider for the routed recipients blocks the send.
+  if (channel === "SMS") {
+    let trCount = 0;
+    let intlCount = 0;
+    let missingTR = false;
+    let missingIntl = false;
+    for (const r of recipients) {
+      const route = resolveSmsProvider(r.country, r.phone);
+      if (route.provider === "NETGSM_SMS") {
+        trCount += 1;
+        if (!route.configured) missingTR = true;
+      } else {
+        intlCount += 1;
+        if (!route.configured) missingIntl = true;
+      }
+    }
+    if (missingTR || missingIntl) {
+      const smsReasons = { ...reasons };
+      if (missingTR) smsReasons["NETGSM_NOT_CONFIGURED"] = trCount;
+      if (missingIntl) smsReasons["BREVO_SMS_NOT_CONFIGURED"] = intlCount;
+      const blocked = missingTR && missingIntl ? "SMS_PROVIDER_NOT_CONFIGURED" : missingTR ? "NETGSM_NOT_CONFIGURED" : "BREVO_SMS_NOT_CONFIGURED";
+      return { ...partial, reasons: smsReasons, providerReady: false, senderReady: false, blocked };
+    }
+    return { ...partial, providerReady: true, senderReady: true, willSend: true };
+  }
+
+  // Provider readiness (WhatsApp / Email).
   const providerReady = isSendEnabled(channel);
   if (!providerReady) return { ...partial, providerReady: false, blocked: "PROVIDER_NOT_CONFIGURED" };
 
-  // Sender readiness.
+  // Sender readiness. Email identity: enabled EMAIL sender email → BREVO_EMAIL_SENDER_EMAIL →
+  // (legacy SendGrid only when EMAIL_LEGACY_SENDGRID_FALLBACK=true). WhatsApp: an ACTIVE Meta sender
+  // with a phoneNumberId.
   const senders = await listSenders();
+  const legacySendgrid = process.env.EMAIL_LEGACY_SENDGRID_FALLBACK === "true" ? process.env.SENDGRID_FROM : null;
   const senderReady =
     channel === "EMAIL"
-      ? !!(senders.find((s) => s.channel === "EMAIL" && s.enabled)?.senderEmail || process.env.SENDGRID_FROM)
+      ? !!(senders.find((s) => s.channel === "EMAIL" && s.enabled)?.senderEmail || process.env.BREVO_EMAIL_SENDER_EMAIL || legacySendgrid)
       : senders.some((s) => s.channel === channel && s.enabled && s.status === "ACTIVE" && !!s.phoneNumberId);
   if (!senderReady) return { ...partial, providerReady, senderReady: false, blocked: "NO_SENDER_AVAILABLE" };
 
