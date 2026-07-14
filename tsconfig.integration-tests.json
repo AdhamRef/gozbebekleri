@@ -15,6 +15,7 @@
     "lib/integration-settings/catalog.ts",
     "lib/integration-settings/crypto.ts",
     "lib/integration-settings/helpers.ts",
+    "lib/integration-settings/provider-testing/**/*.ts",
     "lib/integration-settings/resolver.ts",
     "lib/integration-settings/service.ts",
     "lib/integration-settings/types.ts",
