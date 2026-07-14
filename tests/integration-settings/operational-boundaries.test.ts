@@ -76,13 +76,13 @@ test("Brevo webhook token is server-generated and canonical URL contains it once
   const second = generateBrevoWebhookToken();
   assert.ok(first.length >= 43);
   assert.notEqual(first, second);
-  const url = buildBrevoWebhookUrl(first, { NEXTAUTH_URL: "https://example.org" });
+  const url = buildBrevoWebhookUrl(first, { NODE_ENV: "test", NEXTAUTH_URL: "https://example.org" });
   assert.equal(url, `https://example.org/api/webhooks/brevo/transactional?token=${encodeURIComponent(first)}`);
   assert.equal((url.match(/token=/g) ?? []).length, 1);
 });
 
 test("Brevo webhook resolves active DB before environment and ignores candidate material", () => {
-  const env = { BREVO_SMS_WEBHOOK_SECRET: "environment-secret" };
+  const env = { NODE_ENV: "test", BREVO_SMS_WEBHOOK_SECRET: "environment-secret" };
   assert.equal(resolveBrevoWebhookSecret("active-database-secret", env), "active-database-secret");
   assert.equal(resolveBrevoWebhookSecret(null, env), "environment-secret");
   const pendingCandidate = "pending-candidate-secret";
@@ -98,7 +98,7 @@ test("Brevo webhook comparison is timing-safe compatible and no token appears in
 
 test("Cron uses environment bearer only and protection check does not invoke a provider tester", async () => {
   const secret = "cron-secret-that-is-long-enough-for-infrastructure-123";
-  const env = { CRON_SECRET: secret };
+  const env = { NODE_ENV: "test", CRON_SECRET: secret };
   assert.equal(cronInfrastructureStatus(env).routeProtected, true);
   assert.equal(isCronAuthorizationValid(`Bearer ${secret}`, env), true);
   let testerCalled = false;
