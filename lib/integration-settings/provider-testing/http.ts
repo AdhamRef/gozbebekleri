@@ -20,3 +20,15 @@ export async function providerFetch(
     const response = await fetchImpl(url, {
       ...init,
       signal: controller.signal,
+    });
+    const text = await response.text().catch(() => "");
+    let body: unknown = null;
+    if (text) {
+      try { body = JSON.parse(text); }
+      catch { body = null; }
+    }
+    return { ok: response.ok, status: response.status, body, text };
+  } finally {
+    clearTimeout(timer);
+  }
+}
