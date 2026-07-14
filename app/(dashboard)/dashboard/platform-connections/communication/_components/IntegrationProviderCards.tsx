@@ -2,8 +2,8 @@
 
 import { CheckCircle2, CircleAlert, Clock3, Mail, MessageCircle, MessageSquare, Settings2 } from "lucide-react";
 import type { IntegrationProvider } from "@/lib/integration-settings/catalog";
-import type { SafeIntegrationProviderSnapshot } from "@/lib/integration-settings/types";
 import { INTEGRATION_UI_STATUS_LABEL, PROVIDER_UI_LABEL, PROVIDER_USAGE, uiStatus } from "@/lib/integration-settings/ui";
+import type { IntegrationUiSnapshot } from "./model";
 
 const icons = {
   META_WHATSAPP: MessageCircle,
@@ -12,12 +12,8 @@ const icons = {
   SYSTEM: Clock3,
 } satisfies Record<IntegrationProvider, typeof MessageCircle>;
 
-export function IntegrationProviderCards({
-  providers,
-  active,
-  onOpen,
-}: {
-  providers: SafeIntegrationProviderSnapshot[];
+export function IntegrationProviderCards({ providers, active, onOpen }: {
+  providers: IntegrationUiSnapshot[];
   active: IntegrationProvider;
   onOpen: (provider: IntegrationProvider) => void;
 }) {
@@ -27,8 +23,10 @@ export function IntegrationProviderCards({
         const provider = snapshot.provider;
         const Icon = icons[provider];
         const status = uiStatus(snapshot);
-        const completed = snapshot.fields.filter((field) => field.configured).length;
-        const missing = snapshot.missingRequiredFields.length;
+        const infrastructureOnly = provider === "SYSTEM";
+        const completed = infrastructureOnly ? (snapshot.activeTest.lastTestResult === "SUCCESS" ? 1 : 0) : snapshot.fields.filter((field) => field.configured).length;
+        const total = infrastructureOnly ? 1 : snapshot.fields.length;
+        const missing = infrastructureOnly ? (completed ? 0 : 1) : snapshot.missingRequiredFields.length;
         const isActive = active === provider;
         return (
           <article key={provider} className={`flex min-h-[230px] flex-col rounded-xl border bg-white p-4 shadow-sm transition ${isActive ? "border-[#025EB8] ring-2 ring-blue-100" : "border-slate-200 hover:border-blue-300"}`}>
@@ -42,10 +40,10 @@ export function IntegrationProviderCards({
             <h2 className="mt-3 text-base font-black text-slate-900">{PROVIDER_UI_LABEL[provider]}</h2>
             <p className="mt-1 min-h-10 text-xs leading-5 text-slate-500">{PROVIDER_USAGE[provider]}</p>
             <div className="mt-3 space-y-1 text-xs text-slate-600">
-              <p>الحقول المكتملة: <b className="text-slate-900">{completed}/{snapshot.fields.length}</b></p>
-              <p>الحقول الناقصة: <b className={missing ? "text-amber-700" : "text-emerald-700"}>{missing}</b></p>
-              <p>آخر اختبار: <b className="text-slate-900">{snapshot.candidate.lastTestAt ? new Date(snapshot.candidate.lastTestAt).toLocaleString("ar") : "لم يتم"}</b></p>
-              <p>المصدر: <b className="text-slate-900">{snapshot.fields.some((field) => field.source === "DATABASE") ? "محفوظ داخل النظام" : snapshot.fields.some((field) => field.source === "ENVIRONMENT") ? "إعدادات السيرفر" : "غير مضبوط"}</b></p>
+              <p>الإعدادات المكتملة: <b className="text-slate-900">{completed}/{total}</b></p>
+              <p>الإعدادات الناقصة: <b className={missing ? "text-amber-700" : "text-emerald-700"}>{missing}</b></p>
+              <p>آخر فحص للتكوين العامل: <b className="text-slate-900">{snapshot.activeTest.lastTestAt ? new Date(snapshot.activeTest.lastTestAt).toLocaleString("ar") : "لم يتم"}</b></p>
+              {snapshot.candidate.hasChanges ? <p className="font-bold text-amber-700">توجد تغييرات بانتظار الاختبار أو الاعتماد.</p> : null}
             </div>
             <button type="button" onClick={() => onOpen(provider)} className="mt-auto inline-flex h-9 items-center justify-center gap-2 rounded-md bg-[#025EB8] px-3 text-xs font-bold text-white transition hover:bg-[#024a92] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
               <Settings2 className="h-4 w-4" /> فتح الإعدادات
