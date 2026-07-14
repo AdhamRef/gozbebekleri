@@ -1,0 +1,29 @@
+name: Temporary Vercel integration bootstrap
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: temporary-vercel-integration-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TARGET_COMMIT_SHA: 4df82817f55e146a150b7b479124f700e0cdf488
+      TARGET_BRANCH: agent/secure-integration-settings-backend
+      VERCEL_PROJECT_NAME: gozbebekleri
+      VERCEL_PROJECT_ID: prj_hkMyu8iABc7AAqF7T1DvYRpKYRqV
+      VERCEL_TEAM_SCOPE: gozbebekleri-dernek
+      VERCEL_TEAM_ID: team_zLLO1Hql8hFDCswcnpMMDCBj
+      SAFE_REPORT: ${{ runner.temp }}/temporary-vercel-integration-bootstrap-report.md
+
+    steps:
+     
