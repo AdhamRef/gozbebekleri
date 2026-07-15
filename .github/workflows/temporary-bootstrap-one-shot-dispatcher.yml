@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '7,17,27,37,47,57 * * * *'
+  issue_comment:
+    types:
+      - created
 
 permissions:
   actions: write
@@ -12,6 +15,15 @@ permissions:
 
 jobs:
   dispatch:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.number == 127 &&
+        github.event.comment.body == '/dispatch-temp-bootstrap-20260715' &&
+        github.actor == 'saladin76'
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -27,6 +39,11 @@ jobs:
         run: |
           set -Eeuo pipefail
 
+          if gh api "repos/$REPOSITORY/git/ref/tags/$MARKER_TAG" >/dev/null 2>&1; then
+            echo "ALREADY_DISPATCHED" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
           ERROR_LOG="$RUNNER_TEMP/dispatcher-error.log"
           REPORT_FILE="$RUNNER_TEMP/dispatcher-report.md"
           rm -f "$ERROR_LOG" "$REPORT_FILE"
@@ -34,11 +51,6 @@ jobs:
             rm -f "$ERROR_LOG" "$REPORT_FILE"
           }
           trap cleanup EXIT
-
-          if gh api "repos/$REPOSITORY/git/ref/tags/$MARKER_TAG" >/dev/null 2>&1; then
-            echo "ALREADY_DISPATCHED" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
 
           MAIN_SHA="$(gh api "repos/$REPOSITORY/git/ref/heads/main" --jq '.object.sha' 2>"$ERROR_LOG")"
           if [[ -z "$MAIN_SHA" ]]; then
@@ -52,6 +64,10 @@ jobs:
           if ! gh api --method POST "repos/$REPOSITORY/git/refs" \
             -f ref="refs/tags/$MARKER_TAG" \
             -f sha="$MAIN_SHA" >/dev/null 2>"$ERROR_LOG"; then
+            if gh api "repos/$REPOSITORY/git/ref/tags/$MARKER_TAG" >/dev/null 2>&1; then
+              echo "ALREADY_DISPATCHED" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
             CLASSIFICATION="UNKNOWN_DISPATCH_FAILURE"
             if grep -Eqi '403|forbidden|resource not accessible|permission' "$ERROR_LOG"; then
               CLASSIFICATION="ACTIONS_PERMISSION_DENIED"
