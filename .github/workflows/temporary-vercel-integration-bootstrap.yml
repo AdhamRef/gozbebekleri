@@ -53,7 +53,7 @@ jobs:
 
       - name: Install project dependencies
         id: npm_ci
-        run: npm ci
+        run: npm ci --force
 
       - name: Install pinned Vercel CLI
         id: install_vercel
