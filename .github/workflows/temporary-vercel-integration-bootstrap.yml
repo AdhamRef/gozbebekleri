@@ -1,16 +1,150 @@
 name: Temporary Vercel integration bootstrap
-
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/temporary-vercel-integration-bootstrap.yml
-
-concurrency:
-  group: temporary-vercel-integration-bootstrap
-  cancel-in-progress: false
-
+    branches: [main]
+    paths: [.github/workflows/temporary-vercel-integration-bootstrap.yml]
+concurrency: {group: temporary-vercel-integration-bootstrap, cancel-in-progress: false}
 env:
-  EXPECTED_TARGET_SHA: 4df828
+  EXPECTED_TARGET_SHA: 4df82817f55e146a150b7b479124f700e0cdf488
+  TARGET_BRANCH: agent/secure-integration-settings-backend
+  VERCEL_PROJECT_NAME: gozbebekleri
+  VERCEL_PROJECT_ID: prj_hkMyu8iABc7AAqF7T1DvYRpKYRqV
+  VERCEL_TEAM_SCOPE: gozbebekleri-dernek
+  VERCEL_TEAM_ID: team_zLLO1Hql8hFDCswcnpMMDCBj
+jobs:
+  repair_lockfile:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, 'Trigger temporary Vercel integration bootstrap'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions: {contents: write}
+    outputs:
+      result: ${{ steps.out.outputs.result }}
+      blocker: ${{ steps.out.outputs.blocker }}
+      old_sha: ${{ steps.out.outputs.old_sha }}
+      new_target_sha: ${{ steps.out.outputs.new_sha }}
+      additions: ${{ steps.out.outputs.additions }}
+      deletions: ${{ steps.out.outputs.deletions }}
+      npm_ci: ${{ steps.out.outputs.npm_ci }}
+      tests: ${{ steps.out.outputs.tests }}
+      types: ${{ steps.out.outputs.types }}
+      build: ${{ steps.out.outputs.build }}
+      push: ${{ steps.out.outputs.push }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: agent/secure-integration-settings-backend, fetch-depth: 0, persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm}
+      - name: Repair, verify, test, and commit lockfile
+        id: repair
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          S="$RUNNER_TEMP/s"; mkdir -p "$S"; fail(){ printf '%s\n' "$1" > "$S/blocker"; exit 1; }
+          SHA="$(git rev-parse HEAD)"; printf '%s\n' "$SHA" > "$S/old_sha"; [[ "$SHA" == "$EXPECTED_TARGET_SHA" ]] || fail TARGET_BRANCH_MOVED
+          P="$RUNNER_TEMP/package.json.before"; cp package.json "$P"
+          node - <<'NODE'
+          const f=require('fs'),p=JSON.parse(f.readFileSync('package.json'));
+          const s=x=>JSON.stringify(Object.fromEntries(Object.entries(x||{}).sort(([a],[b])=>a.localeCompare(b))));
+          f.writeFileSync(process.env.RUNNER_TEMP+'/deps',s(p.dependencies));f.writeFileSync(process.env.RUNNER_TEMP+'/devdeps',s(p.devDependencies));
+          NODE
+          L="$RUNNER_TEMP/npm.log"; trap 'rm -f "$L" "$RUNNER_TEMP"/*.log' EXIT
+          npm install -g npm@10.9.2 --no-audit --no-fund > "$L" 2>&1 || fail NPM_PIN_FAILED
+          [[ "$(npm -v)" == 10.9.2 ]] || fail NPM_VERSION_MISMATCH
+          npm install --package-lock-only --force --ignore-scripts --no-audit --no-fund > "$L" 2>&1 || fail LOCKFILE_REPAIR_FAILED
+          cmp -s package.json "$P" || { git checkout -- package.json package-lock.json; fail PACKAGE_JSON_CHANGED; }
+          mapfile -t C < <(git diff --name-only); [[ ${#C[@]} -eq 1 && "${C[0]}" == package-lock.json ]] || { git checkout -- package.json package-lock.json; fail UNEXPECTED_CHANGED_FILES; }
+          node - <<'NODE'
+          const f=require('fs'),p=JSON.parse(f.readFileSync('package.json')),l=JSON.parse(f.readFileSync('package-lock.json'));
+          const s=x=>JSON.stringify(Object.fromEntries(Object.entries(x||{}).sort(([a],[b])=>a.localeCompare(b))));
+          if(l.lockfileVersion!==3)throw Error('LOCKFILE_VERSION');const r=l.packages?.['']||{};
+          if(s(r.dependencies)!==s(p.dependencies)||s(r.devDependencies)!==s(p.devDependencies))throw Error('ROOT_MISMATCH');
+          if(s(p.dependencies)!==f.readFileSync(process.env.RUNNER_TEMP+'/deps','utf8')||s(p.devDependencies)!==f.readFileSync(process.env.RUNNER_TEMP+'/devdeps','utf8'))throw Error('DIRECT_DEPS_CHANGED');
+          for(const[k,v]of Object.entries(l.packages||{}))if(v?.resolved){const u=String(v.resolved);if(!u.startsWith('https://registry.npmjs.org/'))throw Error('REGISTRY:'+k);if(/@[^/]+:|_authToken|authorization/i.test(u))throw Error('CREDENTIAL_URL')}
+          if(/(_authToken|Authorization\s*:|Bearer\s+[A-Za-z0-9._~-]+)/i.test(f.readFileSync('package-lock.json','utf8')))throw Error('CREDENTIAL_CONTENT');
+          NODE
+          read -r A D _ < <(git diff --numstat -- package-lock.json); printf '%s\n' "${A:-0}" > "$S/additions"; printf '%s\n' "${D:-0}" > "$S/deletions"
+          rm -rf node_modules; npm ci --force --no-audit --no-fund > "$L" 2>&1 || fail NPM_CI_FAILED; printf success > "$S/npm_ci"
+          npm run test:integration-settings > "$L" 2>&1 || fail INTEGRATION_TESTS_FAILED; printf success > "$S/tests"
+          npm run typecheck:communication-runtime > "$L" 2>&1 || fail RUNTIME_TYPECHECK_FAILED
+          npm run typecheck:integration-release > "$L" 2>&1 || fail RELEASE_TYPECHECK_FAILED; printf success > "$S/types"
+          npm run build > "$L" 2>&1 || fail BUILD_FAILED; printf success > "$S/build"
+          cmp -s package.json "$P" || fail PACKAGE_JSON_CHANGED_AFTER_CHECKS
+          mapfile -t C < <(git diff --name-only); [[ ${#C[@]} -eq 1 && "${C[0]}" == package-lock.json ]] || fail UNEXPECTED_CHANGED_FILES_AFTER_CHECKS
+          git config user.name github-actions[bot]; git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add package-lock.json; git commit -m 'Repair package lock consistency'; git rev-parse HEAD > "$S/new_sha"
+      - name: Push fast-forward to PR 127
+        id: push
+        if: steps.repair.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        env: {GITHUB_TOKEN: '${{ github.token }}'}
+        run: |
+          set +x; set -Eeuo pipefail; S="$RUNNER_TEMP/s"; L="$RUNNER_TEMP/push.log"; trap 'rm -f "$L"' EXIT
+          A="$(printf 'x-access-token:%s' "$GITHUB_TOKEN"|base64 -w0)"; H="AUTHORIZATION: basic $A"
+          git -c http.https://github.com/.extraheader="$H" fetch origin "$TARGET_BRANCH" --no-tags > "$L" 2>&1 || { echo PR127_BRANCH_PUSH_BLOCKED > "$S/blocker"; exit 1; }
+          [[ "$(git rev-parse FETCH_HEAD)" == "$EXPECTED_TARGET_SHA" ]] || { echo TARGET_BRANCH_MOVED > "$S/blocker"; exit 1; }
+          git -c http.https://github.com/.extraheader="$H" push origin "HEAD:refs/heads/$TARGET_BRANCH" > "$L" 2>&1 || { echo PR127_BRANCH_PUSH_BLOCKED > "$S/blocker"; exit 1; }
+          echo success > "$S/push"
+      - name: Finalize outputs
+        id: out
+        if: always()
+        shell: bash
+        run: |
+          S="$RUNNER_TEMP/s"; v(){ cat "$S/$1" 2>/dev/null||printf '%s' "$2"; }; B="$(v blocker NONE)"; N="$(v new_sha '')"; R=blocked
+          [[ "${{ steps.push.outcome }}" == success && "$B" == NONE && -n "$N" ]]&&R=success; [[ "$B" != NONE ]]||B=UNKNOWN_REPAIR_FAILURE
+          { echo result=$R;echo blocker=$B;echo old_sha="$(v old_sha UNAVAILABLE)";echo new_sha=$N;echo additions="$(v additions 0)";echo deletions="$(v deletions 0)";echo npm_ci="$(v npm_ci '${{ steps.repair.outcome }}')";echo tests="$(v tests '${{ steps.repair.outcome }}')";echo types="$(v types '${{ steps.repair.outcome }}')";echo build="$(v build '${{ steps.repair.outcome }}')";echo push="$(v push '${{ steps.push.outcome }}')"; } >> "$GITHUB_OUTPUT"
+      - if: always() && steps.out.outputs.result != 'success'
+        run: exit 1
+  bootstrap:
+    if: always()
+    needs: repair_lockfile
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions: {contents: read, issues: write, pull-requests: write}
+    env:
+      TARGET_COMMIT_SHA: ${{ needs.repair_lockfile.outputs.new_target_sha }}
+      REPAIR_RESULT: ${{ needs.repair_lockfile.outputs.result }}
+      REPAIR_BLOCKER: ${{ needs.repair_lockfile.outputs.blocker }}
+      OLD_SHA: ${{ needs.repair_lockfile.outputs.old_sha }}
+      ADDITIONS: ${{ needs.repair_lockfile.outputs.additions }}
+      DELETIONS: ${{ needs.repair_lockfile.outputs.deletions }}
+      REPAIR_NPM_CI: ${{ needs.repair_lockfile.outputs.npm_ci }}
+      REPAIR_TESTS: ${{ needs.repair_lockfile.outputs.tests }}
+      REPAIR_TYPES: ${{ needs.repair_lockfile.outputs.types }}
+      REPAIR_BUILD: ${{ needs.repair_lockfile.outputs.build }}
+      REPAIR_PUSH: ${{ needs.repair_lockfile.outputs.push }}
+    steps:
+      - id: checkout
+        if: env.REPAIR_RESULT == 'success'
+        uses: actions/checkout@v4
+        with: {ref: '${{ env.TARGET_COMMIT_SHA }}', fetch-depth: 1, persist-credentials: false}
+      - id: node
+        if: steps.checkout.outcome == 'success'
+        uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm}
+      - id: deps
+        if: steps.node.outcome == 'success'
+        shell: bash
+        run: |
+          L="$RUNNER_TEMP/deps.log"; trap 'rm -f "$L"' EXIT
+          npm install -g npm@10.9.2 --no-audit --no-fund > "$L" 2>&1; [[ "$(npm -v)" == 10.9.2 ]]; npm ci --force --no-audit --no-fund > "$L" 2>&1
+      - id: vercel
+        if: steps.deps.outcome == 'success'
+        run: npm install -g vercel@56.1.0 --no-audit --no-fund
+      - id: bootstrap
+        if: steps.vercel.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        env: {VERCEL_TOKEN: '${{ secrets.VERCEL_TOKEN }}', SAFE_REPORT: '${{ runner.temp }}/vercel.md'}
+        run: bash scripts/bootstrap-integration-settings-vercel-ci.sh
+      - name: Publish sanitized report to PR 127
+        if: always()
+        shell: bash
+        env: {GH_TOKEN: '${{ github.token }}'}
+        run: |
+          V="$RUNNER_TEMP/vercel.md"; O="$RUNNER_TEMP/report.md"
+          { echo '## Temporary Vercel integration bootstrap';echo;echo '| Check | Result |';echo '|---|---|';echo "| Repair lockfile | ${REPAIR_RESULT:-blocked} |";echo "| Repair blocker | ${REPAIR_BLOCKER:-UNKNOWN} |";echo "| Old PR 127 SHA | ${OLD_SHA:-UNAVAILABLE} |";echo "| New PR 127 SHA | ${TARGET_COMMIT_SHA:-NOT_CREATED} |";echo "| package-lock additions | ${ADDITIONS:-0} |";echo "| package-lock deletions | ${DELETIONS:-0} |";echo '| package.json changed | false |';echo '| Direct dependencies changed | false |';echo "| Repair npm ci | ${REPAIR_NPM_CI:-skipped} |";echo "| Integration tests | ${REPAIR_TESTS:-skipped} |";echo "| Typechecks | ${REPAIR_TYPES:-skipped} |";echo "| Build | ${REPAIR_BUILD:-skipped} |";echo "| Push to PR 127 | ${REPAIR_PUSH:-skipped} |";echo "| Bootstrap checkout | ${{ steps.checkout.outcome }} |";echo "| Bootstrap npm ci | ${{ steps.deps.outcome }} |";echo "| Install Vercel CLI | ${{ steps.vercel.outcome }} |";echo "| Bootstrap | ${{ steps.bootstrap.outcome }} |"; } > "$O"
+          if [[ -f "$V" ]];then tail -n +5 "$V" >> "$O";else printf '%s\n' '| Database relation | UNVERIFIED |' '| Preview encryption key | UNVERIFIED |' '| Production encryption key | UNVERIFIED |' '| DATABASE_URL | UNVERIFIED |' '| CRON_SECRET | UNVERIFIED |' '| Canonical URL | UNVERIFIED |' '| Preview deployment | NOT_REACHED |' '| Preflight | NOT_RUN |' '| Migration verify | NOT_RUN |' '| MongoDB transactions | UNVERIFIED |' >> "$O";fi
+          rm -f "$RUNNER_TEMP"/*.log;gh pr comment 127 --repo AdhamRef/gozbebekleri --body-file "$O"
