@@ -21,4 +21,200 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      EXPECTED
+      EXPECTED_HEAD: 4df82817f55e146a150b7b479124f700e0cdf488
+      TARGET_BRANCH: agent/secure-integration-settings-backend
+      TEMP_BRANCH: ops/repair-pr127-lockfile
+
+    steps:
+      - name: Checkout isolated repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TEMP_BRANCH }}
+          fetch-depth: 0
+
+      - name: Verify target branch head
+        id: verify_head
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git fetch origin "$TARGET_BRANCH" --no-tags
+          ACTUAL_HEAD="$(git rev-parse "origin/$TARGET_BRANCH")"
+          printf '%s\n' "$ACTUAL_HEAD" > "$RUNNER_TEMP/actual-head.txt"
+          test "$ACTUAL_HEAD" = "$EXPECTED_HEAD"
+
+      - name: Setup Node 22
+        id: setup_node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Pin npm 10.9.2
+        id: pin_npm
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          npm install --global npm@10.9.2 --no-audit --no-fund
+          test "$(npm --version)" = "10.9.2"
+
+      - name: Repair package lock only
+        id: repair_lock
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          LOG="$RUNNER_TEMP/package-lock-repair.log"
+          CATEGORY_FILE="$RUNNER_TEMP/repair-category.txt"
+          trap 'rm -f "$LOG"' EXIT
+          set +e
+          npm install --package-lock-only --force --ignore-scripts --no-audit --no-fund > "$LOG" 2>&1
+          EXIT_CODE=$?
+          set -e
+          if [[ $EXIT_CODE -ne 0 ]]; then
+            CATEGORY="UNKNOWN_NPM_FAILURE"
+            if grep -Eqi 'EUSAGE|package\.json.*package-lock.*not in sync|package-lock.*package\.json.*not in sync' "$LOG"; then CATEGORY="LOCKFILE_MISMATCH";
+            elif grep -Eq 'ERESOLVE' "$LOG"; then CATEGORY="PEER_DEPENDENCY_CONFLICT";
+            elif grep -Eq 'EAI_AGAIN|ETIMEDOUT|ECONNRESET|ENETUNREACH' "$LOG"; then CATEGORY="REGISTRY_NETWORK_FAILURE";
+            elif grep -Eq 'EINTEGRITY' "$LOG"; then CATEGORY="PACKAGE_INTEGRITY_FAILURE";
+            elif grep -Eq 'EBADENGINE' "$LOG"; then CATEGORY="UNSUPPORTED_ENGINE";
+            elif grep -Eqi 'lifecycle|command failed' "$LOG"; then CATEGORY="LIFECYCLE_SCRIPT_FAILURE";
+            elif grep -Eq 'ENOSPC' "$LOG"; then CATEGORY="DISK_SPACE_FAILURE"; fi
+            printf '%s\n' "$CATEGORY" > "$CATEGORY_FILE"
+            exit "$EXIT_CODE"
+          fi
+          printf '%s\n' "NONE" > "$CATEGORY_FILE"
+
+      - name: Validate lockfile-only scope and integrity
+        id: validate_lock
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git diff --exit-code -- package.json
+          mapfile -t CHANGED < <(git diff --name-only)
+          test "${#CHANGED[@]}" -eq 1
+          test "${CHANGED[0]}" = "package-lock.json"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          if (lock.lockfileVersion !== 3) throw new Error('LOCKFILE_VERSION_CHANGED');
+          const root = lock.packages?.[''] || {};
+          const stable = value => JSON.stringify(Object.fromEntries(Object.entries(value || {}).sort(([a],[b]) => a.localeCompare(b))));
+          if (stable(root.dependencies) !== stable(pkg.dependencies)) throw new Error('ROOT_DEPENDENCIES_MISMATCH');
+          if (stable(root.devDependencies) !== stable(pkg.devDependencies)) throw new Error('ROOT_DEV_DEPENDENCIES_MISMATCH');
+          for (const [key, value] of Object.entries(lock.packages || {})) {
+            if (!value || typeof value !== 'object' || !value.resolved) continue;
+            const resolved = String(value.resolved);
+            if (!resolved.startsWith('https://registry.npmjs.org/')) throw new Error(`NON_NPMJS_REGISTRY:${key}`);
+            if (/@[^/]+:|_authToken|authorization/i.test(resolved)) throw new Error(`CREDENTIAL_LIKE_RESOLVED_URL:${key}`);
+          }
+          const text = fs.readFileSync('package-lock.json', 'utf8');
+          if (/(_authToken|Authorization\s*:|Bearer\s+[A-Za-z0-9._~-]+)/i.test(text)) throw new Error('CREDENTIAL_LIKE_CONTENT');
+          NODE
+
+      - name: Verify clean npm ci
+        id: npm_ci
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          LOG="$RUNNER_TEMP/npm-ci-verify.log"
+          CATEGORY_FILE="$RUNNER_TEMP/npm-ci-category.txt"
+          trap 'rm -f "$LOG"' EXIT
+          rm -rf node_modules
+          set +e
+          npm ci --force --no-audit --no-fund > "$LOG" 2>&1
+          EXIT_CODE=$?
+          set -e
+          if [[ $EXIT_CODE -ne 0 ]]; then
+            CATEGORY="UNKNOWN_NPM_FAILURE"
+            if grep -Eqi 'EUSAGE|package\.json.*package-lock.*not in sync|package-lock.*package\.json.*not in sync' "$LOG"; then CATEGORY="LOCKFILE_MISMATCH";
+            elif grep -Eq 'ERESOLVE' "$LOG"; then CATEGORY="PEER_DEPENDENCY_CONFLICT";
+            elif grep -Eq 'EAI_AGAIN|ETIMEDOUT|ECONNRESET|ENETUNREACH' "$LOG"; then CATEGORY="REGISTRY_NETWORK_FAILURE";
+            elif grep -Eq 'EINTEGRITY' "$LOG"; then CATEGORY="PACKAGE_INTEGRITY_FAILURE";
+            elif grep -Eq 'EBADENGINE' "$LOG"; then CATEGORY="UNSUPPORTED_ENGINE";
+            elif grep -Eqi 'lifecycle|command failed' "$LOG"; then CATEGORY="LIFECYCLE_SCRIPT_FAILURE";
+            elif grep -Eq 'ENOSPC' "$LOG"; then CATEGORY="DISK_SPACE_FAILURE"; fi
+            printf '%s\n' "$CATEGORY" > "$CATEGORY_FILE"
+            exit "$EXIT_CODE"
+          fi
+          printf '%s\n' "NONE" > "$CATEGORY_FILE"
+
+      - name: Run integration settings tests
+        id: tests
+        run: npm run test:integration-settings
+
+      - name: Run communication runtime typecheck
+        id: typecheck_runtime
+        run: npm run typecheck:communication-runtime
+
+      - name: Run integration release typecheck
+        id: typecheck_release
+        run: npm run typecheck:integration-release
+
+      - name: Run production build
+        id: build
+        run: npm run build
+
+      - name: Commit verified package lock on temporary branch
+        id: commit_lock
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git diff --exit-code -- package.json
+          mapfile -t CHANGED < <(git diff --name-only)
+          test "${#CHANGED[@]}" -eq 1
+          test "${CHANGED[0]}" = "package-lock.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "Repair PR 127 package lock"
+          git push origin "HEAD:$TEMP_BRANCH"
+          git rev-parse HEAD > "$RUNNER_TEMP/verified-lock-commit.txt"
+
+      - name: Publish sanitized repair report
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFY_HEAD_OUTCOME: ${{ steps.verify_head.outcome }}
+          SETUP_NODE_OUTCOME: ${{ steps.setup_node.outcome }}
+          PIN_NPM_OUTCOME: ${{ steps.pin_npm.outcome }}
+          REPAIR_LOCK_OUTCOME: ${{ steps.repair_lock.outcome }}
+          VALIDATE_LOCK_OUTCOME: ${{ steps.validate_lock.outcome }}
+          NPM_CI_OUTCOME: ${{ steps.npm_ci.outcome }}
+          TESTS_OUTCOME: ${{ steps.tests.outcome }}
+          TYPECHECK_RUNTIME_OUTCOME: ${{ steps.typecheck_runtime.outcome }}
+          TYPECHECK_RELEASE_OUTCOME: ${{ steps.typecheck_release.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          COMMIT_LOCK_OUTCOME: ${{ steps.commit_lock.outcome }}
+        run: |
+          set -Eeuo pipefail
+          ACTUAL_HEAD="$(cat "$RUNNER_TEMP/actual-head.txt" 2>/dev/null || printf 'UNAVAILABLE')"
+          REPAIR_CATEGORY="$(cat "$RUNNER_TEMP/repair-category.txt" 2>/dev/null || printf 'NOT_RUN')"
+          NPM_CI_CATEGORY="$(cat "$RUNNER_TEMP/npm-ci-category.txt" 2>/dev/null || printf 'NOT_RUN')"
+          VERIFIED_COMMIT="$(cat "$RUNNER_TEMP/verified-lock-commit.txt" 2>/dev/null || printf 'NONE')"
+          rm -f "$RUNNER_TEMP/package-lock-repair.log" "$RUNNER_TEMP/npm-ci-verify.log"
+          cat > "$RUNNER_TEMP/repair-report.md" <<REPORT
+          ## PR 127 package-lock repair
+
+          | Check | Result |
+          |---|---|
+          | Expected Head | $EXPECTED_HEAD |
+          | Actual Head | $ACTUAL_HEAD |
+          | Verify Head | $VERIFY_HEAD_OUTCOME |
+          | Node major | 22 |
+          | npm version | 10.9.2 |
+          | Pin npm | $PIN_NPM_OUTCOME |
+          | Repair lockfile | $REPAIR_LOCK_OUTCOME |
+          | Repair failure category | $REPAIR_CATEGORY |
+          | Validate lockfile-only scope | $VALIDATE_LOCK_OUTCOME |
+          | npm ci | $NPM_CI_OUTCOME |
+          | npm ci failure category | $NPM_CI_CATEGORY |
+          | Integration tests | $TESTS_OUTCOME |
+          | Runtime typecheck | $TYPECHECK_RUNTIME_OUTCOME |
+          | Release typecheck | $TYPECHECK_RELEASE_OUTCOME |
+          | Build | $BUILD_OUTCOME |
+          | Temporary verified commit | $VERIFIED_COMMIT |
+          | Commit verified lockfile | $COMMIT_LOCK_OUTCOME |
+          | Migration | NOT_RUN |
+          REPORT
+          gh pr comment 127 --repo AdhamRef/gozbebekleri --body-file "$RUNNER_TEMP/repair-report.md"
