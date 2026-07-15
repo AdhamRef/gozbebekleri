@@ -23,7 +23,6 @@ jobs:
       VERCEL_PROJECT_ID: prj_hkMyu8iABc7AAqF7T1DvYRpKYRqV
       VERCEL_TEAM_SCOPE: gozbebekleri-dernek
       VERCEL_TEAM_ID: team_zLLO1Hql8hFDCswcnpMMDCBj
-      SAFE_REPORT: ${{ runner.temp }}/temporary-vercel-integration-bootstrap-report.md
 
     steps:
       - name: Checkout reviewed target commit
@@ -50,6 +49,7 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           set -Eeuo pipefail
+          SAFE_REPORT="$RUNNER_TEMP/temporary-vercel-integration-bootstrap-report.md"
 
           TMP_DIR="$(mktemp -d)"
           PREVIEW_ENV="$TMP_DIR/preview.env"
@@ -307,6 +307,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -Eeuo pipefail
+          SAFE_REPORT="$RUNNER_TEMP/temporary-vercel-integration-bootstrap-report.md"
           if [[ ! -f "$SAFE_REPORT" ]]; then
             cat > "$SAFE_REPORT" <<'REPORT'
           ## Temporary Vercel integration bootstrap
