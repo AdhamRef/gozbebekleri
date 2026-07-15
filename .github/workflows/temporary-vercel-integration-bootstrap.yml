@@ -48,12 +48,61 @@ jobs:
         id: setup_node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 22
           cache: npm
+
+      - name: Pin project npm CLI
+        id: pin_npm
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          NODE_MAJOR="$(node --version | sed -E 's/^v([0-9]+).*/\1/')"
+          printf '%s\n' "$NODE_MAJOR" > "$RUNNER_TEMP/node-major-version.txt"
+          npm install --global npm@10.9.2 --no-audit --no-fund
+          NPM_VERSION="$(npm --version)"
+          printf '%s\n' "$NPM_VERSION" > "$RUNNER_TEMP/npm-version.txt"
+          test "$NPM_VERSION" = "10.9.2"
 
       - name: Install project dependencies
         id: npm_ci
-        run: npm ci --force
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          NPM_LOG="$RUNNER_TEMP/npm-ci.log"
+          NPM_CATEGORY="$RUNNER_TEMP/npm-ci-category.txt"
+          rm -f "$NPM_LOG" "$NPM_CATEGORY"
+          cleanup_npm_log() {
+            rm -f "$NPM_LOG"
+          }
+          trap cleanup_npm_log EXIT
+
+          set +e
+          npm ci --force --no-audit --no-fund > "$NPM_LOG" 2>&1
+          NPM_EXIT=$?
+          set -e
+
+          if [[ $NPM_EXIT -ne 0 ]]; then
+            CATEGORY="UNKNOWN_NPM_FAILURE"
+            if grep -Eqi 'EUSAGE|package\.json.*package-lock.*not in sync|package-lock.*package\.json.*not in sync|npm ci can only install packages when your package\.json and package-lock\.json' "$NPM_LOG"; then
+              CATEGORY="LOCKFILE_MISMATCH"
+            elif grep -Eq 'ERESOLVE' "$NPM_LOG"; then
+              CATEGORY="PEER_DEPENDENCY_CONFLICT"
+            elif grep -Eq 'EAI_AGAIN|ETIMEDOUT|ECONNRESET|ENETUNREACH' "$NPM_LOG"; then
+              CATEGORY="REGISTRY_NETWORK_FAILURE"
+            elif grep -Eq 'EINTEGRITY' "$NPM_LOG"; then
+              CATEGORY="PACKAGE_INTEGRITY_FAILURE"
+            elif grep -Eq 'EBADENGINE' "$NPM_LOG"; then
+              CATEGORY="UNSUPPORTED_ENGINE"
+            elif grep -Eqi 'lifecycle|command failed' "$NPM_LOG"; then
+              CATEGORY="LIFECYCLE_SCRIPT_FAILURE"
+            elif grep -Eq 'ENOSPC' "$NPM_LOG"; then
+              CATEGORY="DISK_SPACE_FAILURE"
+            fi
+            printf '%s\n' "$CATEGORY" > "$NPM_CATEGORY"
+            exit "$NPM_EXIT"
+          fi
+
+          printf '%s\n' "NONE" > "$NPM_CATEGORY"
 
       - name: Install pinned Vercel CLI
         id: install_vercel
@@ -64,6 +113,11 @@ jobs:
         shell: bash
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          SETUP_NODE_OUTCOME: ${{ steps.setup_node.outcome }}
+          PIN_NPM_OUTCOME: ${{ steps.pin_npm.outcome }}
+          NPM_CI_OUTCOME: ${{ steps.npm_ci.outcome }}
+          INSTALL_VERCEL_OUTCOME: ${{ steps.install_vercel.outcome }}
         run: |
           set -Eeuo pipefail
           SAFE_REPORT="$RUNNER_TEMP/temporary-vercel-integration-bootstrap-report.md"
@@ -73,15 +127,19 @@ jobs:
           PRODUCTION_ENV="$TMP_DIR/production.env"
           PARSER="$TMP_DIR/env-reader.cjs"
           PREVIEW_URL=""
-          DATABASE_RELATION="UNABLE_TO_VERIFY"
-          PREVIEW_KEY_STATUS="INVALID"
-          PRODUCTION_KEY_STATUS="INVALID"
-          DATABASE_STATUS="MISSING"
-          CRON_STATUS="MISSING"
-          CANONICAL_STATUS="MISSING"
-          PREVIEW_DEPLOYMENT="FAILED"
-          PREFLIGHT_RESULT="BLOCKED"
-          MIGRATION_RESULT="BLOCKED"
+          NODE_MAJOR_VERSION="$(cat "$RUNNER_TEMP/node-major-version.txt" 2>/dev/null || printf 'UNAVAILABLE')"
+          NPM_VERSION="$(cat "$RUNNER_TEMP/npm-version.txt" 2>/dev/null || printf 'UNAVAILABLE')"
+          NPM_FAILURE_CATEGORY="$(cat "$RUNNER_TEMP/npm-ci-category.txt" 2>/dev/null || printf 'NONE')"
+          BOOTSTRAP_STATUS="failure"
+          DATABASE_RELATION="UNVERIFIED"
+          PREVIEW_KEY_STATUS="UNVERIFIED"
+          PRODUCTION_KEY_STATUS="UNVERIFIED"
+          DATABASE_STATUS="UNVERIFIED"
+          CRON_STATUS="UNVERIFIED"
+          CANONICAL_STATUS="UNVERIFIED"
+          PREVIEW_DEPLOYMENT="NOT_REACHED"
+          PREFLIGHT_RESULT="NOT_RUN"
+          MIGRATION_RESULT="NOT_RUN"
           TRANSACTIONS_RESULT="UNVERIFIED"
           WORKFLOW_RESULT="BLOCKED"
           BLOCKER=""
@@ -94,6 +152,15 @@ jobs:
               echo "| Check | Result |"
               echo "|---|---|"
               echo "| Workflow result | $WORKFLOW_RESULT |"
+              echo "| Checkout | ${CHECKOUT_OUTCOME:-UNAVAILABLE} |"
+              echo "| Setup Node | ${SETUP_NODE_OUTCOME:-UNAVAILABLE} |"
+              echo "| Node major version | $NODE_MAJOR_VERSION |"
+              echo "| Pin npm CLI | ${PIN_NPM_OUTCOME:-UNAVAILABLE} |"
+              echo "| npm version | $NPM_VERSION |"
+              echo "| npm ci | ${NPM_CI_OUTCOME:-UNAVAILABLE} |"
+              echo "| npm failure category | $NPM_FAILURE_CATEGORY |"
+              echo "| Install Vercel CLI | ${INSTALL_VERCEL_OUTCOME:-UNAVAILABLE} |"
+              echo "| Bootstrap | $BOOTSTRAP_STATUS |"
               echo "| Target Commit SHA | $TARGET_COMMIT_SHA |"
               echo "| Vercel Project | $VERCEL_PROJECT_NAME |"
               echo "| Database relation | $DATABASE_RELATION |"
@@ -114,7 +181,7 @@ jobs:
 
           cleanup() {
             unset PREVIEW_KEY PRODUCTION_KEY GENERATED_KEY PREVIEW_DB PRODUCTION_DB PREVIEW_CRON PRODUCTION_CRON
-            rm -rf "$TMP_DIR" "$GITHUB_WORKSPACE/.vercel"
+            rm -rf "$TMP_DIR" "$GITHUB_WORKSPACE/.vercel" "$RUNNER_TEMP/npm-ci.log"
             if [[ $REPORT_WRITTEN -eq 0 ]]; then
               BLOCKER="UNEXPECTED_WORKFLOW_FAILURE"
               write_report
@@ -125,6 +192,7 @@ jobs:
           block() {
             BLOCKER="$1"
             WORKFLOW_RESULT="BLOCKED"
+            BOOTSTRAP_STATUS="failure"
             write_report
             exit 1
           }
@@ -315,6 +383,7 @@ jobs:
           else
             WORKFLOW_RESULT="PASS"
           fi
+          BOOTSTRAP_STATUS="success"
           write_report
 
       - name: Publish sanitized report to PR 127
@@ -325,18 +394,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
           SETUP_NODE_OUTCOME: ${{ steps.setup_node.outcome }}
+          PIN_NPM_OUTCOME: ${{ steps.pin_npm.outcome }}
           NPM_CI_OUTCOME: ${{ steps.npm_ci.outcome }}
           INSTALL_VERCEL_OUTCOME: ${{ steps.install_vercel.outcome }}
           BOOTSTRAP_OUTCOME: ${{ steps.bootstrap.outcome }}
         run: |
           set -Eeuo pipefail
           SAFE_REPORT="$RUNNER_TEMP/temporary-vercel-integration-bootstrap-report.md"
+          NODE_MAJOR_VERSION="$(cat "$RUNNER_TEMP/node-major-version.txt" 2>/dev/null || printf 'UNAVAILABLE')"
+          NPM_VERSION="$(cat "$RUNNER_TEMP/npm-version.txt" 2>/dev/null || printf 'UNAVAILABLE')"
+          NPM_FAILURE_CATEGORY="$(cat "$RUNNER_TEMP/npm-ci-category.txt" 2>/dev/null || printf 'NOT_RUN')"
+
           if [[ ! -f "$SAFE_REPORT" ]]; then
             FIRST_BLOCKER="UNKNOWN_EARLY_FAILURE"
             if [[ "$CHECKOUT_OUTCOME" == "failure" || "$CHECKOUT_OUTCOME" == "cancelled" ]]; then
               FIRST_BLOCKER="CHECKOUT_FAILED"
             elif [[ "$SETUP_NODE_OUTCOME" == "failure" || "$SETUP_NODE_OUTCOME" == "cancelled" ]]; then
               FIRST_BLOCKER="NODE_SETUP_FAILED"
+            elif [[ "$PIN_NPM_OUTCOME" == "failure" || "$PIN_NPM_OUTCOME" == "cancelled" ]]; then
+              FIRST_BLOCKER="NPM_PIN_FAILED"
             elif [[ "$NPM_CI_OUTCOME" == "failure" || "$NPM_CI_OUTCOME" == "cancelled" ]]; then
               FIRST_BLOCKER="NPM_CI_FAILED"
             elif [[ "$INSTALL_VERCEL_OUTCOME" == "failure" || "$INSTALL_VERCEL_OUTCOME" == "cancelled" ]]; then
@@ -353,7 +429,11 @@ jobs:
           | Workflow result | BLOCKED |
           | Checkout | ${CHECKOUT_OUTCOME:-skipped} |
           | Setup Node | ${SETUP_NODE_OUTCOME:-skipped} |
+          | Node major version | $NODE_MAJOR_VERSION |
+          | Pin npm CLI | ${PIN_NPM_OUTCOME:-skipped} |
+          | npm version | $NPM_VERSION |
           | npm ci | ${NPM_CI_OUTCOME:-skipped} |
+          | npm failure category | $NPM_FAILURE_CATEGORY |
           | Install Vercel CLI | ${INSTALL_VERCEL_OUTCOME:-skipped} |
           | Bootstrap | ${BOOTSTRAP_OUTCOME:-skipped} |
           | DATABASE_URL | UNVERIFIED |
@@ -368,4 +448,6 @@ jobs:
           | Remaining blocker | $FIRST_BLOCKER |
           REPORT
           fi
+
+          rm -f "$RUNNER_TEMP/npm-ci.log"
           gh pr comment 127 --repo AdhamRef/gozbebekleri --body-file "$SAFE_REPORT"
