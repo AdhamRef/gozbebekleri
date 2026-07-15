@@ -1,453 +1,150 @@
 name: Temporary Vercel integration bootstrap
-
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/temporary-vercel-integration-bootstrap.yml
-
-permissions:
-  contents: read
-  issues: write
-  pull-requests: write
-
-concurrency:
-  group: temporary-vercel-integration-bootstrap
-  cancel-in-progress: false
-
+    branches: [main]
+    paths: [.github/workflows/temporary-vercel-integration-bootstrap.yml]
+concurrency: {group: temporary-vercel-integration-bootstrap, cancel-in-progress: false}
+env:
+  EXPECTED_TARGET_SHA: 4df82817f55e146a150b7b479124f700e0cdf488
+  TARGET_BRANCH: agent/secure-integration-settings-backend
+  VERCEL_PROJECT_NAME: gozbebekleri
+  VERCEL_PROJECT_ID: prj_hkMyu8iABc7AAqF7T1DvYRpKYRqV
+  VERCEL_TEAM_SCOPE: gozbebekleri-dernek
+  VERCEL_TEAM_ID: team_zLLO1Hql8hFDCswcnpMMDCBj
 jobs:
-  bootstrap:
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (
-        github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
-        contains(github.event.head_commit.message, 'Trigger temporary Vercel integration bootstrap')
-      )
+  repair_lockfile:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, 'Trigger temporary Vercel integration bootstrap'))
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    env:
-      TARGET_COMMIT_SHA: 4df82817f55e146a150b7b479124f700e0cdf488
-      TARGET_BRANCH: agent/secure-integration-settings-backend
-      VERCEL_PROJECT_NAME: gozbebekleri
-      VERCEL_PROJECT_ID: prj_hkMyu8iABc7AAqF7T1DvYRpKYRqV
-      VERCEL_TEAM_SCOPE: gozbebekleri-dernek
-      VERCEL_TEAM_ID: team_zLLO1Hql8hFDCswcnpMMDCBj
-
+    timeout-minutes: 60
+    permissions: {contents: write}
+    outputs:
+      result: ${{ steps.out.outputs.result }}
+      blocker: ${{ steps.out.outputs.blocker }}
+      old_sha: ${{ steps.out.outputs.old_sha }}
+      new_target_sha: ${{ steps.out.outputs.new_sha }}
+      additions: ${{ steps.out.outputs.additions }}
+      deletions: ${{ steps.out.outputs.deletions }}
+      npm_ci: ${{ steps.out.outputs.npm_ci }}
+      tests: ${{ steps.out.outputs.tests }}
+      types: ${{ steps.out.outputs.types }}
+      build: ${{ steps.out.outputs.build }}
+      push: ${{ steps.out.outputs.push }}
     steps:
-      - name: Checkout reviewed target commit
-        id: checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TARGET_COMMIT_SHA }}
-          fetch-depth: 1
-
-      - name: Setup project Node.js
-        id: setup_node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Pin project npm CLI
-        id: pin_npm
+      - uses: actions/checkout@v4
+        with: {ref: agent/secure-integration-settings-backend, fetch-depth: 0, persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm}
+      - name: Repair, verify, test, and commit lockfile
+        id: repair
+        continue-on-error: true
         shell: bash
         run: |
           set -Eeuo pipefail
-          NODE_MAJOR="$(node --version | sed -E 's/^v([0-9]+).*/\1/')"
-          printf '%s\n' "$NODE_MAJOR" > "$RUNNER_TEMP/node-major-version.txt"
-          npm install --global npm@10.9.2 --no-audit --no-fund
-          NPM_VERSION="$(npm --version)"
-          printf '%s\n' "$NPM_VERSION" > "$RUNNER_TEMP/npm-version.txt"
-          test "$NPM_VERSION" = "10.9.2"
-
-      - name: Install project dependencies
-        id: npm_ci
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          NPM_LOG="$RUNNER_TEMP/npm-ci.log"
-          NPM_CATEGORY="$RUNNER_TEMP/npm-ci-category.txt"
-          rm -f "$NPM_LOG" "$NPM_CATEGORY"
-          cleanup_npm_log() {
-            rm -f "$NPM_LOG"
-          }
-          trap cleanup_npm_log EXIT
-
-          set +e
-          npm ci --force --no-audit --no-fund > "$NPM_LOG" 2>&1
-          NPM_EXIT=$?
-          set -e
-
-          if [[ $NPM_EXIT -ne 0 ]]; then
-            CATEGORY="UNKNOWN_NPM_FAILURE"
-            if grep -Eqi 'EUSAGE|package\.json.*package-lock.*not in sync|package-lock.*package\.json.*not in sync|npm ci can only install packages when your package\.json and package-lock\.json' "$NPM_LOG"; then
-              CATEGORY="LOCKFILE_MISMATCH"
-            elif grep -Eq 'ERESOLVE' "$NPM_LOG"; then
-              CATEGORY="PEER_DEPENDENCY_CONFLICT"
-            elif grep -Eq 'EAI_AGAIN|ETIMEDOUT|ECONNRESET|ENETUNREACH' "$NPM_LOG"; then
-              CATEGORY="REGISTRY_NETWORK_FAILURE"
-            elif grep -Eq 'EINTEGRITY' "$NPM_LOG"; then
-              CATEGORY="PACKAGE_INTEGRITY_FAILURE"
-            elif grep -Eq 'EBADENGINE' "$NPM_LOG"; then
-              CATEGORY="UNSUPPORTED_ENGINE"
-            elif grep -Eqi 'lifecycle|command failed' "$NPM_LOG"; then
-              CATEGORY="LIFECYCLE_SCRIPT_FAILURE"
-            elif grep -Eq 'ENOSPC' "$NPM_LOG"; then
-              CATEGORY="DISK_SPACE_FAILURE"
-            fi
-            printf '%s\n' "$CATEGORY" > "$NPM_CATEGORY"
-            exit "$NPM_EXIT"
-          fi
-
-          printf '%s\n' "NONE" > "$NPM_CATEGORY"
-
-      - name: Install pinned Vercel CLI
-        id: install_vercel
-        run: npm install --global vercel@56.1.0
-
-      - name: Bootstrap Vercel integration settings safely
-        id: bootstrap
-        shell: bash
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
-          SETUP_NODE_OUTCOME: ${{ steps.setup_node.outcome }}
-          PIN_NPM_OUTCOME: ${{ steps.pin_npm.outcome }}
-          NPM_CI_OUTCOME: ${{ steps.npm_ci.outcome }}
-          INSTALL_VERCEL_OUTCOME: ${{ steps.install_vercel.outcome }}
-        run: |
-          set -Eeuo pipefail
-          SAFE_REPORT="$RUNNER_TEMP/temporary-vercel-integration-bootstrap-report.md"
-
-          TMP_DIR="$(mktemp -d)"
-          PREVIEW_ENV="$TMP_DIR/preview.env"
-          PRODUCTION_ENV="$TMP_DIR/production.env"
-          PARSER="$TMP_DIR/env-reader.cjs"
-          PREVIEW_URL=""
-          NODE_MAJOR_VERSION="$(cat "$RUNNER_TEMP/node-major-version.txt" 2>/dev/null || printf 'UNAVAILABLE')"
-          NPM_VERSION="$(cat "$RUNNER_TEMP/npm-version.txt" 2>/dev/null || printf 'UNAVAILABLE')"
-          NPM_FAILURE_CATEGORY="$(cat "$RUNNER_TEMP/npm-ci-category.txt" 2>/dev/null || printf 'NONE')"
-          BOOTSTRAP_STATUS="failure"
-          DATABASE_RELATION="UNVERIFIED"
-          PREVIEW_KEY_STATUS="UNVERIFIED"
-          PRODUCTION_KEY_STATUS="UNVERIFIED"
-          DATABASE_STATUS="UNVERIFIED"
-          CRON_STATUS="UNVERIFIED"
-          CANONICAL_STATUS="UNVERIFIED"
-          PREVIEW_DEPLOYMENT="NOT_REACHED"
-          PREFLIGHT_RESULT="NOT_RUN"
-          MIGRATION_RESULT="NOT_RUN"
-          TRANSACTIONS_RESULT="UNVERIFIED"
-          WORKFLOW_RESULT="BLOCKED"
-          BLOCKER=""
-          REPORT_WRITTEN=0
-
-          write_report() {
-            {
-              echo "## Temporary Vercel integration bootstrap"
-              echo
-              echo "| Check | Result |"
-              echo "|---|---|"
-              echo "| Workflow result | $WORKFLOW_RESULT |"
-              echo "| Checkout | ${CHECKOUT_OUTCOME:-UNAVAILABLE} |"
-              echo "| Setup Node | ${SETUP_NODE_OUTCOME:-UNAVAILABLE} |"
-              echo "| Node major version | $NODE_MAJOR_VERSION |"
-              echo "| Pin npm CLI | ${PIN_NPM_OUTCOME:-UNAVAILABLE} |"
-              echo "| npm version | $NPM_VERSION |"
-              echo "| npm ci | ${NPM_CI_OUTCOME:-UNAVAILABLE} |"
-              echo "| npm failure category | $NPM_FAILURE_CATEGORY |"
-              echo "| Install Vercel CLI | ${INSTALL_VERCEL_OUTCOME:-UNAVAILABLE} |"
-              echo "| Bootstrap | $BOOTSTRAP_STATUS |"
-              echo "| Target Commit SHA | $TARGET_COMMIT_SHA |"
-              echo "| Vercel Project | $VERCEL_PROJECT_NAME |"
-              echo "| Database relation | $DATABASE_RELATION |"
-              echo "| Preview encryption key | $PREVIEW_KEY_STATUS |"
-              echo "| Production encryption key | $PRODUCTION_KEY_STATUS |"
-              echo "| DATABASE_URL | $DATABASE_STATUS |"
-              echo "| CRON_SECRET | $CRON_STATUS |"
-              echo "| Canonical URL | $CANONICAL_STATUS |"
-              echo "| Preview Deployment | $PREVIEW_DEPLOYMENT |"
-              echo "| Preflight | $PREFLIGHT_RESULT |"
-              echo "| Migration Verify | $MIGRATION_RESULT |"
-              echo "| Transactions | $TRANSACTIONS_RESULT |"
-              echo "| Remaining blockers | ${BLOCKER:-NONE} |"
-            } > "$SAFE_REPORT"
-            cat "$SAFE_REPORT" >> "$GITHUB_STEP_SUMMARY"
-            REPORT_WRITTEN=1
-          }
-
-          cleanup() {
-            unset PREVIEW_KEY PRODUCTION_KEY GENERATED_KEY PREVIEW_DB PRODUCTION_DB PREVIEW_CRON PRODUCTION_CRON
-            rm -rf "$TMP_DIR" "$GITHUB_WORKSPACE/.vercel" "$RUNNER_TEMP/npm-ci.log"
-            if [[ $REPORT_WRITTEN -eq 0 ]]; then
-              BLOCKER="UNEXPECTED_WORKFLOW_FAILURE"
-              write_report
-            fi
-          }
-          trap cleanup EXIT
-
-          block() {
-            BLOCKER="$1"
-            WORKFLOW_RESULT="BLOCKED"
-            BOOTSTRAP_STATUS="failure"
-            write_report
-            exit 1
-          }
-
-          [[ -n "${VERCEL_TOKEN:-}" ]] || block "VERCEL_TOKEN_MISSING"
-
-          cat > "$PARSER" <<'NODE'
-          const fs = require('node:fs');
-          const crypto = require('node:crypto');
-
-          function parse(file) {
-            const result = {};
-            for (const raw of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
-              const line = raw.trim();
-              if (!line || line.startsWith('#')) continue;
-              const index = line.indexOf('=');
-              if (index < 1) continue;
-              const key = line.slice(0, index).trim();
-              let value = line.slice(index + 1).trim();
-              if (value.startsWith('"') && value.endsWith('"')) {
-                try { value = JSON.parse(value); } catch { value = value.slice(1, -1); }
-              } else if (value.startsWith("'") && value.endsWith("'")) {
-                value = value.slice(1, -1);
-              }
-              result[key] = value;
-            }
-            return result;
-          }
-
-          const command = process.argv[2];
-          if (command === 'get') {
-            process.stdout.write(parse(process.argv[3])[process.argv[4]] || '');
-          } else if (command === 'db-relation') {
-            const preview = parse(process.argv[3]).DATABASE_URL || '';
-            const production = parse(process.argv[4]).DATABASE_URL || '';
-            if (!preview || !production) process.stdout.write('UNABLE_TO_VERIFY');
-            else {
-              const left = crypto.createHash('sha256').update(preview).digest();
-              const right = crypto.createHash('sha256').update(production).digest();
-              process.stdout.write(crypto.timingSafeEqual(left, right) ? 'SAME_DATABASE' : 'DIFFERENT_DATABASE');
-            }
-          } else if (command === 'key-valid') {
-            const value = fs.readFileSync(0, 'utf8').trim();
-            let valid = /^[a-fA-F0-9]{64}$/.test(value) && Buffer.from(value, 'hex').length === 32;
-            if (!valid) try { valid = Buffer.from(value, 'base64url').length === 32; } catch {}
-            if (!valid) try { valid = Buffer.from(value, 'base64').length === 32; } catch {}
-            process.stdout.write(valid ? 'VALID' : 'INVALID');
-          } else if (command === 'cron-valid') {
-            const value = fs.readFileSync(0, 'utf8').trim();
-            process.stdout.write(value.length >= 32 && !/[\r\n]/.test(value) ? 'VALID' : 'INVALID');
-          } else if (command === 'canonical') {
-            const env = parse(process.argv[3]);
-            const raw = env.APP_URL || env.NEXTAUTH_URL || env.NEXT_PUBLIC_APP_URL || env.NEXT_PUBLIC_SITE_URL || '';
-            if (!raw) process.stdout.write('MISSING');
-            else {
-              try {
-                const url = new URL(raw);
-                const production = process.argv[4] === 'production';
-                process.stdout.write(production && url.protocol !== 'https:' ? 'INVALID' : 'VALID');
-              } catch { process.stdout.write('INVALID'); }
-            }
-          }
+          S="$RUNNER_TEMP/s"; mkdir -p "$S"; fail(){ printf '%s\n' "$1" > "$S/blocker"; exit 1; }
+          SHA="$(git rev-parse HEAD)"; printf '%s\n' "$SHA" > "$S/old_sha"; [[ "$SHA" == "$EXPECTED_TARGET_SHA" ]] || fail TARGET_BRANCH_MOVED
+          P="$RUNNER_TEMP/package.json.before"; cp package.json "$P"
+          node - <<'NODE'
+          const f=require('fs'),p=JSON.parse(f.readFileSync('package.json'));
+          const s=x=>JSON.stringify(Object.fromEntries(Object.entries(x||{}).sort(([a],[b])=>a.localeCompare(b))));
+          f.writeFileSync(process.env.RUNNER_TEMP+'/deps',s(p.dependencies));f.writeFileSync(process.env.RUNNER_TEMP+'/devdeps',s(p.devDependencies));
           NODE
-
-          vercel whoami > "$TMP_DIR/whoami.log" 2>&1 || block "VERCEL_AUTHENTICATION_FAILED"
-          vercel link --yes --project "$VERCEL_PROJECT_NAME" --scope "$VERCEL_TEAM_SCOPE" > "$TMP_DIR/link.log" 2>&1 || block "VERCEL_PROJECT_LINK_FAILED"
-
-          if ! node - <<'NODE'
-          const fs = require('node:fs');
-          const project = JSON.parse(fs.readFileSync('.vercel/project.json', 'utf8'));
-          if (project.projectId !== process.env.VERCEL_PROJECT_ID || project.orgId !== process.env.VERCEL_TEAM_ID) process.exit(1);
+          L="$RUNNER_TEMP/npm.log"; trap 'rm -f "$L" "$RUNNER_TEMP"/*.log' EXIT
+          npm install -g npm@10.9.2 --no-audit --no-fund > "$L" 2>&1 || fail NPM_PIN_FAILED
+          [[ "$(npm -v)" == 10.9.2 ]] || fail NPM_VERSION_MISMATCH
+          npm install --package-lock-only --force --ignore-scripts --no-audit --no-fund > "$L" 2>&1 || fail LOCKFILE_REPAIR_FAILED
+          cmp -s package.json "$P" || { git checkout -- package.json package-lock.json; fail PACKAGE_JSON_CHANGED; }
+          mapfile -t C < <(git diff --name-only); [[ ${#C[@]} -eq 1 && "${C[0]}" == package-lock.json ]] || { git checkout -- package.json package-lock.json; fail UNEXPECTED_CHANGED_FILES; }
+          node - <<'NODE'
+          const f=require('fs'),p=JSON.parse(f.readFileSync('package.json')),l=JSON.parse(f.readFileSync('package-lock.json'));
+          const s=x=>JSON.stringify(Object.fromEntries(Object.entries(x||{}).sort(([a],[b])=>a.localeCompare(b))));
+          if(l.lockfileVersion!==3)throw Error('LOCKFILE_VERSION');const r=l.packages?.['']||{};
+          if(s(r.dependencies)!==s(p.dependencies)||s(r.devDependencies)!==s(p.devDependencies))throw Error('ROOT_MISMATCH');
+          if(s(p.dependencies)!==f.readFileSync(process.env.RUNNER_TEMP+'/deps','utf8')||s(p.devDependencies)!==f.readFileSync(process.env.RUNNER_TEMP+'/devdeps','utf8'))throw Error('DIRECT_DEPS_CHANGED');
+          for(const[k,v]of Object.entries(l.packages||{}))if(v?.resolved){const u=String(v.resolved);if(!u.startsWith('https://registry.npmjs.org/'))throw Error('REGISTRY:'+k);if(/@[^/]+:|_authToken|authorization/i.test(u))throw Error('CREDENTIAL_URL')}
+          if(/(_authToken|Authorization\s*:|Bearer\s+[A-Za-z0-9._~-]+)/i.test(f.readFileSync('package-lock.json','utf8')))throw Error('CREDENTIAL_CONTENT');
           NODE
-          then
-            block "VERCEL_PROJECT_IDENTITY_MISMATCH"
-          fi
-
-          vercel env pull "$PREVIEW_ENV" --yes --environment=preview --git-branch="$TARGET_BRANCH" --scope "$VERCEL_TEAM_SCOPE" > "$TMP_DIR/pull-preview.log" 2>&1 || block "PREVIEW_ENV_PULL_FAILED"
-          vercel env pull "$PRODUCTION_ENV" --yes --environment=production --scope "$VERCEL_TEAM_SCOPE" > "$TMP_DIR/pull-production.log" 2>&1 || block "PRODUCTION_ENV_PULL_FAILED"
-
-          PREVIEW_DB="$(node "$PARSER" get "$PREVIEW_ENV" DATABASE_URL)"
-          PRODUCTION_DB="$(node "$PARSER" get "$PRODUCTION_ENV" DATABASE_URL)"
-          [[ -n "$PREVIEW_DB" && -n "$PRODUCTION_DB" ]] || block "DATABASE_URL_MISSING"
-          DATABASE_STATUS="PRESENT"
-          DATABASE_RELATION="$(node "$PARSER" db-relation "$PREVIEW_ENV" "$PRODUCTION_ENV")"
-          [[ "$DATABASE_RELATION" != "UNABLE_TO_VERIFY" ]] || block "DATABASE_RELATION_UNVERIFIED"
-          unset PREVIEW_DB PRODUCTION_DB
-
-          PREVIEW_CRON="$(node "$PARSER" get "$PREVIEW_ENV" CRON_SECRET)"
-          PRODUCTION_CRON="$(node "$PARSER" get "$PRODUCTION_ENV" CRON_SECRET)"
-          [[ -n "$PREVIEW_CRON" && -n "$PRODUCTION_CRON" ]] || block "CRON_SECRET_MISSING"
-          CRON_STATUS="PRESENT"
-          [[ "$(printf '%s' "$PREVIEW_CRON" | node "$PARSER" cron-valid)" == "VALID" ]] || block "PREVIEW_CRON_SECRET_INVALID"
-          [[ "$(printf '%s' "$PRODUCTION_CRON" | node "$PARSER" cron-valid)" == "VALID" ]] || block "PRODUCTION_CRON_SECRET_INVALID"
-          unset PREVIEW_CRON PRODUCTION_CRON
-
-          PREVIEW_CANONICAL="$(node "$PARSER" canonical "$PREVIEW_ENV" preview)"
-          PRODUCTION_CANONICAL="$(node "$PARSER" canonical "$PRODUCTION_ENV" production)"
-          [[ "$PREVIEW_CANONICAL" != "MISSING" && "$PRODUCTION_CANONICAL" != "MISSING" ]] || block "CANONICAL_URL_MISSING"
-          [[ "$PREVIEW_CANONICAL" == "VALID" && "$PRODUCTION_CANONICAL" == "VALID" ]] || { CANONICAL_STATUS="INVALID"; block "CANONICAL_URL_INVALID"; }
-          CANONICAL_STATUS="VALID"
-
-          PREVIEW_KEY="$(node "$PARSER" get "$PREVIEW_ENV" INTEGRATION_SETTINGS_ENCRYPTION_KEY)"
-          PRODUCTION_KEY="$(node "$PARSER" get "$PRODUCTION_ENV" INTEGRATION_SETTINGS_ENCRYPTION_KEY)"
-
-          if [[ -n "$PREVIEW_KEY" ]]; then
-            [[ "$(printf '%s' "$PREVIEW_KEY" | node "$PARSER" key-valid)" == "VALID" ]] || block "PREVIEW_ENCRYPTION_KEY_INVALID"
-            PREVIEW_KEY_STATUS="PRESENT"
-          fi
-          if [[ -n "$PRODUCTION_KEY" ]]; then
-            [[ "$(printf '%s' "$PRODUCTION_KEY" | node "$PARSER" key-valid)" == "VALID" ]] || block "PRODUCTION_ENCRYPTION_KEY_INVALID"
-            PRODUCTION_KEY_STATUS="PRESENT"
-          fi
-
-          add_preview_key() {
-            printf '%s' "$1" | vercel env add INTEGRATION_SETTINGS_ENCRYPTION_KEY preview --git-branch="$TARGET_BRANCH" --sensitive --scope "$VERCEL_TEAM_SCOPE" > "$TMP_DIR/add-preview-key.log" 2>&1 || block "PREVIEW_ENCRYPTION_KEY_ADD_FAILED"
-            PREVIEW_KEY_STATUS="ADDED"
-          }
-          add_production_key() {
-            printf '%s' "$1" | vercel env add INTEGRATION_SETTINGS_ENCRYPTION_KEY production --sensitive --scope "$VERCEL_TEAM_SCOPE" > "$TMP_DIR/add-production-key.log" 2>&1 || block "PRODUCTION_ENCRYPTION_KEY_ADD_FAILED"
-            PRODUCTION_KEY_STATUS="ADDED"
-          }
-          new_key() {
-            node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('base64url'))"
-          }
-
-          if [[ "$DATABASE_RELATION" == "SAME_DATABASE" ]]; then
-            if [[ -n "$PREVIEW_KEY" && -n "$PRODUCTION_KEY" ]]; then
-              [[ "$PREVIEW_KEY" == "$PRODUCTION_KEY" ]] || block "ENCRYPTION_KEYS_DIFFER_FOR_SHARED_DATABASE"
-            elif [[ -n "$PREVIEW_KEY" ]]; then
-              add_production_key "$PREVIEW_KEY"
-            elif [[ -n "$PRODUCTION_KEY" ]]; then
-              add_preview_key "$PRODUCTION_KEY"
-            else
-              GENERATED_KEY="$(new_key)"
-              add_preview_key "$GENERATED_KEY"
-              add_production_key "$GENERATED_KEY"
-              unset GENERATED_KEY
-            fi
-          else
-            if [[ -z "$PREVIEW_KEY" ]]; then
-              GENERATED_KEY="$(new_key)"
-              add_preview_key "$GENERATED_KEY"
-              unset GENERATED_KEY
-            fi
-            if [[ -z "$PRODUCTION_KEY" ]]; then
-              GENERATED_KEY="$(new_key)"
-              add_production_key "$GENERATED_KEY"
-              unset GENERATED_KEY
-            fi
-          fi
-          unset PREVIEW_KEY PRODUCTION_KEY
-
-          set +e
-          vercel deploy --yes --scope "$VERCEL_TEAM_SCOPE" > "$TMP_DIR/deploy.log" 2>&1
-          DEPLOY_EXIT=$?
-          set -e
-          [[ $DEPLOY_EXIT -eq 0 ]] || block "PREVIEW_DEPLOYMENT_FAILED"
-
-          PREVIEW_URL="$(grep -Eo 'https://[^[:space:]]+\.vercel\.app' "$TMP_DIR/deploy.log" | tail -n 1 || true)"
-          [[ -n "$PREVIEW_URL" ]] || block "PREVIEW_URL_NOT_FOUND"
-          vercel inspect "$PREVIEW_URL" --wait --timeout 20m --scope "$VERCEL_TEAM_SCOPE" > "$TMP_DIR/inspect.log" 2>&1 || block "PREVIEW_NOT_READY"
-          PREVIEW_DEPLOYMENT="READY"
-
-          set +e
-          vercel env run -e preview --git-branch="$TARGET_BRANCH" -- npm run preflight:integration-settings > "$TMP_DIR/preflight.log" 2>&1
-          PREFLIGHT_EXIT=$?
-          vercel env run -e preview --git-branch="$TARGET_BRANCH" -- npm run verify:integration-settings-migration > "$TMP_DIR/migration-verify.log" 2>&1
-          MIGRATION_EXIT=$?
-          set -e
-
-          PREFLIGHT_RESULT="$(grep -Eo 'INTEGRATION SETTINGS PREFLIGHT: (PASS|WARNING|BLOCKED)' "$TMP_DIR/preflight.log" | tail -n 1 | awk '{print $4}' || true)"
-          [[ -n "$PREFLIGHT_RESULT" ]] || PREFLIGHT_RESULT="BLOCKED"
-
-          MIGRATION_RESULT="$(grep -Eo 'MIGRATION STATUS: (FULLY_APPLIED|PARTIALLY_APPLIED|NOT_APPLIED|UNKNOWN)' "$TMP_DIR/migration-verify.log" | tail -n 1 | awk '{print $3}' || true)"
-          [[ "$MIGRATION_RESULT" != "UNKNOWN" && -n "$MIGRATION_RESULT" ]] || MIGRATION_RESULT="BLOCKED"
-
-          if grep -q '^\[PASS\] transactions:' "$TMP_DIR/preflight.log"; then
-            TRANSACTIONS_RESULT="SUPPORTED"
-          elif grep -q '^\[WARNING\] transactions:' "$TMP_DIR/preflight.log"; then
-            TRANSACTIONS_RESULT="WARNING"
-          fi
-
-          [[ $PREFLIGHT_EXIT -eq 0 && "$PREFLIGHT_RESULT" != "BLOCKED" ]] || block "PREFLIGHT_BLOCKED"
-          [[ $MIGRATION_EXIT -eq 0 && "$MIGRATION_RESULT" != "BLOCKED" ]] || block "MIGRATION_VERIFY_BLOCKED"
-
-          if [[ "$PREFLIGHT_RESULT" == "WARNING" || "$TRANSACTIONS_RESULT" != "SUPPORTED" || "$MIGRATION_RESULT" != "FULLY_APPLIED" ]]; then
-            WORKFLOW_RESULT="WARNING"
-          else
-            WORKFLOW_RESULT="PASS"
-          fi
-          BOOTSTRAP_STATUS="success"
-          write_report
-
-      - name: Publish sanitized report to PR 127
-        id: publish_report
+          read -r A D _ < <(git diff --numstat -- package-lock.json); printf '%s\n' "${A:-0}" > "$S/additions"; printf '%s\n' "${D:-0}" > "$S/deletions"
+          rm -rf node_modules; npm ci --force --no-audit --no-fund > "$L" 2>&1 || fail NPM_CI_FAILED; printf success > "$S/npm_ci"
+          npm run test:integration-settings > "$L" 2>&1 || fail INTEGRATION_TESTS_FAILED; printf success > "$S/tests"
+          npm run typecheck:communication-runtime > "$L" 2>&1 || fail RUNTIME_TYPECHECK_FAILED
+          npm run typecheck:integration-release > "$L" 2>&1 || fail RELEASE_TYPECHECK_FAILED; printf success > "$S/types"
+          npm run build > "$L" 2>&1 || fail BUILD_FAILED; printf success > "$S/build"
+          cmp -s package.json "$P" || fail PACKAGE_JSON_CHANGED_AFTER_CHECKS
+          mapfile -t C < <(git diff --name-only); [[ ${#C[@]} -eq 1 && "${C[0]}" == package-lock.json ]] || fail UNEXPECTED_CHANGED_FILES_AFTER_CHECKS
+          git config user.name github-actions[bot]; git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add package-lock.json; git commit -m 'Repair package lock consistency'; git rev-parse HEAD > "$S/new_sha"
+      - name: Push fast-forward to PR 127
+        id: push
+        if: steps.repair.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        env: {GITHUB_TOKEN: '${{ github.token }}'}
+        run: |
+          set +x; set -Eeuo pipefail; S="$RUNNER_TEMP/s"; L="$RUNNER_TEMP/push.log"; trap 'rm -f "$L"' EXIT
+          A="$(printf 'x-access-token:%s' "$GITHUB_TOKEN"|base64 -w0)"; H="AUTHORIZATION: basic $A"
+          git -c http.https://github.com/.extraheader="$H" fetch origin "$TARGET_BRANCH" --no-tags > "$L" 2>&1 || { echo PR127_BRANCH_PUSH_BLOCKED > "$S/blocker"; exit 1; }
+          [[ "$(git rev-parse FETCH_HEAD)" == "$EXPECTED_TARGET_SHA" ]] || { echo TARGET_BRANCH_MOVED > "$S/blocker"; exit 1; }
+          git -c http.https://github.com/.extraheader="$H" push origin "HEAD:refs/heads/$TARGET_BRANCH" > "$L" 2>&1 || { echo PR127_BRANCH_PUSH_BLOCKED > "$S/blocker"; exit 1; }
+          echo success > "$S/push"
+      - name: Finalize outputs
+        id: out
         if: always()
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
-          SETUP_NODE_OUTCOME: ${{ steps.setup_node.outcome }}
-          PIN_NPM_OUTCOME: ${{ steps.pin_npm.outcome }}
-          NPM_CI_OUTCOME: ${{ steps.npm_ci.outcome }}
-          INSTALL_VERCEL_OUTCOME: ${{ steps.install_vercel.outcome }}
-          BOOTSTRAP_OUTCOME: ${{ steps.bootstrap.outcome }}
         run: |
-          set -Eeuo pipefail
-          SAFE_REPORT="$RUNNER_TEMP/temporary-vercel-integration-bootstrap-report.md"
-          NODE_MAJOR_VERSION="$(cat "$RUNNER_TEMP/node-major-version.txt" 2>/dev/null || printf 'UNAVAILABLE')"
-          NPM_VERSION="$(cat "$RUNNER_TEMP/npm-version.txt" 2>/dev/null || printf 'UNAVAILABLE')"
-          NPM_FAILURE_CATEGORY="$(cat "$RUNNER_TEMP/npm-ci-category.txt" 2>/dev/null || printf 'NOT_RUN')"
-
-          if [[ ! -f "$SAFE_REPORT" ]]; then
-            FIRST_BLOCKER="UNKNOWN_EARLY_FAILURE"
-            if [[ "$CHECKOUT_OUTCOME" == "failure" || "$CHECKOUT_OUTCOME" == "cancelled" ]]; then
-              FIRST_BLOCKER="CHECKOUT_FAILED"
-            elif [[ "$SETUP_NODE_OUTCOME" == "failure" || "$SETUP_NODE_OUTCOME" == "cancelled" ]]; then
-              FIRST_BLOCKER="NODE_SETUP_FAILED"
-            elif [[ "$PIN_NPM_OUTCOME" == "failure" || "$PIN_NPM_OUTCOME" == "cancelled" ]]; then
-              FIRST_BLOCKER="NPM_PIN_FAILED"
-            elif [[ "$NPM_CI_OUTCOME" == "failure" || "$NPM_CI_OUTCOME" == "cancelled" ]]; then
-              FIRST_BLOCKER="NPM_CI_FAILED"
-            elif [[ "$INSTALL_VERCEL_OUTCOME" == "failure" || "$INSTALL_VERCEL_OUTCOME" == "cancelled" ]]; then
-              FIRST_BLOCKER="VERCEL_CLI_INSTALL_FAILED"
-            elif [[ "$BOOTSTRAP_OUTCOME" == "failure" || "$BOOTSTRAP_OUTCOME" == "cancelled" ]]; then
-              FIRST_BLOCKER="BOOTSTRAP_FAILED_BEFORE_REPORT"
-            fi
-
-            cat > "$SAFE_REPORT" <<REPORT
-          ## Temporary Vercel integration bootstrap
-
-          | Check | Result |
-          |---|---|
-          | Workflow result | BLOCKED |
-          | Checkout | ${CHECKOUT_OUTCOME:-skipped} |
-          | Setup Node | ${SETUP_NODE_OUTCOME:-skipped} |
-          | Node major version | $NODE_MAJOR_VERSION |
-          | Pin npm CLI | ${PIN_NPM_OUTCOME:-skipped} |
-          | npm version | $NPM_VERSION |
-          | npm ci | ${NPM_CI_OUTCOME:-skipped} |
-          | npm failure category | $NPM_FAILURE_CATEGORY |
-          | Install Vercel CLI | ${INSTALL_VERCEL_OUTCOME:-skipped} |
-          | Bootstrap | ${BOOTSTRAP_OUTCOME:-skipped} |
-          | DATABASE_URL | UNVERIFIED |
-          | CRON_SECRET | UNVERIFIED |
-          | Canonical URL | UNVERIFIED |
-          | Preview encryption key | UNVERIFIED |
-          | Production encryption key | UNVERIFIED |
-          | Preview Deployment | NOT_REACHED |
-          | Preflight | NOT_RUN |
-          | Migration Verify | NOT_RUN |
-          | Transactions | UNVERIFIED |
-          | Remaining blocker | $FIRST_BLOCKER |
-          REPORT
-          fi
-
-          rm -f "$RUNNER_TEMP/npm-ci.log"
-          gh pr comment 127 --repo AdhamRef/gozbebekleri --body-file "$SAFE_REPORT"
+          S="$RUNNER_TEMP/s"; v(){ cat "$S/$1" 2>/dev/null||printf '%s' "$2"; }; B="$(v blocker NONE)"; N="$(v new_sha '')"; R=blocked
+          [[ "${{ steps.push.outcome }}" == success && "$B" == NONE && -n "$N" ]]&&R=success; [[ "$B" != NONE ]]||B=UNKNOWN_REPAIR_FAILURE
+          { echo result=$R;echo blocker=$B;echo old_sha="$(v old_sha UNAVAILABLE)";echo new_sha=$N;echo additions="$(v additions 0)";echo deletions="$(v deletions 0)";echo npm_ci="$(v npm_ci '${{ steps.repair.outcome }}')";echo tests="$(v tests '${{ steps.repair.outcome }}')";echo types="$(v types '${{ steps.repair.outcome }}')";echo build="$(v build '${{ steps.repair.outcome }}')";echo push="$(v push '${{ steps.push.outcome }}')"; } >> "$GITHUB_OUTPUT"
+      - if: always() && steps.out.outputs.result != 'success'
+        run: exit 1
+  bootstrap:
+    if: always()
+    needs: repair_lockfile
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions: {contents: read, issues: write, pull-requests: write}
+    env:
+      TARGET_COMMIT_SHA: ${{ needs.repair_lockfile.outputs.new_target_sha }}
+      REPAIR_RESULT: ${{ needs.repair_lockfile.outputs.result }}
+      REPAIR_BLOCKER: ${{ needs.repair_lockfile.outputs.blocker }}
+      OLD_SHA: ${{ needs.repair_lockfile.outputs.old_sha }}
+      ADDITIONS: ${{ needs.repair_lockfile.outputs.additions }}
+      DELETIONS: ${{ needs.repair_lockfile.outputs.deletions }}
+      REPAIR_NPM_CI: ${{ needs.repair_lockfile.outputs.npm_ci }}
+      REPAIR_TESTS: ${{ needs.repair_lockfile.outputs.tests }}
+      REPAIR_TYPES: ${{ needs.repair_lockfile.outputs.types }}
+      REPAIR_BUILD: ${{ needs.repair_lockfile.outputs.build }}
+      REPAIR_PUSH: ${{ needs.repair_lockfile.outputs.push }}
+    steps:
+      - id: checkout
+        if: env.REPAIR_RESULT == 'success'
+        uses: actions/checkout@v4
+        with: {ref: '${{ env.TARGET_COMMIT_SHA }}', fetch-depth: 1, persist-credentials: false}
+      - id: node
+        if: steps.checkout.outcome == 'success'
+        uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm}
+      - id: deps
+        if: steps.node.outcome == 'success'
+        shell: bash
+        run: |
+          L="$RUNNER_TEMP/deps.log"; trap 'rm -f "$L"' EXIT
+          npm install -g npm@10.9.2 --no-audit --no-fund > "$L" 2>&1; [[ "$(npm -v)" == 10.9.2 ]]; npm ci --force --no-audit --no-fund > "$L" 2>&1
+      - id: vercel
+        if: steps.deps.outcome == 'success'
+        run: npm install -g vercel@56.1.0 --no-audit --no-fund
+      - id: bootstrap
+        if: steps.vercel.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        env: {VERCEL_TOKEN: '${{ secrets.VERCEL_TOKEN }}', SAFE_REPORT: '${{ runner.temp }}/vercel.md'}
+        run: bash scripts/bootstrap-integration-settings-vercel-ci.sh
+      - name: Publish sanitized report to PR 127
+        if: always()
+        shell: bash
+        env: {GH_TOKEN: '${{ github.token }}'}
+        run: |
+          V="$RUNNER_TEMP/vercel.md"; O="$RUNNER_TEMP/report.md"
+          { echo '## Temporary Vercel integration bootstrap';echo;echo '| Check | Result |';echo '|---|---|';echo "| Repair lockfile | ${REPAIR_RESULT:-blocked} |";echo "| Repair blocker | ${REPAIR_BLOCKER:-UNKNOWN} |";echo "| Old PR 127 SHA | ${OLD_SHA:-UNAVAILABLE} |";echo "| New PR 127 SHA | ${TARGET_COMMIT_SHA:-NOT_CREATED} |";echo "| package-lock additions | ${ADDITIONS:-0} |";echo "| package-lock deletions | ${DELETIONS:-0} |";echo '| package.json changed | false |';echo '| Direct dependencies changed | false |';echo "| Repair npm ci | ${REPAIR_NPM_CI:-skipped} |";echo "| Integration tests | ${REPAIR_TESTS:-skipped} |";echo "| Typechecks | ${REPAIR_TYPES:-skipped} |";echo "| Build | ${REPAIR_BUILD:-skipped} |";echo "| Push to PR 127 | ${REPAIR_PUSH:-skipped} |";echo "| Bootstrap checkout | ${{ steps.checkout.outcome }} |";echo "| Bootstrap npm ci | ${{ steps.deps.outcome }} |";echo "| Install Vercel CLI | ${{ steps.vercel.outcome }} |";echo "| Bootstrap | ${{ steps.bootstrap.outcome }} |"; } > "$O"
+          if [[ -f "$V" ]];then tail -n +5 "$V" >> "$O";else printf '%s\n' '| Database relation | UNVERIFIED |' '| Preview encryption key | UNVERIFIED |' '| Production encryption key | UNVERIFIED |' '| DATABASE_URL | UNVERIFIED |' '| CRON_SECRET | UNVERIFIED |' '| Canonical URL | UNVERIFIED |' '| Preview deployment | NOT_REACHED |' '| Preflight | NOT_RUN |' '| Migration verify | NOT_RUN |' '| MongoDB transactions | UNVERIFIED |' >> "$O";fi
+          rm -f "$RUNNER_TEMP"/*.log;gh pr comment 127 --repo AdhamRef/gozbebekleri --body-file "$O"
