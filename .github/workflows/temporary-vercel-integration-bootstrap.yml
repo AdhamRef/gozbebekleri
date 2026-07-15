@@ -38,24 +38,29 @@ jobs:
 
     steps:
       - name: Checkout reviewed target commit
+        id: checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ env.TARGET_COMMIT_SHA }}
           fetch-depth: 1
 
       - name: Setup project Node.js
+        id: setup_node
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
 
       - name: Install project dependencies
+        id: npm_ci
         run: npm ci
 
       - name: Install pinned Vercel CLI
+        id: install_vercel
         run: npm install --global vercel@56.1.0
 
       - name: Bootstrap Vercel integration settings safely
+        id: bootstrap
         shell: bash
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -313,33 +318,54 @@ jobs:
           write_report
 
       - name: Publish sanitized report to PR 127
+        id: publish_report
         if: always()
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          SETUP_NODE_OUTCOME: ${{ steps.setup_node.outcome }}
+          NPM_CI_OUTCOME: ${{ steps.npm_ci.outcome }}
+          INSTALL_VERCEL_OUTCOME: ${{ steps.install_vercel.outcome }}
+          BOOTSTRAP_OUTCOME: ${{ steps.bootstrap.outcome }}
         run: |
           set -Eeuo pipefail
           SAFE_REPORT="$RUNNER_TEMP/temporary-vercel-integration-bootstrap-report.md"
           if [[ ! -f "$SAFE_REPORT" ]]; then
-            cat > "$SAFE_REPORT" <<'REPORT'
+            FIRST_BLOCKER="UNKNOWN_EARLY_FAILURE"
+            if [[ "$CHECKOUT_OUTCOME" == "failure" || "$CHECKOUT_OUTCOME" == "cancelled" ]]; then
+              FIRST_BLOCKER="CHECKOUT_FAILED"
+            elif [[ "$SETUP_NODE_OUTCOME" == "failure" || "$SETUP_NODE_OUTCOME" == "cancelled" ]]; then
+              FIRST_BLOCKER="NODE_SETUP_FAILED"
+            elif [[ "$NPM_CI_OUTCOME" == "failure" || "$NPM_CI_OUTCOME" == "cancelled" ]]; then
+              FIRST_BLOCKER="NPM_CI_FAILED"
+            elif [[ "$INSTALL_VERCEL_OUTCOME" == "failure" || "$INSTALL_VERCEL_OUTCOME" == "cancelled" ]]; then
+              FIRST_BLOCKER="VERCEL_CLI_INSTALL_FAILED"
+            elif [[ "$BOOTSTRAP_OUTCOME" == "failure" || "$BOOTSTRAP_OUTCOME" == "cancelled" ]]; then
+              FIRST_BLOCKER="BOOTSTRAP_FAILED_BEFORE_REPORT"
+            fi
+
+            cat > "$SAFE_REPORT" <<REPORT
           ## Temporary Vercel integration bootstrap
 
           | Check | Result |
           |---|---|
           | Workflow result | BLOCKED |
-          | Target Commit SHA | 4df82817f55e146a150b7b479124f700e0cdf488 |
-          | Vercel Project | gozbebekleri |
-          | Database relation | UNABLE_TO_VERIFY |
-          | Preview encryption key | INVALID |
-          | Production encryption key | INVALID |
-          | DATABASE_URL | MISSING |
-          | CRON_SECRET | MISSING |
-          | Canonical URL | MISSING |
-          | Preview Deployment | FAILED |
-          | Preflight | BLOCKED |
-          | Migration Verify | BLOCKED |
+          | Checkout | ${CHECKOUT_OUTCOME:-skipped} |
+          | Setup Node | ${SETUP_NODE_OUTCOME:-skipped} |
+          | npm ci | ${NPM_CI_OUTCOME:-skipped} |
+          | Install Vercel CLI | ${INSTALL_VERCEL_OUTCOME:-skipped} |
+          | Bootstrap | ${BOOTSTRAP_OUTCOME:-skipped} |
+          | DATABASE_URL | UNVERIFIED |
+          | CRON_SECRET | UNVERIFIED |
+          | Canonical URL | UNVERIFIED |
+          | Preview encryption key | UNVERIFIED |
+          | Production encryption key | UNVERIFIED |
+          | Preview Deployment | NOT_REACHED |
+          | Preflight | NOT_RUN |
+          | Migration Verify | NOT_RUN |
           | Transactions | UNVERIFIED |
-          | Remaining blockers | WORKFLOW_FAILED_BEFORE_SANITIZED_REPORT |
+          | Remaining blocker | $FIRST_BLOCKER |
           REPORT
           fi
           gh pr comment 127 --repo AdhamRef/gozbebekleri --body-file "$SAFE_REPORT"
