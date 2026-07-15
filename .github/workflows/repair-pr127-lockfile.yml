@@ -1,0 +1,24 @@
+name: Repair PR 127 package lock
+
+on:
+  push:
+    branches:
+      - ops/repair-pr127-lockfile
+    paths:
+      - .github/workflows/repair-pr127-lockfile.yml
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: repair-pr127-package-lock
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EXPECTED
