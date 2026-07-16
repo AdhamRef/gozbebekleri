@@ -9,4 +9,299 @@ env:
   EXPECTED_TARGET_SHA: 4df82817f55e146a150b7b479124f700e0cdf488
   TARGET_BRANCH: agent/secure-integration-settings-backend
   VERCEL_PROJECT_NAME: gozbebekleri
-  VERCEL_PROJECT_ID: prj_hkMyu
+  VERCEL_PROJECT_ID: prj_hkMyu8iABc7AAqF7T1DvYRpKYRqV
+  VERCEL_TEAM_SCOPE: gozbebekleri-dernek
+  VERCEL_TEAM_ID: team_zLLO1Hql8hFDCswcnpMMDCBj
+jobs:
+  repair_lockfile:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.number == 127 &&
+        github.event.comment.body == '/run-pr127-repair-final-20260715' &&
+        github.actor == 'saladin76'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions: {contents: write}
+    outputs:
+      result: ${{ steps.finalize.outputs.result }}
+      blocker: ${{ steps.finalize.outputs.blocker }}
+      failed_step: ${{ steps.finalize.outputs.failed_step }}
+      old_sha: ${{ steps.finalize.outputs.old_sha }}
+      new_target_sha: ${{ steps.finalize.outputs.new_sha }}
+      additions: ${{ steps.finalize.outputs.additions }}
+      deletions: ${{ steps.finalize.outputs.deletions }}
+      npm_ci: ${{ steps.finalize.outputs.npm_ci }}
+      tests: ${{ steps.finalize.outputs.tests }}
+      prisma_default: ${{ steps.finalize.outputs.prisma_default }}
+      prisma_integration: ${{ steps.finalize.outputs.prisma_integration }}
+      runtime_typecheck: ${{ steps.finalize.outputs.runtime_typecheck }}
+      release_typecheck: ${{ steps.finalize.outputs.release_typecheck }}
+      build: ${{ steps.finalize.outputs.build }}
+      push: ${{ steps.finalize.outputs.push }}
+      node_version: ${{ steps.finalize.outputs.node_version }}
+      npm_version: ${{ steps.finalize.outputs.npm_version }}
+      checkout_primary: ${{ steps.finalize.outputs.checkout_primary }}
+      checkout_fallback: ${{ steps.finalize.outputs.checkout_fallback }}
+      setup_node_primary: ${{ steps.finalize.outputs.setup_node_primary }}
+      setup_node_retry: ${{ steps.finalize.outputs.setup_node_retry }}
+      npm_tool: ${{ steps.finalize.outputs.npm_tool }}
+      verify_head: ${{ steps.finalize.outputs.verify_head }}
+      repair: ${{ steps.finalize.outputs.repair }}
+      ts_errors_b64: ${{ steps.finalize.outputs.ts_errors_b64 }}
+    steps:
+      - id: checkout_primary
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: agent/secure-integration-settings-backend
+          fetch-depth: 0
+          persist-credentials: false
+      - id: checkout_fallback
+        if: steps.checkout_primary.outcome == 'failure'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          cd "$GITHUB_WORKSPACE"
+          git init
+          git remote add origin https://github.com/AdhamRef/gozbebekleri.git
+          delays=(5 15 30); ok=false
+          for i in 0 1 2; do
+            if git fetch --no-tags --prune --depth=1 origin "$TARGET_BRANCH"; then ok=true; break; fi
+            sleep "${delays[$i]}"
+          done
+          $ok
+          git checkout --detach FETCH_HEAD
+      - id: checkout_gate
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          S="$RUNNER_TEMP/s"; mkdir -p "$S"
+          if [[ "${{ steps.checkout_primary.outcome }}" != success && "${{ steps.checkout_fallback.outcome }}" != success ]]; then
+            echo CHECKOUT_FAILED > "$S/blocker"; echo checkout > "$S/failed_step"; exit 1
+          fi
+          git rev-parse --is-inside-work-tree >/dev/null
+      - id: setup_node_primary
+        if: steps.checkout_gate.outcome == 'success'
+        continue-on-error: true
+        uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - id: setup_node_retry
+        if: steps.checkout_gate.outcome == 'success' && steps.setup_node_primary.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - id: node_gate
+        if: always() && steps.checkout_gate.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          S="$RUNNER_TEMP/s"; mkdir -p "$S"
+          V="$(node --version 2>/dev/null || true)"; echo "$V" > "$S/node_version"
+          [[ "$V" =~ ^v22\. ]] || { echo NODE_SETUP_FAILED > "$S/blocker"; echo setup_node > "$S/failed_step"; exit 1; }
+      - id: pin_npm
+        if: steps.node_gate.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          S="$RUNNER_TEMP/s"; mkdir -p "$S"
+          TOOL_DIR="$RUNNER_TEMP/npm-tool"; rm -rf "$TOOL_DIR"
+          delays=(5 15 30); ok=false
+          for i in 0 1 2; do
+            if npm install --prefix "$TOOL_DIR" npm@10.9.2 --ignore-scripts --no-audit --no-fund; then ok=true; break; fi
+            sleep "${delays[$i]}"
+          done
+          $ok || { echo NPM_PIN_FAILED > "$S/blocker"; echo pin_npm > "$S/failed_step"; exit 1; }
+          cat > "$RUNNER_TEMP/npm10" <<'SH'
+          #!/usr/bin/env bash
+          exec node "$RUNNER_TEMP/npm-tool/node_modules/npm/bin/npm-cli.js" "$@"
+          SH
+          chmod +x "$RUNNER_TEMP/npm10"
+          V="$("$RUNNER_TEMP/npm10" --version)"; echo "$V" > "$S/npm_version"
+          [[ "$V" == 10.9.2 ]] || { echo NPM_PIN_FAILED > "$S/blocker"; echo pin_npm > "$S/failed_step"; exit 1; }
+          echo "NPM10=$RUNNER_TEMP/npm10" >> "$GITHUB_ENV"
+      - id: verify_head
+        if: steps.pin_npm.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          S="$RUNNER_TEMP/s"; mkdir -p "$S"
+          SHA="$(git rev-parse HEAD)"; echo "$SHA" > "$S/old_sha"
+          [[ "$SHA" == "$EXPECTED_TARGET_SHA" ]] || { echo TARGET_BRANCH_MOVED > "$S/blocker"; echo verify_head > "$S/failed_step"; exit 1; }
+      - id: repair
+        if: steps.verify_head.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          S="$RUNNER_TEMP/s"; L="$RUNNER_TEMP/repair.log"; P="$S/package.json.before"; mkdir -p "$S"
+          trap 'rm -f "$L"' EXIT
+          fail(){ echo "$1" > "$S/blocker"; echo "${2:-repair}" > "$S/failed_step"; exit 1; }
+          run(){ local n="$1" b="$2"; shift 2; "$@" >"$L" 2>&1 || fail "$b" "$n"; echo success > "$S/$n"; }
+          ts(){ node - "$L" "$S/ts.md" <<'NODE'
+          const f=require('fs'),[i,o]=process.argv.slice(2),r=[];const x=s=>String(s).replace(/https?:\/\/\S+/gi,'[URL_REDACTED]').replace(/((?:token|secret|password|authorization|database_url|cron_secret|encryption_key)\s*[:=]\s*)\S+/gi,'$1[REDACTED]').replace(/[|`]/g,"'").slice(0,400);for(const l of f.readFileSync(i,'utf8').split(/\r?\n/)){let m=l.match(/^(.*)\((\d+),(\d+)\): error (TS\d+): (.*)$/)||l.match(/^(.*):(\d+):(\d+)\s+-\s+error (TS\d+): (.*)$/);if(m){r.push(`| ${x(m[1])} | ${m[2]} | ${m[4]} | ${x(m[5])} |`);if(r.length===20)break}}f.writeFileSync(o,(r.length?r:['| UNAVAILABLE | UNAVAILABLE | UNAVAILABLE | Sanitized TypeScript details unavailable. |']).join('\n')+'\n');
+          NODE
+          }
+          cp package.json "$P"
+          node - <<'NODE'
+          const f=require('fs'),p=JSON.parse(f.readFileSync('package.json')),s=x=>JSON.stringify(Object.fromEntries(Object.entries(x||{}).sort(([a],[b])=>a.localeCompare(b))));f.writeFileSync(process.env.RUNNER_TEMP+'/deps.before',s(p.dependencies));f.writeFileSync(process.env.RUNNER_TEMP+'/devdeps.before',s(p.devDependencies));
+          NODE
+          "$NPM10" install --package-lock-only --force --ignore-scripts --no-audit --no-fund >"$L" 2>&1 || fail LOCKFILE_REPAIR_FAILED repair
+          cmp -s package.json "$P" || fail LOCKFILE_REPAIR_FAILED repair
+          mapfile -t C < <(git diff --name-only); [[ ${#C[@]} -eq 1 && "${C[0]}" == package-lock.json ]] || fail LOCKFILE_REPAIR_FAILED repair
+          node - <<'NODE' || fail LOCKFILE_REPAIR_FAILED repair
+          const f=require('fs'),p=JSON.parse(f.readFileSync('package.json')),l=JSON.parse(f.readFileSync('package-lock.json')),s=x=>JSON.stringify(Object.fromEntries(Object.entries(x||{}).sort(([a],[b])=>a.localeCompare(b))));if(l.lockfileVersion!==3)throw Error('LOCKFILE_VERSION');const r=l.packages?.[''];if(!r)throw Error('ROOT_MISSING');if(s(r.dependencies)!==s(p.dependencies)||s(r.devDependencies)!==s(p.devDependencies))throw Error('ROOT_MISMATCH');if(s(p.dependencies)!==f.readFileSync(process.env.RUNNER_TEMP+'/deps.before','utf8')||s(p.devDependencies)!==f.readFileSync(process.env.RUNNER_TEMP+'/devdeps.before','utf8'))throw Error('DIRECT_DEPS_CHANGED');for(const v of Object.values(l.packages||{}))if(v?.resolved){const u=new URL(String(v.resolved));if(u.protocol!=='https:'||u.hostname!=='registry.npmjs.org'||u.username||u.password)throw Error('REGISTRY_URL')}if(/(_authToken|x-access-token|authorization\s*["']?\s*:|Bearer\s+[A-Za-z0-9._~-]+|npm_[A-Za-z0-9]{20,})/i.test(f.readFileSync('package-lock.json','utf8')))throw Error('CREDENTIAL_CONTENT');
+          NODE
+          read -r A D _ < <(git diff --numstat -- package-lock.json); echo "${A:-0}" > "$S/additions"; echo "${D:-0}" > "$S/deletions"
+          rm -rf node_modules
+          run npm_ci NPM_CI_FAILED "$NPM10" ci --force --no-audit --no-fund
+          run tests INTEGRATION_TESTS_FAILED "$NPM10" run test:integration-settings
+          run prisma_default PRISMA_DEFAULT_GENERATION_FAILED ./node_modules/.bin/prisma generate
+          run prisma_integration PRISMA_INTEGRATION_GENERATION_FAILED ./node_modules/.bin/prisma generate --schema prisma/integration-settings.schema.prisma
+          "$NPM10" run typecheck:communication-runtime >"$L" 2>&1 || { ts; fail RUNTIME_TYPECHECK_FAILED runtime_typecheck; }; echo success > "$S/runtime_typecheck"
+          "$NPM10" run typecheck:integration-release >"$L" 2>&1 || { ts; fail RELEASE_TYPECHECK_FAILED release_typecheck; }; echo success > "$S/release_typecheck"
+          run build BUILD_FAILED "$NPM10" run build
+          cmp -s package.json "$P" || fail LOCKFILE_REPAIR_FAILED repair
+          mapfile -t C < <(git diff --name-only); [[ ${#C[@]} -eq 1 && "${C[0]}" == package-lock.json ]] || fail LOCKFILE_REPAIR_FAILED repair
+          git config user.name github-actions[bot]; git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add package-lock.json; git commit -m 'Repair package lock consistency' >/dev/null || fail LOCKFILE_REPAIR_FAILED repair
+          git rev-parse HEAD > "$S/new_sha"
+      - id: push
+        if: steps.repair.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        env: {GITHUB_TOKEN: '${{ github.token }}'}
+        run: |
+          set +x; set -Eeuo pipefail
+          S="$RUNNER_TEMP/s"; L="$RUNNER_TEMP/push.log"; trap 'rm -f "$L"' EXIT
+          A="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"; H="AUTHORIZATION: basic $A"
+          git -c http.https://github.com/.extraheader="$H" fetch origin "$TARGET_BRANCH" --no-tags >"$L" 2>&1 || { echo PR127_BRANCH_PUSH_BLOCKED > "$S/blocker"; echo push > "$S/failed_step"; exit 1; }
+          [[ "$(git rev-parse FETCH_HEAD)" == "$EXPECTED_TARGET_SHA" ]] || { echo TARGET_BRANCH_MOVED > "$S/blocker"; echo verify_head > "$S/failed_step"; exit 1; }
+          git -c http.https://github.com/.extraheader="$H" push origin "HEAD:refs/heads/$TARGET_BRANCH" >"$L" 2>&1 || { echo PR127_BRANCH_PUSH_BLOCKED > "$S/blocker"; echo push > "$S/failed_step"; exit 1; }
+          echo success > "$S/push"
+      - id: finalize
+        if: always()
+        shell: bash
+        run: |
+          S="$RUNNER_TEMP/s"; mkdir -p "$S"; v(){ cat "$S/$1" 2>/dev/null || printf '%s' "$2"; }
+          B="$(v blocker '')"; F="$(v failed_step '')"; N="$(v new_sha '')"; R=blocked
+          if [[ -z "$B" ]]; then
+            if [[ "${{ steps.checkout_gate.outcome }}" != success ]]; then B=CHECKOUT_FAILED;F=checkout
+            elif [[ "${{ steps.node_gate.outcome }}" != success ]]; then B=NODE_SETUP_FAILED;F=setup_node
+            elif [[ "${{ steps.pin_npm.outcome }}" != success ]]; then B=NPM_PIN_FAILED;F=pin_npm
+            elif [[ "${{ steps.verify_head.outcome }}" != success ]]; then B=VERIFY_HEAD_FAILED;F=verify_head
+            elif [[ "${{ steps.repair.outcome }}" != success ]]; then B=LOCKFILE_REPAIR_FAILED;F=repair
+            elif [[ "${{ steps.push.outcome }}" != success ]]; then B=PR127_BRANCH_PUSH_BLOCKED;F=push
+            elif [[ -n "$N" ]]; then B=NONE;F=NONE;R=success
+            else B=UNKNOWN_REPAIR_FAILURE;F=UNKNOWN
+            fi
+          fi
+          T=''; [[ -s "$S/ts.md" ]] && T="$(base64 -w0 < "$S/ts.md")"
+          {
+            echo result=$R; echo blocker=$B; echo failed_step=$F; echo old_sha="$(v old_sha UNAVAILABLE)"; echo new_sha=$N
+            echo additions="$(v additions 0)"; echo deletions="$(v deletions 0)"; echo npm_ci="$(v npm_ci skipped)"; echo tests="$(v tests skipped)"
+            echo prisma_default="$(v prisma_default skipped)"; echo prisma_integration="$(v prisma_integration skipped)"
+            echo runtime_typecheck="$(v runtime_typecheck skipped)"; echo release_typecheck="$(v release_typecheck skipped)"; echo build="$(v build skipped)"; echo push="$(v push '${{ steps.push.outcome }}')"
+            echo node_version="$(v node_version UNAVAILABLE)"; echo npm_version="$(v npm_version UNAVAILABLE)"
+            echo checkout_primary='${{ steps.checkout_primary.outcome }}'; echo checkout_fallback='${{ steps.checkout_fallback.outcome }}'
+            echo setup_node_primary='${{ steps.setup_node_primary.outcome }}'; echo setup_node_retry='${{ steps.setup_node_retry.outcome }}'
+            echo npm_tool='${{ steps.pin_npm.outcome }}'; echo verify_head='${{ steps.verify_head.outcome }}'; echo repair='${{ steps.repair.outcome }}'; echo ts_errors_b64=$T
+          } >> "$GITHUB_OUTPUT"
+          rm -f "$RUNNER_TEMP"/*.log
+      - if: always() && steps.finalize.outputs.result != 'success'
+        run: exit 1
+  bootstrap:
+    if: >
+      always() &&
+      needs.repair_lockfile.result != 'skipped'
+    needs: repair_lockfile
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions: {contents: read, issues: write, pull-requests: write}
+    env:
+      TARGET_COMMIT_SHA: ${{ needs.repair_lockfile.outputs.new_target_sha }}
+      REPAIR_RESULT: ${{ needs.repair_lockfile.outputs.result }}
+      REPAIR_BLOCKER: ${{ needs.repair_lockfile.outputs.blocker }}
+      REPAIR_FAILED_STEP: ${{ needs.repair_lockfile.outputs.failed_step }}
+      OLD_SHA: ${{ needs.repair_lockfile.outputs.old_sha }}
+      ADDITIONS: ${{ needs.repair_lockfile.outputs.additions }}
+      DELETIONS: ${{ needs.repair_lockfile.outputs.deletions }}
+      REPAIR_NPM_CI: ${{ needs.repair_lockfile.outputs.npm_ci }}
+      REPAIR_TESTS: ${{ needs.repair_lockfile.outputs.tests }}
+      REPAIR_PRISMA_DEFAULT: ${{ needs.repair_lockfile.outputs.prisma_default }}
+      REPAIR_PRISMA_INTEGRATION: ${{ needs.repair_lockfile.outputs.prisma_integration }}
+      REPAIR_RUNTIME_TYPECHECK: ${{ needs.repair_lockfile.outputs.runtime_typecheck }}
+      REPAIR_RELEASE_TYPECHECK: ${{ needs.repair_lockfile.outputs.release_typecheck }}
+      REPAIR_BUILD: ${{ needs.repair_lockfile.outputs.build }}
+      REPAIR_PUSH: ${{ needs.repair_lockfile.outputs.push }}
+      TS_ERRORS_B64: ${{ needs.repair_lockfile.outputs.ts_errors_b64 }}
+    steps:
+      - id: checkout
+        if: env.REPAIR_RESULT == 'success'
+        uses: actions/checkout@v4
+        with: {ref: '${{ env.TARGET_COMMIT_SHA }}', fetch-depth: 1, persist-credentials: false}
+      - id: setup_node
+        if: steps.checkout.outcome == 'success'
+        uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - id: pin_npm
+        if: steps.setup_node.outcome == 'success'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          TOOL_DIR="$RUNNER_TEMP/npm-tool"; rm -rf "$TOOL_DIR"
+          npm install --prefix "$TOOL_DIR" npm@10.9.2 --ignore-scripts --no-audit --no-fund
+          cat > "$RUNNER_TEMP/npm10" <<'SH'
+          #!/usr/bin/env bash
+          exec node "$RUNNER_TEMP/npm-tool/node_modules/npm/bin/npm-cli.js" "$@"
+          SH
+          chmod +x "$RUNNER_TEMP/npm10"; test "$("$RUNNER_TEMP/npm10" --version)" = 10.9.2
+          echo "NPM10=$RUNNER_TEMP/npm10" >> "$GITHUB_ENV"
+      - id: npm_ci
+        if: steps.pin_npm.outcome == 'success'
+        run: '"$NPM10" ci --force --no-audit --no-fund'
+      - id: vercel
+        if: steps.npm_ci.outcome == 'success'
+        run: '"$NPM10" install --global vercel@56.1.0 --no-audit --no-fund'
+      - id: bootstrap
+        if: steps.vercel.outcome == 'success'
+        continue-on-error: true
+        env: {VERCEL_TOKEN: '${{ secrets.VERCEL_TOKEN }}', SAFE_REPORT: '${{ runner.temp }}/vercel.md'}
+        run: bash scripts/bootstrap-integration-settings-vercel-ci.sh
+      - id: finalize
+        if: always()
+        env: {GH_TOKEN: '${{ github.token }}'}
+        run: |
+          V="$RUNNER_TEMP/vercel.md"; O="$RUNNER_TEMP/report.md"
+          {
+            echo '## Temporary Vercel integration bootstrap'; echo; echo '| Check | Result |'; echo '|---|---|'
+            echo "| Checkout primary outcome | ${{ needs.repair_lockfile.outputs.checkout_primary }} |"
+            echo "| Checkout fallback outcome | ${{ needs.repair_lockfile.outputs.checkout_fallback }} |"
+            echo "| Setup Node primary outcome | ${{ needs.repair_lockfile.outputs.setup_node_primary }} |"
+            echo "| Setup Node retry outcome | ${{ needs.repair_lockfile.outputs.setup_node_retry }} |"
+            echo "| Node version | ${{ needs.repair_lockfile.outputs.node_version }} |"
+            echo "| npm tool outcome | ${{ needs.repair_lockfile.outputs.npm_tool }} |"
+            echo "| npm version | ${{ needs.repair_lockfile.outputs.npm_version }} |"
+            echo "| Verify Head outcome | ${{ needs.repair_lockfile.outputs.verify_head }} |"
+            echo "| Repair outcome | ${{ needs.repair_lockfile.outputs.repair }} |"
+            echo "| Repair lockfile | ${REPAIR_RESULT:-blocked} |"; echo "| Failed step | ${REPAIR_FAILED_STEP:-UNKNOWN} |"; echo "| Blocker classification | ${REPAIR_BLOCKER:-UNKNOWN_REPAIR_FAILURE} |"
+            echo "| Old PR 127 SHA | ${OLD_SHA:-UNAVAILABLE} |"; echo "| New PR 127 SHA | ${TARGET_COMMIT_SHA:-NOT_CREATED} |"
+            echo "| package-lock additions | ${ADDITIONS:-0} |"; echo "| package-lock deletions | ${DELETIONS:-0} |"
+            echo "| Repair npm ci | ${REPAIR_NPM_CI:-skipped} |"; echo "| Integration tests | ${REPAIR_TESTS:-skipped} |"
+            echo "| Default Prisma generation | ${REPAIR_PRISMA_DEFAULT:-skipped} |"; echo "| Integration Prisma generation | ${REPAIR_PRISMA_INTEGRATION:-skipped} |"
+            echo "| Runtime typecheck | ${REPAIR_RUNTIME_TYPECHECK:-skipped} |"; echo "| Release typecheck | ${REPAIR_RELEASE_TYPECHECK:-skipped} |"; echo "| Build | ${REPAIR_BUILD:-skipped} |"; echo "| Push to PR 127 | ${REPAIR_PUSH:-skipped} |"
+            echo "| Bootstrap checkout | ${{ steps.checkout.outcome }} |"; echo "| Bootstrap npm ci | ${{ steps.npm_ci.outcome }} |"; echo "| Install Vercel CLI | ${{ steps.vercel.outcome }} |"; echo "| Bootstrap | ${{ steps.bootstrap.outcome }} |"
+          } > "$O"
+          if [[ -n "$TS_ERRORS_B64" ]]; then echo; echo '| File | Line | Code | Message |'; echo '|---|---:|---|---|' >> "$O"; printf '%s' "$TS_ERRORS_B64" | base64 -d >> "$O"; fi
+          if [[ -f "$V" ]]; then tail -n +5 "$V" >> "$O"; else printf '%s\n' '| Database relation | UNVERIFIED |' '| Preview encryption key | UNVERIFIED |' '| Production encryption key | UNVERIFIED |' '| DATABASE_URL | UNVERIFIED |' '| CRON_SECRET | UNVERIFIED |' '| Canonical URL | UNVERIFIED |' '| Preview deployment | NOT_REACHED |' '| Preflight | NOT_RUN |' '| Migration verify | NOT_RUN |' '| MongoDB transactions | UNVERIFIED |' >> "$O"; fi
+          rm -f "$RUNNER_TEMP"/*.log
+          gh pr comment 127 --repo AdhamRef/gozbebekleri --body-file "$O"
