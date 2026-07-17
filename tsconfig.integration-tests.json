@@ -21,6 +21,7 @@
     "lib/integration-settings/provider-testing/**/*.ts",
     "lib/integration-settings/release-readiness.ts",
     "lib/integration-settings/resolver.ts",
+    "lib/integration-settings/runtime-policy.ts",
     "lib/integration-settings/service.ts",
     "lib/integration-settings/types.ts",
     "lib/integration-settings/ui-contracts.ts",
