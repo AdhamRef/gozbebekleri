@@ -1,6 +1,7 @@
 import "server-only";
 import type { IntegrationValueSource } from "@/lib/integration-settings/catalog";
 import { getActiveIntegrationRuntimeResolution } from "@/lib/integration-settings/prisma-service";
+import { evaluateActiveRuntimePolicy } from "@/lib/integration-settings/runtime-policy";
 
 export const RUNTIME_CONFIGURATION_CACHE_MAX_AGE_MS = 30_000;
 
@@ -38,7 +39,10 @@ type NotReady = {
 
 export type ActiveRuntimeConfig<T> = Ready<T> | NotReady;
 
-type RuntimeOptions = { allowDisabled?: boolean };
+type RuntimeOptions = {
+  allowDisabled?: boolean;
+  allowDatabaseFallback?: boolean;
+};
 
 async function resolve<T extends Record<string, string>>(
   provider: "META_WHATSAPP" | "BREVO" | "NETGSM",
@@ -47,40 +51,28 @@ async function resolve<T extends Record<string, string>>(
   options: RuntimeOptions = {}
 ): Promise<ActiveRuntimeConfig<T>> {
   const state = await getActiveIntegrationRuntimeResolution(provider);
-  if (state.decryptionFailedFields.length) {
+  const decision = evaluateActiveRuntimePolicy({
+    enabled: state.enabled,
+    databaseAvailable: state.databaseAvailable,
+    values: state.values,
+    decryptionFailedFields: state.decryptionFailedFields,
+    requiredFields: required,
+    allowDisabled: options.allowDisabled,
+    allowDatabaseFallback: options.allowDatabaseFallback,
+  });
+
+  if (!decision.configured) {
     return {
       configured: false,
       enabled: state.enabled,
       values: null,
       sources: state.sources,
       databaseAvailable: state.databaseAvailable,
-      reason: RUNTIME_FAILURE.INTEGRATION_DECRYPTION_FAILED,
-      missingFields: state.decryptionFailedFields,
+      reason: decision.reason,
+      missingFields: decision.missingFields,
     };
   }
-  if (!options.allowDisabled && !state.enabled) {
-    return {
-      configured: false,
-      enabled: false,
-      values: null,
-      sources: state.sources,
-      databaseAvailable: state.databaseAvailable,
-      reason: RUNTIME_FAILURE.PROVIDER_DISABLED,
-      missingFields: [],
-    };
-  }
-  const missingFields = required.filter((key) => !state.values[key]);
-  if (missingFields.length) {
-    return {
-      configured: false,
-      enabled: state.enabled,
-      values: null,
-      sources: state.sources,
-      databaseAvailable: state.databaseAvailable,
-      reason: state.databaseAvailable ? RUNTIME_FAILURE.PROVIDER_NOT_CONFIGURED : RUNTIME_FAILURE.INTEGRATION_DATABASE_UNAVAILABLE,
-      missingFields,
-    };
-  }
+
   return {
     configured: true,
     enabled: state.enabled,
@@ -114,7 +106,12 @@ export function getActiveMetaWhatsappRuntimeConfig(): Promise<ActiveRuntimeConfi
 }
 
 export function getActiveMetaWebhookConfig(): Promise<ActiveRuntimeConfig<Pick<MetaWhatsappRuntimeValues, "appSecret" | "verifyToken">>> {
-  return resolve("META_WHATSAPP", ["APP_SECRET", "WEBHOOK_VERIFY_TOKEN"], (v) => ({ appSecret: v.APP_SECRET, verifyToken: v.WEBHOOK_VERIFY_TOKEN }), { allowDisabled: true });
+  return resolve(
+    "META_WHATSAPP",
+    ["APP_SECRET", "WEBHOOK_VERIFY_TOKEN"],
+    (v) => ({ appSecret: v.APP_SECRET, verifyToken: v.WEBHOOK_VERIFY_TOKEN }),
+    { allowDisabled: true, allowDatabaseFallback: true }
+  );
 }
 
 export type BrevoEmailRuntimeValues = { apiKey: string; senderEmail: string; senderName: string };
@@ -133,7 +130,12 @@ export function getActiveNetgsmRuntimeConfig(): Promise<ActiveRuntimeConfig<Netg
 }
 
 export function getActiveBrevoWebhookSecret(): Promise<ActiveRuntimeConfig<{ secret: string }>> {
-  return resolve("BREVO", ["WEBHOOK_SECRET"], (v) => ({ secret: v.WEBHOOK_SECRET }), { allowDisabled: true });
+  return resolve(
+    "BREVO",
+    ["WEBHOOK_SECRET"],
+    (v) => ({ secret: v.WEBHOOK_SECRET }),
+    { allowDisabled: true, allowDatabaseFallback: true }
+  );
 }
 
 export type CommunicationRuntimeBundle = {
