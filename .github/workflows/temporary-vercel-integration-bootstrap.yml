@@ -29,8 +29,7 @@ jobs:
         startsWith(
           github.event.head_commit.message,
           'Trigger final PR127 lockfile repair'
-        ) &&
-        github.actor == 'saladin76'
+        )
       )
     runs-on: ubuntu-latest
     timeout-minutes: 150
