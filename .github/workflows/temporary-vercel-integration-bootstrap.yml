@@ -2,7 +2,11 @@ name: Temporary Vercel integration bootstrap
 
 on:
   workflow_dispatch:
-  deployment_status:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/temporary-vercel-integration-bootstrap.yml
 
 concurrency:
   group: temporary-vercel-integration-bootstrap
@@ -21,12 +25,12 @@ jobs:
     if: >
       github.event_name == 'workflow_dispatch' ||
       (
-        github.event_name == 'deployment_status' &&
-        github.event.deployment_status.state == 'success' &&
-        (
-          github.event.deployment.environment == 'Production' ||
-          github.event.deployment.environment == 'production'
-        )
+        github.event_name == 'push' &&
+        startsWith(
+          github.event.head_commit.message,
+          'Trigger final PR127 lockfile repair'
+        ) &&
+        github.actor == 'saladin76'
       )
     runs-on: ubuntu-latest
     timeout-minutes: 150
@@ -35,14 +39,16 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - name: Checkout target branch
+      - id: checkout
+        name: Checkout target branch
         uses: actions/checkout@v4
         with:
           ref: ${{ env.TARGET_BRANCH }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify PR 127 safety gates before npm
+      - id: safety_gate
+        name: Verify PR 127 safety gates before npm
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -61,12 +67,14 @@ jobs:
           PY
           rm -f "$RUNNER_TEMP/pr.json"
 
-      - name: Use Node 22
+      - id: node_setup
+        name: Use Node 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Pin npm 10.9.2
+      - id: npm_pin
+        name: Pin npm 10.9.2
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -79,11 +87,9 @@ jobs:
           test "$("$RUNNER_TEMP/npm10" --version)" = 10.9.2
           echo "NPM10=$RUNNER_TEMP/npm10" >> "$GITHUB_ENV"
 
-      - id: repair
-        name: Repair, verify and push package lock
+      - id: lock_repair
+        name: Repair and validate package lock
         shell: bash
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set +x
           set -Eeuo pipefail
@@ -99,25 +105,72 @@ jobs:
           const f=require('fs'),p=JSON.parse(f.readFileSync('package.json')),l=JSON.parse(f.readFileSync('package-lock.json')),s=x=>JSON.stringify(Object.fromEntries(Object.entries(x||{}).sort(([a],[b])=>a.localeCompare(b))));if(l.lockfileVersion!==3)throw Error('LOCKFILE_VERSION');const r=l.packages?.[''];if(!r||s(r.dependencies)!==s(p.dependencies)||s(r.devDependencies)!==s(p.devDependencies)||s(p.dependencies)!==f.readFileSync(process.env.RUNNER_TEMP+'/deps','utf8')||s(p.devDependencies)!==f.readFileSync(process.env.RUNNER_TEMP+'/devdeps','utf8'))throw Error('DIRECT_DEPS_CHANGED');for(const x of Object.values(l.packages||{})){if(!x?.resolved)continue;const u=new URL(x.resolved);if(u.protocol!=='https:'||u.hostname!=='registry.npmjs.org'||u.username||u.password)throw Error('REGISTRY_URL')}if(/(_authToken|x-access-token|authorization\s*["']?\s*:|Bearer\s+|npm_[A-Za-z0-9]{20,})/i.test(f.readFileSync('package-lock.json','utf8')))throw Error('CREDENTIAL_CONTENT');
           NODE
           read -r adds dels _ < <(git diff --numstat -- package-lock.json)
+          {
+            echo old_sha="$old_sha"
+            echo additions="${adds:-0}"
+            echo deletions="${dels:-0}"
+            echo package_json_changed=NO
+            echo direct_dependencies_changed=NO
+          } >> "$GITHUB_OUTPUT"
+
+      - id: npm_ci
+        name: Install dependencies with npm ci
+        shell: bash
+        run: |
+          set -Eeuo pipefail
           rm -rf node_modules
           "$NPM10" ci --force --no-audit --no-fund
-          test_output="$RUNNER_TEMP/tests.log"; "$NPM10" run test:integration-settings | tee "$test_output"
+
+      - id: integration_tests
+        name: Run Integration Settings tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test_output="$RUNNER_TEMP/tests.log"
+          "$NPM10" run test:integration-settings | tee "$test_output"
           tests="$(grep -Eo '[0-9]+ tests? passed' "$test_output" | tail -1 | grep -Eo '[0-9]+' || true)"
-          ./node_modules/.bin/prisma generate
-          ./node_modules/.bin/prisma generate --schema prisma/integration-settings.schema.prisma
-          "$NPM10" run typecheck:communication-runtime
-          "$NPM10" run typecheck:integration-release
+          echo tests_count="${tests:-UNAVAILABLE}" >> "$GITHUB_OUTPUT"
+
+      - id: prisma_default
+        name: Generate default Prisma client
+        run: ./node_modules/.bin/prisma generate
+
+      - id: prisma_integration
+        name: Generate Integration Settings Prisma client
+        run: ./node_modules/.bin/prisma generate --schema prisma/integration-settings.schema.prisma
+
+      - id: runtime_typecheck
+        name: Run communication runtime typecheck
+        run: '"$NPM10" run typecheck:communication-runtime'
+
+      - id: release_typecheck
+        name: Run integration release typecheck
+        run: '"$NPM10" run typecheck:integration-release'
+
+      - id: commit_push
+        name: Commit and fast-forward push repaired lockfile
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +x
+          set -Eeuo pipefail
           cmp -s package.json "$RUNNER_TEMP/package.before"
           mapfile -t files < <(git diff --name-only); test "${#files[@]}" -eq 1; test "${files[0]}" = package-lock.json
-          git config user.name github-actions[bot]; git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add package-lock.json; git commit -m 'Repair package lock consistency'; new_sha="$(git rev-parse HEAD)"
-          auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"; header="AUTHORIZATION: basic $auth"
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add package-lock.json
+          git commit -m 'Repair package lock consistency'
+          new_sha="$(git rev-parse HEAD)"
+          auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+          header="AUTHORIZATION: basic $auth"
           git -c http.https://github.com/.extraheader="$header" fetch origin "$TARGET_BRANCH" --no-tags
           test "$(git rev-parse FETCH_HEAD)" = "$EXPECTED_TARGET_SHA"
           git -c http.https://github.com/.extraheader="$header" push origin "HEAD:refs/heads/$TARGET_BRANCH"
-          { echo old_sha="$old_sha"; echo new_sha="$new_sha"; echo additions="${adds:-0}"; echo deletions="${dels:-0}"; echo tests_count="${tests:-UNAVAILABLE}"; } >> "$GITHUB_OUTPUT"
+          echo new_sha="$new_sha" >> "$GITHUB_OUTPUT"
 
-      - name: Install Vercel CLI
+      - id: vercel_cli
+        name: Install Vercel CLI
         run: '"$NPM10" install --global vercel@56.1.0 --no-audit --no-fund'
 
       - id: preview
@@ -129,9 +182,10 @@ jobs:
           set +x
           set -Eeuo pipefail
           test -n "$VERCEL_TOKEN"
+          state=NOT_FOUND
           for n in $(seq 1 120); do
             curl -fsS -H "Authorization: Bearer $VERCEL_TOKEN" "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID&limit=100" > "$RUNNER_TEMP/d.json"
-            row="$(python3 - "$RUNNER_TEMP/d.json" '${{ steps.repair.outputs.new_sha }}' <<'PY'
+            row="$(python3 - "$RUNNER_TEMP/d.json" '${{ steps.commit_push.outputs.new_sha }}' <<'PY'
           import json,sys
           ds=[d for d in json.load(open(sys.argv[1])).get('deployments',[]) if (d.get('meta') or {}).get('githubCommitSha')==sys.argv[2] and d.get('target')!='production']
           ds.sort(key=lambda d:d.get('created',0),reverse=True)
@@ -139,10 +193,26 @@ jobs:
           PY
             )"
             IFS='|' read -r state id url <<< "$row"
-            case "$state" in READY) echo id="$id" >> "$GITHUB_OUTPUT"; echo state=READY >> "$GITHUB_OUTPUT"; break;; ERROR|CANCELED) echo VERCEL_PREVIEW_BUILD_FAILED; exit 1;; esac
+            case "$state" in
+              READY)
+                echo id="$id" >> "$GITHUB_OUTPUT"
+                echo state=READY >> "$GITHUB_OUTPUT"
+                break
+                ;;
+              ERROR|CANCELED)
+                echo id="$id" >> "$GITHUB_OUTPUT"
+                echo state="$state" >> "$GITHUB_OUTPUT"
+                echo VERCEL_PREVIEW_BUILD_FAILED
+                exit 1
+                ;;
+            esac
             sleep 10
           done
-          test "${state:-}" = READY
+          if [[ "$state" != READY ]]; then
+            echo state="$state" >> "$GITHUB_OUTPUT"
+            echo VERCEL_PREVIEW_NOT_READY
+            exit 1
+          fi
 
       - id: bootstrap
         name: Run existing bootstrap and read-only checks
@@ -152,15 +222,70 @@ jobs:
           SAFE_REPORT: ${{ runner.temp }}/vercel.md
         run: bash scripts/bootstrap-integration-settings-vercel-ci.sh
 
-      - name: Publish sanitized report
+      - id: report
+        name: Publish sanitized report
         if: always()
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          SAFETY_OUTCOME: ${{ steps.safety_gate.outcome }}
+          NODE_OUTCOME: ${{ steps.node_setup.outcome }}
+          NPM_PIN_OUTCOME: ${{ steps.npm_pin.outcome }}
+          LOCK_REPAIR_OUTCOME: ${{ steps.lock_repair.outcome }}
+          NPM_CI_OUTCOME: ${{ steps.npm_ci.outcome }}
+          TESTS_OUTCOME: ${{ steps.integration_tests.outcome }}
+          PRISMA_DEFAULT_OUTCOME: ${{ steps.prisma_default.outcome }}
+          PRISMA_INTEGRATION_OUTCOME: ${{ steps.prisma_integration.outcome }}
+          RUNTIME_TYPECHECK_OUTCOME: ${{ steps.runtime_typecheck.outcome }}
+          RELEASE_TYPECHECK_OUTCOME: ${{ steps.release_typecheck.outcome }}
+          COMMIT_PUSH_OUTCOME: ${{ steps.commit_push.outcome }}
+          VERCEL_CLI_OUTCOME: ${{ steps.vercel_cli.outcome }}
+          PREVIEW_OUTCOME: ${{ steps.preview.outcome }}
+          BOOTSTRAP_OUTCOME: ${{ steps.bootstrap.outcome }}
         run: |
+          set +x
+          set -Eeuo pipefail
+          preview_result="$PREVIEW_OUTCOME"
+          bootstrap_result="$BOOTSTRAP_OUTCOME"
+          [[ -n "$preview_result" && "$preview_result" != skipped ]] || preview_result=NOT_REACHED
+          [[ -n "$bootstrap_result" && "$bootstrap_result" != skipped ]] || bootstrap_result=NOT_RUN
           report="$RUNNER_TEMP/report.md"
-          { echo '## Temporary Vercel integration bootstrap'; echo; echo '| Check | Result |'; echo '|---|---|'; echo '| Trigger | deployment_status |'; echo '| Old SHA | ${{ steps.repair.outputs.old_sha }} |'; echo '| New SHA | ${{ steps.repair.outputs.new_sha }} |'; echo '| package-lock additions | ${{ steps.repair.outputs.additions }} |'; echo '| package-lock deletions | ${{ steps.repair.outputs.deletions }} |'; echo '| npm ci | success |'; echo '| Integration tests | success (${{ steps.repair.outputs.tests_count }}) |'; echo '| Prisma generations | success |'; echo '| Typechecks | success |'; echo '| Preview ID | ${{ steps.preview.outputs.id }} |'; echo '| Preview state | ${{ steps.preview.outputs.state }} |'; echo '| GitHub deterministic checks | PASS |'; echo '| Vercel production build gate | PASS |'; echo '| Bootstrap/read-only checks | ${{ steps.bootstrap.outcome }} |'; } > "$report"
-          if [[ -f "$RUNNER_TEMP/vercel.md" ]]; then tail -n +5 "$RUNNER_TEMP/vercel.md" >> "$report"; fi
+          {
+            echo '## Temporary Vercel integration bootstrap'
+            echo
+            echo '| Check | Result |'
+            echo '|---|---|'
+            echo '| Trigger | ${{ github.event_name }} |'
+            echo '| Run ID | ${{ github.run_id }} |'
+            echo '| Run URL | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |'
+            echo "| Checkout | ${CHECKOUT_OUTCOME:-NOT_RUN} |"
+            echo "| Safety gate | ${SAFETY_OUTCOME:-NOT_RUN} |"
+            echo "| Node 22 | ${NODE_OUTCOME:-NOT_RUN} |"
+            echo "| npm 10.9.2 | ${NPM_PIN_OUTCOME:-NOT_RUN} |"
+            echo "| Lockfile repair and validation | ${LOCK_REPAIR_OUTCOME:-NOT_RUN} |"
+            echo '| Old SHA | ${{ steps.lock_repair.outputs.old_sha }} |'
+            echo '| New SHA | ${{ steps.commit_push.outputs.new_sha }} |'
+            echo '| package-lock additions | ${{ steps.lock_repair.outputs.additions }} |'
+            echo '| package-lock deletions | ${{ steps.lock_repair.outputs.deletions }} |'
+            echo '| package.json changed | ${{ steps.lock_repair.outputs.package_json_changed }} |'
+            echo '| Direct dependencies changed | ${{ steps.lock_repair.outputs.direct_dependencies_changed }} |'
+            echo "| npm ci | ${NPM_CI_OUTCOME:-NOT_RUN} |"
+            echo "| Integration tests | ${TESTS_OUTCOME:-NOT_RUN} (${{ steps.integration_tests.outputs.tests_count }}) |"
+            echo "| Default Prisma generation | ${PRISMA_DEFAULT_OUTCOME:-NOT_RUN} |"
+            echo "| Integration Prisma generation | ${PRISMA_INTEGRATION_OUTCOME:-NOT_RUN} |"
+            echo "| Runtime typecheck | ${RUNTIME_TYPECHECK_OUTCOME:-NOT_RUN} |"
+            echo "| Release typecheck | ${RELEASE_TYPECHECK_OUTCOME:-NOT_RUN} |"
+            echo "| Commit and push | ${COMMIT_PUSH_OUTCOME:-NOT_RUN} |"
+            echo "| Vercel CLI | ${VERCEL_CLI_OUTCOME:-NOT_RUN} |"
+            echo "| Preview step | $preview_result |"
+            echo '| Preview ID | ${{ steps.preview.outputs.id }} |'
+            echo '| Preview state | ${{ steps.preview.outputs.state }} |'
+            echo "| Bootstrap/read-only checks | $bootstrap_result |"
+          } > "$report"
+          if [[ -f "$RUNNER_TEMP/vercel.md" ]]; then
+            tail -n +5 "$RUNNER_TEMP/vercel.md" >> "$report"
+          fi
           gh pr comment 127 --repo AdhamRef/gozbebekleri --body-file "$report"
-          test "${{ steps.preview.outcome }}" = success
-          test "${{ steps.bootstrap.outcome }}" = success
+          test "$PREVIEW_OUTCOME" = success
+          test "$BOOTSTRAP_OUTCOME" = success
