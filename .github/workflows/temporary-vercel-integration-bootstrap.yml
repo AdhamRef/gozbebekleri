@@ -40,11 +40,49 @@ jobs:
     steps:
       - id: checkout
         name: Checkout target branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TARGET_BRANCH }}
-          fetch-depth: 1
-          persist-credentials: false
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+
+          find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          cd "$GITHUB_WORKSPACE"
+
+          git init
+          git remote add origin https://github.com/AdhamRef/gozbebekleri.git
+
+          auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+          header="AUTHORIZATION: basic $auth"
+
+          checkout_ok=false
+          delays=(0 5 15)
+
+          for delay in "${delays[@]}"; do
+            if (( delay > 0 )); then
+              sleep "$delay"
+            fi
+
+            if git \
+              -c http.https://github.com/.extraheader="$header" \
+              fetch \
+              --no-tags \
+              --prune \
+              --depth=1 \
+              origin \
+              "refs/heads/$TARGET_BRANCH"; then
+              checkout_ok=true
+              break
+            fi
+          done
+
+          $checkout_ok
+
+          git checkout --detach FETCH_HEAD
+
+          actual_sha="$(git rev-parse HEAD)"
+          test "$actual_sha" = "$EXPECTED_TARGET_SHA"
 
       - id: safety_gate
         name: Verify PR 127 safety gates before npm
