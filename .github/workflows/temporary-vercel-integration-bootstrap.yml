@@ -48,4 +48,289 @@ jobs:
           set -Eeuo pipefail
 
           find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-         
+          cd "$GITHUB_WORKSPACE"
+
+          git init
+          git remote add origin https://github.com/AdhamRef/gozbebekleri.git
+
+          auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+          header="AUTHORIZATION: basic $auth"
+
+          checkout_ok=false
+          delays=(0 5 15)
+
+          for delay in "${delays[@]}"; do
+            if (( delay > 0 )); then
+              sleep "$delay"
+            fi
+
+            if git \
+              -c http.https://github.com/.extraheader="$header" \
+              fetch \
+              --no-tags \
+              --prune \
+              --depth=1 \
+              origin \
+              "refs/heads/$TARGET_BRANCH"; then
+              checkout_ok=true
+              break
+            fi
+          done
+
+          $checkout_ok
+
+          git checkout --detach FETCH_HEAD
+
+          actual_sha="$(git rev-parse HEAD)"
+          test "$actual_sha" = "$EXPECTED_TARGET_SHA"
+
+      - id: safety_gate
+        name: Verify PR 127 safety gates before npm
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" https://api.github.com/repos/AdhamRef/gozbebekleri/pulls/127 > "$RUNNER_TEMP/pr.json"
+          python3 - "$RUNNER_TEMP/pr.json" "$TARGET_BRANCH" "$EXPECTED_TARGET_SHA" <<'PY'
+          import json, subprocess, sys
+          p=json.load(open(sys.argv[1],encoding='utf-8')); branch=sys.argv[2]; sha=sys.argv[3]
+          local=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          ok=p.get('state')=='open' and p.get('draft') is True and p['head']['ref']==branch and p['head']['sha']==sha and local==sha
+          if not ok:
+              print('TARGET_BRANCH_MOVED'); raise SystemExit(1)
+          print('PR127_SAFETY_GATE_PASS')
+          PY
+          rm -f "$RUNNER_TEMP/pr.json"
+
+      - id: node_setup
+        name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - id: npm_pin
+        name: Pin npm 10.9.2
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          npm install --prefix "$RUNNER_TEMP/npm-tool" npm@10.9.2 --ignore-scripts --no-audit --no-fund
+          cat > "$RUNNER_TEMP/npm10" <<'SH'
+          #!/usr/bin/env bash
+          exec node "$RUNNER_TEMP/npm-tool/node_modules/npm/bin/npm-cli.js" "$@"
+          SH
+          chmod +x "$RUNNER_TEMP/npm10"
+          test "$("$RUNNER_TEMP/npm10" --version)" = 10.9.2
+          echo "NPM10=$RUNNER_TEMP/npm10" >> "$GITHUB_ENV"
+
+      - id: lock_repair
+        name: Verify repaired package lock is stable
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          old_sha="$(git rev-parse HEAD)"; test "$old_sha" = "$EXPECTED_TARGET_SHA"
+          cp package.json "$RUNNER_TEMP/package.before"
+          cp package-lock.json "$RUNNER_TEMP/package-lock.before"
+          node - <<'NODE'
+          const f=require('fs'),p=JSON.parse(f.readFileSync('package.json')),s=x=>JSON.stringify(Object.fromEntries(Object.entries(x||{}).sort(([a],[b])=>a.localeCompare(b))));f.writeFileSync(process.env.RUNNER_TEMP+'/deps',s(p.dependencies));f.writeFileSync(process.env.RUNNER_TEMP+'/devdeps',s(p.devDependencies));
+          NODE
+          "$NPM10" install --package-lock-only --force --ignore-scripts --no-audit --no-fund
+          cmp -s package.json "$RUNNER_TEMP/package.before"
+          cmp -s package-lock.json "$RUNNER_TEMP/package-lock.before" || { echo LOCKFILE_DRIFT_AFTER_REPAIR; exit 1; }
+          test -z "$(git status --porcelain)"
+          node - <<'NODE'
+          const f=require('fs'),p=JSON.parse(f.readFileSync('package.json')),l=JSON.parse(f.readFileSync('package-lock.json')),s=x=>JSON.stringify(Object.fromEntries(Object.entries(x||{}).sort(([a],[b])=>a.localeCompare(b))));if(l.lockfileVersion!==3)throw Error('LOCKFILE_VERSION');const r=l.packages?.[''];if(!r||s(r.dependencies)!==s(p.dependencies)||s(r.devDependencies)!==s(p.devDependencies)||s(p.dependencies)!==f.readFileSync(process.env.RUNNER_TEMP+'/deps','utf8')||s(p.devDependencies)!==f.readFileSync(process.env.RUNNER_TEMP+'/devdeps','utf8'))throw Error('DIRECT_DEPS_CHANGED');for(const x of Object.values(l.packages||{})){if(!x?.resolved)continue;const u=new URL(x.resolved);if(u.protocol!=='https:'||u.hostname!=='registry.npmjs.org'||u.username||u.password)throw Error('REGISTRY_URL')}if(/(_authToken|x-access-token|authorization\s*["']?\s*:|Bearer\s+|npm_[A-Za-z0-9]{20,})/i.test(f.readFileSync('package-lock.json','utf8')))throw Error('CREDENTIAL_CONTENT');
+          NODE
+          {
+            echo old_sha="$old_sha"
+            echo additions=0
+            echo deletions=0
+            echo package_json_changed=NO
+            echo direct_dependencies_changed=NO
+          } >> "$GITHUB_OUTPUT"
+
+      - id: npm_ci
+        name: Install dependencies with npm ci
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf node_modules
+          "$NPM10" ci --force --no-audit --no-fund
+
+      - id: integration_tests
+        name: Run Integration Settings tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test_output="$RUNNER_TEMP/tests.log"
+          "$NPM10" run test:integration-settings | tee "$test_output"
+          tests="$(grep -Eo '[0-9]+ tests? passed' "$test_output" | tail -1 | grep -Eo '[0-9]+' || true)"
+          echo tests_count="${tests:-UNAVAILABLE}" >> "$GITHUB_OUTPUT"
+
+      - id: prisma_default
+        name: Generate default Prisma client
+        run: ./node_modules/.bin/prisma generate
+
+      - id: prisma_integration
+        name: Generate Integration Settings Prisma client
+        run: ./node_modules/.bin/prisma generate --schema prisma/integration-settings.schema.prisma
+
+      - id: runtime_typecheck
+        name: Run communication runtime typecheck
+        run: '"$NPM10" run typecheck:communication-runtime'
+
+      - id: release_typecheck
+        name: Run integration release typecheck
+        run: '"$NPM10" run typecheck:integration-release'
+
+      - id: commit_push
+        name: Confirm repaired lockfile head
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          cmp -s package.json "$RUNNER_TEMP/package.before"
+          cmp -s package-lock.json "$RUNNER_TEMP/package-lock.before"
+          test -z "$(git diff --name-only)"
+          test -z "$(git diff --cached --name-only)"
+
+          git ls-files --others --exclude-standard > "$RUNNER_TEMP/untracked-files"
+
+          unexpected_untracked="$(
+            grep -vE '^generated/integration-settings-client/' \
+              "$RUNNER_TEMP/untracked-files" || true
+          )"
+
+          if [[ -n "$unexpected_untracked" ]]; then
+            echo "UNEXPECTED_UNTRACKED_FILES"
+            printf '%s\n' "$unexpected_untracked"
+            exit 1
+          fi
+
+          test -d generated/integration-settings-client
+          new_sha="$(git rev-parse HEAD)"
+          test "$new_sha" = "$EXPECTED_TARGET_SHA"
+          echo new_sha="$new_sha" >> "$GITHUB_OUTPUT"
+
+      - id: vercel_cli
+        name: Install Vercel CLI
+        run: '"$NPM10" install --global vercel@56.1.0 --no-audit --no-fund'
+
+      - id: preview
+        name: Verify automatic Vercel Preview on current SHA
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          test -n "$VERCEL_TOKEN"
+          state=NOT_FOUND
+          for n in $(seq 1 120); do
+            curl -fsS -H "Authorization: Bearer $VERCEL_TOKEN" "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID&limit=100" > "$RUNNER_TEMP/d.json"
+            row="$(python3 - "$RUNNER_TEMP/d.json" '${{ steps.commit_push.outputs.new_sha }}' <<'PY'
+          import json,sys
+          ds=[d for d in json.load(open(sys.argv[1])).get('deployments',[]) if (d.get('meta') or {}).get('githubCommitSha')==sys.argv[2] and d.get('target')!='production']
+          ds.sort(key=lambda d:d.get('created',0),reverse=True)
+          print('NOT_FOUND||' if not ds else f"{ds[0].get('state')}|{ds[0].get('uid') or ds[0].get('id')}|{ds[0].get('url')}")
+          PY
+            )"
+            IFS='|' read -r state id url <<< "$row"
+            case "$state" in
+              READY)
+                echo id="$id" >> "$GITHUB_OUTPUT"
+                echo state=READY >> "$GITHUB_OUTPUT"
+                break
+                ;;
+              ERROR|CANCELED)
+                echo id="$id" >> "$GITHUB_OUTPUT"
+                echo state="$state" >> "$GITHUB_OUTPUT"
+                echo VERCEL_PREVIEW_BUILD_FAILED
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+          if [[ "$state" != READY ]]; then
+            echo state="$state" >> "$GITHUB_OUTPUT"
+            echo VERCEL_PREVIEW_NOT_READY
+            exit 1
+          fi
+
+      - id: bootstrap
+        name: Run existing bootstrap and read-only checks
+        continue-on-error: true
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          SAFE_REPORT: ${{ runner.temp }}/vercel.md
+        run: bash scripts/bootstrap-integration-settings-vercel-ci.sh
+
+      - id: report
+        name: Publish sanitized report
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          SAFETY_OUTCOME: ${{ steps.safety_gate.outcome }}
+          NODE_OUTCOME: ${{ steps.node_setup.outcome }}
+          NPM_PIN_OUTCOME: ${{ steps.npm_pin.outcome }}
+          LOCK_REPAIR_OUTCOME: ${{ steps.lock_repair.outcome }}
+          NPM_CI_OUTCOME: ${{ steps.npm_ci.outcome }}
+          TESTS_OUTCOME: ${{ steps.integration_tests.outcome }}
+          PRISMA_DEFAULT_OUTCOME: ${{ steps.prisma_default.outcome }}
+          PRISMA_INTEGRATION_OUTCOME: ${{ steps.prisma_integration.outcome }}
+          RUNTIME_TYPECHECK_OUTCOME: ${{ steps.runtime_typecheck.outcome }}
+          RELEASE_TYPECHECK_OUTCOME: ${{ steps.release_typecheck.outcome }}
+          COMMIT_PUSH_OUTCOME: ${{ steps.commit_push.outcome }}
+          VERCEL_CLI_OUTCOME: ${{ steps.vercel_cli.outcome }}
+          PREVIEW_OUTCOME: ${{ steps.preview.outcome }}
+          BOOTSTRAP_OUTCOME: ${{ steps.bootstrap.outcome }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          preview_result="$PREVIEW_OUTCOME"
+          bootstrap_result="$BOOTSTRAP_OUTCOME"
+          [[ -n "$preview_result" && "$preview_result" != skipped ]] || preview_result=NOT_REACHED
+          [[ -n "$bootstrap_result" && "$bootstrap_result" != skipped ]] || bootstrap_result=NOT_RUN
+          report="$RUNNER_TEMP/report.md"
+          {
+            echo '## Temporary Vercel integration bootstrap'
+            echo
+            echo '| Check | Result |'
+            echo '|---|---|'
+            echo '| Trigger | ${{ github.event_name }} |'
+            echo '| Run ID | ${{ github.run_id }} |'
+            echo '| Run URL | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |'
+            echo "| Checkout | ${CHECKOUT_OUTCOME:-NOT_RUN} |"
+            echo "| Safety gate | ${SAFETY_OUTCOME:-NOT_RUN} |"
+            echo "| Node 22 | ${NODE_OUTCOME:-NOT_RUN} |"
+            echo "| npm 10.9.2 | ${NPM_PIN_OUTCOME:-NOT_RUN} |"
+            echo "| Lockfile stability and validation | ${LOCK_REPAIR_OUTCOME:-NOT_RUN} |"
+            echo '| Feature SHA | ${{ steps.lock_repair.outputs.old_sha }} |'
+            echo '| Verified SHA | ${{ steps.commit_push.outputs.new_sha }} |'
+            echo '| package-lock additions | ${{ steps.lock_repair.outputs.additions }} |'
+            echo '| package-lock deletions | ${{ steps.lock_repair.outputs.deletions }} |'
+            echo '| package.json changed | ${{ steps.lock_repair.outputs.package_json_changed }} |'
+            echo '| Direct dependencies changed | ${{ steps.lock_repair.outputs.direct_dependencies_changed }} |'
+            echo "| npm ci | ${NPM_CI_OUTCOME:-NOT_RUN} |"
+            echo "| Integration tests | ${TESTS_OUTCOME:-NOT_RUN} (${{ steps.integration_tests.outputs.tests_count }}) |"
+            echo "| Default Prisma generation | ${PRISMA_DEFAULT_OUTCOME:-NOT_RUN} |"
+            echo "| Integration Prisma generation | ${PRISMA_INTEGRATION_OUTCOME:-NOT_RUN} |"
+            echo "| Runtime typecheck | ${RUNTIME_TYPECHECK_OUTCOME:-NOT_RUN} |"
+            echo "| Release typecheck | ${RELEASE_TYPECHECK_OUTCOME:-NOT_RUN} |"
+            echo "| Feature head verification | ${COMMIT_PUSH_OUTCOME:-NOT_RUN} |"
+            echo "| Vercel CLI | ${VERCEL_CLI_OUTCOME:-NOT_RUN} |"
+            echo "| Preview step | $preview_result |"
+            echo '| Preview ID | ${{ steps.preview.outputs.id }} |'
+            echo '| Preview state | ${{ steps.preview.outputs.state }} |'
+            echo "| Bootstrap/read-only checks | $bootstrap_result |"
+          } > "$report"
+          if [[ -f "$RUNNER_TEMP/vercel.md" ]]; then
+            tail -n +5 "$RUNNER_TEMP/vercel.md" >> "$report"
+          fi
+          gh pr comment 127 --repo AdhamRef/gozbebekleri --body-file "$report"
+          test "$PREVIEW_OUTCOME" = success
+          test "$BOOTSTRAP_OUTCOME" = success
