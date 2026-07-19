@@ -130,7 +130,14 @@ if (project.projectId !== process.env.VERCEL_PROJECT_ID || project.orgId !== pro
 NODE
 then block "VERCEL_PROJECT_IDENTITY_MISMATCH"; fi
 
-vercel env pull "$PREVIEW_ENV" --yes --environment=preview --git-branch="$TARGET_BRANCH" --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$TMP_DIR/pull-preview.log" 2>&1 || block "PREVIEW_ENV_PULL_FAILED"
+if ! vercel env pull "$PREVIEW_ENV" --yes --environment=preview --git-branch="$TARGET_BRANCH" --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$TMP_DIR/pull-preview.log" 2>&1; then
+  echo "SANITIZED_PREVIEW_ENV_PULL_ERROR"
+  sed -E \
+    -e 's/vcp_[A-Za-z0-9_-]+/[REDACTED_TOKEN]/g' \
+    -e 's/(Bearer )[A-Za-z0-9._-]+/\1[REDACTED]/Ig' \
+    "$TMP_DIR/pull-preview.log" | tail -n 20
+  block "PREVIEW_ENV_PULL_FAILED"
+fi
 vercel env pull "$PRODUCTION_ENV" --yes --environment=production --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$TMP_DIR/pull-production.log" 2>&1 || block "PRODUCTION_ENV_PULL_FAILED"
 
 PREVIEW_DB="$(node "$PARSER" get "$PREVIEW_ENV" DATABASE_URL)"
