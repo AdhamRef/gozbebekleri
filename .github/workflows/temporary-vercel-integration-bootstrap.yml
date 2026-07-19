@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  EXPECTED_TARGET_SHA: 9a416b49f4d2a8ed3b8adfce1c01c5fceef0eab7
+  EXPECTED_TARGET_SHA: 8419a9987b50923763ae1cb5f266d7ac89065c8b
   TARGET_BRANCH: agent/secure-integration-settings-backend
   VERCEL_PROJECT_NAME: gozbebekleri
   VERCEL_PROJECT_ID: prj_hkMyu8iABc7AAqF7T1DvYRpKYRqV
@@ -186,7 +186,7 @@ jobs:
         run: '"$NPM10" run typecheck:integration-release'
 
       - id: commit_push
-        name: Confirm repaired lockfile head  
+        name: Confirm repaired lockfile head
         shell: bash
         run: |
           set +x
