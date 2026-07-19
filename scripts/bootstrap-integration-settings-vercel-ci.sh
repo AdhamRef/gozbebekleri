@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# تشغيل إعداد Vercel بعد تفعيل GitHub Actions
+# Controlled Vercel bootstrap for Integration Settings.
 set -Eeuo pipefail
 
 TMP_DIR="$(mktemp -d)"
 PREVIEW_ENV="$TMP_DIR/preview.env"
 PRODUCTION_ENV="$TMP_DIR/production.env"
+ENVS_JSON="$TMP_DIR/envs.json"
 PARSER="$TMP_DIR/env-reader.cjs"
 PREVIEW_URL=""
 BUILD_RESULT="NOT_RUN"
@@ -70,6 +71,8 @@ block() {
 cat > "$PARSER" <<'NODE'
 const fs = require('node:fs');
 const crypto = require('node:crypto');
+const { spawnSync } = require('node:child_process');
+
 function parse(file) {
   const out = {};
   for (const raw of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
@@ -81,13 +84,57 @@ function parse(file) {
     let value = line.slice(i + 1).trim();
     if (value.startsWith('"') && value.endsWith('"')) {
       try { value = JSON.parse(value); } catch { value = value.slice(1, -1); }
-    } else if (value.startsWith("'") && value.endsWith("'")) value = value.slice(1, -1);
+    } else if (value.startsWith("'") && value.endsWith("'")) {
+      value = value.slice(1, -1);
+    }
     out[key] = value;
   }
   return out;
 }
+
+function writeEnv(file, values) {
+  const lines = Object.entries(values)
+    .filter(([key, value]) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(key) && typeof value === 'string')
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${key}=${JSON.stringify(value)}`);
+  fs.writeFileSync(file, `${lines.join('\n')}\n`, { mode: 0o600 });
+}
+
+function targets(item) {
+  if (Array.isArray(item.target)) return item.target;
+  return item.target ? [item.target] : [];
+}
+
+function materialize(data, target, branch) {
+  const envs = Array.isArray(data) ? data : (Array.isArray(data.envs) ? data.envs : []);
+  const selected = new Map();
+  for (const item of envs) {
+    if (!item || typeof item.key !== 'string' || !targets(item).includes(target)) continue;
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(item.key)) continue;
+
+    const itemBranch = typeof item.gitBranch === 'string' ? item.gitBranch : '';
+    let specificity = 1;
+    if (target === 'preview') {
+      if (itemBranch && itemBranch !== branch) continue;
+      specificity = itemBranch === branch ? 2 : 1;
+    } else if (itemBranch) {
+      continue;
+    }
+
+    const value = typeof item.value === 'string' ? item.value : null;
+    if (value === null) continue;
+    const timestamp = Number(item.updatedAt || item.createdAt || 0);
+    const score = specificity * 10 ** 15 + timestamp;
+    const current = selected.get(item.key);
+    if (!current || score >= current.score) selected.set(item.key, { value, score });
+  }
+  return Object.fromEntries([...selected.entries()].map(([key, entry]) => [key, entry.value]));
+}
+
 const command = process.argv[2];
-if (command === 'get') process.stdout.write(parse(process.argv[3])[process.argv[4]] || '');
+if (command === 'get') {
+  process.stdout.write(parse(process.argv[3])[process.argv[4]] || '');
+}
 if (command === 'db-relation') {
   const a = parse(process.argv[3]).DATABASE_URL || '';
   const b = parse(process.argv[4]).DATABASE_URL || '';
@@ -118,6 +165,27 @@ if (command === 'canonical') {
     process.stdout.write(process.argv[4] === 'production' && url.protocol !== 'https:' ? 'INVALID' : 'PRESENT');
   } catch { process.stdout.write('INVALID'); }
 }
+if (command === 'materialize') {
+  const data = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+  if (data.pagination && data.pagination.next != null) {
+    console.error('VERCEL_ENV_API_PAGINATION_REQUIRES_REVIEW');
+    process.exit(2);
+  }
+  writeEnv(process.argv[4], materialize(data, 'preview', process.argv[6]));
+  writeEnv(process.argv[5], materialize(data, 'production', process.argv[6]));
+}
+if (command === 'set') {
+  const file = process.argv[3];
+  const key = process.argv[4];
+  const values = parse(file);
+  values[key] = fs.readFileSync(0, 'utf8');
+  writeEnv(file, values);
+}
+if (command === 'run') {
+  const env = { ...process.env, ...parse(process.argv[3]) };
+  const result = spawnSync(process.argv[4], process.argv.slice(5), { env, stdio: 'inherit' });
+  process.exit(result.status == null ? 1 : result.status);
+}
 NODE
 
 vercel link --yes --project "$VERCEL_PROJECT_NAME" --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$TMP_DIR/link.log" 2>&1 || block "VERCEL_PROJECT_LINK_FAILED"
@@ -130,15 +198,38 @@ if (project.projectId !== process.env.VERCEL_PROJECT_ID || project.orgId !== pro
 NODE
 then block "VERCEL_PROJECT_IDENTITY_MISMATCH"; fi
 
-if ! vercel env pull "$PREVIEW_ENV" --yes --environment=preview --git-branch="$TARGET_BRANCH" --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$TMP_DIR/pull-preview.log" 2>&1; then
-  echo "SANITIZED_PREVIEW_ENV_PULL_ERROR"
-  sed -E \
-    -e 's/vcp_[A-Za-z0-9_-]+/[REDACTED_TOKEN]/g' \
-    -e 's/(Bearer )[A-Za-z0-9._-]+/\1[REDACTED]/Ig' \
-    "$TMP_DIR/pull-preview.log" | tail -n 20
-  block "PREVIEW_ENV_PULL_FAILED"
+ENV_HTTP="$({ curl -sS \
+  -o "$ENVS_JSON" \
+  -w '%{http_code}' \
+  -H "Authorization: Bearer $VERCEL_TOKEN" \
+  -H 'Accept: application/json' \
+  --get "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env" \
+  --data-urlencode "teamId=$VERCEL_TEAM_ID" \
+  --data-urlencode 'decrypt=true' \
+  --data-urlencode 'source=vercel-cli:pull' \
+  --data-urlencode 'limit=1000'; } 2>"$TMP_DIR/env-api-curl.log")" || block "VERCEL_ENV_API_REQUEST_FAILED"
+
+if [[ "$ENV_HTTP" != "200" ]]; then
+  ENV_API_CODE="$(node - "$ENVS_JSON" <<'NODE'
+const fs = require('node:fs');
+try {
+  const data = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+  const value = String(data?.error?.code || data?.code || 'UNKNOWN');
+  process.stdout.write(value.replace(/[^A-Za-z0-9_.:-]/g, '_').slice(0, 80));
+} catch {
+  process.stdout.write('NON_JSON_RESPONSE');
+}
+NODE
+  )"
+  echo "VERCEL_ENV_API_ERROR http=$ENV_HTTP code=$ENV_API_CODE"
+  case "$ENV_HTTP" in
+    401) block "VERCEL_ENV_API_UNAUTHORIZED" ;;
+    403) block "VERCEL_ENV_API_FORBIDDEN" ;;
+    *) block "VERCEL_ENV_API_HTTP_$ENV_HTTP" ;;
+  esac
 fi
-vercel env pull "$PRODUCTION_ENV" --yes --environment=production --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$TMP_DIR/pull-production.log" 2>&1 || block "PRODUCTION_ENV_PULL_FAILED"
+
+node "$PARSER" materialize "$ENVS_JSON" "$PREVIEW_ENV" "$PRODUCTION_ENV" "$TARGET_BRANCH" || block "VERCEL_ENV_MATERIALIZATION_FAILED"
 
 PREVIEW_DB="$(node "$PARSER" get "$PREVIEW_ENV" DATABASE_URL)"
 PRODUCTION_DB="$(node "$PARSER" get "$PRODUCTION_ENV" DATABASE_URL)"
@@ -175,10 +266,12 @@ fi
 
 add_preview_key() {
   printf '%s' "$1" | vercel env add INTEGRATION_SETTINGS_ENCRYPTION_KEY preview --git-branch="$TARGET_BRANCH" --sensitive --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$TMP_DIR/add-preview-key.log" 2>&1 || block "PREVIEW_ENCRYPTION_KEY_ADD_FAILED"
+  printf '%s' "$1" | node "$PARSER" set "$PREVIEW_ENV" INTEGRATION_SETTINGS_ENCRYPTION_KEY
   PREVIEW_KEY_STATUS="ADDED"
 }
 add_production_key() {
   printf '%s' "$1" | vercel env add INTEGRATION_SETTINGS_ENCRYPTION_KEY production --sensitive --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$TMP_DIR/add-production-key.log" 2>&1 || block "PRODUCTION_ENCRYPTION_KEY_ADD_FAILED"
+  printf '%s' "$1" | node "$PARSER" set "$PRODUCTION_ENV" INTEGRATION_SETTINGS_ENCRYPTION_KEY
   PRODUCTION_KEY_STATUS="ADDED"
 }
 new_key() { node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('base64url'))"; }
@@ -186,8 +279,10 @@ new_key() { node -e "process.stdout.write(require('node:crypto').randomBytes(32)
 if [[ "$DATABASE_RELATION" == "SAME_DATABASE" ]]; then
   if [[ -n "$PREVIEW_KEY" && -n "$PRODUCTION_KEY" ]]; then
     [[ "$PREVIEW_KEY" == "$PRODUCTION_KEY" ]] || block "ENCRYPTION_KEYS_DIFFER_FOR_SHARED_DATABASE"
-  elif [[ -n "$PREVIEW_KEY" ]]; then add_production_key "$PREVIEW_KEY"
-  elif [[ -n "$PRODUCTION_KEY" ]]; then add_preview_key "$PRODUCTION_KEY"
+  elif [[ -n "$PREVIEW_KEY" ]]; then
+    add_production_key "$PREVIEW_KEY"
+  elif [[ -n "$PRODUCTION_KEY" ]]; then
+    add_preview_key "$PRODUCTION_KEY"
   else
     GENERATED_KEY="$(new_key)"
     add_preview_key "$GENERATED_KEY"
@@ -211,9 +306,9 @@ vercel inspect "$PREVIEW_URL" --wait --timeout 20m --scope "$VERCEL_TEAM_SCOPE" 
 BUILD_RESULT="READY"
 
 set +e
-vercel env run -e preview -- npm run preflight:integration-settings > "$TMP_DIR/preflight.log" 2>&1
+node "$PARSER" run "$PREVIEW_ENV" npm run preflight:integration-settings > "$TMP_DIR/preflight.log" 2>&1
 PREFLIGHT_EXIT=$?
-vercel env run -e preview -- npm run verify:integration-settings-migration > "$TMP_DIR/migration-verify.log" 2>&1
+node "$PARSER" run "$PREVIEW_ENV" npm run verify:integration-settings-migration > "$TMP_DIR/migration-verify.log" 2>&1
 MIGRATION_EXIT=$?
 set -e
 
