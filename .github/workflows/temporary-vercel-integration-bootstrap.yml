@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  EXPECTED_TARGET_SHA: efa9b52380c6ca901ebc8d18ea0ee36768faedc0
+  EXPECTED_TARGET_SHA: a5376580fa1c5912ded24de9501602947f7b148f
   TARGET_BRANCH: agent/secure-integration-settings-backend
   VERCEL_PROJECT_NAME: gozbebekleri
   VERCEL_PROJECT_ID: prj_hkMyu8iABc7AAqF7T1DvYRpKYRqV
