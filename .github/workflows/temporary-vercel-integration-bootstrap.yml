@@ -186,11 +186,12 @@ jobs:
         run: '"$NPM10" run typecheck:integration-release'
 
       - id: commit_push
-        name: Confirm repaired lockfile head
+        name: Confirm repaired lockfile head  
         shell: bash
         run: |
           set +x
           set -Eeuo pipefail
+          rm -rf .integration-test-build
           cmp -s package.json "$RUNNER_TEMP/package.before"
           cmp -s package-lock.json "$RUNNER_TEMP/package-lock.before"
           test -z "$(git diff --name-only)"
