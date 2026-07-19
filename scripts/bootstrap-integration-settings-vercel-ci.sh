@@ -122,7 +122,6 @@ NODE
 
 vercel link --yes --project "$VERCEL_PROJECT_NAME" --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$TMP_DIR/link.log" 2>&1 || block "VERCEL_PROJECT_LINK_FAILED"
 vercel project inspect "$VERCEL_PROJECT_NAME" --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$TMP_DIR/project.log" 2>&1 || block "VERCEL_PROJECT_INSPECTION_FAILED"
-vercel env ls --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$TMP_DIR/env-list.log" 2>&1 || block "VERCEL_ENVIRONMENT_LIST_FAILED"
 
 if ! node - <<'NODE'
 const fs = require('node:fs');
