@@ -120,7 +120,7 @@ if (command === 'canonical') {
 }
 NODE
 
-vercel whoami --token "$VERCEL_TOKEN" > "$TMP_DIR/whoami.log" 2>&1 || block "VERCEL_AUTHENTICATION_FAILED"
+vercel whoami --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$TMP_DIR/whoami.log" 2>&1 || block "VERCEL_AUTHENTICATION_FAILED"
 vercel link --yes --project "$VERCEL_PROJECT_NAME" --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$TMP_DIR/link.log" 2>&1 || block "VERCEL_PROJECT_LINK_FAILED"
 vercel project inspect "$VERCEL_PROJECT_NAME" --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$TMP_DIR/project.log" 2>&1 || block "VERCEL_PROJECT_INSPECTION_FAILED"
 vercel env ls --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$TMP_DIR/env-list.log" 2>&1 || block "VERCEL_ENVIRONMENT_LIST_FAILED"
