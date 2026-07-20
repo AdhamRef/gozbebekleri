@@ -211,7 +211,8 @@ jobs:
               -H "Authorization: Bearer $VERCEL_TOKEN" \
               -H 'Accept: application/json' \
               --get "https://api.vercel.com/v1/projects/$VERCEL_PROJECT_ID/env/$env_id" \
-              --data-urlencode "teamId=$VERCEL_TEAM_ID")"
+              --data-urlencode "teamId=$VERCEL_TEAM_ID" \
+              --data-urlencode 'decrypt=true')"
             chmod 600 "$response"
             if [[ "$http" != 200 ]]; then
               echo "VERCEL_ENV_API_ERROR http=$http code=$(api_error "$response") key=$key scope=$scope"
