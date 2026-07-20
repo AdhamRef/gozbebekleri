@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": ".integration-test-build",
+    "rootDir": ".",
+    "types": ["node"]
+  },
+  "include": [
+    "lib/integration-settings/active-test-core.ts",
+    "lib/integration-settings/api-contracts.ts",
+    "lib/integration-settings/brevo-webhook.ts",
+    "lib/integration-settings/canonical-url.ts",
+    "lib/integration-settings/catalog.ts",
+    "lib/integration-settings/crypto.ts",
+    "lib/integration-settings/helpers.ts",
+    "lib/integration-settings/provider-testing/**/*.ts",
+    "lib/integration-settings/release-readiness.ts",
+    "lib/integration-settings/resolver.ts",
+    "lib/integration-settings/runtime-policy.ts",
+    "lib/integration-settings/service.ts",
+    "lib/integration-settings/types.ts",
+    "lib/integration-settings/ui-contracts.ts",
+    "lib/integration-settings/ui-lifecycle.ts",
+    "lib/integration-settings/validation.ts",
+    "lib/communication/cron-auth.ts",
+    "lib/dashboard/permissions.ts",
+    "tests/integration-settings/**/*.ts"
+  ]
+}

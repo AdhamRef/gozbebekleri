@@ -1,45 +1,46 @@
-import { getBrevoSmsConfig, brevoSmsDefaultType } from "../../provider-env";
+import { brevoSmsDefaultType } from "../../provider-env";
+import { getActiveBrevoSmsRuntimeConfig, RUNTIME_FAILURE, type ActiveRuntimeConfig, type BrevoSmsRuntimeValues } from "../../runtime-config";
 import { BREVO_SMS_REASONS, mapBrevoError, scrubBrevo } from "./errors";
 import type { BrevoSmsInput, BrevoSendResult } from "./types";
 
-/**
- * Brevo transactional SMS adapter — the default for NON-Turkish (international) numbers. Server-only:
- * BREVO_API_KEY read here, never surfaced. Arabic/Turkish content sends with unicodeEnabled so
- * characters are preserved. Never falls back to Twilio; on failure it returns a safe reason.
- */
-
 const BREVO_SMS_ENDPOINT = "https://api.brevo.com/v3/transactionalSMS/sms";
+export type BrevoSmsRuntimeConfig = ActiveRuntimeConfig<BrevoSmsRuntimeValues>;
 
-export function isBrevoSmsConfigured(): boolean {
-  return getBrevoSmsConfig().configured;
+function failureReason(cfg: BrevoSmsRuntimeConfig): string {
+  if (cfg.configured) return BREVO_SMS_REASONS.NOT_CONFIGURED;
+  if (cfg.reason === RUNTIME_FAILURE.PROVIDER_DISABLED) return "PROVIDER_DISABLED";
+  if (cfg.reason === RUNTIME_FAILURE.INTEGRATION_DECRYPTION_FAILED) return "INTEGRATION_DECRYPTION_FAILED";
+  if (cfg.reason === RUNTIME_FAILURE.INTEGRATION_DATABASE_UNAVAILABLE) return "INTEGRATION_DATABASE_UNAVAILABLE";
+  return BREVO_SMS_REASONS.NOT_CONFIGURED;
 }
 
-export async function sendBrevoSms(input: BrevoSmsInput): Promise<BrevoSendResult> {
-  const cfg = getBrevoSmsConfig();
-  if (!process.env.BREVO_API_KEY?.trim()) return { ok: false, reason: BREVO_SMS_REASONS.NOT_CONFIGURED };
-  const sender = (input.sender ?? process.env.BREVO_SMS_SENDER ?? "").trim();
-  if (!sender || !cfg.configured) return { ok: false, reason: BREVO_SMS_REASONS.NOT_CONFIGURED };
+export async function isBrevoSmsConfigured(runtime?: BrevoSmsRuntimeConfig): Promise<boolean> {
+  return (runtime ?? await getActiveBrevoSmsRuntimeConfig()).configured;
+}
 
+export async function sendBrevoSms(input: BrevoSmsInput, runtime?: BrevoSmsRuntimeConfig): Promise<BrevoSendResult> {
+  const cfg = runtime ?? await getActiveBrevoSmsRuntimeConfig();
+  if (!cfg.configured) return { ok: false, reason: failureReason(cfg) };
+  const sender = (input.sender ?? cfg.values.sender).trim();
+  if (!sender) return { ok: false, reason: BREVO_SMS_REASONS.NOT_CONFIGURED };
   const payload: Record<string, unknown> = {
     sender,
     recipient: input.to,
     content: input.content,
     type: input.type ?? brevoSmsDefaultType(),
-    unicodeEnabled: true, // preserve Arabic / Turkish characters
+    unicodeEnabled: true,
   };
   if (input.tag) payload.tag = input.tag;
   if (input.webUrl) payload.webUrl = input.webUrl;
-
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
     const res = await fetch(BREVO_SMS_ENDPOINT, {
       method: "POST",
-      headers: { "api-key": process.env.BREVO_API_KEY.trim(), "Content-Type": "application/json", accept: "application/json" },
+      headers: { "api-key": cfg.values.apiKey, "Content-Type": "application/json", accept: "application/json" },
       body: JSON.stringify(payload),
       signal: controller.signal,
     }).finally(() => clearTimeout(timer));
-
     const body = await res.json().catch(() => null);
     if (!res.ok) {
       const { reason, detail } = mapBrevoError("sms", res.status, body);

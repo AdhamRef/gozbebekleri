@@ -1,10 +1,6 @@
-import { getMetaConfig, graphFetch } from "./client";
+import { getActiveMetaWhatsappRuntimeConfig } from "../../runtime-config";
+import { graphFetch, metaRuntimeFailure, type MetaRuntimeConfig } from "./client";
 import { META_REASONS } from "./errors";
-
-/**
- * Read approved message templates from the WABA. Read-only; used to reconcile which templates
- * (and languages) Meta has approved. Returns a safe reason when not configured.
- */
 
 export type MetaTemplateSummary = {
   name: string;
@@ -17,21 +13,21 @@ export type ListTemplatesResult =
   | { ok: true; templates: MetaTemplateSummary[] }
   | { ok: false; reason: string; detail?: string };
 
-export async function listApprovedTemplates(businessAccountId?: string | null): Promise<ListTemplatesResult> {
-  const config = getMetaConfig();
-  if (!config) return { ok: false, reason: META_REASONS.NOT_CONFIGURED };
-  const waba = businessAccountId || config.businessAccountId;
+export async function listApprovedTemplates(businessAccountId?: string | null, runtime?: MetaRuntimeConfig): Promise<ListTemplatesResult> {
+  const resolved = runtime ?? await getActiveMetaWhatsappRuntimeConfig();
+  if (!resolved.configured) return { ok: false, reason: metaRuntimeFailure(resolved) };
+  const waba = businessAccountId || resolved.values.businessAccountId;
   if (!waba) return { ok: false, reason: META_REASONS.NOT_CONFIGURED, detail: "missing business account id" };
-
-  const result = await graphFetch(config, `${waba}/message_templates?fields=name,language,status,category&limit=200`, { method: "GET" });
+  const result = await graphFetch(resolved.values, `${waba}/message_templates?fields=name,language,status,category&limit=200`, { method: "GET" });
   if (!result.ok) return { ok: false, reason: result.reason, detail: result.detail };
-
   const rows = ((result.data as { data?: unknown[] })?.data ?? []) as Record<string, unknown>[];
-  const templates: MetaTemplateSummary[] = rows.map((r) => ({
-    name: String(r.name ?? ""),
-    language: String(r.language ?? ""),
-    status: String(r.status ?? ""),
-    category: typeof r.category === "string" ? r.category : null,
-  }));
-  return { ok: true, templates };
+  return {
+    ok: true,
+    templates: rows.map((row) => ({
+      name: String(row.name ?? ""),
+      language: String(row.language ?? ""),
+      status: String(row.status ?? ""),
+      category: typeof row.category === "string" ? row.category : null,
+    })),
+  };
 }

@@ -1,145 +1,77 @@
 import type { Session } from "next-auth";
 
-type UserLike = {
-  role?: string | null;
-  dashboardPermissions?: string[] | null;
-};
+type UserLike = { role?: string | null; dashboardPermissions?: string[] | null };
 
-/** Stable keys aligned with dashboard nav / API authorization */
 export const DASHBOARD_PERMISSION_KEYS = [
-  "revenue",
-  "monthly",
-  "referrals",
-  "bankTransfers",
-  "donors",
-  "team",
-  "logs",
-  "badges",
-  "messages",
-  "templates",
-  "campaigns",
-  "categories",
-  "blog",
-  "slides",
-  "ticker",
-  "pixels",
-  "ads",
-  "platformConnections",
-  "operations",
-  "archive",
-  "brand",
-  "generalSettings",
-  // Action permissions — not tied to a sidebar route. Power-user only.
-  "archiveUpload",
-  "archiveDelete",
-  "archiveAnalyze",
-  "archiveDocuments",
-  "donationsEdit",
-  "reportsExport",
+  "revenue", "monthly", "referrals", "bankTransfers", "donors", "team", "logs",
+  "badges", "messages", "templates", "campaigns", "categories", "blog", "slides",
+  "ticker", "pixels", "ads", "platformConnections", "operations", "archive", "brand",
+  "generalSettings", "platformConnectionsTest", "platformConnectionsManage",
+  "platformConnectionsAdmin", "archiveUpload", "archiveDelete", "archiveAnalyze",
+  "archiveDocuments", "donationsEdit", "reportsExport",
 ] as const;
-
 export type DashboardPermissionKey = (typeof DASHBOARD_PERMISSION_KEYS)[number];
 
 const ACTION_PERMISSION_KEYS: DashboardPermissionKey[] = [
-  "archiveUpload",
-  "archiveDelete",
-  "archiveAnalyze",
-  "archiveDocuments",
-  "donationsEdit",
-  "reportsExport",
+  "platformConnectionsTest", "platformConnectionsManage", "platformConnectionsAdmin",
+  "archiveUpload", "archiveDelete", "archiveAnalyze", "archiveDocuments",
+  "donationsEdit", "reportsExport",
 ];
-
-export function isDashboardPermissionKey(
-  k: string
-): k is DashboardPermissionKey {
-  return (DASHBOARD_PERMISSION_KEYS as readonly string[]).includes(k);
-}
-
-/** Legacy DB value: grants donors + team + logs */
 const LEGACY_USERS_KEY = "users";
 
-function rawDashboardPermissions(user: UserLike | undefined): string[] {
-  if (!Array.isArray(user?.dashboardPermissions)) return [];
-  return user!.dashboardPermissions!.filter((x): x is string => typeof x === "string");
+export function isDashboardPermissionKey(k: string): k is DashboardPermissionKey {
+  return (DASHBOARD_PERMISSION_KEYS as readonly string[]).includes(k);
 }
-
+function rawDashboardPermissions(user: UserLike | undefined): string[] {
+  return Array.isArray(user?.dashboardPermissions)
+    ? user.dashboardPermissions.filter((x): x is string => typeof x === "string")
+    : [];
+}
 function hasLegacyUsersPermission(user: UserLike | undefined): boolean {
   return rawDashboardPermissions(user).includes(LEGACY_USERS_KEY);
 }
-
 function legacyUsersGrants(key: DashboardPermissionKey): boolean {
   return key === "donors" || key === "team" || key === "logs";
 }
-
-export function isDashboardRoutePermissionKey(
-  key: string
-): key is DashboardPermissionKey {
-  return isDashboardPermissionKey(key) && !ACTION_PERMISSION_KEYS.includes(key);
+function integrationPermissionRank(key: DashboardPermissionKey): number {
+  return key === "platformConnections" ? 1
+    : key === "platformConnectionsTest" ? 2
+    : key === "platformConnectionsManage" ? 3
+    : key === "platformConnectionsAdmin" ? 4 : 0;
+}
+function hasIntegrationPermission(perms: readonly DashboardPermissionKey[], key: DashboardPermissionKey): boolean {
+  const required = integrationPermissionRank(key);
+  return required > 0 && perms.some((permission) => integrationPermissionRank(permission) >= required);
 }
 
+export function isDashboardRoutePermissionKey(key: string): key is DashboardPermissionKey {
+  return isDashboardPermissionKey(key) && !ACTION_PERMISSION_KEYS.includes(key);
+}
 export function hasAnyDashboardRoutePermission(user: UserLike | undefined): boolean {
   const raw = rawDashboardPermissions(user);
   if (raw.includes(LEGACY_USERS_KEY)) return true;
-  return sanitizeDashboardPermissions(user?.dashboardPermissions).some(
-    isDashboardRoutePermissionKey
-  );
+  const perms = sanitizeDashboardPermissions(user?.dashboardPermissions);
+  return perms.some(isDashboardRoutePermissionKey) || hasIntegrationPermission(perms, "platformConnections");
 }
-
-export function userHasDashboardPermission(
-  user: UserLike | undefined,
-  key: DashboardPermissionKey
-): boolean {
+export function userHasDashboardPermission(user: UserLike | undefined, key: DashboardPermissionKey): boolean {
   if (!user?.role) return false;
   if (user.role === "ADMIN") return true;
-  if (user.role === "STAFF") {
-    const perms = sanitizeDashboardPermissions(user.dashboardPermissions);
-    if (perms.includes(key)) return true;
-    if (key === "archiveUpload" || key === "archiveDelete" || key === "archiveAnalyze") {
-      if (perms.includes("archive")) return true;
-    }
-    if (hasLegacyUsersPermission(user) && legacyUsersGrants(key)) return true;
-    return false;
-  }
-  return false;
+  if (user.role !== "STAFF") return false;
+  const perms = sanitizeDashboardPermissions(user.dashboardPermissions);
+  if (perms.includes(key) || hasIntegrationPermission(perms, key)) return true;
+  if ((key === "archiveUpload" || key === "archiveDelete" || key === "archiveAnalyze") && perms.includes("archive")) return true;
+  return hasLegacyUsersPermission(user) && legacyUsersGrants(key);
 }
 
-/** True if staff may list/manage donors (promotions, donor table) */
-export function userCanAccessDonorsManagement(user: UserLike | undefined): boolean {
-  return userHasDashboardPermission(user, "donors");
+export function userCanAccessDonorsManagement(user: UserLike | undefined): boolean { return userHasDashboardPermission(user, "donors"); }
+export function userCanAccessTeamManagement(user: UserLike | undefined): boolean { return userHasDashboardPermission(user, "team"); }
+export function userCanAccessLogs(user: UserLike | undefined): boolean { return userHasDashboardPermission(user, "logs"); }
+export function userCanViewUserProfilesInDashboard(user: UserLike | undefined): boolean {
+  return userHasDashboardPermission(user, "donors") || userHasDashboardPermission(user, "team") || hasLegacyUsersPermission(user);
 }
+export function userCanEditDonations(user: UserLike | undefined): boolean { return userHasDashboardPermission(user, "donationsEdit"); }
+export function userCanExportReports(user: UserLike | undefined): boolean { return userHasDashboardPermission(user, "reportsExport"); }
 
-/** True if staff may list team (admin/staff) */
-export function userCanAccessTeamManagement(user: UserLike | undefined): boolean {
-  return userHasDashboardPermission(user, "team");
-}
-
-/** True if staff may view dashboard activity log */
-export function userCanAccessLogs(user: UserLike | undefined): boolean {
-  return userHasDashboardPermission(user, "logs");
-}
-
-/** True if staff may view another user's full profile (donor or team lists) */
-export function userCanViewUserProfilesInDashboard(
-  user: UserLike | undefined
-): boolean {
-  return (
-    userHasDashboardPermission(user, "donors") ||
-    userHasDashboardPermission(user, "team") ||
-    hasLegacyUsersPermission(user)
-  );
-}
-
-/** True if staff may edit/delete individual donations (with stat reconciliation). */
-export function userCanEditDonations(user: UserLike | undefined): boolean {
-  return userHasDashboardPermission(user, "donationsEdit");
-}
-
-/** True if staff may export dashboard reports. */
-export function userCanExportReports(user: UserLike | undefined): boolean {
-  return userHasDashboardPermission(user, "reportsExport");
-}
-
-/** Longer prefixes first — first match wins */
 const PATH_RULES: { prefix: string; key: DashboardPermissionKey }[] = [
   { prefix: "/dashboard/platform-connections", key: "platformConnections" },
   { prefix: "/dashboard/marketing/connections", key: "platformConnections" },
@@ -171,53 +103,24 @@ const PATH_RULES: { prefix: string; key: DashboardPermissionKey }[] = [
   { prefix: "/dashboard/general", key: "generalSettings" },
   { prefix: "/dashboard", key: "revenue" },
 ];
-
-export function pathToDashboardPermission(
-  pathname: string
-): DashboardPermissionKey | null {
+export function pathToDashboardPermission(pathname: string): DashboardPermissionKey | null {
   if (!pathname.startsWith("/dashboard")) return null;
-  const sorted = [...PATH_RULES].sort(
-    (a, b) => b.prefix.length - a.prefix.length
-  );
-  for (const r of sorted) {
-    if (pathname === r.prefix || pathname.startsWith(r.prefix + "/")) {
-      return r.key;
-    }
+  for (const rule of [...PATH_RULES].sort((a, b) => b.prefix.length - a.prefix.length)) {
+    if (pathname === rule.prefix || pathname.startsWith(rule.prefix + "/")) return rule.key;
   }
   return null;
 }
-
-/** Can open any dashboard route (sidebar may still be filtered) */
 export function userCanEnterDashboard(user: UserLike | undefined): boolean {
-  if (!user?.role) return false;
-  if (user.role === "ADMIN") return true;
-  if (user.role === "STAFF") {
-    return hasAnyDashboardRoutePermission(user);
-  }
-  return false;
+  return user?.role === "ADMIN" || (user?.role === "STAFF" && hasAnyDashboardRoutePermission(user));
 }
-
-export function sessionHasDashboardPermission(
-  session: Session | null,
-  key: DashboardPermissionKey
-): boolean {
-  return userHasDashboardPermission(session?.user, key);
+export function sessionHasDashboardPermission(session: Session | null, key: DashboardPermissionKey): boolean {
+  return userHasDashboardPermission(session?.user as UserLike | undefined, key);
 }
-
 export function sanitizeDashboardPermissions(raw: unknown): DashboardPermissionKey[] {
   if (!Array.isArray(raw)) return [];
-  const out = new Set<DashboardPermissionKey>();
-  for (const x of raw) {
-    if (typeof x === "string" && isDashboardPermissionKey(x)) out.add(x);
-  }
-  return [...out];
+  return [...new Set(raw.filter((x): x is DashboardPermissionKey => typeof x === "string" && isDashboardPermissionKey(x)))];
 }
-
-export function getFirstAllowedDashboardHref(
-  user: UserLike | undefined,
-  orderedHrefs: string[],
-  hrefToKey: (href: string) => DashboardPermissionKey | null
-): string | null {
+export function getFirstAllowedDashboardHref(user: UserLike | undefined, orderedHrefs: string[], hrefToKey: (href: string) => DashboardPermissionKey | null): string | null {
   for (const href of orderedHrefs) {
     const key = hrefToKey(href);
     if (key && userHasDashboardPermission(user, key)) return href;

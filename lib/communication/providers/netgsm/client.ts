@@ -1,39 +1,35 @@
-import { getNetgsmSmsConfig } from "../../provider-env";
+import { getActiveNetgsmRuntimeConfig, RUNTIME_FAILURE, type ActiveRuntimeConfig, type NetgsmRuntimeValues } from "../../runtime-config";
 import { NETGSM_REASONS, mapNetgsmCode, scrubNetgsm } from "./errors";
 import { isTurkishNumber, type NetgsmSmsInput, type NetgsmSendResult } from "./types";
 
-/**
- * Netgsm SMS adapter — Turkish numbers ONLY. Server-only: NETGSM_USERCODE / NETGSM_PASSWORD read
- * here, never surfaced. Never falls back to Twilio or Brevo. Response parsing is conservative:
- * success is code "00" (with a jobid). If the account returns a different format, the send is treated
- * as an INVALID_RESPONSE (never a fake sent) — see docs/integrations/netgsm-sms.md for live QA.
- */
-
 const DEFAULT_ENDPOINT = "https://api.netgsm.com.tr/sms/rest/v2/send";
+export type NetgsmRuntimeConfig = ActiveRuntimeConfig<NetgsmRuntimeValues>;
 
-export function isNetgsmConfigured(): boolean {
-  return getNetgsmSmsConfig().configured;
+function failureReason(cfg: NetgsmRuntimeConfig): string {
+  if (cfg.configured) return NETGSM_REASONS.NOT_CONFIGURED;
+  if (cfg.reason === RUNTIME_FAILURE.PROVIDER_DISABLED) return "PROVIDER_DISABLED";
+  if (cfg.reason === RUNTIME_FAILURE.INTEGRATION_DECRYPTION_FAILED) return "INTEGRATION_DECRYPTION_FAILED";
+  if (cfg.reason === RUNTIME_FAILURE.INTEGRATION_DATABASE_UNAVAILABLE) return "INTEGRATION_DATABASE_UNAVAILABLE";
+  return NETGSM_REASONS.NOT_CONFIGURED;
+}
+
+export async function isNetgsmConfigured(runtime?: NetgsmRuntimeConfig): Promise<boolean> {
+  return (runtime ?? await getActiveNetgsmRuntimeConfig()).configured;
 }
 
 export { isTurkishNumber };
 
-export async function sendNetgsmSms(input: NetgsmSmsInput, countryCode?: string | null): Promise<NetgsmSendResult> {
-  const cfg = getNetgsmSmsConfig();
-  if (!cfg.configured) return { ok: false, reason: NETGSM_REASONS.NOT_CONFIGURED };
+export async function sendNetgsmSms(input: NetgsmSmsInput, countryCode?: string | null, runtime?: NetgsmRuntimeConfig): Promise<NetgsmSendResult> {
+  const cfg = runtime ?? await getActiveNetgsmRuntimeConfig();
+  if (!cfg.configured) return { ok: false, reason: failureReason(cfg) };
   if (!isTurkishNumber(input.to, countryCode)) return { ok: false, reason: NETGSM_REASONS.NOT_TURKISH };
-
-  const usercode = process.env.NETGSM_USERCODE!.trim();
-  const password = process.env.NETGSM_PASSWORD!.trim();
-  const header = process.env.NETGSM_HEADER!.trim();
   const endpoint = process.env.NETGSM_SMS_ENDPOINT?.trim() || DEFAULT_ENDPOINT;
-  const auth = Buffer.from(`${usercode}:${password}`).toString("base64");
-
+  const auth = Buffer.from(`${cfg.values.usercode}:${cfg.values.password}`).toString("base64");
   const payload = {
-    msgheader: header,
-    encoding: "TR", // Netgsm Turkish encoding (preserves Turkish characters)
+    msgheader: cfg.values.header,
+    encoding: "TR",
     messages: [{ msg: input.content, no: input.to.replace(/\D/g, "") }],
   };
-
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
@@ -43,11 +39,8 @@ export async function sendNetgsmSms(input: NetgsmSmsInput, countryCode?: string 
       body: JSON.stringify(payload),
       signal: controller.signal,
     }).finally(() => clearTimeout(timer));
-
     const text = await res.text().catch(() => "");
     if (!res.ok) return { ok: false, reason: NETGSM_REASONS.REQUEST_FAILED, detail: scrubNetgsm(`${res.status}: ${text}`) };
-
-    // Prefer JSON { code, jobid }. Fall back to the classic "00 <jobid>" plain-text shape.
     let code: string | null = null;
     let jobid: string | null = null;
     try {
@@ -57,14 +50,12 @@ export async function sendNetgsmSms(input: NetgsmSmsInput, countryCode?: string 
       if (typeof j.jobid === "string") jobid = j.jobid;
       else if (typeof j.jobid === "number") jobid = String(j.jobid);
     } catch {
-      const m = text.trim().match(/^(\d{2})(?:[\s,]+(\d+))?/);
-      if (m) { code = m[1]; jobid = m[2] ?? null; }
+      const match = text.trim().match(/^(\d{2})(?:[\s,]+(\d+))?/);
+      if (match) { code = match[1]; jobid = match[2] ?? null; }
     }
-
     if (!code) return { ok: false, reason: NETGSM_REASONS.INVALID_RESPONSE, detail: scrubNetgsm(text) };
     const mapped = mapNetgsmCode(code);
     if (!mapped.ok) return { ok: false, reason: mapped.reason, detail: scrubNetgsm(`code=${code}`) };
-    // Accepted. jobid is the provider message id when present; otherwise a genuine accept marker.
     return { ok: true, providerMessageId: jobid, internalAccepted: jobid == null };
   } catch (error) {
     console.error("sendNetgsmSms failed", scrubNetgsm(String(error)));
