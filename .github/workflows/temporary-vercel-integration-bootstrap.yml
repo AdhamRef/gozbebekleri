@@ -13,7 +13,7 @@ concurrency:
 env:
   TARGET_PR_NUMBER: 146
   TARGET_BRANCH: release/integration-settings-final
-  EXPECTED_TARGET_SHA: 8419a9987b50923763ae1cb5f266d7ac89065c8b
+  EXPECTED_TARGET_SHA: ddebd7a1521b8686c5c4cc7e4b8b8445872b65b1
   VERCEL_PROJECT_NAME: gozbebekleri
   VERCEL_PROJECT_ID: prj_hkMyu8iABc7AAqF7T1DvYRpKYRqV
   VERCEL_TEAM_SCOPE: gozbebekleri-dernek
@@ -122,7 +122,7 @@ jobs:
         run: |
           set +x; set -Eeuo pipefail; umask 077
           d="$(mktemp -d)"; trap 'rm -rf "$d" .vercel' EXIT
-          ph="$(curl -sS -o "$d/project.json" -w '%{http_code}' -H "Authorization: Bearer $VERCEL_TOKEN" -H 'Accept: application/json' --get "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env" --data-urlencode "teamId=$VERCEL_TEAM_ID" --data-urlencode 'decrypt=true' --data-urlencode 'source=vercel-cli:pull' --data-urlencode 'limit=100)"
+          ph="$(curl -sS -o "$d/project.json" -w '%{http_code}' -H "Authorization: Bearer $VERCEL_TOKEN" -H 'Accept: application/json' --get "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env" --data-urlencode "teamId=$VERCEL_TEAM_ID" --data-urlencode 'decrypt=true' --data-urlencode 'source=vercel-cli:pull' --data-urlencode 'limit=100')"
           [[ "$ph" == 200 ]] || { echo "VERCEL_ENV_API_ERROR http=$ph code=PROJECT_ENV_LIST_FAILED"; exit 1; }
           sh="$(curl -sS -o "$d/shared.json" -w '%{http_code}' -H "Authorization: Bearer $VERCEL_TOKEN" -H 'Accept: application/json' --get 'https://api.vercel.com/v1/env' --data-urlencode "teamId=$VERCEL_TEAM_ID" --data-urlencode "projectId=$VERCEL_PROJECT_ID")"
           [[ "$sh" == 200 ]] || { echo "VERCEL_ENV_API_ERROR http=$sh code=SHARED_ENV_LIST_FAILED"; exit 1; }
