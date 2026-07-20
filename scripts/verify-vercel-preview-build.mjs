@@ -8,37 +8,16 @@ const shouldRun =
 
 if (!shouldRun) process.exit(0);
 
-function run(scriptName, kind) {
-  const result = spawnSync("npm", ["run", scriptName], {
-    cwd: process.cwd(),
-    env: process.env,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+const preflight = spawnSync("npm", ["run", "preflight:integration-settings"], {
+  cwd: process.cwd(),
+  env: process.env,
+  stdio: "inherit",
+});
 
-  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
-  const safeLines = output.split(/\r?\n/).filter((line) =>
-    /^\[(PASS|WARNING|BLOCKED)\] [a-z0-9-]+: /.test(line) ||
-    /^INTEGRATION SETTINGS PREFLIGHT: (PASS|WARNING|BLOCKED)$/.test(line) ||
-    /^MIGRATION STATUS: (NOT_APPLIED|PARTIALLY_APPLIED|FULLY_APPLIED|UNKNOWN)$/.test(line),
-  );
+const migration = spawnSync("npm", ["run", "verify:integration-settings-migration"], {
+  cwd: process.cwd(),
+  env: process.env,
+  stdio: "inherit",
+});
 
-  for (const line of safeLines) console.log(line);
-
-  if (kind === "preflight" && !safeLines.some((line) => line.startsWith("INTEGRATION SETTINGS PREFLIGHT:"))) {
-    console.log("INTEGRATION SETTINGS PREFLIGHT: BLOCKED");
-  }
-  if (kind === "migration" && !safeLines.some((line) => line.startsWith("MIGRATION STATUS:"))) {
-    console.log("MIGRATION STATUS: UNKNOWN");
-  }
-
-  return { status: result.status ?? 1, output };
-}
-
-const preflight = run("preflight:integration-settings", "preflight");
-const migration = run("verify:integration-settings-migration", "migration");
-
-const preflightAccepted = /INTEGRATION SETTINGS PREFLIGHT: (PASS|WARNING)/.test(preflight.output);
-const migrationAccepted = /MIGRATION STATUS: (NOT_APPLIED|PARTIALLY_APPLIED|FULLY_APPLIED)/.test(migration.output);
-
-if (preflight.status !== 0 || !preflightAccepted || migration.status !== 0 || !migrationAccepted) process.exit(1);
+if ((preflight.status ?? 1) !== 0 || (migration.status ?? 1) !== 0) process.exit(1);
