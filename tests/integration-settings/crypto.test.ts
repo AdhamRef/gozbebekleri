@@ -18,7 +18,19 @@ test("tampered ciphertext and incorrect field context fail closed", () => {
 });
 
 test("missing and invalid keys are rejected", () => {
-  assert.throws(() => encryptIntegrationSecret("secret", "SYSTEM:CRON_SECRET", undefined), (error) => error instanceof IntegrationEncryptionError && error.code === "ENCRYPTION_KEY_MISSING");
+  const originalKey = process.env.INTEGRATION_SETTINGS_ENCRYPTION_KEY;
+
+  try {
+    delete process.env.INTEGRATION_SETTINGS_ENCRYPTION_KEY;
+    assert.throws(() => encryptIntegrationSecret("secret", "SYSTEM:CRON_SECRET"), (error) => error instanceof IntegrationEncryptionError && error.code === "ENCRYPTION_KEY_MISSING");
+  } finally {
+    if (originalKey === undefined) {
+      delete process.env.INTEGRATION_SETTINGS_ENCRYPTION_KEY;
+    } else {
+      process.env.INTEGRATION_SETTINGS_ENCRYPTION_KEY = originalKey;
+    }
+  }
+
   assert.throws(() => encryptIntegrationSecret("secret", "SYSTEM:CRON_SECRET", "not-a-key"), (error) => error instanceof IntegrationEncryptionError && error.code === "ENCRYPTION_KEY_INVALID");
 });
 
