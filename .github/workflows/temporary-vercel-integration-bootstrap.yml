@@ -3,10 +3,8 @@ name: Temporary Vercel integration bootstrap
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/temporary-vercel-integration-bootstrap.yml
+    branches: [main]
+    paths: [.github/workflows/temporary-vercel-integration-bootstrap.yml]
 
 concurrency:
   group: temporary-vercel-integration-bootstrap
@@ -14,9 +12,175 @@ concurrency:
 
 env:
   TARGET_PR_NUMBER: 146
-  EXPECTED_TARGET_SHA: 8419a9987b50923763ae1cb5f266d7ac89065c8b
   TARGET_BRANCH: release/integration-settings-final
+  EXPECTED_TARGET_SHA: 8419a9987b50923763ae1cb5f266d7ac89065c8b
   VERCEL_PROJECT_NAME: gozbebekleri
   VERCEL_PROJECT_ID: prj_hkMyu8iABc7AAqF7T1DvYRpKYRqV
   VERCEL_TEAM_SCOPE: gozbebekleri-dernek
-  VERCEL
+  VERCEL_TEAM_ID: team_zLLO1Hql8hFDCswcnpMMDCBj
+
+jobs:
+  bootstrap:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Trigger final integration settings bootstrap'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - id: checkout
+        name: Checkout target branch
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          cd "$GITHUB_WORKSPACE"
+          git init
+          git remote add origin https://github.com/AdhamRef/gozbebekleri.git
+          auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin "refs/heads/$TARGET_BRANCH"
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$EXPECTED_TARGET_SHA"
+
+      - id: safety
+        name: Verify target PR safety gates before npm
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/AdhamRef/gozbebekleri/pulls/$TARGET_PR_NUMBER" > "$RUNNER_TEMP/pr.json"
+          python3 - "$RUNNER_TEMP/pr.json" "$TARGET_PR_NUMBER" "$TARGET_BRANCH" "$EXPECTED_TARGET_SHA" <<'PY'
+          import json, subprocess, sys
+          p=json.load(open(sys.argv[1],encoding='utf-8'))
+          local=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          ok=(p.get('number')==int(sys.argv[2]) and p.get('state')=='open' and p.get('draft') is True and p['head']['ref']==sys.argv[3] and p['head']['sha']==sys.argv[4] and local==sys.argv[4])
+          if not ok: print('TARGET_PR_MOVED'); raise SystemExit(1)
+          print('PR_SAFETY_GATE_PASS')
+          PY
+          rm -f "$RUNNER_TEMP/pr.json"
+
+      - id: node
+        name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - id: npm
+        name: Pin npm 10.9.2
+        run: |
+          npm install --prefix "$RUNNER_TEMP/npm-tool" npm@10.9.2 --ignore-scripts --no-audit --no-fund
+          echo "NPM10=node $RUNNER_TEMP/npm-tool/node_modules/npm/bin/npm-cli.js" >> "$GITHUB_ENV"
+          test "$(node "$RUNNER_TEMP/npm-tool/node_modules/npm/bin/npm-cli.js" --version)" = 10.9.2
+
+      - id: lockfile
+        name: Validate package lock stability
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cp package.json "$RUNNER_TEMP/package.before"
+          cp package-lock.json "$RUNNER_TEMP/package-lock.before"
+          $NPM10 install --package-lock-only --force --ignore-scripts --no-audit --no-fund
+          cmp -s package.json "$RUNNER_TEMP/package.before"
+          cmp -s package-lock.json "$RUNNER_TEMP/package-lock.before"
+          test -z "$(git status --porcelain)"
+          node -e "const l=require('./package-lock.json'),p=require('./package.json');if(l.lockfileVersion!==3||!l.packages?.[''])process.exit(1);if(JSON.stringify(l.packages[''].dependencies||{})!==JSON.stringify(p.dependencies||{}))process.exit(1);if(JSON.stringify(l.packages[''].devDependencies||{})!==JSON.stringify(p.devDependencies||{}))process.exit(1)"
+
+      - id: ci
+        name: Install dependencies with npm ci
+        run: rm -rf node_modules && $NPM10 ci --force --no-audit --no-fund
+
+      - id: tests
+        name: Run Integration Settings tests
+        run: $NPM10 run test:integration-settings
+
+      - id: prisma_default
+        name: Generate default Prisma client
+        run: ./node_modules/.bin/prisma generate
+
+      - id: prisma_integration
+        name: Generate Integration Settings Prisma client
+        run: ./node_modules/.bin/prisma generate --schema prisma/integration-settings.schema.prisma
+
+      - id: runtime_typecheck
+        name: Run communication runtime typecheck
+        run: $NPM10 run typecheck:communication-runtime
+
+      - id: release_typecheck
+        name: Run integration release typecheck
+        run: $NPM10 run typecheck:integration-release
+
+      - id: head
+        name: Verify feature SHA
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_TARGET_SHA"
+
+      - id: vercel
+        name: Install Vercel CLI
+        run: $NPM10 install --global vercel@56.1.0 --no-audit --no-fund
+
+      - id: preview
+        name: Verify matching Vercel Preview is READY
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          test -n "$VERCEL_TOKEN"
+          curl -fsS -H "Authorization: Bearer $VERCEL_TOKEN" "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID&limit=100" > "$RUNNER_TEMP/deployments.json"
+          python3 - "$RUNNER_TEMP/deployments.json" "$EXPECTED_TARGET_SHA" >> "$GITHUB_OUTPUT" <<'PY'
+          import json,sys
+          rows=[d for d in json.load(open(sys.argv[1])).get('deployments',[]) if (d.get('meta') or {}).get('githubCommitSha')==sys.argv[2] and d.get('target')!='production']
+          rows.sort(key=lambda d:d.get('created',0),reverse=True)
+          if not rows or rows[0].get('state')!='READY': raise SystemExit('PREVIEW_NOT_READY')
+          print('id='+str(rows[0].get('uid') or rows[0].get('id')))
+          print('state=READY')
+          PY
+          rm -f "$RUNNER_TEMP/deployments.json"
+
+      - id: readonly
+        name: Run bootstrap and read-only checks
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          SAFE_REPORT: ${{ runner.temp }}/vercel.md
+        run: bash scripts/bootstrap-integration-settings-vercel-ci.sh
+
+      - name: Publish sanitized result
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          report="$RUNNER_TEMP/result.md"
+          {
+            echo '## Temporary Vercel integration bootstrap'
+            echo
+            echo '| Check | Result |'
+            echo '|---|---|'
+            echo '| Run ID | ${{ github.run_id }} |'
+            echo '| Checkout | ${{ steps.checkout.outcome }} |'
+            echo '| Safety gate | ${{ steps.safety.outcome }} |'
+            echo '| Node 22 | ${{ steps.node.outcome }} |'
+            echo '| npm 10.9.2 | ${{ steps.npm.outcome }} |'
+            echo '| Lockfile validation | ${{ steps.lockfile.outcome }} |'
+            echo '| npm ci | ${{ steps.ci.outcome }} |'
+            echo '| Integration tests | ${{ steps.tests.outcome }} |'
+            echo '| Default Prisma generation | ${{ steps.prisma_default.outcome }} |'
+            echo '| Integration Prisma generation | ${{ steps.prisma_integration.outcome }} |'
+            echo '| Runtime typecheck | ${{ steps.runtime_typecheck.outcome }} |'
+            echo '| Release typecheck | ${{ steps.release_typecheck.outcome }} |'
+            echo '| Feature SHA verification | ${{ steps.head.outcome }} |'
+            echo '| Preview ID | ${{ steps.preview.outputs.id }} |'
+            echo '| Preview state | ${{ steps.preview.outputs.state }} |'
+            echo '| Bootstrap/read-only checks | ${{ steps.readonly.outcome }} |'
+          } > "$report"
+          if [[ -f "$RUNNER_TEMP/vercel.md" ]]; then tail -n +5 "$RUNNER_TEMP/vercel.md" >> "$report"; fi
+          gh pr comment "$TARGET_PR_NUMBER" --repo AdhamRef/gozbebekleri --body-file "$report"
+          test '${{ steps.readonly.outcome }}' = success
