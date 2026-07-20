@@ -117,28 +117,150 @@ jobs:
           rm -f "$RUNNER_TEMP/d.json"
 
       - id: readonly
-        name: Audit Vercel env API and run read-only checks securely
+        name: Resolve project env records and run read-only checks securely
         env: {VERCEL_TOKEN: '${{ secrets.VERCEL_TOKEN }}'}
         run: |
           set +x; set -Eeuo pipefail; umask 077
-          d="$(mktemp -d)"; trap 'rm -rf "$d" .vercel' EXIT
-          ph="$(curl -sS -o "$d/project.json" -w '%{http_code}' -H "Authorization: Bearer $VERCEL_TOKEN" -H 'Accept: application/json' --get "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env" --data-urlencode "teamId=$VERCEL_TEAM_ID" --data-urlencode 'decrypt=true' --data-urlencode 'source=vercel-cli:pull' --data-urlencode 'limit=100')"
-          [[ "$ph" == 200 ]] || { echo "VERCEL_ENV_API_ERROR http=$ph code=PROJECT_ENV_LIST_FAILED"; exit 1; }
-          sh="$(curl -sS -o "$d/shared.json" -w '%{http_code}' -H "Authorization: Bearer $VERCEL_TOKEN" -H 'Accept: application/json' --get 'https://api.vercel.com/v1/env' --data-urlencode "teamId=$VERCEL_TEAM_ID" --data-urlencode "projectId=$VERCEL_PROJECT_ID")"
-          [[ "$sh" == 200 ]] || { echo "VERCEL_ENV_API_ERROR http=$sh code=SHARED_ENV_LIST_FAILED"; exit 1; }
-          node - "$d/project.json" "$d/shared.json" <<'NODE'
-          const fs=require('fs');const [p,s]=process.argv.slice(2).map(x=>JSON.parse(fs.readFileSync(x)));const a=[...(p.envs||[]),...(p.data||[]),...(s.envs||[]),...(s.data||[])];const keys=new Set(a.map(x=>x&&x.key).filter(Boolean));for(const k of ['DATABASE_URL','CRON_SECRET','INTEGRATION_SETTINGS_ENCRYPTION_KEY'])if(!keys.has(k)){console.error(k+'_MISSING');process.exit(2)};if(!['APP_URL','NEXTAUTH_URL','NEXT_PUBLIC_APP_URL','NEXT_PUBLIC_SITE_URL'].some(k=>keys.has(k))){console.error('CANONICAL_URL_MISSING');process.exit(2)}
+          d="$(mktemp -d)"
+          trap 'rm -rf "$d"' EXIT
+
+          api_error() {
+            node - "$1" <<'NODE'
+          const fs=require('fs');
+          let code='UNKNOWN';
+          try {
+            const body=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
+            const candidate=body?.error?.code ?? body?.code;
+            if (typeof candidate==='string' && /^[A-Z0-9_.-]{1,80}$/i.test(candidate)) code=candidate;
+          } catch {}
+          process.stdout.write(code);
           NODE
-          vercel link --yes --project "$VERCEL_PROJECT_NAME" --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$d/link.log" 2>&1
+          }
+
+          list_http="$(curl -sS -o "$d/project-env-list.json" -w '%{http_code}' \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            -H 'Accept: application/json' \
+            --get "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env" \
+            --data-urlencode "teamId=$VERCEL_TEAM_ID")"
+          chmod 600 "$d/project-env-list.json"
+          if [[ "$list_http" != 200 ]]; then
+            echo "VERCEL_ENV_API_ERROR http=$list_http code=$(api_error "$d/project-env-list.json")"
+            exit 1
+          fi
+
+          node - "$d/project-env-list.json" "$TARGET_BRANCH" "$d/manifest.json" <<'NODE'
+          const fs=require('fs');
+          const [listPath,branch,outPath]=process.argv.slice(2);
+          const body=JSON.parse(fs.readFileSync(listPath,'utf8'));
+          const records=Array.isArray(body) ? body : (body.envs || body.data || []);
+          const required=['DATABASE_URL','CRON_SECRET','INTEGRATION_SETTINGS_ENCRYPTION_KEY'];
+          const canonical=['APP_URL','NEXTAUTH_URL','NEXT_PUBLIC_APP_URL','NEXT_PUBLIC_SITE_URL'];
+          const targetMatches=(record,target)=>{
+            const raw=record?.target;
+            const targets=Array.isArray(raw) ? raw : [raw];
+            return targets.includes(target) || targets.includes('all');
+          };
+          const timestamp=record=>Number(record?.updatedAt || record?.createdAt || record?.updated || record?.created || 0);
+          function pick(key,target){
+            const candidates=records.filter(record=>record && record.key===key && record.id && targetMatches(record,target));
+            candidates.sort((a,b)=>{
+              if(target==='preview'){
+                const ap=a.gitBranch===branch ? 2 : (!a.gitBranch ? 1 : 0);
+                const bp=b.gitBranch===branch ? 2 : (!b.gitBranch ? 1 : 0);
+                if(ap!==bp) return bp-ap;
+              } else {
+                const ap=!a.gitBranch ? 1 : 0;
+                const bp=!b.gitBranch ? 1 : 0;
+                if(ap!==bp) return bp-ap;
+              }
+              return timestamp(b)-timestamp(a);
+            });
+            const chosen=candidates.find(record=>target!=='preview' || record.gitBranch===branch || !record.gitBranch);
+            return chosen ? {key:chosen.key,id:chosen.id} : null;
+          }
+          function resolve(target){
+            const selected={};
+            for(const key of required){
+              const record=pick(key,target);
+              if(!record){ console.error(key+'_MISSING_FOR_'+target.toUpperCase()); process.exit(2); }
+              selected[key]=record;
+            }
+            for(const key of canonical){
+              const record=pick(key,target);
+              if(record){ selected[key]=record; break; }
+            }
+            if(!canonical.some(key=>selected[key])){ console.error('CANONICAL_URL_MISSING_FOR_'+target.toUpperCase()); process.exit(2); }
+            return selected;
+          }
+          fs.writeFileSync(outPath,JSON.stringify({preview:resolve('preview'),production:resolve('production')}),{mode:0o600});
+          NODE
+          chmod 600 "$d/manifest.json"
+
+          node - "$d/manifest.json" <<'NODE' > "$d/records.tsv"
+          const fs=require('fs');
+          const manifest=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
+          for(const scope of ['preview','production']){
+            for(const record of Object.values(manifest[scope])) console.log([scope,record.key,record.id].join('\t'));
+          }
+          NODE
+          chmod 600 "$d/records.tsv"
+
+          while IFS=$'\t' read -r scope key env_id; do
+            response="$d/${scope}-${key}.json"
+            http="$(curl -sS -o "$response" -w '%{http_code}' \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              -H 'Accept: application/json' \
+              --get "https://api.vercel.com/v1/projects/$VERCEL_PROJECT_ID/env/$env_id" \
+              --data-urlencode "teamId=$VERCEL_TEAM_ID")"
+            chmod 600 "$response"
+            if [[ "$http" != 200 ]]; then
+              echo "VERCEL_ENV_API_ERROR http=$http code=$(api_error "$response") key=$key scope=$scope"
+              exit 1
+            fi
+          done < "$d/records.tsv"
+
+          cat > "$d/run-check.js" <<'NODE'
+          const fs=require('fs');
+          const {spawnSync}=require('child_process');
+          const [dir,scope,script,logPath]=process.argv.slice(2);
+          const manifest=JSON.parse(fs.readFileSync(dir+'/manifest.json','utf8'))[scope];
+          const clean={
+            PATH:process.env.PATH,
+            HOME:process.env.HOME,
+            LANG:process.env.LANG || 'C.UTF-8',
+            CI:'true',
+            NODE_ENV:'production',
+            VERCEL_ENV:scope
+          };
+          for(const record of Object.values(manifest)){
+            const body=JSON.parse(fs.readFileSync(`${dir}/${scope}-${record.key}.json`,'utf8'));
+            const value=typeof body?.value==='string' ? body.value : (typeof body?.env?.value==='string' ? body.env.value : null);
+            if(value===null){ console.error(record.key+'_VALUE_UNAVAILABLE_FOR_'+scope.toUpperCase()); process.exit(3); }
+            clean[record.key]=value;
+          }
+          const fd=fs.openSync(logPath,'w',0o600);
+          const result=spawnSync('npm',['run',script],{cwd:process.cwd(),env:clean,stdio:['ignore',fd,fd]});
+          fs.closeSync(fd);
+          if(result.error){ console.error('CHECK_PROCESS_START_FAILED'); process.exit(4); }
+          process.exit(result.status ?? 1);
+          NODE
+          chmod 600 "$d/run-check.js"
+
           set +e
-          vercel env run -e preview --git-branch "$TARGET_BRANCH" --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" -- npm run preflight:integration-settings > "$d/preflight.log" 2>&1; pe=$?
-          vercel env run -e production --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" -- npm run verify:integration-settings-migration > "$d/migration.log" 2>&1; me=$?
+          node "$d/run-check.js" "$d" preview preflight:integration-settings "$d/preflight.log"
+          preflight_exit=$?
+          node "$d/run-check.js" "$d" production verify:integration-settings-migration "$d/migration.log"
+          migration_exit=$?
           set -e
-          pr="$(grep -Eo 'INTEGRATION SETTINGS PREFLIGHT: (PASS|WARNING|BLOCKED)' "$d/preflight.log"|tail -1|awk '{print $4}'||true)"
-          mr="$(grep -Eo 'MIGRATION STATUS: (FULLY_APPLIED|PARTIALLY_APPLIED|NOT_APPLIED|UNKNOWN)' "$d/migration.log"|tail -1|awk '{print $3}'||true)"
-          [[ $pe -eq 0 && ( "$pr" == PASS || "$pr" == WARNING ) ]] || { echo PREFLIGHT_BLOCKED; exit 1; }
-          [[ $me -eq 0 && -n "$mr" && "$mr" != UNKNOWN ]] || { echo MIGRATION_VERIFY_BLOCKED; exit 1; }
-          echo "preflight=$pr" >> "$GITHUB_OUTPUT"; echo "migration=$mr" >> "$GITHUB_OUTPUT"
+
+          preflight="$(grep -Eo 'INTEGRATION SETTINGS PREFLIGHT: (PASS|WARNING|BLOCKED)' "$d/preflight.log" | tail -1 | awk '{print $4}' || true)"
+          migration="$(grep -Eo 'MIGRATION STATUS: (FULLY_APPLIED|PARTIALLY_APPLIED|NOT_APPLIED|UNKNOWN)' "$d/migration.log" | tail -1 | awk '{print $3}' || true)"
+
+          [[ $preflight_exit -eq 0 && ( "$preflight" == PASS || "$preflight" == WARNING ) ]] || { echo PREFLIGHT_BLOCKED; exit 1; }
+          [[ $migration_exit -eq 0 && ( "$migration" == NOT_APPLIED || "$migration" == PARTIALLY_APPLIED || "$migration" == FULLY_APPLIED ) ]] || { echo MIGRATION_VERIFY_BLOCKED; exit 1; }
+
+          echo "preflight=$preflight" >> "$GITHUB_OUTPUT"
+          echo "migration=$migration" >> "$GITHUB_OUTPUT"
 
       - name: Publish sanitized result
         if: always()
