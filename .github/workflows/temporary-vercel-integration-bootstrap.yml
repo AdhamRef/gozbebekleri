@@ -24,42 +24,30 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Trigger final integration settings bootstrap'))
     runs-on: ubuntu-latest
     timeout-minutes: 150
-    permissions:
-      contents: read
-      issues: write
-      pull-requests: write
+    permissions: {contents: read, issues: write, pull-requests: write}
     steps:
       - id: checkout
         name: Checkout target branch
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+        env: {GITHUB_TOKEN: '${{ github.token }}'}
         run: |
-          set +x
-          set -Eeuo pipefail
+          set +x; set -Eeuo pipefail
           find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-          cd "$GITHUB_WORKSPACE"
-          git init
-          git remote add origin https://github.com/AdhamRef/gozbebekleri.git
-          auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
-          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin "refs/heads/$TARGET_BRANCH"
+          git init; git remote add origin https://github.com/AdhamRef/gozbebekleri.git
+          h="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN"|base64 -w0)"
+          git -c http.https://github.com/.extraheader="$h" fetch --no-tags --depth=1 origin "refs/heads/$TARGET_BRANCH"
           git checkout --detach FETCH_HEAD
           test "$(git rev-parse HEAD)" = "$EXPECTED_TARGET_SHA"
 
       - id: safety
         name: Verify target PR safety gates before npm
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
+        env: {GH_TOKEN: '${{ github.token }}'}
         run: |
-          set +x
-          set -Eeuo pipefail
-          curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/AdhamRef/gozbebekleri/pulls/$TARGET_PR_NUMBER" > "$RUNNER_TEMP/pr.json"
+          set +x; set -Eeuo pipefail
+          curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/AdhamRef/gozbebekleri/pulls/$TARGET_PR_NUMBER" > "$RUNNER_TEMP/pr.json"
           python3 - "$RUNNER_TEMP/pr.json" "$TARGET_PR_NUMBER" "$TARGET_BRANCH" "$EXPECTED_TARGET_SHA" <<'PY'
           import json,subprocess,sys
-          p=json.load(open(sys.argv[1])); local=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
-          ok=p.get('number')==int(sys.argv[2]) and p.get('state')=='open' and p.get('draft') is True and p['head']['ref']==sys.argv[3] and p['head']['sha']==sys.argv[4] and local==sys.argv[4]
-          if not ok: raise SystemExit('TARGET_PR_MOVED')
+          p=json.load(open(sys.argv[1])); h=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          assert p.get('number')==int(sys.argv[2]) and p.get('state')=='open' and p.get('draft') is True and p['head']['ref']==sys.argv[3] and p['head']['sha']==sys.argv[4] and h==sys.argv[4], 'TARGET_PR_MOVED'
           print('PR_SAFETY_GATE_PASS')
           PY
           rm -f "$RUNNER_TEMP/pr.json"
@@ -79,12 +67,9 @@ jobs:
       - id: lockfile
         name: Validate package lock stability
         run: |
-          cp package.json "$RUNNER_TEMP/package.before"
-          cp package-lock.json "$RUNNER_TEMP/package-lock.before"
+          cp package.json "$RUNNER_TEMP/p"; cp package-lock.json "$RUNNER_TEMP/l"
           $NPM10 install --package-lock-only --force --ignore-scripts --no-audit --no-fund
-          cmp -s package.json "$RUNNER_TEMP/package.before"
-          cmp -s package-lock.json "$RUNNER_TEMP/package-lock.before"
-          test -z "$(git status --porcelain)"
+          cmp -s package.json "$RUNNER_TEMP/p"; cmp -s package-lock.json "$RUNNER_TEMP/l"; test -z "$(git status --porcelain)"
 
       - id: ci
         name: Install dependencies with npm ci
@@ -114,54 +99,40 @@ jobs:
         name: Verify feature SHA
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_TARGET_SHA"
 
+      - id: vercel_cli
+        name: Install Vercel CLI
+        run: $NPM10 install --global vercel@56.1.0 --no-audit --no-fund
+
       - id: preview
         name: Verify matching Vercel Preview is READY
         env: {VERCEL_TOKEN: '${{ secrets.VERCEL_TOKEN }}'}
         run: |
           set +x
-          curl -fsS -H "Authorization: Bearer $VERCEL_TOKEN" "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID&limit=100" > "$RUNNER_TEMP/deployments.json"
-          python3 - "$RUNNER_TEMP/deployments.json" "$EXPECTED_TARGET_SHA" >> "$GITHUB_OUTPUT" <<'PY'
+          curl -fsS -H "Authorization: Bearer $VERCEL_TOKEN" "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID&limit=100" > "$RUNNER_TEMP/d.json"
+          python3 - "$RUNNER_TEMP/d.json" "$EXPECTED_TARGET_SHA" >> "$GITHUB_OUTPUT" <<'PY'
           import json,sys
-          rows=[d for d in json.load(open(sys.argv[1])).get('deployments',[]) if (d.get('meta') or {}).get('githubCommitSha')==sys.argv[2] and d.get('target')!='production']
-          rows.sort(key=lambda d:d.get('created',0),reverse=True)
-          if not rows or rows[0].get('state')!='READY': raise SystemExit('PREVIEW_NOT_READY')
-          print('id='+str(rows[0].get('uid') or rows[0].get('id'))); print('state=READY')
+          a=[d for d in json.load(open(sys.argv[1])).get('deployments',[]) if (d.get('meta') or {}).get('githubCommitSha')==sys.argv[2] and d.get('target')!='production'];a.sort(key=lambda d:d.get('created',0),reverse=True)
+          assert a and a[0].get('state')=='READY','PREVIEW_NOT_READY';print('id='+str(a[0].get('uid') or a[0].get('id')));print('state=READY')
           PY
-          rm -f "$RUNNER_TEMP/deployments.json"
+          rm -f "$RUNNER_TEMP/d.json"
 
       - id: readonly
-        name: Resolve Vercel env and run read-only checks
-        shell: bash
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        name: Audit Vercel env API and run read-only checks securely
+        env: {VERCEL_TOKEN: '${{ secrets.VERCEL_TOKEN }}'}
         run: |
-          set +x
-          set -Eeuo pipefail
-          umask 077
-          d="$(mktemp -d)"; trap 'rm -rf "$d"' EXIT
-          project="$d/project.json"; shared="$d/shared.json"; preview="$d/preview.env"; production="$d/production.env"; runner="$d/run.cjs"
-          ph="$(curl -sS -o "$project" -w '%{http_code}' -H "Authorization: Bearer $VERCEL_TOKEN" -H 'Accept: application/json' --get "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env" --data-urlencode "teamId=$VERCEL_TEAM_ID" --data-urlencode 'decrypt=true' --data-urlencode 'source=vercel-cli:pull' --data-urlencode 'limit=100)"
+          set +x; set -Eeuo pipefail; umask 077
+          d="$(mktemp -d)"; trap 'rm -rf "$d" .vercel' EXIT
+          ph="$(curl -sS -o "$d/project.json" -w '%{http_code}' -H "Authorization: Bearer $VERCEL_TOKEN" -H 'Accept: application/json' --get "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env" --data-urlencode "teamId=$VERCEL_TEAM_ID" --data-urlencode 'decrypt=true' --data-urlencode 'source=vercel-cli:pull' --data-urlencode 'limit=100)"
           [[ "$ph" == 200 ]] || { echo "VERCEL_ENV_API_ERROR http=$ph code=PROJECT_ENV_LIST_FAILED"; exit 1; }
-          sh="$(curl -sS -o "$shared" -w '%{http_code}' -H "Authorization: Bearer $VERCEL_TOKEN" -H 'Accept: application/json' --get 'https://api.vercel.com/v1/env' --data-urlencode "teamId=$VERCEL_TEAM_ID" --data-urlencode "projectId=$VERCEL_PROJECT_ID" --data-urlencode 'decrypt=true')"
+          sh="$(curl -sS -o "$d/shared.json" -w '%{http_code}' -H "Authorization: Bearer $VERCEL_TOKEN" -H 'Accept: application/json' --get 'https://api.vercel.com/v1/env' --data-urlencode "teamId=$VERCEL_TEAM_ID" --data-urlencode "projectId=$VERCEL_PROJECT_ID")"
           [[ "$sh" == 200 ]] || { echo "VERCEL_ENV_API_ERROR http=$sh code=SHARED_ENV_LIST_FAILED"; exit 1; }
-          cat > "$runner" <<'NODE'
-          const fs=require('fs'),cp=require('child_process'),crypto=require('crypto');
-          const [,,cmd,pj,sj,pre,prod,branch,...args]=process.argv;
-          const read=p=>JSON.parse(fs.readFileSync(p,'utf8')); const arr=x=>[...(x.envs||[]),...(x.data||[])];
-          const targets=x=>Array.isArray(x.target)?x.target:(x.target?[x.target]:[]);
-          function pick(target){const m=new Map();for(const x of [...arr(read(pj)),...arr(read(sj))]){if(!x||typeof x.key!=='string'||!targets(x).includes(target)||typeof x.value!=='string')continue;const b=typeof x.gitBranch==='string'?x.gitBranch:'';if(target==='preview'&&b&&b!==branch)continue;if(target==='production'&&b)continue;const score=(target==='preview'&&b===branch?2:1)*1e15+Number(x.updatedAt||x.createdAt||0);if(!m.has(x.key)||score>=m.get(x.key).score)m.set(x.key,{value:x.value,score});}return Object.fromEntries([...m].map(([k,v])=>[k,v.value]));}
-          const write=(p,o)=>fs.writeFileSync(p,Object.entries(o).map(([k,v])=>k+'='+JSON.stringify(v)).join('\n')+'\n',{mode:0o600});
-          if(cmd==='materialize'){write(pre,pick('preview'));write(prod,pick('production'));process.exit();}
-          const parse=p=>Object.fromEntries(fs.readFileSync(p,'utf8').trim().split(/\n/).filter(Boolean).map(l=>{const i=l.indexOf('=');return[l.slice(0,i),JSON.parse(l.slice(i+1))]}));
-          if(cmd==='check'){const a=parse(pre),b=parse(prod),need=['DATABASE_URL','CRON_SECRET'];for(const k of need)if(!a[k]||!b[k]){console.error(k+'_MISSING');process.exit(2)};const au=a.APP_URL||a.NEXTAUTH_URL||a.NEXT_PUBLIC_APP_URL||a.NEXT_PUBLIC_SITE_URL,bu=b.APP_URL||b.NEXTAUTH_URL||b.NEXT_PUBLIC_APP_URL||b.NEXT_PUBLIC_SITE_URL;if(!au||!bu){console.error('CANONICAL_URL_MISSING');process.exit(2)};if(!a.INTEGRATION_SETTINGS_ENCRYPTION_KEY||!b.INTEGRATION_SETTINGS_ENCRYPTION_KEY){console.error('INTEGRATION_SETTINGS_ENCRYPTION_KEY_MISSING');process.exit(2)};if(crypto.createHash('sha256').update(a.DATABASE_URL).digest('hex')===crypto.createHash('sha256').update(b.DATABASE_URL).digest('hex')&&a.INTEGRATION_SETTINGS_ENCRYPTION_KEY!==b.INTEGRATION_SETTINGS_ENCRYPTION_KEY){console.error('ENCRYPTION_KEYS_DIFFER_FOR_SHARED_DATABASE');process.exit(2)};process.exit();}
-          if(cmd==='run'){const env={...process.env,...parse(pre)};const r=cp.spawnSync(args[0],args.slice(1),{env,stdio:'inherit'});process.exit(r.status??1)}
+          node - "$d/project.json" "$d/shared.json" <<'NODE'
+          const fs=require('fs');const [p,s]=process.argv.slice(2).map(x=>JSON.parse(fs.readFileSync(x)));const a=[...(p.envs||[]),...(p.data||[]),...(s.envs||[]),...(s.data||[])];const keys=new Set(a.map(x=>x&&x.key).filter(Boolean));for(const k of ['DATABASE_URL','CRON_SECRET','INTEGRATION_SETTINGS_ENCRYPTION_KEY'])if(!keys.has(k)){console.error(k+'_MISSING');process.exit(2)};if(!['APP_URL','NEXTAUTH_URL','NEXT_PUBLIC_APP_URL','NEXT_PUBLIC_SITE_URL'].some(k=>keys.has(k))){console.error('CANONICAL_URL_MISSING');process.exit(2)}
           NODE
-          chmod 600 "$runner" "$project" "$shared"
-          node "$runner" materialize "$project" "$shared" "$preview" "$production" "$TARGET_BRANCH"
-          node "$runner" check "$project" "$shared" "$preview" "$production" "$TARGET_BRANCH"
+          vercel link --yes --project "$VERCEL_PROJECT_NAME" --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" > "$d/link.log" 2>&1
           set +e
-          node "$runner" run "$project" "$shared" "$preview" "$production" "$TARGET_BRANCH" npm run preflight:integration-settings > "$d/preflight.log" 2>&1; pe=$?
-          node "$runner" run "$project" "$shared" "$preview" "$production" "$TARGET_BRANCH" npm run verify:integration-settings-migration > "$d/migration.log" 2>&1; me=$?
+          vercel env run -e preview --git-branch "$TARGET_BRANCH" --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" -- npm run preflight:integration-settings > "$d/preflight.log" 2>&1; pe=$?
+          vercel env run -e production --scope "$VERCEL_TEAM_SCOPE" --token "$VERCEL_TOKEN" -- npm run verify:integration-settings-migration > "$d/migration.log" 2>&1; me=$?
           set -e
           pr="$(grep -Eo 'INTEGRATION SETTINGS PREFLIGHT: (PASS|WARNING|BLOCKED)' "$d/preflight.log"|tail -1|awk '{print $4}'||true)"
           mr="$(grep -Eo 'MIGRATION STATUS: (FULLY_APPLIED|PARTIALLY_APPLIED|NOT_APPLIED|UNKNOWN)' "$d/migration.log"|tail -1|awk '{print $3}'||true)"
@@ -173,20 +144,10 @@ jobs:
         if: always()
         env: {GH_TOKEN: '${{ github.token }}'}
         run: |
-          r="$RUNNER_TEMP/result.md"
-          printf '## Temporary Vercel integration bootstrap\n\n| Check | Result |\n|---|---|\n' > "$r"
-          echo '| Run ID | ${{ github.run_id }} |' >> "$r"
-          echo '| Checkout | ${{ steps.checkout.outcome }} |' >> "$r"
-          echo '| Safety gate | ${{ steps.safety.outcome }} |' >> "$r"
-          echo '| Node/npm | ${{ steps.node.outcome }}/${{ steps.npm.outcome }} |' >> "$r"
-          echo '| Lockfile validation | ${{ steps.lockfile.outcome }} |' >> "$r"
-          echo '| npm ci/tests | ${{ steps.ci.outcome }}/${{ steps.tests.outcome }} |' >> "$r"
-          echo '| Prisma clients | ${{ steps.prisma_default.outcome }}/${{ steps.prisma_integration.outcome }} |' >> "$r"
-          echo '| Typechecks | ${{ steps.runtime_typecheck.outcome }}/${{ steps.release_typecheck.outcome }} |' >> "$r"
-          echo '| Feature SHA verification | ${{ steps.head.outcome }} |' >> "$r"
-          echo '| Preview | ${{ steps.preview.outputs.id }} / ${{ steps.preview.outputs.state }} |' >> "$r"
-          echo '| Read-only checks | ${{ steps.readonly.outcome }} |' >> "$r"
-          echo '| Preflight | ${{ steps.readonly.outputs.preflight }} |' >> "$r"
-          echo '| Migration verify | ${{ steps.readonly.outputs.migration }} |' >> "$r"
-          gh pr comment "$TARGET_PR_NUMBER" --repo AdhamRef/gozbebekleri --body-file "$r"
-          test '${{ steps.readonly.outcome }}' = success
+          r="$RUNNER_TEMP/result.md"; printf '## Temporary Vercel integration bootstrap\n\n| Check | Result |\n|---|---|\n' > "$r"
+          echo '| Run ID | ${{ github.run_id }} |' >> "$r"; echo '| Checkout / Safety | ${{ steps.checkout.outcome }} / ${{ steps.safety.outcome }} |' >> "$r"
+          echo '| Node / npm | ${{ steps.node.outcome }} / ${{ steps.npm.outcome }} |' >> "$r"; echo '| Lockfile / npm ci / tests | ${{ steps.lockfile.outcome }} / ${{ steps.ci.outcome }} / ${{ steps.tests.outcome }} |' >> "$r"
+          echo '| Prisma clients | ${{ steps.prisma_default.outcome }} / ${{ steps.prisma_integration.outcome }} |' >> "$r"; echo '| Typechecks | ${{ steps.runtime_typecheck.outcome }} / ${{ steps.release_typecheck.outcome }} |' >> "$r"
+          echo '| Feature SHA | ${{ steps.head.outcome }} |' >> "$r"; echo '| Preview | ${{ steps.preview.outputs.id }} / ${{ steps.preview.outputs.state }} |' >> "$r"
+          echo '| Read-only checks | ${{ steps.readonly.outcome }} |' >> "$r"; echo '| Preflight | ${{ steps.readonly.outputs.preflight }} |' >> "$r"; echo '| Migration verify | ${{ steps.readonly.outputs.migration }} |' >> "$r"
+          gh pr comment "$TARGET_PR_NUMBER" --repo AdhamRef/gozbebekleri --body-file "$r"; test '${{ steps.readonly.outcome }}' = success
