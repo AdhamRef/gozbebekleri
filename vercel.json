@@ -1,4 +1,5 @@
 {
+  "buildCommand": "node scripts/verify-vercel-preview-build.mjs && npm run build",
   "crons": [
     {
       "path": "/api/cron/exchange-rates",
