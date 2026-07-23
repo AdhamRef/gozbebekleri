@@ -10,7 +10,7 @@ import {
   Award, BarChart3, MessageSquare, Repeat, ScrollText,
   UserCircle,
   ChevronLeft, FileText, Megaphone, Plug, CreditCard,
-  Archive, Palette,
+  Archive,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -38,6 +38,7 @@ import {
   DASHBOARD_NAV_GROUPS,
   DASHBOARD_NAV_HREFS_ORDERED,
   dashboardHrefToPermissionKey,
+  resolveActiveDashboardHref,
 } from "@/lib/dashboard/nav-config";
 import { DashboardAutoEnhancements } from "./_components/DashboardAutoEnhancements";
 import { ProjectEditorSectionsEnhancer } from "./_components/ProjectEditorSectionsEnhancer";
@@ -55,8 +56,7 @@ function DashboardContent({
   const router = useRouter();
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  // Daily-use groups start open; setup/identity/admin groups start collapsed to keep the sidebar short.
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({ "ربط المنصات والإرسال": true, "الهوية": true, "الإدارة": true });
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({ "ربط المنصات والإرسال": true, "الإدارة": true });
   const toggleGroup = (g: string) => setCollapsedGroups((prev) => ({ ...prev, [g]: !prev[g] }));
   const dir = localeDirection(locale);
   const hasChecked = useRef(false);
@@ -101,7 +101,6 @@ function DashboardContent({
     generalSettings: <CreditCard className="w-4 h-4 shrink-0" />,
     operations: <MessageSquare className="w-4 h-4 shrink-0" />,
     archive:    <Archive     className="w-4 h-4 shrink-0" />,
-    brand:      <Palette     className="w-4 h-4 shrink-0" />,
   }), []);
 
   const navigation = useMemo(() => {
@@ -115,8 +114,9 @@ function DashboardContent({
     })).filter((s) => s.items.length > 0);
   }, [session?.user, iconByKey]);
 
-  // Live inbox badge (WhatsApp conversations needing a reply). Fetched client-side so SSR is not
-  // blocked, and only when the user can see the inbox item. Fails gracefully to no badge.
+  const visibleHrefs = useMemo(() => navigation.flatMap((section) => section.items.map((item) => item.href)), [navigation]);
+  const activeHref = useMemo(() => resolveActiveDashboardHref(pathname, visibleHrefs), [pathname, visibleHrefs]);
+
   const INBOX_HREF = "/dashboard/operations/communication/inbox";
   const showInboxBadge = useMemo(() => navigation.some((s) => s.items.some((i) => i.href === INBOX_HREF)), [navigation]);
   const [inboxCount, setInboxCount] = useState(0);
@@ -162,7 +162,7 @@ function DashboardContent({
               <ChevronLeft className={cn("w-3 h-3 transition-transform", collapsed ? "rotate-0" : "-rotate-90")} />
             </button>
             {!collapsed && section.items.map((item) => {
-              const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+              const active = item.href === activeHref;
               const isInbox = item.href === INBOX_HREF;
               return (
                 <button key={item.href} onClick={() => handleNavigation(item.href)} className={cn("w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200", active ? "bg-white text-[#025EB8] shadow-lg" : "text-white/80 hover:bg-white/10 hover:text-white")}>

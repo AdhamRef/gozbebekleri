@@ -68,18 +68,6 @@ export const DASHBOARD_NAV_GROUPS: {
     ],
   },
   {
-    group: "الهوية",
-    items: [
-      { key: "brand", title: "دليل الهوية", href: "/dashboard/brand" },
-      { key: "brand", title: "الأصول والشعارات", href: "/dashboard/brand/assets" },
-      { key: "brand", title: "الألوان", href: "/dashboard/brand/colors" },
-      { key: "brand", title: "الخطوط", href: "/dashboard/brand/typography" },
-      { key: "brand", title: "نبرة الخطاب", href: "/dashboard/brand/voice" },
-      { key: "brand", title: "قوالب الرسائل", href: "/dashboard/brand/frameworks" },
-      { key: "brand", title: "التنزيلات", href: "/dashboard/brand/downloads" },
-    ],
-  },
-  {
     group: "الإدارة",
     items: [
       { key: "team", title: "الفريق", href: "/dashboard/users/team" },
@@ -102,6 +90,12 @@ export function dashboardHrefToPermissionKey(
   return null;
 }
 
+export function resolveActiveDashboardHref(pathname: string, hrefs: readonly string[]): string | null {
+  return [...hrefs]
+    .filter((href) => pathname === href || (href !== "/dashboard" && pathname.startsWith(`${href}/`)))
+    .sort((a, b) => b.length - a.length)[0] ?? null;
+}
+
 export const DASHBOARD_PERMISSION_ROWS: {
   key: DashboardPermissionKey;
   group: string;
@@ -120,7 +114,6 @@ export const DASHBOARD_PERMISSION_ROWS: {
   { key: "referrals", group: "التسويق", title: "إدارة الروابط والإسناد" },
   { key: "pixels", group: "التسويق", title: "عرض التتبع والتحويلات" },
   { key: "platformConnections", group: "ربط المنصات والإرسال", title: "ربط المنصات والإرسال" },
-  { key: "brand", group: "الهوية", title: "الهوية" },
   { key: "team", group: "الإدارة", title: "الفريق" },
   { key: "generalSettings", group: "الإدارة", title: "الإعدادات" },
   { key: "logs", group: "الإدارة", title: "السجلات المتقدمة" },

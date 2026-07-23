@@ -36,19 +36,9 @@ export const aiAssistantContexts: AiAssistantContextDefinition[] = [
     blockedActions: ["No file deletion", "No public publishing", "No external platform calls"],
     entryHref: "/dashboard/archive/ai",
   },
-  {
-    key: "brand",
-    title: "Brand AI Assistant",
-    description: "يحافظ على نبرة الهوية، الألوان، أسماء الجمعيات، وقواعد الكتابة لكل مؤسسة.",
-    systemRole: "Brand governance assistant for multi-organization charity communications.",
-    capabilities: ["BRAND_GUARDRAILS", "WRITE_COPY", "SUMMARIZE_EXECUTIVE"],
-    allowedSources: ["getBrandRules"],
-    blockedActions: ["No logo file changes", "No public publishing", "No legal claims"],
-    entryHref: "/dashboard/brand",
-  },
 ];
 
-const promptExamples: Record<AiAssistantContextKey, string[]> = {
+const promptExamples: Partial<Record<AiAssistantContextKey, string[]>> = {
   marketing: [
     "لخص روابط الحملات التي جلبت تبرعات حقيقية لكن Tracking Truth فيها ناقص.",
     "اقترح أولويات إصلاح Meta/GA4 قبل زيادة الميزانية.",
@@ -57,17 +47,12 @@ const promptExamples: Record<AiAssistantContextKey, string[]> = {
   content: [
     "اقترح خطة محتوى للأسبوع القادم بناءً على الإنتاج والجدولة.",
     "ما المواد الجاهزة التي يمكن تسليمها للتسويق بعد مراجعة بشرية؟",
-    "اكتب مسودة واتساب لحملة الوقف مع الالتزام بقواعد الهوية.",
+    "اكتب مسودة واتساب لحملة الوقف مع الالتزام بقواعد الصياغة المعتمدة.",
   ],
   archive: [
     "اعثر على مواد أرشيف قابلة لإعادة الاستخدام لحملة غزة.",
     "اقترح tags للمواد الجاهزة بدون تعديل الملفات.",
-    "ما الأصول التي تصلح لفيديو قصير مع قواعد الهوية؟",
-  ],
-  brand: [
-    "راجع هذه الرسالة ضد قواعد نبرة الهوية.",
-    "ما الألوان وقواعد الاستخدام المعتمدة لكل مؤسسة؟",
-    "اقترح صياغة بديلة لا تحتوي ادعاءات قانونية أو مبالغات.",
+    "ما الأصول التي تصلح لفيديو قصير مع قواعد الصياغة المعتمدة؟",
   ],
 };
 
@@ -104,7 +89,7 @@ export function getAiAssistantReadiness(contextKey: AiAssistantContextKey): AiAs
     tools: getAiToolContractsForContext(contextKey),
     humanApprovalRules: aiHumanApprovalRules,
     provider: getOpenAiProviderStatus(),
-    promptExamples: promptExamples[contextKey],
+    promptExamples: promptExamples[contextKey] ?? [],
   };
 }
 
@@ -128,7 +113,7 @@ export async function createAiDraftResponse(
       context: contextKey,
       mode: "SAFE_FALLBACK",
       title: "AI Core رفض الطلب",
-      answer: "الأداة المطلوبة غير مسموحة لهذا السياق أو السياق غير معروف.",
+      answer: "الأداة المطلوبة غير مسموحة لهذا السياق أوالسياق غير معروف.",
       requestedTool: requestedTool?.name ?? null,
       auditId: audit.id,
       provider: getOpenAiProviderStatus(),
@@ -154,14 +139,14 @@ export async function createAiDraftResponse(
   return {
     context: contextKey,
     mode: providerResult.mode,
-    title: context ? `${context.title} جاهز للربط` : "AI Core جاهز للربط",
+    title: `${context.title} جاهز للربط`,
     answer: providerResult.answer || `تم استقبال الطلب: ${prompt.trim() || "بدون نص"}.`,
     requestedTool: requestedTool?.name ?? null,
     auditId: audit.id,
     provider: getOpenAiProviderStatus(),
     suggestedNextActions: [
       "راجع مصادر البيانات المسموحة قبل استخدام التحليل.",
-      "حوّل أي اقتراح إرسال أو نشر أو ميزانية إلى طلب موافقة بشرية.",
+      "حوّل أي اقتراح إرسال أونشر أوميزانية إلى طلب موافقة بشرية.",
       "استخدم tool contracts المناسبة للسياق بدل شات عام.",
     ],
     safety: {

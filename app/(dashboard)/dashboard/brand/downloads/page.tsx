@@ -1,11 +1,7 @@
-import { BrandCenterView } from "../_components/BrandCenterView";
-import { getBrandCenterSnapshot } from "@/lib/brand/brand-service";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "التنزيلات | لوحة التحكم" };
-
-export default async function BrandDownloadsPage() {
-  const snapshot = await getBrandCenterSnapshot();
-  return <BrandCenterView activeTab="downloads" snapshot={snapshot} />;
+export default function BrandDownloadsPage() {
+  redirect("/dashboard/archive/assets?source=legacy-brand");
 }

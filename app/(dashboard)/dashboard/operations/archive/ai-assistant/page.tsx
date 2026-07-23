@@ -18,7 +18,7 @@ export default function ArchiveAiAssistantPage() {
         <p className="text-xs text-white/70">المساعد الذكي / سياق الأرشيف</p>
         <h1 className="mt-1.5 text-2xl font-black">مساعد الأرشيف الذكي</h1>
         <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
-          طبقة آمنة لتجهيز مساعد يبحث في الأرشيف ويقترح مواد قابلة لإعادة الاستخدام دون حذف أو نشر أو تعديل ملفات.
+          طبقة آمنة لتجهيز مساعد يبحث في الأرشيف ويقترح مواد قابلة لإعادة الاستخدام دون حذف أونشر أوتعديل ملفات.
         </p>
       </div>
 
@@ -56,7 +56,7 @@ export default function ArchiveAiAssistantPage() {
             <CardDescription>جاهز لاحقًا للبحث الذكي داخل الصور والفيديوهات والتصاميم.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2">
-            <Feature icon={<Search className="h-4 w-4" />} title="بحث ذكي" text="اعثر على أفضل مواد غزة، الوقف، الزكاة أو الشتاء حسب الموسم." />
+            <Feature icon={<Search className="h-4 w-4" />} title="بحث ذكي" text="اعثر على أفضل مواد غزة، الوقف، الزكاة أوالشتاء حسب الموسم." />
             <Feature icon={<Tags className="h-4 w-4" />} title="تصنيف الأصول" text="اقتراح tags ولغات ومشاريع مرتبطة لكل أصل." />
             <Feature icon={<ImageIcon className="h-4 w-4" />} title="إعادة الاستخدام" text="اقتراح مواد جاهزة للتسويق من الأرشيف." />
             <Feature icon={<Archive className="h-4 w-4" />} title="أمان الأرشيف" text="لا حذف ولا تعديل ملفات ولا نشر تلقائي." />
@@ -67,7 +67,7 @@ export default function ArchiveAiAssistantPage() {
       <Card>
         <CardHeader>
           <CardTitle>Prompts مفيدة</CardTitle>
-          <CardDescription>استخدمه لاسترجاع مواد الأرشيف واقتراح إعادة الاستخدام دون حذف أو تعديل ملفات.</CardDescription>
+          <CardDescription>استخدمه لاسترجاع مواد الأرشيف واقتراح إعادة الاستخدام دون حذف أوتعديل ملفات.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
           {readiness?.promptExamples.map((prompt) => (
@@ -79,9 +79,8 @@ export default function ArchiveAiAssistantPage() {
       <Card>
         <CardHeader><CardTitle>روابط مرتبطة</CardTitle></CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          <QuickLink href="/dashboard/operations/archive" title="الأرشيف" />
-          <QuickLink href="/dashboard/operations/command-center" title="مركز قيادة المحتوى" />
-          <QuickLink href="/dashboard/brand" title="Brand Center" />
+          <QuickLink href="/dashboard/archive/assets" title="الأرشيف" />
+          <QuickLink href="/dashboard/operations/tasks" title="مهام المحتوى" />
         </CardContent>
       </Card>
     </div>

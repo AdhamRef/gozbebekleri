@@ -5,7 +5,7 @@ type UserLike = { role?: string | null; dashboardPermissions?: string[] | null }
 export const DASHBOARD_PERMISSION_KEYS = [
   "revenue", "monthly", "referrals", "bankTransfers", "donors", "team", "logs",
   "badges", "messages", "templates", "campaigns", "categories", "blog", "slides",
-  "ticker", "pixels", "ads", "platformConnections", "operations", "archive", "brand",
+  "ticker", "pixels", "ads", "platformConnections", "operations", "archive",
   "generalSettings", "platformConnectionsTest", "platformConnectionsManage",
   "platformConnectionsAdmin", "archiveUpload", "archiveDelete", "archiveAnalyze",
   "archiveDocuments", "donationsEdit", "reportsExport",
@@ -100,7 +100,6 @@ const PATH_RULES: { prefix: string; key: DashboardPermissionKey }[] = [
   { prefix: "/dashboard/ticker", key: "ticker" },
   { prefix: "/dashboard/pixels", key: "pixels" },
   { prefix: "/dashboard/donations", key: "revenue" },
-  { prefix: "/dashboard/brand", key: "brand" },
   { prefix: "/dashboard/general", key: "generalSettings" },
   { prefix: "/dashboard", key: "revenue" },
 ];

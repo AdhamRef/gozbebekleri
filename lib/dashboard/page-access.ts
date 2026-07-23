@@ -17,6 +17,16 @@ export type DashboardPageAccess =
   | { allowed: true; session: AuthenticatedDashboardSession }
   | { allowed: false; redirectTo: string };
 
+export function resolveDashboardFallbackHref(session: Session | null): string {
+  const user = session?.user;
+  if (!user) return "/ar/auth/signin";
+  return getFirstAllowedDashboardHref(
+    user,
+    DASHBOARD_NAV_HREFS_ORDERED,
+    dashboardHrefToPermissionKey,
+  ) ?? "/";
+}
+
 export function resolveDashboardPageAccess(
   session: Session | null,
   requiredPermission: DashboardPermissionKey,
@@ -28,12 +38,7 @@ export function resolveDashboardPageAccess(
   }
 
   if (!userHasDashboardPermission(user, requiredPermission)) {
-    const fallback = getFirstAllowedDashboardHref(
-      user,
-      DASHBOARD_NAV_HREFS_ORDERED,
-      dashboardHrefToPermissionKey,
-    );
-    return { allowed: false, redirectTo: fallback ?? "/" };
+    return { allowed: false, redirectTo: resolveDashboardFallbackHref(session) };
   }
 
   return { allowed: true, session: { ...session, user } };
