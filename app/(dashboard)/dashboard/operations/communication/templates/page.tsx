@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Plus, LayoutTemplate, MessageCircle, Mail, MessageSquare, Cpu } from "lucide-react";
 import { getTemplateCenter, LOCALE_LABEL, type TemplateGroup } from "@/lib/communication/template-center-service";
+import { getBrandCenterSnapshot } from "@/lib/brand/brand-service";
+import type { BrandMessageFramework } from "@/lib/brand/brand-types";
 import { TemplateRowActions } from "./_components/TemplateRowActions";
 
 export const metadata = { title: "القوالب | مركز التواصل" };
@@ -16,6 +18,7 @@ const TABS = [
   { key: "email", label: "إيميل" },
   { key: "sms", label: "رسائل قصيرة" },
   { key: "review", label: "تحتاج مراجعة" },
+  { key: "legacy-frameworks", label: "إطارات صياغة قديمة" },
 ] as const;
 
 const CHANNEL_META: Record<string, { label: string; icon: typeof Mail; cls: string }> = {
@@ -99,11 +102,36 @@ function GroupCard({ g }: { g: TemplateGroup }) {
   );
 }
 
+function LegacyFrameworkCard({ framework }: { framework: BrandMessageFramework }) {
+  return (
+    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="font-black text-slate-900">{framework.name}</h2>
+          <p className="mt-1 text-xs text-slate-500">{framework.type} · {framework.locale.toUpperCase()}</p>
+        </div>
+        <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700">قراءة فقط</span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {framework.structure.map((step) => <span key={step} className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">{step}</span>)}
+      </div>
+      <p className="mt-3 rounded-lg border bg-slate-50 p-3 text-sm leading-6 text-slate-700">{framework.sampleText}</p>
+      <p className="mt-3 text-[11px] leading-5 text-slate-500">هذا إطار صياغة قديم وليس قالب إرسال لدى مزود. لم يتم إرسال رسالة أوتعديل أي Provider Template.</p>
+    </article>
+  );
+}
+
 export default async function TemplatesPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const sp = await searchParams;
   const tab = TABS.some((t) => t.key === sp.tab) ? (sp.tab as string) : "all";
-  const { summary, groups } = await getTemplateCenter();
+  const [{ summary, groups }, brandSnapshot] = await Promise.all([
+    getTemplateCenter(),
+    tab === "legacy-frameworks" ? getBrandCenterSnapshot() : Promise.resolve(null),
+  ]);
   const filtered = filterGroups(groups, tab);
+  const persistedLegacyFrameworks = brandSnapshot
+    ? brandSnapshot.messageFrameworks.filter((framework) => !framework.id.startsWith("framework_"))
+    : [];
 
   return (
     <main className="space-y-5 p-4 sm:p-6" dir="rtl">
@@ -116,7 +144,6 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href={`${BASE}/new`} className="inline-flex h-10 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white shadow-sm hover:bg-[#024a92]"><Plus className="h-4 w-4" /> إنشاء قالب</Link>
-            <Link href="/dashboard/brand/frameworks" className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:border-[#025EB8]/50 hover:text-[#025EB8]">قوالب الرسائل في دليل الهوية</Link>
             <Link href={`${BASE}/layouts`} className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:border-[#025EB8]/50 hover:text-[#025EB8]"><LayoutTemplate className="h-4 w-4" /> تصميم إيميل ثابت</Link>
           </div>
         </div>
@@ -138,7 +165,13 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
         })}
       </nav>
 
-      {filtered.length === 0 ? (
+      {tab === "legacy-frameworks" ? (
+        persistedLegacyFrameworks.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">لا توجد إطارات صياغة محفوظة فعليًا. لم تُعرض بيانات Foundation التجريبية.</div>
+        ) : (
+          <div className="grid gap-3 lg:grid-cols-2">{persistedLegacyFrameworks.map((framework) => <LegacyFrameworkCard key={framework.id} framework={framework} />)}</div>
+        )
+      ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
           <LayoutTemplate className="h-8 w-8 text-slate-300" />
           <p className="text-sm text-slate-500">لا توجد قوالب في هذا القسم بعد.</p>
@@ -151,7 +184,7 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
       )}
 
       <p className="text-[11px] leading-6 text-slate-400">
-        القوالب التلقائية مخصّصة لأحداث النظام ولا تظهر في منشئ الحملات. المعاينة داخلية فقط دون إرسال أو اتصال بأي مزود، وبدون أي بيانات وهمية.
+        القوالب التلقائية مخصّصة لأحداث النظام ولا تظهر في منشئ الحملات. المعاينة داخلية فقط دون إرسال أواتصال بأي مزود، وبدون أي بيانات وهمية.
       </p>
     </main>
   );
