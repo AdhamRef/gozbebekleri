@@ -1,11 +1,10 @@
-import { BrandCenterView } from "../_components/BrandCenterView";
-import { getBrandCenterSnapshot } from "@/lib/brand/brand-service";
+import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { resolveDashboardFallbackHref } from "@/lib/dashboard/page-access";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "نبرة الخطاب | لوحة التحكم" };
-
 export default async function BrandVoicePage() {
-  const snapshot = await getBrandCenterSnapshot();
-  return <BrandCenterView activeTab="voice" snapshot={snapshot} />;
+  redirect(resolveDashboardFallbackHref(await getServerSession(authOptions)));
 }
