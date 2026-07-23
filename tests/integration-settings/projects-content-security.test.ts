@@ -103,7 +103,9 @@ test("localization audit and preview authorize by requested section", () => {
     const source = readFileSync(path, "utf8");
     const handler = source.slice(source.indexOf("export async function GET"));
     const parseIndex = handler.indexOf("parseContentLocalizationSection");
-    const authIndex = handler.indexOf("contentLocalizationPermissionForSection(section)");
+    const directAuthIndex = handler.indexOf("contentLocalizationPermissionForSection(section)");
+    const delegatedAuthIndex = handler.indexOf("authorize(section)");
+    const authIndex = directAuthIndex >= 0 ? directAuthIndex : delegatedAuthIndex;
     const loadIndex = handler.indexOf("loadPreviewRows(") >= 0
       ? handler.indexOf("loadPreviewRows(")
       : handler.indexOf("loadItems(section)");
@@ -111,6 +113,7 @@ test("localization audit and preview authorize by requested section", () => {
     assert.ok(authIndex > parseIndex, `${path} must authorize the parsed section`);
     assert.ok(loadIndex > authIndex, `${path} must authorize before loading section data`);
     assert.doesNotMatch(source, /requireAdminOrDashboardPermission\([^)]*["']content["']/s);
+    assert.match(source, /contentLocalizationPermissionForSection\(section\)/);
   }
 });
 
