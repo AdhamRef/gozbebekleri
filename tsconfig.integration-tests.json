@@ -11,6 +11,7 @@
     "types": ["node"]
   },
   "include": [
+    "types/next-auth.d.ts",
     "lib/integration-settings/active-test-core.ts",
     "lib/integration-settings/api-contracts.ts",
     "lib/integration-settings/brevo-webhook.ts",
