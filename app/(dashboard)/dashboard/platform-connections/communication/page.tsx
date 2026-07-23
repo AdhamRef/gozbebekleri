@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { PageHeader } from "../_components/ui";
@@ -5,6 +6,7 @@ import { userHasDashboardPermission } from "@/lib/dashboard/permissions";
 import { INTEGRATION_PROVIDERS } from "@/lib/integration-settings/catalog";
 import { integrationSettingsService } from "@/lib/integration-settings/prisma-service";
 import { integrationActorFromSession } from "@/lib/integration-settings/http";
+import { resolveCommunicationConnectionsPageAccess } from "@/lib/integration-settings/page-access";
 import { withActiveTestState } from "@/lib/integration-settings/safe-snapshot";
 import { getSchedulerStatus } from "@/lib/communication/scheduler-status";
 import { IntegrationSettingsManager } from "./_components/IntegrationSettingsManager";
@@ -13,15 +15,23 @@ export const metadata = { title: "مزودو التواصل والإرسال | �
 export const dynamic = "force-dynamic";
 
 export default async function CommunicationConnectionsPage() {
-  const session = await getServerSession(authOptions);
-  const user = session?.user;
+  const access = resolveCommunicationConnectionsPageAccess(
+    await getServerSession(authOptions),
+  );
+
+  if (!access.allowed) {
+    redirect(access.redirectTo);
+  }
+
+  const session = access.session;
+  const user = session.user;
   const permissions = {
-    canView: userHasDashboardPermission(user, "platformConnections"),
+    canView: true,
     canTest: userHasDashboardPermission(user, "platformConnectionsTest"),
     canManage: userHasDashboardPermission(user, "platformConnectionsManage"),
     canAdmin: userHasDashboardPermission(user, "platformConnectionsAdmin"),
   };
-  const actor = integrationActorFromSession(session!);
+  const actor = integrationActorFromSession(session);
   const [initialProviders, scheduler] = await Promise.all([
     Promise.all(INTEGRATION_PROVIDERS.map(async (provider) => withActiveTestState(await integrationSettingsService.getProviderSnapshot(provider, actor)))),
     getSchedulerStatus(),
