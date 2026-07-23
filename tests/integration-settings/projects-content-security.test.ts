@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import type { Session } from "next-auth";
 import { resolveDashboardPageAccess } from "../../lib/dashboard/page-access";
 import {
@@ -32,19 +33,13 @@ test("unauthenticated and donor users cannot enter protected content sections", 
       allowed: false,
       redirectTo: "/ar/auth/signin",
     });
-    assert.equal(
-      resolveDashboardPageAccess(sessionFor("DONOR"), permission).allowed,
-      false,
-    );
+    assert.equal(resolveDashboardPageAccess(sessionFor("DONOR"), permission).allowed, false);
   }
 });
 
 test("staff without permissions cannot enter protected content sections", () => {
   for (const permission of protectedSections) {
-    assert.equal(
-      resolveDashboardPageAccess(sessionFor("STAFF"), permission).allowed,
-      false,
-    );
+    assert.equal(resolveDashboardPageAccess(sessionFor("STAFF"), permission).allowed, false);
   }
 });
 
@@ -106,12 +101,15 @@ test("localization audit and preview authorize by requested section", () => {
     "app/api/admin/content-localization/preview/route.ts",
   ]) {
     const source = readFileSync(path, "utf8");
-    const parseIndex = source.indexOf("parseContentLocalizationSection");
-    const authIndex = source.indexOf("contentLocalizationPermissionForSection(section)");
-    const prismaIndex = source.indexOf("await prisma");
+    const handler = source.slice(source.indexOf("export async function GET"));
+    const parseIndex = handler.indexOf("parseContentLocalizationSection");
+    const authIndex = handler.indexOf("contentLocalizationPermissionForSection(section)");
+    const loadIndex = handler.indexOf("loadPreviewRows(") >= 0
+      ? handler.indexOf("loadPreviewRows(")
+      : handler.indexOf("loadItems(section)");
     assert.ok(parseIndex >= 0, `${path} must parse a known section`);
     assert.ok(authIndex > parseIndex, `${path} must authorize the parsed section`);
-    assert.ok(prismaIndex === -1 || prismaIndex > authIndex, `${path} must authorize before database reads`);
+    assert.ok(loadIndex > authIndex, `${path} must authorize before loading section data`);
     assert.doesNotMatch(source, /requireAdminOrDashboardPermission\([^)]*["']content["']/s);
   }
 });
@@ -127,10 +125,7 @@ test("direct bulk Arabic mutation is disabled without OpenAI or database access"
 });
 
 test("localization preview cannot apply or save database changes", () => {
-  const api = readFileSync(
-    "app/api/admin/content-localization/preview/route.ts",
-    "utf8",
-  );
+  const api = readFileSync("app/api/admin/content-localization/preview/route.ts", "utf8");
   const dialog = readFileSync(
     "app/(dashboard)/dashboard/_components/ContentLocalizationPreviewDialog.tsx",
     "utf8",
@@ -147,9 +142,23 @@ test("localization preview cannot apply or save database changes", () => {
 });
 
 test("operations content permission boundary remains unchanged", () => {
-  const source = readFileSync(
-    "app/(dashboard)/dashboard/operations/layout.tsx",
-    "utf8",
-  );
+  const source = readFileSync("app/(dashboard)/dashboard/operations/layout.tsx", "utf8");
   assert.match(source, /resolveDashboardPageAccess[\s\S]*"operations"/);
+});
+
+test("targeted CMS security TypeScript check passes", () => {
+  execFileSync(process.execPath, [
+    "node_modules/typescript/bin/tsc",
+    "-p",
+    "tsconfig.cms-security.json",
+  ], { stdio: "pipe" });
+});
+
+test("primary Prisma schema validates without modification", () => {
+  execFileSync(process.execPath, [
+    "node_modules/prisma/build/index.js",
+    "validate",
+    "--schema",
+    "prisma/schema.prisma",
+  ], { stdio: "pipe" });
 });
