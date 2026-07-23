@@ -1,11 +1,10 @@
 import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { resolveDashboardFallbackHref } from "@/lib/dashboard/page-access";
 
 export const dynamic = "force-dynamic";
 
-/**
- * The "المؤسسات" (organizations) section was removed from the user-facing Brand Center. The route is
- * kept (not deleted) but redirects to the brand guide so old links keep working.
- */
-export default function BrandOrganizationsPage() {
-  redirect("/dashboard/brand");
+export default async function BrandOrganizationsPage() {
+  redirect(resolveDashboardFallbackHref(await getServerSession(authOptions)));
 }
