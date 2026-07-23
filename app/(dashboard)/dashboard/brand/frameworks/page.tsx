@@ -1,11 +1,7 @@
-import { BrandCenterView } from "../_components/BrandCenterView";
-import { getBrandCenterSnapshot } from "@/lib/brand/brand-service";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "قوالب الرسائل | لوحة التحكم" };
-
-export default async function BrandFrameworksPage() {
-  const snapshot = await getBrandCenterSnapshot();
-  return <BrandCenterView activeTab="frameworks" snapshot={snapshot} />;
+export default function BrandFrameworksPage() {
+  redirect("/dashboard/operations/communication/templates?tab=legacy-frameworks");
 }
