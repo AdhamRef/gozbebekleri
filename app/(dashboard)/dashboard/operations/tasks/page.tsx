@@ -77,7 +77,7 @@ export default async function OperationsTasksPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><PlusCircle className="h-5 w-5 text-[#025EB8]" /> إنشاء مهمة</CardTitle>
           <CardDescription className="leading-6">
-            أضف مهمة يدوية للفريق بدون إرسال أو نشر تلقائي.
+            أضف مهمة يدوية للفريق بدون إرسال أونشر تلقائي.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -122,8 +122,7 @@ export default async function OperationsTasksPage() {
               <OperationTaskQuickEdit taskId={task.id} title={task.title} priority={task.priority} dueLabel={task.dueLabel} canMutate={canMutateTasks} />
 
               <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-200 pt-3 text-xs font-bold">
-                <Link href="/dashboard/archive" className="text-[#025EB8] underline-offset-4 hover:underline">اختيار ملفات من الأرشيف</Link>
-                <Link href="/dashboard/brand" className="text-[#025EB8] underline-offset-4 hover:underline">مراجعة دليل الهوية</Link>
+                <Link href="/dashboard/archive/assets" className="text-[#025EB8] underline-offset-4 hover:underline">اختيار ملفات من الأرشيف</Link>
               </div>
             </div>
           ))}
