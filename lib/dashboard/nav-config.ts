@@ -1,8 +1,7 @@
 import type { DashboardPermissionKey } from "./permissions";
 
-// Sidebar Information Architecture — six practical, owner-facing sections in a fixed order.
-// Every `key` is an existing DashboardPermissionKey and every `href` is a real, existing route.
-// Nothing here configures providers; provider setup lives only under "ربط المنصات والإرسال".
+// Sidebar Information Architecture — practical, permission-gated sections in a fixed order.
+// Provider setup and operational sync stay under "ربط المنصات والإرسال".
 export const DASHBOARD_NAV_GROUPS: {
   group: string;
   items: { key: DashboardPermissionKey; title: string; href: string }[];
@@ -27,7 +26,6 @@ export const DASHBOARD_NAV_GROUPS: {
     ],
   },
   {
-    // Using communication — not configuring providers.
     group: "التواصل",
     items: [
       { key: "operations", title: "مركز التواصل", href: "/dashboard/operations/communication" },
@@ -39,7 +37,16 @@ export const DASHBOARD_NAV_GROUPS: {
     ],
   },
   {
-    // Setup and connections only — do NOT link this section to the communication center.
+    group: "التسويق",
+    items: [
+      { key: "ads", title: "نظرة عامة", href: "/dashboard/marketing" },
+      { key: "ads", title: "أداء الحملات", href: "/dashboard/marketing/performance" },
+      { key: "referrals", title: "الروابط والإسناد", href: "/dashboard/marketing/attribution" },
+      { key: "pixels", title: "التتبع والتحويلات", href: "/dashboard/marketing/tracking" },
+      { key: "ads", title: "التوصيات", href: "/dashboard/marketing/recommendations" },
+    ],
+  },
+  {
     group: "ربط المنصات والإرسال",
     items: [
       { key: "platformConnections", title: "نظرة عامة", href: "/dashboard/platform-connections" },
@@ -86,10 +93,6 @@ export function dashboardHrefToPermissionKey(
   return null;
 }
 
-// Assignable route permissions for the staff permissions table. Kept as an explicit list
-// (one row per key) rather than derived from the sidebar, so reorganizing or hiding a nav
-// item never silently removes a grantable permission. `ads`/`referrals` stay assignable even
-// though the marketing pages are no longer surfaced as primary navigation.
 export const DASHBOARD_PERMISSION_ROWS: {
   key: DashboardPermissionKey;
   group: string;
@@ -104,13 +107,14 @@ export const DASHBOARD_PERMISSION_ROWS: {
   { key: "campaigns", group: "الحملات والتشغيل", title: "المشاريع" },
   { key: "categories", group: "الحملات والتشغيل", title: "الحملات والدول" },
   { key: "blog", group: "الحملات والتشغيل", title: "المدونة" },
+  { key: "ads", group: "التسويق", title: "عرض أداء التسويق والتوصيات" },
+  { key: "referrals", group: "التسويق", title: "إدارة الروابط والإسناد" },
+  { key: "pixels", group: "التسويق", title: "عرض التتبع والتحويلات" },
   { key: "platformConnections", group: "ربط المنصات والإرسال", title: "ربط المنصات والإرسال" },
   { key: "brand", group: "الهوية", title: "الهوية" },
   { key: "team", group: "الإدارة", title: "الفريق" },
   { key: "generalSettings", group: "الإدارة", title: "الإعدادات" },
   { key: "logs", group: "الإدارة", title: "السجلات المتقدمة" },
-  { key: "ads", group: "النمو والتسويق", title: "مركز التسويق" },
-  { key: "referrals", group: "النمو والتسويق", title: "الحملات والروابط" },
 ];
 
 export const ACTION_PERMISSION_ROWS: {
