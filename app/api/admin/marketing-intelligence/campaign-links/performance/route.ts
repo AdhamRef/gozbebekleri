@@ -14,7 +14,7 @@ function numberParam(request: NextRequest, key: string, fallback: number, min: n
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
-  const denied = requireAdminOrDashboardPermission(session, "ads");
+  const denied = requireAdminOrDashboardPermission(session, "referrals");
   if (denied) return denied;
 
   const days = numberParam(request, "days", 7, 1, 90);
