@@ -1,4 +1,6 @@
 {
+  "installCommand": "npm ci --include=dev --force",
+  "buildCommand": "bash scripts/run-integration-settings-migration-build.sh",
   "crons": [
     {
       "path": "/api/cron/exchange-rates",
