@@ -25,6 +25,21 @@ function money(candidate: DonorReactivationCandidate) {
   return `${candidate.lastDonationAmount.toLocaleString("en-US", { maximumFractionDigits: 2 })} ${candidate.lastDonationCurrency}`;
 }
 
+function maskEmail(value: string | null) {
+  if (!value) return "لا يوجد بريد";
+  const [local, domain] = value.split("@");
+  if (!domain) return "••••";
+  const visible = local.slice(0, Math.min(2, local.length));
+  return `${visible}${"•".repeat(Math.max(3, local.length - visible.length))}@${domain}`;
+}
+
+function maskPhone(value: string | null) {
+  if (!value) return "لا يوجد هاتف";
+  const digits = value.replace(/\D/g, "");
+  if (digits.length < 4) return "••••";
+  return `${"•".repeat(Math.max(4, digits.length - 4))}${digits.slice(-4)}`;
+}
+
 export default async function DonorReactivationPage() {
   const overview = await getDonorReactivationOverview();
   const canMutate = overview.persistence.mode === "prisma" && !overview.persistence.readOnly;
@@ -40,6 +55,7 @@ export default async function DonorReactivationPage() {
           </p>
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
             <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">بدون إرسال تلقائي</span>
+            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">بيانات الاتصال مخفية افتراضيًا</span>
           </div>
         </div>
         <Link href="/dashboard/operations/tasks" className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-bold text-[#025EB8] shadow-sm hover:bg-white/90">
@@ -104,8 +120,8 @@ export default async function DonorReactivationPage() {
               </div>
 
               <div className="mt-4 grid gap-2 text-sm leading-6 text-slate-600 md:grid-cols-2">
-                <span className="flex items-center gap-2"><Mail className="h-4 w-4 text-[#025EB8]" /> {candidate.donorEmail ?? "لا يوجد بريد"}</span>
-                <span className="flex items-center gap-2"><MessageCircle className="h-4 w-4 text-[#025EB8]" /> {candidate.donorPhone ?? "لا يوجد هاتف"}</span>
+                <span className="flex items-center gap-2"><Mail className="h-4 w-4 text-[#025EB8]" /> {maskEmail(candidate.donorEmail)}</span>
+                <span className="flex items-center gap-2"><MessageCircle className="h-4 w-4 text-[#025EB8]" /> {maskPhone(candidate.donorPhone)}</span>
                 <span>اللغة: <b>{candidate.locale}</b></span>
                 <span>الدولة: <b>{candidate.country ?? "غير محدد"}</b></span>
               </div>
