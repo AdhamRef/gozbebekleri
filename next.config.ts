@@ -1,32 +1,62 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 
-// Must match a file that exists at project root (i18n/request.ts)
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
-/** @type {import('next').NextConfig} */
+const marketingRedirects = [
+  ["/dashboard/marketing/ai-assistant", "/dashboard/marketing/recommendations"],
+  ["/dashboard/marketing/campaign-links", "/dashboard/marketing/attribution"],
+  ["/dashboard/marketing/campaign-links/:id", "/dashboard/marketing/attribution?linkId=:id"],
+  ["/dashboard/marketing/campaign-operating-center", "/dashboard/marketing/attribution"],
+  ["/dashboard/marketing/command-center", "/dashboard/marketing"],
+  ["/dashboard/marketing/connections", "/dashboard/platform-connections/ad-accounts"],
+  ["/dashboard/marketing/connections/catalog", "/dashboard/platform-connections/ad-accounts"],
+  ["/dashboard/marketing/connections/health", "/dashboard/platform-connections/health"],
+  ["/dashboard/marketing/data-sync", "/dashboard/platform-connections/ad-accounts"],
+  ["/dashboard/marketing/google-ads", "/dashboard/marketing/performance"],
+  ["/dashboard/marketing/insights", "/dashboard/marketing/recommendations"],
+  ["/dashboard/marketing/quality", "/dashboard/marketing/tracking"],
+  ["/dashboard/marketing/results", "/dashboard/marketing/performance"],
+  ["/dashboard/marketing/sync-log", "/dashboard/platform-connections/logs"],
+  ["/dashboard/marketing/tracking-hub", "/dashboard/marketing/tracking"],
+  ["/dashboard/marketing-intelligence", "/dashboard/marketing"],
+  ["/dashboard/marketing-intelligence/action-items", "/dashboard/marketing/recommendations"],
+  ["/dashboard/marketing-intelligence/ads-recommendations", "/dashboard/marketing/recommendations"],
+  ["/dashboard/marketing-intelligence/attribution-verification", "/dashboard/marketing/attribution"],
+  ["/dashboard/marketing-intelligence/audit", "/dashboard/marketing/tracking"],
+  ["/dashboard/marketing-intelligence/budget-decisions", "/dashboard/marketing/recommendations"],
+  ["/dashboard/marketing-intelligence/budget-recommendations", "/dashboard/marketing/recommendations"],
+  ["/dashboard/marketing-intelligence/campaign-links", "/dashboard/marketing/attribution"],
+  ["/dashboard/marketing-intelligence/campaign-links/health", "/dashboard/marketing/attribution"],
+  ["/dashboard/marketing-intelligence/conversion-value-audit", "/dashboard/marketing/tracking"],
+  ["/dashboard/marketing-intelligence/data", "/dashboard/marketing/performance"],
+  ["/dashboard/marketing-intelligence/decisions", "/dashboard/marketing/recommendations"],
+  ["/dashboard/marketing-intelligence/executive-overview", "/dashboard/marketing"],
+  ["/dashboard/marketing-intelligence/final-readiness", "/dashboard/marketing/recommendations"],
+  ["/dashboard/marketing-intelligence/launch-readiness", "/dashboard/marketing/recommendations"],
+  ["/dashboard/marketing-intelligence/meta-sync", "/dashboard/platform-connections/ad-accounts"],
+  ["/dashboard/marketing-intelligence/platform-metrics", "/dashboard/marketing/performance"],
+  ["/dashboard/marketing-intelligence/platform-metrics/import", "/dashboard/platform-connections/ad-accounts"],
+  ["/dashboard/marketing-intelligence/platform-status", "/dashboard/platform-connections"],
+  ["/dashboard/marketing-intelligence/platform-sync", "/dashboard/platform-connections/ad-accounts"],
+  ["/dashboard/marketing-intelligence/repair-center", "/dashboard/marketing/tracking"],
+  ["/dashboard/marketing-intelligence/site-vs-platform", "/dashboard/marketing/attribution"],
+  ["/dashboard/marketing-intelligence/system-map", "/dashboard/marketing"],
+  ["/dashboard/marketing-intelligence/test-checklist", "/dashboard/marketing/tracking"],
+  ["/dashboard/link-generator", "/dashboard/marketing/attribution#builder"],
+  ["/dashboard/conversion-events", "/dashboard/marketing/tracking"],
+  ["/dashboard/conversion-events/timeline", "/dashboard/marketing/tracking"],
+  ["/dashboard/conversion-events/retry-truth", "/dashboard/marketing/tracking"],
+] as const;
+
 const nextConfig: NextConfig = {
   experimental: {
-    // Tree-shake big icon / motion libraries so only the icons actually used hit the bundle.
-    // Without this, `import { Heart } from "lucide-react"` pulls in the entire icon set.
-    optimizePackageImports: [
-      "lucide-react",
-      "framer-motion",
-      "motion",
-      "@radix-ui/react-icons",
-      "date-fns",
-      "react-use",
-    ],
-    // Inline above-the-fold CSS into <head> via Beasties and async-load the rest, so the
-    // 24.9 KiB global Tailwind chunk no longer blocks first paint. Cuts render-blocking
-    // CSS time by ~750 ms on slow 4G — directly helps FCP and LCP.
+    optimizePackageImports: ["lucide-react", "framer-motion", "motion", "@radix-ui/react-icons", "date-fns", "react-use"],
     optimizeCss: true,
   },
   images: {
     formats: ["image/avif", "image/webp"],
-    minimumCacheTTL: 2592000, // 30 days
-    // Trim the set of widths the optimizer produces. The defaults include very large widths
-    // (3840) that the homepage never needs and cost cache + bandwidth.
+    minimumCacheTTL: 2592000,
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
     imageSizes: [16, 32, 64, 96, 128, 256, 384],
     remotePatterns: [
@@ -42,69 +72,26 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "division.iium.edu.my" },
     ],
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  devIndicators: {
-    position: 'bottom-right',
-  },
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
+  devIndicators: { position: "bottom-right" },
   reactStrictMode: true,
-  // @usewaypoint/email-builder runs React.createContext at module init.
-  // Externalizing it on the server avoids Next's RSC React shim, which has no createContext.
   serverExternalPackages: ["@usewaypoint/email-builder"],
-  // Strip console.* calls from production bundles (preserve error/warn for prod debugging).
-  compiler: {
-    removeConsole: process.env.NODE_ENV === "production"
-      ? { exclude: ["error", "warn"] }
-      : false,
-  },
-  /** Avoid /subscriptions/[id] shadowing literal "chart" / "stats" segments (legacy URLs). */
+  compiler: { removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error", "warn"] } : false },
   async rewrites() {
     return [
-      {
-        source: "/api/admin/subscriptions/chart",
-        destination: "/api/admin/subscriptions/overview/chart",
-      },
-      {
-        source: "/api/admin/subscriptions/stats",
-        destination: "/api/admin/subscriptions/overview/stats",
-      },
+      { source: "/api/admin/subscriptions/chart", destination: "/api/admin/subscriptions/overview/chart" },
+      { source: "/api/admin/subscriptions/stats", destination: "/api/admin/subscriptions/overview/stats" },
     ];
   },
-  /**
-   * 301 redirects from legacy gozbebekleri.org URLs to preserve Google SEO equity.
-   * Old site was Turkish-only, so targets are the /tr locale.
-   */
   async redirects() {
     return [
-      {
-        source: "/page/biz-kimiz",
-        destination: "/tr/about-us",
-        permanent: true,
-      },
-      {
-        source: "/page/saglik",
-        destination: "/tr",
-        permanent: true,
-      },
-      {
-        source: "/page/yardim",
-        destination: "/tr/contact-us",
-        permanent: true,
-      },
-      {
-        source: "/ar/donates",
-        destination: "/ar/campaigns",
-        permanent: true,
-      },
-      {
-        source: "/donates",
-        destination: "/en/campaigns",
-        permanent: true,
-      },
+      ...marketingRedirects.map(([source, destination]) => ({ source, destination, permanent: false })),
+      { source: "/page/biz-kimiz", destination: "/tr/about-us", permanent: true },
+      { source: "/page/saglik", destination: "/tr", permanent: true },
+      { source: "/page/yardim", destination: "/tr/contact-us", permanent: true },
+      { source: "/ar/donates", destination: "/ar/campaigns", permanent: true },
+      { source: "/donates", destination: "/en/campaigns", permanent: true },
     ];
   },
 };
