@@ -263,7 +263,7 @@ export function ContentLocalizationAuditCard({ section }: { section: Section }) 
 
                 <div className="grid gap-2 sm:grid-cols-3">
                   <SmallMetric label="ترجمات غير موجودة" value={totals.missingRecords} />
-                  <SmallMetric label="حقول ناقصة أوفارغة" value={totals.emptyFields} />
+                  <SmallMetric label="حقول فارغة" value={totals.emptyFields} />
                   <SmallMetric label="حقول مطابقة للعربية" value={totals.identicalFields} />
                 </div>
 
