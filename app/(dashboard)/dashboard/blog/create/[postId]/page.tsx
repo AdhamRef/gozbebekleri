@@ -1,13 +1,11 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import getPost from "@/actions/get-post";
-import { loadDashboardPageData } from "@/lib/dashboard/require-page-permission";
+import { loadBlogEditEditorData } from "@/lib/blog/admin-editor-data";
 import LanguageTabs from "../_components/LanguageTabs";
 
 export const revalidate = 0;
 
-type PostWithRelations = Awaited<ReturnType<typeof getPost>>;
+type PostWithRelations = Awaited<ReturnType<typeof loadBlogEditEditorData>>["post"];
 type TranslationRow = {
   locale: string;
   title?: string | null;
@@ -28,30 +26,7 @@ export default async function PostEditorPage({
   params: Promise<{ postId: string }>;
 }) {
   const { postId } = await params;
-
-  const { post, categories, campaigns } = await loadDashboardPageData(
-    "blog",
-    async () => {
-      const loadedPost = await getPost(postId);
-      if (!loadedPost) {
-        return { post: null, categories: [], campaigns: [] };
-      }
-
-      const [loadedCategories, loadedCampaigns] = await Promise.all([
-        prisma.postCategory.findMany({ orderBy: { name: "asc" } }),
-        prisma.campaign.findMany({
-          select: { id: true, title: true },
-          orderBy: { createdAt: "desc" },
-        }),
-      ]);
-
-      return {
-        post: loadedPost,
-        categories: loadedCategories,
-        campaigns: loadedCampaigns,
-      };
-    },
-  );
+  const { post, categories, campaigns } = await loadBlogEditEditorData(postId);
 
   if (!post) return notFound();
 
