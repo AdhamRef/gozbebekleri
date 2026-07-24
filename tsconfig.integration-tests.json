@@ -31,13 +31,14 @@
     "lib/integration-settings/types.ts",
     "lib/integration-settings/ui-contracts.ts",
     "lib/integration-settings/ui-lifecycle.ts",
-    "lib/integration-settings/validation.ts",
     "lib/communication/cron-auth.ts",
     "lib/dashboard/permissions.ts",
     "lib/dashboard/nav-config.ts",
     "lib/dashboard/page-access.ts",
     "lib/dashboard/page-permission.ts",
     "lib/blog/admin-editor-data-core.ts",
+    "lib/campaign/admin-create-core.ts",
+    "lib/locales.ts",
     "lib/content-localization/access.ts",
     "tests/integration-settings/**/*.ts"
   ]
