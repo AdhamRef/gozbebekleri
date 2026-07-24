@@ -1,6 +1,5 @@
-import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { loadDashboardPageData } from "@/lib/dashboard/require-page-permission";
+import { loadBlogCreateEditorData } from "@/lib/blog/admin-editor-data";
 import LanguageTabs from "./_components/LanguageTabs";
 
 export const revalidate = 0;
@@ -34,15 +33,7 @@ const emptyEditorPost = {
 };
 
 export default async function CreateBlogPage() {
-  const [categories, campaigns] = await loadDashboardPageData("blog", () =>
-    Promise.all([
-      prisma.postCategory.findMany({ orderBy: { name: "asc" } }),
-      prisma.campaign.findMany({
-        select: { id: true, title: true },
-        orderBy: { createdAt: "desc" },
-      }),
-    ]),
-  );
+  const { categories, campaigns } = await loadBlogCreateEditorData();
 
   const categoryOptions = categories.map((category) => ({
     label: category.name,
