@@ -36,6 +36,7 @@
     "lib/dashboard/permissions.ts",
     "lib/dashboard/nav-config.ts",
     "lib/dashboard/page-access.ts",
+    "lib/dashboard/page-permission.ts",
     "lib/content-localization/access.ts",
     "tests/integration-settings/**/*.ts"
   ]
