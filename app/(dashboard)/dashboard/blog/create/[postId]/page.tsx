@@ -1,12 +1,11 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import getPost from "@/actions/get-post";
+import { loadBlogEditEditorData } from "@/lib/blog/admin-editor-data";
 import LanguageTabs from "../_components/LanguageTabs";
 
 export const revalidate = 0;
 
-type PostWithRelations = Awaited<ReturnType<typeof getPost>>;
+type PostWithRelations = Awaited<ReturnType<typeof loadBlogEditEditorData>>["post"];
 type TranslationRow = {
   locale: string;
   title?: string | null;
@@ -17,8 +16,8 @@ type TranslationRow = {
 
 function getTranslations(post: PostWithRelations): TranslationRow[] {
   if (!post || !("translations" in post)) return [];
-  const t = (post as { translations?: TranslationRow[] }).translations;
-  return Array.isArray(t) ? t : [];
+  const translations = (post as { translations?: TranslationRow[] }).translations;
+  return Array.isArray(translations) ? translations : [];
 }
 
 export default async function PostEditorPage({
@@ -27,15 +26,13 @@ export default async function PostEditorPage({
   params: Promise<{ postId: string }>;
 }) {
   const { postId } = await params;
+  const { post, categories, campaigns } = await loadBlogEditEditorData(postId);
 
-  const post = await getPost(postId);
-  if (!post) {
-    return notFound();
-  }
+  if (!post) return notFound();
 
   const translations = getTranslations(post);
-  const trEn = translations.find((t) => t.locale === "en");
-  const trFr = translations.find((t) => t.locale === "fr");
+  const trEn = translations.find((translation) => translation.locale === "en");
+  const trFr = translations.find((translation) => translation.locale === "fr");
 
   const category = post.category
     ? { id: post.category.id, name: (post.category as { name?: string }).name ?? "" }
@@ -69,31 +66,22 @@ export default async function PostEditorPage({
     imageAR: post.image ?? undefined,
     imageEN: trEn?.image ?? undefined,
     imageFR: trFr?.image ?? undefined,
-    translations: translations.map((t) => ({
-      locale: t.locale,
-      title: t.title ?? null,
-      description: t.description ?? null,
-      content: t.content ?? null,
-      image: t.image ?? null,
+    translations: translations.map((translation) => ({
+      locale: translation.locale,
+      title: translation.title ?? null,
+      description: translation.description ?? null,
+      content: translation.content ?? null,
+      image: translation.image ?? null,
     })),
   };
 
-  const categories = await prisma.postCategory.findMany({
-    orderBy: { name: "asc" },
-  });
-
-  const categoryOptions = categories.map((category) => ({
-    label: category.name,
-    value: category.id,
+  const categoryOptions = categories.map((categoryOption) => ({
+    label: categoryOption.name,
+    value: categoryOption.id,
   }));
-
-  const campaigns = await prisma.campaign.findMany({
-    select: { id: true, title: true },
-    orderBy: { createdAt: "desc" },
-  });
-  const campaignOptions = campaigns.map((c) => ({
-    label: c.title,
-    value: c.id,
+  const campaignOptions = campaigns.map((campaign) => ({
+    label: campaign.title,
+    value: campaign.id,
   }));
 
   return (
@@ -105,7 +93,11 @@ export default async function PostEditorPage({
           </CardTitle>
         </CardHeader>
         <CardContent className="p-6">
-          <LanguageTabs post={editorPost} categories={categoryOptions} campaignOptions={campaignOptions} />
+          <LanguageTabs
+            post={editorPost}
+            categories={categoryOptions}
+            campaignOptions={campaignOptions}
+          />
         </CardContent>
       </Card>
     </div>

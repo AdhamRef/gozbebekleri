@@ -1,5 +1,5 @@
-import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { loadBlogCreateEditorData } from "@/lib/blog/admin-editor-data";
 import LanguageTabs from "./_components/LanguageTabs";
 
 export const revalidate = 0;
@@ -33,18 +33,15 @@ const emptyEditorPost = {
 };
 
 export default async function CreateBlogPage() {
-  const [categories, campaigns] = await Promise.all([
-    prisma.postCategory.findMany({ orderBy: { name: "asc" } }),
-    prisma.campaign.findMany({ select: { id: true, title: true }, orderBy: { createdAt: "desc" } }),
-  ]);
+  const { categories, campaigns } = await loadBlogCreateEditorData();
 
   const categoryOptions = categories.map((category) => ({
     label: category.name,
     value: category.id,
   }));
-  const campaignOptions = campaigns.map((c) => ({
-    label: c.title,
-    value: c.id,
+  const campaignOptions = campaigns.map((campaign) => ({
+    label: campaign.title,
+    value: campaign.id,
   }));
 
   return (

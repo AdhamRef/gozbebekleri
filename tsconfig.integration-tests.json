@@ -8,7 +8,11 @@
     "skipLibCheck": true,
     "outDir": ".integration-test-build",
     "rootDir": ".",
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    }
   },
   "include": [
     "types/next-auth.d.ts",
@@ -30,6 +34,11 @@
     "lib/integration-settings/validation.ts",
     "lib/communication/cron-auth.ts",
     "lib/dashboard/permissions.ts",
+    "lib/dashboard/nav-config.ts",
+    "lib/dashboard/page-access.ts",
+    "lib/dashboard/page-permission.ts",
+    "lib/blog/admin-editor-data-core.ts",
+    "lib/content-localization/access.ts",
     "tests/integration-settings/**/*.ts"
   ]
 }
