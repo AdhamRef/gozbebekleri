@@ -28,6 +28,23 @@ const LOCALE_LABELS: Record<string, string> = {
   de: "الألمانية",
 };
 
+const LOCALE_SHORT: Record<string, string> = {
+  en: "EN",
+  fr: "FR",
+  tr: "TR",
+  id: "ID",
+  pt: "PT",
+  es: "ES",
+  de: "DE",
+};
+
+const FIELD_LABELS: Record<string, string> = {
+  title: "العنوان",
+  name: "الاسم",
+  description: "الوصف",
+  content: "المحتوى",
+};
+
 const SECTION_LABELS = {
   campaigns: "المشاريع",
   categories: "الحملات",
@@ -43,23 +60,57 @@ type LocaleSummary = {
   identicalToArabicFields: number;
 };
 
+type LocaleStatus = {
+  exists: boolean;
+  complete: boolean;
+  missingFields: string[];
+  emptyFields: string[];
+  identicalToArabicFields: string[];
+};
+
+type AuditItem = {
+  id: string;
+  label: string;
+  typeLabel: string;
+  arabicQualityIssues: Array<{
+    field: string;
+    rule: string;
+    suggestion: string;
+  }>;
+  localeStatus: Record<string, LocaleStatus>;
+};
+
 type AuditResponse = {
   ok: boolean;
   section: Section;
   targetLocales: string[];
+  generatedAt: string;
   summary: {
     totalItems: number;
     arabicQualityIssues: number;
     byLocale: Record<string, LocaleSummary>;
   };
-  items: Array<{
-    id: string;
-    label: string;
-    typeLabel: string;
-    arabicQualityIssues: Array<{ suggestion: string }>;
-    localeStatus: Record<string, { complete: boolean; exists: boolean }>;
-  }>;
+  items: AuditItem[];
 };
+
+function fieldNames(fields: string[]): string {
+  return fields.map((field) => FIELD_LABELS[field] || field).join("، ");
+}
+
+function issueText(locale: string, status: LocaleStatus): string {
+  const reasons: string[] = [];
+  if (!status.exists) reasons.push("الترجمة غير موجودة");
+  if (status.emptyFields.length) {
+    reasons.push(`حقول فارغة: ${fieldNames(status.emptyFields)}`);
+  }
+  if (status.missingFields.length) {
+    reasons.push(`حقول ناقصة: ${fieldNames(status.missingFields)}`);
+  }
+  if (status.identicalToArabicFields.length) {
+    reasons.push(`مطابق للعربية: ${fieldNames(status.identicalToArabicFields)}`);
+  }
+  return `${LOCALE_LABELS[locale] || locale}: ${reasons.join("، ")}`;
+}
 
 function completionPercent(total: number, incomplete: number): number {
   if (!total) return 100;
@@ -70,6 +121,7 @@ export function ContentLocalizationAuditCard({ section }: { section: Section }) 
   const [data, setData] = useState<AuditResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [itemsOpen, setItemsOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -102,11 +154,24 @@ export function ContentLocalizationAuditCard({ section }: { section: Section }) 
         (sum, item) => sum + item.incompleteItems,
         0,
       ),
+      missingRecords: localeSummaries.reduce(
+        (sum, item) => sum + item.missingRecords,
+        0,
+      ),
+      emptyFields: localeSummaries.reduce(
+        (sum, item) => sum + item.emptyFields,
+        0,
+      ),
+      identicalFields: localeSummaries.reduce(
+        (sum, item) => sum + item.identicalToArabicFields,
+        0,
+      ),
       arabicIssues: data?.summary.arabicQualityIssues || 0,
     };
   }, [data]);
 
   const hasIssues = totals.incomplete > 0 || totals.arabicIssues > 0;
+  const visibleItems = data?.items || [];
 
   return (
     <>
@@ -161,7 +226,7 @@ export function ContentLocalizationAuditCard({ section }: { section: Section }) 
             </div>
 
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">
-              <strong>التعديل الجماعي المباشر متوقف مؤقتًا.</strong> لا يتم إرسال دفعات للتدقيق أوحفظ أي نص تلقائيًا حتى اكتمال مسار Preview → Review → Approve → Apply → Rollback.
+              <strong>التعديل الجماعي المباشر متوقف مؤقتًا.</strong> المعاينة لا تحفظ أي نص، ولا يوجد Save أوApply حتى اكتمال مسار Preview → Review → Approve → Apply → Rollback.
             </div>
 
             {error ? (
@@ -191,9 +256,15 @@ export function ContentLocalizationAuditCard({ section }: { section: Section }) 
                   />
                   <Metric
                     icon={<SearchCheck className="h-4 w-4 text-purple-600" />}
-                    label="ملاحظات العربية"
+                    label="ملاحظات جودة العربية"
                     value={totals.arabicIssues}
                   />
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <SmallMetric label="ترجمات غير موجودة" value={totals.missingRecords} />
+                  <SmallMetric label="حقول ناقصة أوفارغة" value={totals.emptyFields} />
+                  <SmallMetric label="حقول مطابقة للعربية" value={totals.identicalFields} />
                 </div>
 
                 <div className={`rounded-xl border p-3 ${hasIssues ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
@@ -222,6 +293,66 @@ export function ContentLocalizationAuditCard({ section }: { section: Section }) 
                       </div>
                     );
                   })}
+                </div>
+
+                <div className="rounded-xl border bg-white p-3">
+                  <button
+                    type="button"
+                    onClick={() => setItemsOpen((value) => !value)}
+                    className="flex w-full items-center justify-between text-right"
+                  >
+                    <span className="text-sm font-semibold">
+                      العناصر التي تحتاج عملًا ({visibleItems.length})
+                    </span>
+                    {itemsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+
+                  {itemsOpen ? (
+                    <div className="mt-3 max-h-96 space-y-2 overflow-y-auto pr-1">
+                      {visibleItems.length ? visibleItems.map((item) => {
+                        const incompleteLocales = Object.entries(item.localeStatus)
+                          .filter(([, status]) => !status.complete);
+                        return (
+                          <div key={`${item.typeLabel}-${item.id}`} className="rounded-lg border bg-slate-50 p-3 text-sm">
+                            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                              <div className="min-w-0">
+                                <p className="truncate font-medium">{item.label}</p>
+                                <p className="text-xs text-muted-foreground">{item.typeLabel}</p>
+                              </div>
+                              <div className="flex flex-wrap gap-1 lg:justify-end">
+                                {incompleteLocales.map(([locale, status]) => (
+                                  <span
+                                    key={locale}
+                                    className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700"
+                                    title={issueText(locale, status)}
+                                  >
+                                    {LOCALE_SHORT[locale] || locale}: {!status.exists ? "غير موجود" : "غير مكتمل"}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+
+                            {incompleteLocales.length ? (
+                              <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                                {incompleteLocales.map(([locale, status]) => (
+                                  <div key={locale}>• {issueText(locale, status)}</div>
+                                ))}
+                              </div>
+                            ) : null}
+
+                            {item.arabicQualityIssues.length ? (
+                              <div className="mt-2 rounded-md bg-purple-50 px-2 py-1 text-xs text-purple-700">
+                                <strong>ملاحظات جودة العربية:</strong>{" "}
+                                {item.arabicQualityIssues.map((issue) => issue.suggestion).join("، ")}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      }) : (
+                        <p className="text-sm text-muted-foreground">لا توجد عناصر تحتاج عملًا في الفحص الحالي.</p>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
               </>
             ) : null}
@@ -252,6 +383,15 @@ function Metric({
     <div className="rounded-xl border bg-white p-3">
       <div className="flex items-center gap-2 text-sm font-semibold">{icon}{label}</div>
       <div className="mt-2 text-2xl font-bold">{value}</div>
+    </div>
+  );
+}
+
+function SmallMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border bg-white px-3 py-2 text-sm">
+      <span className="text-muted-foreground">{label}: </span>
+      <strong>{value}</strong>
     </div>
   );
 }
