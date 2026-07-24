@@ -17,8 +17,6 @@
     "app/(dashboard)/dashboard/campaigns/layout.tsx",
     "app/(dashboard)/dashboard/categories/layout.tsx",
     "app/(dashboard)/dashboard/blog/layout.tsx",
-    "app/(dashboard)/dashboard/blog/create/page.tsx",
-    "app/(dashboard)/dashboard/blog/create/[postId]/page.tsx",
     "app/(dashboard)/dashboard/_components/ContentLocalizationAuditCard.tsx",
     "app/(dashboard)/dashboard/_components/ContentLocalizationPreviewDialog.tsx",
     "app/api/admin/content-localization/audit/route.ts",
