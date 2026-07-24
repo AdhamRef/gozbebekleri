@@ -8,6 +8,7 @@ import {
   createDashboardPageDataLoader,
   createDashboardPagePermissionGuard,
 } from "../../lib/dashboard/page-permission";
+import { createBlogAdminEditorDataLoaders } from "../../lib/blog/admin-editor-data-core";
 import {
   contentLocalizationPermissionForSection,
   parseContentLocalizationSection,
@@ -43,6 +44,35 @@ function guardedLoaderFor(session: Session | null) {
     },
   );
   return createDashboardPageDataLoader(guard);
+}
+
+function blogEditorLoadersFor(session: Session | null) {
+  let getPostCalls = 0;
+  let postCategoryReads = 0;
+  let campaignReads = 0;
+  const guardedLoad = guardedLoaderFor(session);
+
+  const loaders = createBlogAdminEditorDataLoaders({
+    loadDashboardPageData: (permission, loader) =>
+      guardedLoad(permission, async () => loader()),
+    getPost: async (postId: string) => {
+      getPostCalls += 1;
+      return { id: postId };
+    },
+    loadCategories: async () => {
+      postCategoryReads += 1;
+      return [{ id: "category-1", name: "Category" }];
+    },
+    loadCampaigns: async () => {
+      campaignReads += 1;
+      return [{ id: "campaign-1", title: "Campaign" }];
+    },
+  });
+
+  return {
+    ...loaders,
+    calls: () => ({ getPostCalls, postCategoryReads, campaignReads }),
+  };
 }
 
 const protectedSections = ["campaigns", "categories", "blog"] as const;
@@ -82,86 +112,105 @@ test("admin can enter campaigns categories and blog", () => {
   }
 });
 
-test("denied sessions redirect before data loaders or Prisma mocks run", async () => {
+test("denied users cannot start blog create or edit data reads", async () => {
   for (const deniedSession of [
     null,
     sessionFor("DONOR"),
     sessionFor("STAFF", ["campaigns"]),
   ]) {
-    let loaderCalls = 0;
-    let postCategoryReads = 0;
-    let campaignReads = 0;
-    const prismaMock = {
-      postCategory: {
-        findMany: async () => {
-          postCategoryReads += 1;
-          return [];
-        },
-      },
-      campaign: {
-        findMany: async () => {
-          campaignReads += 1;
-          return [];
-        },
-      },
-    };
-
-    const loadDashboardPageData = guardedLoaderFor(deniedSession);
+    const createLoaders = blogEditorLoadersFor(deniedSession);
     await assert.rejects(
-      loadDashboardPageData("blog", async () => {
-        loaderCalls += 1;
-        await Promise.all([
-          prismaMock.postCategory.findMany(),
-          prismaMock.campaign.findMany(),
-        ]);
-        return true;
-      }),
+      createLoaders.loadBlogCreateEditorData(),
       RedirectSignal,
     );
+    assert.deepEqual(createLoaders.calls(), {
+      getPostCalls: 0,
+      postCategoryReads: 0,
+      campaignReads: 0,
+    });
 
-    assert.equal(loaderCalls, 0);
-    assert.equal(postCategoryReads, 0);
-    assert.equal(campaignReads, 0);
+    const editLoaders = blogEditorLoadersFor(deniedSession);
+    await assert.rejects(
+      editLoaders.loadBlogEditEditorData("post-1"),
+      RedirectSignal,
+    );
+    assert.deepEqual(editLoaders.calls(), {
+      getPostCalls: 0,
+      postCategoryReads: 0,
+      campaignReads: 0,
+    });
   }
 });
 
-test("admin and staff with the exact permission can run guarded data loaders", async () => {
+test("admin and staff with blog permission can load blog editor data", async () => {
   for (const allowedSession of [
     sessionFor("ADMIN"),
     sessionFor("STAFF", ["blog"]),
   ]) {
-    let loaderCalls = 0;
-    let prismaReads = 0;
-    const loadDashboardPageData = guardedLoaderFor(allowedSession);
-    const result = await loadDashboardPageData("blog", async (session) => {
-      loaderCalls += 1;
-      prismaReads += 2;
-      return session.user.role;
+    const createLoaders = blogEditorLoadersFor(allowedSession);
+    const createData = await createLoaders.loadBlogCreateEditorData();
+    assert.equal(createData.categories.length, 1);
+    assert.equal(createData.campaigns.length, 1);
+    assert.deepEqual(createLoaders.calls(), {
+      getPostCalls: 0,
+      postCategoryReads: 1,
+      campaignReads: 1,
     });
 
-    assert.equal(loaderCalls, 1);
-    assert.equal(prismaReads, 2);
-    assert.equal(result, allowedSession?.user?.role);
+    const editLoaders = blogEditorLoadersFor(allowedSession);
+    const editData = await editLoaders.loadBlogEditEditorData("post-1");
+    assert.equal(editData.post?.id, "post-1");
+    assert.equal(editData.categories.length, 1);
+    assert.equal(editData.campaigns.length, 1);
+    assert.deepEqual(editLoaders.calls(), {
+      getPostCalls: 1,
+      postCategoryReads: 1,
+      campaignReads: 1,
+    });
   }
 });
 
-test("layouts remain an additional defense while blog reads use the page data guard", () => {
+test("layouts remain defense in depth and pages use only editor data loaders", () => {
   for (const permission of protectedSections) {
     const layout = readFileSync(
       `app/(dashboard)/dashboard/${permission}/layout.tsx`,
       "utf8",
     );
     assert.match(layout, /requireDashboardPagePermission/);
-    assert.match(layout, new RegExp(`requireDashboardPagePermission\\(\"${permission}\"\\)`));
+    assert.match(layout, new RegExp(`requireDashboardPagePermission\\("${permission}"\\)`));
   }
 
-  for (const path of [
+  const createPage = readFileSync(
     "app/(dashboard)/dashboard/blog/create/page.tsx",
+    "utf8",
+  );
+  const editPage = readFileSync(
     "app/(dashboard)/dashboard/blog/create/[postId]/page.tsx",
-  ]) {
-    const source = readFileSync(path, "utf8");
-    assert.match(source, /loadDashboardPageData\(\s*"blog"/);
-  }
+    "utf8",
+  );
+  assert.match(createPage, /loadBlogCreateEditorData\(\)/);
+  assert.match(editPage, /loadBlogEditEditorData\(postId\)/);
+  assert.doesNotMatch(createPage, /prisma\.|getPost|loadDashboardPageData/);
+  assert.doesNotMatch(editPage, /prisma\.|getPost|loadDashboardPageData/);
+});
+
+test("server-only editor data module owns protected Prisma and getPost reads", () => {
+  const source = readFileSync("lib/blog/admin-editor-data.ts", "utf8");
+  assert.match(source, /import "server-only"/);
+  assert.match(source, /loadDashboardPageData/);
+  assert.match(source, /getPost/);
+  assert.match(source, /prisma\.postCategory\.findMany/);
+  assert.match(source, /prisma\.campaign\.findMany/);
+  assert.match(source, /loadBlogCreateEditorData/);
+  assert.match(source, /loadBlogEditEditorData/);
+});
+
+test("targeted TypeScript scope includes editor data without legacy editor pages", () => {
+  const tsconfig = readFileSync("tsconfig.cms-security.json", "utf8");
+  assert.match(tsconfig, /lib\/blog\/admin-editor-data\.ts/);
+  assert.match(tsconfig, /lib\/blog\/admin-editor-data-core\.ts/);
+  assert.doesNotMatch(tsconfig, /dashboard\/blog\/create\/page\.tsx/);
+  assert.doesNotMatch(tsconfig, /dashboard\/blog\/create\/\[postId\]\/page\.tsx/);
 });
 
 test("localization sections map only to existing section permissions", () => {
@@ -233,6 +282,8 @@ test("read-only localization audit retains actionable item details", () => {
   assert.match(card, /emptyFields/);
   assert.match(card, /identicalToArabicFields/);
   assert.match(card, /ملاحظات جودة العربية/);
+  assert.match(card, /label="حقول فارغة" value=\{totals\.emptyFields\}/);
+  assert.doesNotMatch(card, /حقول ناقصة أوفارغة/);
 });
 
 test("operations content permission boundary remains unchanged", () => {
