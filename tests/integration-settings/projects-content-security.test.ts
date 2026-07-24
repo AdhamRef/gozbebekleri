@@ -5,6 +5,10 @@ import { execFileSync } from "node:child_process";
 import type { Session } from "next-auth";
 import { resolveDashboardPageAccess } from "../../lib/dashboard/page-access";
 import {
+  createDashboardPageDataLoader,
+  createDashboardPagePermissionGuard,
+} from "../../lib/dashboard/page-permission";
+import {
   contentLocalizationPermissionForSection,
   parseContentLocalizationSection,
 } from "../../lib/content-localization/access";
@@ -23,6 +27,22 @@ function sessionFor(
       dashboardPermissions: permissions,
     },
   } as Session;
+}
+
+class RedirectSignal extends Error {
+  constructor(readonly redirectTo: string) {
+    super(`redirect:${redirectTo}`);
+  }
+}
+
+function guardedLoaderFor(session: Session | null) {
+  const guard = createDashboardPagePermissionGuard(
+    async () => session,
+    (redirectTo) => {
+      throw new RedirectSignal(redirectTo);
+    },
+  );
+  return createDashboardPageDataLoader(guard);
 }
 
 const protectedSections = ["campaigns", "categories", "blog"] as const;
@@ -62,29 +82,86 @@ test("admin can enter campaigns categories and blog", () => {
   }
 });
 
-test("section layouts enforce permission before rendering nested server pages", () => {
-  for (const permission of protectedSections) {
-    const path = `app/(dashboard)/dashboard/${permission}/layout.tsx`;
-    const source = readFileSync(path, "utf8");
-    const guardIndex = source.indexOf("resolveDashboardPageAccess");
-    const permissionIndex = source.indexOf(`\"${permission}\"`);
-    const redirectIndex = source.indexOf("redirect(access.redirectTo)");
-    const childrenIndex = source.indexOf("return children");
-    assert.ok(guardIndex >= 0, `${path} must resolve server access`);
-    assert.ok(permissionIndex > guardIndex, `${path} must require ${permission}`);
-    assert.ok(redirectIndex > permissionIndex, `${path} must redirect denied users`);
-    assert.ok(childrenIndex > redirectIndex, `${path} must not render children before redirect`);
+test("denied sessions redirect before data loaders or Prisma mocks run", async () => {
+  for (const deniedSession of [
+    null,
+    sessionFor("DONOR"),
+    sessionFor("STAFF", ["campaigns"]),
+  ]) {
+    let loaderCalls = 0;
+    let postCategoryReads = 0;
+    let campaignReads = 0;
+    const prismaMock = {
+      postCategory: {
+        findMany: async () => {
+          postCategoryReads += 1;
+          return [];
+        },
+      },
+      campaign: {
+        findMany: async () => {
+          campaignReads += 1;
+          return [];
+        },
+      },
+    };
+
+    const loadDashboardPageData = guardedLoaderFor(deniedSession);
+    await assert.rejects(
+      loadDashboardPageData("blog", async () => {
+        loaderCalls += 1;
+        await Promise.all([
+          prismaMock.postCategory.findMany(),
+          prismaMock.campaign.findMany(),
+        ]);
+        return true;
+      }),
+      RedirectSignal,
+    );
+
+    assert.equal(loaderCalls, 0);
+    assert.equal(postCategoryReads, 0);
+    assert.equal(campaignReads, 0);
   }
 });
 
-test("blog create and edit data reads remain nested behind the blog server guard", () => {
-  const layout = readFileSync("app/(dashboard)/dashboard/blog/layout.tsx", "utf8");
-  const create = readFileSync("app/(dashboard)/dashboard/blog/create/page.tsx", "utf8");
-  const edit = readFileSync("app/(dashboard)/dashboard/blog/create/[postId]/page.tsx", "utf8");
-  assert.match(layout, /resolveDashboardPageAccess[\s\S]*"blog"/);
-  assert.match(layout, /redirect\(access\.redirectTo\)[\s\S]*return children/);
-  assert.match(create, /prisma\.(postCategory|campaign)\.findMany/);
-  assert.match(edit, /(getPost\(|prisma\.(postCategory|campaign)\.findMany)/);
+test("admin and staff with the exact permission can run guarded data loaders", async () => {
+  for (const allowedSession of [
+    sessionFor("ADMIN"),
+    sessionFor("STAFF", ["blog"]),
+  ]) {
+    let loaderCalls = 0;
+    let prismaReads = 0;
+    const loadDashboardPageData = guardedLoaderFor(allowedSession);
+    const result = await loadDashboardPageData("blog", async (session) => {
+      loaderCalls += 1;
+      prismaReads += 2;
+      return session.user.role;
+    });
+
+    assert.equal(loaderCalls, 1);
+    assert.equal(prismaReads, 2);
+    assert.equal(result, allowedSession?.user?.role);
+  }
+});
+
+test("layouts remain an additional defense while blog reads use the page data guard", () => {
+  for (const permission of protectedSections) {
+    const layout = readFileSync(
+      `app/(dashboard)/dashboard/${permission}/layout.tsx`,
+      "utf8",
+    );
+    assert.match(layout, /requireDashboardPagePermission/);
+    assert.match(layout, new RegExp(`requireDashboardPagePermission\\(\"${permission}\"\\)`));
+  }
+
+  for (const path of [
+    "app/(dashboard)/dashboard/blog/create/page.tsx",
+    "app/(dashboard)/dashboard/blog/create/[postId]/page.tsx",
+  ]) {
+    const source = readFileSync(path, "utf8");
+    assert.match(source, /loadDashboardPageData\(\s*"blog"/);
+  }
 });
 
 test("localization sections map only to existing section permissions", () => {
@@ -142,6 +219,20 @@ test("localization preview cannot apply or save database changes", () => {
   assert.doesNotMatch(api, /\.update\(|\.upsert\(|\.create\(|\.delete\(/);
   assert.doesNotMatch(dialog, /saveRows|حفظ بعد التدقيق|rows:\s*changedRows/);
   assert.doesNotMatch(card, /arabic-bulk-proofread|تدقيق العربي بالكامل/);
+});
+
+test("read-only localization audit retains actionable item details", () => {
+  const card = readFileSync(
+    "app/(dashboard)/dashboard/_components/ContentLocalizationAuditCard.tsx",
+    "utf8",
+  );
+  assert.match(card, /العناصر التي تحتاج عملًا/);
+  assert.match(card, /item\.label/);
+  assert.match(card, /item\.typeLabel/);
+  assert.match(card, /missingFields/);
+  assert.match(card, /emptyFields/);
+  assert.match(card, /identicalToArabicFields/);
+  assert.match(card, /ملاحظات جودة العربية/);
 });
 
 test("operations content permission boundary remains unchanged", () => {
