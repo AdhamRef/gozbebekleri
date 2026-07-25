@@ -29,6 +29,15 @@ export async function uploadDashboardMedia(
   return asset;
 }
 
+export async function uploadDashboardMediaRequest(
+  formData: FormData,
+  scope: MediaScope,
+): Promise<{ data: DashboardMediaAsset }> {
+  const file = formData.get("file");
+  if (!(file instanceof File)) throw new Error("Upload form is missing a file");
+  return { data: await uploadDashboardMedia(file, scope) };
+}
+
 export function pendingDashboardAsset(url: string): DashboardMediaAsset | null {
   return pendingAssets.get(url) ?? null;
 }
