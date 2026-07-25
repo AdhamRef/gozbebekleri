@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import axios from "axios";
 import { toast } from "react-hot-toast";
 import { Loader2, Upload, X } from "lucide-react";
 import Image from "next/image";
@@ -16,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import WysiwygEditor from "@/app/[locale]/blog/_components/wysiwyg/wysiwyg-editor";
 import { defaultEditorContent } from "@/app/[locale]/blog/_components/wysiwyg/default-content";
+import { deleteUnsavedDashboardMedia, uploadDashboardMedia } from "@/lib/media/client";
 import { useCreateTranslations, type BufferedLocale } from "./CreateTranslationsContext";
 import { SmartSeoAuditCard } from "../../../_components/SmartSeoAuditCard";
 
@@ -50,10 +50,8 @@ export default function BlogLocaleBufferEditor({ locale }: { locale: BufferedLoc
     if (!file) return;
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const response = await axios.post("/api/upload", formData);
-      setImage(response.data?.url ?? "");
+      const asset = await uploadDashboardMedia(file, "blog");
+      setImage(asset.url);
       toast.success("تم رفع الصورة بنجاح");
     } catch (err) {
       console.error("Image upload error:", err);
@@ -63,13 +61,8 @@ export default function BlogLocaleBufferEditor({ locale }: { locale: BufferedLoc
     }
   };
 
-  const removeImage = () => {
-    if (image) {
-      const publicId = image.split("/").slice(-1)[0].split(".")[0];
-      if (publicId) {
-        axios.delete(`/api/upload?publicId=${publicId}`).catch(() => {});
-      }
-    }
+  const removeImage = async () => {
+    if (image) await deleteUnsavedDashboardMedia(image, "blog").catch(() => false);
     setImage("");
   };
 
@@ -131,7 +124,7 @@ export default function BlogLocaleBufferEditor({ locale }: { locale: BufferedLoc
               <>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp"
                   onChange={handleImageUpload}
                   className="hidden"
                   id={`buffered-image-${locale}`}
@@ -155,7 +148,7 @@ export default function BlogLocaleBufferEditor({ locale }: { locale: BufferedLoc
               </>
             )}
             <p className="text-xs text-amber-700">
-              Recommended size: <strong>1200×675 px</strong> (16:9), JPG/PNG, max 2MB.
+              Recommended size: <strong>1200×675 px</strong> (16:9), JPG/PNG/WebP.
             </p>
           </div>
         </CardContent>
