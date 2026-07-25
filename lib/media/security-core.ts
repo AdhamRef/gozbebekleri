@@ -11,6 +11,11 @@ export const MEDIA_SCOPES = [
 export type MediaScope = (typeof MEDIA_SCOPES)[number];
 export type MediaKind = "image" | "video";
 
+export const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+export const VIDEO_MAX_BYTES = 50 * 1024 * 1024;
+export const MAX_MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
+export const MAX_FILES_PER_REQUEST = 1;
+
 export type DetectedMediaType = {
   extension: "jpg" | "png" | "webp" | "mp4";
   mimeType: "image/jpeg" | "image/png" | "image/webp" | "video/mp4";
@@ -29,10 +34,6 @@ export class MediaSecurityError extends Error {
   }
 }
 
-const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
-const VIDEO_MAX_BYTES = 50 * 1024 * 1024;
-const MAX_FILES_PER_REQUEST = 1;
-
 const MIME_BY_EXTENSION: Record<string, DetectedMediaType["mimeType"]> = {
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
@@ -48,6 +49,11 @@ const PERMITTED_BY_SCOPE: Record<MediaScope, readonly DetectedMediaType["mimeTyp
   categories: ["image/jpeg", "image/png", "image/webp"],
   ticker: ["image/jpeg", "image/png", "image/webp"],
 };
+
+const UUID_PATTERN = "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
+const DANGEROUS_EXTENSIONS = new Set([
+  "exe", "dll", "js", "mjs", "cjs", "html", "htm", "svg", "sh", "bat", "cmd", "com", "scr",
+]);
 
 function startsWith(bytes: Uint8Array, signature: readonly number[], offset = 0): boolean {
   return signature.every((value, index) => bytes[offset + index] === value);
@@ -74,7 +80,7 @@ export function detectMediaType(bytes: Uint8Array): DetectedMediaType {
   if (startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) {
     return { extension: "png", mimeType: "image/png", type: "image", maxBytes: IMAGE_MAX_BYTES };
   }
-  if (ascii(bytes, 0, 4) === "RIFF" && ascii(bytes, 8, 4) === "WEBP") {
+  if (bytes.byteLength >= 12 && ascii(bytes, 0, 4) === "RIFF" && ascii(bytes, 8, 4) === "WEBP") {
     return { extension: "webp", mimeType: "image/webp", type: "image", maxBytes: IMAGE_MAX_BYTES };
   }
   if (bytes.byteLength >= 12 && ascii(bytes, 4, 4) === "ftyp") {
@@ -93,7 +99,7 @@ export function detectMediaType(bytes: Uint8Array): DetectedMediaType {
   throw new MediaSecurityError("Unsupported or corrupt media file", 400, "UNSUPPORTED_TYPE");
 }
 
-function extensionFromName(name: string): string {
+export function extensionFromName(name: string): string {
   const normalized = name.trim().toLowerCase();
   if (!normalized || normalized.includes("\0")) {
     throw new MediaSecurityError("Invalid filename", 400, "INVALID_FILENAME");
@@ -102,8 +108,7 @@ function extensionFromName(name: string): string {
   if (segments.length < 2) {
     throw new MediaSecurityError("A supported file extension is required", 400, "INVALID_EXTENSION");
   }
-  const executableExtensions = new Set(["exe", "dll", "js", "mjs", "cjs", "html", "htm", "svg", "sh", "bat", "cmd", "com", "scr"]);
-  if (segments.slice(1, -1).some((part) => executableExtensions.has(part))) {
+  if (segments.slice(1, -1).some((part) => DANGEROUS_EXTENSIONS.has(part))) {
     throw new MediaSecurityError("Suspicious double extension", 400, "INVALID_EXTENSION");
   }
   return segments.at(-1) ?? "";
@@ -125,6 +130,33 @@ export type ValidatedMedia = {
   size: number;
 };
 
+export function declaredMediaMaxBytes(file: Pick<FileLike, "name" | "type">, scope: MediaScope): number {
+  if (scope !== "campaigns") return IMAGE_MAX_BYTES;
+  let extension = "";
+  try {
+    extension = extensionFromName(file.name);
+  } catch {
+    return IMAGE_MAX_BYTES;
+  }
+  return file.type.toLowerCase() === "video/mp4" && extension === "mp4"
+    ? VIDEO_MAX_BYTES
+    : IMAGE_MAX_BYTES;
+}
+
+export function assertContentLength(
+  contentLength: string | null | undefined,
+  maxPayloadBytes: number,
+): void {
+  if (!contentLength) return;
+  const parsed = Number(contentLength);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new MediaSecurityError("Invalid Content-Length", 400, "INVALID_CONTENT_LENGTH");
+  }
+  if (parsed > maxPayloadBytes + MAX_MULTIPART_OVERHEAD_BYTES) {
+    throw new MediaSecurityError("Request exceeds the allowed size", 413, "REQUEST_TOO_LARGE");
+  }
+}
+
 export async function validateMediaFile(file: FileLike, scope: MediaScope): Promise<ValidatedMedia> {
   if (!file || typeof file.arrayBuffer !== "function") {
     throw new MediaSecurityError("No file uploaded", 400, "MISSING_FILE");
@@ -132,11 +164,17 @@ export async function validateMediaFile(file: FileLike, scope: MediaScope): Prom
   if (file.size <= 0) {
     throw new MediaSecurityError("Empty files are not allowed", 400, "EMPTY_FILE");
   }
+
+  const preReadLimit = declaredMediaMaxBytes(file, scope);
+  if (file.size > preReadLimit) {
+    throw new MediaSecurityError("File exceeds the allowed size", 413, "FILE_TOO_LARGE");
+  }
+
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const detected = detectMediaType(bytes);
   if (bytes.byteLength !== file.size) {
     throw new MediaSecurityError("File size mismatch", 400, "SIZE_MISMATCH");
   }
+  const detected = detectMediaType(bytes);
   if (file.size > detected.maxBytes) {
     throw new MediaSecurityError("File exceeds the allowed size", 413, "FILE_TOO_LARGE");
   }
@@ -170,7 +208,8 @@ export function validateFileCount(files: readonly unknown[]): void {
 }
 
 export function buildAssetId(scope: MediaScope, randomId: string, extension: string): string {
-  if (!/^[a-f0-9-]{16,}$/i.test(randomId)) {
+  const uuid = new RegExp(`^${UUID_PATTERN}$`, "i");
+  if (!uuid.test(randomId)) {
     throw new MediaSecurityError("Invalid generated asset identifier", 400, "INVALID_ASSET_ID");
   }
   return `${MEDIA_NAMESPACE}/${scope}/${randomId}.${extension}`;
@@ -193,11 +232,27 @@ export function assertSafeAssetId(assetId: string, scope: MediaScope): string {
   ) {
     throw new MediaSecurityError("Unsafe asset identifier", 400, "UNSAFE_ASSET_ID");
   }
-  const prefix = `${MEDIA_NAMESPACE}/${scope}/`;
-  if (!decoded.startsWith(prefix) || !/^[a-z0-9/_-]+\.(jpg|png|webp|mp4)$/i.test(decoded)) {
+  const extensions = scope === "campaigns" ? "jpg|png|webp|mp4" : "jpg|png|webp";
+  const exact = new RegExp(`^${MEDIA_NAMESPACE}/${scope}/${UUID_PATTERN}\\.(${extensions})$`, "i");
+  if (!exact.test(decoded)) {
     throw new MediaSecurityError("Asset is outside the permitted namespace", 400, "OUTSIDE_NAMESPACE");
   }
   return decoded;
+}
+
+export function managedAssetIdFromUrl(url: string, scope: MediaScope): string | null {
+  try {
+    const parsed = new URL(url);
+    const marker = "/upload/";
+    const markerIndex = parsed.pathname.indexOf(marker);
+    if (markerIndex < 0) return null;
+    let candidate = parsed.pathname.slice(markerIndex + marker.length);
+    candidate = candidate.replace(/^v\d+\//, "");
+    candidate = decodeURIComponent(candidate);
+    return assertSafeAssetId(candidate, scope);
+  } catch {
+    return null;
+  }
 }
 
 export type NormalizedUploadResponse = {
