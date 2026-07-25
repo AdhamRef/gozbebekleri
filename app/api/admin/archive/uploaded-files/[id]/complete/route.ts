@@ -6,8 +6,8 @@ import {
 } from "@/lib/archive/archive-blob-storage";
 import { metadataObject, numberField, stringField } from "@/lib/archive/uploaded-files";
 import {
-  assembleValidatedChunks,
   validateArchiveCompletion,
+  assembleValidatedChunks,
   type ArchiveUploadParent,
   type ExistingArchiveChunk,
 } from "@/lib/media/archive-chunks-core";
