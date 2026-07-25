@@ -37,6 +37,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import WysiwygEditor from "@/app/[locale]/blog/_components/wysiwyg/wysiwyg-editor";
 import { defaultEditorContent } from "@/app/[locale]/blog/_components/wysiwyg/default-content";
+import {
+  cleanupManagedDashboardMediaAfterSave,
+  deleteUnsavedDashboardMedia,
+  markDashboardAssetPersisted,
+  uploadDashboardMediaRequest,
+} from "@/lib/media/client";
 import { SmartSeoAuditCard } from "../../../_components/SmartSeoAuditCard";
 import { SaveStatusNotice, type SaveStatusState } from "../../../_components/SaveStatusNotice";
 
@@ -91,6 +97,7 @@ export default function BlogLocaleEditor({ post, locale }: BlogLocaleEditorProps
   const [uploadingImage, setUploadingImage] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatusState | null>(null);
   const [content, setContent] = useState<string | null>(trans?.content ?? null);
+  const [removedPersistedImage, setRemovedPersistedImage] = useState<string | null>(null);
 
   const schema = schemaFor(locale);
   const form = useForm<z.infer<typeof schema>>({
@@ -114,8 +121,8 @@ export default function BlogLocaleEditor({ post, locale }: BlogLocaleEditorProps
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const response = await axios.post("/api/upload", formData);
-      form.setValue("image", response.data?.url ?? "");
+      const response = await uploadDashboardMediaRequest(formData, "blog");
+      form.setValue("image", response.data.url);
       toast.success("تم رفع الصورة بنجاح");
     } catch (err) {
       console.error("Image upload error:", err);
@@ -125,11 +132,11 @@ export default function BlogLocaleEditor({ post, locale }: BlogLocaleEditorProps
     }
   };
 
-  const removeImage = () => {
+  const removeImage = async () => {
     const current = form.getValues("image");
-    if (current) {
-      axios.delete(`/api/upload?publicId=${current.split("/").slice(-1)[0].split(".")[0]}`).catch(() => {});
-    }
+    if (!current) return;
+    const deletedUnsaved = await deleteUnsavedDashboardMedia(current, "blog").catch(() => false);
+    if (!deletedUnsaved && current === trans?.image) setRemovedPersistedImage(current);
     form.setValue("image", "");
   };
 
@@ -168,6 +175,11 @@ export default function BlogLocaleEditor({ post, locale }: BlogLocaleEditorProps
           },
         },
       });
+      if (data.image) markDashboardAssetPersisted(data.image);
+      if (removedPersistedImage) {
+        await cleanupManagedDashboardMediaAfterSave(removedPersistedImage, "blog").catch(() => false);
+        setRemovedPersistedImage(null);
+      }
       setSaveStatus({ type: "success", message: "تم تحديث الترجمة بنجاح", detail: "أنت ما زلت داخل صفحة التعديل" });
       toast.success(config.success);
       router.refresh();
@@ -267,7 +279,7 @@ export default function BlogLocaleEditor({ post, locale }: BlogLocaleEditorProps
                           <>
                             <input
                               type="file"
-                              accept="image/*"
+                              accept="image/jpeg,image/png,image/webp"
                               onChange={handleImageUpload}
                               className="hidden"
                               id={`blog-locale-image-${locale}`}
@@ -292,7 +304,7 @@ export default function BlogLocaleEditor({ post, locale }: BlogLocaleEditorProps
                     </FormControl>
                     <FormDescription>
                       <span className="text-amber-700">
-                        Recommended size: <strong>1200×675 px</strong> (16:9 ratio), JPG or PNG, max 2MB.
+                        Recommended size: <strong>1200×675 px</strong> (16:9 ratio), JPG, PNG or WebP.
                       </span>
                     </FormDescription>
                     <FormMessage />
