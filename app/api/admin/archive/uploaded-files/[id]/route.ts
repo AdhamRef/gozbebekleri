@@ -1,4 +1,7 @@
-import { deleteArchiveBlobFile } from "@/lib/archive/archive-blob-storage";
+import {
+  assertArchiveBlobPathname,
+  deleteArchiveBlobFile,
+} from "@/lib/archive/archive-blob-storage";
 import { getArchiveRepositorySnapshot } from "@/lib/archive/archive-repository";
 import {
   buildArchiveUploadReferences,
@@ -64,20 +67,64 @@ export async function DELETE(_request: Request, context: Params) {
 
   const { id } = await Promise.resolve(context.params);
   const row = await findArchiveUploadedFile(id);
-  if (!row) return jsonNoStore({ ok: false, error: "الملف غير موجود" }, { status: 404 });
+  if (!row) {
+    return jsonNoStore({ ok: true, deleted: false, notFound: true, message: "الملف غير موجود" });
+  }
 
   const metadata = metadataObject(row.metadata);
   const docsDenied = await requireDocumentsAccessIfNeeded(metadata);
   if (docsDenied) return docsDenied;
 
-  await deleteArchiveBlobFile(stringField(metadata.blobUrl) || stringField(metadata.blobPathname));
-  await prisma.auditLog.deleteMany({ where: { action: "archive.uploadedFile.chunk", entityType: "ArchiveUploadedFileChunk", entityId: id } });
+  const blobPathname = stringField(metadata.blobPathname);
+  if (blobPathname) {
+    let safePathname: string;
+    try {
+      safePathname = assertArchiveBlobPathname(blobPathname);
+    } catch {
+      return jsonNoStore(
+        { ok: false, error: "معرّف الملف خارج نطاق التخزين المسموح" },
+        { status: 400 },
+      );
+    }
+
+    if (await archiveBlobUsedByAnotherRecord(id, safePathname)) {
+      return jsonNoStore(
+        { ok: false, error: "الملف مستخدم في سجل آخر" },
+        { status: 409 },
+      );
+    }
+    await deleteArchiveBlobFile(safePathname);
+  }
+
+  await prisma.auditLog.deleteMany({
+    where: {
+      action: "archive.uploadedFile.chunk",
+      entityType: "ArchiveUploadedFileChunk",
+      entityId: id,
+    },
+  });
   await prisma.auditLog.delete({ where: { id } });
-  return jsonNoStore({ ok: true, message: "تم حذف الملف" });
+  return jsonNoStore({ ok: true, deleted: true, notFound: false, message: "تم حذف الملف" });
+}
+
+async function archiveBlobUsedByAnotherRecord(currentId: string, pathname: string): Promise<boolean> {
+  const rows = await prisma.auditLog.findMany({
+    where: {
+      action: "archive.uploadedFile.create",
+      entityType: "ArchiveUploadedFile",
+      id: { not: currentId },
+    },
+    select: { metadata: true },
+    take: 500,
+  });
+  return rows.some((candidate) => stringField(metadataObject(candidate.metadata).blobPathname) === pathname);
 }
 
 async function findArchiveUploadedFile(id: string) {
-  const row = await prisma.auditLog.findUnique({ where: { id }, select: { id: true, action: true, entityType: true, metadata: true } });
+  const row = await prisma.auditLog.findUnique({
+    where: { id },
+    select: { id: true, action: true, entityType: true, metadata: true },
+  });
   if (!row || row.action !== "archive.uploadedFile.create" || row.entityType !== "ArchiveUploadedFile") return null;
   return row;
 }
@@ -94,5 +141,7 @@ async function requireDocumentsAccessIfNeeded(metadata: Record<string, unknown>)
 }
 
 function parseReviewStatus(value: unknown, fallback: string): ArchiveReviewStatus {
-  return allowedStatuses.includes(String(value || "") as ArchiveReviewStatus) ? String(value) as ArchiveReviewStatus : (fallback as ArchiveReviewStatus || "NEW");
+  return allowedStatuses.includes(String(value || "") as ArchiveReviewStatus)
+    ? String(value) as ArchiveReviewStatus
+    : (fallback as ArchiveReviewStatus || "NEW");
 }
