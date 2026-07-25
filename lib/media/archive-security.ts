@@ -1,3 +1,4 @@
+import * as XLSX from "xlsx";
 import { MediaSecurityError, type FileLike } from "./security-core";
 
 export const ARCHIVE_MEDIA_MAX_BYTES = 30 * 1024 * 1024;
@@ -37,21 +38,86 @@ function safeExtension(name: string): "pdf" | "xlsx" | "xls" {
   return extension;
 }
 
-function detectArchiveType(bytes: Uint8Array): Pick<ValidatedArchiveMedia, "extension" | "mimeType"> {
-  if (startsWith(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d])) {
-    return { extension: "pdf", mimeType: "application/pdf" };
+function containsAscii(bytes: Uint8Array, needle: string): boolean {
+  const encoded = new TextEncoder().encode(needle);
+  outer: for (let index = 0; index <= bytes.length - encoded.length; index += 1) {
+    for (let offset = 0; offset < encoded.length; offset += 1) {
+      if (bytes[index + offset] !== encoded[offset]) continue outer;
+    }
+    return true;
   }
-  if (startsWith(bytes, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])) {
-    return { extension: "xls", mimeType: "application/vnd.ms-excel" };
-  }
-  if (startsWith(bytes, [0x50, 0x4b, 0x03, 0x04])) {
-    return {
-      extension: "xlsx",
-      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    };
-  }
-  throw new MediaSecurityError("Unsupported or corrupt archive file", 400, "UNSUPPORTED_TYPE");
+  return false;
 }
+
+function containsUtf16Le(bytes: Uint8Array, needle: string): boolean {
+  const encoded = new Uint8Array(needle.length * 2);
+  for (let index = 0; index < needle.length; index += 1) {
+    encoded[index * 2] = needle.charCodeAt(index);
+    encoded[index * 2 + 1] = 0;
+  }
+  outer: for (let index = 0; index <= bytes.length - encoded.length; index += 1) {
+    for (let offset = 0; offset < encoded.length; offset += 1) {
+      if (bytes[index + offset] !== encoded[offset]) continue outer;
+    }
+    return true;
+  }
+  return false;
+}
+
+function parseWorkbook(bytes: Uint8Array): void {
+  try {
+    const workbook = XLSX.read(Buffer.from(bytes), {
+      type: "buffer",
+      bookSheets: true,
+      bookProps: true,
+      cellFormula: false,
+      cellHTML: false,
+      cellStyles: false,
+    });
+    if (!Array.isArray(workbook.SheetNames) || workbook.SheetNames.length === 0) {
+      throw new Error("Workbook contains no sheets");
+    }
+  } catch {
+    throw new MediaSecurityError("Invalid Excel workbook structure", 400, "CORRUPT_WORKBOOK");
+  }
+}
+
+function verifyPdf(bytes: Uint8Array): void {
+  if (!startsWith(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d])) {
+    throw new MediaSecurityError("Invalid PDF signature", 400, "CORRUPT_PDF");
+  }
+  const tailStart = Math.max(0, bytes.length - 2048);
+  const tail = new TextDecoder().decode(bytes.slice(tailStart));
+  if (!tail.includes("%%EOF")) {
+    throw new MediaSecurityError("Incomplete PDF file", 400, "CORRUPT_PDF");
+  }
+}
+
+function verifyXlsx(bytes: Uint8Array): void {
+  if (!startsWith(bytes, [0x50, 0x4b, 0x03, 0x04])) {
+    throw new MediaSecurityError("Invalid XLSX container", 400, "CORRUPT_XLSX");
+  }
+  if (!containsAscii(bytes, "[Content_Types].xml") || !containsAscii(bytes, "xl/workbook.xml")) {
+    throw new MediaSecurityError("ZIP file is not an XLSX workbook", 400, "CORRUPT_XLSX");
+  }
+  parseWorkbook(bytes);
+}
+
+function verifyXls(bytes: Uint8Array): void {
+  if (!startsWith(bytes, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])) {
+    throw new MediaSecurityError("Invalid XLS container", 400, "CORRUPT_XLS");
+  }
+  if (!containsUtf16Le(bytes, "Workbook") && !containsUtf16Le(bytes, "Book")) {
+    throw new MediaSecurityError("OLE file does not contain an Excel workbook stream", 400, "CORRUPT_XLS");
+  }
+  parseWorkbook(bytes);
+}
+
+const EXPECTED_MIME = {
+  pdf: "application/pdf",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  xls: "application/vnd.ms-excel",
+} as const;
 
 export async function validateArchiveMediaFile(file: FileLike): Promise<ValidatedArchiveMedia> {
   if (!file || typeof file.arrayBuffer !== "function") {
@@ -63,22 +129,26 @@ export async function validateArchiveMediaFile(file: FileLike): Promise<Validate
   if (file.size > ARCHIVE_MEDIA_MAX_BYTES) {
     throw new MediaSecurityError("Archive file exceeds 30MB", 413, "FILE_TOO_LARGE");
   }
+
+  const expectedExtension = safeExtension(file.name);
+  const expectedMime = EXPECTED_MIME[expectedExtension];
+  if (file.type.toLowerCase() !== expectedMime) {
+    throw new MediaSecurityError("Archive MIME type does not match its extension", 400, "MIME_MISMATCH");
+  }
+
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (bytes.byteLength !== file.size) {
     throw new MediaSecurityError("Archive file size mismatch", 400, "SIZE_MISMATCH");
   }
-  const expectedExtension = safeExtension(file.name);
-  const detected = detectArchiveType(bytes);
-  if (expectedExtension !== detected.extension) {
-    throw new MediaSecurityError("Archive extension does not match file content", 400, "EXTENSION_MISMATCH");
-  }
-  if (file.type.toLowerCase() !== detected.mimeType) {
-    throw new MediaSecurityError("Archive MIME type does not match file content", 400, "MIME_MISMATCH");
-  }
+
+  if (expectedExtension === "pdf") verifyPdf(bytes);
+  else if (expectedExtension === "xlsx") verifyXlsx(bytes);
+  else verifyXls(bytes);
+
   return {
     bytes,
-    extension: detected.extension,
-    mimeType: detected.mimeType,
+    extension: expectedExtension,
+    mimeType: expectedMime,
     size: file.size,
     originalName: file.name,
   };
