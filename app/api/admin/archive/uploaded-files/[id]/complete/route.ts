@@ -5,10 +5,20 @@ import {
   type ArchiveBlobStoredFile,
 } from "@/lib/archive/archive-blob-storage";
 import { metadataObject, numberField, stringField } from "@/lib/archive/uploaded-files";
+import {
+  assembleValidatedChunks,
+  validateArchiveCompletion,
+  type ArchiveUploadParent,
+  type ExistingArchiveChunk,
+} from "@/lib/media/archive-chunks-core";
 import { validateArchiveMediaFile } from "@/lib/media/archive-security";
 import { MediaSecurityError } from "@/lib/media/security-core";
 import { prisma } from "@/lib/prisma";
-import { jsonNoStore, requireArchiveActionAccess } from "../../../_auth";
+import {
+  jsonNoStore,
+  requireArchiveActionAccess,
+  requireArchiveUploadedFileListAccess,
+} from "../../../_auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,25 +30,38 @@ export async function POST(_request: Request, context: Params) {
   if (denied) return denied;
 
   const { id } = await Promise.resolve(context.params);
-  const parent = await prisma.auditLog.findUnique({
+  const parentRow = await prisma.auditLog.findUnique({
     where: { id },
     select: { id: true, action: true, entityType: true, metadata: true },
   });
-  if (!parent || parent.action !== "archive.uploadedFile.create" || parent.entityType !== "ArchiveUploadedFile") {
+  if (!parentRow || parentRow.action !== "archive.uploadedFile.create" || parentRow.entityType !== "ArchiveUploadedFile") {
     return jsonNoStore({ ok: false, error: "ملف الرفع غير موجود" }, { status: 404 });
   }
 
-  const metadata = metadataObject(parent.metadata);
-  const chunks = await readUploadChunks(id);
-  const expected = numberField(metadata.chunkCount);
-  const receivedIndexes = new Set(chunks.map((item) => numberField(item.index)));
-
-  if (!expected || receivedIndexes.size < expected) {
-    return jsonNoStore({ ok: false, error: "لم تكتمل كل أجزاء الملف" }, { status: 400 });
+  const metadata = metadataObject(parentRow.metadata);
+  const parent: ArchiveUploadParent = {
+    uploadStatus: stringField(metadata.uploadStatus),
+    category: stringField(metadata.category),
+    chunkCount: numberField(metadata.chunkCount),
+    sizeBytes: numberField(metadata.sizeBytes),
+  };
+  if (parent.category === "DOCUMENTS") {
+    const documentsAccess = await requireArchiveUploadedFileListAccess("DOCUMENTS");
+    if (documentsAccess.denied) return documentsAccess.denied;
   }
 
   try {
-    const storagePatch = await buildStoragePatch(metadata, chunks);
+    const chunks = await readUploadChunks(id);
+    const ordered = validateArchiveCompletion({ parent, chunks });
+    const buffer = assembleValidatedChunks(ordered);
+    const validated = await validateArchiveMediaFile({
+      name: stringField(metadata.fileName),
+      type: stringField(metadata.mimeType),
+      size: buffer.byteLength,
+      arrayBuffer: async () => buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
+    });
+
+    const storagePatch = await buildStoragePatch(parent.category, validated);
     try {
       await prisma.auditLog.update({
         where: { id },
@@ -74,7 +97,7 @@ export async function POST(_request: Request, context: Params) {
   }
 }
 
-async function readUploadChunks(fileId: string) {
+async function readUploadChunks(fileId: string): Promise<ExistingArchiveChunk[]> {
   const rows = await prisma.auditLog.findMany({
     where: {
       action: "archive.uploadedFile.chunk",
@@ -83,28 +106,24 @@ async function readUploadChunks(fileId: string) {
     },
     select: { metadata: true },
   });
-  return rows
-    .map((row) => metadataObject(row.metadata))
-    .sort((a, b) => numberField(a.index) - numberField(b.index));
+  return rows.map((row) => {
+    const metadata = metadataObject(row.metadata);
+    return {
+      index: numberField(metadata.index),
+      total: numberField(metadata.total),
+      sizeBytes: numberField(metadata.sizeBytes),
+      base64: stringField(metadata.base64),
+    };
+  });
 }
 
 async function buildStoragePatch(
-  metadata: Record<string, unknown>,
-  chunks: Record<string, unknown>[],
+  category: string,
+  validated: Awaited<ReturnType<typeof validateArchiveMediaFile>>,
 ): Promise<ArchiveBlobStoredFile | { storageMode: "CLIENT_CHUNKED" }> {
-  const base64 = chunks.map((item) => stringField(item.base64)).join("");
-  const buffer = Buffer.from(base64, "base64");
-  const validated = await validateArchiveMediaFile({
-    name: stringField(metadata.fileName),
-    type: stringField(metadata.mimeType),
-    size: buffer.byteLength,
-    arrayBuffer: async () => buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
-  });
-
   if (!archiveBlobEnabled()) return { storageMode: "CLIENT_CHUNKED" };
-
   return storeArchiveBlobFile({
-    category: stringField(metadata.category),
+    category,
     extension: validated.extension,
     contentType: validated.mimeType,
     body: Buffer.from(validated.bytes),
