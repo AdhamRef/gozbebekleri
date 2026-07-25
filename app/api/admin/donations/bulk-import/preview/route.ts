@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
-import { parseDonationImportBuffer, importOrderId, IMPORT_PROVIDER } from "@/lib/donations/bulk-import";
+import { parseDonationImportBuffer } from "@/lib/donations/bulk-import";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,29 +34,20 @@ export async function POST(request: NextRequest) {
 
   const valid = parsed.rows.filter((r) => r.valid);
   const emails = [...new Set(valid.map((r) => r.email).filter(Boolean) as string[])];
-  const orderIds = valid.map((r) => importOrderId(r.dedupKey));
 
-  const [existingUsers, existingDonations] = await Promise.all([
-    process.env.DATABASE_URL
-      ? prisma.user.findMany({ where: { email: { in: emails } }, select: { email: true } }).catch(() => [])
-      : Promise.resolve([]),
-    process.env.DATABASE_URL
-      ? prisma.donation.findMany({ where: { provider: IMPORT_PROVIDER, providerOrderId: { in: orderIds } }, select: { providerOrderId: true } }).catch(() => [])
-      : Promise.resolve([]),
-  ]);
-
+  // Donor dedup by email only. Donations are NOT deduped — every valid row (incl. repeats) imports.
+  const existingUsers = process.env.DATABASE_URL
+    ? await prisma.user.findMany({ where: { email: { in: emails } }, select: { email: true } }).catch(() => [])
+    : [];
   const existingEmailSet = new Set(existingUsers.map((u) => (u.email ?? "").toLowerCase()).filter(Boolean));
-  const alreadyImportedSet = new Set(existingDonations.map((d) => d.providerOrderId).filter(Boolean) as string[]);
 
   const byCurrency: Record<string, { count: number; amount: number }> = {};
   let totalUsdPaid = 0;
   let paid = 0;
   let failed = 0;
-  let newlyImportable = 0;
+  const newlyImportable = valid.length;
   for (const r of valid) {
-    const already = alreadyImportedSet.has(importOrderId(r.dedupKey));
-    if (!already) newlyImportable += 1;
-    if (r.status === "PAID") { paid += 1; if (!already) totalUsdPaid += r.amountUSD ?? 0; }
+    if (r.status === "PAID") { paid += 1; totalUsdPaid += r.amountUSD ?? 0; }
     else failed += 1;
     const c = byCurrency[r.currency] ?? { count: 0, amount: 0 };
     c.count += 1; c.amount += r.amount ?? 0;
@@ -74,7 +65,7 @@ export async function POST(request: NextRequest) {
       invalidRows: parsed.totalRows - valid.length,
       paid,
       failed,
-      alreadyImported: valid.length - newlyImportable,
+      alreadyImported: 0,
       newlyImportable,
       newDonors: newDonorEmails.length,
       existingDonors: emails.length - newDonorEmails.length,
@@ -97,7 +88,7 @@ export async function POST(request: NextRequest) {
       createdAtISO: r.createdAtISO,
       valid: r.valid,
       issues: r.issues,
-      alreadyImported: r.valid && alreadyImportedSet.has(importOrderId(r.dedupKey)),
+      alreadyImported: false,
       isNewDonor: !!r.email && !existingEmailSet.has(r.email),
     })),
     sampleTruncated: parsed.rows.length > SAMPLE_LIMIT,

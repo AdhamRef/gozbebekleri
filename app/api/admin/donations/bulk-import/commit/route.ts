@@ -17,7 +17,8 @@ const CHUNK = 500;
 /**
  * Bulk donation import — COMMIT. Re-parses the uploaded file (never trusts client-sent rows), then:
  *   1) resolves each donor by email (creates the User if new; back-fills only MISSING fields on existing),
- *   2) creates a Donation per valid row, keyed by an import order id so re-uploads are idempotent.
+ *   2) creates a Donation for EVERY valid row — repeats/re-uploads are accepted (no donation-level
+ *      dedup); donors are deduped by email so repeated donations append to the same user.
  *
  * SAFETY: imported donations are HISTORICAL records — `provider="IMPORT"`. This route does NOT call
  * dispatchDonationPaid / CAPI / receipts / Telegram, so no messages are sent and no donor data is
@@ -41,17 +42,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "لا توجد صفوف صالحة للاستيراد (يلزم بريد إلكتروني ومبلغ صحيح).", warnings: parsed.warnings }, { status: 400 });
   }
 
-  // Idempotency — skip rows already imported (matched by import order id).
-  const orderIds = valid.map((r) => importOrderId(r.dedupKey));
-  const existingDonations = await prisma.donation
-    .findMany({ where: { provider: IMPORT_PROVIDER, providerOrderId: { in: orderIds } }, select: { providerOrderId: true } })
-    .catch(() => []);
-  const alreadyImported = new Set(existingDonations.map((d) => d.providerOrderId).filter(Boolean) as string[]);
-
-  let toImport = valid.filter((r) => !alreadyImported.has(importOrderId(r.dedupKey)));
+  // Import EVERY valid row — repeats/re-uploads are accepted (no donation-level dedup). Only donors
+  // are deduped by email, so repeated donations append to the same user.
+  let toImport = valid;
   const truncated = toImport.length > MAX_IMPORT;
   if (truncated) toImport = toImport.slice(0, MAX_IMPORT);
-  const skippedDuplicate = valid.length - toImport.length - (truncated ? 0 : 0);
+  const skippedDuplicate = 0;
 
   // ── Resolve donors by email (create new, back-fill missing on existing) ──
   const firstRowByEmail = new Map<string, ParsedDonationRow>();

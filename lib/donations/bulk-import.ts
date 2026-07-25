@@ -40,9 +40,9 @@ export type ParsedDonationRow = {
   errorCode: string | null;
   usdRate: number | null;
   euroRate: number | null;
-  /** Natural dedup key: source KEYID when present, otherwise a content hash. */
+  /** Per-row reference tag (source KEYID or a content hash + row number) stored as providerOrderId. */
   dedupKey: string;
-  /** Whether this row is safe to import (has email + a positive amount). */
+  /** Whether this row is safe to import (has email + a positive amount). Repeats are allowed. */
   valid: boolean;
   issues: string[];
   raw: Record<string, string>;
@@ -204,7 +204,6 @@ export function parseDonationImportBuffer(buffer: Buffer): ParsedDonationSheet {
   if (map.amountUSD === undefined) warnings.push("لا يوجد عمود USD HALİ — سيُحتسب المبلغ بالدولار من المبلغ الأصلي إن أمكن.");
 
   const rows: ParsedDonationRow[] = [];
-  const seenKeys = new Set<string>();
 
   for (let r = headerRowIndex + 1; r < matrix.length; r += 1) {
     const row = matrix[r] ?? [];
@@ -229,10 +228,10 @@ export function parseDonationImportBuffer(buffer: Buffer): ParsedDonationSheet {
     else if (!isEmail(email)) issues.push("بريد إلكتروني غير صالح");
     if (amount === null || amount <= 0) issues.push("مبلغ غير صالح");
 
+    // Reference tag for the created donation (providerOrderId). Repeats are ALLOWED — every row is
+    // imported, so this is made unique per row (row number suffix) rather than used to skip anything.
     const dedupBasis = keyId || `${email}|${amountUSD ?? amount ?? ""}|${createdAtISO ?? ""}|${cell(row, map.basket)}`;
-    const dedupKey = keyId ?? `hash:${sha256(dedupBasis).slice(0, 24)}`;
-    if (seenKeys.has(dedupKey)) issues.push("مكرر داخل الملف");
-    seenKeys.add(dedupKey);
+    const dedupKey = `${keyId ?? `hash:${sha256(dedupBasis).slice(0, 16)}`}#${r + 1}`;
 
     rows.push({
       rowNumber: r + 1,

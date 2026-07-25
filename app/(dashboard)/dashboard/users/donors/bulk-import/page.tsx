@@ -153,12 +153,11 @@ export default function BulkDonationImportPage() {
         <>
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Stat label="صفوف صالحة" value={num(s.validRows)} tone="ok" />
-            <Stat label="ستُضاف الآن" value={num(s.newlyImportable)} tone="ok" />
+            <Stat label="ستُضاف كلها" value={num(s.newlyImportable)} tone="ok" />
             <Stat label="متبرعون جدد" value={num(s.newDonors)} />
-            <Stat label="إجمالي المبلغ (USD) للناجح الجديد" value={`$${num(s.totalUsdPaidNew)}`} tone="ok" />
+            <Stat label="إجمالي المبلغ (USD) الناجح" value={`$${num(s.totalUsdPaidNew)}`} tone="ok" />
             <Stat label="ناجحة" value={num(s.paid)} tone="ok" />
             <Stat label="فاشلة" value={num(s.failed)} tone={s.failed > 0 ? "warn" : undefined} />
-            <Stat label="مستوردة مسبقًا (تُتخطّى)" value={num(s.alreadyImported)} tone={s.alreadyImported > 0 ? "warn" : undefined} />
             <Stat label="صفوف غير صالحة" value={num(s.invalidRows)} tone={s.invalidRows > 0 ? "bad" : undefined} />
           </section>
 
@@ -193,7 +192,7 @@ export default function BulkDonationImportPage() {
                 </thead>
                 <tbody>
                   {preview!.sample.map((r) => (
-                    <tr key={r.rowNumber} className={`border-b last:border-0 ${!r.valid ? "bg-rose-50/40" : r.alreadyImported ? "bg-slate-50" : ""}`}>
+                    <tr key={r.rowNumber} className={`border-b last:border-0 ${!r.valid ? "bg-rose-50/40" : ""}`}>
                       <td className="p-2.5 text-slate-400">{r.rowNumber}</td>
                       <td className="p-2.5 font-semibold text-slate-800">{r.name ?? "—"}</td>
                       <td className="p-2.5 text-slate-600" dir="ltr">{r.email ?? "—"}{r.isNewDonor && r.valid ? <span className="ms-1 rounded bg-blue-50 px-1 text-[10px] font-bold text-[#025EB8]">جديد</span> : null}</td>
@@ -207,7 +206,6 @@ export default function BulkDonationImportPage() {
                       <td className="p-2.5 text-center text-slate-500" dir="ltr">{fmtDate(r.createdAtISO)}</td>
                       <td className="p-2.5 text-center text-[11px]">
                         {!r.valid ? <span className="font-semibold text-rose-600">{r.issues.join("، ")}</span>
-                          : r.alreadyImported ? <span className="text-slate-400">مستورد مسبقًا</span>
                           : <span className="text-emerald-600">جاهز</span>}
                       </td>
                     </tr>
@@ -227,7 +225,6 @@ export default function BulkDonationImportPage() {
             <p>تبرعات أُنشئت: <b>{num(result.createdDonations)}</b></p>
             <p>متبرعون جدد: <b>{num(result.createdDonors)}</b></p>
             <p>مرتبطة بمتبرعين حاليين: <b>{num(result.linkedExistingDonors)}</b></p>
-            <p>مكرر تم تخطّيه: <b>{num(result.skippedDuplicate)}</b></p>
           </div>
           {result.truncated ? <p className="mt-2 text-xs font-semibold text-amber-700">تم استيراد أول 5000 صف فقط في هذه الدفعة — أعد رفع الملف لاستيراد الباقي.</p> : null}
           <div className="mt-4 flex gap-2">

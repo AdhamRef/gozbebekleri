@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { Dialog, DialogOverlay, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -104,6 +105,12 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
   }, [selectedTemplateId, open, target, apiBase, channel, localeChoice]);
 
   const send = async () => {
+    // WhatsApp sending moved to the Communication Center (Meta Cloud API). The legacy send route is
+    // disabled (410), so this dialog never posts WhatsApp — it directs the user there instead.
+    if (channel === "whatsapp") {
+      toast("تم نقل إرسال واتساب إلى مركز التواصل.");
+      return;
+    }
     if (!selectedTemplateId) {
       toast.error("اختر قالبًا أولًا");
       return;
@@ -129,8 +136,13 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
         toast.error(`فشل الإرسال — ${failedCount} حالة`);
       }
       onOpenChange(false);
-    } catch {
-      toast.error("فشل الإرسال");
+    } catch (err) {
+      // Defensive: a legacy/disabled route returns 410 with an Arabic message + redirect target.
+      if (axios.isAxiosError(err) && err.response?.status === 410) {
+        toast.error(err.response.data?.messageAr || "تم نقل الإرسال إلى مركز التواصل.");
+      } else {
+        toast.error("فشل الإرسال");
+      }
     } finally {
       setSending(false);
     }
@@ -156,6 +168,20 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
               ? "جارٍ حساب عدد المتبرعين…"
               : `سيتم الإرسال إلى ${recipientCount} متبرع وفق الفلاتر الحالية.`}
         </p>
+
+        {channel === "whatsapp" && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-800">
+            تم نقل إرسال واتساب إلى <b>مركز التواصل</b> (عبر Meta الرسمي بقوالب معتمدة). يمكنك المعاينة هنا،
+            لكن الإرسال يتم من هناك عبر حملة أو تجربة قالب.{" "}
+            <Link
+              href="/dashboard/operations/communication"
+              onClick={() => onOpenChange(false)}
+              className="font-bold text-[#025EB8] underline-offset-4 hover:underline"
+            >
+              فتح مركز التواصل
+            </Link>
+          </div>
+        )}
 
         <div className="space-y-4">
           <div className="space-y-1.5">
@@ -246,22 +272,29 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
               إلغاء
             </Button>
-            <Button
-              onClick={send}
-              disabled={sending || !selectedTemplateId || (target.kind === "filtered" && recipientCount === 0)}
-              className={
-                channel === "email"
-                  ? "bg-[#025EB8] hover:bg-[#025EB8]/90"
-                  : "bg-[#25D366] hover:bg-[#25D366]/90"
-              }
-            >
-              {sending ? (
-                <Loader2 className="w-4 h-4 animate-spin me-2" />
-              ) : (
-                <Send className="w-4 h-4 me-2" />
-              )}
-              إرسال
-            </Button>
+            {channel === "whatsapp" ? (
+              <Link
+                href="/dashboard/operations/communication/campaigns"
+                onClick={() => onOpenChange(false)}
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-[#025EB8] px-4 py-2 text-sm font-bold text-white hover:bg-[#024a92]"
+              >
+                <Send className="w-4 h-4" />
+                فتح مركز التواصل
+              </Link>
+            ) : (
+              <Button
+                onClick={send}
+                disabled={sending || !selectedTemplateId || (target.kind === "filtered" && recipientCount === 0)}
+                className="bg-[#025EB8] hover:bg-[#025EB8]/90"
+              >
+                {sending ? (
+                  <Loader2 className="w-4 h-4 animate-spin me-2" />
+                ) : (
+                  <Send className="w-4 h-4 me-2" />
+                )}
+                إرسال
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>
