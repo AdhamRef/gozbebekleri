@@ -12,24 +12,20 @@ interface AvatarUploaderProps {
   image: string | null | undefined;
   name: string | null | undefined;
   email: string | null | undefined;
-  /** Called with the new image URL (or null to clear) after a successful save. */
   onUpdated: (nextImage: string | null) => void;
-  /** Visual size — must be one of the predefined options because Tailwind's JIT
-   *  doesn't resolve interpolated class names. Default "lg". */
   size?: "md" | "lg" | "xl";
 }
 
-// Predefined size classes so Tailwind's class extraction can see literal strings.
 const SIZE_CLASSES: Record<NonNullable<AvatarUploaderProps["size"]>, string> = {
   md: "w-20 h-20",
   lg: "w-24 h-24",
   xl: "w-28 h-28",
 };
 
-const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+const MAX_BYTES = 2 * 1024 * 1024;
+const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export default function AvatarUploader({
-  userId,
   image,
   name,
   email,
@@ -43,7 +39,7 @@ export default function AvatarUploader({
   const initial = (name ?? email ?? "?").charAt(0).toUpperCase();
 
   const handleSelect = async (file: File) => {
-    if (!file.type.startsWith("image/")) {
+    if (!ALLOWED_TYPES.has(file.type)) {
       toast.error(t("notImage"));
       return;
     }
@@ -55,10 +51,9 @@ export default function AvatarUploader({
     try {
       const form = new FormData();
       form.append("file", file);
-      const uploadRes = await axios.post("/api/upload", form);
+      const uploadRes = await axios.post("/api/users/me/avatar", form);
       const url = uploadRes.data?.url as string | undefined;
-      if (!url) throw new Error("upload returned no url");
-      await axios.put(`/api/users/${userId}`, { image: url });
+      if (!url) throw new Error("avatar upload returned no url");
       onUpdated(url);
       toast.success(t("updated"));
     } catch (err) {
@@ -72,7 +67,7 @@ export default function AvatarUploader({
   const handleRemove = async () => {
     setUploading(true);
     try {
-      await axios.put(`/api/users/${userId}`, { image: "" });
+      await axios.delete("/api/users/me/avatar");
       onUpdated(null);
       toast.success(t("removed"));
     } catch (err) {
@@ -118,7 +113,7 @@ export default function AvatarUploader({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
