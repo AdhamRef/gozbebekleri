@@ -54,7 +54,7 @@ export async function storeArchiveBlobFile(args: {
   category: string;
   extension: string;
   contentType: string;
-  body: BodyInit | Buffer;
+  body: Buffer;
 }): Promise<ArchiveBlobStoredFile> {
   const pathname = buildArchiveBlobPath(args.category, args.extension);
   const blob = await put(pathname, args.body, {
