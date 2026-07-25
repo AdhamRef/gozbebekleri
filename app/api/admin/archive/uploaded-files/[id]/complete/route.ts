@@ -54,11 +54,12 @@ export async function POST(_request: Request, context: Params) {
     const chunks = await readUploadChunks(id);
     const ordered = validateArchiveCompletion({ parent, chunks });
     const buffer = assembleValidatedChunks(ordered);
+    const bytes = Uint8Array.from(buffer);
     const validated = await validateArchiveMediaFile({
       name: stringField(metadata.fileName),
       type: stringField(metadata.mimeType),
-      size: buffer.byteLength,
-      arrayBuffer: async () => buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
+      size: bytes.byteLength,
+      arrayBuffer: async () => bytes.buffer,
     });
 
     const storagePatch = await buildStoragePatch(parent.category, validated);
