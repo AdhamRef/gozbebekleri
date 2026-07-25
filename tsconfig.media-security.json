@@ -28,6 +28,9 @@
     "app/api/upload/route.ts",
     "app/api/admin/archive/_auth.ts",
     "app/api/admin/archive/uploaded-files/route.ts",
+    "app/api/admin/archive/uploaded-files/start/route.ts",
+    "app/api/admin/archive/uploaded-files/[id]/chunk/route.ts",
+    "app/api/admin/archive/uploaded-files/[id]/complete/route.ts",
     "app/api/admin/archive/uploaded-files/[id]/route.ts"
   ],
   "exclude": [
