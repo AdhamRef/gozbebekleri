@@ -1,0 +1,38 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "incremental": false,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": [
+    "next-env.d.ts",
+    "types/**/*.d.ts",
+    "lib/media/security-core.ts",
+    "lib/media/archive-security.ts",
+    "lib/media/access.ts",
+    "lib/media/storage-adapter.ts",
+    "lib/media/reference-check.ts",
+    "lib/cloudinary.ts",
+    "lib/prisma.ts",
+    "lib/dashboard/api-auth.ts",
+    "lib/dashboard/permissions.ts",
+    "lib/audit-log.ts",
+    "lib/archive/archive-blob-storage.ts",
+    "lib/archive/archive-repository.ts",
+    "lib/archive/uploaded-files.ts",
+    "app/api/auth/[...nextauth]/options.ts",
+    "app/api/upload/route.ts",
+    "app/api/admin/archive/_auth.ts",
+    "app/api/admin/archive/uploaded-files/route.ts",
+    "app/api/admin/archive/uploaded-files/[id]/route.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next",
+    "tests"
+  ]
+}
