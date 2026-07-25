@@ -1,7 +1,11 @@
 "use client";
 
 import axios from "axios";
-import type { MediaScope, NormalizedUploadResponse } from "./security-core";
+import {
+  managedAssetIdFromUrl,
+  type MediaScope,
+  type NormalizedUploadResponse,
+} from "./security-core";
 
 export type DashboardMediaAsset = NormalizedUploadResponse;
 
@@ -51,11 +55,10 @@ export async function cleanupManagedDashboardMediaAfterSave(
   scope: MediaScope,
 ): Promise<boolean> {
   if (!previousUrl) return false;
-  const asset = pendingAssets.get(previousUrl);
-  if (!asset) return false;
-  await axios.delete("/api/upload", {
-    params: { scope, assetId: asset.assetId },
-  });
+  const pending = pendingAssets.get(previousUrl);
+  const assetId = pending?.assetId ?? managedAssetIdFromUrl(previousUrl, scope);
+  if (!assetId) return false;
+  await axios.delete("/api/upload", { params: { scope, assetId } });
   pendingAssets.delete(previousUrl);
   return true;
 }
