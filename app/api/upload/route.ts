@@ -94,7 +94,16 @@ export async function DELETE(request: Request) {
     const { session, denied, scope } = await authorize(request);
     if (denied || !session || !scope) return denied;
 
-    const assetId = new URL(request.url).searchParams.get("assetId");
+    const searchParams = new URL(request.url).searchParams;
+    if (searchParams.get("legacyDetach") === "1") {
+      return NextResponse.json({
+        deleted: false,
+        notFound: false,
+        detachedOnly: true,
+      });
+    }
+
+    const assetId = searchParams.get("assetId");
     if (!assetId) {
       throw new MediaSecurityError("Asset identifier is required", 400, "MISSING_ASSET_ID");
     }
