@@ -12,6 +12,7 @@ import {
   validArchiveProjectId,
   type ArchiveReviewStatus,
 } from "@/lib/archive/uploaded-files";
+import { hasArchiveBlobReference } from "@/lib/media/archive-reference-core";
 import { prisma } from "@/lib/prisma";
 import { jsonNoStore, requireArchiveActionAccess, requireArchiveUploadedFileListAccess } from "../../_auth";
 
@@ -111,16 +112,20 @@ export async function DELETE(_request: Request, context: Params) {
 }
 
 async function archiveBlobUsedByAnotherRecord(currentId: string, pathname: string): Promise<boolean> {
-  const rows = await prisma.auditLog.findMany({
-    where: {
-      action: "archive.uploadedFile.create",
-      entityType: "ArchiveUploadedFile",
-      id: { not: currentId },
-    },
-    select: { metadata: true },
-    take: 500,
+  return hasArchiveBlobReference({
+    currentId,
+    pathname,
+    readPage: async ({ cursor, take }) => prisma.auditLog.findMany({
+      where: {
+        action: "archive.uploadedFile.create",
+        entityType: "ArchiveUploadedFile",
+      },
+      orderBy: { id: "asc" },
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      select: { id: true, metadata: true },
+      take,
+    }),
   });
-  return rows.some((candidate) => stringField(metadataObject(candidate.metadata).blobPathname) === pathname);
 }
 
 async function findArchiveUploadedFile(id: string) {
