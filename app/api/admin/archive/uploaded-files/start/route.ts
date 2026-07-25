@@ -1,5 +1,5 @@
 import { auditActorFromDashboardSession } from "@/lib/audit-log";
-import { getArchiveRepositorySnapshot } from "@/lib/archive/archive-repository";
+import { getArchiveRepositorySnapshot, type ArchiveFoundationData } from "@/lib/archive/archive-repository";
 import {
   ARCHIVE_MAX_FILE_BYTES,
   archiveExtension,
@@ -17,6 +17,16 @@ import { jsonNoStore, requireArchiveActionAccess, requireArchiveUploadedFileList
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const EMPTY_ARCHIVE_FOUNDATION: ArchiveFoundationData = {
+  collections: [], projects: [], driveLinks: [], assets: [], videoFrames: [],
+};
+
+function unsafeClientFileName(value: string): boolean {
+  let decoded = value;
+  try { decoded = decodeURIComponent(value); } catch { return true; }
+  return decoded.includes("\0") || decoded.includes("..") || decoded.includes("/") || decoded.includes("\\") || /^[a-z][a-z0-9+.-]*:/i.test(decoded);
+}
 
 export async function POST(request: Request) {
   const { session, denied } = await requireArchiveActionAccess("archiveUpload");
@@ -38,13 +48,13 @@ export async function POST(request: Request) {
     const docsAccess = await requireArchiveUploadedFileListAccess("DOCUMENTS");
     if (docsAccess.denied) return docsAccess.denied;
   }
-  if (!fileName) return jsonNoStore({ ok: false, error: "اسم الملف غير واضح" }, { status: 400 });
+  if (!fileName || unsafeClientFileName(fileName)) return jsonNoStore({ ok: false, error: "اسم الملف غير آمن" }, { status: 400 });
   if (!isAllowedArchiveFile(extension, mimeType)) return jsonNoStore({ ok: false, error: "الملفات المسموحة PDF أو Excel فقط" }, { status: 400 });
   if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return jsonNoStore({ ok: false, error: "حجم الملف غير صحيح" }, { status: 400 });
-  if (sizeBytes > ARCHIVE_MAX_FILE_BYTES) return jsonNoStore({ ok: false, error: "حجم الملف كبير جدًا. الحد الحالي 30MB" }, { status: 400 });
+  if (sizeBytes > ARCHIVE_MAX_FILE_BYTES) return jsonNoStore({ ok: false, error: "حجم الملف كبير جدًا. الحد الحالي 30MB" }, { status: 413 });
   if (!Number.isInteger(totalChunks) || totalChunks <= 0 || totalChunks > 40) return jsonNoStore({ ok: false, error: "عدد أجزاء الملف غير صحيح" }, { status: 400 });
 
-  const snapshot = await getArchiveRepositorySnapshot();
+  const snapshot = await getArchiveRepositorySnapshot(EMPTY_ARCHIVE_FOUNDATION);
   const references = buildArchiveUploadReferences(snapshot.collections, snapshot.projects);
   const linkedCollectionId = validArchiveCollectionId(String(body?.linkedCollectionId || ""), references);
   const linkedProjectId = validArchiveProjectId(String(body?.linkedProjectId || ""), references);
