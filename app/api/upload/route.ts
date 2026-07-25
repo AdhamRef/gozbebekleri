@@ -10,7 +10,7 @@ import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { inferMediaScope, permissionForMediaScope } from "@/lib/media/access";
 import {
   MediaSecurityError,
-  assertSafeAssetId,
+  createSecureMediaDeleter,
   validateFileCount,
   validateMediaFile,
 } from "@/lib/media/security-core";
@@ -80,6 +80,12 @@ export async function POST(request: Request) {
   }
 }
 
+const secureDelete = createSecureMediaDeleter({
+  lookupUrl: lookupMediaUrl,
+  isReferenced: isMediaUrlReferenced,
+  remove: deleteMedia,
+});
+
 export async function DELETE(request: Request) {
   try {
     const { session, denied, scope } = await authorize(request);
@@ -90,32 +96,28 @@ export async function DELETE(request: Request) {
       throw new MediaSecurityError("Asset identifier is required", 400, "MISSING_ASSET_ID");
     }
 
-    const safeAssetId = assertSafeAssetId(assetId, scope);
-    const existingUrl = await lookupMediaUrl(safeAssetId, scope);
-    if (!existingUrl) {
-      return NextResponse.json({ deleted: false, notFound: true });
-    }
-
-    if (await isMediaUrlReferenced(existingUrl)) {
+    const result = await secureDelete(assetId, scope);
+    if (result.inUse) {
       return NextResponse.json(
         { error: "Media asset is still in use", code: "ASSET_IN_USE" },
         { status: 409 },
       );
     }
 
-    const result = await deleteMedia(safeAssetId, scope);
-    const actor = auditActorFromSiteSession(session);
-    await writeAuditLog({
-      ...actor,
-      action: "MEDIA_DELETE",
-      messageAr: `${actor.actorName ?? "مستخدم"} حذف ملفًا من قسم ${scope}`,
-      entityType: "Media",
-      entityId: safeAssetId,
-      metadata: { assetId: safeAssetId, scope, deleted: result.deleted },
-      stream: auditStreamForRole(actor.actorRole),
-    });
+    if (result.deleted) {
+      const actor = auditActorFromSiteSession(session);
+      await writeAuditLog({
+        ...actor,
+        action: "MEDIA_DELETE",
+        messageAr: `${actor.actorName ?? "مستخدم"} حذف ملفًا من قسم ${scope}`,
+        entityType: "Media",
+        entityId: assetId,
+        metadata: { assetId, scope, deleted: true },
+        stream: auditStreamForRole(actor.actorRole),
+      });
+    }
 
-    return NextResponse.json(result);
+    return NextResponse.json({ deleted: result.deleted, notFound: result.notFound });
   } catch (error) {
     return mediaError(error);
   }
