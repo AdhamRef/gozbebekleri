@@ -217,3 +217,22 @@ export function normalizeUploadResponse(input: NormalizedUploadResponse): Normal
     size: input.size,
   };
 }
+
+export type SecureDeleteDependencies = {
+  lookupUrl(assetId: string, scope: MediaScope): Promise<string | null>;
+  isReferenced(url: string): Promise<boolean>;
+  remove(assetId: string, scope: MediaScope): Promise<{ deleted: boolean; notFound: boolean }>;
+};
+
+export function createSecureMediaDeleter(dependencies: SecureDeleteDependencies) {
+  return async (assetId: string, scope: MediaScope) => {
+    const safeAssetId = assertSafeAssetId(assetId, scope);
+    const url = await dependencies.lookupUrl(safeAssetId, scope);
+    if (!url) return { deleted: false, notFound: true };
+    if (await dependencies.isReferenced(url)) {
+      return { deleted: false, notFound: false, inUse: true };
+    }
+    const result = await dependencies.remove(safeAssetId, scope);
+    return { ...result, inUse: false };
+  };
+}
