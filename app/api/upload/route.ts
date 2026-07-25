@@ -7,9 +7,11 @@ import {
   auditStreamForRole,
 } from "@/lib/audit-log";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
-import { inferMediaScope, permissionForMediaScope } from "@/lib/media/access";
+import { explicitMediaScope, permissionForMediaScope } from "@/lib/media/access";
 import {
   MediaSecurityError,
+  VIDEO_MAX_BYTES,
+  assertContentLength,
   createSecureMediaDeleter,
   validateFileCount,
   validateMediaFile,
@@ -37,7 +39,7 @@ async function authorize(request: Request) {
       scope: null,
     };
   }
-  const scope = inferMediaScope(request.url, request.headers.get("referer"));
+  const scope = explicitMediaScope(request.url);
   const denied = requireAdminOrDashboardPermission(
     session,
     permissionForMediaScope(scope),
@@ -50,6 +52,7 @@ export async function POST(request: Request) {
     const { session, denied, scope } = await authorize(request);
     if (denied || !session || !scope) return denied;
 
+    assertContentLength(request.headers.get("content-length"), VIDEO_MAX_BYTES);
     const formData = await request.formData();
     const files = formData.getAll("file").filter((value): value is File => value instanceof File);
     validateFileCount(files);
