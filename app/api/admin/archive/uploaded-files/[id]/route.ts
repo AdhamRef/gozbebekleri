@@ -2,7 +2,7 @@ import {
   assertArchiveBlobPathname,
   deleteArchiveBlobFile,
 } from "@/lib/archive/archive-blob-storage";
-import { getArchiveRepositorySnapshot } from "@/lib/archive/archive-repository";
+import { getArchiveRepositorySnapshot, type ArchiveFoundationData } from "@/lib/archive/archive-repository";
 import {
   buildArchiveUploadReferences,
   cleanText,
@@ -21,6 +21,9 @@ export const dynamic = "force-dynamic";
 type Params = { params: Promise<{ id: string }> | { id: string } };
 
 const allowedStatuses: ArchiveReviewStatus[] = ["NEW", "REVIEWED", "IMPORTANT"];
+const EMPTY_ARCHIVE_FOUNDATION: ArchiveFoundationData = {
+  collections: [], projects: [], driveLinks: [], assets: [], videoFrames: [],
+};
 
 export async function PATCH(request: Request, context: Params) {
   const { denied } = await requireArchiveActionAccess("archiveUpload");
@@ -130,7 +133,7 @@ async function findArchiveUploadedFile(id: string) {
 }
 
 async function getReferences() {
-  const snapshot = await getArchiveRepositorySnapshot();
+  const snapshot = await getArchiveRepositorySnapshot(EMPTY_ARCHIVE_FOUNDATION);
   return buildArchiveUploadReferences(snapshot.collections, snapshot.projects);
 }
 
