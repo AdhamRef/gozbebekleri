@@ -5,7 +5,7 @@ import {
   storeArchiveBlobFile,
   type ArchiveBlobStoredFile,
 } from "@/lib/archive/archive-blob-storage";
-import { getArchiveRepositorySnapshot } from "@/lib/archive/archive-repository";
+import { getArchiveRepositorySnapshot, type ArchiveFoundationData } from "@/lib/archive/archive-repository";
 import {
   ARCHIVE_BASE64_CHUNK_SIZE,
   archiveUploadMessage,
@@ -28,6 +28,10 @@ import { jsonNoStore, requireArchiveActionAccess, requireArchiveUploadedFileList
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const EMPTY_ARCHIVE_FOUNDATION: ArchiveFoundationData = {
+  collections: [], projects: [], driveLinks: [], assets: [], videoFrames: [],
+};
+
 export async function GET(request: Request) {
   const category = parseArchiveUploadCategory(new URL(request.url).searchParams.get("category"));
   if (!category) return jsonNoStore({ ok: false, error: "Invalid category" }, { status: 400 });
@@ -35,7 +39,7 @@ export async function GET(request: Request) {
   const { denied } = await requireArchiveUploadedFileListAccess(category);
   if (denied) return denied;
 
-  const snapshot = await getArchiveRepositorySnapshot();
+  const snapshot = await getArchiveRepositorySnapshot(EMPTY_ARCHIVE_FOUNDATION);
   const references = buildArchiveUploadReferences(snapshot.collections, snapshot.projects);
   const rows = await prisma.auditLog.findMany({
     where: { action: "archive.uploadedFile.create", entityType: "ArchiveUploadedFile" },
@@ -46,7 +50,7 @@ export async function GET(request: Request) {
 
   const files = rows
     .map((row) => toArchiveUploadedFileItem(row, references))
-    .filter((file): file is ArchiveUploadedFileItem => Boolean(file) && file.category === category);
+    .filter((file): file is ArchiveUploadedFileItem => file !== null && file.category === category);
 
   return jsonNoStore({ ok: true, files, references, storage: { blobEnabled: archiveBlobEnabled() } });
 }
@@ -71,8 +75,10 @@ export async function POST(request: Request) {
       if (docsAccess.denied) return docsAccess.denied;
     }
 
-    const validated = await validateArchiveMediaFile(files[0]);
-    const snapshot = await getArchiveRepositorySnapshot();
+    const uploadFile = files[0];
+    if (!uploadFile) throw new MediaSecurityError("No file uploaded", 400, "MISSING_FILE");
+    const validated = await validateArchiveMediaFile(uploadFile);
+    const snapshot = await getArchiveRepositorySnapshot(EMPTY_ARCHIVE_FOUNDATION);
     const references = buildArchiveUploadReferences(snapshot.collections, snapshot.projects);
     const linkedCollectionId = validArchiveCollectionId(String(formData.get("linkedCollectionId") || ""), references);
     const linkedProjectId = validArchiveProjectId(String(formData.get("linkedProjectId") || ""), references);
@@ -119,15 +125,10 @@ export async function POST(request: Request) {
         },
       });
 
-      if (!blob && chunks.length > 1) {
-        await saveArchiveChunks(row.id, chunks, actor);
-      }
-
+      if (!blob && chunks.length > 1) await saveArchiveChunks(row.id, chunks, actor);
       return jsonNoStore({ ok: true, file: toArchiveUploadedFileItem(row, references), message: "تم رفع الملف" });
     } catch (error) {
-      if (blob?.blobPathname) {
-        await deleteArchiveBlobFile(blob.blobPathname).catch(() => undefined);
-      }
+      if (blob?.blobPathname) await deleteArchiveBlobFile(blob.blobPathname).catch(() => undefined);
       throw error;
     }
   } catch (error) {
