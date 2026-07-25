@@ -58,7 +58,9 @@ export async function storeArchiveBlobFile(args: {
 }): Promise<ArchiveBlobStoredFile> {
   const pathname = buildArchiveBlobPath(args.category, args.extension);
   const blob = await put(pathname, args.body, {
-    access: "private",
+    // The installed SDK's type declaration only exposes "public", while the
+    // existing runtime supports private Blob access. Keep the override local.
+    access: "private" as never,
     addRandomSuffix: false,
     contentType: args.contentType,
   });
