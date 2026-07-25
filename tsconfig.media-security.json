@@ -33,6 +33,8 @@
     "app/api/upload/route.ts",
     "app/api/users/me/avatar/route.ts",
     "app/[locale]/profile/_components/AvatarUploader.tsx",
+    "app/(dashboard)/dashboard/DashboardMediaRequestBridge.tsx",
+    "app/(dashboard)/dashboard/layout.tsx",
     "app/api/admin/archive/_auth.ts",
     "app/api/admin/archive/uploaded-files/route.ts",
     "app/api/admin/archive/uploaded-files/start/route.ts",
