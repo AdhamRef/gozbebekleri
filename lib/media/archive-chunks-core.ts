@@ -1,5 +1,6 @@
-import { ARCHIVE_MAX_FILE_BYTES } from "@/lib/archive/uploaded-files";
 import { MediaSecurityError } from "./security-core";
+
+const ARCHIVE_MAX_FILE_BYTES = 30 * 1024 * 1024;
 
 export type ArchiveUploadParent = {
   uploadStatus: string;
