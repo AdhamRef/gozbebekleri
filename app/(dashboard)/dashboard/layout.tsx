@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import DashboardLayoutClient from "./DashboardLayoutClient";
-import DashboardMediaRequestBridge from "./DashboardMediaRequestBridge";
 import ar from "../../../i18n/messages/ar.json";
 
 export const metadata: Metadata = {
@@ -27,7 +26,6 @@ export default async function DashboardLayout({
       messages={messages}
       locale={locale}
     >
-      <DashboardMediaRequestBridge />
       {children}
     </DashboardLayoutClient>
   );
