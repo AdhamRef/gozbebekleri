@@ -9,6 +9,7 @@ import {
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { explicitMediaScope, permissionForMediaScope } from "@/lib/media/access";
 import {
+  IMAGE_MAX_BYTES,
   MediaSecurityError,
   VIDEO_MAX_BYTES,
   assertContentLength,
@@ -52,7 +53,10 @@ export async function POST(request: Request) {
     const { session, denied, scope } = await authorize(request);
     if (denied || !session || !scope) return denied;
 
-    assertContentLength(request.headers.get("content-length"), VIDEO_MAX_BYTES);
+    assertContentLength(
+      request.headers.get("content-length"),
+      scope === "campaigns" ? VIDEO_MAX_BYTES : IMAGE_MAX_BYTES,
+    );
     const formData = await request.formData();
     const files = formData.getAll("file").filter((value): value is File => value instanceof File);
     validateFileCount(files);
@@ -94,16 +98,7 @@ export async function DELETE(request: Request) {
     const { session, denied, scope } = await authorize(request);
     if (denied || !session || !scope) return denied;
 
-    const searchParams = new URL(request.url).searchParams;
-    if (searchParams.get("legacyDetach") === "1") {
-      return NextResponse.json({
-        deleted: false,
-        notFound: false,
-        detachedOnly: true,
-      });
-    }
-
-    const assetId = searchParams.get("assetId");
+    const assetId = new URL(request.url).searchParams.get("assetId");
     if (!assetId) {
       throw new MediaSecurityError("Asset identifier is required", 400, "MISSING_ASSET_ID");
     }
