@@ -1,12 +1,10 @@
 name: Finalize media callers
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/secure-media-upload-delete
-    paths:
-      - scripts/media-finalize-callers.mjs
-      - .github/workflows/media-finalize-callers.yml
+      - main
+    types: [synchronize]
   workflow_dispatch:
 
 permissions:
@@ -18,7 +16,7 @@ concurrency:
 
 jobs:
   convert-and-verify:
-    if: github.actor != 'github-actions[bot]'
+    if: github.head_ref == 'agent/secure-media-upload-delete' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
