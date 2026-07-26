@@ -12,10 +12,31 @@ export type StoredAvatar = {
   size: number;
 };
 
+function safeUserId(userId: string): string {
+  const safe = userId.replace(/[^a-zA-Z0-9_-]/g, "");
+  if (!safe || safe !== userId) throw new Error("Invalid authenticated user id");
+  return safe;
+}
+
 function avatarAssetId(userId: string, extension: ValidatedAvatar["extension"]): string {
-  const safeUserId = userId.replace(/[^a-zA-Z0-9_-]/g, "");
-  if (!safeUserId || safeUserId !== userId) throw new Error("Invalid authenticated user id");
-  return `gozbebekleri/avatars/${safeUserId}/${randomUUID()}.${extension}`;
+  return `gozbebekleri/avatars/${safeUserId(userId)}/${randomUUID()}.${extension}`;
+}
+
+export function managedAvatarAssetIdFromUrl(url: string | null | undefined, userId: string): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const marker = "/upload/";
+    const index = parsed.pathname.indexOf(marker);
+    if (index < 0) return null;
+    const candidate = decodeURIComponent(parsed.pathname.slice(index + marker.length)).replace(/^v\d+\//, "");
+    const prefix = `gozbebekleri/avatars/${safeUserId(userId)}/`;
+    if (!candidate.startsWith(prefix) || candidate.slice(prefix.length).includes("/")) return null;
+    if (!/^[a-zA-Z0-9_-]+\/avatars\/[a-zA-Z0-9_-]+\/[0-9a-f-]+\.(jpg|png|webp)$/i.test(candidate)) return null;
+    return candidate;
+  } catch {
+    return null;
+  }
 }
 
 export async function uploadAvatar(userId: string, avatar: ValidatedAvatar): Promise<StoredAvatar> {
@@ -37,12 +58,14 @@ export async function uploadAvatar(userId: string, avatar: ValidatedAvatar): Pro
   };
 }
 
-export async function deleteNewAvatar(assetId: string, userId: string): Promise<void> {
-  const prefix = `gozbebekleri/avatars/${userId}/`;
+export async function deleteManagedAvatar(assetId: string, userId: string): Promise<void> {
+  const prefix = `gozbebekleri/avatars/${safeUserId(userId)}/`;
   if (!assetId.startsWith(prefix) || assetId.slice(prefix.length).includes("/")) return;
-  if (!/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+\/[0-9a-f-]+\.(jpg|png|webp)$/i.test(assetId)) return;
+  if (!/^[a-zA-Z0-9_-]+\/avatars\/[a-zA-Z0-9_-]+\/[0-9a-f-]+\.(jpg|png|webp)$/i.test(assetId)) return;
   await cloudinary.uploader.destroy(assetId.replace(/\.[^.]+$/, ""), {
     resource_type: "image",
     invalidate: true,
   }).catch(() => undefined);
 }
+
+export const deleteNewAvatar = deleteManagedAvatar;
