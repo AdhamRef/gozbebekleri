@@ -186,8 +186,9 @@ test("chunk and complete routes recheck document permission before file data ope
   assert.ok(complete.indexOf("validateArchiveCompletion") < complete.indexOf("assembleValidatedChunks"));
 });
 
-test("legacy donation-new editor redirects without changing donation logic", () => {
+test("donation-new remains a real page and media work does not change donation APIs", () => {
   const source = readFileSync("app/(dashboard)/dashboard/donations/new/page.tsx", "utf8");
-  assert.match(source, /redirect\("\/dashboard\/campaigns\/new"\)/);
-  assert.doesNotMatch(source, /api\/upload|api\/donations|prisma|payment/i);
+  assert.doesNotMatch(source, /redirect\("\/dashboard\/campaigns\/new"\)/);
+  assert.doesNotMatch(source, /api\/donations|api\/payments|prisma|payment/i);
+  assert.match(source, /export default function NewCampaignPage/);
 });
