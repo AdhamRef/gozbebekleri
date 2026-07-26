@@ -1,0 +1,56 @@
+name: Finalize media callers
+
+on:
+  push:
+    branches:
+      - agent/secure-media-upload-delete
+    paths:
+      - scripts/media-finalize-callers.mjs
+      - .github/workflows/media-finalize-callers.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: media-finalize-callers
+  cancel-in-progress: false
+
+jobs:
+  convert-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/secure-media-upload-delete
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Convert callers and enforce active-source guard
+        run: node scripts/media-finalize-callers.mjs
+      - name: Integration settings tests
+        run: npm run test:integration-settings
+      - name: Targeted media TypeScript
+        run: npx tsc -p tsconfig.media-security.json
+      - name: Validate Prisma schema
+        run: npx prisma validate --schema prisma/schema.prisma
+      - name: Communication runtime TypeScript
+        run: npm run typecheck:communication-runtime
+      - name: Integration release TypeScript
+        run: npm run typecheck:integration-release
+      - name: Production build
+        run: npm run build
+      - name: Remove one-time conversion files
+        run: rm -f scripts/media-finalize-callers.mjs .github/workflows/media-finalize-callers.yml
+      - name: Commit verified media caller conversion
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "Finalize direct media callers"
+          git push origin HEAD:agent/secure-media-upload-delete
