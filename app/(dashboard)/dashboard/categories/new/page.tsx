@@ -24,6 +24,11 @@ import {
 import { ArrowLeft, Loader2, Upload, X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CategoryIcon, { CATEGORY_ICON_NAMES } from '@/components/CategoryIcon';
+import {
+  deleteUnsavedDashboardMedia,
+  markDashboardAssetPersisted,
+  uploadDashboardMedia,
+} from '@/lib/media/client';
 
 const formSchema = z.object({
   name: z.string().min(1, 'اسم الحملة مطلوب').max(50, 'اسم الحملة طويل جداً'),
@@ -95,6 +100,7 @@ export default function NewCategoryPage() {
           de: { name: values.name_de ?? '', description: values.description_de ?? '' },
         },
       });
+      if (values.image) markDashboardAssetPersisted(values.image);
       toast.success('تم إنشاء الحملة بنجاح');
       router.push('/dashboard/categories');
     } catch (error) {
@@ -110,12 +116,9 @@ export default function NewCategoryPage() {
     if (!file) return;
 
     setUploadingImage(true);
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-      const response = await axios.post('/api/upload', formData);
-      form.setValue('image', response.data.url);
+      const asset = await uploadDashboardMedia(file, 'categories');
+      form.setValue('image', asset.url);
       toast.success('تم رفع الصورة بنجاح');
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -130,10 +133,7 @@ export default function NewCategoryPage() {
     if (!imageUrl) return;
 
     try {
-      const publicId = imageUrl.split('/').slice(-1)[0].split('.')[0];
-      if (publicId) {
-        await axios.delete(`/api/upload?publicId=${publicId}`);
-      }
+      await deleteUnsavedDashboardMedia(imageUrl, 'categories');
       form.setValue('image', '');
       toast.success('تم حذف الصورة بنجاح');
     } catch (error) {
@@ -289,7 +289,6 @@ export default function NewCategoryPage() {
 
           <Card className="p-6">
             <div className="grid gap-6">
-
               <FormField
                 control={form.control}
                 name="image"
@@ -354,7 +353,6 @@ export default function NewCategoryPage() {
                 )}
               />
 
-              {/* Icon Picker */}
               <FormField
                 control={form.control}
                 name="icon"
@@ -399,7 +397,6 @@ export default function NewCategoryPage() {
             </div>
           </Card>
 
-          {/* Actions */}
           <div className="flex justify-end gap-4">
             <Button
               type="button"
@@ -421,4 +418,4 @@ export default function NewCategoryPage() {
       </Form>
     </div>
   );
-} 
+}
