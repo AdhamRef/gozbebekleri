@@ -49,10 +49,28 @@ export async function POST(_request: Request, context: Params) {
     const documentsAccess = await requireArchiveUploadedFileListAccess("DOCUMENTS");
     if (documentsAccess.denied) return documentsAccess.denied;
   }
+  if (parent.uploadStatus !== "UPLOADING") {
+    return jsonNoStore({ ok: false, error: "الملف قيد المعالجة أو مكتمل" }, { status: 409 });
+  }
 
+  const claimed = await prisma.auditLog.updateMany({
+    where: {
+      id,
+      metadata: { path: ["uploadStatus"], equals: "UPLOADING" },
+    },
+    data: {
+      metadata: { ...metadata, uploadStatus: "PROCESSING" },
+    },
+  });
+  if (claimed.count !== 1) {
+    return jsonNoStore({ ok: false, error: "تم بدء إكمال الملف بالفعل" }, { status: 409 });
+  }
+
+  let storagePatch: ArchiveBlobStoredFile | { storageMode: "CLIENT_CHUNKED" } | null = null;
   try {
+    const processingParent: ArchiveUploadParent = { ...parent, uploadStatus: "PROCESSING" };
     const chunks = await readUploadChunks(id);
-    const ordered = validateArchiveCompletion({ parent, chunks });
+    const ordered = validateArchiveCompletion({ parent: { ...processingParent, uploadStatus: "UPLOADING" }, chunks });
     const buffer = assembleValidatedChunks(ordered);
     const bytes = Uint8Array.from(buffer);
     const validated = await validateArchiveMediaFile({
@@ -62,34 +80,38 @@ export async function POST(_request: Request, context: Params) {
       arrayBuffer: async () => bytes.buffer,
     });
 
-    const storagePatch = await buildStoragePatch(parent.category, validated);
-    try {
-      await prisma.auditLog.update({
-        where: { id },
-        data: {
-          metadata: { ...metadata, ...storagePatch, uploadStatus: "READY" },
-          messageAr: "تم رفع الملف داخل الأرشيف",
-          messageEn: "Archive uploaded file completed",
+    storagePatch = await buildStoragePatch(parent.category, validated);
+    await prisma.auditLog.update({
+      where: { id },
+      data: {
+        metadata: { ...metadata, ...storagePatch, uploadStatus: "READY" },
+        messageAr: "تم رفع الملف داخل الأرشيف",
+        messageEn: "Archive uploaded file completed",
+      },
+    });
+    if (storagePatch.storageMode === "BLOB") {
+      await prisma.auditLog.deleteMany({
+        where: {
+          action: "archive.uploadedFile.chunk",
+          entityType: "ArchiveUploadedFileChunk",
+          entityId: id,
         },
       });
-      if (storagePatch.storageMode === "BLOB") {
-        await prisma.auditLog.deleteMany({
-          where: {
-            action: "archive.uploadedFile.chunk",
-            entityType: "ArchiveUploadedFileChunk",
-            entityId: id,
-          },
-        });
-      }
-    } catch (error) {
-      if (storagePatch.storageMode === "BLOB") {
-        await deleteArchiveBlobFile(storagePatch.blobPathname).catch(() => undefined);
-      }
-      throw error;
     }
 
     return jsonNoStore({ ok: true, message: "تم رفع الملف" });
   } catch (error) {
+    if (storagePatch?.storageMode === "BLOB") {
+      await deleteArchiveBlobFile(storagePatch.blobPathname).catch(() => undefined);
+    }
+    await prisma.auditLog.updateMany({
+      where: {
+        id,
+        metadata: { path: ["uploadStatus"], equals: "PROCESSING" },
+      },
+      data: { metadata: { ...metadata, uploadStatus: "UPLOADING" } },
+    }).catch(() => undefined);
+
     if (error instanceof MediaSecurityError) {
       return jsonNoStore({ ok: false, error: error.message, code: error.code }, { status: error.status });
     }
