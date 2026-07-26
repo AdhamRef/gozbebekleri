@@ -25,6 +25,23 @@ function convertCampaignNew() {
   write(path, s);
 }
 
+function convertCampaignEdit() {
+  const path = "app/(dashboard)/dashboard/campaigns/edit/[id]/page.tsx";
+  let s = read(path);
+  s = replaceOnce(s, "import axios from 'axios';", `import axios from 'axios';\nimport {\n  cleanupManagedDashboardMediaAfterSave,\n  deleteUnsavedDashboardMedia,\n  markDashboardAssetPersisted,\n  uploadDashboardMedia,\n} from '@/lib/media/client';`, "campaign-edit import");
+  s = replaceOnce(s, `  const shareLabelsRef = useRef<ShareLabelsSectionRef>(null);`, `  const shareLabelsRef = useRef<ShareLabelsSectionRef>(null);\n  const removedCampaignMediaRef = useRef<Set<string>>(new Set());\n  const removedUpdateMediaRef = useRef<Set<string>>(new Set());\n\n  const detachMedia = async (url: string | null | undefined, bucket: React.MutableRefObject<Set<string>>) => {\n    if (!url) return;\n    const deletedUnsaved = await deleteUnsavedDashboardMedia(url, 'campaigns').catch(() => false);\n    if (!deletedUnsaved) bucket.current.add(url);\n  };\n\n  const cleanupAfterSave = async (bucket: React.MutableRefObject<Set<string>>) => {\n    const urls = [...bucket.current];\n    bucket.current.clear();\n    await Promise.all(urls.map((url) => cleanupManagedDashboardMediaAfterSave(url, 'campaigns').catch(() => false)));\n  };`, "campaign-edit cleanup refs");
+  s = replaceOnce(s, `      await axios.put(\`/api/campaigns/\${params.id}\`, requestData);\n      toast.success('تم تحديث المشروع بنجاح');`, `      await axios.put(\`/api/campaigns/\${params.id}\`, requestData);\n      const persistedMedia = [\n        ...values.images,\n        values.image_en, values.image_fr, values.image_tr, values.image_id,\n        values.image_pt, values.image_es, values.image_de,\n      ].filter((url): url is string => Boolean(url));\n      persistedMedia.forEach(markDashboardAssetPersisted);\n      await cleanupAfterSave(removedCampaignMediaRef);\n      toast.success('تم تحديث المشروع بنجاح');`, "campaign-edit save cleanup");
+  s = replaceOnce(s, `      const formData = new FormData();\n      formData.append('file', file);\n      const response = await axios.post('/api/upload', formData);\n      form.setValue(\`image_\${locale}\` as LocaleImageKey, response.data?.url ?? '', {`, `      const key = \`image_\${locale}\` as LocaleImageKey;\n      const previous = form.getValues(key);\n      const asset = await uploadDashboardMedia(file, 'campaigns');\n      if (previous) await detachMedia(previous, removedCampaignMediaRef);\n      form.setValue(key, asset.url, {`, "campaign-edit locale upload");
+  s = replaceRegex(s, /  const removeLocaleImage = \(locale: 'en' \| 'fr' \| 'tr' \| 'id' \| 'pt' \| 'es' \| 'de'\) => \{[\s\S]*?\n  \};\n\n  const renderLocaleMedia/, `  const removeLocaleImage = async (locale: 'en' | 'fr' | 'tr' | 'id' | 'pt' | 'es' | 'de') => {\n    const key = \`image_\${locale}\` as LocaleImageKey;\n    const current = form.getValues(key);\n    if (current) await detachMedia(current, removedCampaignMediaRef);\n    form.setValue(key, '', { shouldDirty: true });\n  };\n\n  const renderLocaleMedia`, "campaign-edit locale remove");
+  s = replaceRegex(s, /    const uploadPromises = Array\.from\(files\)\.map\(async \(file\) => \{[\s\S]*?\n    \}\);/, `    const uploadPromises = Array.from(files).map(async (file) => {\n      const asset = await uploadDashboardMedia(file, 'campaigns');\n      return asset.url;\n    });`, "campaign-edit uploads");
+  s = replaceRegex(s, /  const removeImage = async \(index: number\) => \{[\s\S]*?\n  \};\n\n  const reorderImages/, `  const removeImage = async (index: number) => {\n    const currentImages = form.getValues('images');\n    const imageUrl = currentImages[index];\n    if (imageUrl) await detachMedia(imageUrl, removedCampaignMediaRef);\n    form.setValue('images', currentImages.filter((_, i) => i !== index));\n    toast.success('تم فصل الصورة؛ سيكتمل التنظيف بعد حفظ المشروع');\n  };\n\n  const reorderImages`, "campaign-edit image remove");
+  s = replaceOnce(s, `    const formData = new FormData();\n    formData.append('file', file);\n\n    try {\n      const response = await axios.post('/api/upload', formData);\n      setUpdateImage(response.data.url);`, `    try {\n      const asset = await uploadDashboardMedia(file, 'campaigns');\n      if (updateImage) await detachMedia(updateImage, removedUpdateMediaRef);\n      setUpdateImage(asset.url);`, "campaign-edit update upload");
+  s = replaceRegex(s, /  const removeUpdateImage = async \(\) => \{[\s\S]*?\n  \};\n\n  const handleAddUpdate/, `  const removeUpdateImage = async () => {\n    if (updateImage) await detachMedia(updateImage, removedUpdateMediaRef);\n    setUpdateImage('');\n    toast.success('تم فصل الصورة؛ سيكتمل التنظيف بعد حفظ التحديث');\n  };\n\n  const handleAddUpdate`, "campaign-edit update remove");
+  s = replaceOnce(s, `      setUpdates(prev => [response.data, ...prev]);`, `      if (updateImage) markDashboardAssetPersisted(updateImage);\n      await cleanupAfterSave(removedUpdateMediaRef);\n      setUpdates(prev => [response.data, ...prev]);`, "campaign-add-update cleanup");
+  s = replaceOnce(s, `      setUpdates(updates.map(update => update.id === id ? response.data : update));`, `      if (updateImage) markDashboardAssetPersisted(updateImage);\n      await cleanupAfterSave(removedUpdateMediaRef);\n      setUpdates(updates.map(update => update.id === id ? response.data : update));`, "campaign-edit-update cleanup");
+  write(path, s);
+}
+
 function convertBlogEditor() {
   const path = "app/[locale]/blog/_components/BlogEditor.jsx";
   let s = read(path);
@@ -45,6 +62,7 @@ function convertSimpleBlogUpload(path, importNeedle, oldBlock, newBlock, label) 
 }
 
 convertCampaignNew();
+convertCampaignEdit();
 convertBlogEditor();
 convertSimpleBlogUpload(
   "app/[locale]/blog/_components/wysiwyg/toolbar.tsx",
