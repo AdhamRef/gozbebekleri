@@ -2,6 +2,10 @@ import * as XLSX from "xlsx";
 import { MediaSecurityError, type FileLike } from "./security-core";
 
 export const ARCHIVE_MEDIA_MAX_BYTES = 30 * 1024 * 1024;
+export const XLSX_MAX_ENTRIES = 2048;
+export const XLSX_MAX_TOTAL_UNCOMPRESSED_BYTES = 120 * 1024 * 1024;
+export const XLSX_MAX_ENTRY_UNCOMPRESSED_BYTES = 30 * 1024 * 1024;
+export const XLSX_MAX_COMPRESSION_RATIO = 100;
 
 export type ValidatedArchiveMedia = {
   bytes: Uint8Array;
@@ -38,17 +42,6 @@ function safeExtension(name: string): "pdf" | "xlsx" | "xls" {
   return extension;
 }
 
-function containsAscii(bytes: Uint8Array, needle: string): boolean {
-  const encoded = new TextEncoder().encode(needle);
-  outer: for (let index = 0; index <= bytes.length - encoded.length; index += 1) {
-    for (let offset = 0; offset < encoded.length; offset += 1) {
-      if (bytes[index + offset] !== encoded[offset]) continue outer;
-    }
-    return true;
-  }
-  return false;
-}
-
 function containsUtf16Le(bytes: Uint8Array, needle: string): boolean {
   const encoded = new Uint8Array(needle.length * 2);
   for (let index = 0; index < needle.length; index += 1) {
@@ -82,6 +75,99 @@ function parseWorkbook(bytes: Uint8Array): void {
   }
 }
 
+function readUInt16(bytes: Uint8Array, offset: number): number {
+  return bytes[offset] | (bytes[offset + 1] << 8);
+}
+
+function readUInt32(bytes: Uint8Array, offset: number): number {
+  return (bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16) | (bytes[offset + 3] << 24)) >>> 0;
+}
+
+function signatureAt(bytes: Uint8Array, offset: number, signature: number): boolean {
+  return offset >= 0 && offset + 4 <= bytes.length && readUInt32(bytes, offset) === signature;
+}
+
+export type XlsxDirectoryInspection = {
+  entries: number;
+  totalUncompressedBytes: number;
+  hasContentTypes: boolean;
+  hasWorkbook: boolean;
+};
+
+export function inspectXlsxCentralDirectory(bytes: Uint8Array): XlsxDirectoryInspection {
+  const minimumEocdSize = 22;
+  const searchStart = Math.max(0, bytes.length - 65_557);
+  let eocdOffset = -1;
+  for (let offset = bytes.length - minimumEocdSize; offset >= searchStart; offset -= 1) {
+    if (signatureAt(bytes, offset, 0x06054b50)) {
+      eocdOffset = offset;
+      break;
+    }
+  }
+  if (eocdOffset < 0) {
+    throw new MediaSecurityError("XLSX central directory is missing", 400, "CORRUPT_XLSX");
+  }
+
+  const diskNumber = readUInt16(bytes, eocdOffset + 4);
+  const centralDisk = readUInt16(bytes, eocdOffset + 6);
+  const entriesOnDisk = readUInt16(bytes, eocdOffset + 8);
+  const entries = readUInt16(bytes, eocdOffset + 10);
+  const centralSize = readUInt32(bytes, eocdOffset + 12);
+  const centralOffset = readUInt32(bytes, eocdOffset + 16);
+  if (diskNumber !== 0 || centralDisk !== 0 || entriesOnDisk !== entries) {
+    throw new MediaSecurityError("Multi-disk XLSX archives are not supported", 400, "CORRUPT_XLSX");
+  }
+  if (entries <= 0 || entries > XLSX_MAX_ENTRIES) {
+    throw new MediaSecurityError("XLSX contains too many entries", 400, "XLSX_LIMIT_EXCEEDED");
+  }
+  if (centralOffset + centralSize > eocdOffset || centralOffset + centralSize > bytes.length) {
+    throw new MediaSecurityError("Invalid XLSX central directory bounds", 400, "CORRUPT_XLSX");
+  }
+
+  let offset = centralOffset;
+  let totalUncompressedBytes = 0;
+  let hasContentTypes = false;
+  let hasWorkbook = false;
+  const decoder = new TextDecoder();
+
+  for (let entry = 0; entry < entries; entry += 1) {
+    if (!signatureAt(bytes, offset, 0x02014b50) || offset + 46 > bytes.length) {
+      throw new MediaSecurityError("Invalid XLSX central directory entry", 400, "CORRUPT_XLSX");
+    }
+    const compressedSize = readUInt32(bytes, offset + 20);
+    const uncompressedSize = readUInt32(bytes, offset + 24);
+    const nameLength = readUInt16(bytes, offset + 28);
+    const extraLength = readUInt16(bytes, offset + 30);
+    const commentLength = readUInt16(bytes, offset + 32);
+    const entryEnd = offset + 46 + nameLength + extraLength + commentLength;
+    if (entryEnd > centralOffset + centralSize || entryEnd > bytes.length) {
+      throw new MediaSecurityError("Invalid XLSX entry bounds", 400, "CORRUPT_XLSX");
+    }
+    if (uncompressedSize > XLSX_MAX_ENTRY_UNCOMPRESSED_BYTES) {
+      throw new MediaSecurityError("XLSX entry is too large", 400, "XLSX_LIMIT_EXCEEDED");
+    }
+    if (uncompressedSize > 0 && compressedSize === 0) {
+      throw new MediaSecurityError("XLSX compression ratio is unsafe", 400, "XLSX_LIMIT_EXCEEDED");
+    }
+    if (compressedSize > 0 && uncompressedSize / compressedSize > XLSX_MAX_COMPRESSION_RATIO) {
+      throw new MediaSecurityError("XLSX compression ratio is unsafe", 400, "XLSX_LIMIT_EXCEEDED");
+    }
+    totalUncompressedBytes += uncompressedSize;
+    if (totalUncompressedBytes > XLSX_MAX_TOTAL_UNCOMPRESSED_BYTES) {
+      throw new MediaSecurityError("XLSX expands beyond the allowed size", 400, "XLSX_LIMIT_EXCEEDED");
+    }
+    const name = decoder.decode(bytes.slice(offset + 46, offset + 46 + nameLength));
+    if (name === "[Content_Types].xml") hasContentTypes = true;
+    if (name === "xl/workbook.xml") hasWorkbook = true;
+    offset = entryEnd;
+  }
+
+  if (offset !== centralOffset + centralSize || !hasContentTypes || !hasWorkbook) {
+    throw new MediaSecurityError("ZIP file is not an XLSX workbook", 400, "CORRUPT_XLSX");
+  }
+  return { entries, totalUncompressedBytes, hasContentTypes, hasWorkbook };
+}
+
 function verifyPdf(bytes: Uint8Array): void {
   if (!startsWith(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d])) {
     throw new MediaSecurityError("Invalid PDF signature", 400, "CORRUPT_PDF");
@@ -97,9 +183,7 @@ function verifyXlsx(bytes: Uint8Array): void {
   if (!startsWith(bytes, [0x50, 0x4b, 0x03, 0x04])) {
     throw new MediaSecurityError("Invalid XLSX container", 400, "CORRUPT_XLSX");
   }
-  if (!containsAscii(bytes, "[Content_Types].xml") || !containsAscii(bytes, "xl/workbook.xml")) {
-    throw new MediaSecurityError("ZIP file is not an XLSX workbook", 400, "CORRUPT_XLSX");
-  }
+  inspectXlsxCentralDirectory(bytes);
   parseWorkbook(bytes);
 }
 
