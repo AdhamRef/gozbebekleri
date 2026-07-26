@@ -53,14 +53,13 @@ export async function POST(_request: Request, context: Params) {
     return jsonNoStore({ ok: false, error: "الملف قيد المعالجة أو مكتمل" }, { status: 409 });
   }
 
+  const processingMetadata = { ...metadata, uploadStatus: "PROCESSING" };
   const claimed = await prisma.auditLog.updateMany({
     where: {
       id,
-      metadata: { path: ["uploadStatus"], equals: "UPLOADING" },
+      metadata: { equals: parentRow.metadata },
     },
-    data: {
-      metadata: { ...metadata, uploadStatus: "PROCESSING" },
-    },
+    data: { metadata: processingMetadata },
   });
   if (claimed.count !== 1) {
     return jsonNoStore({ ok: false, error: "تم بدء إكمال الملف بالفعل" }, { status: 409 });
@@ -68,9 +67,8 @@ export async function POST(_request: Request, context: Params) {
 
   let storagePatch: ArchiveBlobStoredFile | { storageMode: "CLIENT_CHUNKED" } | null = null;
   try {
-    const processingParent: ArchiveUploadParent = { ...parent, uploadStatus: "PROCESSING" };
     const chunks = await readUploadChunks(id);
-    const ordered = validateArchiveCompletion({ parent: { ...processingParent, uploadStatus: "UPLOADING" }, chunks });
+    const ordered = validateArchiveCompletion({ parent, chunks });
     const buffer = assembleValidatedChunks(ordered);
     const bytes = Uint8Array.from(buffer);
     const validated = await validateArchiveMediaFile({
@@ -81,14 +79,20 @@ export async function POST(_request: Request, context: Params) {
     });
 
     storagePatch = await buildStoragePatch(parent.category, validated);
-    await prisma.auditLog.update({
-      where: { id },
+    const ready = await prisma.auditLog.updateMany({
+      where: {
+        id,
+        metadata: { equals: processingMetadata },
+      },
       data: {
         metadata: { ...metadata, ...storagePatch, uploadStatus: "READY" },
         messageAr: "تم رفع الملف داخل الأرشيف",
         messageEn: "Archive uploaded file completed",
       },
     });
+    if (ready.count !== 1) {
+      throw new MediaSecurityError("Upload state changed during completion", 409, "UPLOAD_STATE_CHANGED");
+    }
     if (storagePatch.storageMode === "BLOB") {
       await prisma.auditLog.deleteMany({
         where: {
@@ -107,7 +111,7 @@ export async function POST(_request: Request, context: Params) {
     await prisma.auditLog.updateMany({
       where: {
         id,
-        metadata: { path: ["uploadStatus"], equals: "PROCESSING" },
+        metadata: { equals: processingMetadata },
       },
       data: { metadata: { ...metadata, uploadStatus: "UPLOADING" } },
     }).catch(() => undefined);
