@@ -21,8 +21,8 @@ export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> | { id: string } };
 
-function chunkRecordId(uploadId: string, index: number): string {
-  return `archive-chunk-${createHash("sha256").update(`${uploadId}:${index}`).digest("hex")}`;
+export function chunkRecordId(uploadId: string, index: number): string {
+  return createHash("sha256").update(`${uploadId}:${index}`).digest("hex").slice(0, 24);
 }
 
 function mediaError(error: unknown) {
