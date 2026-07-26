@@ -91,7 +91,17 @@ export async function POST(_request: Request, context: Params) {
       },
     });
     if (ready.count !== 1) {
-      throw new MediaSecurityError("Upload state changed during completion", 409, "UPLOAD_STATE_CHANGED");
+      if (storagePatch.storageMode === "BLOB") {
+        await deleteArchiveBlobFile(storagePatch.blobPathname).catch(() => undefined);
+      }
+      await prisma.auditLog.updateMany({
+        where: { id, metadata: { equals: processingMetadata } },
+        data: { metadata: { ...metadata, uploadStatus: "UPLOADING" } },
+      }).catch(() => undefined);
+      return jsonNoStore(
+        { ok: false, error: "تغيرت حالة الملف أثناء الإكمال", code: "UPLOAD_STATE_CHANGED" },
+        { status: 409 },
+      );
     }
     if (storagePatch.storageMode === "BLOB") {
       await prisma.auditLog.deleteMany({
