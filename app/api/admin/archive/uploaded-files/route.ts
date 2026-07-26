@@ -8,6 +8,7 @@ import {
 import { getArchiveRepositorySnapshot, type ArchiveFoundationData } from "@/lib/archive/archive-repository";
 import {
   ARCHIVE_BASE64_CHUNK_SIZE,
+  ARCHIVE_MAX_FILE_BYTES,
   archiveUploadMessage,
   archiveUploadMessageEn,
   buildArchiveUploadReferences,
@@ -20,7 +21,7 @@ import {
   type ArchiveUploadCategory,
   type ArchiveUploadedFileItem,
 } from "@/lib/archive/uploaded-files";
-import { MediaSecurityError, validateFileCount } from "@/lib/media/security-core";
+import { MediaSecurityError, assertContentLength, validateFileCount } from "@/lib/media/security-core";
 import { validateArchiveMediaFile } from "@/lib/media/archive-security";
 import { prisma } from "@/lib/prisma";
 import { jsonNoStore, requireArchiveActionAccess, requireArchiveUploadedFileListAccess } from "../_auth";
@@ -60,21 +61,28 @@ export async function POST(request: Request) {
   if (denied) return denied;
   if (!session?.user) return jsonNoStore({ ok: false, error: "Unauthorized" }, { status: 401 });
 
+  const authorizedCategory = parseArchiveUploadCategory(new URL(request.url).searchParams.get("category"));
+  if (!authorizedCategory) {
+    return jsonNoStore({ ok: false, error: "اختر نوع الملف" }, { status: 400 });
+  }
+  if (authorizedCategory === "DOCUMENTS") {
+    const docsAccess = await requireArchiveUploadedFileListAccess("DOCUMENTS");
+    if (docsAccess.denied) return docsAccess.denied;
+  }
+
   try {
+    assertContentLength(request.headers.get("content-length"), ARCHIVE_MAX_FILE_BYTES);
     const formData = await request.formData();
     const files = formData.getAll("file").filter((value): value is File => value instanceof File);
     validateFileCount(files);
 
-    const category = parseArchiveUploadCategory(String(formData.get("category") || ""));
+    const bodyCategory = parseArchiveUploadCategory(String(formData.get("category") || ""));
+    if (!bodyCategory || bodyCategory !== authorizedCategory) {
+      return jsonNoStore({ ok: false, error: "نوع الملف لا يطابق القسم المصرح" }, { status: 400 });
+    }
+    const category = authorizedCategory;
     const title = String(formData.get("title") || "").trim();
     const notes = String(formData.get("notes") || "").trim();
-
-    if (!category) return jsonNoStore({ ok: false, error: "اختر نوع الملف" }, { status: 400 });
-    if (category === "DOCUMENTS") {
-      const docsAccess = await requireArchiveUploadedFileListAccess("DOCUMENTS");
-      if (docsAccess.denied) return docsAccess.denied;
-    }
-
     const uploadFile = files[0];
     if (!uploadFile) throw new MediaSecurityError("No file uploaded", 400, "MISSING_FILE");
     const validated = await validateArchiveMediaFile(uploadFile);
@@ -84,12 +92,7 @@ export async function POST(request: Request) {
     const linkedProjectId = validArchiveProjectId(String(formData.get("linkedProjectId") || ""), references);
     const actor = auditActorFromDashboardSession(session);
     const buffer = Buffer.from(validated.bytes);
-    const blob = await tryStoreBlob({
-      category,
-      extension: validated.extension,
-      mimeType: validated.mimeType,
-      buffer,
-    });
+    const blob = await tryStoreBlob({ category, extension: validated.extension, mimeType: validated.mimeType, buffer });
     const base64 = blob ? "" : buffer.toString("base64");
     const chunks = blob ? [] : chunkString(base64, ARCHIVE_BASE64_CHUNK_SIZE);
 
