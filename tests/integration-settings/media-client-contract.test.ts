@@ -24,9 +24,7 @@ test("legacy publicId requests never reach provider deletion", () => {
   assert.match(bridge, /legacyDetach/);
   assert.match(bridge, /assetId: pending\.assetId/);
   const route = read("app/api/upload/route.ts");
-  const legacySection = route.slice(route.indexOf('searchParams.get("legacyDetach")'), route.indexOf('const assetId'));
-  assert.match(legacySection, /detachedOnly: true/);
-  assert.doesNotMatch(legacySection, /deleteMedia|secureDelete|lookupMediaUrl/);
+  assert.doesNotMatch(route, /legacyDetach|publicId/);
 });
 
 test("new dashboard media keeps url and assetId for safe cleanup", () => {
@@ -47,8 +45,9 @@ test("profile avatar is isolated from admin media and is self-only", () => {
   assert.doesNotMatch(route, /where:\s*\{\s*id:\s*formData/);
 });
 
-test("donation-new is a safe legacy redirect with no upload or donation mutation", () => {
+test("donation-new remains a real page and does not mutate donation APIs", () => {
   const source = read("app/(dashboard)/dashboard/donations/new/page.tsx");
-  assert.match(source, /redirect\("\/dashboard\/campaigns\/new"\)/);
-  assert.doesNotMatch(source, /\/api\/upload|\/api\/donations|prisma|payment/i);
+  assert.doesNotMatch(source, /redirect\("\/dashboard\/campaigns\/new"\)/);
+  assert.doesNotMatch(source, /\/api\/donations|\/api\/payments|prisma|payment/i);
+  assert.match(source, /export default function NewCampaignPage/);
 });
