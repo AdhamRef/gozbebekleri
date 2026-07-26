@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { auditActorFromDashboardSession } from "@/lib/audit-log";
 import { ARCHIVE_CLIENT_CHUNK_MAX_BYTES } from "@/lib/archive/uploaded-files";
 import { metadataObject, numberField, stringField } from "@/lib/archive/uploaded-files";
@@ -18,6 +20,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> | { id: string } };
+
+function chunkRecordId(uploadId: string, index: number): string {
+  return `archive-chunk-${createHash("sha256").update(`${uploadId}:${index}`).digest("hex")}`;
+}
 
 function mediaError(error: unknown) {
   if (error instanceof MediaSecurityError) {
@@ -53,6 +59,9 @@ export async function POST(request: Request, context: Params) {
     if (parent.category === "DOCUMENTS") {
       const documentsAccess = await requireArchiveUploadedFileListAccess("DOCUMENTS");
       if (documentsAccess.denied) return documentsAccess.denied;
+    }
+    if (parent.uploadStatus !== "UPLOADING") {
+      return jsonNoStore({ ok: false, error: "الرفع غير متاح في الحالة الحالية" }, { status: 409 });
     }
 
     const formData = await request.formData();
@@ -99,24 +108,32 @@ export async function POST(request: Request, context: Params) {
       throw new MediaSecurityError("Chunk size mismatch", 400, "SIZE_MISMATCH");
     }
     const actor = auditActorFromDashboardSession(session);
-    await prisma.auditLog.create({
-      data: {
-        ...actor,
-        action: "archive.uploadedFile.chunk",
-        messageAr: "تم حفظ جزء من ملف أرشيفي",
-        messageEn: "Archive uploaded file chunk saved",
-        entityType: "ArchiveUploadedFileChunk",
-        entityId: id,
-        metadata: {
-          fileId: id,
-          index,
-          total,
-          sizeBytes: buffer.byteLength,
-          base64: buffer.toString("base64"),
+    try {
+      await prisma.auditLog.create({
+        data: {
+          id: chunkRecordId(id, index),
+          ...actor,
+          action: "archive.uploadedFile.chunk",
+          messageAr: "تم حفظ جزء من ملف أرشيفي",
+          messageEn: "Archive uploaded file chunk saved",
+          entityType: "ArchiveUploadedFileChunk",
+          entityId: id,
+          metadata: {
+            fileId: id,
+            index,
+            total,
+            sizeBytes: buffer.byteLength,
+            base64: buffer.toString("base64"),
+          },
+          stream: "TEAM",
         },
-        stream: "TEAM",
-      },
-    });
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        return jsonNoStore({ ok: true, index, duplicate: true });
+      }
+      throw error;
+    }
 
     return jsonNoStore({ ok: true, index, duplicate: false });
   } catch (error) {
