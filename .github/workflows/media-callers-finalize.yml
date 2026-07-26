@@ -1,0 +1,105 @@
+name: Finalize scoped media callers
+
+on:
+  push:
+    branches:
+      - agent/secure-media-upload-delete
+
+permissions:
+  contents: write
+
+concurrency:
+  group: media-callers-finalize
+  cancel-in-progress: false
+
+jobs:
+  migrate-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/secure-media-upload-delete
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Convert active campaign and blog callers
+        run: |
+          git show 63e3b4008844349474b6dbcfa18f58698014e061:scripts/media-finalize-callers.mjs > /tmp/media-finalize-callers.mjs
+          node /tmp/media-finalize-callers.mjs
+      - name: Add repository-wide media caller contract
+        run: |
+          cat > tests/integration-settings/media-caller-contract.test.ts <<'EOF'
+          import test from "node:test";
+          import assert from "node:assert/strict";
+          import { readFileSync, readdirSync, statSync } from "node:fs";
+          import path from "node:path";
+
+          const roots = ["app", "components", "lib"];
+          const extensions = /\.(?:[cm]?[jt]sx?)$/;
+
+          function filesUnder(root: string): string[] {
+            if (!statSync(root, { throwIfNoEntry: false })) return [];
+            return readdirSync(root).flatMap((name) => {
+              const file = path.join(root, name);
+              return statSync(file).isDirectory() ? filesUnder(file) : extensions.test(file) ? [file] : [];
+            });
+          }
+
+          function lineAt(source: string, index: number) {
+            return source.slice(0, index).split(/\r?\n/).length;
+          }
+
+          test("active source tree contains no legacy or unscoped media callers", () => {
+            const failures: string[] = [];
+            const banned = [
+              ["/api/upload?publicId=", "legacy publicId delete"],
+              ["DashboardMediaRequestBridge", "dashboard media bridge"],
+              ["pendingByLegacyPublicId", "legacy publicId bridge map"],
+              ["media-pr-source", "temporary source relay"],
+            ] as const;
+
+            for (const file of roots.flatMap(filesUnder)) {
+              const source = readFileSync(file, "utf8");
+              for (const [needle, label] of banned) {
+                let index = source.indexOf(needle);
+                while (index >= 0) {
+                  failures.push(`${file}:${lineAt(source, index)}: ${label}`);
+                  index = source.indexOf(needle, index + needle.length);
+                }
+              }
+
+              const directUpload = /(?:axios\.post|fetch)\s*\(\s*(["'`])\/api\/upload(?!\?scope=)[^\1]*?\1/g;
+              for (const match of source.matchAll(directUpload)) {
+                failures.push(`${file}:${lineAt(source, match.index ?? 0)}: direct POST/fetch to /api/upload without explicit scope or media client`);
+              }
+
+              const cloudinaryDeleteExtraction = /\.split\(\s*["']\/["']\s*\)|\.split\(\s*["']\.["']\s*\)/g;
+              if (/publicId|cloudinary/i.test(source)) {
+                for (const match of source.matchAll(cloudinaryDeleteExtraction)) {
+                  failures.push(`${file}:${lineAt(source, match.index ?? 0)}: URL-derived Cloudinary identifier`);
+                }
+              }
+            }
+
+            assert.deepEqual(failures, [], failures.join("\n"));
+          });
+          EOF
+      - run: npm ci
+      - name: Integration settings tests
+        run: npm run test:integration-settings
+      - name: Targeted media TypeScript
+        run: npx tsc -p tsconfig.media-security.json
+      - name: Production build
+        run: npm run build
+      - name: Commit verified migration
+        run: |
+          rm -f .github/workflows/media-callers-finalize.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "Finalize scoped media callers"
+          git push origin HEAD:agent/secure-media-upload-delete
