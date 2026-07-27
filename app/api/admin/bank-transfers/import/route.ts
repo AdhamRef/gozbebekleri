@@ -10,6 +10,7 @@ import {
   parseBankStatementFile,
 } from "@/lib/bank-transfers/statement-parser";
 import { enhanceBankTransferRowsSmart } from "@/lib/bank-transfers/smart-enhancer";
+import { aiEnhanceBankRows, applyAiEnhancements } from "@/lib/bank-transfers/ai-extractor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,7 +72,21 @@ export async function POST(request: NextRequest) {
     }
 
     const parsed = await parseBankStatementFile({ buffer: Buffer.from(await file.arrayBuffer()), fileName, currency, donorLocale, bankId });
-    const enhancedRows = enhanceBankTransferRowsSmart(parsed.rows);
+    // Heuristic first (always works), then AI refinement of donor name + purpose when configured.
+    let enhancedRows = enhanceBankTransferRowsSmart(parsed.rows);
+    let notesByHash = new Map<string, string>();
+    let aiApplied = false;
+    try {
+      const ai = await aiEnhanceBankRows(enhancedRows);
+      if (ai) {
+        const applied = applyAiEnhancements(enhancedRows, ai);
+        enhancedRows = applied.rows;
+        notesByHash = applied.notesByHash;
+        aiApplied = true;
+      }
+    } catch (err) {
+      console.error("[bank-transfers] AI enhancement failed, using heuristics", err);
+    }
     const allCreditRows = enhancedRows.filter((row) => row.direction === "CREDIT" && typeof row.amount === "number" && row.amount > 0);
     const creditRows = allCreditRows.filter((row) => !excludedHashes.has(row.transactionHash));
     const duplicateHashes = await existingHashes(creditRows.map((row) => row.transactionHash));
@@ -87,6 +102,7 @@ export async function POST(request: NextRequest) {
       donorLocale,
       parser: parsed.parser,
       smartAnalysis: true,
+      aiEnhanced: aiApplied,
       uploadedBy: actor.actorId,
       uploadedByName: actor.actorName,
       rowCount: enhancedRows.length,
@@ -118,6 +134,8 @@ export async function POST(request: NextRequest) {
         finalProject: row.suggestedProject,
         confidence: row.confidence,
         smartAnalysis: true,
+        aiEnhanced: aiApplied,
+        note: notesByHash.get(row.transactionHash) ?? null,
         status: "PENDING_REVIEW",
         transferMethod: "BANK_TRANSFER",
         raw: row.raw,

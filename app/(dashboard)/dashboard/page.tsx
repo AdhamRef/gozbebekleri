@@ -26,6 +26,7 @@ import {
   Download,
   Plus,
   UploadCloud,
+  Landmark,
 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 import {
@@ -2034,6 +2035,14 @@ export default function DashboardPage() {
                                   </span>
                                 )}
                               </button>
+                            ) : d.provider === "BANK_TRANSFER" ? (
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-[#025EB8]/10 text-[#025EB8]"
+                                title="تبرع عبر تحويل بنكي — مستورد من كشف الحساب"
+                              >
+                                <Landmark className="w-3 h-3" />
+                                تحويل بنكي
+                              </span>
                             ) : (
                               <span className="text-slate-400 text-xs">—</span>
                             )}

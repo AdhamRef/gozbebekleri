@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { auditActorFromDashboardSession, writeAuditLog } from "@/lib/audit-log";
+import { createDonationFromBankTransfer } from "@/lib/donations/bank-transfer-donation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,6 +61,42 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     }
 
+    // On approval → create a real Donation (provider BANK_TRANSFER) so it shows on the dashboards with
+    // a "تحويل بنكي" hint. Deduped by donorName; idempotent per transaction hash; no messages sent.
+    let donationId: string | null = null;
+    if (status === "APPROVED") {
+      const found = await prisma.$runCommandRaw({ find: COLLECTION, filter: { _id: { $oid: id } }, limit: 1 }).catch(() => null);
+      const doc = isRecord(found) && isRecord(found.cursor) && Array.isArray(found.cursor.firstBatch)
+        ? (found.cursor.firstBatch[0] as Record<string, unknown> | undefined) ?? null
+        : null;
+      if (doc && !doc.donationId) {
+        const pick = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+        const result = await createDonationFromBankTransfer({
+          transactionHash: String(doc.transactionHash ?? ""),
+          donorName: (typeof $set.donorName === "string" ? $set.donorName : pick(doc.donorName)) ?? null,
+          amount: typeof doc.amount === "number" ? doc.amount : Number(doc.amount) || 0,
+          currency: String(doc.currency ?? "TRY"),
+          transactionDate: pick(doc.transactionDate),
+          donorLocale: (typeof $set.donorLocale === "string" ? $set.donorLocale : pick(doc.donorLocale)) ?? null,
+          project: (typeof $set.finalProject === "string" ? $set.finalProject : pick(doc.finalProject) ?? pick(doc.suggestedProject)) ?? null,
+          note: pick(doc.note),
+          description: pick(doc.description),
+          reference: pick(doc.reference),
+          bankId: pick(doc.bankId),
+          bankIban: pick(doc.bankIban),
+        });
+        if (result.ok) {
+          donationId = result.donationId;
+          $set.donationId = result.donationId;
+          $set.donorUserId = result.donorId;
+          $set.convertedToDonation = true;
+          $set.convertedAt = now;
+        }
+      } else if (doc && typeof doc.donationId === "string") {
+        donationId = doc.donationId;
+      }
+    }
+
     await prisma.$runCommandRaw({
       update: COLLECTION,
       updates: [{ q: { _id: { $oid: id } }, u: { $set }, upsert: false }],
@@ -72,10 +109,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       messageAr: status === "DELETED" ? `${actor.actorName ?? "مسؤول"} حذف عملية تحويل بنكي نهائيًا` : `${actor.actorName ?? "مسؤول"} راجع عملية تحويل بنكي`,
       entityType: "BankTransferTransaction",
       entityId: id,
-      metadata: { status: $set.status, donorLocale: $set.donorLocale, finalProject: $set.finalProject },
+      metadata: { status: $set.status, donorLocale: $set.donorLocale, finalProject: $set.finalProject, donationId },
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, donationId });
   } catch (error) {
     console.error("[bank-transfers] failed to update transaction", error);
     return NextResponse.json({ error: "Failed to update bank transfer transaction" }, { status: 500 });
