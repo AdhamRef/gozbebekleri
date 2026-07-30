@@ -128,6 +128,10 @@ interface DonationRow {
   teamSupport: number;
   fees: number;
   type: string;
+  /** true when this row is an automatic renewal rather than the signup charge */
+  isRecurringCharge?: boolean;
+  /** 1-based position within its subscription (1 = signup charge) */
+  subscriptionCycle?: number | null;
   status: string;
   paidAt?: string | null;
   provider?: string | null;
@@ -2064,8 +2068,19 @@ export default function DashboardPage() {
                                   ? "bg-[#025EB8]/10 text-[#025EB8]"
                                   : "bg-gray-100 text-gray-600"
                               )}
+                              title={
+                                d.type === "MONTHLY"
+                                  ? d.isRecurringCharge
+                                    ? "خصم تلقائي متكرر — تم دون أي إجراء من المتبرع"
+                                    : "أول دفعة عند إنشاء الاشتراك"
+                                  : undefined
+                              }
                             >
-                              {d.type === "MONTHLY" ? "شهري" : "مرة واحدة"}
+                              {d.type === "MONTHLY"
+                                ? d.isRecurringCharge
+                                  ? `تجديد تلقائي${d.subscriptionCycle ? ` #${d.subscriptionCycle}` : ""}`
+                                  : "شهري — أول دفعة"
+                                : "مرة واحدة"}
                             </span>
                           </td>
                           <td className="py-1.5 px-2 align-middle">

@@ -22,6 +22,8 @@ import {
   LayoutList,
   Download,
   Plus,
+  RefreshCw,
+  Star,
 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 import {
@@ -115,6 +117,10 @@ interface DonationRow {
   teamSupport: number;
   fees: number;
   type: string;
+  /** true when this row is an automatic renewal rather than the signup charge */
+  isRecurringCharge?: boolean;
+  /** 1-based position within its subscription (1 = signup charge) */
+  subscriptionCycle?: number | null;
   status: string;
   paidAt?: string | null;
   provider?: string | null;
@@ -1754,6 +1760,9 @@ export default function MonthlySubscriptionsDashboardPage() {
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
                         التبرع
                       </th>
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
+                        نوع الدفعة
+                      </th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
                         الحالة
                       </th>
@@ -1780,19 +1789,19 @@ export default function MonthlySubscriptionsDashboardPage() {
                   <tbody>
                     {donationsLoading && donations.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="py-12 text-center">
+                        <td colSpan={11} className="py-12 text-center">
                           <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" />
                         </td>
                       </tr>
                     ) : !donationsFetchedOnce ? (
                       <tr>
-                        <td colSpan={10} className="py-12 text-center text-slate-500">
+                        <td colSpan={11} className="py-12 text-center text-slate-500">
                           جاري التحميل...
                         </td>
                       </tr>
                     ) : donations.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="py-12 text-center text-slate-500">
+                        <td colSpan={11} className="py-12 text-center text-slate-500">
                           لا توجد تبرعات تطابق التصفية
                         </td>
                       </tr>
@@ -1826,6 +1835,30 @@ export default function MonthlySubscriptionsDashboardPage() {
                             <span dir="ltr">
                               {formatMoney(donationDisplayTotalLocal(d), d.currency, d.amountUSD ?? undefined)}
                             </span>
+                          </td>
+                          <td className="py-1.5 px-2 whitespace-nowrap">
+                            {d.type === "MONTHLY" ? (
+                              d.isRecurringCharge ? (
+                                <span
+                                  className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[11px] font-medium bg-[#025EB8]/10 text-[#025EB8]"
+                                  title="خصم تلقائي متكرر — تم دون أي إجراء من المتبرع"
+                                >
+                                  <RefreshCw className="w-3 h-3" />
+                                  تجديد تلقائي
+                                  {d.subscriptionCycle ? ` #${d.subscriptionCycle}` : ""}
+                                </span>
+                              ) : (
+                                <span
+                                  className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[11px] font-medium bg-[#FA5D17]/10 text-[#FA5D17]"
+                                  title="أول دفعة عند إنشاء الاشتراك"
+                                >
+                                  <Star className="w-3 h-3" />
+                                  أول دفعة
+                                </span>
+                              )
+                            ) : (
+                              <span className="text-[11px] text-slate-400">—</span>
+                            )}
                           </td>
                           <td className="py-1.5 px-2">
                             {d.status === "FAILED" ? (

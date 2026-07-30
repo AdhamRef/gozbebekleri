@@ -8,13 +8,75 @@ import type { TReaderDocument } from "@usewaypoint/email-builder";
 import { notifyDonationEvent } from "@/lib/telegram/notify";
 import { sendDonationServerConversions } from "@/lib/tracking/donation-conversion-server";
 import { upsertProfileForUser } from "@/lib/communication/donor-communication-profile-service";
-import { sendAutomaticEmailMessage, sendAutomaticWhatsappMessage, resolveMetaTemplateMapping } from "@/lib/communication/automatic-message-dispatcher";
+import { sendAutomaticEmailMessage, sendAutomaticWhatsappMessage, resolveMetaTemplateMapping, type AutomaticOutcome } from "@/lib/communication/automatic-message-dispatcher";
 import { listSenders } from "@/lib/communication/sender-service";
 import { getActiveCommunicationRuntimeBundle } from "@/lib/communication/runtime-config";
+import type { CommunicationPurposeId } from "@/lib/communication/communication-runtime-types";
+import type { SupportedLocale } from "@/lib/locales";
 
-export type MessageTriggerEvent = "DONATION_PAID" | "DONATION_FAILED" | "FIRST_DONATION" | "USER_REGISTERED" | "SUBSCRIPTION_CREATED" | "SUBSCRIPTION_PAYMENT" | "SUBSCRIPTION_CANCELLED";
+export type MessageTriggerEvent = "DONATION_PAID" | "DONATION_FAILED" | "FIRST_DONATION" | "USER_REGISTERED" | "SUBSCRIPTION_CREATED" | "SUBSCRIPTION_PAYMENT" | "SUBSCRIPTION_CANCELLED" | "DONATION_LAPSED";
 export interface EventDispatchInput { userId?: string; donationId?: string }
 interface DispatchResult { triggers: number; emailsSent: number; whatsappSent: number; errors: number }
+
+/** Resolved sender identities shared by every send in one dispatch/batch run. */
+export interface TriggerSendConfig {
+  emailIdentity: string | null;
+  whatsappSender: { id: string | null; phoneNumberId: string | null } | null;
+}
+
+/**
+ * Resolve the email/WhatsApp sender identities once. Batch senders (the DONATION_LAPSED cron)
+ * resolve this a single time and reuse it across hundreds of recipients.
+ */
+export async function resolveTriggerSendConfig(): Promise<TriggerSendConfig> {
+  const [senders, runtime] = await Promise.all([listSenders().catch(() => []), getActiveCommunicationRuntimeBundle()]);
+  const emailSenderRow = senders.find((sender) => sender.channel === "EMAIL" && sender.enabled)?.senderEmail ?? null;
+  const emailIdentity = emailSenderRow || (runtime.brevoEmail.configured ? runtime.brevoEmail.values.senderEmail : null);
+  const metaSenderRow = senders.find((sender) => sender.channel === "WHATSAPP" && sender.enabled && sender.phoneNumberId);
+  const whatsappSender = metaSenderRow
+    ? { id: metaSenderRow.id, phoneNumberId: metaSenderRow.phoneNumberId }
+    : runtime.meta.configured
+      ? { id: null, phoneNumberId: runtime.meta.values.defaultPhoneNumberId }
+      : null;
+  return { emailIdentity, whatsappSender };
+}
+
+export type TriggerSendOutcome = { channel: "EMAIL" | "WHATSAPP"; outcome: AutomaticOutcome; reason?: string };
+
+/**
+ * Render one trigger's template for one recipient and hand it to the provider layer.
+ * Returns null when the referenced template no longer exists (deleted behind the trigger).
+ */
+export async function sendTriggerMessage(
+  trigger: { channel: string; templateId: string },
+  ctx: TemplateContext,
+  opts: { event: MessageTriggerEvent; locale: SupportedLocale; config: TriggerSendConfig; donationId?: string | null; purpose?: CommunicationPurposeId }
+): Promise<TriggerSendOutcome | null> {
+  const { event, locale, config } = opts;
+  const variables = ctx as unknown as Record<string, unknown>;
+  const donationId = opts.donationId ?? null;
+
+  if (trigger.channel === "EMAIL") {
+    const tpl = await prisma.emailTemplate.findUnique({ where: { id: trigger.templateId } });
+    if (!tpl) return null;
+    const variant = resolveEmailVariant(tpl, locale);
+    const html = await renderEmailHtml(variant.document as TReaderDocument, ctx);
+    const subject = renderEmailSubject(variant.subject, ctx);
+    const response = await sendAutomaticEmailMessage({ triggerEvent: event, templateId: tpl.id, templateName: tpl.name, locale, recipientUserId: ctx.user.id, recipientName: ctx.user.name || null, recipientEmail: ctx.user.email ?? null, renderedSubject: subject, renderedBody: html, senderEmail: config.emailIdentity, variables, donationId, purpose: opts.purpose });
+    return { channel: "EMAIL", outcome: response.outcome, reason: response.reason };
+  }
+
+  if (trigger.channel === "WHATSAPP") {
+    const tpl = await prisma.whatsappTemplate.findUnique({ where: { id: trigger.templateId } });
+    if (!tpl) return null;
+    const variant = resolveWhatsappBody(tpl, locale);
+    const body = mergeText(variant.body, ctx);
+    const response = await sendAutomaticWhatsappMessage({ triggerEvent: event, templateId: tpl.id, templateName: tpl.name, locale, recipientUserId: ctx.user.id, recipientName: ctx.user.name || null, recipientPhone: ctx.user.phone ?? null, renderedBody: body, metaTemplate: resolveMetaTemplateMapping(tpl, locale), sender: config.whatsappSender, variables, donationId, purpose: opts.purpose });
+    return { channel: "WHATSAPP", outcome: response.outcome, reason: response.reason };
+  }
+
+  return null;
+}
 
 export async function dispatchEvent(event: MessageTriggerEvent, input: EventDispatchInput): Promise<DispatchResult> {
   const result: DispatchResult = { triggers: 0, emailsSent: 0, whatsappSent: 0, errors: 0 };
@@ -23,42 +85,23 @@ export async function dispatchEvent(event: MessageTriggerEvent, input: EventDisp
     const triggers = await prisma.messageTrigger.findMany({ where: { event, enabled: true } });
     result.triggers = triggers.length;
     if (!triggers.length) return result;
-    let ctx: TemplateContext | null = input.donationId ? await loadContextForDonation(input.donationId) : input.userId ? await loadContext(input.userId) : null;
+    const ctx: TemplateContext | null = input.donationId ? await loadContextForDonation(input.donationId) : input.userId ? await loadContext(input.userId) : null;
     if (!ctx) {
       await writeAuditLog({ actorRole: "SYSTEM", action: "EVENT_DISPATCH_NO_CONTEXT", messageAr: `تعذّر تحميل سياق الحدث ${event}`, metadata: { event, ...input }, stream: "TEAM" });
       return result;
     }
     const locale = pickLocale({ recipientLang: ctx.user.preferredLang });
-    const variablesSnapshot = ctx as unknown as Record<string, unknown>;
-    const [senders, runtime] = await Promise.all([listSenders().catch(() => []), getActiveCommunicationRuntimeBundle()]);
-    const emailSenderRow = senders.find((sender) => sender.channel === "EMAIL" && sender.enabled)?.senderEmail ?? null;
-    const emailIdentity = emailSenderRow || (runtime.brevoEmail.configured ? runtime.brevoEmail.values.senderEmail : null);
-    const metaSenderRow = senders.find((sender) => sender.channel === "WHATSAPP" && sender.enabled && sender.phoneNumberId);
-    const whatsappSender = metaSenderRow
-      ? { id: metaSenderRow.id, phoneNumberId: metaSenderRow.phoneNumberId }
-      : runtime.meta.configured
-        ? { id: null, phoneNumberId: runtime.meta.values.defaultPhoneNumberId }
-        : null;
+    const config = await resolveTriggerSendConfig();
 
     for (const trigger of triggers) {
       try {
-        if (trigger.channel === "EMAIL") {
-          const tpl = await prisma.emailTemplate.findUnique({ where: { id: trigger.templateId } });
-          if (!tpl) continue;
-          const variant = resolveEmailVariant(tpl, locale);
-          const html = await renderEmailHtml(variant.document as TReaderDocument, ctx);
-          const subject = renderEmailSubject(variant.subject, ctx);
-          const response = await sendAutomaticEmailMessage({ triggerEvent: event, templateId: tpl.id, templateName: tpl.name, locale, recipientUserId: ctx.user.id, recipientName: ctx.user.name || null, recipientEmail: ctx.user.email ?? null, renderedSubject: subject, renderedBody: html, senderEmail: emailIdentity, variables: variablesSnapshot, donationId: input.donationId ?? null });
-          if (response.outcome === "SENT") result.emailsSent += 1;
-          else if (response.outcome === "FAILED") result.errors += 1;
-        } else if (trigger.channel === "WHATSAPP") {
-          const tpl = await prisma.whatsappTemplate.findUnique({ where: { id: trigger.templateId } });
-          if (!tpl) continue;
-          const variant = resolveWhatsappBody(tpl, locale);
-          const body = mergeText(variant.body, ctx);
-          const response = await sendAutomaticWhatsappMessage({ triggerEvent: event, templateId: tpl.id, templateName: tpl.name, locale, recipientUserId: ctx.user.id, recipientName: ctx.user.name || null, recipientPhone: ctx.user.phone ?? null, renderedBody: body, metaTemplate: resolveMetaTemplateMapping(tpl, locale), sender: whatsappSender, variables: variablesSnapshot, donationId: input.donationId ?? null });
-          if (response.outcome === "SENT") result.whatsappSent += 1;
-          else if (response.outcome === "FAILED") result.errors += 1;
+        const sent = await sendTriggerMessage(trigger, ctx, { event, locale, config, donationId: input.donationId ?? null });
+        if (!sent) continue;
+        if (sent.outcome === "SENT") {
+          if (sent.channel === "EMAIL") result.emailsSent += 1;
+          else result.whatsappSent += 1;
+        } else if (sent.outcome === "FAILED") {
+          result.errors += 1;
         }
       } catch {
         result.errors += 1;

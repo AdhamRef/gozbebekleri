@@ -127,9 +127,46 @@ export async function GET(request: NextRequest) {
       skip,
       take: limit,
     });
+    // Subscription payment sequence: is this row the signup charge or the Nth
+    // automatic renewal? Stripe's `billingReason` is authoritative when present;
+    // for legacy rows we fall back to the row's position within its subscription.
+    // Ranked over the whole subscription (not just this page) so paging can't
+    // change a donation's cycle number.
+    const pageSubscriptionIds = [
+      ...new Set(donations.map((d) => d.subscriptionId).filter(Boolean) as string[]),
+    ];
+    const cycleById = new Map<string, number>();
+    if (pageSubscriptionIds.length > 0) {
+      const siblings = await prisma.donation.findMany({
+        where: { subscriptionId: { in: pageSubscriptionIds }, status: "PAID" },
+        select: { id: true, subscriptionId: true, paidAt: true, createdAt: true },
+      });
+      const bySubscription = new Map<string, typeof siblings>();
+      for (const row of siblings) {
+        const key = row.subscriptionId!;
+        const list = bySubscription.get(key) ?? [];
+        list.push(row);
+        bySubscription.set(key, list);
+      }
+      for (const list of bySubscription.values()) {
+        list
+          .sort(
+            (a, b) =>
+              (a.paidAt ?? a.createdAt).getTime() - (b.paidAt ?? b.createdAt).getTime()
+          )
+          .forEach((row, index) => cycleById.set(row.id, index + 1));
+      }
+    }
+
     const formattedDonations = donations.map((donation) => ({
       ...donation,
       type: donation.subscriptionId ? ("MONTHLY" as const) : ("ONE_TIME" as const),
+      subscriptionCycle: donation.subscriptionId ? cycleById.get(donation.id) ?? null : null,
+      isRecurringCharge: donation.subscriptionId
+        ? donation.billingReason
+          ? donation.billingReason !== "subscription_create"
+          : (cycleById.get(donation.id) ?? 1) > 1
+        : false,
       fees: donation.fees,
       teamSupport: donation.teamSupport,
       // Legacy rows can have paymentMethod unset in MongoDB even though every

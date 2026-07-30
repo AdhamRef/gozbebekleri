@@ -2,6 +2,7 @@ import type { Prisma, MessageTriggerEvent } from "@prisma/client";
 import { createDeliveryRecord, markDeliveryStatus } from "./delivery-log-service";
 import { sendPreparedDelivery } from "./provider-router";
 import { logSentMessage } from "@/lib/messaging/log-sent";
+import type { CommunicationPurposeId } from "./communication-runtime-types";
 
 /**
  * Automatic (trigger-fired) message dispatcher for the Communication Center.
@@ -34,6 +35,12 @@ type CommonInput = {
   /** Rendered variable snapshot (template context). Stored on the delivery + mirror. */
   variables: Record<string, unknown>;
   donationId?: string | null;
+  /**
+   * Archive purpose for the delivery record. Defaults to TRANSACTIONAL (donation/subscription
+   * receipts). Re-engagement events such as DONATION_LAPSED pass MARKETING so consent reporting
+   * and provider routing classify them correctly.
+   */
+  purpose?: CommunicationPurposeId;
 };
 
 /** Config/sender/mapping problems → SKIPPED (safe, retryable). Real provider errors → FAILED. */
@@ -102,7 +109,7 @@ export async function sendAutomaticEmailMessage(
     channel: "EMAIL" as const,
     provider: "BREVO_EMAIL" as const,
     origin: "TRIGGER" as const,
-    purpose: "TRANSACTIONAL" as const,
+    purpose: input.purpose ?? ("TRANSACTIONAL" as const),
     templateId: input.templateId,
     templateName: input.templateName,
     recipientUserId: input.recipientUserId,
@@ -163,7 +170,7 @@ export async function sendAutomaticWhatsappMessage(
     channel: "WHATSAPP" as const,
     provider: "META_WHATSAPP" as const,
     origin: "TRIGGER" as const,
-    purpose: "TRANSACTIONAL" as const,
+    purpose: input.purpose ?? ("TRANSACTIONAL" as const),
     templateId: input.templateId,
     templateName: input.templateName,
     recipientUserId: input.recipientUserId,

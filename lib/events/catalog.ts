@@ -1,11 +1,28 @@
 import type { MessageTriggerEvent } from "./dispatch";
 
+/**
+ * Timing defaults + guard rails for scheduled triggers (DONATION_LAPSED). They live here rather
+ * than in `donation-lapsed.ts` because the dashboard client components need them and that module
+ * pulls in Prisma.
+ */
+export const DEFAULT_LAPSE_DAYS = 30;
+export const DEFAULT_COOLDOWN_DAYS = 90;
+export const MIN_LAPSE_DAYS = 1;
+export const MAX_LAPSE_DAYS = 3650;
+export const MIN_COOLDOWN_DAYS = 1;
+export const MAX_COOLDOWN_DAYS = 3650;
+
 export interface EventDefinition {
   event: MessageTriggerEvent;
   label: string;
   description: string;
   /** Whether donation context ({{donation.*}}) is available */
   hasDonation: boolean;
+  /**
+   * Scheduled events are not fired by a webhook — a daily cron evaluates them and they expose the
+   * `lapseDays` / `cooldownDays` timing settings in the dashboard.
+   */
+  scheduled?: boolean;
 }
 
 export const EVENT_CATALOG: EventDefinition[] = [
@@ -50,6 +67,14 @@ export const EVENT_CATALOG: EventDefinition[] = [
     label: "إلغاء اشتراك",
     description: "يُرسل عند إلغاء اشتراك متكرّر.",
     hasDonation: false,
+  },
+  {
+    event: "DONATION_LAPSED",
+    label: "تذكير بالتبرّع مجددًا",
+    description:
+      "يُرسل تلقائيًا للمتبرّع الذي مضى على آخر تبرّع ناجح له المدة المحدّدة (٣٠ يومًا افتراضيًا) لتشجيعه على التبرّع مجددًا. يُفحص يوميًا، ويستثني المشتركين شهريًا ومن ألغى الاشتراك بالرسائل، ولا يُكرَّر لنفس المتبرّع قبل انتهاء فترة الانتظار.",
+    hasDonation: true,
+    scheduled: true,
   },
 ];
 

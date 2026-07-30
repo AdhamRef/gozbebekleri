@@ -53,6 +53,7 @@ const TRIGGER_EVENT_LABELS: Record<string, string> = {
   SUBSCRIPTION_CREATED: "إنشاء اشتراك",
   SUBSCRIPTION_PAYMENT: "دفعة اشتراك",
   SUBSCRIPTION_CANCELLED: "إلغاء اشتراك",
+  DONATION_LAPSED: "تذكير بالتبرّع مجددًا",
 };
 
 interface Props {

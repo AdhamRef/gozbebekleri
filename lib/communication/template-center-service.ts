@@ -56,6 +56,7 @@ const TRIGGER_EVENT_LABELS: Record<string, string> = {
   SUBSCRIPTION_CREATED: "اشتراك جديد",
   SUBSCRIPTION_PAYMENT: "دفعة اشتراك",
   SUBSCRIPTION_CANCELLED: "إلغاء اشتراك",
+  DONATION_LAPSED: "تذكير بالتبرّع",
 };
 
 function localesFrom(translations: unknown): SupportedLocale[] {

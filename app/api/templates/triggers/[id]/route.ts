@@ -5,10 +5,13 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { prisma } from "@/lib/prisma";
 import { auditActorFromDashboardSession, writeAuditLog } from "@/lib/audit-log";
+import { MAX_COOLDOWN_DAYS, MAX_LAPSE_DAYS, MIN_COOLDOWN_DAYS, MIN_LAPSE_DAYS } from "@/lib/events/catalog";
 
 const updateSchema = z.object({
   enabled: z.boolean().optional(),
   templateId: z.string().min(1).optional(),
+  lapseDays: z.number().int().min(MIN_LAPSE_DAYS).max(MAX_LAPSE_DAYS).optional(),
+  cooldownDays: z.number().int().min(MIN_COOLDOWN_DAYS).max(MAX_COOLDOWN_DAYS).optional(),
 });
 
 export async function PATCH(
@@ -44,11 +47,16 @@ export async function PATCH(
     }
   }
 
+  // Timing only applies to scheduled events; silently ignore it on event-driven triggers.
+  const scheduled = existing.event === "DONATION_LAPSED";
+
   const updated = await prisma.messageTrigger.update({
     where: { id },
     data: {
       enabled: parsed.data.enabled,
       templateId: parsed.data.templateId,
+      lapseDays: scheduled ? parsed.data.lapseDays : undefined,
+      cooldownDays: scheduled ? parsed.data.cooldownDays : undefined,
     },
   });
 

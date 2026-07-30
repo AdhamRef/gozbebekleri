@@ -454,6 +454,11 @@ model Donation {
 
   subscriptionId String?       @db.ObjectId
   subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  /// Stripe invoice `billing_reason` for subscription donations — the authoritative
+  /// "is this the signup charge or an automatic renewal?" marker.
+  /// "subscription_create" = first charge, "subscription_cycle" = automatic renewal.
+  /// Null on one-time donations and on legacy rows created before this was recorded.
+  billingReason  String?
 
   comment       String?
   /// Optional only to tolerate legacy / pre-enforcement rows that exist in
@@ -885,6 +890,9 @@ enum MessageTriggerEvent {
   SUBSCRIPTION_CREATED
   SUBSCRIPTION_PAYMENT
   SUBSCRIPTION_CANCELLED
+  /// Scheduled (not event-driven): the donor's last PAID donation is older than `lapseDays`.
+  /// Evaluated daily by /api/cron/donation-reminders — see lib/events/donation-lapsed.ts.
+  DONATION_LAPSED
 }
 
 enum MessageChannel {
@@ -899,6 +907,10 @@ model MessageTrigger {
   /// Refers to EmailTemplate.id when channel=EMAIL, WhatsappTemplate.id when channel=WHATSAPP
   templateId   String              @db.ObjectId
   enabled      Boolean             @default(true)
+  /// DONATION_LAPSED only — days since the donor's last PAID donation before the reminder fires.
+  lapseDays    Int?
+  /// DONATION_LAPSED only — minimum days before the same donor may be reminded again.
+  cooldownDays Int?
   createdById  String?             @db.ObjectId
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt

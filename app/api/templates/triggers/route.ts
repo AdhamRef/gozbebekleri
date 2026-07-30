@@ -5,6 +5,14 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { prisma } from "@/lib/prisma";
 import { auditActorFromDashboardSession, writeAuditLog } from "@/lib/audit-log";
+import {
+  DEFAULT_COOLDOWN_DAYS,
+  DEFAULT_LAPSE_DAYS,
+  MAX_COOLDOWN_DAYS,
+  MAX_LAPSE_DAYS,
+  MIN_COOLDOWN_DAYS,
+  MIN_LAPSE_DAYS,
+} from "@/lib/events/catalog";
 
 const EVENT_VALUES = [
   "DONATION_PAID",
@@ -14,6 +22,7 @@ const EVENT_VALUES = [
   "SUBSCRIPTION_CREATED",
   "SUBSCRIPTION_PAYMENT",
   "SUBSCRIPTION_CANCELLED",
+  "DONATION_LAPSED",
 ] as const;
 
 const createSchema = z.object({
@@ -21,10 +30,13 @@ const createSchema = z.object({
   channel: z.enum(["EMAIL", "WHATSAPP"]),
   templateId: z.string().min(1),
   enabled: z.boolean().optional(),
+  // DONATION_LAPSED timing — ignored for event-driven triggers.
+  lapseDays: z.number().int().min(MIN_LAPSE_DAYS).max(MAX_LAPSE_DAYS).optional(),
+  cooldownDays: z.number().int().min(MIN_COOLDOWN_DAYS).max(MAX_COOLDOWN_DAYS).optional(),
 });
 
 async function enrichTriggers(
-  rows: { id: string; event: string; channel: string; templateId: string; enabled: boolean; createdAt: Date; updatedAt: Date }[]
+  rows: { id: string; event: string; channel: string; templateId: string; enabled: boolean; lapseDays: number | null; cooldownDays: number | null; createdAt: Date; updatedAt: Date }[]
 ) {
   const emailIds = rows.filter((r) => r.channel === "EMAIL").map((r) => r.templateId);
   const waIds = rows.filter((r) => r.channel === "WHATSAPP").map((r) => r.templateId);
@@ -81,7 +93,8 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  const { event, channel, templateId, enabled } = parsed.data;
+  const { event, channel, templateId, enabled, lapseDays, cooldownDays } = parsed.data;
+  const scheduled = event === "DONATION_LAPSED";
 
   // Validate the templateId actually exists in the matching channel's table.
   const exists =
@@ -99,6 +112,8 @@ export async function POST(request: NextRequest) {
       channel,
       templateId,
       enabled: enabled ?? true,
+      lapseDays: scheduled ? lapseDays ?? DEFAULT_LAPSE_DAYS : null,
+      cooldownDays: scheduled ? cooldownDays ?? DEFAULT_COOLDOWN_DAYS : null,
       createdById: actor.actorId,
     },
   });

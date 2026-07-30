@@ -143,6 +143,13 @@ export async function POST(req: NextRequest) {
         // Compute paidAt from invoice timestamp
         const paidAt = new Date((invoice as any).created * 1000);
 
+        // Stripe's own first-vs-renewal marker. "subscription_create" is the signup
+        // charge; "subscription_cycle" is an automatic renewal. Anything else
+        // (subscription_update / manual) is treated as a renewal-style charge —
+        // it is money taken without a fresh checkout, so it needs its own row.
+        const billingReason = ((invoice as any).billing_reason as string | null) ?? null;
+        const isSignupInvoice = billingReason === "subscription_create";
+
         // nextBillingDate = one month after this invoice was paid. Stripe owns the
         // actual billing cadence (donors can't pick a day); we just mirror it so
         // the admin UI and cron filters have a usable value. Clamp to the target
@@ -178,6 +185,13 @@ export async function POST(req: NextRequest) {
           // but fall back to the unpaid row for this subscription — different
           // checkout flows (PaymentElement vs Checkout Session) store different
           // ids in providerOrderId, so equality-by-invoice-id isn't reliable.
+          //
+          // The fallback is deliberately gated on this being the SIGNUP invoice.
+          // It matches any dangling unsettled row for the subscription, so on a
+          // renewal (`subscription_cycle`) it would silently swallow the new
+          // charge into a months-old row instead of creating one — the renewal
+          // would then be invisible in every createdAt-ranged dashboard and the
+          // subscription would stay permanently one donation short.
           const existingPending =
             (await tx.donation.findFirst({
               where: {
@@ -186,14 +200,16 @@ export async function POST(req: NextRequest) {
                 paidAt: null,
               },
             })) ??
-            (await tx.donation.findFirst({
-              where: {
-                subscriptionId: dbSubscription.id,
-                status: "PAID",
-                paidAt: null,
-              },
-              orderBy: { createdAt: "asc" },
-            }));
+            (isSignupInvoice
+              ? await tx.donation.findFirst({
+                  where: {
+                    subscriptionId: dbSubscription.id,
+                    status: "PAID",
+                    paidAt: null,
+                  },
+                  orderBy: { createdAt: "asc" },
+                })
+              : null);
 
           if (existingPending) {
             // First invoice: update the existing donation with provider details
@@ -202,6 +218,7 @@ export async function POST(req: NextRequest) {
               data: {
                 status: "PAID",
                 paidAt,
+                billingReason,
                 providerOrderId: invoice.id,
                 providerAuthCode: stripeSubscriptionId,
                 providerTxnResult: "Success",
@@ -221,9 +238,17 @@ export async function POST(req: NextRequest) {
                 totalAmount: finalTotal,
                 status: "PAID",
                 paidAt,
+                // Stamp createdAt from the invoice too. Every dashboard/list range
+                // filter keys on createdAt, so leaving it at now() would file the
+                // charge under the wrong period on any delayed/replayed delivery.
+                createdAt: paidAt,
+                billingReason,
                 donorCountryCode: donorCountrySnapshot,
                 donorId: dbSubscription.donorId,
                 subscriptionId: dbSubscription.id,
+                // Carried from the subscription so renewals keep showing up on
+                // referral dashboards and in locale-segmented reporting.
+                referralId: dbSubscription.referralId ?? undefined,
                 paymentMethod: "CARD",
                 provider: "STRIPE",
                 providerOrderId: invoice.id,

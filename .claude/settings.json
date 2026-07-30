@@ -1,17 +1,20 @@
 {
   "permissions": {
     "allow": [
-      "Bash(awk '/^model CommunicationAudienceMember \\\\{/,/^\\\\}/' prisma/schema.prisma)",
-      "Bash(npx next *)",
-      "Bash(echo \"EXIT=$?\")",
-      "Bash(grep -viE \"//|/\\\\*\")",
-      "Bash(grep -viE \"^\\\\s*//|/\\\\*|sampleVariablesMap|no sample|non-visible|without.*sample\")",
-      "Bash(grep -viE \"//\")",
-      "Bash(grep -viE \"No sample|non-visible|without.*sample|//|sampleVariablesMap\")",
-      "Bash(find \"app/api/dashboard/operations/communication/audience-lists\" -type f)",
-      "Bash(find app/api -type d -iname \"*audience*\")",
-      "Bash(find lib *)",
-      "Bash(awk '/model Donation /{f=1} f{print} /^}/{if\\(f\\)exit}' prisma/schema.prisma)"
+      "Bash",
+      "Read",
+      "Edit",
+      "Write",
+      "WebFetch",
+      "Grep",
+      "Glob",
+      "LS",
+      "MultiEdit",
+      "NotebookRead",
+      "NotebookEdit",
+      "TodoRead",
+      "TodoWrite",
+      "WebSearch"
     ]
   }
 }
