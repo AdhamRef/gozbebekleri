@@ -38,6 +38,9 @@
     "lib/dashboard/page-permission.ts",
     "lib/blog/admin-editor-data-core.ts",
     "lib/campaign/admin-create-core.ts",
+    "lib/media/security-core.ts",
+    "lib/media/archive-security.ts",
+    "lib/media/access.ts",
     "lib/locales.ts",
     "lib/content-localization/access.ts",
     "tests/integration-settings/**/*.ts"

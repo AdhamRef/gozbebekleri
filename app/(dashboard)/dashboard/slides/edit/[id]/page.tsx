@@ -15,6 +15,12 @@ import { ArrowLeft, Loader2, Upload, X } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import {
+  cleanupManagedDashboardMediaAfterSave,
+  deleteUnsavedDashboardMedia,
+  markDashboardAssetPersisted,
+  uploadDashboardMedia,
+} from '@/lib/media/client';
 
 const schema = z.object({
   title: z.string().min(1, 'مطلوب'),
@@ -54,6 +60,7 @@ export default function EditSlidePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [originalImage, setOriginalImage] = useState('');
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -71,6 +78,7 @@ export default function EditSlidePage() {
         const d = res.data;
         const getTr = (locale: string) => d.translations?.find((t: { locale: string }) => t.locale === locale);
         const en = getTr('en'); const fr = getTr('fr'); const tr = getTr('tr'); const id = getTr('id'); const pt = getTr('pt'); const es = getTr('es'); const de = getTr('de');
+        setOriginalImage(d.image ?? '');
         form.reset({
           title: d.title ?? '',
           description: d.description ?? '',
@@ -113,6 +121,11 @@ export default function EditSlidePage() {
           de: { title: values.title_de ?? '', description: values.description_de ?? '', buttonText: values.buttonText_de ?? '' },
         },
       });
+      if (originalImage && originalImage !== values.image) {
+        await cleanupManagedDashboardMediaAfterSave(originalImage, 'slides').catch(() => false);
+      }
+      if (values.image) markDashboardAssetPersisted(values.image);
+      setOriginalImage(values.image || '');
       toast.success('تم التحديث');
       router.push('/dashboard/slides');
     } catch (e) {
@@ -126,17 +139,22 @@ export default function EditSlidePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingImage(true);
-    const fd = new FormData();
-    fd.append('file', file);
     try {
-      const res = await axios.post('/api/upload', fd);
-      form.setValue('image', res.data.url);
+      const asset = await uploadDashboardMedia(file, 'slides');
+      form.setValue('image', asset.url);
       toast.success('تم رفع الصورة');
     } catch (e) {
       toast.error('فشل الرفع');
     } finally {
       setUploadingImage(false);
     }
+  };
+
+  const removeImage = async () => {
+    const image = form.getValues('image');
+    if (!image) return;
+    await deleteUnsavedDashboardMedia(image, 'slides').catch(() => false);
+    form.setValue('image', '');
   };
 
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -160,62 +178,14 @@ export default function EditSlidePage() {
               <TabsTrigger value="es">Español</TabsTrigger>
               <TabsTrigger value="de">Deutsch</TabsTrigger>
             </TabsList>
-            <TabsContent value="ar" className="mt-0">
-              <Card className="p-6 space-y-4">
-                <FormField control={form.control} name="title" render={({ field }) => (<FormItem><FormLabel>العنوان</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>الوصف</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="buttonText" render={({ field }) => (<FormItem><FormLabel>نص الزر</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-              </Card>
-            </TabsContent>
-            <TabsContent value="en" className="mt-0">
-              <Card className="p-6 space-y-4">
-                <FormField control={form.control} name="title_en" render={({ field }) => (<FormItem><FormLabel>Title (English)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="description_en" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="buttonText_en" render={({ field }) => (<FormItem><FormLabel>Button text</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-              </Card>
-            </TabsContent>
-            <TabsContent value="fr" className="mt-0">
-              <Card className="p-6 space-y-4">
-                <FormField control={form.control} name="title_fr" render={({ field }) => (<FormItem><FormLabel>Titre (français)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="description_fr" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="buttonText_fr" render={({ field }) => (<FormItem><FormLabel>Texte du bouton</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-              </Card>
-            </TabsContent>
-            <TabsContent value="tr" className="mt-0">
-              <Card className="p-6 space-y-4">
-                <FormField control={form.control} name="title_tr" render={({ field }) => (<FormItem><FormLabel>Başlık (Türkçe)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="description_tr" render={({ field }) => (<FormItem><FormLabel>Açıklama</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="buttonText_tr" render={({ field }) => (<FormItem><FormLabel>Buton metni</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-              </Card>
-            </TabsContent>
-            <TabsContent value="id" className="mt-0">
-              <Card className="p-6 space-y-4">
-                <FormField control={form.control} name="title_id" render={({ field }) => (<FormItem><FormLabel>Judul (Indonesia)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="description_id" render={({ field }) => (<FormItem><FormLabel>Deskripsi</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="buttonText_id" render={({ field }) => (<FormItem><FormLabel>Teks tombol</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-              </Card>
-            </TabsContent>
-            <TabsContent value="pt" className="mt-0">
-              <Card className="p-6 space-y-4">
-                <FormField control={form.control} name="title_pt" render={({ field }) => (<FormItem><FormLabel>Título (Português)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="description_pt" render={({ field }) => (<FormItem><FormLabel>Descrição</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="buttonText_pt" render={({ field }) => (<FormItem><FormLabel>Texto do botão</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-              </Card>
-            </TabsContent>
-            <TabsContent value="es" className="mt-0">
-              <Card className="p-6 space-y-4">
-                <FormField control={form.control} name="title_es" render={({ field }) => (<FormItem><FormLabel>Título (Español)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="description_es" render={({ field }) => (<FormItem><FormLabel>Descripción</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="buttonText_es" render={({ field }) => (<FormItem><FormLabel>Texto del botón</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-              </Card>
-            </TabsContent>
-            <TabsContent value="de" className="mt-0">
-              <Card className="p-6 space-y-4">
-                <FormField control={form.control} name="title_de" render={({ field }) => (<FormItem><FormLabel>Titel (Deutsch)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="description_de" render={({ field }) => (<FormItem><FormLabel>Beschreibung</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} />
-                <FormField control={form.control} name="buttonText_de" render={({ field }) => (<FormItem><FormLabel>Button-Text</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-              </Card>
-            </TabsContent>
+            <TabsContent value="ar" className="mt-0"><Card className="p-6 space-y-4"><FormField control={form.control} name="title" render={({ field }) => (<FormItem><FormLabel>العنوان</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} /><FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>الوصف</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} /><FormField control={form.control} name="buttonText" render={({ field }) => (<FormItem><FormLabel>نص الزر</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} /></Card></TabsContent>
+            <TabsContent value="en" className="mt-0"><Card className="p-6 space-y-4"><FormField control={form.control} name="title_en" render={({ field }) => (<FormItem><FormLabel>Title (English)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} /><FormField control={form.control} name="description_en" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} /><FormField control={form.control} name="buttonText_en" render={({ field }) => (<FormItem><FormLabel>Button text</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} /></Card></TabsContent>
+            <TabsContent value="fr" className="mt-0"><Card className="p-6 space-y-4"><FormField control={form.control} name="title_fr" render={({ field }) => (<FormItem><FormLabel>Titre (français)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} /><FormField control={form.control} name="description_fr" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} /><FormField control={form.control} name="buttonText_fr" render={({ field }) => (<FormItem><FormLabel>Texte du bouton</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} /></Card></TabsContent>
+            <TabsContent value="tr" className="mt-0"><Card className="p-6 space-y-4"><FormField control={form.control} name="title_tr" render={({ field }) => (<FormItem><FormLabel>Başlık (Türkçe)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} /><FormField control={form.control} name="description_tr" render={({ field }) => (<FormItem><FormLabel>Açıklama</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} /><FormField control={form.control} name="buttonText_tr" render={({ field }) => (<FormItem><FormLabel>Buton metni</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} /></Card></TabsContent>
+            <TabsContent value="id" className="mt-0"><Card className="p-6 space-y-4"><FormField control={form.control} name="title_id" render={({ field }) => (<FormItem><FormLabel>Judul (Indonesia)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} /><FormField control={form.control} name="description_id" render={({ field }) => (<FormItem><FormLabel>Deskripsi</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} /><FormField control={form.control} name="buttonText_id" render={({ field }) => (<FormItem><FormLabel>Teks tombol</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} /></Card></TabsContent>
+            <TabsContent value="pt" className="mt-0"><Card className="p-6 space-y-4"><FormField control={form.control} name="title_pt" render={({ field }) => (<FormItem><FormLabel>Título (Português)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} /><FormField control={form.control} name="description_pt" render={({ field }) => (<FormItem><FormLabel>Descrição</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} /><FormField control={form.control} name="buttonText_pt" render={({ field }) => (<FormItem><FormLabel>Texto do botão</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} /></Card></TabsContent>
+            <TabsContent value="es" className="mt-0"><Card className="p-6 space-y-4"><FormField control={form.control} name="title_es" render={({ field }) => (<FormItem><FormLabel>Título (Español)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} /><FormField control={form.control} name="description_es" render={({ field }) => (<FormItem><FormLabel>Descripción</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} /><FormField control={form.control} name="buttonText_es" render={({ field }) => (<FormItem><FormLabel>Texto del botón</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} /></Card></TabsContent>
+            <TabsContent value="de" className="mt-0"><Card className="p-6 space-y-4"><FormField control={form.control} name="title_de" render={({ field }) => (<FormItem><FormLabel>Titel (Deutsch)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} /><FormField control={form.control} name="description_de" render={({ field }) => (<FormItem><FormLabel>Beschreibung</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl></FormItem>)} /><FormField control={form.control} name="buttonText_de" render={({ field }) => (<FormItem><FormLabel>Button-Text</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} /></Card></TabsContent>
           </Tabs>
 
           <Card className="p-6 space-y-4">
@@ -226,7 +196,7 @@ export default function EditSlidePage() {
                   <div className="space-y-2">
                     {field.value ? (
                       <div className="relative w-40 h-28"><img src={field.value} alt="" className="w-full h-full object-cover rounded" />
-                        <button type="button" onClick={() => form.setValue('image', '')} className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded"><X className="w-4 h-4" /></button></div>
+                        <button type="button" onClick={removeImage} className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded"><X className="w-4 h-4" /></button></div>
                     ) : (
                       <label className="flex flex-col items-center justify-center w-40 h-28 border-2 border-dashed rounded cursor-pointer">
                         <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploadingImage} />

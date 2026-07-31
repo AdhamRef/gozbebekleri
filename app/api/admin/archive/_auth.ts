@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import type { Session } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import type { DashboardPermissionKey } from "@/lib/dashboard/permissions";
@@ -36,6 +37,6 @@ export async function readJson(request: Request) {
   return request.json().catch(() => ({}));
 }
 
-export function dashboardUser(session: Awaited<ReturnType<typeof getServerSession>>) {
+export function dashboardUser(session: Session | null) {
   return session?.user?.email || session?.user?.name || "dashboard-user";
 }

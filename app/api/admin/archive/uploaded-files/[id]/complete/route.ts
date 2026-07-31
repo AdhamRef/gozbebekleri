@@ -1,7 +1,24 @@
-import { archiveBlobEnabled, storeArchiveBlobFile } from "@/lib/archive/archive-blob-storage";
+import {
+  archiveBlobEnabled,
+  deleteArchiveBlobFile,
+  storeArchiveBlobFile,
+  type ArchiveBlobStoredFile,
+} from "@/lib/archive/archive-blob-storage";
 import { metadataObject, numberField, stringField } from "@/lib/archive/uploaded-files";
+import {
+  validateArchiveCompletion,
+  assembleValidatedChunks,
+  type ArchiveUploadParent,
+  type ExistingArchiveChunk,
+} from "@/lib/media/archive-chunks-core";
+import { validateArchiveMediaFile } from "@/lib/media/archive-security";
+import { MediaSecurityError } from "@/lib/media/security-core";
 import { prisma } from "@/lib/prisma";
-import { jsonNoStore, requireArchiveActionAccess } from "../../../_auth";
+import {
+  jsonNoStore,
+  requireArchiveActionAccess,
+  requireArchiveUploadedFileListAccess,
+} from "../../../_auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,55 +30,139 @@ export async function POST(_request: Request, context: Params) {
   if (denied) return denied;
 
   const { id } = await Promise.resolve(context.params);
-  const parent = await prisma.auditLog.findUnique({ where: { id }, select: { id: true, action: true, entityType: true, metadata: true } });
-  if (!parent || parent.action !== "archive.uploadedFile.create" || parent.entityType !== "ArchiveUploadedFile") {
+  const parentRow = await prisma.auditLog.findUnique({
+    where: { id },
+    select: { id: true, action: true, entityType: true, metadata: true },
+  });
+  if (!parentRow || parentRow.action !== "archive.uploadedFile.create" || parentRow.entityType !== "ArchiveUploadedFile") {
     return jsonNoStore({ ok: false, error: "ملف الرفع غير موجود" }, { status: 404 });
   }
 
-  const metadata = metadataObject(parent.metadata);
-  const chunks = await readUploadChunks(id);
-  const expected = numberField(metadata.chunkCount);
-  const receivedIndexes = new Set(chunks.map((item) => numberField(item.index)));
-
-  if (!expected || receivedIndexes.size < expected) {
-    return jsonNoStore({ ok: false, error: "لم تكتمل كل أجزاء الملف" }, { status: 400 });
+  const metadata = metadataObject(parentRow.metadata);
+  const parent: ArchiveUploadParent = {
+    uploadStatus: stringField(metadata.uploadStatus),
+    category: stringField(metadata.category),
+    chunkCount: numberField(metadata.chunkCount),
+    sizeBytes: numberField(metadata.sizeBytes),
+  };
+  if (parent.category === "DOCUMENTS") {
+    const documentsAccess = await requireArchiveUploadedFileListAccess("DOCUMENTS");
+    if (documentsAccess.denied) return documentsAccess.denied;
+  }
+  if (parent.uploadStatus !== "UPLOADING") {
+    return jsonNoStore({ ok: false, error: "الملف قيد المعالجة أو مكتمل" }, { status: 409 });
   }
 
-  const storagePatch = await buildStoragePatch(id, metadata, chunks);
-  await prisma.auditLog.update({
-    where: { id },
-    data: {
-      metadata: { ...metadata, ...storagePatch, uploadStatus: "READY" },
-      messageAr: "تم رفع الملف داخل الأرشيف",
-      messageEn: "Archive uploaded file completed",
+  const processingMetadata = { ...metadata, uploadStatus: "PROCESSING" };
+  const claimed = await prisma.auditLog.updateMany({
+    where: {
+      id,
+      metadata: { equals: parentRow.metadata },
     },
+    data: { metadata: processingMetadata },
   });
+  if (claimed.count !== 1) {
+    return jsonNoStore({ ok: false, error: "تم بدء إكمال الملف بالفعل" }, { status: 409 });
+  }
 
-  return jsonNoStore({ ok: true, message: "تم رفع الملف" });
+  let storagePatch: ArchiveBlobStoredFile | { storageMode: "CLIENT_CHUNKED" } | null = null;
+  try {
+    const chunks = await readUploadChunks(id);
+    const ordered = validateArchiveCompletion({ parent, chunks });
+    const buffer = assembleValidatedChunks(ordered);
+    const bytes = Uint8Array.from(buffer);
+    const validated = await validateArchiveMediaFile({
+      name: stringField(metadata.fileName),
+      type: stringField(metadata.mimeType),
+      size: bytes.byteLength,
+      arrayBuffer: async () => bytes.buffer,
+    });
+
+    storagePatch = await buildStoragePatch(parent.category, validated);
+    const ready = await prisma.auditLog.updateMany({
+      where: {
+        id,
+        metadata: { equals: processingMetadata },
+      },
+      data: {
+        metadata: { ...metadata, ...storagePatch, uploadStatus: "READY" },
+        messageAr: "تم رفع الملف داخل الأرشيف",
+        messageEn: "Archive uploaded file completed",
+      },
+    });
+    if (ready.count !== 1) {
+      if (storagePatch.storageMode === "BLOB") {
+        await deleteArchiveBlobFile(storagePatch.blobPathname).catch(() => undefined);
+      }
+      await prisma.auditLog.updateMany({
+        where: { id, metadata: { equals: processingMetadata } },
+        data: { metadata: { ...metadata, uploadStatus: "UPLOADING" } },
+      }).catch(() => undefined);
+      return jsonNoStore(
+        { ok: false, error: "تغيرت حالة الملف أثناء الإكمال", code: "UPLOAD_STATE_CHANGED" },
+        { status: 409 },
+      );
+    }
+    if (storagePatch.storageMode === "BLOB") {
+      await prisma.auditLog.deleteMany({
+        where: {
+          action: "archive.uploadedFile.chunk",
+          entityType: "ArchiveUploadedFileChunk",
+          entityId: id,
+        },
+      });
+    }
+
+    return jsonNoStore({ ok: true, message: "تم رفع الملف" });
+  } catch (error) {
+    if (storagePatch?.storageMode === "BLOB") {
+      await deleteArchiveBlobFile(storagePatch.blobPathname).catch(() => undefined);
+    }
+    await prisma.auditLog.updateMany({
+      where: {
+        id,
+        metadata: { equals: processingMetadata },
+      },
+      data: { metadata: { ...metadata, uploadStatus: "UPLOADING" } },
+    }).catch(() => undefined);
+
+    if (error instanceof MediaSecurityError) {
+      return jsonNoStore({ ok: false, error: error.message, code: error.code }, { status: error.status });
+    }
+    console.error("Archive completion failed");
+    return jsonNoStore({ ok: false, error: "تعذر إكمال رفع الملف" }, { status: 500 });
+  }
 }
 
-async function readUploadChunks(fileId: string) {
+async function readUploadChunks(fileId: string): Promise<ExistingArchiveChunk[]> {
   const rows = await prisma.auditLog.findMany({
-    where: { action: "archive.uploadedFile.chunk", entityType: "ArchiveUploadedFileChunk", entityId: fileId },
+    where: {
+      action: "archive.uploadedFile.chunk",
+      entityType: "ArchiveUploadedFileChunk",
+      entityId: fileId,
+    },
     select: { metadata: true },
   });
-  return rows.map((row) => metadataObject(row.metadata)).sort((a, b) => numberField(a.index) - numberField(b.index));
+  return rows.map((row) => {
+    const metadata = metadataObject(row.metadata);
+    return {
+      index: numberField(metadata.index),
+      total: numberField(metadata.total),
+      sizeBytes: numberField(metadata.sizeBytes),
+      base64: stringField(metadata.base64),
+    };
+  });
 }
 
-async function buildStoragePatch(fileId: string, metadata: Record<string, unknown>, chunks: Record<string, unknown>[]) {
+async function buildStoragePatch(
+  category: string,
+  validated: Awaited<ReturnType<typeof validateArchiveMediaFile>>,
+): Promise<ArchiveBlobStoredFile | { storageMode: "CLIENT_CHUNKED" }> {
   if (!archiveBlobEnabled()) return { storageMode: "CLIENT_CHUNKED" };
-
-  try {
-    const base64 = chunks.map((item) => stringField(item.base64)).join("");
-    const blob = await storeArchiveBlobFile({
-      category: stringField(metadata.category),
-      fileName: stringField(metadata.fileName) || `archive-${fileId}`,
-      contentType: stringField(metadata.mimeType) || "application/octet-stream",
-      body: Buffer.from(base64, "base64"),
-    });
-    await prisma.auditLog.deleteMany({ where: { action: "archive.uploadedFile.chunk", entityType: "ArchiveUploadedFileChunk", entityId: fileId } });
-    return { ...blob, chunkCount: 0, base64: undefined };
-  } catch {
-    return { storageMode: "CLIENT_CHUNKED" };
-  }
+  return storeArchiveBlobFile({
+    category,
+    extension: validated.extension,
+    contentType: validated.mimeType,
+    body: Buffer.from(validated.bytes),
+  });
 }

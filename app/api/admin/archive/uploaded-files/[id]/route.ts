@@ -1,5 +1,8 @@
-import { deleteArchiveBlobFile } from "@/lib/archive/archive-blob-storage";
-import { getArchiveRepositorySnapshot } from "@/lib/archive/archive-repository";
+import {
+  assertArchiveBlobPathname,
+  deleteArchiveBlobFile,
+} from "@/lib/archive/archive-blob-storage";
+import { getArchiveRepositorySnapshot, type ArchiveFoundationData } from "@/lib/archive/archive-repository";
 import {
   buildArchiveUploadReferences,
   cleanText,
@@ -9,6 +12,7 @@ import {
   validArchiveProjectId,
   type ArchiveReviewStatus,
 } from "@/lib/archive/uploaded-files";
+import { hasArchiveBlobReference } from "@/lib/media/archive-reference-core";
 import { prisma } from "@/lib/prisma";
 import { jsonNoStore, requireArchiveActionAccess, requireArchiveUploadedFileListAccess } from "../../_auth";
 
@@ -18,6 +22,9 @@ export const dynamic = "force-dynamic";
 type Params = { params: Promise<{ id: string }> | { id: string } };
 
 const allowedStatuses: ArchiveReviewStatus[] = ["NEW", "REVIEWED", "IMPORTANT"];
+const EMPTY_ARCHIVE_FOUNDATION: ArchiveFoundationData = {
+  collections: [], projects: [], driveLinks: [], assets: [], videoFrames: [],
+};
 
 export async function PATCH(request: Request, context: Params) {
   const { denied } = await requireArchiveActionAccess("archiveUpload");
@@ -64,26 +71,74 @@ export async function DELETE(_request: Request, context: Params) {
 
   const { id } = await Promise.resolve(context.params);
   const row = await findArchiveUploadedFile(id);
-  if (!row) return jsonNoStore({ ok: false, error: "الملف غير موجود" }, { status: 404 });
+  if (!row) {
+    return jsonNoStore({ ok: true, deleted: false, notFound: true, message: "الملف غير موجود" });
+  }
 
   const metadata = metadataObject(row.metadata);
   const docsDenied = await requireDocumentsAccessIfNeeded(metadata);
   if (docsDenied) return docsDenied;
 
-  await deleteArchiveBlobFile(stringField(metadata.blobUrl) || stringField(metadata.blobPathname));
-  await prisma.auditLog.deleteMany({ where: { action: "archive.uploadedFile.chunk", entityType: "ArchiveUploadedFileChunk", entityId: id } });
+  const blobPathname = stringField(metadata.blobPathname);
+  if (blobPathname) {
+    let safePathname: string;
+    try {
+      safePathname = assertArchiveBlobPathname(blobPathname);
+    } catch {
+      return jsonNoStore(
+        { ok: false, error: "معرّف الملف خارج نطاق التخزين المسموح" },
+        { status: 400 },
+      );
+    }
+
+    if (await archiveBlobUsedByAnotherRecord(id, safePathname)) {
+      return jsonNoStore(
+        { ok: false, error: "الملف مستخدم في سجل آخر" },
+        { status: 409 },
+      );
+    }
+    await deleteArchiveBlobFile(safePathname);
+  }
+
+  await prisma.auditLog.deleteMany({
+    where: {
+      action: "archive.uploadedFile.chunk",
+      entityType: "ArchiveUploadedFileChunk",
+      entityId: id,
+    },
+  });
   await prisma.auditLog.delete({ where: { id } });
-  return jsonNoStore({ ok: true, message: "تم حذف الملف" });
+  return jsonNoStore({ ok: true, deleted: true, notFound: false, message: "تم حذف الملف" });
+}
+
+async function archiveBlobUsedByAnotherRecord(currentId: string, pathname: string): Promise<boolean> {
+  return hasArchiveBlobReference({
+    currentId,
+    pathname,
+    readPage: async ({ cursor, take }) => prisma.auditLog.findMany({
+      where: {
+        action: "archive.uploadedFile.create",
+        entityType: "ArchiveUploadedFile",
+      },
+      orderBy: { id: "asc" },
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      select: { id: true, metadata: true },
+      take,
+    }),
+  });
 }
 
 async function findArchiveUploadedFile(id: string) {
-  const row = await prisma.auditLog.findUnique({ where: { id }, select: { id: true, action: true, entityType: true, metadata: true } });
+  const row = await prisma.auditLog.findUnique({
+    where: { id },
+    select: { id: true, action: true, entityType: true, metadata: true },
+  });
   if (!row || row.action !== "archive.uploadedFile.create" || row.entityType !== "ArchiveUploadedFile") return null;
   return row;
 }
 
 async function getReferences() {
-  const snapshot = await getArchiveRepositorySnapshot();
+  const snapshot = await getArchiveRepositorySnapshot(EMPTY_ARCHIVE_FOUNDATION);
   return buildArchiveUploadReferences(snapshot.collections, snapshot.projects);
 }
 
@@ -94,5 +149,7 @@ async function requireDocumentsAccessIfNeeded(metadata: Record<string, unknown>)
 }
 
 function parseReviewStatus(value: unknown, fallback: string): ArchiveReviewStatus {
-  return allowedStatuses.includes(String(value || "") as ArchiveReviewStatus) ? String(value) as ArchiveReviewStatus : (fallback as ArchiveReviewStatus || "NEW");
+  return allowedStatuses.includes(String(value || "") as ArchiveReviewStatus)
+    ? String(value) as ArchiveReviewStatus
+    : (fallback as ArchiveReviewStatus || "NEW");
 }

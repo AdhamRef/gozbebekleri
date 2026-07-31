@@ -1,0 +1,49 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "incremental": false,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": [
+    "next-env.d.ts",
+    "types/**/*.d.ts",
+    "lib/media/security-core.ts",
+    "lib/media/archive-security.ts",
+    "lib/media/archive-chunks-core.ts",
+    "lib/media/archive-reference-core.ts",
+    "lib/media/avatar-core.ts",
+    "lib/media/avatar-storage.ts",
+    "lib/media/access.ts",
+    "lib/media/client.ts",
+    "lib/media/storage-adapter.ts",
+    "lib/media/reference-check.ts",
+    "lib/cloudinary.ts",
+    "lib/prisma.ts",
+    "lib/dashboard/api-auth.ts",
+    "lib/dashboard/permissions.ts",
+    "lib/audit-log.ts",
+    "lib/archive/archive-blob-storage.ts",
+    "lib/archive/archive-repository.ts",
+    "lib/archive/uploaded-files.ts",
+    "app/api/auth/[...nextauth]/options.ts",
+    "app/api/upload/route.ts",
+    "app/api/users/me/avatar/route.ts",
+    "app/[locale]/profile/_components/AvatarUploader.tsx",
+    "app/(dashboard)/dashboard/DashboardMediaRequestBridge.tsx",
+    "app/api/admin/archive/_auth.ts",
+    "app/api/admin/archive/uploaded-files/route.ts",
+    "app/api/admin/archive/uploaded-files/start/route.ts",
+    "app/api/admin/archive/uploaded-files/[id]/chunk/route.ts",
+    "app/api/admin/archive/uploaded-files/[id]/complete/route.ts",
+    "app/api/admin/archive/uploaded-files/[id]/route.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next",
+    "tests"
+  ]
+}

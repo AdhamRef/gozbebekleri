@@ -26,6 +26,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CategoryIcon, { CATEGORY_ICON_NAMES } from '@/components/CategoryIcon';
 import { SmartSeoWorkbenchCard } from '../../../_components/SmartSeoWorkbenchCard';
 import { SaveStatusNotice, type SaveStatusState } from '../../../_components/SaveStatusNotice';
+import {
+  cleanupManagedDashboardMediaAfterSave,
+  deleteUnsavedDashboardMedia,
+  markDashboardAssetPersisted,
+  uploadDashboardMedia,
+} from '@/lib/media/client';
 
 const formSchema = z.object({
   name: z.string().min(1, 'اسم الحملة مطلوب').max(50, 'اسم الحملة طويل جداً'),
@@ -61,6 +67,7 @@ export default function EditCategoryPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [activeLocale, setActiveLocale] = useState<SeoLocale>('ar');
   const [saveStatus, setSaveStatus] = useState<SaveStatusState | null>(null);
+  const [originalImage, setOriginalImage] = useState('');
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -80,6 +87,7 @@ export default function EditCategoryPage() {
         const category = response.data;
         const getTr = (locale: string) => category.translations?.find((t: { locale: string }) => t.locale === locale);
         const en = getTr('en'); const fr = getTr('fr'); const tr = getTr('tr'); const id = getTr('id'); const pt = getTr('pt'); const es = getTr('es'); const de = getTr('de');
+        setOriginalImage(category.image || '');
         form.reset({
           name: category.name || '',
           description: category.description || '',
@@ -126,6 +134,11 @@ export default function EditCategoryPage() {
           de: { name: values.name_de ?? '', description: values.description_de ?? '' },
         },
       });
+      if (originalImage && originalImage !== values.image) {
+        await cleanupManagedDashboardMediaAfterSave(originalImage, 'categories').catch(() => false);
+      }
+      if (values.image) markDashboardAssetPersisted(values.image);
+      setOriginalImage(values.image || '');
       setSaveStatus({ type: 'success', message: 'تم تحديث الحملة بنجاح', detail: 'أنت ما زلت داخل صفحة التعديل' });
       toast.success('تم تحديث الحملة بنجاح');
       router.refresh();
@@ -150,12 +163,9 @@ export default function EditCategoryPage() {
     if (!file) return;
 
     setUploadingImage(true);
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-      const response = await axios.post('/api/upload', formData);
-      form.setValue('image', response.data.url);
+      const asset = await uploadDashboardMedia(file, 'categories');
+      form.setValue('image', asset.url);
       toast.success('تم رفع الصورة بنجاح');
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -168,15 +178,13 @@ export default function EditCategoryPage() {
   const removeImage = async () => {
     const imageUrl = form.getValues('image');
     if (!imageUrl) return;
-
     try {
-      const publicId = imageUrl.split('/').slice(-1)[0].split('.')[0];
-      if (publicId) await axios.delete(`/api/upload?publicId=${publicId}`);
+      await deleteUnsavedDashboardMedia(imageUrl, 'categories');
       form.setValue('image', '');
-      toast.success('تم حذف الصورة بنجاح');
+      toast.success('تم فصل الصورة. احفظ التغييرات لتأكيد الإزالة.');
     } catch (error) {
       console.error('Error removing image:', error);
-      toast.error('فشل في حذف الصورة');
+      toast.error('فشل في حذف الصورة الجديدة');
     }
   };
 
