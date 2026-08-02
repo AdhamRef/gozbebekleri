@@ -6,8 +6,8 @@ import { toast } from "react-hot-toast";
 import { Building2, CheckCircle2, Download, FileText, Landmark, Loader2, Plus, RefreshCw, Search, Trash2, Upload, XCircle } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { EmptyState } from "@/components/dashboard/EmptyState";
+import { MetricSummaryBand } from "@/components/dashboard/MetricSummaryBand";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -33,7 +33,6 @@ function money(n?: number | null, c?: string) { return `${(n ?? 0).toLocaleStrin
 function statusLabel(status: TransactionStatus) { if (status === "APPROVED" || status === "IMPORTED") return "معتمد"; if (status === "IGNORED") return "مستبعد"; if (status === "DELETED") return "محذوف"; return "تحتاج مراجعة"; }
 function statusClass(status: TransactionStatus) { if (status === "APPROVED" || status === "IMPORTED") return "border-emerald-200 bg-emerald-50 text-emerald-700"; if (status === "IGNORED" || status === "DELETED") return "border-slate-200 bg-slate-50 text-slate-600"; return "border-amber-200 bg-amber-50 text-amber-700"; }
 function previewRowKey(row: PreviewRow) { return row.transactionHash ?? `${row.rowNumber}-${row.description}`; }
-function bankLabel(bank?: Bank) { return bank ? `${bank.nameAr}${bank.ibanLast4 ? ` • ${bank.ibanLast4}` : ""}` : "—"; }
 
 export default function BankTransfersPage() {
   const [banks, setBanks] = useState<Bank[]>([]);
@@ -103,31 +102,515 @@ export default function BankTransfersPage() {
   function applyFilters() { setPage(1); void loadTransactions(filters, 1); }
   function resetFilters() { setFilters(defaultFilters); setPage(1); void loadTransactions(defaultFilters, 1); }
 
-  if (loading) return <div className="flex min-h-[260px] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-24 animate-pulse rounded-2xl border border-slate-200 bg-white" />
+        <div className="h-40 animate-pulse rounded-2xl border border-slate-200 bg-white" />
+        <div className="h-96 animate-pulse rounded-2xl border border-slate-200 bg-white" />
+      </div>
+    );
+  }
 
-  return <div className="space-y-6" dir="rtl">
-    <PageHeader
-      eyebrow="الإدارة المالية"
-      title="التحويلات البنكية"
-      description="صفحة واحدة لرفع كشوفات الحساب، معاينة العمليات، منع التكرار، مراجعة المتبرعين البنكيين، واعتماد أو استبعاد العمليات."
-      icon={Landmark}
-      actions={<div className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-600">البنك المختار: <b className="text-slate-900">{selectedBank ? bankLabel(selectedBank) : "اختر بنك"}</b></div>}
-    />
+  const filterCount = [
+    filters.q, filters.status !== "all" ? filters.status : "", filters.bankId !== "all" ? filters.bankId : "",
+    filters.currency !== "all" ? filters.currency : "", filters.dateFrom, filters.dateTo,
+    filters.amountMin, filters.amountMax,
+  ].filter(Boolean).length;
 
-    <div className="grid gap-3 md:grid-cols-4"><Kpi label="قيد المراجعة" value={String(pendingCount)} /><Kpi label="معتمد في الصفحة" value={String(approvedCount)} /><Kpi label="مستبعد في الصفحة" value={String(ignoredCount)} /><Kpi label="إجمالي النتائج" value={String(total)} /></div>
+  return (
+    <div className="space-y-5" dir="rtl">
+      <PageHeader
+        eyebrow="الإدارة المالية"
+        title="التحويلات البنكية"
+        description="ارفع كشف الحساب، راجع العمليات المقروءة، ثم اعتمد ما يجب احتسابه في الإجماليات."
+        icon={Landmark}
+        actions={
+          <>
+            <Button variant="outline" className="gap-2" onClick={() => loadTransactions(filters, page)} disabled={transactionsLoading}>
+              <RefreshCw className={`h-4 w-4 ${transactionsLoading ? "animate-spin" : ""}`} />
+              تحديث
+            </Button>
+            <a
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              href={`/api/admin/bank-transfers/export?${currentQuery}`}
+            >
+              <Download className="h-4 w-4" />
+              تصدير Excel
+            </a>
+          </>
+        }
+      />
 
-    <div className="grid gap-4 xl:grid-cols-[1.35fr_1fr_1fr]">
-      <Card className="h-full"><CardHeader><CardTitle className="flex items-center gap-2"><Search className="h-5 w-5 text-brand" />فلترة ومراجعة سريعة</CardTitle><CardDescription>فلتر النتائج وصدّر Excel من نفس الصفحة.</CardDescription></CardHeader><CardContent className="space-y-3"><div className="grid gap-2 md:grid-cols-2"><Input placeholder="بحث باسم/وصف/مرجع" value={filters.q} onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))} /><Select value={filters.status} onValueChange={(v) => setFilters((f) => ({ ...f, status: v }))}><SelectTrigger><SelectValue placeholder="الحالة" /></SelectTrigger><SelectContent><SelectItem value="all">كل الحالات</SelectItem><SelectItem value="PENDING_REVIEW">تحتاج مراجعة</SelectItem><SelectItem value="APPROVED">معتمد</SelectItem><SelectItem value="IMPORTED">مستورد/معتمد</SelectItem><SelectItem value="IGNORED">مستبعد</SelectItem></SelectContent></Select><Select value={filters.bankId} onValueChange={(v) => setFilters((f) => ({ ...f, bankId: v }))}><SelectTrigger><SelectValue placeholder="البنك" /></SelectTrigger><SelectContent><SelectItem value="all">كل البنوك</SelectItem>{activeBanks.map((bank) => <SelectItem key={bank.id ?? bank.code ?? bank.nameAr} value={bank.id ?? bank.code ?? bank.nameAr}>{bank.nameAr}</SelectItem>)}</SelectContent></Select><Select value={filters.currency} onValueChange={(v) => setFilters((f) => ({ ...f, currency: v }))}><SelectTrigger><SelectValue placeholder="العملة" /></SelectTrigger><SelectContent><SelectItem value="all">كل العملات</SelectItem>{supportedCurrencies.map((c) => <SelectItem key={c} value={c}>{currencyLabels[c] ?? c}</SelectItem>)}</SelectContent></Select><Input type="date" value={filters.dateFrom} onChange={(e) => setFilters((f) => ({ ...f, dateFrom: e.target.value }))} /><Input type="date" value={filters.dateTo} onChange={(e) => setFilters((f) => ({ ...f, dateTo: e.target.value }))} /><Input placeholder="قيمة من" value={filters.amountMin} onChange={(e) => setFilters((f) => ({ ...f, amountMin: e.target.value }))} /><Input placeholder="قيمة إلى" value={filters.amountMax} onChange={(e) => setFilters((f) => ({ ...f, amountMax: e.target.value }))} /><Select value={filters.limit} onValueChange={(v) => setFilters((f) => ({ ...f, limit: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="25">25</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem><SelectItem value="200">200</SelectItem></SelectContent></Select><Select value={filters.sortDir} onValueChange={(v) => setFilters((f) => ({ ...f, sortDir: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="desc">الأحدث/الأكبر</SelectItem><SelectItem value="asc">الأقدم/الأصغر</SelectItem></SelectContent></Select></div><div className="flex flex-wrap gap-2"><Button onClick={applyFilters} disabled={transactionsLoading}>{transactionsLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Search className="ml-2 h-4 w-4" />}تطبيق</Button><Button variant="outline" onClick={resetFilters}>ضبط</Button><Button variant="outline" onClick={() => loadTransactions(filters, page)}><RefreshCw className="ml-2 h-4 w-4" />تحديث</Button><a className="inline-flex items-center rounded-md border px-3 py-2 text-sm hover:bg-slate-50" href={`/api/admin/bank-transfers/export?${currentQuery}`}><Download className="ml-2 h-4 w-4" />Excel</a></div></CardContent></Card>
-      <Card className="h-full"><CardHeader><CardTitle className="flex items-center gap-2"><Upload className="h-5 w-5" />رفع كشف الحساب</CardTitle><CardDescription>ارفع الملف ثم راجع المعاينة.</CardDescription></CardHeader><CardContent className="space-y-3"><div className="grid gap-2"><Select value={selectedBankId} onValueChange={(v) => { setSelectedBankId(v); const bank = activeBanks.find((b) => b.id === v || b.code === v); if (bank) setStatementCurrency(bank.currency); }}><SelectTrigger><SelectValue placeholder="البنك" /></SelectTrigger><SelectContent>{activeBanks.map((bank) => <SelectItem key={bank.id ?? bank.code ?? bank.nameAr} value={bank.id ?? bank.code ?? bank.nameAr}>{bank.nameAr}</SelectItem>)}</SelectContent></Select><Select value={statementCurrency} onValueChange={(v) => setStatementCurrency(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{supportedCurrencies.map((c) => <SelectItem key={c} value={c}>{currencyLabels[c] ?? c}</SelectItem>)}</SelectContent></Select><Select value={donorLocale} onValueChange={(v) => setDonorLocale(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(localeLabels).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent></Select></div><div className="rounded-2xl border border-dashed bg-slate-50 p-4"><FileText className="mb-2 h-7 w-7 text-slate-400" /><Input type="file" accept=".xlsx,.xls,.csv,.pdf,application/pdf" onChange={onFileChange} /><p className="mt-2 text-xs text-slate-500">الوارد فقط يدخل للمراجعة، والمكرر يُتجاهل.</p>{statementFile ? <p className="mt-2 text-xs font-medium">{statementFile.name}</p> : null}</div><div className="flex flex-wrap gap-2"><Button onClick={parsePreview} disabled={parsing || !statementFile} variant="outline">{parsing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : null}معاينة</Button><Button onClick={importStatement} disabled={importing || !statementFile}>{importing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Upload className="ml-2 h-4 w-4" />}إدخال</Button></div></CardContent></Card>
-      <Card className="h-full"><CardHeader><CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />إضافة بنك</CardTitle><CardDescription>عند إضافة حساب بنكي جديد فقط.</CardDescription></CardHeader><CardContent className="space-y-3"><div className="grid gap-2"><Input placeholder="اسم البنك بالعربية" value={form.nameAr} onChange={(e) => setForm((f) => ({ ...f, nameAr: e.target.value }))} /><Select value={form.currency} onValueChange={(v) => setForm((f) => ({ ...f, currency: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{supportedCurrencies.map((c) => <SelectItem key={c} value={c}>{currencyLabels[c] ?? c}</SelectItem>)}</SelectContent></Select><Input placeholder="الاسم بالتركية" value={form.nameTr} onChange={(e) => setForm((f) => ({ ...f, nameTr: e.target.value }))} /><Input placeholder="الاسم بالإنجليزية" value={form.nameEn} onChange={(e) => setForm((f) => ({ ...f, nameEn: e.target.value }))} /><Input placeholder="اسم الحساب" value={form.accountName} onChange={(e) => setForm((f) => ({ ...f, accountName: e.target.value }))} /><Input placeholder="آخر 4 من IBAN" value={form.ibanLast4} onChange={(e) => setForm((f) => ({ ...f, ibanLast4: e.target.value }))} /></div><Button onClick={addBank} disabled={saving}>{saving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : null}إضافة البنك</Button></CardContent></Card>
+      {/* Work-waiting is the number that decides whether this page needs attention today, so it
+          leads. The remaining counts are context, not peers. */}
+      <MetricSummaryBand
+        eyebrow="عمليات تنتظر المراجعة"
+        value={String(pendingCount)}
+        note={`من إجمالي ${total.toLocaleString("en-US")} عملية مطابقة للتصفية الحالية.`}
+        stats={[
+          { label: "معتمد في الصفحة", value: String(approvedCount) },
+          { label: "مستبعد في الصفحة", value: String(ignoredCount) },
+          { label: "البنوك النشطة", value: String(activeBanks.length) },
+        ]}
+      />
+
+      {/* ── Step 1–3: import pipeline ─────────────────────────────────────────────
+          Bank choice, file upload, preview and commit were three cards scattered down
+          the page. They are one linear task, so they are one panel now, and the preview
+          appears in place rather than several screens below the button that produced it. */}
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3.5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand">
+              <Upload className="h-[18px] w-[18px]" />
+            </span>
+            <div>
+              <h2 className="text-[15px] font-semibold leading-tight text-slate-900">استيراد كشف حساب</h2>
+              <p className="text-xs text-slate-500">الوارد فقط يدخل للمراجعة، والمكرر يُتجاهل تلقائيًا.</p>
+            </div>
+          </div>
+          {statementFile && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
+              <FileText className="h-3.5 w-3.5" />
+              {statementFile.name}
+            </span>
+          )}
+        </header>
+
+        <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label className="text-[11px] font-semibold text-slate-600">البنك</Label>
+              <Select
+                value={selectedBankId}
+                onValueChange={(v) => {
+                  setSelectedBankId(v);
+                  const bank = activeBanks.find((b) => b.id === v || b.code === v);
+                  if (bank) setStatementCurrency(bank.currency);
+                }}
+              >
+                <SelectTrigger className="h-10 text-[13px]"><SelectValue placeholder="اختر البنك" /></SelectTrigger>
+                <SelectContent>
+                  {activeBanks.map((bank) => (
+                    <SelectItem key={bank.id ?? bank.code ?? bank.nameAr} value={bank.id ?? bank.code ?? bank.nameAr}>
+                      {bank.nameAr}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-[11px] font-semibold text-slate-600">العملة</Label>
+              <Select value={statementCurrency} onValueChange={(v) => setStatementCurrency(v)}>
+                <SelectTrigger className="h-10 text-[13px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {supportedCurrencies.map((c) => <SelectItem key={c} value={c}>{currencyLabels[c] ?? c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-[11px] font-semibold text-slate-600">لغة المتبرعين</Label>
+              <Select value={donorLocale} onValueChange={(v) => setDonorLocale(v)}>
+                <SelectTrigger className="h-10 text-[13px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(localeLabels).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="sm:col-span-3">
+              <label className="group flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 px-4 py-3.5 transition-colors hover:border-brand/50 hover:bg-brand-50/40">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-slate-400 shadow-sm transition-colors group-hover:text-brand">
+                  <FileText className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-semibold text-slate-800">
+                    {statementFile ? statementFile.name : "اختر ملف كشف الحساب"}
+                  </span>
+                  <span className="block text-[11px] text-slate-500">Excel أو CSV أو PDF</span>
+                </span>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv,.pdf,application/pdf"
+                  onChange={onFileChange}
+                  className="sr-only"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="flex flex-row gap-2 lg:flex-col lg:justify-end">
+            <Button variant="outline" className="gap-2" onClick={parsePreview} disabled={parsing || !statementFile}>
+              {parsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              معاينة
+            </Button>
+            <Button className="gap-2 bg-brand hover:bg-brand-dark" onClick={importStatement} disabled={importing || !statementFile}>
+              {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              إدخال للمراجعة
+            </Button>
+          </div>
+        </div>
+
+        {/* Preview appears inline, directly under the controls that produced it. */}
+        {preview && (
+          <div className="border-t border-slate-100 bg-slate-50/50 p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+              <span>
+                {preview.fileName} • IBAN: {preview.bankIban ?? "لم يتم التقاطه"} • المعروض{" "}
+                <b className="tabular-nums text-slate-900">{visiblePreviewRows.length}</b> من{" "}
+                <b className="tabular-nums text-slate-900">{preview.rowCount}</b>
+                {excludedPreviewHashes.size > 0 && <> • محذوف <b className="tabular-nums">{excludedPreviewHashes.size}</b></>}
+              </span>
+              {excludedPreviewHashes.size > 0 && (
+                <Button size="sm" variant="outline" onClick={() => setExcludedPreviewHashes(new Set())}>
+                  إعادة الصفوف المحذوفة
+                </Button>
+              )}
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+              <table className="min-w-full text-right text-xs">
+                <thead className="bg-slate-50">
+                  <tr className="border-b border-slate-200">
+                    {["#", "التاريخ", "الاسم", "الوصف", "القيمة", "الاتجاه", "المشروع", ""].map((h) => (
+                      <th key={h} className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {visiblePreviewRows.slice(0, 100).map((row) => (
+                    <tr key={previewRowKey(row)} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
+                      <td className="px-3 py-2.5 font-mono text-slate-400">{row.rowNumber}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">{row.transactionDate ?? "—"}</td>
+                      <td className="px-3 py-2.5 font-medium text-slate-800">{row.donorName ?? "—"}</td>
+                      <td className="min-w-72 px-3 py-2.5 text-slate-500">{row.description}</td>
+                      <td className="px-3 py-2.5 font-mono tabular-nums whitespace-nowrap">{row.amount === null ? "—" : money(row.amount, row.currency)}</td>
+                      <td className="px-3 py-2.5">{row.direction === "CREDIT" ? "وارد" : row.direction === "DEBIT" ? "صادر" : "غير محدد"}</td>
+                      <td className="px-3 py-2.5">{row.suggestedProject}</td>
+                      <td className="px-3 py-2.5">
+                        <Button size="sm" variant="ghost" className="text-rose-600 hover:text-rose-700" onClick={() => removePreviewRow(row)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                  {!visiblePreviewRows.length && (
+                    <tr>
+                      <td colSpan={8} className="p-0">
+                        <EmptyState
+                          variant="inline"
+                          icon={FileText}
+                          title="لا توجد صفوف معروضة"
+                          description="حُذفت كل الصفوف من المعاينة. استخدم «إعادة الصفوف المحذوفة» لاستعادتها."
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* ── Step 4: the review queue — the page's primary working surface ───────── */}
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3.5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand">
+              <CheckCircle2 className="h-[18px] w-[18px]" />
+            </span>
+            <div>
+              <h2 className="text-[15px] font-semibold leading-tight text-slate-900">مراجعة العمليات</h2>
+              <p className="text-xs text-slate-500">
+                {transactionsLoading ? "جاري تطبيق الفلاتر…" : "عدّل البيانات ثم اعتمد ما يجب احتسابه في الإجماليات."}
+              </p>
+            </div>
+          </div>
+          <span className="text-xs tabular-nums text-slate-500">
+            صفحة {page} من {totalPages} • {total.toLocaleString("en-US")} نتيجة
+          </span>
+        </header>
+
+        {/* Filters, horizontal. Previously ten controls stacked inside a narrow column. */}
+        <div className="border-b border-slate-100 bg-slate-50/50 p-3">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="relative min-w-[220px] flex-1">
+              <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                placeholder="بحث باسم أو وصف أو مرجع"
+                value={filters.q}
+                onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === "Enter") applyFilters(); }}
+                className="h-10 ps-9 text-[13px]"
+              />
+            </div>
+
+            <Select value={filters.status} onValueChange={(v) => setFilters((f) => ({ ...f, status: v }))}>
+              <SelectTrigger className="h-10 w-[150px] text-[13px]"><SelectValue placeholder="الحالة" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">كل الحالات</SelectItem>
+                <SelectItem value="PENDING_REVIEW">تحتاج مراجعة</SelectItem>
+                <SelectItem value="APPROVED">معتمد</SelectItem>
+                <SelectItem value="IMPORTED">مستورد/معتمد</SelectItem>
+                <SelectItem value="IGNORED">مستبعد</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filters.bankId} onValueChange={(v) => setFilters((f) => ({ ...f, bankId: v }))}>
+              <SelectTrigger className="h-10 w-[150px] text-[13px]"><SelectValue placeholder="البنك" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">كل البنوك</SelectItem>
+                {activeBanks.map((bank) => (
+                  <SelectItem key={bank.id ?? bank.code ?? bank.nameAr} value={bank.id ?? bank.code ?? bank.nameAr}>{bank.nameAr}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={filters.currency} onValueChange={(v) => setFilters((f) => ({ ...f, currency: v }))}>
+              <SelectTrigger className="h-10 w-[140px] text-[13px]"><SelectValue placeholder="العملة" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">كل العملات</SelectItem>
+                {supportedCurrencies.map((c) => <SelectItem key={c} value={c}>{currencyLabels[c] ?? c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+
+            <details className="group relative">
+              <summary className="inline-flex h-10 cursor-pointer list-none items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-medium text-slate-700 transition-colors hover:border-slate-300">
+                تصفية متقدمة
+                {filterCount > 0 && (
+                  <span className="rounded-full bg-brand px-1.5 text-[10px] font-bold text-white tabular-nums">{filterCount}</span>
+                )}
+              </summary>
+              <div className="absolute end-0 z-20 mt-2 w-[320px] rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold text-slate-600">من تاريخ</Label>
+                    <Input type="date" value={filters.dateFrom} onChange={(e) => setFilters((f) => ({ ...f, dateFrom: e.target.value }))} className="h-9 text-[13px]" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold text-slate-600">إلى تاريخ</Label>
+                    <Input type="date" value={filters.dateTo} onChange={(e) => setFilters((f) => ({ ...f, dateTo: e.target.value }))} className="h-9 text-[13px]" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold text-slate-600">قيمة من</Label>
+                    <Input value={filters.amountMin} onChange={(e) => setFilters((f) => ({ ...f, amountMin: e.target.value }))} className="h-9 text-[13px]" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold text-slate-600">قيمة إلى</Label>
+                    <Input value={filters.amountMax} onChange={(e) => setFilters((f) => ({ ...f, amountMax: e.target.value }))} className="h-9 text-[13px]" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold text-slate-600">لكل صفحة</Label>
+                    <Select value={filters.limit} onValueChange={(v) => setFilters((f) => ({ ...f, limit: v }))}>
+                      <SelectTrigger className="h-9 text-[13px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {["25", "50", "100", "200"].map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-semibold text-slate-600">الترتيب</Label>
+                    <Select value={filters.sortDir} onValueChange={(v) => setFilters((f) => ({ ...f, sortDir: v }))}>
+                      <SelectTrigger className="h-9 text-[13px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="desc">الأحدث/الأكبر</SelectItem>
+                        <SelectItem value="asc">الأقدم/الأصغر</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </details>
+
+            <Button className="h-10 gap-2 bg-brand hover:bg-brand-dark" onClick={applyFilters} disabled={transactionsLoading}>
+              {transactionsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              تطبيق
+            </Button>
+            <Button variant="ghost" className="h-10" onClick={resetFilters}>ضبط</Button>
+          </div>
+        </div>
+
+        {/* Bulk bar only exists when a selection exists — no dead controls on screen. */}
+        {selectedIds.size > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-brand-200 bg-brand-50 px-4 py-2.5">
+            <span className="text-[13px] font-medium text-brand-800">تم تحديد {selectedIds.size} عملية</span>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" className="bg-brand hover:bg-brand-dark" disabled={bulkBusy} onClick={() => bulkReview("APPROVED")}>اعتماد المحدد</Button>
+              <Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulkReview("IGNORED")}>استبعاد المحدد</Button>
+              <Button size="sm" variant="ghost" disabled={bulkBusy} onClick={() => setSelectedIds(new Set())}>إلغاء التحديد</Button>
+            </div>
+          </div>
+        )}
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-right text-xs">
+            <thead className="bg-slate-50">
+              <tr className="border-b border-slate-200">
+                <th className="w-10 px-3 py-3">
+                  <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} aria-label="تحديد الكل" />
+                </th>
+                {["الحالة", "التاريخ", "الاسم", "البنك", "القيمة", "اللغة", "المشروع", "الوصف", "إجراءات"].map((h) => (
+                  <th key={h} className="px-3 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.map((tx) => {
+                const edit = tx.id ? edits[tx.id] : undefined;
+                return (
+                  <tr key={tx.id ?? tx.reference ?? `${tx.donorName}-${tx.amount}`} className="border-b border-slate-100 align-top last:border-0 hover:bg-slate-50/60">
+                    <td className="px-3 py-3">
+                      {tx.id && <input type="checkbox" checked={selectedIds.has(tx.id)} onChange={() => toggleSelected(tx.id!)} />}
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-medium ${statusClass(tx.status)}`}>{statusLabel(tx.status)}</span>
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap text-slate-600">{tx.transactionDate || "—"}</td>
+                    <td className="min-w-44 px-3 py-3">
+                      <Input className="h-9 text-xs" value={edit?.donorName ?? ""} onChange={(e) => tx.id && setEdit(tx.id, { donorName: e.target.value })} />
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap text-slate-600">{tx.bankId || "—"}</td>
+                    <td className="px-3 py-3 font-mono tabular-nums whitespace-nowrap font-semibold text-slate-900">{money(tx.amount, tx.currency)}</td>
+                    <td className="min-w-32 px-3 py-3">
+                      <Select value={edit?.donorLocale ?? tx.donorLocale ?? "ar"} onValueChange={(v) => tx.id && setEdit(tx.id, { donorLocale: v })}>
+                        <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(localeLabels).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="min-w-56 px-3 py-3">
+                      <Input
+                        className="h-9 text-xs"
+                        value={edit?.finalProject ?? tx.finalProject ?? tx.suggestedProject ?? ""}
+                        onChange={(e) => tx.id && setEdit(tx.id, { finalProject: e.target.value })}
+                      />
+                    </td>
+                    <td className="min-w-72 px-3 py-3 text-slate-500">
+                      <div className="line-clamp-2">{tx.description}</div>
+                      {tx.reference && <div className="mt-1 font-mono text-[10px] text-slate-400">{tx.reference}</div>}
+                    </td>
+                    <td className="px-3 py-3">
+                      {tx.id && (
+                        <div className="flex flex-wrap gap-1">
+                          <Button size="sm" variant="outline" disabled={reviewingId === tx.id} onClick={() => reviewTransaction(tx, "PENDING_REVIEW")}>حفظ</Button>
+                          <Button size="sm" className="bg-brand hover:bg-brand-dark" disabled={reviewingId === tx.id} onClick={() => reviewTransaction(tx, "APPROVED")}>
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="outline" disabled={reviewingId === tx.id} onClick={() => reviewTransaction(tx, "IGNORED")}>
+                            <XCircle className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="text-rose-600 hover:text-rose-700" disabled={reviewingId === tx.id} onClick={() => deleteTransaction(tx)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              {!transactions.length && (
+                <tr>
+                  <td colSpan={10} className="p-0">
+                    <EmptyState
+                      variant="inline"
+                      icon={Search}
+                      title="لا توجد عمليات مطابقة"
+                      description="لا توجد عملية تطابق الفلاتر الحالية. جرّب توسيع النطاق الزمني أو اختيار «كل الحالات»."
+                      action={<Button size="sm" variant="outline" onClick={resetFilters}>إعادة ضبط الفلاتر</Button>}
+                    />
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-3 text-[13px] text-slate-600">
+          <span className="tabular-nums">صفحة {page} من {totalPages}</span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={page <= 1 || transactionsLoading} onClick={() => { const next = page - 1; setPage(next); void loadTransactions(filters, next); }}>السابق</Button>
+            <Button variant="outline" size="sm" disabled={page >= totalPages || transactionsLoading} onClick={() => { const next = page + 1; setPage(next); void loadTransactions(filters, next); }}>التالي</Button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Bank administration — collapsed by default ───────────────────────────
+          Adding a bank happens rarely; it previously held a third of the page permanently. */}
+      <details className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+              <Building2 className="h-[18px] w-[18px]" />
+            </span>
+            <div>
+              <h2 className="text-[15px] font-semibold leading-tight text-slate-900">الحسابات البنكية</h2>
+              <p className="text-xs text-slate-500">{activeBanks.length} حساب نشط • إجماليات وإضافة حساب جديد</p>
+            </div>
+          </div>
+          <span className="text-xs font-medium text-brand transition-transform group-open:rotate-180">▾</span>
+        </summary>
+
+        <div className="space-y-4 border-t border-slate-100 p-4">
+          <div className="grid gap-3 md:grid-cols-3">
+            {activeBanks.map((bank) => {
+              const s = bank.stats ?? { operationCount: 0, totals: {}, localeTotals: {} };
+              return (
+                <div key={bank.id ?? bank.code ?? bank.nameAr} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-[15px] font-semibold text-slate-900">{bank.nameAr}</p>
+                      <p className="truncate text-xs text-slate-500">{bank.nameTr || bank.nameEn || bank.code || "حساب بنكي"}</p>
+                    </div>
+                    <span className="rounded-lg bg-brand-50 p-2 text-brand"><Building2 className="h-4 w-4" /></span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {[
+                      { label: "دولار", value: money(s.totals.USD, "USD") },
+                      { label: "ليرة", value: money(s.totals.TRY, "TRY") },
+                      { label: "عمليات", value: String(s.operationCount) },
+                    ].map((cell) => (
+                      <div key={cell.label} className="rounded-lg bg-slate-50 p-2.5">
+                        <p className="text-[10px] text-slate-500">{cell.label}</p>
+                        <p className="mt-0.5 truncate text-[13px] font-semibold tabular-nums text-slate-900">{cell.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[11px] text-slate-400">العملة الافتراضية: <span className="font-mono">{bank.currency}</span></p>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="rounded-xl border border-dashed border-slate-300 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <Plus className="h-4 w-4 text-slate-400" />
+              <h3 className="text-[13px] font-semibold text-slate-800">إضافة حساب بنكي جديد</h3>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <Input placeholder="اسم البنك بالعربية" value={form.nameAr} onChange={(e) => setForm((f) => ({ ...f, nameAr: e.target.value }))} className="h-10 text-[13px]" />
+              <Select value={form.currency} onValueChange={(v) => setForm((f) => ({ ...f, currency: v }))}>
+                <SelectTrigger className="h-10 text-[13px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {supportedCurrencies.map((c) => <SelectItem key={c} value={c}>{currencyLabels[c] ?? c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Input placeholder="الاسم بالتركية" value={form.nameTr} onChange={(e) => setForm((f) => ({ ...f, nameTr: e.target.value }))} className="h-10 text-[13px]" />
+              <Input placeholder="الاسم بالإنجليزية" value={form.nameEn} onChange={(e) => setForm((f) => ({ ...f, nameEn: e.target.value }))} className="h-10 text-[13px]" />
+              <Input placeholder="اسم الحساب" value={form.accountName} onChange={(e) => setForm((f) => ({ ...f, accountName: e.target.value }))} className="h-10 text-[13px]" />
+              <Input placeholder="آخر 4 من IBAN" value={form.ibanLast4} onChange={(e) => setForm((f) => ({ ...f, ibanLast4: e.target.value }))} className="h-10 text-[13px]" />
+            </div>
+            <Button className="mt-3 gap-2 bg-brand hover:bg-brand-dark" onClick={addBank} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              إضافة البنك
+            </Button>
+          </div>
+        </div>
+      </details>
     </div>
-
-    <div className="grid gap-4 md:grid-cols-3">{activeBanks.map((bank) => { const s = bank.stats ?? { operationCount: 0, totals: {}, localeTotals: {} }; return <Card key={bank.id ?? bank.code ?? bank.nameAr}><CardHeader className="pb-3"><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-lg">{bank.nameAr}</CardTitle><CardDescription>{bank.nameTr || bank.nameEn || bank.code || "حساب بنكي"}</CardDescription></div><div className="rounded-full bg-blue-50 p-2 text-brand"><Building2 className="h-5 w-5" /></div></div></CardHeader><CardContent className="space-y-3 text-sm"><div className="grid grid-cols-3 gap-2"><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">دولار</p><p className="font-semibold">{money(s.totals.USD, "USD")}</p></div><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">ليرة</p><p className="font-semibold">{money(s.totals.TRY, "TRY")}</p></div><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">عمليات</p><p className="font-semibold">{s.operationCount}</p></div></div><div className="text-xs text-slate-500">العملة الافتراضية: <span className="font-mono">{bank.currency}</span></div></CardContent></Card>; })}</div>
-
-    <Card><CardHeader><CardTitle>معاينة العمليات المقروءة</CardTitle><CardDescription>احذف أي صف غير مناسب قبل إدخاله للمراجعة.</CardDescription></CardHeader><CardContent>{!preview ? <EmptyState icon={FileText} title="لا توجد معاينة بعد" description="ارفع كشف حساب من لوحة «رفع كشف الحساب» لتظهر العمليات المقروءة هنا قبل إدخالها للمراجعة." /> :<div className="space-y-3"><div className="flex flex-col gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600 md:flex-row md:items-center md:justify-between"><div>الملف: {preview.fileName} • IBAN: {preview.bankIban ?? "لم يتم التقاطه"} • المعروض: {visiblePreviewRows.length} من {preview.rowCount} • المحذوف: {excludedPreviewHashes.size}</div>{excludedPreviewHashes.size > 0 ? <Button size="sm" variant="outline" onClick={() => setExcludedPreviewHashes(new Set())}>إعادة الصفوف المحذوفة</Button> : null}</div><div className="overflow-x-auto rounded-xl border"><table className="min-w-full text-right text-xs"><thead className="bg-slate-50"><tr><th className="p-2">#</th><th className="p-2">التاريخ</th><th className="p-2">الاسم</th><th className="p-2">الوصف</th><th className="p-2">القيمة</th><th className="p-2">الاتجاه</th><th className="p-2">المشروع</th><th className="p-2">إجراء</th></tr></thead><tbody>{visiblePreviewRows.slice(0, 100).map((row) => <tr key={previewRowKey(row)} className="border-t"><td className="p-2 font-mono">{row.rowNumber}</td><td className="p-2">{row.transactionDate ?? "-"}</td><td className="p-2">{row.donorName ?? "-"}</td><td className="p-2 min-w-80">{row.description}</td><td className="p-2 font-mono">{row.amount === null ? "-" : money(row.amount, row.currency)}</td><td className="p-2">{row.direction === "CREDIT" ? "وارد" : row.direction === "DEBIT" ? "صادر" : "غير محدد"}</td><td className="p-2">{row.suggestedProject}</td><td className="p-2"><Button size="sm" variant="ghost" onClick={() => removePreviewRow(row)}>حذف</Button></td></tr>)}{!visiblePreviewRows.length ? <tr><td colSpan={8} className="p-0"><EmptyState variant="inline" icon={FileText} title="لا توجد صفوف معروضة" description="حُذفت كل الصفوف من المعاينة. استخدم «إعادة الصفوف المحذوفة» لاستعادتها." /></td></tr> : null}</tbody></table></div></div>}</CardContent></Card>
-
-    <Card><CardHeader><CardTitle>لوحة المتبرعين البنكيين</CardTitle><CardDescription>{transactionsLoading ? "جاري تطبيق الفلاتر..." : "عدّل البيانات ثم احفظ، واعتمد فقط العمليات التي يجب احتسابها في الإجماليات."}</CardDescription></CardHeader><CardContent>{selectedIds.size > 0 ? <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-blue-50 p-3 text-xs text-blue-900"><span>تم تحديد {selectedIds.size} عملية</span><div className="flex flex-wrap gap-2"><Button size="sm" disabled={bulkBusy} onClick={() => bulkReview("APPROVED")}>اعتماد المحدد</Button><Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => bulkReview("IGNORED")}>استبعاد المحدد</Button><Button size="sm" variant="outline" disabled={bulkBusy} onClick={() => setSelectedIds(new Set())}>إلغاء التحديد</Button></div></div> : null}<div className="overflow-x-auto rounded-xl border"><table className="min-w-full text-right text-xs"><thead className="bg-slate-50"><tr><th className="p-2"><input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} aria-label="تحديد الكل" /></th><th className="p-2">الحالة</th><th className="p-2">التاريخ</th><th className="p-2">الاسم</th><th className="p-2">البنك</th><th className="p-2">القيمة</th><th className="p-2">اللغة</th><th className="p-2">المشروع</th><th className="p-2">الوصف</th><th className="p-2">إجراءات</th></tr></thead><tbody>{transactions.map((tx) => { const edit = tx.id ? edits[tx.id] : undefined; return <tr key={tx.id ?? tx.reference ?? `${tx.donorName}-${tx.amount}`} className="border-t align-top"><td className="p-2">{tx.id ? <input type="checkbox" checked={selectedIds.has(tx.id)} onChange={() => toggleSelected(tx.id!)} /> : null}</td><td className="p-2"><span className={`inline-flex rounded-full border px-2 py-1 ${statusClass(tx.status)}`}>{statusLabel(tx.status)}</span></td><td className="p-2 whitespace-nowrap">{tx.transactionDate || "-"}</td><td className="p-2 min-w-44"><Input className="h-8 text-xs" value={edit?.donorName ?? ""} onChange={(e) => tx.id && setEdit(tx.id, { donorName: e.target.value })} /></td><td className="p-2 whitespace-nowrap">{tx.bankId || "-"}</td><td className="p-2 font-mono whitespace-nowrap">{money(tx.amount, tx.currency)}</td><td className="p-2 min-w-32"><Select value={edit?.donorLocale ?? tx.donorLocale ?? "ar"} onValueChange={(v) => tx.id && setEdit(tx.id, { donorLocale: v })}><SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(localeLabels).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent></Select></td><td className="p-2 min-w-56"><Input className="h-8 text-xs" value={edit?.finalProject ?? tx.finalProject ?? tx.suggestedProject ?? ""} onChange={(e) => tx.id && setEdit(tx.id, { finalProject: e.target.value })} /></td><td className="p-2 min-w-80 text-slate-500"><div className="line-clamp-3">{tx.description}</div>{tx.reference ? <div className="mt-1 font-mono text-[10px]">{tx.reference}</div> : null}</td><td className="p-2"><div className="flex flex-wrap gap-1">{tx.id ? <><Button size="sm" variant="outline" disabled={reviewingId === tx.id} onClick={() => reviewTransaction(tx, "PENDING_REVIEW")}>حفظ</Button><Button size="sm" disabled={reviewingId === tx.id} onClick={() => reviewTransaction(tx, "APPROVED")}><CheckCircle2 className="ml-1 h-3 w-3" />اعتماد</Button><Button size="sm" variant="outline" disabled={reviewingId === tx.id} onClick={() => reviewTransaction(tx, "IGNORED")}><XCircle className="ml-1 h-3 w-3" />استبعاد</Button><Button size="sm" variant="ghost" className="text-rose-600" disabled={reviewingId === tx.id} onClick={() => deleteTransaction(tx)}><Trash2 className="ml-1 h-3 w-3" />حذف</Button></> : null}</div></td></tr>; })}{!transactions.length ? <tr><td colSpan={10} className="p-0"><EmptyState variant="inline" icon={Search} title="لا توجد عمليات مطابقة" description="لا توجد عملية تطابق الفلاتر الحالية. جرّب توسيع النطاق الزمني أو اختيار «كل الحالات»." action={<Button size="sm" variant="outline" onClick={resetFilters}>إعادة ضبط الفلاتر</Button>} /></td></tr> : null}</tbody></table></div><div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600"><span>صفحة {page} من {totalPages}</span><div className="flex gap-2"><Button variant="outline" disabled={page <= 1 || transactionsLoading} onClick={() => { const next = page - 1; setPage(next); void loadTransactions(filters, next); }}>السابق</Button><Button variant="outline" disabled={page >= totalPages || transactionsLoading} onClick={() => { const next = page + 1; setPage(next); void loadTransactions(filters, next); }}>التالي</Button></div></div></CardContent></Card>
-  </div>;
+  );
 }
-
-function Kpi({ label, value }: { label: string; value: string }) { return <Card><CardContent className="p-4"><div className="text-xs text-slate-500">{label}</div><div className="mt-1 text-2xl font-black text-slate-950">{value}</div></CardContent></Card>; }
