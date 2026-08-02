@@ -30,6 +30,7 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/PageHeader";
+import { CHART_THEME } from "@/lib/dashboard/chart-theme";
 import { useCurrency } from "@/context/CurrencyContext";
 import {
   ResponsiveContainer,
@@ -210,12 +211,15 @@ const PERIOD_LABELS: Record<ChartPeriod, string> = {
   custom: "مخصص",
 };
 
+// Was a local block of raw hex duplicated verbatim in monthly/page.tsx and built on a generic
+// blue rather than the brand colour. Aliased so every existing CHART_COLORS.* reference in
+// this file keeps working while the values now come from one shared, brand-anchored palette.
 const CHART_COLORS = {
-  primary: "#2563eb",
-  primaryLight: "#93c5fd",
-  secondary: "#1d4ed8",
-  grid: "#e2e8f0",
-  text: "#334155",
+  primary: CHART_THEME.primary,
+  primaryLight: CHART_THEME.primaryLight,
+  secondary: CHART_THEME.primaryDark,
+  grid: CHART_THEME.grid,
+  text: CHART_THEME.text,
 };
 
 const PAGE_SIZE = 10;
@@ -767,6 +771,52 @@ export default function DashboardPage() {
 
 
 
+
+        {/* Executive hero band. The page previously opened straight into a grid of equal-weight
+            KPI tiles, so nothing told the reader which number actually matters. This promotes
+            the headline figure and keeps its supporting counts adjacent. */}
+        {!searchParams.get("userId") && (
+          <section className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-brand-800 via-brand to-brand-600 p-5 text-white shadow-[0_8px_28px_rgba(2,94,184,0.22)] sm:p-6">
+            <div
+              className="pointer-events-none absolute -top-16 start-1/3 h-56 w-56 rounded-full bg-white/10 blur-3xl"
+              aria-hidden
+            />
+            <div className="relative flex flex-wrap items-end justify-between gap-6">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/70">
+                  إجمالي الإيرادات الناجحة — كل الوقت
+                </p>
+                <p className="mt-2 text-3xl font-bold tabular-nums tracking-tight sm:text-4xl">
+                  {formatInSelectedCurrency(
+                    stats?.paidRevenueAllTimeUnfiltered ??
+                      stats?.allTimeRevenue ??
+                      stats?.totalAmount ??
+                      0,
+                  )}
+                </p>
+                <p className="mt-1.5 text-[13px] leading-6 text-white/75">
+                  لا تتأثر هذه القيمة بالفترة أو التصفية المختارة أدناه.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-stretch gap-3">
+                {[
+                  { label: "تبرعات ناجحة", value: (stats?.paidCount ?? 0).toLocaleString("en-US") },
+                  { label: "اشتراكات نشطة", value: (stats?.activeMonthlyCount ?? 0).toLocaleString("en-US") },
+                  { label: "المتبرعون", value: (stats?.totalUsers ?? 0).toLocaleString("en-US") },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    className="min-w-[104px] rounded-xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-sm"
+                  >
+                    <p className="text-[11px] font-medium text-white/70">{item.label}</p>
+                    <p className="mt-1 text-xl font-bold tabular-nums">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* المؤشرات — تختفي عند عرض تبرعات مستخدم معين عبر الرابط */}
         {!searchParams.get("userId") && (

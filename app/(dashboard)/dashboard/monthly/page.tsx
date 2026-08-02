@@ -26,6 +26,7 @@ import {
   Star,
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/PageHeader";
+import { CHART_THEME } from "@/lib/dashboard/chart-theme";
 import { useCurrency } from "@/context/CurrencyContext";
 import {
   ResponsiveContainer,
@@ -219,12 +220,13 @@ const PERIOD_LABELS: Record<ChartPeriod, string> = {
   custom: "مخصص",
 };
 
+// See lib/dashboard/chart-theme.ts — this block was duplicated verbatim from page.tsx.
 const CHART_COLORS = {
-  primary: "#2563eb",
-  primaryLight: "#93c5fd",
-  secondary: "#1d4ed8",
-  grid: "#e2e8f0",
-  text: "#334155",
+  primary: CHART_THEME.primary,
+  primaryLight: CHART_THEME.primaryLight,
+  secondary: CHART_THEME.primaryDark,
+  grid: CHART_THEME.grid,
+  text: CHART_THEME.text,
 };
 
 const PAGE_SIZE = 10;
