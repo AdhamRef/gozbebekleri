@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ClipboardCheck, MessageSquareWarning, AlertOctagon, FileWarning, Megaphone, Inbox, Users, Settings2, ArrowLeft } from "lucide-react";
+import { ClipboardCheck, MessageSquareWarning, AlertOctagon, FileWarning, Megaphone, Inbox, MessageCircle, Users, Settings2, ArrowLeft } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -35,17 +36,18 @@ export default async function CommunicationHomePage() {
   return (
     <main className="mx-auto max-w-6xl space-y-6" dir="rtl">
       {/* Header */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-xs text-slate-400">التشغيل / التواصل</p>
-          <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">مركز التواصل</h1>
-          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500">أرسل حملات واتساب وإيميل ورسائل حسب اللغة، وتابع المحادثات والنتائج من مكان واحد.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button asChild className="gap-2"><Link href="/dashboard/operations/communication/campaigns"><Megaphone className="h-4 w-4" /> إنشاء حملة</Link></Button>
-          <Button asChild variant="outline" className="gap-2"><Link href="/dashboard/operations/communication/inbox"><Inbox className="h-4 w-4" /> فتح المحادثات</Link></Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="التشغيل / التواصل"
+        title="مركز التواصل"
+        description="أرسل حملات واتساب وإيميل ورسائل حسب اللغة، وتابع المحادثات والنتائج من مكان واحد."
+        icon={MessageCircle}
+        actions={
+          <>
+            <Button asChild className="gap-2"><Link href="/dashboard/operations/communication/campaigns"><Megaphone className="h-4 w-4" /> إنشاء حملة</Link></Button>
+            <Button asChild variant="outline" className="gap-2"><Link href="/dashboard/operations/communication/inbox"><Inbox className="h-4 w-4" /> فتح المحادثات</Link></Button>
+          </>
+        }
+      />
 
       {/* Four action cards */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

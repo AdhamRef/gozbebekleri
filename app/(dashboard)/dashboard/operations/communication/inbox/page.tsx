@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Loader2, RefreshCw, Search, MessageCircle, AlertTriangle, UserX, Phone, Globe, MapPin, Heart, Inbox } from "lucide-react";
 import { EmptyState } from "@/components/dashboard/EmptyState";
+import { PageHeader } from "@/components/dashboard/PageHeader";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -116,16 +117,18 @@ export default function InboxPage() {
   return (
     <main dir="rtl">
       {/* Clean header */}
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs text-slate-400">التواصل / المحادثات</p>
-          <h1 className="mt-0.5 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">صندوق واتساب {needsReplyCount > 0 ? <span className="text-sm font-bold text-amber-600">({needsReplyCount} بحاجة رد)</span> : null}</h1>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" className="gap-2" onClick={() => load()} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> تحديث</Button>
-          <Button asChild variant="outline" size="sm" className="gap-2"><Link href="/dashboard/operations/communication">العودة <ArrowLeft className="h-4 w-4" /></Link></Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="التواصل / المحادثات"
+        title="صندوق واتساب"
+        icon={Inbox}
+        description={needsReplyCount > 0 ? <span className="font-bold text-amber-600">{needsReplyCount} محادثة بحاجة رد</span> : "كل المحادثات مُجاب عنها."}
+        actions={
+          <>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => load()} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> تحديث</Button>
+            <Button asChild variant="outline" size="sm" className="gap-2"><Link href="/dashboard/operations/communication">العودة <ArrowLeft className="h-4 w-4" /></Link></Button>
+          </>
+        }
+      />
 
       {!providerConfigured ? (
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">مزود واتساب غير مُعد بعد. ستظهر المحادثات هنا بعد اكتمال الإعداد واستقبال الرسائل.</div>
