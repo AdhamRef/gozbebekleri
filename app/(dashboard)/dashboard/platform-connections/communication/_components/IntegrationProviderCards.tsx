@@ -7,7 +7,8 @@ import type { IntegrationUiSnapshot } from "./model";
 
 const icons = {
   META_WHATSAPP: MessageCircle,
-  BREVO: Mail,
+  ELASTIC_EMAIL: Mail,
+  BREVO: MessageSquare,
   NETGSM: MessageSquare,
   SYSTEM: Clock3,
 } satisfies Record<IntegrationProvider, typeof MessageCircle>;
@@ -29,9 +30,9 @@ export function IntegrationProviderCards({ providers, active, onOpen }: {
         const missing = infrastructureOnly ? (completed ? 0 : 1) : snapshot.missingRequiredFields.length;
         const isActive = active === provider;
         return (
-          <article key={provider} className={`flex min-h-[230px] flex-col rounded-xl border bg-white p-4 shadow-sm transition ${isActive ? "border-[#025EB8] ring-2 ring-blue-100" : "border-slate-200 hover:border-blue-300"}`}>
+          <article key={provider} className={`flex min-h-[230px] flex-col rounded-xl border bg-white p-4 shadow-sm transition ${isActive ? "border-brand ring-2 ring-blue-100" : "border-slate-200 hover:border-blue-300"}`}>
             <div className="flex items-start justify-between gap-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-[#025EB8]"><Icon className="h-5 w-5" /></span>
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-brand"><Icon className="h-5 w-5" /></span>
               <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold text-slate-700">
                 {status === "READY" || status === "PENDING_ACTIVATION" ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <CircleAlert className="h-3.5 w-3.5 text-amber-600" />}
                 {INTEGRATION_UI_STATUS_LABEL[status]}
@@ -45,7 +46,7 @@ export function IntegrationProviderCards({ providers, active, onOpen }: {
               <p>آخر فحص للتكوين العامل: <b className="text-slate-900">{snapshot.activeTest.lastTestAt ? new Date(snapshot.activeTest.lastTestAt).toLocaleString("ar") : "لم يتم"}</b></p>
               {snapshot.candidate.hasChanges ? <p className="font-bold text-amber-700">توجد تغييرات بانتظار الاختبار أو الاعتماد.</p> : null}
             </div>
-            <button type="button" onClick={() => onOpen(provider)} className="mt-auto inline-flex h-9 items-center justify-center gap-2 rounded-md bg-[#025EB8] px-3 text-xs font-bold text-white transition hover:bg-[#024a92] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+            <button type="button" onClick={() => onOpen(provider)} className="mt-auto inline-flex h-9 items-center justify-center gap-2 rounded-md bg-brand px-3 text-xs font-bold text-white transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
               <Settings2 className="h-4 w-4" /> فتح الإعدادات
             </button>
           </article>

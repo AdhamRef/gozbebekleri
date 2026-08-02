@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "react-hot-toast";
 import { Award, Pencil, Trash2, Plus, Loader2 } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/PageHeader";
 import { cn } from "@/lib/utils";
 import type { BadgeCriteriaType } from "@/lib/badge-criteria";
 import { LOCALE_OPTIONS } from "@/lib/locales";
@@ -214,19 +215,18 @@ export default function BadgesPage() {
 
   return (
     <div className="min-h-0" dir="rtl">
-      <div className="space-y-6 p-4 md:p-6 max-w-[1200px] mx-auto">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground">الشارات (مجموعات المستخدمين)</h1>
-            <p className="text-muted-foreground text-sm mt-1">
-              إنشاء وتعديل شارات حسب معايير التبرع (مبلغ، فترة، عدد)
-            </p>
-          </div>
-          <Button onClick={openCreate} className="gap-2">
-            <Plus className="w-4 h-4" />
-            شارة جديدة
-          </Button>
-        </header>
+      <div className="space-y-6 max-w-[1200px] mx-auto">
+        <PageHeader
+          title="الشارات (مجموعات المستخدمين)"
+          description="إنشاء وتعديل شارات حسب معايير التبرع (مبلغ، فترة، عدد)"
+          icon={Award}
+          actions={
+            <Button onClick={openCreate} className="gap-2">
+              <Plus className="w-4 h-4" />
+              شارة جديدة
+            </Button>
+          }
+        />
 
         {loading ? (
           <div className="flex items-center justify-center py-12">

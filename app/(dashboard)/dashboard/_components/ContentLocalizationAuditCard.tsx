@@ -179,7 +179,7 @@ export function ContentLocalizationAuditCard({ section }: { section: Section }) 
         <CardHeader className="pb-3">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex items-start gap-3">
-              <div className="rounded-full bg-blue-100 p-2 text-[#025EB8]">
+              <div className="rounded-full bg-blue-100 p-2 text-brand">
                 <Languages className="h-5 w-5" />
               </div>
               <div>
@@ -218,7 +218,7 @@ export function ContentLocalizationAuditCard({ section }: { section: Section }) 
               <Button
                 size="sm"
                 onClick={() => setPreviewOpen(true)}
-                className="gap-2 bg-[#025EB8] hover:bg-[#014f9c]"
+                className="gap-2 bg-brand hover:bg-[#014f9c]"
               >
                 <Sparkles className="h-4 w-4" />
                 فتح المعاينة الآمنة

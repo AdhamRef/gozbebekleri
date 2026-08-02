@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, BellRing, CalendarDays, CheckCircle2, Clock3, FileText, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BellRing, Calendar, CalendarDays, CheckCircle2, Clock3, FileText, Sparkles } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getOperationsCalendarOverview } from "@/lib/operations/calendar-service";
@@ -54,20 +55,19 @@ export default function OperationsCalendarPage() {
   const { events, alertRules, kpis } = overview;
 
   return (
-    <div className="space-y-5 p-4 sm:p-6" dir="rtl">
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <p className="text-xs font-bold text-[#025EB8]">المحتوى والتشغيل / التقويم والتنبيهات</p>
-          <h1 className="mt-1 text-xl font-black text-slate-900">التقويم والتنبيهات</h1>
-          <p className="mt-1.5 max-w-3xl text-sm leading-6 text-slate-600">
-            خطط للمواسم، المواعيد، والحملات القادمة.
-          </p>
-        </div>
-        <Link href="/dashboard/operations/content" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-[#025EB8]/50 hover:text-[#025EB8]">
-          فتح لوحة المحتوى
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-      </div>
+    <div className="space-y-5" dir="rtl">
+      <PageHeader
+        eyebrow="المحتوى والتشغيل / التقويم والتنبيهات"
+        title="التقويم والتنبيهات"
+        description="خطط للمواسم، المواعيد، والحملات القادمة."
+        icon={Calendar}
+        actions={
+          <Link href="/dashboard/operations/content" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-brand/50 hover:text-brand">
+            فتح لوحة المحتوى
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
         <Card><CardHeader><CardDescription>أحداث تشغيلية</CardDescription><CardTitle className="text-3xl">{kpis.totalEvents}</CardTitle></CardHeader></Card>
@@ -80,7 +80,7 @@ export default function OperationsCalendarPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-[#025EB8]" /> الخطة المقترحة</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-brand" /> الخطة المقترحة</CardTitle>
           <CardDescription>اقتراحات إنتاجية بناءً على نقص المواد في المواسم القادمة. يمكنك تحويل أي اقتراح إلى مهمة لفريق المحتوى.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 lg:grid-cols-2">
@@ -118,7 +118,7 @@ export default function OperationsCalendarPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-[#025EB8]" /> جاهزية المواسم</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-brand" /> جاهزية المواسم</CardTitle>
           <CardDescription>قراءة لتوضيح جاهزية المواسم، النقص في المواد، والتنبيهات التشغيلية.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 lg:grid-cols-2">
@@ -138,12 +138,12 @@ export default function OperationsCalendarPage() {
                 <span>الناقص: <b>{season.missingAssets}</b></span>
               </div>
               <div className="mt-4 h-2 overflow-hidden rounded-full bg-white">
-                <div className="h-full rounded-full bg-[#025EB8]" style={{ width: `${season.readinessScore}%` }} />
+                <div className="h-full rounded-full bg-brand" style={{ width: `${season.readinessScore}%` }} />
               </div>
               <div className="mt-4 space-y-2">
                 {season.alerts.map((alert) => (
                   <div key={alert} className="flex gap-2 rounded-xl border bg-white p-3 text-xs leading-5 text-slate-600">
-                    <BellRing className="mt-0.5 h-4 w-4 shrink-0 text-[#025EB8]" />
+                    <BellRing className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
                     {alert}
                   </div>
                 ))}
@@ -156,7 +156,7 @@ export default function OperationsCalendarPage() {
       <div className="grid gap-4 xl:grid-cols-[1.4fr_0.6fr]">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-[#025EB8]" /> خريطة المواسم والتنبيهات</CardTitle>
+            <CardTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-brand" /> خريطة المواسم والتنبيهات</CardTitle>
             <CardDescription>نسخة تأسيسية ثابتة يمكن تحويل عناصرها الآن إلى مهام تشغيل محفوظة لحين ربطها بقاعدة البيانات والتقويم الهجري.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -173,9 +173,9 @@ export default function OperationsCalendarPage() {
                   <Badge variant="outline" className={priorityClass[event.priority]}>{priorityLabel[event.priority] ?? event.priority}</Badge>
                 </div>
                 <div className="mt-4 grid gap-3 text-sm text-slate-600 md:grid-cols-3">
-                  <span className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-[#025EB8]" /> {event.dateLabel}</span>
-                  <span className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-[#025EB8]" /> {event.hijriLabel || "غير محدد"}</span>
-                  <span className="flex items-center gap-2"><BellRing className="h-4 w-4 text-[#025EB8]" /> قبل {event.leadTimeDays} يوم</span>
+                  <span className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-brand" /> {event.dateLabel}</span>
+                  <span className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-brand" /> {event.hijriLabel || "غير محدد"}</span>
+                  <span className="flex items-center gap-2"><BellRing className="h-4 w-4 text-brand" /> قبل {event.leadTimeDays} يوم</span>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {event.requiredAssets.map((asset) => (
@@ -198,9 +198,9 @@ export default function OperationsCalendarPage() {
           </CardContent>
         </Card>
         <div className="space-y-4">
-          <Card className="border-[#025EB8]/20 bg-blue-50/60"><CardHeader><CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-[#025EB8]" /> دور AI لاحقًا</CardTitle><CardDescription className="leading-6">سيقرأ AI لاحقًا الخطة المقترحة، ويحوّلها إلى مسودات محتوى وجدول أولويات قابل للمراجعة البشرية.</CardDescription></CardHeader></Card>
-          <Card><CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-amber-600" /> قواعد التنبيه</CardTitle></CardHeader><CardContent className="space-y-3">{alertRules.map((rule) => <div key={rule} className="flex gap-2 rounded-xl border bg-slate-50 p-3 text-sm leading-6 text-slate-700"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#025EB8]" />{rule}</div>)}</CardContent></Card>
-          <Card><CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-[#025EB8]" /> القادم</CardTitle><CardDescription className="leading-6">الخطوة القادمة ستكون تحويل هذه الإجراءات إلى مهام إنتاج فعلية مرتبطة بلوحة المحتوى.</CardDescription></CardHeader></Card>
+          <Card className="border-brand/20 bg-blue-50/60"><CardHeader><CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-brand" /> دور AI لاحقًا</CardTitle><CardDescription className="leading-6">سيقرأ AI لاحقًا الخطة المقترحة، ويحوّلها إلى مسودات محتوى وجدول أولويات قابل للمراجعة البشرية.</CardDescription></CardHeader></Card>
+          <Card><CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-amber-600" /> قواعد التنبيه</CardTitle></CardHeader><CardContent className="space-y-3">{alertRules.map((rule) => <div key={rule} className="flex gap-2 rounded-xl border bg-slate-50 p-3 text-sm leading-6 text-slate-700"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand" />{rule}</div>)}</CardContent></Card>
+          <Card><CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-brand" /> القادم</CardTitle><CardDescription className="leading-6">الخطوة القادمة ستكون تحويل هذه الإجراءات إلى مهام إنتاج فعلية مرتبطة بلوحة المحتوى.</CardDescription></CardHeader></Card>
         </div>
       </div>
     </div>

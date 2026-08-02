@@ -123,7 +123,7 @@ export function OperationsFoundationItemActions({ collection, item, fields, comp
                     <select
                       value={String(form[field.key] ?? "")}
                       onChange={(event) => setForm((value) => ({ ...value, [field.key]: event.target.value }))}
-                      className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]"
+                      className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand"
                     >
                       {(field.options ?? []).map(([value, label]) => (
                         <option key={value} value={value}>{label}</option>
@@ -134,7 +134,7 @@ export function OperationsFoundationItemActions({ collection, item, fields, comp
                       type={field.type === "number" ? "number" : "text"}
                       value={String(form[field.key] ?? "")}
                       onChange={(event) => setForm((value) => ({ ...value, [field.key]: field.type === "number" ? event.target.valueAsNumber : event.target.value }))}
-                      className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]"
+                      className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand"
                     />
                   )}
                 </label>

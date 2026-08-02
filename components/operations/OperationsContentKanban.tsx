@@ -86,7 +86,7 @@ export function OperationsContentKanban({ items, boardColumns, statusClass }: Op
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <span className="rounded-full border bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-600">{productionIndicator(item.status)}</span>
-                          <span className="rounded-full border bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-[#025EB8]">{operationsContentProgressLabel(progress)}</span>
+                          <span className="rounded-full border bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-brand">{operationsContentProgressLabel(progress)}</span>
                         </div>
                         <div className="mt-3">
                           <div className="mb-1 flex items-center justify-between text-[11px] font-bold text-slate-500">
@@ -94,7 +94,7 @@ export function OperationsContentKanban({ items, boardColumns, statusClass }: Op
                             <span>{progress}%</span>
                           </div>
                           <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                            <div className="h-full rounded-full bg-[#025EB8]" style={{ width: `${progress}%` }} />
+                            <div className="h-full rounded-full bg-brand" style={{ width: `${progress}%` }} />
                           </div>
                         </div>
                         <div className="mt-3 space-y-1 text-xs text-slate-500">
@@ -114,7 +114,7 @@ export function OperationsContentKanban({ items, boardColumns, statusClass }: Op
                         {links.length > 0 ? (
                           <div className="mt-3 flex flex-wrap gap-2">
                             {links.map(([label, href]) => (
-                              <a key={label} href={href} target="_blank" rel="noreferrer" className="rounded-full border bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-[#025EB8] hover:border-[#025EB8]">
+                              <a key={label} href={href} target="_blank" rel="noreferrer" className="rounded-full border bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-brand hover:border-brand">
                                 {label}
                               </a>
                             ))}

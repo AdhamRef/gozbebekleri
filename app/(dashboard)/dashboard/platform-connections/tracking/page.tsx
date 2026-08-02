@@ -9,7 +9,7 @@ export default async function TrackingPage() {
   const { rows, configuredCount, total } = await getTrackingReadiness();
 
   return (
-    <main className="space-y-5 p-4 sm:p-6" dir="rtl">
+    <main className="space-y-5" dir="rtl">
       <PageHeader
         eyebrow="ربط المنصات والإرسال / بكسلات التتبع"
         title="بكسلات التتبع"
@@ -40,7 +40,7 @@ export default async function TrackingPage() {
                     <td className="p-3 text-center text-slate-500">{r.server ? "✓" : "—"}</td>
                     <td className="p-3 text-center"><StatusBadge status={r.status} /></td>
                     <td className="p-3 text-left">
-                      <div className="flex justify-end gap-3 text-xs font-bold text-[#025EB8]">
+                      <div className="flex justify-end gap-3 text-xs font-bold text-brand">
                         <Link href="/dashboard/pixels" className="hover:underline">فتح الإعدادات</Link>
                         <Link href="/dashboard/conversion-events" className="hover:underline">عرض الأحداث</Link>
                       </div>
@@ -54,7 +54,7 @@ export default async function TrackingPage() {
       </Card>
 
       <p className="max-w-2xl rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-6 text-slate-500">
-        تُدار قيم البكسلات ورموز التتبع من <Link href="/dashboard/pixels" className="font-bold text-[#025EB8] hover:underline">صفحة إعدادات البكسلات</Link>. لا تُعرض أي مفاتيح أو رموز سرية هنا.
+        تُدار قيم البكسلات ورموز التتبع من <Link href="/dashboard/pixels" className="font-bold text-brand hover:underline">صفحة إعدادات البكسلات</Link>. لا تُعرض أي مفاتيح أو رموز سرية هنا.
       </p>
     </main>
   );

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowLeft, Megaphone } from "lucide-react";
+import { ArrowLeft, Megaphone, Send } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getOperationsOverview } from "@/lib/operations/service";
@@ -24,7 +25,7 @@ const publishingPlatforms = [
 ] as const;
 
 const statusClass: Record<string, string> = {
-  READY_FOR_MANUAL_SEND: "border-blue-200 bg-blue-50 text-[#025EB8]",
+  READY_FOR_MANUAL_SEND: "border-blue-200 bg-blue-50 text-brand",
   PUBLISHED: "border-emerald-200 bg-emerald-50 text-emerald-700",
   MANUALLY_SENT: "border-emerald-200 bg-emerald-50 text-emerald-700",
   SCHEDULED: "border-indigo-200 bg-indigo-50 text-indigo-700",
@@ -55,20 +56,19 @@ export default async function OperationsPublishingPage() {
   const issueCount = publications.filter((publication) => ["FAILED", "CANCELLED"].includes(publication.status)).length;
 
   return (
-    <div className="space-y-5 p-4 sm:p-6" dir="rtl">
-      <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-xs font-bold text-[#025EB8]">المحتوى والعمليات / النشر</p>
-          <h1 className="mt-1 text-xl font-black text-slate-900">النشر اليدوي</h1>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-            قائمة متابعة لكل مادة عبر المنصات. الأزرار تسجّل حالة يدوية فقط، بدون نشر تلقائي أو اتصال بأي منصة خارجية.
-          </p>
-        </div>
-        <Link href="/dashboard/operations/content" className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-[#025EB8]/50 hover:text-[#025EB8]">
-          فتح عناصر المحتوى
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-      </div>
+    <div className="space-y-5" dir="rtl">
+      <PageHeader
+        eyebrow="المحتوى والعمليات / النشر"
+        title="النشر اليدوي"
+        description="قائمة متابعة لكل مادة عبر المنصات. الأزرار تسجّل حالة يدوية فقط، بدون نشر تلقائي أو اتصال بأي منصة خارجية."
+        icon={Send}
+        actions={
+          <Link href="/dashboard/operations/content" className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-brand/50 hover:text-brand">
+            فتح عناصر المحتوى
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard title="عناصر المحتوى" value={overview.items.length} />
@@ -89,7 +89,7 @@ export default async function OperationsPublishingPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-[#025EB8]"><Megaphone className="h-4 w-4" /></span>
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-brand"><Megaphone className="h-4 w-4" /></span>
                     <h2 className="font-black text-slate-900">{item.title}</h2>
                   </div>
                   <p className="mt-2 text-sm leading-6 text-slate-600">{item.type} · {item.channel} · due {item.due}</p>
@@ -103,13 +103,13 @@ export default async function OperationsPublishingPage() {
                   const status = marker?.status ?? "PENDING";
                   const date = formatDate(markerTime(marker));
                   return (
-                    <div key={`${item.id ?? item.title}-${platform}`} className="rounded-2xl border bg-slate-50 p-3">
+                    <div key={`${item.id ?? item.title}-${platform}`} className="rounded-2xl border bg-slate-50">
                       <div className="flex items-center justify-between gap-2">
                         <b className="text-sm text-slate-900">{platform}</b>
                         <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black ${statusClass[status] ?? statusClass.PENDING}`}>{status}</span>
                       </div>
                       <p className="mt-2 min-h-8 text-xs leading-5 text-slate-500">
-                        {marker?.publishedUrl ? <a className="font-bold text-[#025EB8] underline" href={marker.publishedUrl} target="_blank" rel="noreferrer">فتح رابط النشر</a> : date ? `آخر تحديث: ${date}` : "لم يتم تسجيل إجراء بعد"}
+                        {marker?.publishedUrl ? <a className="font-bold text-brand underline" href={marker.publishedUrl} target="_blank" rel="noreferrer">فتح رابط النشر</a> : date ? `آخر تحديث: ${date}` : "لم يتم تسجيل إجراء بعد"}
                       </p>
                       {item.id ? <PublishingManualActions contentItemId={item.id} title={item.title} platform={platform} /> : null}
                     </div>

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { MarketingPageHeader } from "../_components/MarketingPageHeader";
-import { MarketingQuickNav } from "../_components/MarketingQuickNav";
 
 type PlatformKey = "all" | "meta" | "google_ads" | "ga4" | "tiktok" | "twilio";
 type PeriodKey = "today" | "7" | "14" | "30" | "custom";
@@ -94,10 +93,8 @@ export default function MarketingDataSyncPage() {
       description="شاشة تشغيل فقط: اختر الفترة والمنصة ثم اسحب النتائج. تظهر التفاصيل الفنية فقط عند وجود خطأ أو حقول ناقصة."
     />
 
-    <MarketingQuickNav />
-
     <Card>
-      <CardHeader><CardTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-[#025EB8]" />تشغيل المزامنة</CardTitle><CardDescription>كل شيء في خطوة واحدة.</CardDescription></CardHeader>
+      <CardHeader><CardTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-brand" />تشغيل المزامنة</CardTitle><CardDescription>كل شيء في خطوة واحدة.</CardDescription></CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
           <div className="space-y-2"><div className="text-sm font-bold text-slate-800">الفترة</div><div className="flex flex-wrap gap-2">{periods.map((item) => <Button key={item.key} variant={period === item.key ? "default" : "outline"} onClick={() => setPeriod(item.key)}>{item.label}</Button>)}</div></div>

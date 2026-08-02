@@ -247,7 +247,7 @@ export function AdGroupsTab({ filterQs }: Props) {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="ابحث في utm_term, utm_campaign, الإعلان, الدولة..."
-              className="w-full h-9 pr-8 pl-8 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
+              className="w-full h-9 pr-8 pl-8 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             />
             {searchInput && (
               <button
@@ -269,7 +269,7 @@ export function AdGroupsTab({ filterQs }: Props) {
                 className={cn(
                   "h-9 px-3 text-xs rounded-lg border transition-colors",
                   statusFilter === k
-                    ? "bg-[#025EB8] text-white border-[#025EB8]"
+                    ? "bg-brand text-white border-brand"
                     : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
                 )}
               >
@@ -339,20 +339,20 @@ export function AdGroupsTab({ filterQs }: Props) {
                   <button
                     type="button"
                     onClick={() => toggleSort("date")}
-                    className="inline-flex items-center gap-1 hover:text-[#025EB8]"
+                    className="inline-flex items-center gap-1 hover:text-brand"
                   >
                     التاريخ
-                    <ArrowUpDown className={cn("w-3 h-3", sortKey === "date" ? "text-[#025EB8]" : "text-slate-400")} />
+                    <ArrowUpDown className={cn("w-3 h-3", sortKey === "date" ? "text-brand" : "text-slate-400")} />
                   </button>
                 </th>
                 <th className="text-right py-2 px-3 font-semibold text-slate-700 whitespace-nowrap">
                   <button
                     type="button"
                     onClick={() => toggleSort("amountUSD")}
-                    className="inline-flex items-center gap-1 hover:text-[#025EB8]"
+                    className="inline-flex items-center gap-1 hover:text-brand"
                   >
                     المبلغ
-                    <ArrowUpDown className={cn("w-3 h-3", sortKey === "amountUSD" ? "text-[#025EB8]" : "text-slate-400")} />
+                    <ArrowUpDown className={cn("w-3 h-3", sortKey === "amountUSD" ? "text-brand" : "text-slate-400")} />
                   </button>
                 </th>
                 <th className="text-right py-2 px-3 font-semibold text-slate-700">الدولة</th>
@@ -366,10 +366,10 @@ export function AdGroupsTab({ filterQs }: Props) {
                   <button
                     type="button"
                     onClick={() => toggleSort("confidence")}
-                    className="inline-flex items-center gap-1 hover:text-[#025EB8]"
+                    className="inline-flex items-center gap-1 hover:text-brand"
                   >
                     الثقة
-                    <ArrowUpDown className={cn("w-3 h-3", sortKey === "confidence" ? "text-[#025EB8]" : "text-slate-400")} />
+                    <ArrowUpDown className={cn("w-3 h-3", sortKey === "confidence" ? "text-brand" : "text-slate-400")} />
                   </button>
                 </th>
               </tr>
@@ -453,7 +453,7 @@ export function AdGroupsTab({ filterQs }: Props) {
                             type="button"
                             onClick={() => copyToClipboard(r.utmCampaign!)}
                             title={`${r.utmCampaign} — اضغط للنسخ`}
-                            className="text-right truncate block text-slate-700 hover:text-[#025EB8] hover:underline"
+                            className="text-right truncate block text-slate-700 hover:text-brand hover:underline"
                           >
                             {r.utmCampaign}
                           </button>
@@ -467,7 +467,7 @@ export function AdGroupsTab({ filterQs }: Props) {
                             type="button"
                             onClick={() => copyToClipboard(r.utmTerm!)}
                             title={`${r.utmTerm} — اضغط للنسخ`}
-                            className="text-right truncate block font-medium text-slate-800 hover:text-[#025EB8] hover:underline"
+                            className="text-right truncate block font-medium text-slate-800 hover:text-brand hover:underline"
                           >
                             {r.utmTerm}
                           </button>

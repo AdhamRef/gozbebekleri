@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { SUPPORTED_LOCALES, LOCALES, type SupportedLocale } from "@/lib/locales";
 import type { CommunicationChannel } from "./communication-types";
+import { safeCountValue } from "@/lib/dashboard/safe-count";
 
 /**
  * Dynamic audiences — computed live from the donor base (`User`), never a manual
@@ -61,7 +62,7 @@ async function localeCounts(locale: SupportedLocale) {
     prisma.user.count({ where: { ...base, email: { not: null }, emailNotifications: true } }),
     prisma.user.count({ where: { ...base, phone: { not: null }, smsNotifications: true } }),
     // WhatsApp is only eligible with an explicit opt-in on the donor communication profile.
-    prisma.donorCommunicationProfile.count({ where: { preferredLocale: locale, whatsappOptIn: true, doNotContact: false } }).catch(() => 0),
+    safeCountValue("audience.whatsappReachable", () => prisma.donorCommunicationProfile.count({ where: { preferredLocale: locale, whatsappOptIn: true, doNotContact: false } })),
   ]);
   // Phone contacts without an explicit opt-in still need human review before any bulk WhatsApp.
   const whatsappNeedsReview = Math.max(0, withPhone - whatsappEligible);

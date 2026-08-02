@@ -6,6 +6,10 @@ import axios from 'axios';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PageHeader } from '@/components/dashboard/PageHeader';
+import { FilterBar } from '@/components/dashboard/FilterBar';
+import { EmptyState } from '@/components/dashboard/EmptyState';
+import { PageHeaderSkeleton, FilterBarSkeleton, TableSkeleton } from '@/components/dashboard/skeletons';
 import {
   Table,
   TableBody,
@@ -58,6 +62,7 @@ import {
   RotateCcw,
   PowerOff,
   Trash2,
+  Heart,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -65,6 +70,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { CampaignReorderDialog } from './_components/CampaignReorderDialog';
 import { ContentLocalizationAuditCard } from '../_components/ContentLocalizationAuditCard';
+import { computeCampaignProgressPercent, showCampaignProgress } from '@/lib/campaign/campaign-modes';
 
 interface Campaign {
   goalType: string;
@@ -221,7 +227,9 @@ export default function CampaignsPage() {
       const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         catNamesJoined.includes(searchQuery.toLowerCase());
       const matchesCategory = selectedCategory === 'all' || cats.some((cat) => cat.id === selectedCategory);
-      const progress = c.targetAmount > 0 ? (c.currentAmount / c.targetAmount) * 100 : 0;
+      // Same helper as the table cell, so the "completed / ongoing" filter and the displayed
+      // percentage can never disagree (OPEN-goal campaigns are 0% in both).
+      const progress = computeCampaignProgressPercent(c.currentAmount, c.targetAmount, c.goalType);
       const matchesProgress = progressFilter === 'all' ||
         (progressFilter === 'completed' && progress >= 100) ||
         (progressFilter === 'ongoing' && progress < 100);
@@ -269,62 +277,62 @@ export default function CampaignsPage() {
   if (loading) return <LoadingSkeleton />;
 
   return (
-    <div className="space-y-4 sm:space-y-6 p-0 sm:p-2">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground">المشاريع</h1>
-          <p className="text-sm text-muted-foreground">إدارة مشاريع التبرع</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={() => window.location.href = '/dashboard/campaigns/new'} className="bg-[#025EB8] hover:bg-[#014fa0] gap-2">
-            <Plus className="w-4 h-4" />
-            إنشاء مشروع جديد
-          </Button>
-          <Button variant="outline" className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => setArchiveOpen(true)}>
-            <Archive className="w-4 h-4" />
-            أرشيف المشاريع
-            {archivedCampaigns.length > 0 && (
-              <span className="bg-amber-100 text-amber-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
-                {archivedCampaigns.length}
-              </span>
-            )}
-          </Button>
-          <CampaignReorderDialog onReorder={() => fetchData()} />
-        </div>
+    <div>
+      <PageHeader
+        title="المشاريع"
+        description="إدارة مشاريع التبرع"
+        icon={Heart}
+        actions={
+          <>
+            <Button onClick={() => window.location.href = '/dashboard/campaigns/new'} className="bg-brand hover:bg-brand-dark gap-2">
+              <Plus className="w-4 h-4" />
+              إنشاء مشروع جديد
+            </Button>
+            <Button variant="outline" className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => setArchiveOpen(true)}>
+              <Archive className="w-4 h-4" />
+              أرشيف المشاريع
+              {archivedCampaigns.length > 0 && (
+                <span className="bg-amber-100 text-amber-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
+                  {archivedCampaigns.length}
+                </span>
+              )}
+            </Button>
+            <CampaignReorderDialog onReorder={() => fetchData()} />
+          </>
+        }
+      />
+
+      <div className="mb-4">
+        <ContentLocalizationAuditCard section="campaigns" />
       </div>
 
-      <ContentLocalizationAuditCard section="campaigns" />
-
-      {/* Filters */}
-      <Card className="p-4">
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 flex-wrap">
-          <div className="relative flex-1 min-w-0">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <Input placeholder="البحث في المشاريع..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-4 pr-10" />
-          </div>
-          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="جميع الحملات" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">جميع الحملات</SelectItem>
-              {categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={progressFilter} onValueChange={(v: any) => setProgressFilter(v)}>
-            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="التقدم" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">جميع المشاريع</SelectItem>
-              <SelectItem value="completed">مكتملة</SelectItem>
-              <SelectItem value="ongoing">جارية</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" className="gap-2" onClick={exportToCSV}>
+      <FilterBar
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="البحث في المشاريع..."
+        actions={
+          <Button variant="outline" size="sm" className="gap-2" onClick={exportToCSV}>
             <Download className="w-4 h-4" />
             تصدير CSV
           </Button>
-        </div>
-
-      </Card>
+        }
+      >
+        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+          <SelectTrigger className="h-9 w-full sm:w-[180px]"><SelectValue placeholder="جميع الحملات" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">جميع الحملات</SelectItem>
+            {categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={progressFilter} onValueChange={(v: any) => setProgressFilter(v)}>
+          <SelectTrigger className="h-9 w-full sm:w-[180px]"><SelectValue placeholder="التقدم" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">جميع المشاريع</SelectItem>
+            <SelectItem value="completed">مكتملة</SelectItem>
+            <SelectItem value="ongoing">جارية</SelectItem>
+          </SelectContent>
+        </Select>
+      </FilterBar>
 
       {/* Table */}
       <Card className="overflow-hidden">
@@ -356,7 +364,22 @@ export default function CampaignsPage() {
             <TableBody>
               {paginatedCampaigns.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">لا توجد مشاريع نشطة</TableCell>
+                  <TableCell colSpan={7} className="p-0">
+                    <EmptyState
+                      variant="inline"
+                      icon={Heart}
+                      title="لا توجد مشاريع نشطة"
+                      description={searchQuery || selectedCategory !== 'all' || progressFilter !== 'all'
+                        ? "لا يوجد مشروع يطابق التصفية الحالية. جرّب توسيع نطاق البحث."
+                        : "ابدأ بإنشاء أول مشروع تبرع ليظهر على الموقع."}
+                      action={
+                        <Button onClick={() => window.location.href = '/dashboard/campaigns/new'} className="bg-brand hover:bg-brand-dark gap-2">
+                          <Plus className="w-4 h-4" />
+                          إنشاء مشروع جديد
+                        </Button>
+                      }
+                    />
+                  </TableCell>
                 </TableRow>
               ) : paginatedCampaigns.map(campaign => (
                 <TableRow key={campaign.id}>
@@ -365,17 +388,29 @@ export default function CampaignsPage() {
                   <TableCell>${campaign.targetAmount.toLocaleString()}</TableCell>
                   <TableCell>${campaign.currentAmount.toLocaleString()}</TableCell>
                   <TableCell>
-                    {campaign.goalType === "OPEN" ? "—" : (
-                      <div className="space-y-1 min-w-[5rem]">
-                        <div className="w-full bg-muted rounded-full h-2.5">
-                          <div className="bg-[#025EB8] h-2.5 rounded-full transition-all"
-                            style={{ width: `${Math.min((campaign.currentAmount / campaign.targetAmount) * 100, 100)}%` }} />
+                    {!showCampaignProgress(campaign.goalType) ? "—" : (() => {
+                      // Was dividing by campaign.targetAmount unguarded: a non-OPEN campaign
+                      // with targetAmount 0 rendered "NaN%" (0/0) or "Infinity%" (n/0) and an
+                      // invalid CSS width. computeCampaignProgressPercent already clamps and
+                      // returns 0 for an invalid target — the same helper the rest of the app
+                      // uses, so the table now agrees with every other progress display.
+                      const pct = computeCampaignProgressPercent(
+                        campaign.currentAmount,
+                        campaign.targetAmount,
+                        campaign.goalType
+                      );
+                      return (
+                        <div className="space-y-1 min-w-[5rem]">
+                          <div className="w-full bg-muted rounded-full h-2.5">
+                            <div className="bg-brand h-2.5 rounded-full transition-all"
+                              style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {Math.round(pct)}%
+                          </span>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {Math.round((campaign.currentAmount / campaign.targetAmount) * 100)}%
-                        </span>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>{format(new Date(campaign.createdAt), 'PPP', { locale: ar })}</TableCell>
                   <TableCell>
@@ -537,9 +572,9 @@ export default function CampaignsPage() {
 }
 
 const LoadingSkeleton = () => (
-  <div className="space-y-4 sm:space-y-6 p-0 sm:p-2">
-    <div className="h-16 sm:h-20 bg-muted rounded-lg animate-pulse" />
-    <div className="h-14 sm:h-16 bg-muted rounded-lg animate-pulse" />
-    <div className="h-64 sm:h-96 bg-muted rounded-lg animate-pulse" />
+  <div>
+    <PageHeaderSkeleton />
+    <FilterBarSkeleton />
+    <TableSkeleton rows={8} columns={7} />
   </div>
 );

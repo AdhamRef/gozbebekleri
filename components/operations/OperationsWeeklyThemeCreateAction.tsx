@@ -60,15 +60,15 @@ export function OperationsWeeklyThemeCreateAction() {
         <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
           <label className="space-y-1 font-semibold text-slate-600">
             الأسبوع
-            <input value={form.week} onChange={(event) => setForm((value) => ({ ...value, week: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" />
+            <input value={form.week} onChange={(event) => setForm((value) => ({ ...value, week: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" />
           </label>
           <label className="space-y-1 font-semibold text-slate-600">
             المحور
-            <input value={form.theme} onChange={(event) => setForm((value) => ({ ...value, theme: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" />
+            <input value={form.theme} onChange={(event) => setForm((value) => ({ ...value, theme: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" />
           </label>
           <label className="space-y-1 font-semibold text-slate-600 sm:col-span-2">
             الوصف
-            <input value={form.description} onChange={(event) => setForm((value) => ({ ...value, description: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" />
+            <input value={form.description} onChange={(event) => setForm((value) => ({ ...value, description: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" />
           </label>
           <div className="flex flex-wrap gap-2 sm:col-span-2">
             <Button type="button" size="sm" disabled={busy} onClick={saveTheme}>

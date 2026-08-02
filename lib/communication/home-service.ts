@@ -3,6 +3,7 @@ import { SUPPORTED_LOCALES } from "@/lib/locales";
 import { listConversations } from "./conversation-service";
 import { listChannelTemplates } from "./template-compat";
 import { isSendEnabled } from "./provider-router";
+import { safeCountValue } from "@/lib/dashboard/safe-count";
 
 /**
  * Compact data for the Communication Center home (command center). Read-only, lightweight — the four
@@ -19,14 +20,22 @@ export type CommunicationHome = {
 };
 
 export async function getCommunicationHome(): Promise<CommunicationHome> {
-  const providers = { whatsapp: isSendEnabled("WHATSAPP"), email: isSendEnabled("EMAIL"), sms: isSendEnabled("SMS") };
+  // `isSendEnabled` is async. Unawaited, each value was a Promise — always truthy — so the
+  // Communication Center home showed every channel as "جاهز" (ready, green) even with no
+  // provider configured at all.
+  const [whatsappEnabled, emailEnabled, smsEnabled] = await Promise.all([
+    isSendEnabled("WHATSAPP"),
+    isSendEnabled("EMAIL"),
+    isSendEnabled("SMS"),
+  ]);
+  const providers = { whatsapp: whatsappEnabled, email: emailEnabled, sms: smsEnabled };
   if (!process.env.DATABASE_URL) {
     return { campaignsInReview: 0, repliesNeedingAction: 0, failedDeliveries: 0, incompleteTemplates: 0, providers, recentCampaigns: [] };
   }
 
   const [inReview, failed, recent, conversations, waT, emailT] = await Promise.all([
-    prisma.communicationCampaign.count({ where: { status: "REVIEW" } }).catch(() => 0),
-    prisma.communicationDelivery.count({ where: { status: "FAILED" } }).catch(() => 0),
+    safeCountValue("home.campaignsInReview", () => prisma.communicationCampaign.count({ where: { status: "REVIEW" } })),
+    safeCountValue("home.failedDeliveries", () => prisma.communicationDelivery.count({ where: { status: "FAILED" } })),
     prisma.communicationCampaign.findMany({ orderBy: { updatedAt: "desc" }, take: 6, select: { id: true, name: true, channel: true, status: true } }).catch(() => []),
     listConversations().catch(() => []),
     listChannelTemplates("WHATSAPP"),

@@ -17,7 +17,7 @@ export function OperationsInfoCards() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Megaphone className="h-5 w-5 text-[#025EB8]" /> التسليم للتسويق
+            <Megaphone className="h-5 w-5 text-brand" /> التسليم للتسويق
           </CardTitle>
         </CardHeader>
         <CardContent className="text-sm leading-6 text-slate-700">

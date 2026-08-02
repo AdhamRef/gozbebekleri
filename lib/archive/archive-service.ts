@@ -203,7 +203,13 @@ function sortedCollections(items: ArchiveCollection[]) {
   return [...items].sort((a, b) => a.order - b.order);
 }
 
-function foundationArchiveData(): ArchiveFoundationData {
+/**
+ * Exported so API routes can call `getArchiveRepositorySnapshot(foundationArchiveData())`.
+ * That argument is REQUIRED: the repository's `fallback()` path dereferences
+ * `foundation.collections` immediately, so calling it with no argument threw an uncaught
+ * TypeError whenever the DB was unreachable or the archive tables were empty.
+ */
+export function foundationArchiveData(): ArchiveFoundationData {
   return {
     collections: sortedCollections(collections),
     projects: [...projects],

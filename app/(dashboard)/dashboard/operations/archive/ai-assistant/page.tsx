@@ -13,10 +13,10 @@ export default function ArchiveAiAssistantPage() {
   const context = readiness?.context;
 
   return (
-    <div className="space-y-5 p-4 sm:p-6" dir="rtl">
-      <div className="rounded-2xl border bg-gradient-to-l from-slate-950 via-[#025EB8] to-slate-900 p-5 text-white shadow-sm">
+    <div className="space-y-5" dir="rtl">
+      <div className="rounded-2xl border bg-gradient-to-l from-slate-950 via-brand to-slate-900 p-5 text-white shadow-sm">
         <p className="text-xs text-white/70">المساعد الذكي / سياق الأرشيف</p>
-        <h1 className="mt-1.5 text-2xl font-black">مساعد الأرشيف الذكي</h1>
+        <h1 className="mt-1.5 text-xl sm:text-2xl font-bold tracking-tight">مساعد الأرشيف الذكي</h1>
         <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
           طبقة آمنة لتجهيز مساعد يبحث في الأرشيف ويقترح مواد قابلة لإعادة الاستخدام دون حذف أونشر أوتعديل ملفات.
         </p>
@@ -25,7 +25,7 @@ export default function ArchiveAiAssistantPage() {
       <div className="grid gap-4 lg:grid-cols-[0.75fr_1.25fr]">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Bot className="h-5 w-5 text-[#025EB8]" /> {context?.title}</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Bot className="h-5 w-5 text-brand" /> {context?.title}</CardTitle>
             <CardDescription>{context?.description}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -88,9 +88,9 @@ export default function ArchiveAiAssistantPage() {
 }
 
 function Feature({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
-  return <div className="rounded-2xl border bg-slate-50 p-4"><span className="text-[#025EB8]">{icon}</span><h2 className="mt-2 font-black text-slate-900">{title}</h2><p className="mt-1 text-sm leading-6 text-slate-600">{text}</p></div>;
+  return <div className="rounded-2xl border bg-slate-50 p-4"><span className="text-brand">{icon}</span><h2 className="mt-2 font-black text-slate-900">{title}</h2><p className="mt-1 text-sm leading-6 text-slate-600">{text}</p></div>;
 }
 
 function QuickLink({ href, title }: { href: string; title: string }) {
-  return <Link href={href} className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-bold text-[#025EB8] hover:bg-slate-50">{title}<ArrowLeft className="h-3.5 w-3.5" /></Link>;
+  return <Link href={href} className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-bold text-brand hover:bg-slate-50">{title}<ArrowLeft className="h-3.5 w-3.5" /></Link>;
 }

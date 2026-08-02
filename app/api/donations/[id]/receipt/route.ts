@@ -166,10 +166,31 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!id) {
       return NextResponse.json({ error: 'Donation ID required' }, { status: 400 });
     }
-    let locale = (request.nextUrl.searchParams.get('locale') || 'en').slice(0, 2) as LocaleKey;
+    const requestedLocale = (request.nextUrl.searchParams.get('locale') || 'en').slice(0, 2);
+    let locale = requestedLocale as LocaleKey;
 
-    // Force English receipt if Arabic to avoid RTL/font issues
-    if (locale === 'ar') {
+    /**
+     * Set to true only once an Arabic-capable TTF is registered with jsPDF
+     * (doc.addFileToVFS + doc.addFont) AND text is shaped for RTL. Flipping this alone is not
+     * enough — it is the single switch that turns the Arabic path back on, so both halves stay
+     * together instead of drifting.
+     */
+    const ARABIC_PDF_FONT_AVAILABLE = false;
+
+    // Force English receipt if Arabic to avoid RTL/font issues.
+    //
+    // This is DELIBERATE, not an oversight: the PDF is drawn with jsPDF's built-in helvetica,
+    // which has no Arabic glyphs. Rendering `ar` without embedding an Arabic TTF produces
+    // boxes/garbage, so an English receipt is the better failure mode.
+    //
+    // Consequences, so nobody "fixes" one half and ships broken PDFs:
+    //   - `isRtl` below is therefore ALWAYS false (see the note there).
+    //   - the bilingual "Arabic / English" branch in getLabels() is unreachable for the same
+    //     reason — it is kept for the day a font is embedded.
+    // Making Arabic receipts genuinely Arabic requires doc.addFileToVFS + doc.addFont with an
+    // Arabic-capable TTF and a shaping pass; that is a feature, not a cleanup. Until then this
+    // line is what keeps receipts readable.
+    if (!ARABIC_PDF_FONT_AVAILABLE && locale === 'ar') {
       locale = 'en';
     }
     const session = await getServerSession(authOptions);
@@ -247,7 +268,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const L = getLabels(locale);
     const dateLocale = getDateLocale(locale);
-    const isRtl = locale === 'ar';
+    // Derived from the ORIGINAL request, not the coerced `locale` (which can no longer be
+    // 'ar', so comparing it was dead code that also failed to typecheck). Always false while
+    // ARABIC_PDF_FONT_AVAILABLE is false; the RTL layout below is kept wired up so it works
+    // the moment the font lands.
+    const isRtl = ARABIC_PDF_FONT_AVAILABLE && requestedLocale === 'ar';
     const receiptShortId = id;
 
     const doc = new jsPDF({

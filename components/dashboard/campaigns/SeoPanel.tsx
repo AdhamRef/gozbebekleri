@@ -106,7 +106,7 @@ export function SeoPanel({ campaignId }: { campaignId: string }) {
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <Search className="h-5 w-5 text-[#025EB8]" />
+            <Search className="h-5 w-5 text-brand" />
             <h3 className="text-lg font-semibold text-gray-900">5. SEO</h3>
           </div>
           <p className="mt-1 text-sm text-gray-500">

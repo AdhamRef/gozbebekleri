@@ -26,7 +26,7 @@ export type CommunicationCenterOverview = {
 
 function providerKeyForChannel(channel: CommunicationChannel): CommunicationProviderKey {
   if (channel === "WHATSAPP") return "META_WHATSAPP";
-  if (channel === "EMAIL") return "BREVO_EMAIL";
+  if (channel === "EMAIL") return "ELASTIC_EMAIL";
   return "BREVO_SMS";
 }
 

@@ -11,6 +11,7 @@ import { metaDonationEventId } from "@/lib/tracking/canonical";
 import { pickAttributionForAudit, toTurkeyIso, writeConversionAudit } from "@/lib/tracking/conversion-audit";
 import { recordConversionEvent, type ConversionEventStatus } from "@/lib/tracking/conversion-event-log";
 import { getGa4ServerCredentialsFromSettings } from "@/lib/tracking/tracking-settings";
+import { donationFieldEmpty } from "@/lib/donations/mongo-null";
 
 type Attribution = Record<string, string>;
 export type DonationConversionSyncOptions = { force?: boolean };
@@ -148,7 +149,19 @@ export async function sendDonationFailedConversions(donationId: string, options:
     if (!options.force && row.conversionFailedEventsSentAt != null) return { ok: false, skipped: true, reason: "already sent" };
 
     if (!options.force) {
-      const claim = await prisma.donation.updateMany({ where: { id: row.id, status: "FAILED", paidAt: null, conversionFailedEventsSentAt: null }, data: { conversionFailedEventsSentAt: new Date() } });
+      // `paidAt` and `conversionFailedEventsSentAt` are ABSENT (not null) on almost every row,
+      // and Prisma's `{ field: null }` does not match an absent field on MongoDB. This claim
+      // therefore matched 0 of 212 failed donations — DonateFailed has never actually fired.
+      const claim = await prisma.donation.updateMany({
+        where: {
+          AND: [
+            { id: row.id, status: "FAILED" },
+            donationFieldEmpty("paidAt"),
+            donationFieldEmpty("conversionFailedEventsSentAt"),
+          ],
+        },
+        data: { conversionFailedEventsSentAt: new Date() },
+      });
       if (claim.count === 0) return { ok: false, skipped: true, reason: "lost idempotency claim" };
     }
 

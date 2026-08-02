@@ -1,6 +1,7 @@
 import type { Prisma, MessageTriggerEvent } from "@prisma/client";
 import { createDeliveryRecord, markDeliveryStatus } from "./delivery-log-service";
 import { sendPreparedDelivery } from "./provider-router";
+import { EMAIL_PROVIDER_ID } from "./providers/email/client";
 import { logSentMessage } from "@/lib/messaging/log-sent";
 import type { CommunicationPurposeId } from "./communication-runtime-types";
 
@@ -8,7 +9,7 @@ import type { CommunicationPurposeId } from "./communication-runtime-types";
  * Automatic (trigger-fired) message dispatcher for the Communication Center.
  *
  * Every automatic donation/subscription message now flows through the FINAL provider architecture:
- *   - EMAIL    → Brevo (via ProviderRouter). Never SendGrid unless the explicit legacy flag is on.
+ *   - EMAIL    → Elastic Email (via ProviderRouter). Never SendGrid, never Brevo.
  *   - WHATSAPP → Meta WhatsApp Cloud API using an APPROVED template. Never Twilio. If the stored
  *                WhatsappTemplate has no Meta-approved template mapping, the send is SKIPPED with
  *                `META_TEMPLATE_REQUIRED_FOR_AUTOMATIC_WHATSAPP` (never faked, never Twilio).
@@ -94,20 +95,20 @@ async function mirrorSentMessage(
   });
 }
 
-/* ────────────────────────────── EMAIL (Brevo) ────────────────────────────── */
+/* ─────────────────────────── EMAIL (Elastic Email) ─────────────────────────── */
 
 export async function sendAutomaticEmailMessage(
   input: CommonInput & {
     recipientEmail: string | null;
     renderedSubject: string;
     renderedBody: string;
-    /** Resolved sender identity: enabled EMAIL sender email → BREVO_EMAIL_SENDER_EMAIL → (legacy). */
+    /** Resolved sender identity: enabled EMAIL sender email → ELASTIC_EMAIL_SENDER_EMAIL. */
     senderEmail: string | null;
   }
 ): Promise<AutomaticResult> {
   const base = {
     channel: "EMAIL" as const,
-    provider: "BREVO_EMAIL" as const,
+    provider: EMAIL_PROVIDER_ID,
     origin: "TRIGGER" as const,
     purpose: input.purpose ?? ("TRANSACTIONAL" as const),
     templateId: input.templateId,

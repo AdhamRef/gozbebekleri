@@ -31,7 +31,7 @@ export function BankTransfersSummaryCard() {
 
   return (
     <Link href="/dashboard/bank-transfers" className="block h-full">
-      <Card className="h-full border-border shadow-sm transition hover:border-[#025EB8]/40 hover:shadow-md">
+      <Card className="h-full border-border shadow-sm transition hover:border-brand/40 hover:shadow-md">
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -50,7 +50,7 @@ export function BankTransfersSummaryCard() {
                 </>
               )}
             </div>
-            <div className="rounded-xl bg-blue-50 p-2 text-[#025EB8]">
+            <div className="rounded-xl bg-blue-50 p-2 text-brand">
               <Landmark className="h-5 w-5" />
             </div>
           </div>

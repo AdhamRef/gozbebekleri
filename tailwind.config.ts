@@ -14,6 +14,42 @@ export default {
   			poppins: ["var(--font-poppins)"],
   		},
   		colors: {
+  			// Brand palette. Previously the brand blue was pasted as a raw `#025EB8` literal
+  			// in ~750 places across ~170 dashboard files, so a palette change meant editing
+  			// every one of them. `brand-600` IS `#025EB8`; `brand-700` is `#024A92` and
+  			// `brand.dark` is `#014FA0`, both of which already appeared as hover-state
+  			// literals in the existing code, so the scale is a superset of what was in use.
+  			brand: {
+  				DEFAULT: '#025EB8',
+  				dark: '#014FA0',
+  				50:  '#EFF6FF',
+  				100: '#DBEBFE',
+  				200: '#BEDBFD',
+  				300: '#8FC4FB',
+  				400: '#3E9BF4',
+  				500: '#0E76D9',
+  				600: '#025EB8',
+  				700: '#024A92',
+  				800: '#053C74',
+  				900: '#0A3260',
+  				950: '#07203F',
+  			},
+  			// Deliberately NOT named `accent` — that key is already the shadcn neutral-gray
+  			// token used by every `hover:bg-accent` ghost button. Overloading it would
+  			// turn every ghost hover orange.
+  			'brand-orange': {
+  				DEFAULT: '#FA5D17',
+  				50:  '#FFF4ED',
+  				100: '#FFE6D5',
+  				200: '#FEC8AA',
+  				300: '#FDA274',
+  				400: '#FC7A3C',
+  				500: '#FA5D17',
+  				600: '#EB420D',
+  				700: '#C32F0D',
+  				800: '#9B2813',
+  				900: '#7D2413',
+  			},
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {
@@ -26,10 +62,12 @@ export default {
   			},
   			primary: {
   				DEFAULT: 'hsl(var(--primary))',
+  				light: 'hsl(var(--primary-light))',
   				foreground: 'hsl(var(--primary-foreground))'
   			},
   			secondary: {
   				DEFAULT: 'hsl(var(--secondary))',
+  				light: 'hsl(var(--secondary-light))',
   				foreground: 'hsl(var(--secondary-foreground))'
   			},
   			muted: {

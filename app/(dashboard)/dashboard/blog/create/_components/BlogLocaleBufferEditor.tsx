@@ -139,12 +139,12 @@ export default function BlogLocaleBufferEditor({ locale }: { locale: BufferedLoc
                 />
                 <label
                   htmlFor={`buffered-image-${locale}`}
-                  className={`flex flex-col items-center justify-center h-32 w-full border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#025EB8] transition-colors ${
+                  className={`flex flex-col items-center justify-center h-32 w-full border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-brand transition-colors ${
                     uploading ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                 >
                   {uploading ? (
-                    <Loader2 className="w-6 h-6 animate-spin text-[#025EB8]" />
+                    <Loader2 className="w-6 h-6 animate-spin text-brand" />
                   ) : (
                     <>
                       <Upload className="w-6 h-6 text-gray-400" />

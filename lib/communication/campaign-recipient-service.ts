@@ -3,6 +3,7 @@ import { SUPPORTED_LOCALES, LOCALES, DEFAULT_LOCALE, isValidLocale, type Support
 import type { CommunicationChannelId } from "./communication-runtime-types";
 import { donorChannelEligibility } from "./audience-service";
 import { parseListKey, loadListMembers, memberEligibleForChannel, type ResolvedListMember } from "./audience-list-service";
+import { safeCountValue } from "@/lib/dashboard/safe-count";
 
 /**
  * Recipient counts + eligibility breakdown for a campaign, per locale, for one channel.
@@ -36,7 +37,7 @@ async function localeBreakdown(channel: CommunicationChannelId, locale: Supporte
     prisma.user.count({ where: base }),
     prisma.user.count({ where: { ...base, email: { not: null } } }),
     prisma.user.count({ where: { ...base, phone: { not: null } } }),
-    prisma.donorCommunicationProfile.count({ where: { preferredLocale: locale, doNotContact: true } }).catch(() => 0),
+    safeCountValue("recipients.doNotContact", () => prisma.donorCommunicationProfile.count({ where: { preferredLocale: locale, doNotContact: true } })),
   ]);
 
   if (channel === "EMAIL") {
@@ -54,9 +55,11 @@ async function localeBreakdown(channel: CommunicationChannelId, locale: Supporte
     return { locale, label: LOCALES[locale].label, total, eligible: Math.max(0, eligible - dnc), needsReview: 0, missingContact: Math.max(0, total - withPhone), optedOut, doNotContact: dnc };
   }
   // WHATSAPP — eligible only with explicit opt-in; other phone contacts need review.
-  const eligible = await prisma.donorCommunicationProfile
-    .count({ where: { preferredLocale: locale, whatsappOptIn: true, doNotContact: false } })
-    .catch(() => 0);
+  const eligible = await safeCountValue("recipients.whatsappEligible", () =>
+    prisma.donorCommunicationProfile.count({
+      where: { preferredLocale: locale, whatsappOptIn: true, doNotContact: false },
+    })
+  );
   const needsReview = Math.max(0, withPhone - eligible);
   return { locale, label: LOCALES[locale].label, total, eligible, needsReview, missingContact: Math.max(0, total - withPhone), optedOut: 0, doNotContact: dnc };
 }

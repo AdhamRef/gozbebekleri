@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
-const prisma = globalForPrisma.prisma || new PrismaClient();
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { prisma } from "@/lib/prisma";
 
 // GET /api/posts/[postId]/translations - return all translations for a post
+//
+// Admin-only: this returns EVERY locale's title/description/content for a post regardless of
+// publication state, so unauthenticated it leaked unpublished drafts to anyone who could guess
+// or scrape a post id. Guarded with "blog", matching every sibling route in app/api/posts.
+//
+// Also switched from a locally-constructed `new PrismaClient()` to the shared `@/lib/prisma`
+// singleton — the local copy opened its own connection pool per serverless instance.
 export async function GET(request: NextRequest, { params }: { params: Promise<{ postId: string }> }) {
   try {
+    const session = await getServerSession(authOptions);
+    const denied = requireAdminOrDashboardPermission(session, "blog");
+    if (denied) return denied;
+
     const { postId } = await params;
 
     const translations = await prisma.postTranslation.findMany({

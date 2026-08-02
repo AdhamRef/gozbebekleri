@@ -9,7 +9,7 @@ const operationalFiles = [
   "lib/communication/providers/meta-whatsapp/messages.ts",
   "lib/communication/providers/meta-whatsapp/templates.ts",
   "lib/communication/providers/meta-whatsapp/webhooks.ts",
-  "lib/communication/providers/brevo/email-client.ts",
+  "lib/communication/providers/elastic-email/client.ts",
   "lib/communication/providers/brevo/sms-client.ts",
   "lib/communication/providers/netgsm/client.ts",
   "lib/communication/providers/email/client.ts",
@@ -20,6 +20,7 @@ const operationalFiles = [
   "lib/events/dispatch.ts",
   "app/api/webhooks/meta/whatsapp/route.ts",
   "app/api/webhooks/brevo/transactional/route.ts",
+  "app/api/webhooks/elastic-email/route.ts",
   "app/api/dashboard/operations/communication/providers/email/test/route.ts",
   "app/api/dashboard/operations/communication/providers/sms/test/route.ts",
   "app/api/dashboard/operations/communication/providers/whatsapp/test-template/route.ts",
@@ -35,9 +36,11 @@ const credentialNames = [
   "META_WHATSAPP_BUSINESS_ACCOUNT_ID",
   "META_WHATSAPP_PHONE_NUMBER_ID",
   "META_GRAPH_VERSION",
+  "ELASTIC_EMAIL_API_KEY",
+  "ELASTIC_EMAIL_SENDER_NAME",
+  "ELASTIC_EMAIL_SENDER_EMAIL",
+  "ELASTIC_EMAIL_WEBHOOK_SECRET",
   "BREVO_API_KEY",
-  "BREVO_EMAIL_SENDER_NAME",
-  "BREVO_EMAIL_SENDER_EMAIL",
   "BREVO_SMS_SENDER",
   "BREVO_SMS_WEBHOOK_SECRET",
   "NETGSM_USERCODE",
@@ -84,12 +87,24 @@ test("test-send tools use runtime configuration and create delivery records", ()
   }
 });
 
-test("Brevo and Meta webhooks use active runtime helpers and never candidate helpers", () => {
+test("provider webhooks use active runtime helpers and never candidate helpers", () => {
   const meta = source("app/api/webhooks/meta/whatsapp/route.ts") + source("lib/communication/providers/meta-whatsapp/webhooks.ts");
   const brevo = source("app/api/webhooks/brevo/transactional/route.ts");
+  const elastic = source("app/api/webhooks/elastic-email/route.ts");
   assert.match(meta, /getActiveMetaWebhookConfig/);
   assert.match(brevo, /getActiveBrevoWebhookSecret/);
-  assert.equal(/Candidate|pending/i.test(meta + brevo), false);
+  assert.match(elastic, /getActiveElasticEmailWebhookSecret/);
+  assert.equal(/Candidate|pending/i.test(meta + brevo + elastic), false);
+});
+
+test("email channel routes exclusively through Elastic Email", () => {
+  const emailFacade = source("lib/communication/providers/email/client.ts");
+  assert.match(emailFacade, /elastic-email/);
+  assert.equal(/brevo/i.test(emailFacade), false);
+
+  // Brevo must remain SMS-only: no email endpoint may survive anywhere in its adapter folder.
+  const brevoAdapters = ["lib/communication/providers/brevo/sms-client.ts", "lib/communication/providers/brevo/errors.ts", "lib/communication/providers/brevo/types.ts"].map(source).join("\n");
+  assert.equal(brevoAdapters.includes("smtp/email"), false);
 });
 
 test("Cron remains environment-only and outside integration runtime", () => {

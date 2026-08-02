@@ -59,8 +59,10 @@ export async function createTestDelivery(
     createdBy: opts.createdBy ?? null,
   };
 
-  // Ask the provider router — no adapter wired yet, so this is always "not configured".
-  const decision = resolveProviderForSend(channel);
+  // `resolveProviderForSend` is async. Without the await, `decision` was a Promise, so
+  // `decision.canSend` was `undefined` and `!undefined` is always true — every test send was
+  // recorded as SKIPPED with `reason: undefined`, even once providers were configured.
+  const decision = await resolveProviderForSend(channel);
   if (!decision.canSend) {
     const skipped = await recordSkippedDelivery(base, decision.reason);
     if (!skipped.ok) return skipped;

@@ -6,6 +6,7 @@ import { planCampaignSend, type SendPlan } from "./campaign-send-planner";
 import { renderChannelTemplate } from "./template-compat";
 import { createDeliveryRecord, recordSkippedDelivery, markDeliveryStatus } from "./delivery-log-service";
 import { resolveProviderForSendWithRuntime, sendPreparedDelivery } from "./provider-router";
+import { EMAIL_PROVIDER_ID } from "./providers/email/client";
 import { getActiveCommunicationRuntimeBundle } from "./runtime-config";
 import { listSenders, toSenderConfig } from "./sender-service";
 import { listRoutingRules, toRoutingRuleConfig } from "./routing-rule-service";
@@ -66,7 +67,7 @@ export async function executeCampaignSend(campaignId: string, opts: { actor?: Ac
   const senderConfigs = senders.filter((sender) => sender.channel === channel).map(toSenderConfig);
   const ruleConfigs = rules.map(toRoutingRuleConfig);
   const rawSenderById = new Map(senders.map((sender) => [sender.id, sender]));
-  const defaultEmailIdentity = senders.find((sender) => sender.channel === "EMAIL" && sender.enabled)?.senderEmail || (runtime.brevoEmail.configured ? runtime.brevoEmail.values.senderEmail : null);
+  const defaultEmailIdentity = senders.find((sender) => sender.channel === "EMAIL" && sender.enabled)?.senderEmail || (runtime.elasticEmail.configured ? runtime.elasticEmail.values.senderEmail : null);
   const existing = await prisma.communicationDelivery.findMany({ where: { campaignId, templateId, channel, origin }, select: { recipientUserId: true, status: true, providerMessageId: true } }).catch(() => []);
   const alreadyDone = new Set(existing.filter((delivery) => (delivery.status && PROCESSED_STATUSES.includes(delivery.status)) || !!delivery.providerMessageId).map((delivery) => delivery.recipientUserId).filter(Boolean) as string[]);
 
@@ -99,7 +100,7 @@ export async function executeCampaignSend(campaignId: string, opts: { actor?: Ac
     }
     const to = channel === "EMAIL" ? recipient.email ?? "" : recipient.phone ?? "";
     const decision = resolveProviderForSendWithRuntime(runtime, channel, sender, { country: recipient.country, phone: to });
-    const provider = decision.canSend ? decision.providerId : channel === "WHATSAPP" ? "META_WHATSAPP" : channel === "EMAIL" ? "BREVO_EMAIL" : undefined;
+    const provider = decision.canSend ? decision.providerId : channel === "WHATSAPP" ? "META_WHATSAPP" : channel === "EMAIL" ? EMAIL_PROVIDER_ID : undefined;
     const created = await createDeliveryRecord({ channel, provider: provider as never, campaignId, templateId, templateName: rendered.templateName, recipientUserId: recipient.userId, recipientEmail: channel === "EMAIL" ? recipient.email : null, recipientPhone: channel !== "EMAIL" ? recipient.phone : null, recipientName: recipient.name, locale: recipient.locale, purpose, origin, renderedSubject: rendered.subject, renderedBody: rendered.body, senderId: sender?.id ?? null, createdBy: actor?.actorId ?? null, status: "RENDERED" });
     if (!created.ok) { base.failed += 1; bump(base.reasons, "ARCHIVE_FAILED"); continue; }
     const deliveryId = created.data.id;

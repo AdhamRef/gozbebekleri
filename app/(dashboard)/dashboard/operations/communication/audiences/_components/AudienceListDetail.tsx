@@ -52,7 +52,7 @@ export function AudienceListDetail({ list, members }: { list: ListSummary; membe
     <div className="space-y-5">
       {/* actions */}
       <div className="flex flex-wrap gap-2">
-        <Link href={campaignHref} className="inline-flex h-9 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white hover:bg-[#024a92]"><Megaphone className="h-4 w-4" /> إنشاء حملة من القائمة</Link>
+        <Link href={campaignHref} className="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:bg-brand-700"><Megaphone className="h-4 w-4" /> إنشاء حملة من القائمة</Link>
         {list.type === "TEST" ? <Link href={testHref} className="inline-flex h-9 items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-4 text-sm font-bold text-amber-800 hover:bg-amber-100"><FlaskConical className="h-4 w-4" /> أدوات الاختبار</Link> : null}
         <button type="button" disabled={busy !== null} onClick={async () => { const ok = await post(`/${list.id}/duplicate`, { method: "POST" }, "dup"); if (ok) refresh(); }} className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"><Copy className="h-4 w-4" /> نسخ القائمة</button>
         <button type="button" disabled={busy !== null} onClick={async () => { if (!confirm("أرشفة هذه القائمة؟")) return; const ok = await post(`/${list.id}`, { method: "PATCH", body: JSON.stringify({ status: "ARCHIVED" }) }, "arch"); if (ok) router.push("/dashboard/operations/communication/audiences"); }} className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-4 text-sm font-bold text-slate-500 hover:bg-slate-50"><Archive className="h-4 w-4" /> أرشفة</button>
@@ -88,16 +88,16 @@ export function AudienceListDetail({ list, members }: { list: ListSummary; membe
         {/* add */}
         <div className="space-y-4">
           <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <p className="mb-2 flex items-center gap-2 text-sm font-black text-slate-800"><UserPlus className="h-4 w-4 text-[#025EB8]" /> إضافة متبرعين</p>
+            <p className="mb-2 flex items-center gap-2 text-sm font-black text-slate-800"><UserPlus className="h-4 w-4 text-brand" /> إضافة متبرعين</p>
             <div className="flex gap-2">
               <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && search()} placeholder="ابحث بالاسم أو البريد أو الهاتف" className={inputCls} />
-              <button type="button" onClick={search} className="inline-flex h-10 items-center rounded-md bg-[#025EB8] px-3 text-white">{busy === "search" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</button>
+              <button type="button" onClick={search} className="inline-flex h-10 items-center rounded-md bg-brand px-3 text-white">{busy === "search" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</button>
             </div>
             <div className="mt-2 space-y-1.5">
               {results.map((d) => (
                 <div key={d.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs">
                   <div className="min-w-0"><div className="truncate font-semibold text-slate-800">{d.name ?? "متبرع"}</div><div className="truncate text-slate-400" dir="ltr">{d.email || d.phone || "—"}</div></div>
-                  <button type="button" onClick={async () => { const ok = await post(`/${list.id}/members`, { method: "POST", body: JSON.stringify({ userIds: [d.id] }) }, `add-${d.id}`); if (ok) { setResults((r) => r.filter((x) => x.id !== d.id)); refresh(); } }} className="shrink-0 rounded bg-[#025EB8]/10 px-2 py-1 font-bold text-[#025EB8] hover:bg-[#025EB8]/20">إضافة</button>
+                  <button type="button" onClick={async () => { const ok = await post(`/${list.id}/members`, { method: "POST", body: JSON.stringify({ userIds: [d.id] }) }, `add-${d.id}`); if (ok) { setResults((r) => r.filter((x) => x.id !== d.id)); refresh(); } }} className="shrink-0 rounded bg-brand/10 px-2 py-1 font-bold text-brand hover:bg-brand/20">إضافة</button>
                 </div>
               ))}
             </div>

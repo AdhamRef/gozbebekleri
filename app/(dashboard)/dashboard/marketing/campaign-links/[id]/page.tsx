@@ -264,7 +264,7 @@ export default function CampaignLinkDetailPage() {
   }
 
   if (loading) {
-    return <div className="flex min-h-[24rem] items-center justify-center" dir="rtl"><Loader2 className="h-8 w-8 animate-spin text-[#025EB8]" /></div>;
+    return <div className="flex min-h-[24rem] items-center justify-center" dir="rtl"><Loader2 className="h-8 w-8 animate-spin text-brand" /></div>;
   }
 
   if (!link) {
@@ -294,7 +294,7 @@ export default function CampaignLinkDetailPage() {
       <div>
         <Link href="/dashboard/marketing/campaign-links" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900"><ArrowRight className="h-4 w-4" /> العودة إلى سجل الروابط</Link>
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-black text-slate-950">{link.name}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">{link.name}</h1>
           <Badge variant="outline" className={statusClass(link.status)}>{link.status}</Badge>
           <Badge variant="outline">{link.platform ?? "UNKNOWN"}</Badge>
           <Badge variant="outline">{link.channel ?? "No channel"}</Badge>
@@ -405,9 +405,9 @@ export default function CampaignLinkDetailPage() {
             {trackingRows(link).map((row) => <TrackingBucketRow key={row.label} label={row.label} bucket={row.bucket} />)}
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href={conversionEventsHref(link)} className="inline-flex rounded-md border px-3 py-2 text-xs font-bold text-[#025EB8] hover:bg-slate-50">Open Conversion Events filtered by donation/campaign</Link>
-            {timelineHref ? <Link href={timelineHref} className="inline-flex rounded-md border px-3 py-2 text-xs font-bold text-[#025EB8] hover:bg-slate-50">Open Donation Timeline</Link> : <span className="inline-flex rounded-md border bg-slate-50 px-3 py-2 text-xs font-bold text-slate-400">Open Donation Timeline</span>}
-            <Link href={`/dashboard/conversion-events/retry-truth?days=${days}`} className="inline-flex rounded-md border px-3 py-2 text-xs font-bold text-[#025EB8] hover:bg-slate-50">Open Retry Truth</Link>
+            <Link href={conversionEventsHref(link)} className="inline-flex rounded-md border px-3 py-2 text-xs font-bold text-brand hover:bg-slate-50">Open Conversion Events filtered by donation/campaign</Link>
+            {timelineHref ? <Link href={timelineHref} className="inline-flex rounded-md border px-3 py-2 text-xs font-bold text-brand hover:bg-slate-50">Open Donation Timeline</Link> : <span className="inline-flex rounded-md border bg-slate-50 px-3 py-2 text-xs font-bold text-slate-400">Open Donation Timeline</span>}
+            <Link href={`/dashboard/conversion-events/retry-truth?days=${days}`} className="inline-flex rounded-md border px-3 py-2 text-xs font-bold text-brand hover:bg-slate-50">Open Retry Truth</Link>
           </div>
           {trackingWarnings.length > 0 ? <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
             <div className="text-sm font-black text-amber-900">Warnings</div>

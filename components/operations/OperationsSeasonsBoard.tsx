@@ -43,7 +43,7 @@ export function OperationsSeasonsBoard({ seasons, weeklyThemes, statusClass }: O
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <CalendarClock className="h-5 w-5 text-[#025EB8]" /> التقويم التشغيلي والمواسم
+          <CalendarClock className="h-5 w-5 text-brand" /> التقويم التشغيلي والمواسم
         </CardTitle>
         <CardDescription>نظرة واحدة على المواسم والمحاور التي تقود إنتاج المحتوى، مع إمكانية تحويل كل موسم أو محور أسبوعي إلى مهمة محفوظة.</CardDescription>
       </CardHeader>
@@ -63,7 +63,7 @@ export function OperationsSeasonsBoard({ seasons, weeklyThemes, statusClass }: O
                 <p>الفترة: <b>{season.period}</b></p>
                 <p>المواد: <b>{season.ready}</b> جاهزة من <b>{season.required}</b></p>
                 <div className="h-2 overflow-hidden rounded-full bg-white">
-                  <div className="h-full rounded-full bg-[#025EB8]" style={{ width: `${season.progress}%` }} />
+                  <div className="h-full rounded-full bg-brand" style={{ width: `${season.progress}%` }} />
                 </div>
                 <p className="text-left font-bold text-slate-700">{season.progress}%</p>
               </div>
@@ -81,7 +81,7 @@ export function OperationsSeasonsBoard({ seasons, weeklyThemes, statusClass }: O
           <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {weeklyThemes.map((theme) => (
               <div key={theme.id || theme.week} className="rounded-xl border bg-slate-50 p-3">
-                <p className="text-xs font-bold text-[#025EB8]">{theme.week}</p>
+                <p className="text-xs font-bold text-brand">{theme.week}</p>
                 <h4 className="mt-1 font-black text-slate-900">{theme.theme}</h4>
                 <p className="mt-1 text-xs leading-5 text-slate-500">{theme.description}</p>
                 <OperationsWeeklyThemeTaskAction theme={theme} />

@@ -1,5 +1,16 @@
 # Dashboard Operating System — Target Architecture
 
+> ⚠️ **متجاوَزة جزئيًا — SUPERSEDED (2026-08-01)**
+>
+> **المصدر الموثوق لحالة لوحة التحكم هو `docs/dashboard-completion-roadmap.md`.**
+> هذه الوثيقة وثيقة معمارية مرجعية (north-star) ولم تُحدَّث بعد إصلاحات جلسة 2026-07-31/08-01. أجزاء منها لم تعد صحيحة:
+>
+> - تصف **مركز التواصل** كنموذج أولي «الإرسال معطّل». الإرسال ما يزال غير مُفعَّل لعدم وجود مزوّد، لكن ثلاث `await` ناقصة كانت تجعل الواجهة تدّعي الجاهزية — أُصلحت (P1-7).
+> - تسرد مسارات `/dashboard/brand/*` و`api/admin/brand/*` — **لم تعد موجودة**.
+> - أرقام الإيرادات والمتبرعين الواردة فيها سبقت إصلاحات P0/P1/P2 (منها تضخيم عدّاد المتبرعين العام بنسبة ~51%، و`teamSupport` على الرسم بـ5.5×).
+>
+> اقرأ الخارطة أولًا؛ استخدم هذه الوثيقة للسياق المعماري لا لحالة النظام.
+
 North-star document. Pairs with the current-state audit in
 `docs/dashboard-operating-system-audit.md` and the communication decision in
 `docs/architecture/communication-center-audit.md`. This describes where the

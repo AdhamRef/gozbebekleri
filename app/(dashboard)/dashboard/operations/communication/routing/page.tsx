@@ -70,12 +70,12 @@ export default function RoutingPage() {
   }
 
   return (
-    <main className="space-y-5 p-4 sm:p-6" dir="rtl">
+    <main className="space-y-5" dir="rtl">
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-bold text-[#025EB8]">مركز التواصل</p>
-            <h1 className="mt-1 text-xl font-black text-slate-900">قواعد توجيه المُرسِلين</h1>
+            <p className="text-xs font-bold text-brand">مركز التواصل</p>
+            <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">قواعد توجيه المُرسِلين</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
               اختر أي مُرسِل يُستخدم حسب اللغة والدولة والغرض، مع مُرسِل بديل عند الحاجة. إعداد فقط — لا إرسال.
             </p>
@@ -101,7 +101,7 @@ export default function RoutingPage() {
         <Card className="border-amber-200 bg-amber-50">
           <CardContent className="p-4 text-sm leading-6 text-amber-900">
             لا يوجد مُرسِلون بعد. أضف مُرسِلين أولًا من صفحة «مُرسِلو التواصل» قبل إنشاء قواعد التوجيه.
-            <Link href="/dashboard/operations/communication/senders" className="mr-1 font-bold text-[#025EB8] underline">فتح المُرسِلين</Link>
+            <Link href="/dashboard/operations/communication/senders" className="mr-1 font-bold text-brand underline">فتح المُرسِلين</Link>
           </CardContent>
         </Card>
       ) : null}
@@ -111,7 +111,7 @@ export default function RoutingPage() {
       <RoutingPreview senders={senders} />
 
       {loading ? (
-        <div className="flex min-h-[12rem] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#025EB8]" /></div>
+        <div className="flex min-h-[12rem] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-brand" /></div>
       ) : failed ? (
         <Card className="border-rose-200 bg-rose-50"><CardContent className="p-6 text-center text-sm font-semibold text-rose-700">تعذّر تحميل القواعد. حدّث الصفحة.</CardContent></Card>
       ) : rules.length === 0 ? (
@@ -244,7 +244,7 @@ function RoutingPreview({ senders }: { senders: Sender[] }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2"><Route className="h-4 w-4 text-[#025EB8]" /> معاينة التوجيه</CardTitle>
+        <CardTitle className="text-base flex items-center gap-2"><Route className="h-4 w-4 text-brand" /> معاينة التوجيه</CardTitle>
         <CardDescription>اختبر أي مُرسِل سيُختار لمدخلات معيّنة — بدون إرسال.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3 md:grid-cols-5">
@@ -271,8 +271,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="block text-sm"><span className="mb-1 block text-xs font-bold text-slate-500">{label}</span>{children}</label>;
 }
 function Input({ value, onChange, type = "text" }: { value: string; onChange: (v: string) => void; type?: string }) {
-  return <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#025EB8]" />;
+  return <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand" />;
 }
 function Select({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
-  return <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#025EB8]">{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>;
+  return <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand">{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>;
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowLeft, Archive } from "lucide-react";
+import { ArrowLeft, Archive, FileStack } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/PageHeader";
 import { Button } from "@/components/ui/button";
 import { OperationsContentWorkspace } from "@/components/operations/OperationsContentWorkspace";
 import { OperationsInfoCards } from "@/components/operations/OperationsInfoCards";
@@ -40,24 +41,21 @@ export default async function OperationsContentPage() {
   const { kpis, seasons, weeklyThemes, plans, items, tasks } = overview;
 
   return (
-    <div className="space-y-5 p-4 sm:p-6" dir="rtl">
-      <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-xs font-bold text-[#025EB8]">العمليات والمحتوى</p>
-          <h1 className="mt-1 text-xl font-black text-slate-900">لوحة إنتاج المحتوى</h1>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-            مركز واحد للمواسم، الخطط، عناصر المحتوى، مهام الإنتاج، وتسليم المواد الجاهزة للتسويق.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+    <div className="space-y-5" dir="rtl">
+      <PageHeader
+        eyebrow="العمليات والمحتوى"
+        title="لوحة إنتاج المحتوى"
+        description="مركز واحد للمواسم، الخطط، عناصر المحتوى، مهام الإنتاج، وتسليم المواد الجاهزة للتسويق."
+        icon={FileStack}
+        actions={<>
           <Button asChild variant="outline" className="gap-2 font-bold">
             <Link href="/dashboard/archive/assets"><Archive className="h-4 w-4" /> أصول الأرشيف</Link>
           </Button>
           <Button asChild variant="outline" className="gap-2 font-bold">
             <Link href="/dashboard/operations/tasks">العودة للمهام <ArrowLeft className="h-4 w-4" /></Link>
           </Button>
-        </div>
-      </div>
+        </>}
+      />
 
       <ContentItemCreatePanel />
       <OperationsKpis kpis={kpis} />

@@ -33,7 +33,7 @@ export function OperationsProductionTasks({ tasks, statusClass }: OperationsProd
       <CardHeader className="gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <CardTitle className="flex items-center gap-2">
-            <UserRoundCheck className="h-5 w-5 text-[#025EB8]" /> مهام الإنتاج
+            <UserRoundCheck className="h-5 w-5 text-brand" /> مهام الإنتاج
           </CardTitle>
           <CardDescription className="mt-2">حوّل المهام المقترحة إلى مهام فعلية وتابع المسؤول والموعد والحالة من صفحة مهام التشغيل.</CardDescription>
         </div>

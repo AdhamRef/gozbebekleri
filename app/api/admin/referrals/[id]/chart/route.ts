@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
-import { PAID_DONATION_FILTER } from "@/lib/dashboard/donation-usd-revenue";
+import { PAID_DONATION_FILTER, donationRowUsdApprox } from "@/lib/dashboard/donation-usd-revenue";
 import {
   eachIstanbulDateKey,
   formatIstanbulDateKey,
@@ -75,6 +75,8 @@ export async function GET(
         amountUSD: true,
         totalAmount: true,
         amount: true,
+        // Required by donationRowUsdApprox.
+        currency: true,
         items: { select: { amount: true, amountUSD: true } },
         categoryItems: { select: { amount: true, amountUSD: true } },
       },
@@ -101,7 +103,9 @@ export async function GET(
         teamSupport: 0,
         fees: 0,
       };
-      const amount = Number(d.amountUSD ?? d.totalAmount ?? d.amount ?? 0);
+      // USD-labelled series must be summed in USD — see the same fix in
+      // app/api/admin/donations/chart/route.ts.
+      const amount = donationRowUsdApprox(d);
       if (d.subscriptionId == null) {
         bucket.amountOneTime += amount;
         bucket.countOneTime += 1;
@@ -109,8 +113,11 @@ export async function GET(
         bucket.amountMonthly += amount;
         bucket.countMonthly += 1;
       }
-      bucket.teamSupport += Number(d.teamSupport ?? 0);
-      bucket.fees += Number(d.fees ?? 0);
+      const localTotal = Number(d.totalAmount) || 0;
+      if (localTotal > 0) {
+        bucket.teamSupport += amount * ((Number(d.teamSupport) || 0) / localTotal);
+        bucket.fees += amount * ((Number(d.fees) || 0) / localTotal);
+      }
       byDate.set(dateStr, bucket);
     }
 

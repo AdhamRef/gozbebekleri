@@ -113,7 +113,7 @@ export default function SentMessagePreviewDialog({ id, onOpenChange }: Props) {
         <SheetHeader className="p-5 border-b border-slate-200 sticky top-0 bg-white z-10">
           <SheetTitle className="flex items-center justify-between gap-3 text-right">
             <span className="flex items-center gap-2">
-              <ChannelIcon className="w-5 h-5 text-[#025EB8]" />
+              <ChannelIcon className="w-5 h-5 text-brand" />
               معاينة الرسالة المرسلة
             </span>
             {statusMeta && StatusIcon && (

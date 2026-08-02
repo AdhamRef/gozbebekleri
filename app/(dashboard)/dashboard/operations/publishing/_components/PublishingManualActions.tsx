@@ -93,7 +93,7 @@ export function PublishingManualActions({
   return (
     <div className="mt-3 space-y-2">
       <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" variant="outline" className="border-blue-200 text-[#025EB8] hover:bg-blue-50" disabled={disabled} onClick={() => record("READY_FOR_MANUAL_SEND")}>
+        <Button type="button" size="sm" variant="outline" className="border-blue-200 text-brand hover:bg-blue-50" disabled={disabled} onClick={() => record("READY_FOR_MANUAL_SEND")}>
           {busy === "READY_FOR_MANUAL_SEND" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           Queue
         </Button>

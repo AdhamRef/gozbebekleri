@@ -1,10 +1,40 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { metaDonationEventId } from "@/lib/tracking/canonical";
 import { buildMetaUserData } from "@/lib/tracking/meta-capi";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/**
+ * Single source of truth for what this route loads. The helpers below are typed from THIS
+ * object, so if a field is ever dropped from the query the helper that reads it stops
+ * compiling — previously they were typed as a bare `findUnique` payload (no relations), which
+ * made `row.donor` a type error and, more importantly, meant the types could not have caught
+ * an actually-missing include.
+ */
+const donationTrackingInclude = {
+  donor: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      countryCode: true,
+      city: true,
+      region: true,
+      gender: true,
+      birthdate: true,
+    },
+  },
+  items: { include: { campaign: { select: { id: true, title: true } } } },
+  categoryItems: { include: { category: { select: { id: true, name: true } } } },
+} satisfies Prisma.DonationInclude;
+
+type DonationTrackingRow = Prisma.DonationGetPayload<{
+  include: typeof donationTrackingInclude;
+}>;
 
 interface TrackingContent {
   id: string;
@@ -45,7 +75,7 @@ function firstString(value: unknown): string | undefined {
   return undefined;
 }
 
-function paidDonationValue(row: NonNullable<Awaited<ReturnType<typeof prisma.donation.findUnique>>>) {
+function paidDonationValue(row: DonationTrackingRow) {
   const total = Number(row.totalAmount ?? 0);
   if (Number.isFinite(total) && total > 0) return total;
   const amount = Number(row.amount ?? 0);
@@ -55,7 +85,7 @@ function paidDonationValue(row: NonNullable<Awaited<ReturnType<typeof prisma.don
   return Number.isFinite(fallback) ? fallback : 0;
 }
 
-function buildBrowserAdvancedMatching(row: NonNullable<Awaited<ReturnType<typeof prisma.donation.findUnique>>>) {
+function buildBrowserAdvancedMatching(row: DonationTrackingRow) {
   const donor = row.donor;
   const [firstName, ...rest] = (donor?.name ?? "").trim().split(/\s+/);
   const metaUserData = buildMetaUserData({
@@ -90,23 +120,7 @@ export async function GET(
 
   const row = await prisma.donation.findUnique({
     where: { id },
-    include: {
-      donor: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          phone: true,
-          countryCode: true,
-          city: true,
-          region: true,
-          gender: true,
-          birthdate: true,
-        },
-      },
-      items: { include: { campaign: { select: { id: true, title: true } } } },
-      categoryItems: { include: { category: { select: { id: true, name: true } } } },
-    },
+    include: donationTrackingInclude,
   });
 
   if (!row) {

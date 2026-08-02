@@ -7,7 +7,7 @@ export const foundationTransactionalFlows: TransactionalFlow[] = [
     title: "تأكيد التبرع الناجح",
     status: "DRAFT",
     steps: [
-      { id: "success_email_receipt", channel: "EMAIL", providerKey: "BREVO_EMAIL", templateId: "donation_thank_you_tr", delayMinutes: 0, requiresConsent: false },
+      { id: "success_email_receipt", channel: "EMAIL", providerKey: "ELASTIC_EMAIL", templateId: "donation_thank_you_tr", delayMinutes: 0, requiresConsent: false },
       { id: "success_whatsapp_thanks", channel: "WHATSAPP", providerKey: "META_WHATSAPP", templateId: "donation_thank_you_tr", delayMinutes: 10, requiresConsent: true },
     ],
   },
@@ -17,7 +17,7 @@ export const foundationTransactionalFlows: TransactionalFlow[] = [
     title: "فشل محاولة الدفع",
     status: "DRAFT",
     steps: [
-      { id: "failed_email_retry", channel: "EMAIL", providerKey: "BREVO_EMAIL", templateId: "payment_failed_retry", delayMinutes: 5, requiresConsent: false },
+      { id: "failed_email_retry", channel: "EMAIL", providerKey: "ELASTIC_EMAIL", templateId: "payment_failed_retry", delayMinutes: 5, requiresConsent: false },
       { id: "failed_sms_retry", channel: "SMS", providerKey: "BREVO_SMS", templateId: "payment_failed_retry_sms", delayMinutes: 60, requiresConsent: true, fallbackProviderKey: "SMS_FALLBACK" },
     ],
   },
@@ -27,7 +27,7 @@ export const foundationTransactionalFlows: TransactionalFlow[] = [
     title: "إصدار إيصال التبرع",
     status: "DRAFT",
     steps: [
-      { id: "receipt_email", channel: "EMAIL", providerKey: "BREVO_EMAIL", templateId: "receipt_email", delayMinutes: 0, requiresConsent: false },
+      { id: "receipt_email", channel: "EMAIL", providerKey: "ELASTIC_EMAIL", templateId: "receipt_email", delayMinutes: 0, requiresConsent: false },
     ],
   },
   {
@@ -36,7 +36,7 @@ export const foundationTransactionalFlows: TransactionalFlow[] = [
     title: "فشل خصم التبرع الشهري",
     status: "DRAFT",
     steps: [
-      { id: "monthly_failed_email", channel: "EMAIL", providerKey: "BREVO_EMAIL", templateId: "monthly_failed_email", delayMinutes: 15, requiresConsent: false },
+      { id: "monthly_failed_email", channel: "EMAIL", providerKey: "ELASTIC_EMAIL", templateId: "monthly_failed_email", delayMinutes: 15, requiresConsent: false },
       { id: "monthly_failed_whatsapp", channel: "WHATSAPP", providerKey: "META_WHATSAPP", templateId: "monthly_failed_whatsapp", delayMinutes: 120, requiresConsent: true },
     ],
   },
@@ -46,7 +46,7 @@ export const foundationTransactionalFlows: TransactionalFlow[] = [
     title: "شكر خاص للتبرعات الكبيرة",
     status: "DRAFT",
     steps: [
-      { id: "large_donation_email", channel: "EMAIL", providerKey: "BREVO_EMAIL", templateId: "large_donation_thanks", delayMinutes: 0, requiresConsent: false },
+      { id: "large_donation_email", channel: "EMAIL", providerKey: "ELASTIC_EMAIL", templateId: "large_donation_thanks", delayMinutes: 0, requiresConsent: false },
       { id: "large_donation_whatsapp", channel: "WHATSAPP", providerKey: "META_WHATSAPP", templateId: "large_donation_thanks", delayMinutes: 30, requiresConsent: true },
     ],
   },

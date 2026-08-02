@@ -38,7 +38,7 @@ export default async function CommunicationHomePage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs text-slate-400">التشغيل / التواصل</p>
-          <h1 className="mt-1 text-2xl font-black text-slate-900">مركز التواصل</h1>
+          <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">مركز التواصل</h1>
           <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-500">أرسل حملات واتساب وإيميل ورسائل حسب اللغة، وتابع المحادثات والنتائج من مكان واحد.</p>
         </div>
         <div className="flex gap-2">
@@ -63,7 +63,7 @@ export default async function CommunicationHomePage() {
                   <Icon className={`h-5 w-5 ${urgent ? "text-rose-500" : a.tone}`} />
                 </div>
                 <p className="mt-2 text-sm font-semibold text-slate-700">{a.label}</p>
-                <Link href={a.href} className={`mt-2 inline-block text-xs font-bold ${urgent ? "text-rose-600" : "text-[#025EB8]"}`}>{a.cta} ←</Link>
+                <Link href={a.href} className={`mt-2 inline-block text-xs font-bold ${urgent ? "text-rose-600" : "text-brand"}`}>{a.cta} ←</Link>
               </CardContent>
             </Card>
           );
@@ -77,8 +77,8 @@ export default async function CommunicationHomePage() {
           {quick.map((q) => {
             const Icon = q.icon;
             return (
-              <Link key={q.label} href={q.href} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-[#025EB8]/40 hover:shadow-sm">
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-[#025EB8]"><Icon className="h-4 w-4" /></span>
+              <Link key={q.label} href={q.href} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white transition hover:border-brand/40 hover:shadow-sm">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-brand"><Icon className="h-4 w-4" /></span>
                 <span className="text-sm font-semibold text-slate-700">{q.label}</span>
               </Link>
             );
@@ -121,7 +121,7 @@ export default async function CommunicationHomePage() {
                   <span className={`font-bold ${r.cls}`}>{r.text}</span>
                 </div>
               ))}
-              <Link href="/dashboard/operations/communication/settings" className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-[#025EB8]">الإعدادات المتقدمة <ArrowLeft className="h-3 w-3" /></Link>
+              <Link href="/dashboard/operations/communication/settings" className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-brand">الإعدادات المتقدمة <ArrowLeft className="h-3 w-3" /></Link>
             </CardContent>
           </Card>
         </section>

@@ -13,7 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Trash2, Plus, Save, Loader2, RefreshCw } from "lucide-react";
+import { Trash2, Plus, Save, Loader2, RefreshCw, Ticket } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/PageHeader";
 import { useToast } from "@/hooks/use-toast";
 
 interface AmountRange {
@@ -204,23 +205,19 @@ export default function TickerAdminPanel() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
+      <div className="flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-8 space-y-6">
-      {/* العنوان */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">إعدادات شريط التبرعات المباشر</h1>
-          <p className="text-muted-foreground">
-            إدارة إعدادات عرض التبرعات المباشرة
-          </p>
-        </div>
-        <div className="flex gap-2">
+    <div className="max-w-5xl mx-auto space-y-6">
+      <PageHeader
+        title="إعدادات شريط التبرعات المباشر"
+        description="إدارة إعدادات عرض التبرعات المباشرة"
+        icon={Ticket}
+        actions={<>
           <Button variant="outline" onClick={fetchConfig} disabled={loading}>
             <RefreshCw className="h-4 w-4 mr-2" />
             تحديث
@@ -233,8 +230,8 @@ export default function TickerAdminPanel() {
             )}
             حفظ الإعدادات
           </Button>
-        </div>
-      </div>
+        </>}
+      />
 
       {/* حالة الشريط */}
       <Card>
@@ -368,7 +365,7 @@ export default function TickerAdminPanel() {
           ))}
 
           {config.amountRanges.length > 0 && (
-            <div className="flex items-center justify-between p-4 bg-[#025EB8]/8 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-brand/8 rounded-lg">
               <span className="font-medium">إجمالي الاحتمالات:</span>
               <span className="text-lg font-bold">
                 {calculateTotalProbability()}

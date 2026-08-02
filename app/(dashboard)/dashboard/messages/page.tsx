@@ -2,21 +2,19 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Inbox, Send } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/PageHeader";
 import InboundMessagesTab from "./_components/InboundMessagesTab";
 import OutboundHistoryTab from "./_components/OutboundHistoryTab";
 
 export default function MessagesPage() {
   return (
     <div className="min-h-0" dir="rtl">
-      <div className="space-y-6 sm:space-y-8 p-0 sm:p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto">
-        <header className="text-right">
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground tracking-tight">
-            الرسائل
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            رسائل الزوار من نموذج التواصل، وسجل البريد والواتساب الصادر من القوالب.
-          </p>
-        </header>
+      <div className="space-y-6 max-w-[1600px] mx-auto">
+        <PageHeader
+          title="الرسائل"
+          description="رسائل الزوار من نموذج التواصل، وسجل البريد والواتساب الصادر من القوالب."
+          icon={Inbox}
+        />
 
         <Tabs defaultValue="outbound" dir="rtl" className="w-full">
           <TabsList className="grid grid-cols-2 max-w-md">

@@ -59,7 +59,7 @@ export function EmailTemplateList() {
         <Button
           size="sm"
           onClick={() => setEditor({ open: true, id: null })}
-          className="gap-2 bg-[#025EB8] hover:bg-[#025EB8]/90"
+          className="gap-2 bg-brand hover:bg-brand/90"
         >
           <Plus className="w-4 h-4" /> قالب جديد
         </Button>

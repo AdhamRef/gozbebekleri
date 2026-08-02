@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runSyncJob } from "@/lib/marketing/sync";
+import { isCronAuthorizationValid } from "@/lib/communication/cron-auth";
 
+/**
+ * NOT scheduled in vercel.json — deliberately, and it should stay that way.
+ *
+ * `/api/cron/marketing-platform-sync` runs every 3 hours over
+ * ["meta", "google_ads", "ga4", "tiktok", "x", "twilio"] — "meta" included — so this route is
+ * fully superseded for scheduled work. Adding it to vercel.json would sync Meta twice on
+ * overlapping windows for no benefit.
+ *
+ * Kept because it is still useful to trigger manually: a Meta-only re-sync over a specific
+ * date range, without waiting on (or re-running) the other five platforms.
+ */
 export const dynamic = "force-dynamic";
 
 function day(date: Date) {
@@ -17,9 +29,9 @@ function rangeForLastDays(days: number) {
 }
 
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  // Fails CLOSED — see lib/communication/cron-auth.ts. The previous form ran unauthenticated
+  // whenever CRON_SECRET was unset.
+  if (!isCronAuthorizationValid(request.headers.get("authorization"))) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 

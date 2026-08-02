@@ -221,11 +221,11 @@ export function ConnectionsPageClient() {
     <div className="p-4 sm:p-6 space-y-4" dir="rtl">
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div className="flex items-start gap-3">
-          <span className="rounded-xl p-2 bg-[#025EB8]/10 text-[#025EB8]">
+          <span className="rounded-xl p-2 bg-brand/10 text-brand">
             <Plug className="w-5 h-5" />
           </span>
           <div>
-            <h1 className="text-lg font-bold text-slate-900">ربط المنصات والحسابات</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">ربط المنصات والحسابات</h1>
             <p className="text-xs text-slate-500 mt-0.5 leading-relaxed max-w-2xl">
               إدارة حسابات الإعلانات والتحليلات والرسائل، ومراجعة اكتمال الإعدادات
               قبل المزامنة. يمكن تطبيق اتصال مكتمل على قسم «البكسلات والتتبع» عند الحاجة،
@@ -246,7 +246,7 @@ export function ConnectionsPageClient() {
           <Button
             size="sm"
             onClick={() => setDrawer({ open: true, editingId: null })}
-            className="gap-2 bg-[#025EB8] hover:bg-[#025EB8]/90"
+            className="gap-2 bg-brand hover:bg-brand/90"
           >
             <Plus className="w-4 h-4" /> إضافة اتصال
           </Button>
@@ -269,7 +269,7 @@ export function ConnectionsPageClient() {
           className={cn(
             "px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors",
             view === "connections"
-              ? "border-[#025EB8] text-[#025EB8]"
+              ? "border-brand text-brand"
               : "border-transparent text-slate-600 hover:text-slate-900"
           )}
         >
@@ -281,7 +281,7 @@ export function ConnectionsPageClient() {
           className={cn(
             "px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors",
             view === "sync"
-              ? "border-[#025EB8] text-[#025EB8]"
+              ? "border-brand text-brand"
               : "border-transparent text-slate-600 hover:text-slate-900"
           )}
         >
@@ -676,7 +676,7 @@ function CategoryPill({
       className={cn(
         "h-8 px-3 rounded-lg border text-xs transition-colors",
         active
-          ? "bg-[#025EB8] text-white border-[#025EB8]"
+          ? "bg-brand text-white border-brand"
           : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
       )}
     >

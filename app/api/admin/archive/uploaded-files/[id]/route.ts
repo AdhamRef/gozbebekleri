@@ -1,5 +1,6 @@
 import { deleteArchiveBlobFile } from "@/lib/archive/archive-blob-storage";
 import { getArchiveRepositorySnapshot } from "@/lib/archive/archive-repository";
+import { foundationArchiveData } from "@/lib/archive/archive-service";
 import {
   buildArchiveUploadReferences,
   cleanText,
@@ -83,7 +84,7 @@ async function findArchiveUploadedFile(id: string) {
 }
 
 async function getReferences() {
-  const snapshot = await getArchiveRepositorySnapshot();
+  const snapshot = await getArchiveRepositorySnapshot(foundationArchiveData());
   return buildArchiveUploadReferences(snapshot.collections, snapshot.projects);
 }
 

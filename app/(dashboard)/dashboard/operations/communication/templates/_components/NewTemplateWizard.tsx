@@ -119,7 +119,7 @@ export function NewTemplateWizard() {
       {/* step indicator */}
       <ol className="flex flex-wrap gap-2">
         {STEPS.map((s, i) => (
-          <li key={s} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold ${i === step ? "border-[#025EB8] bg-[#025EB8] text-white" : i < step ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-500"}`}>
+          <li key={s} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold ${i === step ? "border-brand bg-brand text-white" : i < step ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-500"}`}>
             {i < step ? <Check className="h-3 w-3" /> : <span>{i + 1}</span>} {s}
           </li>
         ))}
@@ -132,7 +132,7 @@ export function NewTemplateWizard() {
             <Field label="نوع القالب">
               <div className="flex gap-2">
                 {(["CAMPAIGN", "SYSTEM"] as const).map((k) => (
-                  <button key={k} type="button" onClick={() => setKind(k)} className={`flex-1 rounded-md border px-3 py-2 text-sm font-bold ${kind === k ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]" : "border-slate-200 text-slate-600"}`}>{k === "CAMPAIGN" ? "حملة" : "تلقائي"}</button>
+                  <button key={k} type="button" onClick={() => setKind(k)} className={`flex-1 rounded-md border px-3 py-2 text-sm font-bold ${kind === k ? "border-brand bg-brand/5 text-brand" : "border-slate-200 text-slate-600"}`}>{k === "CAMPAIGN" ? "حملة" : "تلقائي"}</button>
                 ))}
               </div>
               <div className="mt-2 space-y-1 rounded-lg bg-slate-50 p-2.5 text-[11px] leading-5 text-slate-600">
@@ -144,7 +144,7 @@ export function NewTemplateWizard() {
               <div className="flex gap-2">
                 {CHANNELS.map((c) => {
                   const Icon = c.icon;
-                  return <button key={c.key} type="button" onClick={() => setChannel(c.key)} className={`flex flex-1 items-center justify-center gap-1.5 rounded-md border px-2 py-2 text-xs font-bold ${channel === c.key ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]" : "border-slate-200 text-slate-600"}`}><Icon className="h-3.5 w-3.5" /> {c.label}</button>;
+                  return <button key={c.key} type="button" onClick={() => setChannel(c.key)} className={`flex flex-1 items-center justify-center gap-1.5 rounded-md border px-2 py-2 text-xs font-bold ${channel === c.key ? "border-brand bg-brand/5 text-brand" : "border-slate-200 text-slate-600"}`}><Icon className="h-3.5 w-3.5" /> {c.label}</button>;
                 })}
               </div>
               {channel === "SMS" ? (
@@ -234,7 +234,7 @@ export function NewTemplateWizard() {
             {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{error}</p> : null}
             <div className="flex flex-wrap gap-2">
               <button type="button" disabled={saving} onClick={() => save(false)} className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 hover:bg-slate-50 disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} حفظ كمسودة</button>
-              <button type="button" disabled={saving} onClick={() => save(true)} className="inline-flex h-10 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white hover:bg-[#024a92] disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} حفظ كجاهز</button>
+              <button type="button" disabled={saving} onClick={() => save(true)} className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} حفظ كجاهز</button>
             </div>
           </div>
         ) : null}
@@ -244,7 +244,7 @@ export function NewTemplateWizard() {
       <div className="flex items-center justify-between">
         <button type="button" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 disabled:opacity-40"><ArrowRight className="h-4 w-4" /> السابق</button>
         {step < STEPS.length - 1 ? (
-          <button type="button" disabled={!canNext} onClick={() => { if (step === 1) runPreview(); setStep((s) => Math.min(STEPS.length - 1, s + 1)); }} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white disabled:opacity-40">التالي <ArrowLeft className="h-4 w-4" /></button>
+          <button type="button" disabled={!canNext} onClick={() => { if (step === 1) runPreview(); setStep((s) => Math.min(STEPS.length - 1, s + 1)); }} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-brand px-4 text-sm font-bold text-white disabled:opacity-40">التالي <ArrowLeft className="h-4 w-4" /></button>
         ) : (
           <Link href="/dashboard/operations/communication/templates" className="text-xs font-bold text-slate-500 hover:underline">إلغاء والعودة</Link>
         )}

@@ -63,7 +63,7 @@ export default function PaymentGatewaysPage() {
   return (
     <div className="space-y-6" dir="rtl">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">بوابات الدفع</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">بوابات الدفع</h1>
         <p className="text-sm text-muted-foreground mt-1.5">
           تحكّم في بوابات الدفع المتاحة للمتبرعين. Stripe مفعّل دائمًا ولا
           يمكن إيقافه. عند إيقاف PayFor، تمر جميع التبرعات في كل العملات

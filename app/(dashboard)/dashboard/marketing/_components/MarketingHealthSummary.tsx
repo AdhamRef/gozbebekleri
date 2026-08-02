@@ -58,7 +58,7 @@ export function MarketingHealthSummary() {
   return <Card>
     <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
       <div>
-        <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-[#025EB8]" />صحة التسويق السريعة</CardTitle>
+        <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-brand" />صحة التسويق السريعة</CardTitle>
         <CardDescription>ملخص من Health API بدون تغيير التتبع أو الدفع.</CardDescription>
       </div>
       <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-2">
@@ -66,7 +66,7 @@ export function MarketingHealthSummary() {
       </Button>
     </CardHeader>
     <CardContent>
-      {loading ? <div className="flex min-h-28 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-[#025EB8]" /></div> : error || !scores ? <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">تعذر تحميل ملخص الصحة الآن. افتح صفحة جودة التتبع للتفاصيل.</div> : <div className="space-y-4">
+      {loading ? <div className="flex min-h-28 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-brand" /></div> : error || !scores ? <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">تعذر تحميل ملخص الصحة الآن. افتح صفحة جودة التتبع للتفاصيل.</div> : <div className="space-y-4">
         <div className="grid gap-3 md:grid-cols-4">
           <Mini label="الصحة العامة" value={`${scores.overall}%`} className={tone(scores.overall)} />
           <Mini label="جاهزية الربط" value={`${scores.readiness}%`} className={tone(scores.readiness)} />

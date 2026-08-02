@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isCronAuthorizationValid } from "@/lib/communication/cron-auth";
 import { refreshExchangeRatesFromApi } from "@/lib/exchange/rates-service";
 
 /**
@@ -8,9 +9,9 @@ import { refreshExchangeRatesFromApi } from "@/lib/exchange/rates-service";
  */
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("authorization");
-    const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    // Fails CLOSED: the previous `if (cronSecret && ...)` form skipped the check entirely
+    // whenever CRON_SECRET was unset, leaving the endpoint fully public in that environment.
+    if (!isCronAuthorizationValid(request.headers.get("authorization"))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

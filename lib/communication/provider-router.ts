@@ -1,7 +1,7 @@
 import type { CommunicationChannelId } from "./communication-runtime-types";
 import { getActiveCommunicationRuntimeBundle, type CommunicationRuntimeBundle } from "./runtime-config";
 import { META_REASONS } from "./providers/meta-whatsapp/errors";
-import { EMAIL_REASONS } from "./providers/email/client";
+import { EMAIL_REASONS, EMAIL_PROVIDER_ID } from "./providers/email/client";
 import { resolveSmsProviderWithRuntime, sendSmsMessage } from "./providers/sms/client";
 
 export type ProviderSendDecision =
@@ -29,9 +29,9 @@ export function resolveProviderForSendWithRuntime(
     return { canSend: true, providerId: "META_WHATSAPP" };
   }
   if (channel === "EMAIL") {
-    if (!runtime.brevoEmail.configured) return { canSend: false, reason: runtime.brevoEmail.reason ?? EMAIL_REASONS.NOT_CONFIGURED };
-    if (!sender?.senderEmail && !runtime.brevoEmail.values.senderEmail) return { canSend: false, reason: EMAIL_REASONS.SENDER_MISSING_IDENTITY };
-    return { canSend: true, providerId: "BREVO_EMAIL" };
+    if (!runtime.elasticEmail.configured) return { canSend: false, reason: runtime.elasticEmail.reason ?? EMAIL_REASONS.NOT_CONFIGURED };
+    if (!sender?.senderEmail && !runtime.elasticEmail.values.senderEmail) return { canSend: false, reason: EMAIL_REASONS.SENDER_MISSING_IDENTITY };
+    return { canSend: true, providerId: EMAIL_PROVIDER_ID };
   }
   const sms = resolveSmsProviderWithRuntime(runtime, ctx?.country, ctx?.phone);
   if (!sms.configured) return { canSend: false, reason: sms.reason };
@@ -45,7 +45,7 @@ export async function resolveProviderForSend(channel: CommunicationChannelId, se
 export async function isSendEnabled(channel: CommunicationChannelId, runtime?: CommunicationRuntimeBundle): Promise<boolean> {
   const bundle = runtime ?? await getActiveCommunicationRuntimeBundle();
   if (channel === "WHATSAPP") return bundle.meta.configured;
-  if (channel === "EMAIL") return bundle.brevoEmail.configured;
+  if (channel === "EMAIL") return bundle.elasticEmail.configured;
   return bundle.netgsm.configured || bundle.brevoSms.configured;
 }
 
@@ -93,8 +93,8 @@ export async function sendPreparedDelivery(input: PreparedSendInput, runtime?: C
       html: input.html ?? "",
       text: input.text,
       senderEmail: input.sender?.senderEmail,
-    }, bundle.brevoEmail);
-    if (!res.ok) return { ok: false, provider: "BREVO_EMAIL", reason: res.reason };
+    }, bundle.elasticEmail);
+    if (!res.ok) return { ok: false, provider: EMAIL_PROVIDER_ID, reason: res.reason, detail: res.detail };
     return { ok: true, provider: res.providerId, providerMessageId: res.providerMessageId, internalAccepted: res.internalAccepted };
   }
 

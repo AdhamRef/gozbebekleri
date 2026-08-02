@@ -29,7 +29,9 @@ type Sender = {
 };
 
 const CHANNELS = ["WHATSAPP", "EMAIL", "SMS"] as const;
-const PROVIDERS = ["META_WHATSAPP", "TWILIO", "SENDGRID", "NETGSM", "CUSTOM"] as const;
+// Only the final-architecture send paths may be picked for a new sender. Legacy ids (TWILIO,
+// SENDGRID, BREVO_EMAIL) still exist on historical rows but are never offered as a choice.
+const PROVIDERS = ["META_WHATSAPP", "ELASTIC_EMAIL", "BREVO_SMS", "NETGSM_SMS", "CUSTOM"] as const;
 const STATUSES = ["NOT_CONFIGURED", "ACTIVE", "NEEDS_ATTENTION", "DISABLED"] as const;
 const PURPOSES = ["MARKETING", "UTILITY", "TRANSACTIONAL", "AUTHENTICATION"] as const;
 
@@ -179,12 +181,12 @@ export default function SendersPage() {
   }
 
   return (
-    <main className="space-y-5 p-4 sm:p-6" dir="rtl">
+    <main className="space-y-5" dir="rtl">
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs font-bold text-[#025EB8]">مركز التواصل / المُرسِلون</p>
-            <h1 className="mt-1 text-xl font-black text-slate-900">مُرسِلو التواصل</h1>
+            <p className="text-xs font-bold text-brand">مركز التواصل / المُرسِلون</p>
+            <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">مُرسِلو التواصل</h1>
             <p className="mt-1.5 max-w-3xl text-sm leading-6 text-slate-600">
               أرقام واتساب، مُرسِلو الإيميل والرسائل. إعداد فقط — لا يوجد إرسال ولا تظهر أي مفاتيح أو أسرار.
             </p>
@@ -210,7 +212,7 @@ export default function SendersPage() {
 
       {loading ? (
         <div className="flex min-h-[14rem] items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-[#025EB8]" />
+          <Loader2 className="h-8 w-8 animate-spin text-brand" />
         </div>
       ) : failed ? (
         <Card className="border-rose-200 bg-rose-50">
@@ -231,7 +233,7 @@ export default function SendersPage() {
                   <div>
                     <CardDescription>{channelLabel[s.channel] ?? s.channel} · {s.provider}</CardDescription>
                     <CardTitle className="mt-1 flex items-center gap-2 text-lg">
-                      <Radio className="h-4 w-4 text-[#025EB8]" /> {s.displayName || s.name}
+                      <Radio className="h-4 w-4 text-brand" /> {s.displayName || s.name}
                       {s.isDefault ? <Star className="h-4 w-4 fill-amber-400 text-amber-400" /> : null}
                     </CardTitle>
                   </div>
@@ -308,7 +310,7 @@ function SenderForm({
           <p className="mb-1 text-xs font-bold text-slate-500">اللغات المدعومة (فارغ = الكل)</p>
           <div className="flex flex-wrap gap-2">
             {LOCALE_OPTIONS.map((l) => (
-              <button key={l.code} type="button" onClick={() => toggleArr("supportedLocales", l.code)} className={`rounded-md border px-2 py-1 text-xs ${form.supportedLocales.includes(l.code) ? "border-[#025EB8] bg-blue-50 text-[#025EB8]" : "border-slate-200 text-slate-600"}`}>{l.label}</button>
+              <button key={l.code} type="button" onClick={() => toggleArr("supportedLocales", l.code)} className={`rounded-md border px-2 py-1 text-xs ${form.supportedLocales.includes(l.code) ? "border-brand bg-blue-50 text-brand" : "border-slate-200 text-slate-600"}`}>{l.label}</button>
             ))}
           </div>
         </div>
@@ -316,7 +318,7 @@ function SenderForm({
           <p className="mb-1 text-xs font-bold text-slate-500">الأغراض المدعومة</p>
           <div className="flex flex-wrap gap-2">
             {PURPOSES.map((p) => (
-              <button key={p} type="button" onClick={() => toggleArr("supportedPurposes", p)} className={`rounded-md border px-2 py-1 text-xs ${form.supportedPurposes.includes(p) ? "border-[#025EB8] bg-blue-50 text-[#025EB8]" : "border-slate-200 text-slate-600"}`}>{purposeLabel[p] ?? p}</button>
+              <button key={p} type="button" onClick={() => toggleArr("supportedPurposes", p)} className={`rounded-md border px-2 py-1 text-xs ${form.supportedPurposes.includes(p) ? "border-brand bg-blue-50 text-brand" : "border-slate-200 text-slate-600"}`}>{purposeLabel[p] ?? p}</button>
             ))}
           </div>
         </div>
@@ -336,8 +338,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="block text-sm"><span className="mb-1 block text-xs font-bold text-slate-500">{label}</span>{children}</label>;
 }
 function Input({ value, onChange, type = "text" }: { value: string; onChange: (v: string) => void; type?: string }) {
-  return <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#025EB8]" />;
+  return <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand" />;
 }
 function Select({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
-  return <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#025EB8]">{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>;
+  return <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand">{options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>;
 }

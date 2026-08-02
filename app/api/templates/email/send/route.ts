@@ -12,7 +12,7 @@ import { loadContextsForUserIds } from "@/lib/templates/variables";
 import { renderEmailHtml, renderEmailSubject } from "@/lib/templates/render";
 import { pickLocale, resolveEmailVariant } from "@/lib/templates/locale-resolver";
 import { logSentMessage } from "@/lib/messaging/log-sent";
-import { getActiveBrevoEmailRuntimeConfig } from "@/lib/communication/runtime-config";
+import { getActiveElasticEmailRuntimeConfig } from "@/lib/communication/runtime-config";
 import { sendArchivedEmail } from "@/lib/communication/system-email";
 
 export const dynamic = "force-dynamic";
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   if (!userIds.length) return NextResponse.json({ sent: 0, failed: [], skipped: 0, total: 0 });
   const contexts = await loadContextsForUserIds(userIds);
   const actor = auditActorFromDashboardSession(session!);
-  const runtimeConfig = await getActiveBrevoEmailRuntimeConfig();
+  const runtimeConfig = await getActiveElasticEmailRuntimeConfig();
   let sent = 0;
   let skipped = 0;
   const failed: { to: string; error: string }[] = [];

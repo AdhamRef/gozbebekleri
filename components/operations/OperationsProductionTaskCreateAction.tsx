@@ -61,19 +61,19 @@ export function OperationsProductionTaskCreateAction() {
         <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
           <label className="space-y-1 font-semibold text-slate-600 sm:col-span-2">
             اسم المهمة
-            <input value={form.title} onChange={(event) => setForm((value) => ({ ...value, title: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" />
+            <input value={form.title} onChange={(event) => setForm((value) => ({ ...value, title: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" />
           </label>
           <label className="space-y-1 font-semibold text-slate-600">
             مرتبطة بـ
-            <input value={form.item} onChange={(event) => setForm((value) => ({ ...value, item: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" />
+            <input value={form.item} onChange={(event) => setForm((value) => ({ ...value, item: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" />
           </label>
           <label className="space-y-1 font-semibold text-slate-600">
             المسؤول
-            <input value={form.owner} onChange={(event) => setForm((value) => ({ ...value, owner: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" />
+            <input value={form.owner} onChange={(event) => setForm((value) => ({ ...value, owner: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" />
           </label>
           <label className="space-y-1 font-semibold text-slate-600">
             الحالة
-            <select value={form.status} onChange={(event) => setForm((value) => ({ ...value, status: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]">
+            <select value={form.status} onChange={(event) => setForm((value) => ({ ...value, status: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand">
               <option value="IDEA">فكرة</option>
               <option value="WRITING">كتابة</option>
               <option value="DESIGN">تصميم</option>
@@ -84,7 +84,7 @@ export function OperationsProductionTaskCreateAction() {
           </label>
           <label className="space-y-1 font-semibold text-slate-600">
             موعد التسليم
-            <input value={form.due} onChange={(event) => setForm((value) => ({ ...value, due: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" />
+            <input value={form.due} onChange={(event) => setForm((value) => ({ ...value, due: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" />
           </label>
           <div className="flex flex-wrap gap-2 sm:col-span-2">
             <Button type="button" size="sm" disabled={busy} onClick={saveTask}>

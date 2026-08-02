@@ -1,16 +1,4 @@
-/** Shared types for the Brevo email + SMS adapters. */
-
-export type BrevoEmailInput = {
-  to: string;
-  toName?: string | null;
-  subject: string;
-  html: string;
-  text?: string | null;
-  senderName?: string | null;
-  senderEmail?: string | null;
-  templateId?: number | null;
-  params?: Record<string, unknown> | null;
-};
+/** Shared types for the Brevo SMS adapter (email moved to Elastic Email). */
 
 export type BrevoSmsInput = {
   to: string;

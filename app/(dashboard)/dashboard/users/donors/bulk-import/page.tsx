@@ -48,7 +48,7 @@ const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "ok" | "warn" | "bad" }) {
   const color = tone === "ok" ? "text-emerald-700" : tone === "warn" ? "text-amber-700" : tone === "bad" ? "text-rose-700" : "text-slate-900";
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="text-xs text-slate-500">{label}</div>
       <div className={`mt-1 text-2xl font-black ${color}`}>{value}</div>
     </div>
@@ -115,13 +115,13 @@ export default function BulkDonationImportPage() {
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-xs font-bold text-[#025EB8]">المتبرعون / استيراد بالجملة</p>
-            <h1 className="mt-1 text-xl font-black text-slate-900">استيراد التبرعات من Excel / CSV</h1>
+            <p className="text-xs font-bold text-brand">المتبرعون / استيراد بالجملة</p>
+            <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">استيراد التبرعات من Excel / CSV</h1>
             <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-600">
               ارفع ملف مبيعات (مثل تصدير PayFor) لإنشاء تبرعات مرتبطة بالمتبرعين عبر البريد الإلكتروني. تُعرض معاينة قبل الحفظ، ولا يُرسل أي إشعار.
             </p>
           </div>
-          <Link href="/dashboard/users/donors" className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-[#025EB8]/50 hover:text-[#025EB8]">
+          <Link href="/dashboard/users/donors" className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-brand/50 hover:text-brand">
             العودة للمتبرعين <ArrowLeft className="h-4 w-4" />
           </Link>
         </div>
@@ -130,17 +130,17 @@ export default function BulkDonationImportPage() {
       {/* Upload */}
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-          <FileSpreadsheet className="h-8 w-8 text-[#025EB8]" />
+          <FileSpreadsheet className="h-8 w-8 text-brand" />
           <div>
             <p className="text-sm font-bold text-slate-800">{file ? file.name : "اختر ملف Excel (.xlsx) أو CSV"}</p>
             <p className="mt-1 text-xs text-slate-500">الأعمدة المدعومة: EPOSTA، AD SOYAD، TELEFON، SEPET، TOPLAM، PARA BİRİMİ، USD HALİ، DURUM، TARİH SAAT، ÜLKE، SİTE DİL …</p>
           </div>
           <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv,text/csv" className="hidden" onChange={(e) => onPick(e.target.files?.[0] ?? null)} />
           <div className="flex flex-wrap justify-center gap-2">
-            <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:border-[#025EB8]/50 hover:text-[#025EB8]">
+            <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:border-brand/50 hover:text-brand">
               <UploadCloud className="h-4 w-4" /> اختيار ملف
             </button>
-            <button type="button" disabled={!file || busy !== null} onClick={runPreview} className="inline-flex h-10 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white hover:bg-[#024a92] disabled:opacity-40">
+            <button type="button" disabled={!file || busy !== null} onClick={runPreview} className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-40">
               {busy === "preview" ? <Loader2 className="h-4 w-4 animate-spin" /> : null} معاينة الملف
             </button>
           </div>
@@ -195,7 +195,7 @@ export default function BulkDonationImportPage() {
                     <tr key={r.rowNumber} className={`border-b last:border-0 ${!r.valid ? "bg-rose-50/40" : ""}`}>
                       <td className="p-2.5 text-slate-400">{r.rowNumber}</td>
                       <td className="p-2.5 font-semibold text-slate-800">{r.name ?? "—"}</td>
-                      <td className="p-2.5 text-slate-600" dir="ltr">{r.email ?? "—"}{r.isNewDonor && r.valid ? <span className="ms-1 rounded bg-blue-50 px-1 text-[10px] font-bold text-[#025EB8]">جديد</span> : null}</td>
+                      <td className="p-2.5 text-slate-600" dir="ltr">{r.email ?? "—"}{r.isNewDonor && r.valid ? <span className="ms-1 rounded bg-blue-50 px-1 text-[10px] font-bold text-brand">جديد</span> : null}</td>
                       <td className="p-2.5 text-slate-600">{r.basket ?? "—"}</td>
                       <td className="p-2.5 text-center text-slate-700" dir="ltr">{r.amount ?? "—"} {r.currency}</td>
                       <td className="p-2.5 text-center text-slate-700" dir="ltr">{r.amountUSD ?? "—"}</td>
@@ -228,7 +228,7 @@ export default function BulkDonationImportPage() {
           </div>
           {result.truncated ? <p className="mt-2 text-xs font-semibold text-amber-700">تم استيراد أول 5000 صف فقط في هذه الدفعة — أعد رفع الملف لاستيراد الباقي.</p> : null}
           <div className="mt-4 flex gap-2">
-            <Link href="/dashboard/users/donors" className="inline-flex h-9 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white hover:bg-[#024a92]">عرض المتبرعين</Link>
+            <Link href="/dashboard/users/donors" className="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:bg-brand-700">عرض المتبرعين</Link>
             <button type="button" onClick={() => { onPick(null); if (inputRef.current) inputRef.current.value = ""; }} className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700">استيراد ملف آخر</button>
           </div>
         </section>

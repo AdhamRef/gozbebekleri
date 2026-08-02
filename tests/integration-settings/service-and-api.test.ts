@@ -206,38 +206,38 @@ test("failed provider test preserves the active configuration", async () => {
 });
 
 test("editing any field after a successful test invalidates the previous candidate version", async () => {
-  const { service } = setup({ env: { NODE_ENV: "test", BREVO_EMAIL_SENDER_EMAIL: "verified@example.org", BREVO_SMS_SENDER: "GOZBEBEK" } });
-  const first = await service.saveProviderSettings("BREVO", [{ key: "API_KEY", value: "xkeysib-first-api-key-value-123456" }], actor);
-  await service.testProviderConnection("BREVO", actor);
-  const second = await service.saveProviderSettings("BREVO", [{ key: "EMAIL_SENDER_NAME", value: "Gözbebekleri" }], actor);
+  const { service } = setup({ env: { NODE_ENV: "test", ELASTIC_EMAIL_SENDER_EMAIL: "verified@example.org", ELASTIC_EMAIL_SENDER_NAME: "Gozbebekleri" } });
+  const first = await service.saveProviderSettings("ELASTIC_EMAIL", [{ key: "API_KEY", value: "xkeysib-first-api-key-value-123456" }], actor);
+  await service.testProviderConnection("ELASTIC_EMAIL", actor);
+  const second = await service.saveProviderSettings("ELASTIC_EMAIL", [{ key: "SENDER_NAME", value: "Gözbebekleri" }], actor);
   assert.notEqual(first.snapshot.candidate.version, second.snapshot.candidate.version);
-  await expectCode(service.activateProviderCandidate("BREVO", first.snapshot.candidate.version!, actor), "CANDIDATE_VERSION_MISMATCH");
-  await expectCode(service.activateProviderCandidate("BREVO", second.snapshot.candidate.version!, actor), "CANDIDATE_NOT_VERIFIED");
+  await expectCode(service.activateProviderCandidate("ELASTIC_EMAIL", first.snapshot.candidate.version!, actor), "CANDIDATE_VERSION_MISMATCH");
+  await expectCode(service.activateProviderCandidate("ELASTIC_EMAIL", second.snapshot.candidate.version!, actor), "CANDIDATE_NOT_VERIFIED");
 });
 
 test("provider activation commits all candidate fields together", async () => {
   const { service } = setup();
-  const staged = await service.saveProviderSettings("BREVO", [
+  const staged = await service.saveProviderSettings("ELASTIC_EMAIL", [
     { key: "API_KEY", value: "xkeysib-atomic-api-key-value-123456" },
-    { key: "EMAIL_SENDER_EMAIL", value: "verified@example.org" },
-    { key: "SMS_SENDER", value: "GOZBEBEK" },
+    { key: "SENDER_EMAIL", value: "verified@example.org" },
+    { key: "SENDER_NAME", value: "Gozbebekleri" },
   ], actor);
   const version = staged.snapshot.candidate.version!;
-  await service.testProviderConnection("BREVO", actor);
-  await service.activateProviderCandidate("BREVO", version, actor);
-  const values = await service.getResolvedProviderValues("BREVO", actor);
+  await service.testProviderConnection("ELASTIC_EMAIL", actor);
+  await service.activateProviderCandidate("ELASTIC_EMAIL", version, actor);
+  const values = await service.getResolvedProviderValues("ELASTIC_EMAIL", actor);
   assert.equal(values.API_KEY, "xkeysib-atomic-api-key-value-123456");
-  assert.equal(values.EMAIL_SENDER_EMAIL, "verified@example.org");
-  assert.equal(values.SMS_SENDER, "GOZBEBEK");
+  assert.equal(values.SENDER_EMAIL, "verified@example.org");
+  assert.equal(values.SENDER_NAME, "Gozbebekleri");
 });
 
 test("environment fallback participates in candidate configuration", async () => {
-  const { service } = setup({ env: { NODE_ENV: "test", BREVO_EMAIL_SENDER_EMAIL: "verified@example.org", BREVO_SMS_SENDER: "GOZBEBEK" } });
-  await service.saveProviderSettings("BREVO", [{ key: "API_KEY", value: "xkeysib-candidate-api-key-value-123456" }], actor);
-  const candidate = await service.getCandidateConfiguration("BREVO", actor);
+  const { service } = setup({ env: { NODE_ENV: "test", ELASTIC_EMAIL_SENDER_EMAIL: "verified@example.org", ELASTIC_EMAIL_SENDER_NAME: "Gozbebekleri" } });
+  await service.saveProviderSettings("ELASTIC_EMAIL", [{ key: "API_KEY", value: "xkeysib-candidate-api-key-value-123456" }], actor);
+  const candidate = await service.getCandidateConfiguration("ELASTIC_EMAIL", actor);
   assert.equal(candidate.sources.API_KEY, "CANDIDATE");
-  assert.equal(candidate.sources.EMAIL_SENDER_EMAIL, "ENVIRONMENT");
-  assert.equal(candidate.values.EMAIL_SENDER_EMAIL, "verified@example.org");
+  assert.equal(candidate.sources.SENDER_EMAIL, "ENVIRONMENT");
+  assert.equal(candidate.values.SENDER_EMAIL, "verified@example.org");
   assert.deepEqual(candidate.missingRequiredFields, []);
 });
 

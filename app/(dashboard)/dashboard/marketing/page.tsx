@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { AlertTriangle, ArrowLeft, BarChart3, Gauge, Link2, Sparkles, TrendingUp, Wallet } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/PageHeader";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { resolveDashboardPageAccess } from "@/lib/dashboard/page-access";
 import { getMarketingResultsOverview } from "@/lib/marketing/results/results-service";
@@ -45,17 +46,18 @@ export default async function MarketingOverviewPage() {
 
   return (
     <main className="space-y-6" dir="rtl">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-xs font-bold text-[#025EB8]">التسويق / نظرة عامة</p>
-          <h1 className="mt-1 text-2xl font-black text-slate-950">نظرة عامة</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">ملخص تنفيذي سريع للأداء الفعلي، التتبع، وآخر مزامنة دون تكرار الجداول التفصيلية.</p>
-        </div>
-        <nav className="flex flex-wrap gap-2 text-sm font-bold">
-          <Link className="rounded-md border px-3 py-2 hover:bg-slate-50" href="/dashboard/marketing/performance">أداء الحملات</Link>
-          <Link className="rounded-md border px-3 py-2 hover:bg-slate-50" href="/dashboard/marketing/recommendations">التوصيات</Link>
-        </nav>
-      </header>
+      <PageHeader
+        eyebrow="التسويق / نظرة عامة"
+        title="نظرة عامة"
+        description="ملخص تنفيذي سريع للأداء الفعلي، التتبع، وآخر مزامنة دون تكرار الجداول التفصيلية."
+        icon={TrendingUp}
+        actions={
+          <>
+            <Link className="rounded-md border px-3 py-2 text-sm font-bold hover:bg-slate-50" href="/dashboard/marketing/performance">أداء الحملات</Link>
+            <Link className="rounded-md border px-3 py-2 text-sm font-bold hover:bg-slate-50" href="/dashboard/marketing/recommendations">التوصيات</Link>
+          </>
+        }
+      />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="إجمالي الإنفاق" value={money(results.summary.totalSpend)} icon={<Wallet className="h-5 w-5" />} />
@@ -84,14 +86,14 @@ export default async function MarketingOverviewPage() {
           <CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-amber-500" />حالة التتبع</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
             <p>{tracking.configuredCount} من {tracking.total} تكاملات تتبع مُعدّة.</p>
-            <Link href="/dashboard/marketing/tracking" className="inline-flex items-center gap-1 font-bold text-[#025EB8]">فتح التتبع والتحويلات <ArrowLeft className="h-4 w-4" /></Link>
+            <Link href="/dashboard/marketing/tracking" className="inline-flex items-center gap-1 font-bold text-brand">فتح التتبع والتحويلات <ArrowLeft className="h-4 w-4" /></Link>
           </CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-amber-500" />أهم توصية</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
             {topRecommendation ? <><p className="font-bold text-slate-900">{topRecommendation.title}</p><p className="leading-6 text-slate-600">{topRecommendation.reason}</p></> : <p className="text-slate-500">لا توجد توصيات مدعومة ببيانات كافية الآن.</p>}
-            <Link href="/dashboard/marketing/recommendations" className="inline-flex items-center gap-1 font-bold text-[#025EB8]">عرض كل التوصيات <ArrowLeft className="h-4 w-4" /></Link>
+            <Link href="/dashboard/marketing/recommendations" className="inline-flex items-center gap-1 font-bold text-brand">عرض كل التوصيات <ArrowLeft className="h-4 w-4" /></Link>
           </CardContent>
         </Card>
       </section>
@@ -107,9 +109,9 @@ export default async function MarketingOverviewPage() {
 }
 
 function Metric({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
-  return <Card><CardContent className="p-5"><span className="text-[#025EB8]">{icon}</span><div className="mt-3 text-2xl font-black text-slate-950">{value}</div><div className="mt-1 text-sm text-slate-500">{label}</div></CardContent></Card>;
+  return <Card><CardContent className="p-5"><span className="text-brand">{icon}</span><div className="mt-3 text-2xl font-black text-slate-950">{value}</div><div className="mt-1 text-sm text-slate-500">{label}</div></CardContent></Card>;
 }
 
 function Quick({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) {
-  return <Link href={href} className="flex items-center justify-between rounded-xl border bg-white p-4 text-sm font-bold text-slate-700 hover:border-[#025EB8]/40"><span className="flex items-center gap-2">{icon}{label}</span><ArrowLeft className="h-4 w-4 text-slate-400" /></Link>;
+  return <Link href={href} className="flex items-center justify-between rounded-xl border bg-white p-4 text-sm font-bold text-slate-700 hover:border-brand/40"><span className="flex items-center gap-2">{icon}{label}</span><ArrowLeft className="h-4 w-4 text-slate-400" /></Link>;
 }

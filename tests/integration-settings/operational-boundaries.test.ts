@@ -44,7 +44,7 @@ test("test-active receives active values only and ignores pending values", async
     },
   };
   await runActiveProviderTest("BREVO", actor, {
-    resolveActiveValues: async () => ({ API_KEY: activeToken, EMAIL_SENDER_EMAIL: "sender@example.org", SMS_SENDER: "GOZBEBEK" }),
+    resolveActiveValues: async () => ({ API_KEY: activeToken, SMS_SENDER: "GOZBEBEK" }),
     tester,
     record: async () => {},
     now: () => new Date("2026-07-14T08:00:00.000Z"),
@@ -57,7 +57,7 @@ test("active test result persists independently and does not alter candidate tes
   const candidateState = { version: "candidate-v1", result: "SUCCESS" };
   let stored: { result: string; failure: string | null } | null = null;
   await runActiveProviderTest("BREVO", actor, {
-    resolveActiveValues: async () => ({ API_KEY: "active", EMAIL_SENDER_EMAIL: "sender@example.org", SMS_SENDER: "GOZBEBEK" }),
+    resolveActiveValues: async () => ({ API_KEY: "active", SMS_SENDER: "GOZBEBEK" }),
     tester: { test: async () => ({ success: false, connectionStatus: "FAILED", messageAr: "failed", failureCode: "BREVO_UNAUTHORIZED" }) },
     record: async (_provider, _at, result) => { stored = { result: result.success ? "SUCCESS" : "FAILED", failure: result.failureCode }; },
   });

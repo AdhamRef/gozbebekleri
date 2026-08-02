@@ -127,7 +127,7 @@ export function TriggerList() {
         <Button
           size="sm"
           onClick={() => setEditorOpen(true)}
-          className="gap-2 bg-[#025EB8] hover:bg-[#025EB8]/90"
+          className="gap-2 bg-brand hover:bg-brand/90"
         >
           <Plus className="w-4 h-4" /> حدث جديد
         </Button>
@@ -174,7 +174,7 @@ export function TriggerList() {
                     <span className="inline-flex items-center gap-1.5">
                       {t.channel === "EMAIL" ? (
                         <>
-                          <Mail className="w-3.5 h-3.5 text-[#025EB8]" /> بريد
+                          <Mail className="w-3.5 h-3.5 text-brand" /> بريد
                         </>
                       ) : (
                         <>
@@ -274,7 +274,7 @@ export function TriggerList() {
                 if (!window.confirm("إرسال التذكير فعليًا الآن للمتبرعين المستحقين؟")) return;
                 runLapsed(false);
               }}
-              className="gap-1.5 bg-[#025EB8] hover:bg-[#025EB8]/90"
+              className="gap-1.5 bg-brand hover:bg-brand/90"
             >
               {running === "send" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
               تشغيل الآن

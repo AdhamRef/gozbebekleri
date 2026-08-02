@@ -76,8 +76,8 @@ export interface ViewUserBadgeOption {
 }
 
 const ROLE_STYLE: Record<string, { label: string; cls: string }> = {
-  ADMIN: { label: "مدير", cls: "bg-[#FA5D17] text-white" },
-  STAFF: { label: "طاقم", cls: "bg-[#025EB8] text-white" },
+  ADMIN: { label: "مدير", cls: "bg-brand-orange text-white" },
+  STAFF: { label: "طاقم", cls: "bg-brand text-white" },
   DONOR: { label: "متبرع", cls: "bg-white/15 text-white" },
 };
 
@@ -236,7 +236,7 @@ function ClaritySettingsPopover({
           size="sm"
           onClick={save}
           disabled={saving || !dirty}
-          className="h-8 gap-1.5 bg-[#025EB8] hover:bg-[#025EB8]/90"
+          className="h-8 gap-1.5 bg-brand hover:bg-brand/90"
         >
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
           حفظ
@@ -259,7 +259,7 @@ function ClaritySettingsPopover({
             href={buildClarityUrl(saved)}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-[#025EB8] hover:underline"
+            className="inline-flex items-center gap-1 text-xs text-brand hover:underline"
           >
             <ExternalLink className="w-3.5 h-3.5" />
             فتح Clarity
@@ -448,7 +448,7 @@ export function ViewUserProfileDialog({
                           href={mapsUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-[#025EB8] hover:underline inline-flex items-center gap-1 min-w-0"
+                          className="text-brand hover:underline inline-flex items-center gap-1 min-w-0"
                           title="فتح في خرائط Google"
                         >
                           <span className="truncate">
@@ -481,7 +481,7 @@ export function ViewUserProfileDialog({
                         type="button"
                         onClick={copyUserId}
                         title={user.id}
-                        className="font-mono text-xs text-foreground min-w-0 flex-1 truncate text-right hover:text-[#025EB8] inline-flex items-center justify-end gap-1"
+                        className="font-mono text-xs text-foreground min-w-0 flex-1 truncate text-right hover:text-brand inline-flex items-center justify-end gap-1"
                       >
                         <span className="truncate" dir="ltr">{user.id}</span>
                         {idCopied ? (
@@ -513,7 +513,7 @@ export function ViewUserProfileDialog({
                             key={key}
                             className={cn(
                               "inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium text-white",
-                              isAction ? "bg-slate-600" : "bg-[#025EB8]"
+                              isAction ? "bg-slate-600" : "bg-brand"
                             )}
                           >
                             {row.title}
@@ -564,7 +564,7 @@ export function ViewUserProfileDialog({
                         size="icon"
                         className={cn(
                           "h-8 w-8 text-muted-foreground hover:text-foreground",
-                          user.clarityId && "text-[#025EB8]"
+                          user.clarityId && "text-brand"
                         )}
                         title={
                           user.clarityId ? "معرّف Clarity مرتبط" : "ربط معرّف Clarity (اختياري)"
@@ -599,7 +599,7 @@ export function ViewUserProfileDialog({
                   onClick={() => setSendDialog({ open: true, channel: "email" })}
                   disabled={!user.email}
                   title={!user.email ? "لا يوجد بريد إلكتروني" : undefined}
-                  className="h-8 gap-1.5 bg-[#025EB8] hover:bg-[#025EB8]/90"
+                  className="h-8 gap-1.5 bg-brand hover:bg-brand/90"
                 >
                   <Mail className="w-3.5 h-3.5" /> بريد
                 </Button>

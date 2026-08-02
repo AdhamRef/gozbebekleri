@@ -491,7 +491,7 @@ export default function ReferralAnalyticsPage() {
               <ArrowRight className="w-4 h-4" />
               العودة إلى قائمة الورابط
             </Link>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               تحليل الرابط: {referral.name || referral.code}
             </h1>
             <p className="text-muted-foreground mt-1 text-sm">
@@ -587,7 +587,7 @@ export default function ReferralAnalyticsPage() {
                   <div className="h-[400px] w-full">
                     {chartLoading ? (
                       <div className="h-full flex items-center justify-center bg-slate-50 rounded-lg">
-                        <Loader2 className="w-9 h-9 animate-spin text-[#025EB8]" />
+                        <Loader2 className="w-9 h-9 animate-spin text-brand" />
                       </div>
                     ) : chartView === "bar" ? (
                       chartMetric === "amount" ? (
@@ -796,11 +796,11 @@ export default function ReferralAnalyticsPage() {
                   <div className="flex gap-2 pt-1 border-slate-100">
                     <div className="space-y-1">
                       <label className="text-[11px] font-medium text-slate-500">من</label>
-                      <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]" />
+                      <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand" />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[11px] font-medium text-slate-500">إلى</label>
-                      <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]" />
+                      <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand" />
                     </div>
                   </div>
                 )}
@@ -1039,7 +1039,7 @@ export default function ReferralAnalyticsPage() {
                             {(d.teamSupport ?? 0) > 0 ? <span dir="ltr">{formatMoney(d.teamSupport ?? 0, d.currency, (d.totalAmount && (d.amountUSD != null)) ? ((d.teamSupport ?? 0) / d.totalAmount) * d.amountUSD : undefined)}</span> : <span className="text-slate-500">—</span>}
                           </td>
                           <td className="py-1.5 px-2">
-                            <span className={cn("inline-block px-1.5 py-px rounded-full text-[11px]", d.type === "MONTHLY" ? "bg-[#025EB8] text-white" : "bg-slate-100 text-slate-600")}>
+                            <span className={cn("inline-block px-1.5 py-px rounded-full text-[11px]", d.type === "MONTHLY" ? "bg-brand text-white" : "bg-slate-100 text-slate-600")}>
                               {d.type === "MONTHLY" ? "شهري" : "مرة واحدة"}
                             </span>
                           </td>
@@ -1066,7 +1066,7 @@ export default function ReferralAnalyticsPage() {
                                 const fullList = d.campaigns.map((c) => c.title).join(", ");
                                 return (
                                   <div className="flex items-center gap-1 max-w-[110px]">
-                                    <Link href={`/${locale}/campaign/${first.id}`} target="_blank" rel="noopener noreferrer" title={fullList} className="truncate text-slate-700 hover:text-[#025EB8] hover:underline">
+                                    <Link href={`/${locale}/campaign/${first.id}`} target="_blank" rel="noopener noreferrer" title={fullList} className="truncate text-slate-700 hover:text-brand hover:underline">
                                       {first.title}
                                     </Link>
                                     {more > 0 && <span className="shrink-0 text-[10px] text-slate-400" title={fullList}>+{more}</span>}
@@ -1080,7 +1080,7 @@ export default function ReferralAnalyticsPage() {
                                 const fullList = "فئة: " + d.categories.map((c) => c.name).join(", ");
                                 return (
                                   <div className="flex items-center gap-1 max-w-[110px]">
-                                    <Link href={`/${locale}/category/${first.id}`} target="_blank" rel="noopener noreferrer" title={fullList} className="truncate text-slate-700 hover:text-[#025EB8] hover:underline">
+                                    <Link href={`/${locale}/category/${first.id}`} target="_blank" rel="noopener noreferrer" title={fullList} className="truncate text-slate-700 hover:text-brand hover:underline">
                                       فئة: {first.name}
                                     </Link>
                                     {more > 0 && <span className="shrink-0 text-[10px] text-slate-400" title={fullList}>+{more}</span>}

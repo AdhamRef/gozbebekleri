@@ -67,16 +67,16 @@ export function ArchiveDriveLinkManageActions({ link, projects }: Props) {
         <div className="grid gap-3">
           <div className="grid gap-3 md:grid-cols-[1fr_1.1fr]">
             <Field label="المشروع">
-              <select value={projectId} onChange={(event) => setProjectId(event.target.value)} className="h-9 rounded-md border px-3 text-sm outline-none focus:border-[#025EB8]">
+              <select value={projectId} onChange={(event) => setProjectId(event.target.value)} className="h-9 rounded-md border px-3 text-sm outline-none focus:border-brand">
                 {projects.map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}
               </select>
             </Field>
             <Field label="اسم الرابط">
-              <input value={title} onChange={(event) => setTitle(event.target.value)} className="h-9 rounded-md border px-3 text-sm outline-none focus:border-[#025EB8]" />
+              <input value={title} onChange={(event) => setTitle(event.target.value)} className="h-9 rounded-md border px-3 text-sm outline-none focus:border-brand" />
             </Field>
           </div>
           <Field label="رابط الملف">
-            <input dir="ltr" value={driveUrl} onChange={(event) => setDriveUrl(event.target.value)} className="h-9 rounded-md border px-3 text-left font-mono text-sm outline-none focus:border-[#025EB8]" />
+            <input dir="ltr" value={driveUrl} onChange={(event) => setDriveUrl(event.target.value)} className="h-9 rounded-md border px-3 text-left font-mono text-sm outline-none focus:border-brand" />
           </Field>
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" onClick={saveChanges} disabled={busy} className="gap-2 font-bold">

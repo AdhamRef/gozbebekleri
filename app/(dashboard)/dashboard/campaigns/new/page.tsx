@@ -495,12 +495,12 @@ export default function NewCampaignPage() {
                       />
                       <label
                         htmlFor={`new-locale-image-${locale}`}
-                        className={`flex flex-col items-center justify-center w-56 h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#025EB8] transition-colors ${
+                        className={`flex flex-col items-center justify-center w-56 h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-brand transition-colors ${
                           isUploading ? 'opacity-50 cursor-not-allowed' : ''
                         }`}
                       >
                         {isUploading ? (
-                          <Loader2 className="w-6 h-6 animate-spin text-[#025EB8]" />
+                          <Loader2 className="w-6 h-6 animate-spin text-brand" />
                         ) : (
                           <>
                             <Upload className="w-6 h-6 text-gray-400" />
@@ -618,7 +618,7 @@ const getTranslationStatus = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-[#025EB8]" />
+        <Loader2 className="w-8 h-8 animate-spin text-brand" />
       </div>
     );
   }
@@ -629,7 +629,7 @@ const getTranslationStatus = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">إنشاء مشروع جديدة</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">إنشاء مشروع جديدة</h1>
           <p className="text-gray-600">قم بإدخال معلومات المشروع</p>
           
           {/* ✅ Translation Status Badge */}
@@ -641,7 +641,7 @@ const getTranslationStatus = () => {
             {translationStatus.hasEn && (
               <CheckCircle2 className="w-4 h-4 text-green-600" title="English ready" />
             )}
-            {translationStatus.hasFr && <CheckCircle2 className="w-4 h-4 text-[#025EB8]" title="French ready" />}
+            {translationStatus.hasFr && <CheckCircle2 className="w-4 h-4 text-brand" title="French ready" />}
             {translationStatus.hasTr && <CheckCircle2 className="w-4 h-4 text-green-600" title="Turkish ready" />}
             {translationStatus.hasId && <CheckCircle2 className="w-4 h-4 text-green-600" title="Indonesian ready" />}
             {translationStatus.hasPt && <CheckCircle2 className="w-4 h-4 text-green-600" title="Portuguese ready" />}
@@ -681,7 +681,7 @@ const getTranslationStatus = () => {
                 </TabsTrigger>
                 <TabsTrigger value="fr" className="gap-2">
                   <ReactCountryFlag countryCode="FR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Français
-                  {translationStatus.hasFr && <CheckCircle2 className="w-3 h-3 text-[#025EB8]" />}
+                  {translationStatus.hasFr && <CheckCircle2 className="w-3 h-3 text-brand" />}
                 </TabsTrigger>
                 <TabsTrigger value="tr" className="gap-2">
                   <ReactCountryFlag countryCode="TR" svg style={{width:'1em',height:'1em',verticalAlign:'middle'}} /> Türkçe
@@ -1390,10 +1390,10 @@ const getTranslationStatus = () => {
                               }}
                               className={`relative group rounded-lg cursor-move transition-all ${
                                 isMain
-                                  ? 'ring-4 ring-[#025EB8] ring-offset-2 shadow-lg'
-                                  : 'ring-1 ring-gray-200 hover:ring-[#025EB8]/40'
+                                  ? 'ring-4 ring-brand ring-offset-2 shadow-lg'
+                                  : 'ring-1 ring-gray-200 hover:ring-brand/40'
                               } ${isDragging ? 'opacity-40 scale-95' : ''} ${
-                                isDropTarget ? 'ring-4 ring-[#FA5D17] ring-offset-2' : ''
+                                isDropTarget ? 'ring-4 ring-brand-orange ring-offset-2' : ''
                               }`}
                             >
                               <img
@@ -1403,7 +1403,7 @@ const getTranslationStatus = () => {
                                 className="w-full h-32 object-cover rounded-lg pointer-events-none select-none"
                               />
                               {isMain && (
-                                <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-[#025EB8] to-[#025EB8]/0 rounded-t-lg p-2 flex items-center gap-1.5">
+                                <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-brand to-brand/0 rounded-t-lg p-2 flex items-center gap-1.5">
                                   <Star className="w-4 h-4 text-white fill-white" />
                                   <span className="text-white text-xs font-bold drop-shadow">الصورة الرئيسية</span>
                                 </div>
@@ -1423,7 +1423,7 @@ const getTranslationStatus = () => {
                                   type="button"
                                   onClick={() => reorderImages(index, 0)}
                                   title="تعيين كصورة رئيسية"
-                                  className="absolute bottom-2 left-2 px-2 py-1 bg-white text-[#025EB8] text-xs font-semibold rounded shadow opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 hover:bg-[#025EB8] hover:text-white"
+                                  className="absolute bottom-2 left-2 px-2 py-1 bg-white text-brand text-xs font-semibold rounded shadow opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 hover:bg-brand hover:text-white"
                                 >
                                   <Star className="w-3 h-3" />
                                   جعلها الرئيسية
@@ -1448,10 +1448,10 @@ const getTranslationStatus = () => {
                             />
                             <label
                               htmlFor="images"
-                              className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#025EB8] transition-colors"
+                              className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-brand transition-colors"
                             >
                               {uploadingImage ? (
-                                <Loader2 className="w-6 h-6 animate-spin text-[#025EB8]" />
+                                <Loader2 className="w-6 h-6 animate-spin text-brand" />
                               ) : (
                                 <>
                                   <Upload className="w-6 h-6 text-gray-400" />
@@ -1507,12 +1507,12 @@ const getTranslationStatus = () => {
 
           {/* ✅ Translation Summary */}
           {(translationStatus.hasEn || translationStatus.hasFr || translationStatus.hasTr || translationStatus.hasId || translationStatus.hasPt || translationStatus.hasEs) && (
-            <Card className="p-6 bg-[#025EB8]/8 border-blue-200">
+            <Card className="p-6 bg-brand/8 border-blue-200">
               <div className="flex items-start gap-3">
-                <Globe className="w-5 h-5 text-[#025EB8] mt-0.5" />
+                <Globe className="w-5 h-5 text-brand mt-0.5" />
                 <div>
-                  <h3 className="font-semibold text-[#025EB8] mb-2">ملخص الترجمات</h3>
-                  <div className="space-y-1 text-sm text-[#025EB8]">
+                  <h3 className="font-semibold text-brand mb-2">ملخص الترجمات</h3>
+                  <div className="space-y-1 text-sm text-brand">
                     <p>✓ المحتوى العربي: مكتمل (مطلوب)</p>
                     {translationStatus.hasEn && (
                       <p>✓ الترجمة الإنجليزية: مكتملة</p>
@@ -1522,12 +1522,12 @@ const getTranslationStatus = () => {
                     {translationStatus.hasId && <p>✓ الترجمة الإندونيسية: مكتملة</p>}
                     {translationStatus.hasPt && <p>✓ الترجمة البرتغالية: مكتملة</p>}
                     {translationStatus.hasEs && <p>✓ الترجمة الإسبانية: مكتملة</p>}
-                    {!translationStatus.hasEn && <p className="text-[#025EB8]">○ الترجمة الإنجليزية: غير مكتملة (اختياري)</p>}
-                    {!translationStatus.hasFr && <p className="text-[#025EB8]">○ الترجمة الفرنسية: غير مكتملة (اختياري)</p>}
-                    {!translationStatus.hasTr && <p className="text-[#025EB8]">○ الترجمة التركية: غير مكتملة (اختياري)</p>}
-                    {!translationStatus.hasId && <p className="text-[#025EB8]">○ الترجمة الإندونيسية: غير مكتملة (اختياري)</p>}
-                    {!translationStatus.hasPt && <p className="text-[#025EB8]">○ الترجمة البرتغالية: غير مكتملة (اختياري)</p>}
-                    {!translationStatus.hasEs && <p className="text-[#025EB8]">○ الترجمة الإسبانية: غير مكتملة (اختياري)</p>}
+                    {!translationStatus.hasEn && <p className="text-brand">○ الترجمة الإنجليزية: غير مكتملة (اختياري)</p>}
+                    {!translationStatus.hasFr && <p className="text-brand">○ الترجمة الفرنسية: غير مكتملة (اختياري)</p>}
+                    {!translationStatus.hasTr && <p className="text-brand">○ الترجمة التركية: غير مكتملة (اختياري)</p>}
+                    {!translationStatus.hasId && <p className="text-brand">○ الترجمة الإندونيسية: غير مكتملة (اختياري)</p>}
+                    {!translationStatus.hasPt && <p className="text-brand">○ الترجمة البرتغالية: غير مكتملة (اختياري)</p>}
+                    {!translationStatus.hasEs && <p className="text-brand">○ الترجمة الإسبانية: غير مكتملة (اختياري)</p>}
                   </div>
                 </div>
               </div>
@@ -1548,7 +1548,7 @@ const getTranslationStatus = () => {
             </Button>
             <Button
               type="submit"
-              className="bg-[#025EB8] hover:bg-[#014fa0] gap-2"
+              className="bg-brand hover:bg-brand-dark gap-2"
               disabled={saving}
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />}

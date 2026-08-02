@@ -51,7 +51,7 @@ export function ArchiveAssetTaskAction({ assetId, fileName }: Props) {
           <ClipboardList className="h-4 w-4" /> {saving ? "جاري إنشاء المهمة" : "إنشاء مهمة"}
         </Button>
         {feedback?.tone === "success" ? (
-          <Link href="/dashboard/operations/tasks" className="inline-flex items-center gap-1 text-xs font-bold text-[#025EB8] hover:underline">
+          <Link href="/dashboard/operations/tasks" className="inline-flex items-center gap-1 text-xs font-bold text-brand hover:underline">
             فتح مهام الفريق <ExternalLink className="h-3.5 w-3.5" />
           </Link>
         ) : null}

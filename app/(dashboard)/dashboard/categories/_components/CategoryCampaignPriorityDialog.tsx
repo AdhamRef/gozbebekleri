@@ -174,7 +174,7 @@ export const CategoryCampaignPriorityDialog = ({
       <DialogContent className="max-w-md" dir="rtl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Crown className="w-5 h-5 text-[#025EB8]" />
+            <Crown className="w-5 h-5 text-brand" />
             أولويات المشاريع — {categoryName}
           </DialogTitle>
         </DialogHeader>

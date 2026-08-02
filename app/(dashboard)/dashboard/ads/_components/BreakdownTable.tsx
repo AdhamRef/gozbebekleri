@@ -244,7 +244,7 @@ export function BreakdownTable({ filterQs, dimension, entityHeader, emptyHint }:
         value={searchInput}
         onChange={(e) => setSearchInput(e.target.value)}
         placeholder={`ابحث في ${entityHeader}…`}
-        className="w-full h-9 pr-8 pl-8 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
+        className="w-full h-9 pr-8 pl-8 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
       />
       {searchInput && (
         <button
@@ -275,10 +275,10 @@ export function BreakdownTable({ filterQs, dimension, entityHeader, emptyHint }:
       <button
         type="button"
         onClick={() => toggleSort(k)}
-        className="inline-flex items-center gap-1 hover:text-[#025EB8]"
+        className="inline-flex items-center gap-1 hover:text-brand"
       >
         {children}
-        <ArrowUpDown className={cn("w-3 h-3", sortKey === k ? "text-[#025EB8]" : "text-slate-400")} />
+        <ArrowUpDown className={cn("w-3 h-3", sortKey === k ? "text-brand" : "text-slate-400")} />
       </button>
     </th>
   );

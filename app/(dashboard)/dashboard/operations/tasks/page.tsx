@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Clock3, ListChecks, PlusCircle, Sparkles, UserRound } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { OperationTaskActions } from "@/components/dashboard/operations/OperationTaskActions";
@@ -49,20 +50,19 @@ export default async function OperationsTasksPage() {
   const canMutateTasks = isDbBacked && !overview.persistence.readOnly;
 
   return (
-    <div className="space-y-5 p-4 sm:p-6" dir="rtl">
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <p className="text-xs font-bold text-[#025EB8]">المحتوى والتشغيل / مهام المحتوى</p>
-          <h1 className="mt-1 text-xl font-black text-slate-900">مهام المحتوى</h1>
-          <p className="mt-1.5 max-w-3xl text-sm leading-6 text-slate-600">
-            حوّل الأفكار والحملات إلى مهام واضحة قابلة للمتابعة.
-          </p>
-        </div>
-        <Link href="/dashboard/operations/calendar" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-[#025EB8]/50 hover:text-[#025EB8]">
-          فتح التقويم والتنبيهات
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-      </div>
+    <div className="space-y-5" dir="rtl">
+      <PageHeader
+        eyebrow="المحتوى والتشغيل / مهام المحتوى"
+        title="مهام المحتوى"
+        description="حوّل الأفكار والحملات إلى مهام واضحة قابلة للمتابعة."
+        icon={ListChecks}
+        actions={
+          <Link href="/dashboard/operations/calendar" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-brand/50 hover:text-brand">
+            فتح التقويم والتنبيهات
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
         <Card><CardHeader><CardDescription>إجمالي المهام</CardDescription><CardTitle className="text-3xl">{overview.summary.totalTasks}</CardTitle></CardHeader></Card>
@@ -75,7 +75,7 @@ export default async function OperationsTasksPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><PlusCircle className="h-5 w-5 text-[#025EB8]" /> إنشاء مهمة</CardTitle>
+          <CardTitle className="flex items-center gap-2"><PlusCircle className="h-5 w-5 text-brand" /> إنشاء مهمة</CardTitle>
           <CardDescription className="leading-6">
             أضف مهمة يدوية للفريق بدون إرسال أونشر تلقائي.
           </CardDescription>
@@ -87,7 +87,7 @@ export default async function OperationsTasksPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><ListChecks className="h-5 w-5 text-[#025EB8]" /> قائمة مهام المحتوى</CardTitle>
+          <CardTitle className="flex items-center gap-2"><ListChecks className="h-5 w-5 text-brand" /> قائمة مهام المحتوى</CardTitle>
           <CardDescription>
             {isDbBacked
               ? "متابعة مهام الفريق مع تحديث الحالة والتعديل السريع من الواجهة."
@@ -109,29 +109,29 @@ export default async function OperationsTasksPage() {
               </div>
 
               <div className="mt-4 grid gap-2 text-sm text-slate-600 md:grid-cols-3">
-                <span className="flex items-center gap-2"><UserRound className="h-4 w-4 text-[#025EB8]" /> {task.assignee}</span>
-                <span className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-[#025EB8]" /> {task.dueLabel}</span>
-                <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#025EB8]" /> {task.progress}%</span>
+                <span className="flex items-center gap-2"><UserRound className="h-4 w-4 text-brand" /> {task.assignee}</span>
+                <span className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-brand" /> {task.dueLabel}</span>
+                <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-brand" /> {task.progress}%</span>
               </div>
 
               <div className="mt-4 h-2 overflow-hidden rounded-full bg-white">
-                <div className="h-full rounded-full bg-[#025EB8]" style={{ width: `${task.progress}%` }} />
+                <div className="h-full rounded-full bg-brand" style={{ width: `${task.progress}%` }} />
               </div>
 
               <OperationTaskActions taskId={task.id} status={task.status} canMutate={canMutateTasks} />
               <OperationTaskQuickEdit taskId={task.id} title={task.title} priority={task.priority} dueLabel={task.dueLabel} canMutate={canMutateTasks} />
 
               <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-slate-200 pt-3 text-xs font-bold">
-                <Link href="/dashboard/archive/assets" className="text-[#025EB8] underline-offset-4 hover:underline">اختيار ملفات من الأرشيف</Link>
+                <Link href="/dashboard/archive/assets" className="text-brand underline-offset-4 hover:underline">اختيار ملفات من الأرشيف</Link>
               </div>
             </div>
           ))}
         </CardContent>
       </Card>
 
-      <Card className="border-[#025EB8]/20 bg-blue-50/60">
+      <Card className="border-brand/20 bg-blue-50/60">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-[#025EB8]" /> القادم</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-brand" /> القادم</CardTitle>
           <CardDescription className="leading-6">
             المهام تقبل الإنشاء والتعديل السريع والانتقالات اليومية. قريبًا: ربط المهام مباشرة بعناصر المحتوى ومواد الأرشيف.
           </CardDescription>

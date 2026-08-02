@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Clock, Tags, Megaphone, ShieldAlert, FileText, Image as ImageIcon, Video, File as FileIcon } from "lucide-react";
+import { EmptyState } from "@/components/dashboard/EmptyState";
 import type { ArchiveAsset, ArchiveProject, ArchiveSnapshot } from "@/lib/archive/archive-types";
 import { ArchiveAssetUseInContent } from "./ArchiveAssetUseInContent";
 
@@ -82,7 +83,7 @@ export function ArchiveDailyWork({ snapshot, work = "latest" }: { snapshot: Arch
             <Link
               key={key}
               href={href(key)}
-              className={`rounded-xl border bg-white p-4 shadow-sm transition hover:border-[#025EB8]/50 ${isActive ? "border-[#025EB8] ring-1 ring-[#025EB8]/30" : "border-slate-200"}`}
+              className={`rounded-xl border bg-white p-4 shadow-sm transition hover:border-brand/50 ${isActive ? "border-brand ring-1 ring-brand/30" : "border-slate-200"}`}
             >
               <div className="flex items-center justify-between gap-2">
                 <span className={`text-xs font-bold text-slate-500`}>{meta.label}</span>
@@ -102,16 +103,21 @@ export function ArchiveDailyWork({ snapshot, work = "latest" }: { snapshot: Arch
             <h2 className="text-base font-black text-slate-950">{activeMeta.label}</h2>
             <p className="mt-0.5 text-xs text-slate-500">{activeMeta.caption}</p>
           </div>
-          <Link href="/dashboard/archive/marketing-picks" className="text-xs font-bold text-[#025EB8] hover:underline">مختارات التسويق</Link>
+          <Link href="/dashboard/archive/marketing-picks" className="text-xs font-bold text-brand hover:underline">مختارات التسويق</Link>
         </div>
 
         {active.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="text-sm text-slate-500">لا توجد ملفات في هذه القائمة بعد.</p>
-            <div className="mt-3 flex flex-wrap justify-center gap-2">
-              <Link href="/dashboard/archive/marketing-files" className="inline-flex h-9 items-center rounded-md bg-[#025EB8] px-4 text-xs font-bold text-white hover:bg-[#024a92]">رفع ملف</Link>
-            </div>
-          </div>
+          <EmptyState
+            variant="inline"
+            icon={FileText}
+            title="لا توجد ملفات في هذه القائمة بعد"
+            description="ارفع ملفًا ليظهر ضمن عمل اليوم."
+            action={
+              // Was "/dashboard/archive/marketing-files", which next.config.ts redirects to
+              // this same URL — one wasted hop. Points at the canonical destination now.
+              <Link href="/dashboard/archive/assets?category=MARKETING" className="inline-flex h-9 items-center rounded-md bg-brand px-4 text-xs font-bold text-white hover:bg-brand-dark">رفع ملف</Link>
+            }
+          />
         ) : (
           <ul className="divide-y">
             {active.map((asset) => {
@@ -157,7 +163,7 @@ export function ArchiveDailyWork({ snapshot, work = "latest" }: { snapshot: Arch
                           <span>تأثير: {asset.emotionScore}</span>
                           {asset.tags.length ? <span>وسوم: {asset.tags.join("، ")}</span> : null}
                         </div>
-                        {asset.webViewLink ? <a href={asset.webViewLink} target="_blank" rel="noreferrer" className="font-bold text-[#025EB8] hover:underline">فتح الملف الأصلي</a> : null}
+                        {asset.webViewLink ? <a href={asset.webViewLink} target="_blank" rel="noreferrer" className="font-bold text-brand hover:underline">فتح الملف الأصلي</a> : null}
                       </div>
                     </details>
                   </div>
@@ -184,10 +190,10 @@ export function ArchiveDailyWork({ snapshot, work = "latest" }: { snapshot: Arch
 export function ArchivePrimaryCtas(): ReactNode {
   return (
     <div className="flex flex-wrap gap-2">
-      <Link href="/dashboard/archive/marketing-files" className="inline-flex h-9 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#024a92]">
+      <Link href="/dashboard/archive/marketing-files" className="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white shadow-sm transition hover:bg-brand-700">
         رفع ملف
       </Link>
-      <Link href="/dashboard/archive?work=latest#new-collection" className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 transition hover:border-[#025EB8] hover:text-[#025EB8]">
+      <Link href="/dashboard/archive?work=latest#new-collection" className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 transition hover:border-brand hover:text-brand">
         إنشاء مجموعة
       </Link>
     </div>

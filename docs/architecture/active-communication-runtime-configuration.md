@@ -20,9 +20,10 @@ The main functions are:
 
 - `getActiveMetaWhatsappRuntimeConfig()`
 - `getActiveMetaWebhookConfig()`
-- `getActiveBrevoEmailRuntimeConfig()`
+- `getActiveElasticEmailRuntimeConfig()`
 - `getActiveBrevoSmsRuntimeConfig()`
 - `getActiveBrevoWebhookSecret()`
+- `getActiveElasticEmailWebhookSecret()`
 - `getActiveNetgsmRuntimeConfig()`
 - `getActiveCommunicationRuntimeBundle()`
 
@@ -32,7 +33,7 @@ Each result contains internal readiness, enabled state, safe failure reason, fie
 
 The provider `enabled` flag blocks new outbound sends with `PROVIDER_DISABLED`. It does not trigger a legacy fallback.
 
-Meta and Brevo webhooks deliberately resolve approved active verification secrets even while outbound sending is disabled. Delivery, read, open, click, and failure events for messages accepted before the provider was disabled must continue to update existing delivery records. Removing or rotating a webhook secret is the explicit way to stop webhook verification.
+Meta, Elastic Email, and Brevo webhooks deliberately resolve approved active verification secrets even while outbound sending is disabled. Delivery, read, open, click, and failure events for messages accepted before the provider was disabled must continue to update existing delivery records. Removing or rotating a webhook secret is the explicit way to stop webhook verification.
 
 ## Failure boundaries
 
@@ -56,9 +57,9 @@ The resolver also has an in-memory cache capped at **30 seconds**. Vercel server
 
 Active runtime values include Access Token, App Secret, Webhook Verify Token, Business Account ID, Default Phone Number ID, and Graph API Version. A sender-specific Phone Number ID takes precedence; the approved default is used only when no sender-specific ID exists. Existing template-only automatic-send rules remain unchanged.
 
-### Brevo Email
+### Elastic Email
 
-The approved API key and default sender identity are used. A sender selected inside the Communication Center may override the default sender identity. There is no SendGrid fallback.
+The approved API key and default sender identity are used for every outbound email. A sender selected inside the Communication Center may override the default sender identity. Elastic Email is the only email path — there is no SendGrid and no Brevo email fallback.
 
 ### Brevo SMS
 

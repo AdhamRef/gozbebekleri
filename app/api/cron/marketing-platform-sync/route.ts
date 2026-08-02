@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runSyncJob, type PlatformSelector } from "@/lib/marketing/sync";
+import { isCronAuthorizationValid } from "@/lib/communication/cron-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +20,9 @@ function rangeForLastDays(days: number) {
 }
 
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  // Fails CLOSED — see lib/communication/cron-auth.ts. The previous form ran unauthenticated
+  // whenever CRON_SECRET was unset.
+  if (!isCronAuthorizationValid(request.headers.get("authorization"))) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 

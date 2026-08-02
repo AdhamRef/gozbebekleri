@@ -135,7 +135,7 @@ export function TriggerEditorDialog({ open, onOpenChange }: Props) {
                 <p className="text-[11px] text-slate-500 leading-relaxed">
                   {eventDef.description}
                   {eventDef.hasDonation && (
-                    <span className="block mt-0.5 text-[#025EB8]">
+                    <span className="block mt-0.5 text-brand">
                       ✓ متاح لهذا الحدث متغيّرات{" "}
                       <code className="font-mono">{"{{donation.*}}"}</code> و{" "}
                       <code className="font-mono">{"{{#donation.items}}"}</code>
@@ -223,7 +223,7 @@ export function TriggerEditorDialog({ open, onOpenChange }: Props) {
               <Button
                 onClick={save}
                 disabled={saving || !event || !templateId || !timingValid}
-                className="bg-[#025EB8] hover:bg-[#025EB8]/90"
+                className="bg-brand hover:bg-brand/90"
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin me-2" />}
                 حفظ

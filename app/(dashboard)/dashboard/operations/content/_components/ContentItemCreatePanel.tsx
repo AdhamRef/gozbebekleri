@@ -96,11 +96,11 @@ export function ContentItemCreatePanel() {
     <section className="rounded-2xl border bg-white p-4 shadow-sm" aria-label="إنشاء عنصر محتوى">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-bold text-[#025EB8]">إضافة محتوى</p>
+          <p className="text-xs font-bold text-brand">إضافة محتوى</p>
           <h2 className="mt-1 text-lg font-black text-slate-950">عنصر محتوى جديد</h2>
           <p className="mt-1 text-sm leading-6 text-slate-500">سجل فكرة أو مادة مطلوبة بكل تفاصيلها حتى تظهر داخل مراحل الإنتاج والمتابعة.</p>
         </div>
-        <PlusCircle className="hidden h-8 w-8 text-[#025EB8] sm:block" aria-hidden="true" />
+        <PlusCircle className="hidden h-8 w-8 text-brand sm:block" aria-hidden="true" />
       </div>
 
       <form onSubmit={submit} className="mt-4 space-y-3">
@@ -129,7 +129,7 @@ export function ContentItemCreatePanel() {
           <Input value={details.driveUrl} onChange={(event) => setDetails((value) => ({ ...value, driveUrl: event.target.value }))} placeholder="رابط Drive" aria-label="رابط Drive" />
           <Input value={details.videoUrl} onChange={(event) => setDetails((value) => ({ ...value, videoUrl: event.target.value }))} placeholder="رابط الفيديو" aria-label="رابط الفيديو" />
           <Input value={details.finalAssetUrl} onChange={(event) => setDetails((value) => ({ ...value, finalAssetUrl: event.target.value }))} placeholder="رابط النسخة النهائية" aria-label="رابط النسخة النهائية" />
-          <textarea value={details.copy} onChange={(event) => setDetails((value) => ({ ...value, copy: event.target.value }))} placeholder="النص أو ملاحظات الإنتاج" className="min-h-20 rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-[#025EB8] md:col-span-2 xl:col-span-3" aria-label="النص" />
+          <textarea value={details.copy} onChange={(event) => setDetails((value) => ({ ...value, copy: event.target.value }))} placeholder="النص أو ملاحظات الإنتاج" className="min-h-20 rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-brand md:col-span-2 xl:col-span-3" aria-label="النص" />
         </div>
       </form>
 

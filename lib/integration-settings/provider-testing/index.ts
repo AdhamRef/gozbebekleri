@@ -116,14 +116,69 @@ export class MetaWhatsAppConnectionTester implements IntegrationProviderTester {
   }
 }
 
+/** Elastic Email (REST API v4) — the only email provider. Verifies the key without sending mail. */
+export class ElasticEmailConnectionTester implements IntegrationProviderTester {
+  constructor(private readonly fetchImpl: ProviderFetch = fetch) {}
+
+  async test(input: ProviderConnectionTestInput): Promise<ProviderConnectionTestResult> {
+    const key = input.values.API_KEY;
+    const senderEmail = input.values.SENDER_EMAIL?.trim().toLowerCase();
+    if (!key || !senderEmail) return failed("بيانات Elastic Email المطلوبة غير مكتملة.", "ELASTIC_EMAIL_CONFIGURATION_INCOMPLETE");
+
+    try {
+      validateIntegrationSettingValue("ELASTIC_EMAIL", "SENDER_EMAIL", senderEmail);
+    } catch {
+      return failed("بريد المرسل غير صالح محليًا.", "ELASTIC_EMAIL_SENDER_INVALID");
+    }
+    const senderDomain = senderEmail.split("@")[1] ?? "";
+
+    try {
+      const domains = await providerFetch(this.fetchImpl, "https://api.elasticemail.com/v4/domains", {
+        method: "GET",
+        headers: { "X-ElasticEmail-ApiKey": key, accept: "application/json" },
+      });
+
+      if (domains.status === 401) return failed("مفتاح Elastic Email غير صالح أو انتهت صلاحيته.", "ELASTIC_EMAIL_UNAUTHORIZED");
+
+      // A send-scoped key may not be allowed to list domains (403) and older accounts may not expose
+      // the endpoint at all (404/405). The key still works for sending, so treat those as "connected
+      // but domain unverified" instead of a false failure.
+      if (!domains.ok) {
+        if (domains.status === 403 || domains.status === 404 || domains.status === 405) {
+          return connected("تم قبول مفتاح Elastic Email. صلاحيات المفتاح لا تسمح بقراءة النطاقات، لذا لم يتم التحقق من توثيق نطاق المرسل تلقائيًا.");
+        }
+        return failed("تعذر الوصول إلى حساب Elastic Email.", "ELASTIC_EMAIL_ACCOUNT_UNAVAILABLE");
+      }
+
+      const rows = Array.isArray(domains.body) ? domains.body : arrayFrom(domains.body, "Data");
+      const matched = rows.some((item) => {
+        if (!item || typeof item !== "object") return false;
+        const row = item as Record<string, unknown>;
+        const name = row.Domain ?? row.domain;
+        return typeof name === "string" && name.trim().toLowerCase() === senderDomain;
+      });
+      if (!matched) return failed("نطاق بريد المرسل غير موجود ضمن نطاقات Elastic Email الموثّقة.", "ELASTIC_EMAIL_SENDER_DOMAIN_NOT_VERIFIED");
+
+      return connected("تم التحقق من مفتاح Elastic Email ومن توثيق نطاق بريد المرسل دون إرسال أي رسالة.");
+    } catch {
+      return failed("تعذر الاتصال بخدمة Elastic Email حاليًا.", "ELASTIC_EMAIL_REQUEST_FAILED");
+    }
+  }
+}
+
+/** Brevo — international (non-Turkish) SMS only. Email moved to Elastic Email. */
 export class BrevoConnectionTester implements IntegrationProviderTester {
   constructor(private readonly fetchImpl: ProviderFetch = fetch) {}
 
   async test(input: ProviderConnectionTestInput): Promise<ProviderConnectionTestResult> {
     const key = input.values.API_KEY;
-    const senderEmail = input.values.EMAIL_SENDER_EMAIL?.toLowerCase();
-    if (!key || !senderEmail || !input.values.SMS_SENDER) {
-      return failed("بيانات Brevo المطلوبة غير مكتملة.", "BREVO_CONFIGURATION_INCOMPLETE");
+    const smsSender = input.values.SMS_SENDER;
+    if (!key || !smsSender) return failed("بيانات Brevo المطلوبة غير مكتملة.", "BREVO_CONFIGURATION_INCOMPLETE");
+
+    try {
+      validateIntegrationSettingValue("BREVO", "SMS_SENDER", smsSender);
+    } catch {
+      return failed("اسم مرسل SMS غير صالح محليًا.", "BREVO_SMS_SENDER_INVALID");
     }
 
     try {
@@ -133,19 +188,7 @@ export class BrevoConnectionTester implements IntegrationProviderTester {
       });
       if (!account.ok) return failed("تعذر الوصول إلى حساب Brevo.", account.status === 401 ? "BREVO_UNAUTHORIZED" : "BREVO_ACCOUNT_UNAVAILABLE");
 
-      const senders = await providerFetch(this.fetchImpl, "https://api.brevo.com/v3/senders", {
-        method: "GET",
-        headers: apiKey(key),
-      });
-      if (!senders.ok) return failed("تعذر التحقق من مرسلي البريد في Brevo.", "BREVO_SENDERS_UNAVAILABLE");
-      const verified = arrayFrom(senders.body, "senders").some((item) => {
-        if (!item || typeof item !== "object") return false;
-        const row = item as Record<string, unknown>;
-        return typeof row.email === "string" && row.email.toLowerCase() === senderEmail && row.active !== false;
-      });
-      if (!verified) return failed("بريد المرسل غير موجود أو غير مفعل في Brevo.", "BREVO_EMAIL_SENDER_NOT_VERIFIED");
-
-      return connected("تم التحقق من حساب Brevo ومرسل البريد بنجاح، وتمت مراجعة إعداد مرسل SMS دون إرسال رسالة.");
+      return connected("تم التحقق من حساب Brevo ومن إعداد مرسل SMS الدولي دون إرسال رسالة.");
     } catch {
       return failed("تعذر الاتصال بخدمة Brevo حاليًا.", "BREVO_REQUEST_FAILED");
     }
@@ -206,6 +249,7 @@ export class IntegrationProviderTesterRegistry implements IntegrationProviderTes
   constructor(fetchImpl: ProviderFetch = fetch) {
     this.testers = {
       META_WHATSAPP: new MetaWhatsAppConnectionTester(fetchImpl),
+      ELASTIC_EMAIL: new ElasticEmailConnectionTester(fetchImpl),
       BREVO: new BrevoConnectionTester(fetchImpl),
       NETGSM: new NetgsmConnectionTester(fetchImpl),
       SYSTEM: new SystemCronConnectionTester(),

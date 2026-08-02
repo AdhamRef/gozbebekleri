@@ -1,7 +1,7 @@
 import "server-only";
 import { createDeliveryRecord, markDeliveryStatus } from "./delivery-log-service";
-import { getActiveBrevoEmailRuntimeConfig, type BrevoEmailRuntimeValues, type ActiveRuntimeConfig } from "./runtime-config";
-import { sendEmailMessage } from "./providers/email/client";
+import { getActiveElasticEmailRuntimeConfig, type ElasticEmailRuntimeValues, type ActiveRuntimeConfig } from "./runtime-config";
+import { sendEmailMessage, EMAIL_PROVIDER_ID } from "./providers/email/client";
 
 export type ArchivedEmailInput = {
   to: string;
@@ -22,10 +22,10 @@ export type ArchivedEmailResult =
   | { ok: true; deliveryId: string; providerMessageId: string | null }
   | { ok: false; reason: string; deliveryId?: string };
 
-export async function sendArchivedEmail(input: ArchivedEmailInput, runtime?: ActiveRuntimeConfig<BrevoEmailRuntimeValues>): Promise<ArchivedEmailResult> {
+export async function sendArchivedEmail(input: ArchivedEmailInput, runtime?: ActiveRuntimeConfig<ElasticEmailRuntimeValues>): Promise<ArchivedEmailResult> {
   const created = await createDeliveryRecord({
     channel: "EMAIL",
-    provider: "BREVO_EMAIL",
+    provider: EMAIL_PROVIDER_ID,
     recipientEmail: input.to,
     recipientUserId: input.recipientUserId ?? null,
     recipientName: input.recipientName ?? null,
@@ -41,7 +41,7 @@ export async function sendArchivedEmail(input: ArchivedEmailInput, runtime?: Act
   });
   if (!created.ok) return { ok: false, reason: "ARCHIVE_FAILED" };
   const deliveryId = created.data.id;
-  const config = runtime ?? await getActiveBrevoEmailRuntimeConfig();
+  const config = runtime ?? await getActiveElasticEmailRuntimeConfig();
   const result = await sendEmailMessage({ to: input.to, subject: input.subject, html: input.html, text: input.text }, config);
   if (!result.ok) {
     const terminal = result.reason.endsWith("_NOT_CONFIGURED") || result.reason === "PROVIDER_DISABLED" || result.reason === "INTEGRATION_DECRYPTION_FAILED" || result.reason === "INTEGRATION_DATABASE_UNAVAILABLE";

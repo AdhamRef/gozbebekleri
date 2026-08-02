@@ -130,7 +130,7 @@ export function DonorAttributionJourney({ donorId }: { donorId: string }) {
 
   return (
     <div className="space-y-3">
-      <div className="rounded-lg border border-border bg-gradient-to-l from-[#025EB8]/5 to-white p-4">
+      <div className="rounded-lg border border-border bg-gradient-to-l from-brand/5 to-white p-4">
         <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2 mb-2">
           <Megaphone className="w-4 h-4" /> مصدر الاكتساب الأول
         </h3>
@@ -185,7 +185,7 @@ export function DonorAttributionJourney({ donorId }: { donorId: string }) {
                 {formatIstanbulShort(j.paidAt ?? j.createdAt)}
               </span>
               {j.type === "MONTHLY" ? (
-                <span className="text-[10px] px-1.5 py-px rounded-full bg-[#025EB8]/10 text-[#025EB8] whitespace-nowrap">
+                <span className="text-[10px] px-1.5 py-px rounded-full bg-brand/10 text-brand whitespace-nowrap">
                   شهري
                 </span>
               ) : null}

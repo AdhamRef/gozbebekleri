@@ -31,7 +31,7 @@ export interface TriggerSendConfig {
 export async function resolveTriggerSendConfig(): Promise<TriggerSendConfig> {
   const [senders, runtime] = await Promise.all([listSenders().catch(() => []), getActiveCommunicationRuntimeBundle()]);
   const emailSenderRow = senders.find((sender) => sender.channel === "EMAIL" && sender.enabled)?.senderEmail ?? null;
-  const emailIdentity = emailSenderRow || (runtime.brevoEmail.configured ? runtime.brevoEmail.values.senderEmail : null);
+  const emailIdentity = emailSenderRow || (runtime.elasticEmail.configured ? runtime.elasticEmail.values.senderEmail : null);
   const metaSenderRow = senders.find((sender) => sender.channel === "WHATSAPP" && sender.enabled && sender.phoneNumberId);
   const whatsappSender = metaSenderRow
     ? { id: metaSenderRow.id, phoneNumberId: metaSenderRow.phoneNumberId }

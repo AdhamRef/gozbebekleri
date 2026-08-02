@@ -81,7 +81,7 @@ export function ArchiveProjectOptionsPanel() {
     <section className="rounded-xl border bg-white shadow-sm">
       <div className="border-b p-4">
         <div className="flex items-center gap-2">
-          <Settings2 className="h-4 w-4 text-[#025EB8]" />
+          <Settings2 className="h-4 w-4 text-brand" />
           <h2 className="text-base font-black text-slate-950">إعدادات خيارات المشاريع</h2>
         </div>
         <p className="mt-1 text-xs leading-5 text-slate-600">أضف القيم التي تريد ظهورها في نماذج إضافة وتعديل المشاريع لكل أعضاء الفريق.</p>
@@ -103,7 +103,7 @@ export function ArchiveProjectOptionsPanel() {
                 }}
                 placeholder={group.placeholder}
                 disabled={Boolean(savingKey)}
-                className="h-8 min-w-0 flex-1 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-[#025EB8] disabled:opacity-60"
+                className="h-8 min-w-0 flex-1 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-brand disabled:opacity-60"
               />
               <Button type="button" size="sm" onClick={() => addOption(group.key)} disabled={Boolean(savingKey)} className="h-8 px-2">
                 {savingKey === group.key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}

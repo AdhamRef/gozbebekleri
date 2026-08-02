@@ -54,14 +54,14 @@ export function ArchiveProjectOptionsSettings() {
       <section className="rounded-2xl border bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs font-black text-[#025EB8]">الأرشيف</p>
-            <h1 className="mt-2 text-2xl font-black sm:text-3xl">إعدادات خيارات المشاريع</h1>
+            <p className="text-xs font-black text-brand">الأرشيف</p>
+            <h1 className="mt-2 text-xl sm:text-2xl font-bold tracking-tight">إعدادات خيارات المشاريع</h1>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
               هنا يتم تنظيم القوائم التي تظهر عند إضافة أو تعديل مشروع داخل الأرشيف، مثل السنوات والمدن والتصنيفات.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href="/dashboard/archive" className="inline-flex h-9 items-center rounded-md border bg-white px-3 text-sm font-bold text-slate-800 hover:border-[#025EB8] hover:text-[#025EB8]">
+            <Link href="/dashboard/archive" className="inline-flex h-9 items-center rounded-md border bg-white px-3 text-sm font-bold text-slate-800 hover:border-brand hover:text-brand">
               الرجوع للأرشيف
             </Link>
             <Button type="button" variant="outline" onClick={reset} disabled={saving} className="h-9 gap-2 font-bold">
@@ -83,7 +83,7 @@ export function ArchiveProjectOptionsSettings() {
                 <p className="text-xs font-bold text-slate-500">{item.title}</p>
                 <p className="mt-1 text-2xl font-black text-slate-950">{item.count}</p>
               </div>
-              <Settings2 className="h-5 w-5 text-[#025EB8]" />
+              <Settings2 className="h-5 w-5 text-brand" />
             </div>
           </div>
         ))}
@@ -102,7 +102,7 @@ export function ArchiveProjectOptionsSettings() {
             <textarea
               value={draft[field.key].join("\n")}
               onChange={(event) => setDraft((current) => ({ ...current, [field.key]: splitLines(event.target.value) }))}
-              className="mt-3 min-h-40 w-full rounded-lg border bg-slate-50 px-3 py-2 text-sm leading-7 text-slate-900 outline-none focus:border-[#025EB8]"
+              className="mt-3 min-h-40 w-full rounded-lg border bg-slate-50 px-3 py-2 text-sm leading-7 text-slate-900 outline-none focus:border-brand"
             />
           </label>
         ))}

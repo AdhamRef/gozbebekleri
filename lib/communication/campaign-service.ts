@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
 import type { CommunicationCampaign, Prisma } from "@prisma/client";
 import { isCommunicationChannel, type CommunicationChannelId, type CampaignStatusId } from "./communication-runtime-types";
+import { safeCountValue } from "@/lib/dashboard/safe-count";
 
 /**
  * CampaignService — CRUD + status transitions for CommunicationCampaign. This package
@@ -277,7 +278,7 @@ export async function deleteDraftCampaign(id: string, actor?: Actor): Promise<Se
     if (!current) return { ok: false, status: 404, error: "Campaign not found." };
     if (current.status !== "DRAFT") return { ok: false, status: 409, error: "لا يمكن حذف إلا المسودات." };
 
-    const deliveries = await prisma.communicationDelivery.count({ where: { campaignId: id } }).catch(() => 0);
+    const deliveries = await safeCountValue("campaign.deliveries", () => prisma.communicationDelivery.count({ where: { campaignId: id } }));
     if (deliveries > 0) {
       await prisma.communicationCampaign.update({ where: { id }, data: { status: "ARCHIVED" } });
       await auditCampaign(actor ?? null, "communication.campaign.archive", `أرشفة مسودة لها سجلات: ${current.name}`, `Archived draft with deliveries: ${current.name}`, id, { reason: "HAS_DELIVERIES", deliveries });

@@ -14,6 +14,10 @@ import {
 } from '@/lib/audit-log';
 import Stripe from 'stripe';
 import { dispatchDonationPaid } from "@/lib/events/dispatch";
+import {
+  recomputeCampaignCurrentAmount as sharedRecomputeCampaign,
+  recomputeCategoryCurrentAmount as sharedRecomputeCategory,
+} from "@/lib/campaign/current-amount";
 
 const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-03-25.dahlia' })
@@ -376,46 +380,19 @@ async function recomputeCampaignCurrentAmount(
   tx: Prisma.TransactionClient,
   campaignId: string
 ) {
-  // Strict filter: only count donations that actually settled with paidAt.
-  // Subscription pending rows show up as ناجح in dashboards but don't
-  // contribute here — the webhook still owns incrementing currentAmount when
-  // the gateway confirms, so double-counting them would corrupt the total.
-  const rows = await tx.donationItem.findMany({
-    where: {
-      campaignId,
-      donation: { status: "PAID", paidAt: { not: null } },
-    },
-    select: { amount: true, amountUSD: true },
-  });
-  const currentAmount = rows.reduce(
-    (sum, row) => sum + (row.amountUSD ?? row.amount),
-    0
-  );
-  await tx.campaign.update({
-    where: { id: campaignId },
-    data: { currentAmount },
-  });
+  // Delegates to lib/campaign/current-amount.ts so the campaign's manually-entered
+  // `baselineAmount` (offline/legacy donations) is added back. This used to be an absolute
+  // overwrite from donation rows only, which meant editing or deleting ONE donation wiped
+  // the entire offline baseline off a campaign permanently.
+  await sharedRecomputeCampaign(tx, campaignId);
 }
 
 async function recomputeCategoryCurrentAmount(
   tx: Prisma.TransactionClient,
   categoryId: string
 ) {
-  const rows = await tx.donationCategoryItem.findMany({
-    where: {
-      categoryId,
-      donation: { status: "PAID", paidAt: { not: null } },
-    },
-    select: { amount: true, amountUSD: true },
-  });
-  const currentAmount = rows.reduce(
-    (sum, row) => sum + (row.amountUSD ?? row.amount),
-    0
-  );
-  await tx.category.update({
-    where: { id: categoryId },
-    data: { currentAmount },
-  });
+  // Same baseline-preserving delegation as recomputeCampaignCurrentAmount above.
+  await sharedRecomputeCategory(tx, categoryId);
 }
 
 // DELETE /api/donations/[id]

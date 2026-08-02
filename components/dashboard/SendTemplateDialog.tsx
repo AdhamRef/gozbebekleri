@@ -158,7 +158,7 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
         dir="rtl"
       >
         <DialogTitle className="text-lg font-bold mb-1 flex items-center gap-2">
-          <Icon className="w-5 h-5 text-[#025EB8]" />
+          <Icon className="w-5 h-5 text-brand" />
           إرسال {channelLabelAr}
         </DialogTitle>
         <p className="text-sm text-muted-foreground mb-4">
@@ -176,7 +176,7 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
             <Link
               href="/dashboard/operations/communication"
               onClick={() => onOpenChange(false)}
-              className="font-bold text-[#025EB8] underline-offset-4 hover:underline"
+              className="font-bold text-brand underline-offset-4 hover:underline"
             >
               فتح مركز التواصل
             </Link>
@@ -276,7 +276,7 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
               <Link
                 href="/dashboard/operations/communication/campaigns"
                 onClick={() => onOpenChange(false)}
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-[#025EB8] px-4 py-2 text-sm font-bold text-white hover:bg-[#024a92]"
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-bold text-white hover:bg-brand-700"
               >
                 <Send className="w-4 h-4" />
                 فتح مركز التواصل
@@ -285,7 +285,7 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
               <Button
                 onClick={send}
                 disabled={sending || !selectedTemplateId || (target.kind === "filtered" && recipientCount === 0)}
-                className="bg-[#025EB8] hover:bg-[#025EB8]/90"
+                className="bg-brand hover:bg-brand/90"
               >
                 {sending ? (
                   <Loader2 className="w-4 h-4 animate-spin me-2" />

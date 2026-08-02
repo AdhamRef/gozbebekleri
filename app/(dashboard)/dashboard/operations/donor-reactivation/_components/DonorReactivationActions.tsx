@@ -118,7 +118,7 @@ export function DonorReactivationActions({ donorId, canMutate }: { donorId: stri
           </Button>
         );
       })}
-      {createdTask ? <Link href="/dashboard/operations/tasks" className="text-xs font-bold text-[#025EB8] underline-offset-4 hover:underline">فتح مهام الفريق</Link> : null}
+      {createdTask ? <Link href="/dashboard/operations/tasks" className="text-xs font-bold text-brand underline-offset-4 hover:underline">فتح مهام الفريق</Link> : null}
     </div>
   );
 }

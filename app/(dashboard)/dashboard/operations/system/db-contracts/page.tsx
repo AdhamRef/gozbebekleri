@@ -33,11 +33,11 @@ export default function DashboardDbContractsPage() {
   const visibleContexts = snapshot.byContext.filter((group) => group.context !== "brand");
 
   return (
-    <div className="space-y-5 p-4 sm:p-6" dir="rtl">
+    <div className="space-y-5" dir="rtl">
       <div className="flex flex-col gap-4 rounded-2xl border bg-slate-950 p-5 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-xs text-white/65">Operations / System / DB Contracts</p>
-          <h1 className="mt-1.5 text-2xl font-black">عقود قاعدة بيانات الداشبورد</h1>
+          <h1 className="mt-1.5 text-xl sm:text-2xl font-bold tracking-tight">عقود قاعدة بيانات الداشبورد</h1>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-white/80">
             هذه الصفحة تثبت الموديلات التي يمكن تحويلها إلى Prisma بدون تغيير الدفع أوالتتبع أوإرسال أي بيانات لمنصات خارجية.
           </p>
@@ -82,7 +82,7 @@ export default function DashboardDbContractsPage() {
             <CardHeader className="gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">
-                  <Layers3 className="h-5 w-5 text-[#025EB8]" /> {contextLabels[group.context]}
+                  <Layers3 className="h-5 w-5 text-brand" /> {contextLabels[group.context]}
                 </CardTitle>
                 <CardDescription className="mt-2">{group.total} models, {group.prismaReady} ready for Prisma, {group.dbBacked} DB-backed.</CardDescription>
               </div>
@@ -126,7 +126,7 @@ export default function DashboardDbContractsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-[#025EB8]" /> الحزمة التالية المقترحة</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-brand" /> الحزمة التالية المقترحة</CardTitle>
           <CardDescription>{snapshot.nextRecommendedPackage.scope}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

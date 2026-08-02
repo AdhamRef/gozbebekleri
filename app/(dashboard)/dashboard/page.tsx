@@ -746,7 +746,7 @@ export default function DashboardPage() {
       <div className="space-y-6 sm:space-y-8 p-0 sm:p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div className="text-right min-w-0 flex-1">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               تحليل الإيرادات
             </h1>
             <p className="text-muted-foreground mt-1 text-sm break-words">
@@ -972,7 +972,7 @@ export default function DashboardPage() {
                   <div className="h-[400px] w-full">
                     {chartLoading ? (
                       <div className="h-full flex items-center justify-center bg-slate-50 rounded-lg">
-                        <Loader2 className="w-9 h-9 animate-spin text-[#025EB8]" />
+                        <Loader2 className="w-9 h-9 animate-spin text-brand" />
                       </div>
                     ) : chartView === "bar" ? (
                       chartMetric === "amount" ? (
@@ -1597,7 +1597,7 @@ export default function DashboardPage() {
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
+              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             />
           </div>
           <div className="space-y-1">
@@ -1606,7 +1606,7 @@ export default function DashboardPage() {
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
+              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             />
           </div>
         </div>
@@ -2041,7 +2041,7 @@ export default function DashboardPage() {
                               </button>
                             ) : d.provider === "BANK_TRANSFER" ? (
                               <span
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-[#025EB8]/10 text-[#025EB8]"
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-brand/10 text-brand"
                                 title="تبرع عبر تحويل بنكي — مستورد من كشف الحساب"
                               >
                                 <Landmark className="w-3 h-3" />
@@ -2065,7 +2065,7 @@ export default function DashboardPage() {
                               className={cn(
                                 "inline-block w-max px-1.5 py-px rounded-full text-[11px]",
                                 d.type === "MONTHLY"
-                                  ? "bg-[#025EB8]/10 text-[#025EB8]"
+                                  ? "bg-brand/10 text-brand"
                                   : "bg-gray-100 text-gray-600"
                               )}
                               title={
@@ -2087,7 +2087,7 @@ export default function DashboardPage() {
                             {d.referral ? (
                               <Link
                                 href={`/dashboard/referrals/${d.referral.id}`}
-                                className="text-xs font-medium text-[#025EB8] hover:text-[#025EB8] hover:underline"
+                                className="text-xs font-medium text-brand hover:text-brand hover:underline"
                               >
                                 {d.referral.code}
                               </Link>
@@ -2123,7 +2123,7 @@ export default function DashboardPage() {
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       title={fullList}
-                                      className="truncate text-slate-700 hover:text-[#025EB8] hover:underline"
+                                      className="truncate text-slate-700 hover:text-brand hover:underline"
                                     >
                                       {first.title}
                                     </Link>
@@ -2147,7 +2147,7 @@ export default function DashboardPage() {
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       title={fullList}
-                                      className="truncate text-slate-700 hover:text-[#025EB8] hover:underline"
+                                      className="truncate text-slate-700 hover:text-brand hover:underline"
                                     >
                                       فئة: {first.name}
                                     </Link>
@@ -2252,7 +2252,7 @@ export default function DashboardPage() {
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-6 p-4 sm:p-6 md:p-8 max-w-[1600px] mx-auto" dir="rtl">
+    <div className="space-y-6 max-w-[1600px] mx-auto" dir="rtl">
       <div className="h-16 rounded-lg bg-slate-200 animate-pulse" />
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
         {[1, 2, 3, 4, 5].map((i) => (

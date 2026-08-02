@@ -37,6 +37,8 @@ import {
 import { EMPTY_TIPTAP_DOC_JSON } from "@/lib/tiptap-empty-doc";
 import { normalizeCategoryIdsInput, parseCategoryPriorities } from "@/lib/campaign/categories";
 import { NOT_SOFT_DELETED } from "@/lib/campaign/soft-delete-filter";
+import { setCampaignDisplayTotal } from "@/lib/campaign/current-amount";
+import { PAID_DONATION_FILTER } from "@/lib/dashboard/donation-usd-revenue";
 
 // ✅ Prisma Singleton - Reuse connection across requests
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
@@ -178,7 +180,9 @@ export async function GET(
 
     const [donationCount, firstDonation, lastDonation, largestDonation] =
       await Promise.all([
-        prisma.donationItem.count({ where: { campaignId: realId } }),
+        // See app/api/campaigns/main/route.ts — must join `donation` so unsettled and
+        // orphaned items don't inflate the campaign's donation count.
+        prisma.donationItem.count({ where: { campaignId: realId, donation: PAID_DONATION_FILTER } }),
         pickStat({ createdAt: "asc" }),
         pickStat({ createdAt: "desc" }),
         pickStat({ amount: "desc" }),
@@ -337,7 +341,14 @@ export async function PUT(
     if (body.title !== undefined) updateData.title = body.title;
     if (body.description !== undefined) updateData.description = body.description;
     if (body.targetAmount !== undefined) updateData.targetAmount = body.targetAmount;
-    if (body.currentAmount !== undefined) updateData.currentAmount = body.currentAmount;
+    // `currentAmount` is applied AFTER the main update via setCampaignDisplayTotal, so the
+    // portion not explained by settled donations is recorded as `baselineAmount` (offline /
+    // legacy money). Writing it directly here would leave baselineAmount stale, and the next
+    // donation edit would silently reset the campaign to the donation-only figure.
+    const desiredDisplayTotal =
+      typeof body.currentAmount === "number" && Number.isFinite(body.currentAmount)
+        ? body.currentAmount
+        : null;
     if (body.images !== undefined) updateData.images = body.images;
     if (body.videoUrl !== undefined) updateData.videoUrl = body.videoUrl;
     if (body.isActive !== undefined) updateData.isActive = body.isActive;
@@ -529,6 +540,12 @@ export async function PUT(
           where: { id },
           data: updateData,
         });
+
+        // Split an admin-entered total into settled donations + offline baseline so a later
+        // donation edit can't wipe the offline part. See lib/campaign/current-amount.ts.
+        if (desiredDisplayTotal !== null) {
+          await setCampaignDisplayTotal(tx, id, desiredDisplayTotal);
+        }
 
         // Process upserts sequentially because the locale-slug uniqueness check inside
         // generateUniqueLocaleSlug must see prior writes within this transaction.

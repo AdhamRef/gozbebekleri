@@ -201,7 +201,7 @@ export function EmailTemplateEditorDialog({ id, open, onOpenChange }: Props) {
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
               إلغاء
             </Button>
-            <Button onClick={save} disabled={saving} className="bg-[#025EB8] hover:bg-[#025EB8]/90">
+            <Button onClick={save} disabled={saving} className="bg-brand hover:bg-brand/90">
               {saving && <Loader2 className="w-4 h-4 animate-spin me-2" />}
               حفظ
             </Button>
@@ -262,9 +262,9 @@ function LocaleTabs({
               className={cn(
                 "px-2.5 py-1 rounded-md text-xs font-medium transition-colors border",
                 active
-                  ? "bg-[#025EB8] text-white border-[#025EB8]"
+                  ? "bg-brand text-white border-brand"
                   : has
-                    ? "bg-white text-slate-700 border-border hover:border-[#025EB8]"
+                    ? "bg-white text-slate-700 border-border hover:border-brand"
                     : "bg-transparent text-slate-400 border-dashed border-slate-300 hover:border-slate-500 hover:text-slate-600"
               )}
               title={

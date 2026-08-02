@@ -33,7 +33,7 @@ export function OperationsContentPlans({ plans, items, statusClass }: Props) {
     <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><CalendarClock className="h-5 w-5 text-[#025EB8]" /> خطط المحتوى</CardTitle>
+          <CardTitle className="flex items-center gap-2"><CalendarClock className="h-5 w-5 text-brand" /> خطط المحتوى</CardTitle>
           <CardDescription>تابع أهداف كل خطة، عدد المواد المطلوبة، وما تم إنجازه حتى الآن.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -60,7 +60,7 @@ export function OperationsContentPlans({ plans, items, statusClass }: Props) {
                     <span>{progress}%</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-white">
-                    <div className="h-full rounded-full bg-[#025EB8]" style={{ width: `${progress}%` }} />
+                    <div className="h-full rounded-full bg-brand" style={{ width: `${progress}%` }} />
                   </div>
                 </div>
                 <OperationsContentPlanTaskAction plan={plan} />
@@ -72,7 +72,7 @@ export function OperationsContentPlans({ plans, items, statusClass }: Props) {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-[#025EB8]" /> عناصر المحتوى</CardTitle>
+          <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-brand" /> عناصر المحتوى</CardTitle>
           <CardDescription>قائمة مختصرة بأهم عناصر المحتوى المرتبطة بالإنتاج.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -96,13 +96,13 @@ export function OperationsContentPlans({ plans, items, statusClass }: Props) {
                     <span>{progress}%</span>
                   </div>
                   <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full rounded-full bg-[#025EB8]" style={{ width: `${progress}%` }} />
+                    <div className="h-full rounded-full bg-brand" style={{ width: `${progress}%` }} />
                   </div>
                 </div>
                 {links.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {links.map(([label, href]) => (
-                      <a key={label} href={href} target="_blank" rel="noreferrer" className="rounded-full border bg-slate-50 px-3 py-1 text-xs font-bold text-[#025EB8] hover:border-[#025EB8]">
+                      <a key={label} href={href} target="_blank" rel="noreferrer" className="rounded-full border bg-slate-50 px-3 py-1 text-xs font-bold text-brand hover:border-brand">
                         {label}
                       </a>
                     ))}

@@ -230,7 +230,12 @@ function ratio(localAmount: number, localTotal: number, amountUSD: number | null
 }
 
 function aggregate(rows: DonationExportRow[]): Aggregates {
-  const paid = rows.filter((r) => r.status === "PAID");
+  // Must match PAID_DONATION_FILTER (lib/dashboard/donation-usd-revenue.ts), which the
+  // on-screen cards use: settled one-time donations, plus subscription rows where status=PAID
+  // alone is enough. Bare `status === "PAID"` also counted abandoned checkouts that never
+  // settled, so the exported workbook reported more successful donations — and more money —
+  // than the dashboard it was exported from.
+  const paid = rows.filter((r) => r.status === "PAID" && (r.paidAt != null || r.subscriptionId != null));
 
   const perCurrencyMap = new Map<string, PerCurrencyTotal>();
   const perCampaignMap = new Map<string, PerBucketTotal>();

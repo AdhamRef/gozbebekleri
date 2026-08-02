@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { prisma } from "@/lib/prisma";
 import { PAID_DONATION_FILTER } from "@/lib/dashboard/donation-usd-revenue";
+import { safeCountValue } from "@/lib/dashboard/safe-count";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +70,7 @@ export async function GET() {
     collectionCount("MarketingBudgetDecisionLog"),
     collectionCount("ConversionEvent"),
     collectionCount("ConversionEvent", { status: "FAILED" }),
-    prisma.donation.count({ where: { createdAt: { gte: since }, ...PAID_DONATION_FILTER } }).catch(() => 0),
+    safeCountValue("finalReadiness.paidDonations", () => prisma.donation.count({ where: { createdAt: { gte: since }, ...PAID_DONATION_FILTER } })),
     trackingSettings(),
     latestRows("MarketingPlatformDailyMetric", 3),
   ]);

@@ -209,7 +209,7 @@ export function SyncPanel() {
       {/* Controls */}
       <div className="rounded-xl border border-border bg-white shadow-sm p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <RefreshCw className="w-4 h-4 text-[#025EB8]" />
+          <RefreshCw className="w-4 h-4 text-brand" />
           <h3 className="text-sm font-semibold text-slate-800">تشغيل مزامنة يدوية</h3>
         </div>
         <p className="text-[12px] text-slate-500 leading-relaxed">
@@ -283,7 +283,7 @@ export function SyncPanel() {
             size="sm"
             onClick={runSync}
             disabled={running}
-            className="gap-2 bg-[#025EB8] hover:bg-[#025EB8]/90"
+            className="gap-2 bg-brand hover:bg-brand/90"
           >
             {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
             تشغيل المزامنة
@@ -294,7 +294,7 @@ export function SyncPanel() {
       {/* Snapshot availability */}
       <div className="rounded-xl border border-border bg-white shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
-          <Activity className="w-4 h-4 text-[#025EB8]" />
+          <Activity className="w-4 h-4 text-brand" />
           <h3 className="text-sm font-semibold text-slate-800">توفر اللقطات</h3>
         </div>
         {snapshots.length === 0 ? (
@@ -345,7 +345,7 @@ export function SyncPanel() {
       {/* Run history */}
       <div className="rounded-xl border border-border bg-white shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
-          <Activity className="w-4 h-4 text-[#025EB8]" />
+          <Activity className="w-4 h-4 text-brand" />
           <h3 className="text-sm font-semibold text-slate-800">سجل المزامنات</h3>
           {loadingHistory ? <Loader2 className="w-3 h-3 animate-spin text-slate-400" /> : null}
         </div>
@@ -398,7 +398,7 @@ export function SyncPanel() {
                           <button
                             type="button"
                             onClick={() => toggle(r.id)}
-                            className="inline-flex items-center gap-1 text-[#025EB8] hover:underline text-[11px]"
+                            className="inline-flex items-center gap-1 text-brand hover:underline text-[11px]"
                           >
                             {isOpen ? (
                               <>

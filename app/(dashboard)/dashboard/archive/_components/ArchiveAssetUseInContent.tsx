@@ -47,7 +47,7 @@ export function ArchiveAssetUseInContent({ assetId, fileName }: Props) {
         type="button"
         onClick={run}
         disabled={saving}
-        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#025EB8]/30 bg-[#025EB8]/5 px-3 text-xs font-bold text-[#025EB8] transition hover:bg-[#025EB8]/10 disabled:opacity-60"
+        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-brand/30 bg-brand/5 px-3 text-xs font-bold text-brand transition hover:bg-brand/10 disabled:opacity-60"
       >
         {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Layers3 className="h-3.5 w-3.5" />}
         استخدام في محتوى

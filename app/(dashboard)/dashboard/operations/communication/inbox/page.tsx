@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Loader2, RefreshCw, Search, MessageCircle, AlertTriangle, UserX, Phone, Globe, MapPin, Heart } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, RefreshCw, Search, MessageCircle, AlertTriangle, UserX, Phone, Globe, MapPin, Heart, Inbox } from "lucide-react";
+import { EmptyState } from "@/components/dashboard/EmptyState";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -118,7 +119,7 @@ export default function InboxPage() {
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs text-slate-400">التواصل / المحادثات</p>
-          <h1 className="mt-0.5 text-xl font-black text-slate-900">صندوق واتساب {needsReplyCount > 0 ? <span className="text-sm font-bold text-amber-600">({needsReplyCount} بحاجة رد)</span> : null}</h1>
+          <h1 className="mt-0.5 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">صندوق واتساب {needsReplyCount > 0 ? <span className="text-sm font-bold text-amber-600">({needsReplyCount} بحاجة رد)</span> : null}</h1>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" className="gap-2" onClick={() => load()} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> تحديث</Button>
@@ -136,25 +137,30 @@ export default function InboxPage() {
           <div className="border-b border-slate-100 p-3">
             <div className="relative">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث بالاسم أو الهاتف أو البريد" className="w-full rounded-lg border border-slate-200 py-2 pr-9 pl-3 text-sm outline-none focus:border-[#025EB8]" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث بالاسم أو الهاتف أو البريد" className="w-full rounded-lg border border-slate-200 py-2 pr-9 pl-3 text-sm outline-none focus:border-brand" />
             </div>
             {senders.length > 0 ? (
-              <select value={senderId} onChange={(e) => setSenderId(e.target.value)} className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-[#025EB8]">
+              <select value={senderId} onChange={(e) => setSenderId(e.target.value)} className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-brand">
                 <option value="all">كل الأرقام</option>
                 {senders.map((s) => <option key={s.id} value={s.id}>{senderLabel(s)}</option>)}
               </select>
             ) : null}
             <div className="mt-2 flex flex-wrap gap-1">
               {([["all", "الكل"], ["needsReply", "يحتاج رد"], ["unresolved", "غير مربوط"], ["handled", "تم التعامل"]] as [Filter, string][]).map(([f, label]) => (
-                <button key={f} onClick={() => setFilter(f)} className={cn("rounded-full border px-3 py-1 text-xs font-semibold", filter === f ? "border-[#025EB8] bg-blue-50 text-[#025EB8]" : "border-slate-200 text-slate-500")}>{label}</button>
+                <button key={f} onClick={() => setFilter(f)} className={cn("rounded-full border px-3 py-1 text-xs font-semibold", filter === f ? "border-brand bg-blue-50 text-brand" : "border-slate-200 text-slate-500")}>{label}</button>
               ))}
             </div>
           </div>
           <div className="max-h-[70vh] overflow-y-auto">
             {loading ? (
-              <div className="flex min-h-[12rem] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#025EB8]" /></div>
+              <div className="flex min-h-[12rem] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-brand" /></div>
             ) : filtered.length === 0 ? (
-              <div className="p-8 text-center text-sm text-slate-500">لا توجد محادثات مطابقة.</div>
+              <EmptyState
+                variant="inline"
+                icon={Inbox}
+                title="لا توجد محادثات مطابقة"
+                description="لا توجد محادثة تطابق البحث أو التصفية الحالية."
+              />
             ) : (
               <ul className="divide-y divide-slate-100">
                 {filtered.map((c) => (
@@ -186,7 +192,7 @@ export default function InboxPage() {
           {!selected ? (
             <div className="flex min-h-[24rem] flex-col items-center justify-center gap-2 text-sm text-slate-400"><MessageCircle className="h-6 w-6" /> اختر محادثة لعرضها</div>
           ) : detailLoading ? (
-            <div className="flex min-h-[24rem] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#025EB8]" /></div>
+            <div className="flex min-h-[24rem] items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-brand" /></div>
           ) : !detail ? (
             <div className="p-8 text-center text-sm text-slate-500">تعذّر تحميل المحادثة.</div>
           ) : (
@@ -198,7 +204,7 @@ export default function InboxPage() {
                   <p className="truncate font-bold text-slate-800">{displayName(detail.donor, detail.phone)}</p>
                   {detail.unresolved ? <span className="text-[11px] text-amber-600">متبرع غير محدد</span> : null}
                 </div>
-                <button onClick={() => setShowDonor((v) => !v)} className="text-xs font-bold text-[#025EB8] lg:hidden">التفاصيل</button>
+                <button onClick={() => setShowDonor((v) => !v)} className="text-xs font-bold text-brand lg:hidden">التفاصيل</button>
               </div>
 
               {/* mobile donor drawer */}
@@ -207,7 +213,12 @@ export default function InboxPage() {
               {/* timeline */}
               <div className="flex-1 space-y-2 overflow-y-auto p-4">
                 {detail.timeline.length === 0 ? (
-                  <p className="py-10 text-center text-sm text-slate-400">لا توجد رسائل في هذه المحادثة بعد.</p>
+                  <EmptyState
+                    variant="inline"
+                    icon={MessageCircle}
+                    title="لا توجد رسائل بعد"
+                    description="لم تُتبادل أي رسالة في هذه المحادثة حتى الآن."
+                  />
                 ) : detail.timeline.map((t, i) => (
                   t.kind === "status" ? (
                     <div key={i} className="text-center text-[11px] text-slate-400">{statusNote[t.status ?? ""] ?? "تحديث"}{t.at ? ` · ${fmt(t.at)}` : ""}</div>
@@ -262,7 +273,7 @@ function DonorPanel({
   onAction: (action: "handled" | "followup" | "link", phone: string, okMsg: string) => void;
 }) {
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4">
       <div>
         <p className="font-black text-slate-900">{donor?.name || donor?.email || "متبرع غير محدد"}</p>
         {unresolved ? <Badge variant="outline" className="mt-1 border-amber-200 bg-amber-50 text-amber-700"><AlertTriangle className="ml-1 h-3 w-3" /> غير مربوط بمتبرع</Badge> : <Badge variant="outline" className="mt-1 border-emerald-200 bg-emerald-50 text-emerald-700">متبرع مطابق</Badge>}

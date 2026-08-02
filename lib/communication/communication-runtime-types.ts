@@ -7,9 +7,10 @@
 export const COMMUNICATION_CHANNELS = ["WHATSAPP", "EMAIL", "SMS"] as const;
 export type CommunicationChannelId = (typeof COMMUNICATION_CHANNELS)[number];
 
-// Final architecture provider ids (BREVO_EMAIL / BREVO_SMS / NETGSM_SMS are the active ones;
-// META_WHATSAPP for WhatsApp; TWILIO + SENDGRID + legacy NETGSM kept for legacy/back-compat rows).
-export const COMMUNICATION_PROVIDERS = ["META_WHATSAPP", "BREVO_EMAIL", "BREVO_SMS", "NETGSM_SMS", "TWILIO", "SENDGRID", "NETGSM", "CUSTOM"] as const;
+// Final architecture provider ids (ELASTIC_EMAIL / BREVO_SMS / NETGSM_SMS are the active ones;
+// META_WHATSAPP for WhatsApp; BREVO_EMAIL + TWILIO + SENDGRID + legacy NETGSM kept so historical
+// delivery rows written before the Elastic Email migration still validate).
+export const COMMUNICATION_PROVIDERS = ["META_WHATSAPP", "ELASTIC_EMAIL", "BREVO_EMAIL", "BREVO_SMS", "NETGSM_SMS", "TWILIO", "SENDGRID", "NETGSM", "CUSTOM"] as const;
 export type CommunicationProviderId = (typeof COMMUNICATION_PROVIDERS)[number];
 
 export const COMMUNICATION_PURPOSES = ["MARKETING", "UTILITY", "TRANSACTIONAL", "AUTHENTICATION"] as const;

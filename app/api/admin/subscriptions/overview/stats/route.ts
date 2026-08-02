@@ -11,6 +11,7 @@ import {
   donationUsdSumFallback,
 } from "@/lib/dashboard/donation-usd-revenue";
 import { istanbulDateKeysToUtcRange } from "@/lib/admin/istanbul-calendar";
+import { donationWhereAll } from "@/lib/donations/mongo-null";
 
 function getDateRange(period: string, startParam?: string | null, endParam?: string | null) {
   let endDate: Date;
@@ -104,23 +105,33 @@ function buildDonationItemWhereSub(
   campaignId: string | null,
   referralId: string | null
 ): Prisma.DonationItemWhereInput {
-  const donation: Prisma.DonationWhereInput = {
+  // Composed with donationWhereAll: assigning `donation.OR` for the category filter used to
+  // OVERWRITE the `OR` that PAID_DONATION_FILTER contributes, silently stripping the paid guard
+  // so abandoned checkouts were counted as revenue whenever a category was selected.
+  const scoped: Prisma.DonationWhereInput = {
     subscriptionId: { not: null },
     createdAt: { gte: startDate, lte: endDate },
-    ...PAID_DONATION_FILTER,
   };
-  if (referralId) donation.referralId = referralId;
-  if (campaignId && campaignId !== "all") {
-    donation.items = { some: { campaignId } };
-  } else if (categoryId && categoryId !== "all") {
-    donation.OR = [
-      { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
-      { categoryItems: { some: { categoryId } } },
-    ];
-  }
-  if (campaignId && campaignId !== "all") {
-    return { donation, campaignId };
-  }
+  if (referralId) scoped.referralId = referralId;
+
+  const byCampaign = campaignId && campaignId !== "all";
+  const byCategory = !byCampaign && categoryId && categoryId !== "all";
+  if (byCampaign) scoped.items = { some: { campaignId } };
+
+  const donation = donationWhereAll(
+    scoped,
+    PAID_DONATION_FILTER,
+    byCategory
+      ? {
+          OR: [
+            { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
+            { categoryItems: { some: { categoryId } } },
+          ],
+        }
+      : null
+  );
+
+  if (byCampaign) return { donation, campaignId };
   if (categoryId && categoryId !== "all") {
     return { donation, campaign: { categoryIds: { has: categoryId } } };
   }
@@ -133,20 +144,23 @@ function buildDonationCategoryItemWhereSub(
   categoryId: string | null,
   referralId: string | null
 ): Prisma.DonationCategoryItemWhereInput {
-  const donation: Prisma.DonationWhereInput = {
+  // Same inverse-collision fix as buildDonationItemWhereSub above.
+  const scoped: Prisma.DonationWhereInput = {
     subscriptionId: { not: null },
     createdAt: { gte: startDate, lte: endDate },
-    ...PAID_DONATION_FILTER,
   };
-  if (referralId) donation.referralId = referralId;
+  if (referralId) scoped.referralId = referralId;
+
   if (categoryId && categoryId !== "all") {
-    donation.OR = [
-      { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
-      { categoryItems: { some: { categoryId } } },
-    ];
+    const donation = donationWhereAll(scoped, PAID_DONATION_FILTER, {
+      OR: [
+        { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
+        { categoryItems: { some: { categoryId } } },
+      ],
+    });
     return { donation, categoryId };
   }
-  return { donation };
+  return { donation: donationWhereAll(scoped, PAID_DONATION_FILTER) };
 }
 
 /** GET /api/admin/subscriptions/overview/stats — monthly subscriptions + donations from subscriptions */
@@ -186,11 +200,12 @@ export async function GET(request: NextRequest) {
       donations: { some: PAID_DONATION_FILTER },
     };
     const donationChargeBase = buildDonationChargeBase(startDate, endDate, categoryId, campaignId, referralId);
-    // status=PAID alone includes abandoned checkouts that never settled; require paidAt too.
-    const donationPaidWhere = { ...donationChargeBase, ...PAID_DONATION_FILTER };
-    const donationFailedWhere = { ...donationChargeBase, status: "FAILED" as const };
+    // donationWhereAll, not spread — the charge base carries a category `OR` that would
+    // otherwise be overwritten by PAID_DONATION_FILTER's own `OR`.
+    const donationPaidWhere = donationWhereAll(donationChargeBase, PAID_DONATION_FILTER);
+    const donationFailedWhere = donationWhereAll(donationChargeBase, { status: "FAILED" as const });
     const donationAllTimeBase = buildDonationChargeAllTimeBase(categoryId, campaignId, referralId);
-    const donationPaidAllTime = { ...donationAllTimeBase, ...PAID_DONATION_FILTER };
+    const donationPaidAllTime = donationWhereAll(donationAllTimeBase, PAID_DONATION_FILTER);
 
     const { monthStart, monthEnd } = getCurrentCalendarMonthIstanbulRange();
     const thisMonthBase = buildDonationChargeBase(
@@ -200,7 +215,7 @@ export async function GET(request: NextRequest) {
       campaignId,
       referralId
     );
-    const thisMonthPaid = { ...thisMonthBase, ...PAID_DONATION_FILTER };
+    const thisMonthPaid = donationWhereAll(thisMonthBase, PAID_DONATION_FILTER);
 
     const [
       totalCampaigns,
@@ -345,9 +360,13 @@ export async function GET(request: NextRequest) {
       rows.reduce(
         (acc, r) => {
           const usd = donationRowUsdApprox(r);
-          const total = r.totalAmount || 1;
-          acc.teamSupport += usd * ((r.teamSupport ?? 0) / total);
-          acc.fees += usd * ((r.fees ?? 0) / total);
+          // See app/api/admin/stats/route.ts — `|| 1` made an unproratable row contribute
+          // `usd * teamSupport` instead of its share. Skip such rows entirely.
+          const total = Number(r.totalAmount) || 0;
+          if (total > 0) {
+            acc.teamSupport += usd * ((r.teamSupport ?? 0) / total);
+            acc.fees += usd * ((r.fees ?? 0) / total);
+          }
           return acc;
         },
         { teamSupport: 0, fees: 0 }

@@ -39,7 +39,17 @@ type CollectionBundle = {
   years: YearBundle[];
 };
 
-export function ArchiveConsole({ snapshot, selection, work = "latest" }: Props) {
+export function ArchiveConsole({ snapshot, selection, work = "latest", activeTab = "overview" }: Props) {
+  // `activeTab` was declared in Props but never destructured, so all seven archive routes
+  // (overview/collections/projects/drive-links/assets/marketing-picks/reports/ai) rendered a
+  // byte-identical console with no indication of where you were — and, because nothing
+  // rendered ARCHIVE_TABS either, no way to move between them except by typing URLs.
+  //
+  // Deliberately NOT filtering sections by tab: the console renders every section
+  // unconditionally today, and picking which section "belongs" to which tab would be inventing
+  // product behaviour and could hide tools admins currently reach from any of these URLs.
+  // Surfacing the tab bar makes the prop meaningful and the routes navigable without removing
+  // anything.
   const explorer = buildExplorer(snapshot);
   const activeCollection = explorer.find((item) => item.collection.id === selection?.collectionId);
   const activeProject = selection?.projectId ? findProject(explorer, selection.projectId) : null;
@@ -49,6 +59,7 @@ export function ArchiveConsole({ snapshot, selection, work = "latest" }: Props) 
   return (
     <main className="min-h-screen bg-[#FFFDF8] p-4 text-slate-950 sm:p-6" dir="rtl">
       <Hero snapshot={snapshot} explorer={explorer} />
+      <ArchiveTabBar activeTab={activeTab} tabs={snapshot.tabs} />
       <Breadcrumb collection={activeCollection?.collection} year={selectedYear} project={activeProject?.bundle.project} />
 
       {!activeCollection ? (
@@ -64,18 +75,43 @@ export function ArchiveConsole({ snapshot, selection, work = "latest" }: Props) 
   );
 }
 
+function ArchiveTabBar({ activeTab, tabs }: { activeTab: ArchiveTabKey; tabs: ArchiveSnapshot["tabs"] }) {
+  if (!tabs?.length) return null;
+  return (
+    <nav aria-label="أقسام الأرشيف" className="mt-3 flex flex-wrap gap-1.5">
+      {tabs.map((tab) => {
+        const isActive = tab.key === activeTab;
+        return (
+          <Link
+            key={tab.key}
+            href={tab.href}
+            aria-current={isActive ? "page" : undefined}
+            className={
+              isActive
+                ? "inline-flex h-8 items-center rounded-md border border-brand bg-brand px-3 text-xs font-bold text-white"
+                : "inline-flex h-8 items-center rounded-md border bg-white px-3 text-xs font-bold text-slate-700 transition hover:border-brand hover:text-brand"
+            }
+          >
+            {tab.title}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
 function Hero({ snapshot, explorer }: { snapshot: ArchiveSnapshot; explorer: CollectionBundle[] }) {
   return (
     <section className="rounded-2xl border bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-black sm:text-3xl">الأرشيف</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">الأرشيف</h1>
           <p className="mt-2 max-w-3xl text-xs leading-6 text-slate-600">
             تصفح المواد خطوة بخطوة: المجموعة، ثم السنة، ثم المشروع، ثم جدول المواد. رابط Google Drive يضاف داخل المشروع فقط.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <ArchivePrimaryCtas />
-            <Link href="/dashboard/archive/settings" className="inline-flex h-9 items-center gap-2 rounded-md border bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-[#025EB8] hover:text-[#025EB8]">
+            <Link href="/dashboard/archive/settings" className="inline-flex h-9 items-center gap-2 rounded-md border bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-brand hover:text-brand">
               <Settings2 className="h-3.5 w-3.5" /> إعدادات الأرشيف
             </Link>
           </div>
@@ -157,7 +193,7 @@ function CollectionDetail({ item, collections }: { item: CollectionBundle; colle
       <Panel title="السنوات" description="اختر السنة التي تريد عرض مشاريعها.">
         <div className="grid gap-2 sm:grid-cols-4 xl:grid-cols-6">
           {yearOptions(item).map((year) => (
-            <Link key={year} href={archiveHref({ collectionId: item.collection.id, year })} className="rounded-lg border bg-slate-50 p-3 text-center transition hover:border-[#025EB8] hover:bg-white">
+            <Link key={year} href={archiveHref({ collectionId: item.collection.id, year })} className="rounded-lg border bg-slate-50 p-3 text-center transition hover:border-brand hover:bg-white">
               <p className="text-[11px] font-bold text-slate-500">السنة</p>
               <p className="mt-1 text-xl font-black text-slate-950">{year}</p>
               <p className="mt-1 text-[11px] text-slate-500">{item.years.find((itemYear) => itemYear.year === year)?.projects.length ?? 0} مشروع</p>
@@ -261,7 +297,7 @@ function ProjectTable({ collection, year, collections }: { collection: ArchiveCo
               <td className="p-3 font-bold text-slate-800">{bundle.assets.length}</td>
               <td className="p-3">
                 <div className="flex flex-wrap gap-2">
-                  <Link href={archiveHref({ collectionId: collection.id, year: bundle.project.year, projectId: bundle.project.id })} className="inline-flex h-8 items-center rounded-md border bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-[#025EB8] hover:text-[#025EB8]">فتح</Link>
+                  <Link href={archiveHref({ collectionId: collection.id, year: bundle.project.year, projectId: bundle.project.id })} className="inline-flex h-8 items-center rounded-md border bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-brand hover:text-brand">فتح</Link>
                   <ArchiveProjectManageActions project={bundle.project} collections={collections} />
                 </div>
               </td>
@@ -284,7 +320,7 @@ function CollectionCard({ item }: { item: CollectionBundle }) {
           <p className="text-[11px] font-bold text-slate-500">مجموعة</p>
           <h3 className="mt-1 text-lg font-black text-slate-950">{item.collection.name}</h3>
         </div>
-        <FolderOpen className="h-4 w-4 text-[#025EB8]" />
+        <FolderOpen className="h-4 w-4 text-brand" />
       </div>
       {description ? <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{description}</p> : null}
       <div className="mt-3 grid grid-cols-3 gap-2 text-center">
@@ -293,7 +329,7 @@ function CollectionCard({ item }: { item: CollectionBundle }) {
         <SmallCounter label="روابط" value={stats.links} />
       </div>
       <div className="mt-3 grid grid-cols-[1fr_auto] items-start gap-2">
-        <Link href={archiveHref({ collectionId: item.collection.id })} className="inline-flex h-8 items-center justify-center rounded-md border bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-[#025EB8] hover:text-[#025EB8]">فتح</Link>
+        <Link href={archiveHref({ collectionId: item.collection.id })} className="inline-flex h-8 items-center justify-center rounded-md border bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-brand hover:text-brand">فتح</Link>
         <ArchiveCollectionManageActions collection={item.collection} />
       </div>
     </article>
@@ -356,7 +392,7 @@ function MaterialTable({ assets }: { assets: ArchiveAsset[] }) {
               <td className="p-3 text-slate-700">{archiveText(asset.fileName) || asset.fileName}</td>
               <td className="p-3">
                 {asset.webViewLink ? (
-                  <a className="font-bold text-[#025EB8] hover:underline" href={asset.webViewLink} target="_blank" rel="noreferrer">عرض</a>
+                  <a className="font-bold text-brand hover:underline" href={asset.webViewLink} target="_blank" rel="noreferrer">عرض</a>
                 ) : (
                   <span className="text-slate-400">غير متاح</span>
                 )}
@@ -374,9 +410,9 @@ function Breadcrumb({ collection, year, project }: { collection?: ArchiveCollect
   if (!collection && !year && !project) return null;
   return (
     <nav className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600">
-      <Link href="/dashboard/archive" className="rounded-md border bg-white px-3 py-1.5 hover:border-[#025EB8]">الأرشيف</Link>
-      {collection ? <Link href={archiveHref({ collectionId: collection.id })} className="rounded-md border bg-white px-3 py-1.5 hover:border-[#025EB8]">{collection.name}</Link> : null}
-      {collection && year ? <Link href={archiveHref({ collectionId: collection.id, year })} className="rounded-md border bg-white px-3 py-1.5 hover:border-[#025EB8]">{year}</Link> : null}
+      <Link href="/dashboard/archive" className="rounded-md border bg-white px-3 py-1.5 hover:border-brand">الأرشيف</Link>
+      {collection ? <Link href={archiveHref({ collectionId: collection.id })} className="rounded-md border bg-white px-3 py-1.5 hover:border-brand">{collection.name}</Link> : null}
+      {collection && year ? <Link href={archiveHref({ collectionId: collection.id, year })} className="rounded-md border bg-white px-3 py-1.5 hover:border-brand">{year}</Link> : null}
       {collection && year && project ? <span className="rounded-md bg-slate-900 px-3 py-1.5 text-white">{project.title}</span> : null}
     </nav>
   );
@@ -523,11 +559,11 @@ function driveLinkTypeLabel(value: ArchiveDriveLink["linkType"]) {
 }
 
 function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
-  return <div className="rounded-lg border bg-slate-50 p-2.5"><div className="flex items-center justify-between gap-2"><div><p className="text-[11px] font-bold text-slate-500">{label}</p><p className="mt-1 text-xl font-black text-slate-950">{value}</p></div><span className="text-[#025EB8] [&>svg]:h-4 [&>svg]:w-4">{icon}</span></div></div>;
+  return <div className="rounded-lg border bg-slate-50 p-2.5"><div className="flex items-center justify-between gap-2"><div><p className="text-[11px] font-bold text-slate-500">{label}</p><p className="mt-1 text-xl font-black text-slate-950">{value}</p></div><span className="text-brand [&>svg]:h-4 [&>svg]:w-4">{icon}</span></div></div>;
 }
 
 function SummaryCard({ icon, title, value }: { icon: ReactNode; title: string; value: number }) {
-  return <div className="rounded-lg border bg-slate-50 p-3"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black text-slate-950">{title}</p><p className="mt-1 text-xl font-black text-slate-950">{value}</p></div><span className="text-[#025EB8] [&>svg]:h-4 [&>svg]:w-4">{icon}</span></div></div>;
+  return <div className="rounded-lg border bg-slate-50 p-3"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black text-slate-950">{title}</p><p className="mt-1 text-xl font-black text-slate-950">{value}</p></div><span className="text-brand [&>svg]:h-4 [&>svg]:w-4">{icon}</span></div></div>;
 }
 
 function SmallCounter({ label, value }: { label: string; value: number }) {

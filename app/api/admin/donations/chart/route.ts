@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { requireAdminOrDashboardPermission } from '@/lib/dashboard/api-auth';
+import { donationFieldEmpty } from '@/lib/donations/mongo-null';
+import { donationRowUsdApprox } from '@/lib/dashboard/donation-usd-revenue';
 import {
   eachIstanbulDateKey,
   formatIstanbulDateKey,
@@ -57,9 +59,11 @@ export async function GET(request: NextRequest) {
       { status: 'PAID', paidAt: { gte: startDate, lte: endDate } },
       {
         status: 'PAID',
-        paidAt: null,
         subscriptionId: { not: null },
         createdAt: { gte: startDate, lte: endDate },
+        // `paidAt` is ABSENT rather than null on most unsettled rows, and Prisma's
+        // `{ paidAt: null }` does not match an absent field — it matched 6 of 431.
+        ...donationFieldEmpty('paidAt'),
       },
       { status: 'FAILED', createdAt: { gte: startDate, lte: endDate } },
     ];
@@ -98,6 +102,9 @@ export async function GET(request: NextRequest) {
         amountUSD: true,
         totalAmount: true,
         amount: true,
+        // Required by donationRowUsdApprox — without it a USD row with a null amountUSD
+        // can't be recognised and would silently contribute 0.
+        currency: true,
         status: true,
         paidAt: true,
         items: { select: { amount: true, amountUSD: true } },
@@ -140,7 +147,11 @@ export async function GET(request: NextRequest) {
         fees: 0,
       };
 
-      const amount = Number(d.amountUSD ?? d.totalAmount ?? d.amount ?? 0);
+      // Every series on this chart is labelled USD, so it must be summed in USD.
+      // The old expression fell back to `totalAmount`/`amount` in the row's LOCAL currency,
+      // so a ₺1,000 donation with no `amountUSD` plotted as 1000 on a dollar axis.
+      // `donationRowUsdApprox` is the same helper the KPI cards use, so chart and card agree.
+      const amount = donationRowUsdApprox(d);
 
       if (isPaid) {
         if (d.subscriptionId == null) {
@@ -150,8 +161,14 @@ export async function GET(request: NextRequest) {
           bucket.amountMonthly += amount;
           bucket.countMonthly += 1;
         }
-        bucket.teamSupport += Number(d.teamSupport ?? 0);
-        bucket.fees += Number(d.fees ?? 0);
+        // teamSupport/fees are stored in the local currency too. Prorate them against the
+        // row's USD value exactly as /api/admin/stats does, instead of adding raw lira to a
+        // dollar total.
+        const localTotal = Number(d.totalAmount) || 0;
+        if (localTotal > 0) {
+          bucket.teamSupport += amount * ((Number(d.teamSupport) || 0) / localTotal);
+          bucket.fees += amount * ((Number(d.fees) || 0) / localTotal);
+        }
       } else if (isFailed) {
         bucket.amountFailed += amount;
         bucket.countFailed += 1;

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getRawTrackingSettings, trackingString } from "@/lib/tracking/tracking-settings";
 import { getSchedulerStatus, type SchedulerStatus } from "@/lib/communication/scheduler-status";
 import { getActiveCommunicationRuntimeBundle, getActiveMetaWebhookConfig } from "@/lib/communication/runtime-config";
+import { safeCountValue } from "@/lib/dashboard/safe-count";
 
 export type ConnStatus = "READY" | "NEEDS_SETUP" | "FAILED" | "DISABLED";
 export const STATUS_LABEL: Record<ConnStatus, string> = { READY: "جاهز", NEEDS_SETUP: "يحتاج إعداد", FAILED: "فشل آخر اختبار", DISABLED: "غير مفعّل" };
@@ -90,19 +91,28 @@ export async function getCommunicationReadiness(): Promise<CommunicationReadines
   let routingRules = 0;
   if (hasDb()) {
     [sendersWithNumber, sendersMissingNumber, enabledEmailSenders, routingRules] = await Promise.all([
-      prisma.communicationSender.count({ where: { channel: "WHATSAPP", phoneNumberId: { not: null } } }).catch(() => 0),
-      prisma.communicationSender.count({ where: { channel: "WHATSAPP", phoneNumberId: null } }).catch(() => 0),
-      prisma.communicationSender.count({ where: { channel: "EMAIL", enabled: true } }).catch(() => 0),
-      prisma.senderRoutingRule.count().catch(() => 0),
+      safeCountValue("readiness.whatsappWithNumber", () => prisma.communicationSender.count({ where: { channel: "WHATSAPP", phoneNumberId: { not: null } } })),
+      // `phoneNumberId: null` alone matches only an EXPLICIT null — in MongoDB a field that
+      // was never written is absent, not null, so a sender created without a number would be
+      // missed and "senders missing a number" would under-report. See §1.5 of
+      // docs/dashboard-completion-roadmap.md. Latent today (0 WhatsApp senders exist), which
+      // is exactly when it is cheap to fix.
+      safeCountValue("readiness.whatsappMissingNumber", () =>
+        prisma.communicationSender.count({
+          where: { channel: "WHATSAPP", OR: [{ phoneNumberId: null }, { phoneNumberId: { isSet: false } }] },
+        })
+      ),
+      safeCountValue("readiness.emailEnabled", () => prisma.communicationSender.count({ where: { channel: "EMAIL", enabled: true } })),
+      safeCountValue("readiness.routingRules", () => prisma.senderRoutingRule.count()),
     ]);
   }
   const whatsappStatus = runtimeStatus(runtime.meta);
-  const emailStatus = runtimeStatus(runtime.brevoEmail);
+  const emailStatus = runtimeStatus(runtime.elasticEmail);
   const netgsmStatus = runtimeStatus(runtime.netgsm);
   const brevoSmsStatus = runtimeStatus(runtime.brevoSms);
   const smsStatus: ConnStatus = netgsmStatus === "FAILED" || brevoSmsStatus === "FAILED" ? "FAILED" : netgsmStatus === "READY" || brevoSmsStatus === "READY" ? "READY" : netgsmStatus === "DISABLED" && brevoSmsStatus === "DISABLED" ? "DISABLED" : "NEEDS_SETUP";
   const status: ConnStatus = [whatsappStatus, emailStatus, smsStatus].includes("FAILED") ? "FAILED" : [whatsappStatus, emailStatus, smsStatus].includes("READY") ? "READY" : "NEEDS_SETUP";
-  return { status, whatsapp: { status: whatsappStatus, sendersWithNumber, sendersMissingNumber }, email: { status: emailStatus, envConfigured: runtime.brevoEmail.configured && Object.values(runtime.brevoEmail.sources).includes("ENVIRONMENT"), enabledSenders: enabledEmailSenders }, sms: { status: smsStatus }, routingRules, scheduler };
+  return { status, whatsapp: { status: whatsappStatus, sendersWithNumber, sendersMissingNumber }, email: { status: emailStatus, envConfigured: runtime.elasticEmail.configured && Object.values(runtime.elasticEmail.sources).includes("ENVIRONMENT"), enabledSenders: enabledEmailSenders }, sms: { status: smsStatus }, routingRules, scheduler };
 }
 
 export const WHATSAPP_WEBHOOK_PATH = "/api/webhooks/meta/whatsapp";

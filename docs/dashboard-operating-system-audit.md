@@ -1,5 +1,16 @@
 # Dashboard Operating System — Phase 0 Audit
 
+> ⚠️ **متجاوَزة جزئيًا — SUPERSEDED (2026-08-01)**
+>
+> **المصدر الموثوق لحالة لوحة التحكم هو `docs/dashboard-completion-roadmap.md`.**
+> هذه الوثيقة تدقيق مؤرّخ 2026-07-04 ولم تُحدَّث بعد إصلاحات جلسة 2026-07-31/08-01. أجزاء منها لم تعد صحيحة:
+>
+> - تصف **مركز التواصل** كنموذج أولي «الإرسال معطّل». الإرسال ما يزال غير مُفعَّل لعدم وجود مزوّد، لكن ثلاث `await` ناقصة كانت تجعل الواجهة تدّعي الجاهزية — أُصلحت (P1-7).
+> - تسرد مسارات `/dashboard/brand/*` و`api/admin/brand/*` — **لم تعد موجودة**.
+> - أرقام الإيرادات والمتبرعين الواردة فيها سبقت إصلاحات P0/P1/P2 (منها تضخيم عدّاد المتبرعين العام بنسبة ~51%، و`teamSupport` على الرسم بـ5.5×).
+>
+> اقرأ الخارطة أولًا؛ استخدم هذه الوثيقة للسياق المعماري لا لحالة النظام.
+
 Status: **audit only, no runtime behaviour changed by this document.**
 Date: 2026-07-04
 Scope: repository root `d:/Work/alafiya - Copy/` (the active project). The
@@ -67,8 +78,11 @@ This audit verifies the actual codebase against the target architecture. It does
 There are **two disconnected systems**. They share no code, tables, or providers.
 
 ### A. LEGACY send path — REAL, working, do NOT break
-- `lib/whatsapp.ts` → **Twilio** WhatsApp (`sendBulkWhatsapp`, concurrency 5).
-- `lib/email.ts` → **SendGrid** (`sendBulkEmail`, `sendVerificationEmail`).
+- `lib/whatsapp.ts` → **Twilio** WhatsApp (`sendBulkWhatsapp`, concurrency 5). Hard-disabled unless
+  `WHATSAPP_LEGACY_TWILIO_ENABLED=true`; imported by no active route.
+- ~~`lib/email.ts` → **SendGrid**~~ — **deleted**. Email is now Elastic Email only, via
+  `lib/communication/providers/email/client.ts`. `app/api/templates/email/send` and the auth
+  verification emails go through `sendArchivedEmail` / `sendVerificationEmailViaRuntime`.
 - `lib/events/dispatch.ts` → the trigger fan-out. On `DONATION_PAID` it loads the
   donation context, picks locale from `user.preferredLang` (fallback `ar`), renders,
   sends, and writes a `SentMessage` row per recipient (SENT/FAILED/SKIPPED). Also

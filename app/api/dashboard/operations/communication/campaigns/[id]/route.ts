@@ -45,8 +45,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   // Tracking links + real donation attribution (short-circuits cheaply when no links are attached).
   const trackingReport = await getCampaignDonationReport({ id: campaign.id, channel: campaign.channel }).catch(() => null);
 
+  // `isSendEnabled` is async — unawaited it serialized to `{}`, which is truthy on the client,
+  // so the "إرسال اختبار" button was offered even with no provider configured.
+  const sendEnabled = channel ? await isSendEnabled(channel) : false;
+
   return NextResponse.json(
-    { campaign, breakdown, templates, senders, coverage, coverageGate, plan: planSummary, sendEnabled: channel ? isSendEnabled(channel) : false, schedulerConfigured: isSchedulerConfigured(), trackingReport },
+    { campaign, breakdown, templates, senders, coverage, coverageGate, plan: planSummary, sendEnabled, schedulerConfigured: isSchedulerConfigured(), trackingReport },
     { headers: operationsNoStoreHeaders }
   );
 }

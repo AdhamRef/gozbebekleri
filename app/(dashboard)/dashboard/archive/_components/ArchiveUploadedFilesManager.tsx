@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Clock3, Download, Edit3, Loader2, Save, Search, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { Clock3, Download, Edit3, FileSearch, Loader2, Save, Search, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { EmptyState } from "@/components/dashboard/EmptyState";
 import { Button } from "@/components/ui/button";
 import { ArchiveFileActivityPanel, type ArchiveFileActivityItem } from "./ArchiveFileActivityPanel";
 import { ArchiveReferenceSelects } from "./ArchiveReferenceSelects";
@@ -203,11 +204,11 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
       <section className="rounded-2xl border bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs font-black text-[#025EB8]">الأرشيف</p>
-            <h1 className="mt-2 text-2xl font-black sm:text-3xl">{title}</h1>
+            <p className="text-xs font-black text-brand">الأرشيف</p>
+            <h1 className="mt-2 text-xl sm:text-2xl font-bold tracking-tight">{title}</h1>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">{description}</p>
           </div>
-          <Link href="/dashboard/archive" className="inline-flex h-9 items-center rounded-md border bg-white px-3 text-sm font-bold text-slate-800 hover:border-[#025EB8] hover:text-[#025EB8]">
+          <Link href="/dashboard/archive" className="inline-flex h-9 items-center rounded-md border bg-white px-3 text-sm font-bold text-slate-800 hover:border-brand hover:text-brand">
             الرجوع للأرشيف
           </Link>
         </div>
@@ -219,8 +220,8 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
           <p className="mt-1 text-xs leading-5 text-slate-600">اختر ملف PDF أو Excel من جهازك. يمكنك ربط الملف بمجموعة أو مشروع.</p>
         </div>
         <div className="grid gap-3 p-4 xl:grid-cols-[1fr_1fr_1.5fr_1.4fr_auto]">
-          <input value={fileTitle} onChange={(event) => setFileTitle(event.target.value)} placeholder="اسم الملف" className="h-9 rounded-md border px-3 text-sm outline-none focus:border-[#025EB8]" />
-          <input value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="ملاحظات" className="h-9 rounded-md border px-3 text-sm outline-none focus:border-[#025EB8]" />
+          <input value={fileTitle} onChange={(event) => setFileTitle(event.target.value)} placeholder="اسم الملف" className="h-9 rounded-md border px-3 text-sm outline-none focus:border-brand" />
+          <input value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="ملاحظات" className="h-9 rounded-md border px-3 text-sm outline-none focus:border-brand" />
           <ArchiveReferenceSelects refs={archiveRefs} collectionId={linkedCollectionId} projectId={linkedProjectId} onCollectionChange={setLinkedCollectionId} onProjectChange={setLinkedProjectId} />
           <input ref={fileRef} type="file" accept=".pdf,.xls,.xlsx,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="h-9 rounded-md border bg-white px-2 py-1.5 text-sm file:ml-2 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs file:font-bold file:text-slate-700" />
           <Button type="button" onClick={upload} disabled={saving} className="h-9 gap-2 font-bold">
@@ -228,7 +229,7 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
             {saving ? `${progress}%` : "رفع"}
           </Button>
         </div>
-        {saving ? <div className="mx-4 mb-4 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-[#025EB8] transition-all" style={{ width: `${progress}%` }} /></div> : null}
+        {saving ? <div className="mx-4 mb-4 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-brand transition-all" style={{ width: `${progress}%` }} /></div> : null}
       </section>
 
       {feedback ? (
@@ -246,19 +247,19 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
           <div className="grid gap-2 md:grid-cols-[1.4fr_0.8fr_1fr_1fr] xl:min-w-[720px]">
             <label className="relative block">
               <Search className="absolute right-2 top-2.5 h-4 w-4 text-slate-400" />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="بحث باسم الملف أو الملاحظات" className="h-9 w-full rounded-md border bg-white pr-8 pl-3 text-sm outline-none focus:border-[#025EB8]" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="بحث باسم الملف أو الملاحظات" className="h-9 w-full rounded-md border bg-white pr-8 pl-3 text-sm outline-none focus:border-brand" />
             </label>
-            <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-sm outline-none focus:border-[#025EB8]">
+            <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-sm outline-none focus:border-brand">
               <option value="ALL">كل الأنواع</option>
               <option value="pdf">PDF</option>
               <option value="xls">XLS</option>
               <option value="xlsx">XLSX</option>
             </select>
-            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-sm outline-none focus:border-[#025EB8]">
+            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-sm outline-none focus:border-brand">
               <option value="ALL">كل التصنيفات</option>
               {categoryOptions.map((option) => <option key={option} value={option}>{option}</option>)}
             </select>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-sm outline-none focus:border-[#025EB8]">
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-sm outline-none focus:border-brand">
               <option value="ALL">كل الحالات</option>
               {reviewStatuses.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
@@ -268,7 +269,11 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
           {loading ? (
             <p className="rounded-lg border bg-slate-50 p-4 text-sm text-slate-600">جاري تحميل الملفات...</p>
           ) : filteredFiles.length === 0 ? (
-            <p className="rounded-lg border border-dashed bg-white p-6 text-center text-sm text-slate-600">لا توجد ملفات مطابقة.</p>
+            <EmptyState
+              icon={FileSearch}
+              title="لا توجد ملفات مطابقة"
+              description="لا يوجد ملف يطابق البحث أو التصفية الحالية. جرّب مصطلحًا أوسع أو غيّر التصنيف."
+            />
           ) : (
             <table className="w-full min-w-[1320px] text-sm">
               <thead className="bg-slate-50 text-xs text-slate-500">
@@ -293,8 +298,8 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
                       <td className="p-3">
                         {isEditing ? (
                           <div className="grid gap-2">
-                            <input value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]" />
-                            <input value={draft.notes} onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))} placeholder="ملاحظات" className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]" />
+                            <input value={draft.title} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-brand" />
+                            <input value={draft.notes} onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))} placeholder="ملاحظات" className="h-8 rounded-md border px-2 text-xs outline-none focus:border-brand" />
                           </div>
                         ) : (
                           <>
@@ -309,14 +314,14 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
                       <td className="p-3 font-bold text-slate-700">{file.extension?.toUpperCase() || "FILE"}</td>
                       <td className="p-3 text-slate-700">
                         {isEditing ? (
-                          <select value={draft.fileCategory} onChange={(event) => setDraft((current) => ({ ...current, fileCategory: event.target.value }))} className="h-8 rounded-md border bg-white px-2 text-xs outline-none focus:border-[#025EB8]">
+                          <select value={draft.fileCategory} onChange={(event) => setDraft((current) => ({ ...current, fileCategory: event.target.value }))} className="h-8 rounded-md border bg-white px-2 text-xs outline-none focus:border-brand">
                             {categoryOptions.map((option) => <option key={option} value={option}>{option}</option>)}
                           </select>
                         ) : <Badge>{file.fileCategory || "عام"}</Badge>}
                       </td>
                       <td className="p-3 text-slate-700">
                         {isEditing ? (
-                          <select value={draft.reviewStatus} onChange={(event) => setDraft((current) => ({ ...current, reviewStatus: event.target.value as ReviewStatus }))} className="h-8 rounded-md border bg-white px-2 text-xs outline-none focus:border-[#025EB8]">
+                          <select value={draft.reviewStatus} onChange={(event) => setDraft((current) => ({ ...current, reviewStatus: event.target.value as ReviewStatus }))} className="h-8 rounded-md border bg-white px-2 text-xs outline-none focus:border-brand">
                             {reviewStatuses.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                           </select>
                         ) : <Badge>{statusLabel(file.reviewStatus)}</Badge>}
@@ -334,7 +339,7 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
                         ) : (
                           <div className="space-y-1 text-xs">
                             <p>{file.linkedCollectionName || "بدون مجموعة"}</p>
-                            {file.linkedProjectName ? <p className="font-bold text-[#025EB8]">{file.linkedProjectName}</p> : null}
+                            {file.linkedProjectName ? <p className="font-bold text-brand">{file.linkedProjectName}</p> : null}
                           </div>
                         )}
                       </td>
@@ -353,7 +358,7 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
                               <ActionButton disabled={Boolean(analyzingId)} onClick={() => void analyzeFile(file.id)} icon={isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} label="تحليل" />
                               <ActionButton onClick={() => void toggleActivity(file.id)} icon={<Clock3 className="h-3.5 w-3.5" />} label="نشاط" />
                               <ActionButton onClick={() => startEdit(file)} icon={<Edit3 className="h-3.5 w-3.5" />} label="تعديل" />
-                              <a href={`/api/admin/archive/uploaded-files/${file.id}/download`} className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-white px-3 text-xs font-bold text-slate-800 hover:border-[#025EB8] hover:text-[#025EB8]"><Download className="h-3.5 w-3.5" /> تنزيل</a>
+                              <a href={`/api/admin/archive/uploaded-files/${file.id}/download`} className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-white px-3 text-xs font-bold text-slate-800 hover:border-brand hover:text-brand"><Download className="h-3.5 w-3.5" /> تنزيل</a>
                               <IconButton danger onClick={() => void removeFile(file.id)} icon={<Trash2 className="h-3.5 w-3.5" />} />
                             </>
                           )}
@@ -372,7 +377,7 @@ export function ArchiveUploadedFilesManager({ category, title, description }: Pr
 }
 
 function ActionButton({ label, icon, onClick, disabled }: { label: string; icon: ReactNode; onClick: () => void; disabled?: boolean }) {
-  return <button type="button" onClick={onClick} disabled={disabled} className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-white px-3 text-xs font-bold text-slate-800 hover:border-[#025EB8] hover:text-[#025EB8] disabled:opacity-60">{icon}{label}</button>;
+  return <button type="button" onClick={onClick} disabled={disabled} className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-white px-3 text-xs font-bold text-slate-800 hover:border-brand hover:text-brand disabled:opacity-60">{icon}{label}</button>;
 }
 
 function IconButton({ icon, onClick, danger }: { icon: ReactNode; onClick: () => void; danger?: boolean }) {
@@ -387,7 +392,7 @@ function AnalysisBox({ analysis, analyzedAt }: { analysis: FileAnalysis; analyze
   return (
     <div className="mt-3 rounded-lg border bg-slate-50 p-3 text-xs leading-6 text-slate-700">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-md bg-white px-2 py-1 font-black text-[#025EB8] ring-1 ring-slate-200">تحليل الملف</span>
+        <span className="rounded-md bg-white px-2 py-1 font-black text-brand ring-1 ring-slate-200">تحليل الملف</span>
         <span className="rounded-md bg-white px-2 py-1 font-bold text-slate-500 ring-1 ring-slate-200">{analysis.confidence === "ai_assisted" ? "مدعوم بالذكاء" : "اعتمادًا على بيانات الملف"}</span>
         {analyzedAt ? <span className="text-[11px] text-slate-400">{formatArchiveDate(analyzedAt)}</span> : null}
       </div>

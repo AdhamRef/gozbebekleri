@@ -11,6 +11,7 @@ import {
   donationUsdSumFallback,
 } from '@/lib/dashboard/donation-usd-revenue';
 import { istanbulDateKeysToUtcRange } from '@/lib/admin/istanbul-calendar';
+import { donationFieldEmpty, donationWhereAll } from '@/lib/donations/mongo-null';
 
 function getDateRange(period: string, startParam?: string | null, endParam?: string | null) {
   let endDate: Date;
@@ -165,15 +166,22 @@ export async function GET(request: NextRequest) {
       country
     );
 
-    // Only donations that actually settled (status=PAID + paidAt set) count toward revenue.
-    // status=PAID alone includes abandoned checkouts that never increment campaign.currentAmount.
-    const paidWhere = { ...donationWhere, ...PAID_DONATION_FILTER };
-    const oneTimeWhere = { ...paidWhere, subscriptionId: null };
-    const fromSubscriptionWhere = { ...paidWhere, subscriptionId: { not: null } };
-    const failedWhere = { ...donationWhere, status: 'FAILED' as const };
+    // Revenue counts settled one-time donations plus subscription rows (PAID_DONATION_FILTER is
+    // deliberately lenient for subscriptions — see lib/dashboard/donation-usd-revenue.ts).
+    //
+    // These MUST be composed with donationWhereAll, not object spread. Both `donationWhere`
+    // (category filter) and PAID_DONATION_FILTER carry a top-level `OR`, and spreading one over
+    // the other silently drops the category filter — which made every revenue card show
+    // org-wide totals next to a correctly-scoped donation count.
+    const paidWhere = donationWhereAll(donationWhere, PAID_DONATION_FILTER);
+    // `subscriptionId` is ABSENT on 1172 of 1218 one-time donations, and `{ subscriptionId: null }`
+    // does not match an absent field on MongoDB — it matched 41 of 1022 paid one-time donations.
+    const oneTimeWhere = donationWhereAll(paidWhere, donationFieldEmpty('subscriptionId'));
+    const fromSubscriptionWhere = donationWhereAll(paidWhere, { subscriptionId: { not: null } });
+    const failedWhere = donationWhereAll(donationWhere, { status: 'FAILED' as const });
     // All-status splits for the "breakdown" cards ("مرة واحدة (عدد)" / "شهرية (عدد)")
-    const oneTimeAllWhere = { ...donationWhere, subscriptionId: null };
-    const monthlyAllWhere = { ...donationWhere, subscriptionId: { not: null } };
+    const oneTimeAllWhere = donationWhereAll(donationWhere, donationFieldEmpty('subscriptionId'));
+    const monthlyAllWhere = donationWhereAll(donationWhere, { subscriptionId: { not: null } });
 
     const { monthStart, monthEnd } = getCurrentCalendarMonthIstanbulRange();
     const thisMonthDonationWhere = mergeFilters(
@@ -181,7 +189,7 @@ export async function GET(request: NextRequest) {
       locale,
       country
     );
-    const thisMonthPaidWhere = { ...thisMonthDonationWhere, ...PAID_DONATION_FILTER };
+    const thisMonthPaidWhere = donationWhereAll(thisMonthDonationWhere, PAID_DONATION_FILTER);
 
     const subscriptionWhere: Record<string, unknown> = { status: 'ACTIVE' };
     if (campaignId && campaignId !== 'all') {
@@ -261,7 +269,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.donation.aggregate({
         _sum: { amountUSD: true },
-        where: { ...donationWhereAllTime, ...PAID_DONATION_FILTER },
+        where: donationWhereAll(donationWhereAllTime, PAID_DONATION_FILTER),
       }),
       prisma.donation.aggregate({
         _sum: { amountUSD: true },
@@ -348,7 +356,7 @@ export async function GET(request: NextRequest) {
     }
     let allTimeRevenue = allTimeRevenueResult._sum?.amountUSD ?? 0;
     if (allTimeRevenue === 0) {
-      const allTimePaidWhere = { ...donationWhereAllTime, ...PAID_DONATION_FILTER };
+      const allTimePaidWhere = donationWhereAll(donationWhereAllTime, PAID_DONATION_FILTER);
       const allTimePaidCount = await prisma.donation.count({ where: allTimePaidWhere });
       if (allTimePaidCount > 0) {
         allTimeRevenue = await donationUsdSumFallback(allTimePaidWhere);
@@ -377,9 +385,17 @@ export async function GET(request: NextRequest) {
       rows.reduce(
         (acc, r) => {
           const usd = donationRowUsdApprox(r);
-          const total = r.totalAmount || 1;
-          acc.teamSupport += usd * ((r.teamSupport ?? 0) / total);
-          acc.fees += usd * ((r.fees ?? 0) / total);
+          // `|| 1` was a divide-by-zero guard that silently changed the MEANING of the sum:
+          // with totalAmount = 0 the row stopped contributing its *share* of teamSupport and
+          // instead contributed `usd * teamSupport` outright, letting a single row dominate
+          // the whole card. A row we cannot prorate must contribute nothing, not something
+          // wrong. (Measured 2026-08-01: 0 settled rows have totalAmount <= 0 today, so this
+          // guards a future row rather than correcting a current number.)
+          const total = Number(r.totalAmount) || 0;
+          if (total > 0) {
+            acc.teamSupport += usd * ((r.teamSupport ?? 0) / total);
+            acc.fees += usd * ((r.fees ?? 0) / total);
+          }
           return acc;
         },
         { teamSupport: 0, fees: 0 }

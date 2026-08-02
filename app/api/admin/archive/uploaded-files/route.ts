@@ -1,6 +1,7 @@
 import { auditActorFromDashboardSession } from "@/lib/audit-log";
 import { archiveBlobEnabled, storeArchiveBlobFile } from "@/lib/archive/archive-blob-storage";
 import { getArchiveRepositorySnapshot } from "@/lib/archive/archive-repository";
+import { foundationArchiveData } from "@/lib/archive/archive-service";
 import {
   ARCHIVE_BASE64_CHUNK_SIZE,
   ARCHIVE_MAX_FILE_BYTES,
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
   const { denied } = await requireArchiveUploadedFileListAccess(category);
   if (denied) return denied;
 
-  const snapshot = await getArchiveRepositorySnapshot();
+  const snapshot = await getArchiveRepositorySnapshot(foundationArchiveData());
   const references = buildArchiveUploadReferences(snapshot.collections, snapshot.projects);
   const rows = await prisma.auditLog.findMany({
     where: { action: "archive.uploadedFile.create", entityType: "ArchiveUploadedFile" },
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
     return jsonNoStore({ ok: false, error: "الملفات المسموحة PDF أو Excel فقط" }, { status: 400 });
   }
 
-  const snapshot = await getArchiveRepositorySnapshot();
+  const snapshot = await getArchiveRepositorySnapshot(foundationArchiveData());
   const references = buildArchiveUploadReferences(snapshot.collections, snapshot.projects);
   const linkedCollectionId = validArchiveCollectionId(String(formData.get("linkedCollectionId") || ""), references);
   const linkedProjectId = validArchiveProjectId(String(formData.get("linkedProjectId") || ""), references);

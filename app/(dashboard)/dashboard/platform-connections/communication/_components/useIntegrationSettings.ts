@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import type { IntegrationProvider } from "@/lib/integration-settings/catalog";
 import type { SafeProviderConnectionTestResponse } from "@/lib/integration-settings/types";
 import { safeErrorMessage } from "@/lib/integration-settings/ui";
-import type { IntegrationUiSnapshot } from "./model";
+import { ROTATABLE_WEBHOOK_PROVIDERS, type IntegrationUiSnapshot } from "./model";
 
 type Notice = { kind: "success" | "error"; text: string } | null;
 type Drafts = Record<string, string>;
 
-type BrevoWebhookReveal = { url: string; candidateVersion: string | null } | null;
+type WebhookReveal = { url: string; candidateVersion: string | null } | null;
 
 async function json(response: Response): Promise<Record<string, any>> {
   const body = await response.json().catch(() => ({}));
@@ -30,7 +30,7 @@ export function useIntegrationSettings(initialProviders: IntegrationUiSnapshot[]
   const [notice, setNotice] = useState<Notice>(null);
   const [lastCandidateTest, setLastCandidateTest] = useState<SafeProviderConnectionTestResponse | null>(null);
   const [lastActiveTest, setLastActiveTest] = useState<SafeProviderConnectionTestResponse | null>(null);
-  const [brevoWebhookReveal, setBrevoWebhookReveal] = useState<BrevoWebhookReveal>(null);
+  const [webhookReveal, setWebhookReveal] = useState<WebhookReveal>(null);
   const snapshot = providers.find((item) => item.provider === active)!;
   const hasDirty = dirty.size > 0;
 
@@ -51,7 +51,7 @@ export function useIntegrationSettings(initialProviders: IntegrationUiSnapshot[]
     setDirty(new Set());
     setLastCandidateTest(null);
     setLastActiveTest(null);
-    setBrevoWebhookReveal(null);
+    setWebhookReveal(null);
     setNotice(null);
   }, [active]);
 
@@ -150,7 +150,7 @@ export function useIntegrationSettings(initialProviders: IntegrationUiSnapshot[]
       setDrafts(cleanDrafts(next));
       setDirty(new Set());
       setLastCandidateTest(null);
-      setBrevoWebhookReveal(null);
+      setWebhookReveal(null);
       setNotice({ kind: "success", text: "تم اعتماد الإعدادات بنجاح." });
     } catch (error) {
       const e = error as Error & { code?: string };
@@ -171,7 +171,7 @@ export function useIntegrationSettings(initialProviders: IntegrationUiSnapshot[]
       setDrafts(cleanDrafts(next));
       setDirty(new Set());
       setLastCandidateTest(null);
-      setBrevoWebhookReveal(null);
+      setWebhookReveal(null);
       setNotice({ kind: "success", text: "تم إلغاء التغييرات، ولم يتأثر التكوين العامل." });
     } catch (error) {
       const e = error as Error & { code?: string };
@@ -179,14 +179,16 @@ export function useIntegrationSettings(initialProviders: IntegrationUiSnapshot[]
     } finally { setBusy(null); }
   }
 
-  async function rotateBrevoWebhook() {
-    setBusy("brevo-webhook");
+  /** Rotates the server-minted webhook secret for whichever provider is currently open. */
+  async function rotateWebhook() {
+    if (!ROTATABLE_WEBHOOK_PROVIDERS[active]) return;
+    setBusy("rotate-webhook");
     setNotice(null);
     try {
-      const body = await json(await fetch("/api/admin/integration-settings/BREVO/webhook-token", { method: "POST" }));
-      setBrevoWebhookReveal({ url: String(body.webhookUrl), candidateVersion: body.candidateVersion ?? null });
-      await refreshProvider("BREVO");
-      setNotice({ kind: "success", text: "تم إنشاء رابط جديد بانتظار اعتماد إعدادات Brevo." });
+      const body = await json(await fetch(`/api/admin/integration-settings/${active}/webhook-token`, { method: "POST" }));
+      setWebhookReveal({ url: String(body.webhookUrl), candidateVersion: body.candidateVersion ?? null });
+      await refreshProvider(active);
+      setNotice({ kind: "success", text: "تم إنشاء رابط جديد بانتظار اعتماد الإعدادات." });
     } catch (error) {
       const e = error as Error & { code?: string };
       setNotice({ kind: "error", text: safeErrorMessage(e.code, e.message) });
@@ -210,7 +212,11 @@ export function useIntegrationSettings(initialProviders: IntegrationUiSnapshot[]
   async function toggleProvider() {
     if (active === "SYSTEM") return;
     const action = snapshot.enabled ? "DISABLE" : "ENABLE";
-    const warning = active === "BREVO" ? "تعطيل Brevo قد يوقف الإيميل وSMS الدولي." : "تعطيل المزود قد يوقف إرسال الرسائل المرتبطة به.";
+    const warning = active === "ELASTIC_EMAIL"
+      ? "تعطيل Elastic Email سيوقف كل رسائل البريد الإلكتروني."
+      : active === "BREVO"
+        ? "تعطيل Brevo سيوقف SMS للأرقام الدولية."
+        : "تعطيل المزود قد يوقف إرسال الرسائل المرتبطة به.";
     if (!window.confirm(`${warning} هل تريد المتابعة؟`)) return;
     setBusy("toggle");
     try {
@@ -225,7 +231,7 @@ export function useIntegrationSettings(initialProviders: IntegrationUiSnapshot[]
 
   return {
     providers, active, snapshot, drafts, dirty, busy, notice, lastCandidateTest, lastActiveTest,
-    brevoWebhookReveal, hasDirty, chooseProvider, updateDraft, saveChanges, testCandidate, testActive,
-    activateCandidate, discardCandidate, rotateBrevoWebhook, deleteField, toggleProvider, setNotice,
+    webhookReveal, hasDirty, chooseProvider, updateDraft, saveChanges, testCandidate, testActive,
+    activateCandidate, discardCandidate, rotateWebhook, deleteField, toggleProvider, setNotice,
   };
 }

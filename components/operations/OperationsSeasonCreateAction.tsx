@@ -71,15 +71,15 @@ export function OperationsSeasonCreateAction() {
         <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
           <label className="space-y-1 font-semibold text-slate-600 sm:col-span-2">
             اسم الموسم
-            <input value={form.title} onChange={(event) => setForm((value) => ({ ...value, title: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" />
+            <input value={form.title} onChange={(event) => setForm((value) => ({ ...value, title: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" />
           </label>
           <label className="space-y-1 font-semibold text-slate-600 sm:col-span-2">
             التركيز
-            <input value={form.focus} onChange={(event) => setForm((value) => ({ ...value, focus: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" />
+            <input value={form.focus} onChange={(event) => setForm((value) => ({ ...value, focus: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" />
           </label>
           <label className="space-y-1 font-semibold text-slate-600">
             الحالة
-            <select value={form.status} onChange={(event) => setForm((value) => ({ ...value, status: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]">
+            <select value={form.status} onChange={(event) => setForm((value) => ({ ...value, status: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand">
               <option value="PLANNING">تخطيط</option>
               <option value="ACTIVE">نشط</option>
               <option value="UPCOMING">قادم</option>
@@ -88,19 +88,19 @@ export function OperationsSeasonCreateAction() {
           </label>
           <label className="space-y-1 font-semibold text-slate-600">
             الفترة
-            <input value={form.period} onChange={(event) => setForm((value) => ({ ...value, period: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" />
+            <input value={form.period} onChange={(event) => setForm((value) => ({ ...value, period: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" />
           </label>
           <label className="space-y-1 font-semibold text-slate-600">
             المطلوب
-            <input type="number" value={form.required} onChange={(event) => setForm((value) => ({ ...value, required: event.target.valueAsNumber }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" />
+            <input type="number" value={form.required} onChange={(event) => setForm((value) => ({ ...value, required: event.target.valueAsNumber }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" />
           </label>
           <label className="space-y-1 font-semibold text-slate-600">
             الجاهز
-            <input type="number" value={form.ready} onChange={(event) => setForm((value) => ({ ...value, ready: event.target.valueAsNumber }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" />
+            <input type="number" value={form.ready} onChange={(event) => setForm((value) => ({ ...value, ready: event.target.valueAsNumber }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" />
           </label>
           <label className="space-y-1 font-semibold text-slate-600">
             نسبة الإنجاز
-            <input type="number" value={form.progress} onChange={(event) => setForm((value) => ({ ...value, progress: event.target.valueAsNumber }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" />
+            <input type="number" value={form.progress} onChange={(event) => setForm((value) => ({ ...value, progress: event.target.valueAsNumber }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" />
           </label>
           <div className="flex flex-wrap gap-2 sm:col-span-2">
             <Button type="button" size="sm" disabled={busy} onClick={saveSeason}>

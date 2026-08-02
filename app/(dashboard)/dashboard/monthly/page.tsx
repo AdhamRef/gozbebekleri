@@ -728,7 +728,7 @@ export default function MonthlySubscriptionsDashboardPage() {
       <div className="space-y-6 sm:space-y-8 p-0 sm:p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div className="text-right min-w-0 flex-1">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               التبرعات الشهرية والاشتراكات
             </h1>
             <p className="text-muted-foreground mt-1 text-sm break-words">
@@ -949,7 +949,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                   <div className="h-[400px] w-full">
                     {chartLoading ? (
                       <div className="h-full flex items-center justify-center bg-slate-50 rounded-lg">
-                        <Loader2 className="w-9 h-9 animate-spin text-[#025EB8]" />
+                        <Loader2 className="w-9 h-9 animate-spin text-brand" />
                       </div>
                     ) : chartView === "bar" ? (
                       chartMetric === "amount" ? (
@@ -1489,7 +1489,7 @@ export default function MonthlySubscriptionsDashboardPage() {
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
+              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             />
           </div>
           <div className="space-y-1">
@@ -1498,7 +1498,7 @@ export default function MonthlySubscriptionsDashboardPage() {
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
+              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             />
           </div>
         </div>
@@ -1840,7 +1840,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                             {d.type === "MONTHLY" ? (
                               d.isRecurringCharge ? (
                                 <span
-                                  className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[11px] font-medium bg-[#025EB8]/10 text-[#025EB8]"
+                                  className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[11px] font-medium bg-brand/10 text-brand"
                                   title="خصم تلقائي متكرر — تم دون أي إجراء من المتبرع"
                                 >
                                   <RefreshCw className="w-3 h-3" />
@@ -1849,7 +1849,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                                 </span>
                               ) : (
                                 <span
-                                  className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[11px] font-medium bg-[#FA5D17]/10 text-[#FA5D17]"
+                                  className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[11px] font-medium bg-brand-orange/10 text-brand-orange"
                                   title="أول دفعة عند إنشاء الاشتراك"
                                 >
                                   <Star className="w-3 h-3" />
@@ -1916,7 +1916,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                             {d.referral ? (
                               <Link
                                 href={`/dashboard/referrals/${d.referral.id}`}
-                                className="text-xs font-medium text-[#025EB8] hover:text-[#025EB8] hover:underline"
+                                className="text-xs font-medium text-brand hover:text-brand hover:underline"
                               >
                                 {d.referral.code}
                               </Link>
@@ -1952,7 +1952,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       title={fullList}
-                                      className="truncate text-slate-700 hover:text-[#025EB8] hover:underline"
+                                      className="truncate text-slate-700 hover:text-brand hover:underline"
                                     >
                                       {first.title}
                                     </Link>
@@ -1976,7 +1976,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       title={fullList}
-                                      className="truncate text-slate-700 hover:text-[#025EB8] hover:underline"
+                                      className="truncate text-slate-700 hover:text-brand hover:underline"
                                     >
                                       فئة: {first.name}
                                     </Link>
@@ -2048,10 +2048,10 @@ export default function MonthlySubscriptionsDashboardPage() {
             الاشتراكات
           </h2>
           <Card className="border border-gray-200/60 shadow-md shadow-violet-500/5 overflow-hidden bg-card">
-            <CardHeader className="border-b border-[#025EB8]/20 py-4 bg-[#025EB8]/4">
+            <CardHeader className="border-b border-brand/20 py-4 bg-brand/4">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between flex-row-reverse">
                 <div className="flex items-center gap-3 justify-end min-w-0">
-                  <div className="p-2 rounded-xl bg-[#025EB8] text-white shadow-sm shrink-0">
+                  <div className="p-2 rounded-xl bg-brand text-white shadow-sm shrink-0">
                     <LayoutList className="w-5 h-5" />
                   </div>
                   <div className="text-right min-w-0">
@@ -2106,9 +2106,9 @@ export default function MonthlySubscriptionsDashboardPage() {
                             className="shrink-0 h-8 w-8 inline-flex items-center justify-center rounded-md border border-gray-200 bg-white/90 hover:bg-gray-50  disabled:opacity-50"
                           >
                             {usersSearchLoading ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#025EB8]" />
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-brand" />
                             ) : (
-                              <Search className="w-3.5 h-3.5 text-[#025EB8]" />
+                              <Search className="w-3.5 h-3.5 text-brand" />
                             )}
                           </button>
                         </div>
@@ -2188,7 +2188,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                     {subsLoading && subsRows.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="py-14 text-center">
-                          <Loader2 className="w-8 h-8 animate-spin mx-auto text-[#025EB8]" />
+                          <Loader2 className="w-8 h-8 animate-spin mx-auto text-brand" />
                         </td>
                       </tr>
                     ) : !subsFetchedOnce ? (
@@ -2242,8 +2242,8 @@ export default function MonthlySubscriptionsDashboardPage() {
                                 <SelectTrigger
                                   className={cn(
                                     "h-7 text-[11px] w-full border-gray-200 bg-white/90 py-0",
-                                    s.status === "ACTIVE" && "text-[#025EB8] border-[#025EB8]/20",
-                                    s.status === "PAUSED" && "text-[#FA5D17] border-[#FA5D17]/20",
+                                    s.status === "ACTIVE" && "text-brand border-brand/20",
+                                    s.status === "PAUSED" && "text-brand-orange border-brand-orange/20",
                                     s.status === "CANCELLED" && "text-slate-700 border-slate-200"
                                   )}
                                 >
@@ -2262,7 +2262,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                                 </SelectContent>
                               </Select>
                               {subsStatusUpdatingId === s.id && (
-                                <Loader2 className="w-4 h-4 shrink-0 animate-spin text-[#025EB8]" />
+                                <Loader2 className="w-4 h-4 shrink-0 animate-spin text-brand" />
                               )}
                             </div>
                           </td>
@@ -2279,7 +2279,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                             {s.referral ? (
                               <Link
                                 href={`/dashboard/referrals/${s.referral.id}`}
-                                className="text-xs font-medium text-[#025EB8] hover:underline"
+                                className="text-xs font-medium text-brand hover:underline"
                               >
                                 {s.referral.code}
                               </Link>
@@ -2324,7 +2324,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                     type="button"
                     onClick={loadMoreSubs}
                     disabled={subsLoading}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#025EB8] hover:bg-[#025EB8] text-white text-sm font-medium disabled:opacity-50 shadow-sm"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand hover:bg-brand text-white text-sm font-medium disabled:opacity-50 shadow-sm"
                   >
                     {subsLoading ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -2409,7 +2409,7 @@ export default function MonthlySubscriptionsDashboardPage() {
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-6 p-4 sm:p-6 md:p-8 max-w-[1600px] mx-auto" dir="rtl">
+    <div className="space-y-6 max-w-[1600px] mx-auto" dir="rtl">
       <div className="h-16 rounded-lg bg-slate-200 animate-pulse" />
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
         {[1, 2, 3, 4, 5].map((i) => (

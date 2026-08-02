@@ -34,7 +34,7 @@ export function OperationsFilters({ filters, selectedFilter, query, resultCount,
       <CardHeader className="gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5 text-[#025EB8]" /> فلاتر المحتوى
+            <Filter className="h-5 w-5 text-brand" /> فلاتر المحتوى
           </CardTitle>
           <CardDescription className="mt-2">فلترة حسب مرحلة العمل والبحث داخل عناصر المحتوى.</CardDescription>
         </div>
@@ -47,7 +47,7 @@ export function OperationsFilters({ filters, selectedFilter, query, resultCount,
                 type="button"
                 aria-pressed={active}
                 onClick={() => onFilterChange(filter)}
-                className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${active ? "border-[#025EB8] bg-[#025EB8] text-white" : "bg-white text-slate-700 hover:border-[#025EB8] hover:text-[#025EB8]"}`}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${active ? "border-brand bg-brand text-white" : "bg-white text-slate-700 hover:border-brand hover:text-brand"}`}
               >
                 {labelForFilter(filter)}
               </button>

@@ -495,7 +495,7 @@ export default function DashboardPage() {
       <div className="space-y-6 sm:space-y-8 p-0 sm:p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div className="text-right min-w-0 flex-1">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               تحليل الإيرادات
             </h1>
             <p className="text-muted-foreground mt-1 text-sm break-words">
@@ -668,7 +668,7 @@ export default function DashboardPage() {
                   <div className="h-[400px] w-full">
                     {chartLoading ? (
                       <div className="h-full flex items-center justify-center bg-slate-50 rounded-lg">
-                        <Loader2 className="w-9 h-9 animate-spin text-[#025EB8]" />
+                        <Loader2 className="w-9 h-9 animate-spin text-brand" />
                       </div>
                     ) : chartView === "bar" ? (
                       chartMetric === "amount" ? (
@@ -1192,7 +1192,7 @@ export default function DashboardPage() {
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
+              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             />
           </div>
           <div className="space-y-1">
@@ -1201,7 +1201,7 @@ export default function DashboardPage() {
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
+              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             />
           </div>
         </div>
@@ -1503,7 +1503,7 @@ export default function DashboardPage() {
                               className={cn(
                                 "inline-block w-max px-1.5 py-px rounded-full text-[11px]",
                                 d.type === "MONTHLY"
-                                  ? "bg-[#025EB8]/10 text-[#025EB8]"
+                                  ? "bg-brand/10 text-brand"
                                   : "bg-slate-100 text-slate-600"
                               )}
                             >
@@ -1568,26 +1568,26 @@ const ACCENT_STYLES: Record<
   string,
   { bg: string; text: string; border: string }
 > = {
-  teal: { bg: "bg-[#025EB8]/8", text: "text-[#025EB8]", border: "border-[#025EB8]/20" },
+  teal: { bg: "bg-brand/8", text: "text-brand", border: "border-brand/20" },
   indigo: {
-    bg: "bg-[#025EB8]/8",
-    text: "text-[#025EB8]",
-    border: "border-[#025EB8]/20",
+    bg: "bg-brand/8",
+    text: "text-brand",
+    border: "border-brand/20",
   },
   amber: {
-    bg: "bg-[#FA5D17]/8",
-    text: "text-[#FA5D17]",
-    border: "border-[#FA5D17]/20",
+    bg: "bg-brand-orange/8",
+    text: "text-brand-orange",
+    border: "border-brand-orange/20",
   },
   violet: {
-    bg: "bg-[#025EB8]",
-    text: "text-[#025EB8]",
+    bg: "bg-brand",
+    text: "text-brand",
     border: "border-gray-200",
   },
   emerald: {
-    bg: "bg-[#025EB8]/8",
-    text: "text-[#025EB8]",
-    border: "border-[#025EB8]/20",
+    bg: "bg-brand/8",
+    text: "text-brand",
+    border: "border-brand/20",
   },
   slate: {
     bg: "bg-slate-100",
@@ -1595,9 +1595,9 @@ const ACCENT_STYLES: Record<
     border: "border-slate-200",
   },
   orange: {
-    bg: "bg-[#FA5D17]/8",
-    text: "text-[#FA5D17]",
-    border: "border-[#FA5D17]/20",
+    bg: "bg-brand-orange/8",
+    text: "text-brand-orange",
+    border: "border-brand-orange/20",
   },
 };
 

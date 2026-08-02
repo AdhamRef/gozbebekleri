@@ -46,6 +46,25 @@ body {
   background-color: rgba(255,255,255,0.80);
 }
 
+/* Dashboard sidebar scrollbar — light variant, for the neutral (white) shell. */
+.sidebar-scroll-light {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(203 213 225) transparent;
+}
+.sidebar-scroll-light::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-scroll-light::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-scroll-light::-webkit-scrollbar-thumb {
+  background-color: rgb(226 232 240);
+  border-radius: 99px;
+}
+.sidebar-scroll-light:hover::-webkit-scrollbar-thumb {
+  background-color: rgb(203 213 225);
+}
+
 .nextjs-portal {
   display: none;
 }
@@ -78,12 +97,18 @@ body {
     /* Primary color: rgba(2, 94, 184) converted to HSL */
     --primary: 206 98% 36%;
     --primary-light: 206 98% 65%;
-    --primary-foreground: 206 98% 65%;
+    /* A *-foreground token must be the contrast colour that sits ON TOP of its pair.
+       This was 206 98% 65% — light blue on a blue background, i.e. unreadable. Nothing
+       relied on it looking that way: ui/button.tsx already hardcodes `text-white` on the
+       default variant precisely to route around this. Fixing it makes the token usable
+       and repairs tooltip/checkbox/calendar, which do consume it. */
+    --primary-foreground: 0 0% 100%;
 
     /* Secondary color: rgba(250, 93, 23) converted to HSL */
     --secondary: 19 96% 54%;
     --secondary-light: 19 96% 75%;
-    --secondary-foreground: 19 96% 75%;
+    /* Same defect as --primary-foreground: light orange on orange. */
+    --secondary-foreground: 0 0% 100%;
 
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;

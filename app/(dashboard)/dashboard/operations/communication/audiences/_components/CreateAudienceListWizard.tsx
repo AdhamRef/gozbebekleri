@@ -171,7 +171,7 @@ export function CreateAudienceListWizard({ defaultType, smsEnabled = true }: { d
                   {s.kind === "TEST" ? (
                     <span className="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">جهة اختبار</span>
                   ) : (
-                    <span className="rounded border border-[#025EB8]/20 bg-[#025EB8]/5 px-1.5 py-0.5 text-[10px] font-bold text-[#025EB8]">متبرع</span>
+                    <span className="rounded border border-brand/20 bg-brand/5 px-1.5 py-0.5 text-[10px] font-bold text-brand">متبرع</span>
                   )}
                   {localeLabel(s.locale) ? <span className="text-[10px] text-slate-400">{localeLabel(s.locale)}</span> : null}
                 </div>
@@ -197,7 +197,7 @@ export function CreateAudienceListWizard({ defaultType, smsEnabled = true }: { d
     <div className="space-y-5">
       <ol className="flex flex-wrap gap-2">
         {STEPS.map((s, i) => (
-          <li key={s} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold ${i === step ? "border-[#025EB8] bg-[#025EB8] text-white" : i < step ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-500"}`}>
+          <li key={s} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold ${i === step ? "border-brand bg-brand text-white" : i < step ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-500"}`}>
             {i < step ? <Check className="h-3 w-3" /> : <span>{i + 1}</span>} {s}
           </li>
         ))}
@@ -212,7 +212,7 @@ export function CreateAudienceListWizard({ defaultType, smsEnabled = true }: { d
             <div><span className="mb-1 block text-xs font-bold text-slate-600">النوع</span>
               <div className="flex gap-2">
                 {(["CUSTOM", "TEST"] as const).map((t) => (
-                  <button key={t} type="button" onClick={() => setType(t)} className={`flex-1 rounded-md border px-3 py-2 text-sm font-bold ${type === t ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]" : "border-slate-200 text-slate-600"}`}>{TYPE_LABEL[t]}</button>
+                  <button key={t} type="button" onClick={() => setType(t)} className={`flex-1 rounded-md border px-3 py-2 text-sm font-bold ${type === t ? "border-brand bg-brand/5 text-brand" : "border-slate-200 text-slate-600"}`}>{TYPE_LABEL[t]}</button>
                 ))}
               </div>
               {type === "TEST" ? <p className="mt-1.5 text-[11px] leading-5 text-amber-700">جهة اختبار فقط، لن تظهر ضمن المتبرعين.</p> : null}
@@ -229,7 +229,7 @@ export function CreateAudienceListWizard({ defaultType, smsEnabled = true }: { d
                   const disabled = c.key === "SMS" && !smsEnabled;
                   const active = channels.includes(c.key);
                   return (
-                    <button key={c.key} type="button" disabled={disabled} onClick={() => toggleChannel(c.key)} className={`rounded-md border px-3 py-1.5 text-xs font-bold ${disabled ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300" : active ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]" : "border-slate-200 text-slate-600"}`}>{c.label}</button>
+                    <button key={c.key} type="button" disabled={disabled} onClick={() => toggleChannel(c.key)} className={`rounded-md border px-3 py-1.5 text-xs font-bold ${disabled ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300" : active ? "border-brand bg-brand/5 text-brand" : "border-slate-200 text-slate-600"}`}>{c.label}</button>
                   );
                 })}
               </div>
@@ -244,10 +244,10 @@ export function CreateAudienceListWizard({ defaultType, smsEnabled = true }: { d
             <div className="grid gap-5 lg:grid-cols-2">
               {/* Area A — search real donors */}
               <div>
-                <p className="mb-2 flex items-center gap-2 text-sm font-black text-slate-800"><UserPlus className="h-4 w-4 text-[#025EB8]" /> إضافة متبرعين</p>
+                <p className="mb-2 flex items-center gap-2 text-sm font-black text-slate-800"><UserPlus className="h-4 w-4 text-brand" /> إضافة متبرعين</p>
                 <div className="flex gap-2">
                   <input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && search()} placeholder="ابحث بالاسم أو البريد أو الهاتف" className={inputCls} />
-                  <button type="button" onClick={search} className="inline-flex h-10 items-center gap-1 rounded-md bg-[#025EB8] px-3 text-xs font-bold text-white">{searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</button>
+                  <button type="button" onClick={search} className="inline-flex h-10 items-center gap-1 rounded-md bg-brand px-3 text-xs font-bold text-white">{searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</button>
                 </div>
                 <div className="mt-2 space-y-1.5">
                   {results.length === 0 ? <p className="py-3 text-center text-xs text-slate-400">ابحث لإضافة متبرعين حقيقيين.</p> : results.map((d) => {
@@ -269,7 +269,7 @@ export function CreateAudienceListWizard({ defaultType, smsEnabled = true }: { d
                         {added ? (
                           <span className="inline-flex shrink-0 items-center gap-1 rounded px-2 py-1 font-bold text-emerald-600"><Check className="h-3.5 w-3.5" /> مضاف</span>
                         ) : (
-                          <button type="button" onClick={() => addDonor(d)} className="shrink-0 rounded bg-[#025EB8]/10 px-2 py-1 font-bold text-[#025EB8] hover:bg-[#025EB8]/20">إضافة</button>
+                          <button type="button" onClick={() => addDonor(d)} className="shrink-0 rounded bg-brand/10 px-2 py-1 font-bold text-brand hover:bg-brand/20">إضافة</button>
                         )}
                       </div>
                     );
@@ -314,7 +314,7 @@ export function CreateAudienceListWizard({ defaultType, smsEnabled = true }: { d
 
             <SelectedList />
 
-            <button type="button" onClick={save} disabled={busy} className="inline-flex h-10 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white hover:bg-[#024a92] disabled:opacity-40">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} حفظ القائمة</button>
+            <button type="button" onClick={save} disabled={busy} className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-40">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} حفظ القائمة</button>
           </div>
         ) : null}
 
@@ -324,7 +324,7 @@ export function CreateAudienceListWizard({ defaultType, smsEnabled = true }: { d
       <div className="flex items-center justify-between">
         <button type="button" disabled={step === 0} onClick={() => { setError(null); setStep((s) => Math.max(0, s - 1)); }} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 disabled:opacity-40"><ArrowRight className="h-4 w-4" /> السابق</button>
         {step < STEPS.length - 1 ? (
-          <button type="button" onClick={next} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white">التالي <ArrowLeft className="h-4 w-4" /></button>
+          <button type="button" onClick={next} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-brand px-4 text-sm font-bold text-white">التالي <ArrowLeft className="h-4 w-4" /></button>
         ) : null}
       </div>
     </div>

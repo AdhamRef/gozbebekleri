@@ -55,22 +55,22 @@ export function ArchiveUploadCard({ category, title, description, openHref }: Pr
           <h2 className="text-sm font-black text-slate-950">{title}</h2>
           <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
         </div>
-        <FileUp className="h-4 w-4 text-[#025EB8]" />
+        <FileUp className="h-4 w-4 text-brand" />
       </div>
 
       <div className="mt-3 grid gap-2">
-        <input value={fileTitle} onChange={(event) => setFileTitle(event.target.value)} placeholder="اسم الملف" className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]" />
+        <input value={fileTitle} onChange={(event) => setFileTitle(event.target.value)} placeholder="اسم الملف" className="h-8 rounded-md border px-2 text-xs outline-none focus:border-brand" />
         <input ref={fileRef} type="file" accept=".pdf,.xls,.xlsx,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="h-8 rounded-md border bg-white px-2 py-1 text-xs file:ml-2 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs file:font-bold file:text-slate-700" />
         <div className="grid grid-cols-[1fr_auto] gap-2">
           <Button type="button" size="sm" onClick={upload} disabled={saving} className="h-8 gap-2 text-xs font-bold">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
             {saving ? `${progress}%` : "رفع"}
           </Button>
-          <Link href={openHref} className="inline-flex h-8 items-center justify-center rounded-md border bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-[#025EB8] hover:text-[#025EB8]">
+          <Link href={openHref} className="inline-flex h-8 items-center justify-center rounded-md border bg-white px-3 text-xs font-bold text-slate-800 transition hover:border-brand hover:text-brand">
             فتح
           </Link>
         </div>
-        {saving ? <div className="h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-[#025EB8] transition-all" style={{ width: `${progress}%` }} /></div> : null}
+        {saving ? <div className="h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-brand transition-all" style={{ width: `${progress}%` }} /></div> : null}
         {message ? (
           <p className={`rounded-md border px-2 py-1.5 text-[11px] font-bold ${tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}>
             {message}

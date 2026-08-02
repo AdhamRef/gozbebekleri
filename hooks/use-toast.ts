@@ -1,194 +1,72 @@
-"use client"
+"use client";
 
-// Inspired by react-hot-toast library
-import * as React from "react"
+import type * as React from "react";
+import hotToast from "react-hot-toast";
 
-import type {
-  ToastActionElement,
-  ToastProps,
-} from "@/components/ui/toast"
+/**
+ * Adapter: shadcn's `useToast()` call shape on top of `react-hot-toast`.
+ *
+ * This file used to be the full shadcn toast store. It "worked" in the sense that it updated
+ * internal state — but rendering that state requires shadcn's `<Toaster />`
+ * (components/ui/toaster.tsx), and **nothing in this app ever mounted it**. The app mounts
+ * `react-hot-toast`'s `<Toaster />` instead (app/[locale]/layout.tsx and
+ * app/(dashboard)/dashboard/DashboardLayoutClient.tsx).
+ *
+ * So every `toast({...})` call through this hook was silently invisible. That hit two live
+ * dashboard pages:
+ *   - /dashboard/blog   (3 calls)
+ *   - /dashboard/ticker (7 calls)
+ * including error paths like "فشل في تحميل إعدادات شريط التبرعات" — an admin saw a failed save
+ * as complete silence.
+ *
+ * Rewriting the hook rather than the 10 call sites keeps the diff small and fixes both pages at
+ * once. It also drops this file's dependency on components/ui/toast.tsx, which imports the
+ * uninstalled `@radix-ui/react-toast` (see P2-4).
+ */
 
-const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+type ToastVariant = "default" | "destructive";
 
-type ToasterToast = ToastProps & {
-  id: string
-  title?: React.ReactNode
-  description?: React.ReactNode
-  action?: ToastActionElement
+export type ToastArgs = {
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+  variant?: ToastVariant;
+  /** Accepted and ignored — react-hot-toast has no action-button slot. */
+  action?: unknown;
+};
+
+/** Flattens {title, description} into one line; non-text ReactNodes are dropped. */
+function toMessage(title?: React.ReactNode, description?: React.ReactNode): string {
+  const parts = [title, description]
+    .filter((part) => part != null && part !== "")
+    .map((part) => (typeof part === "string" || typeof part === "number" ? String(part) : ""))
+    .filter(Boolean);
+  return parts.join(" — ") || "…";
 }
 
-const actionTypes = {
-  ADD_TOAST: "ADD_TOAST",
-  UPDATE_TOAST: "UPDATE_TOAST",
-  DISMISS_TOAST: "DISMISS_TOAST",
-  REMOVE_TOAST: "REMOVE_TOAST",
-} as const
-
-let count = 0
-
-function genId() {
-  count = (count + 1) % Number.MAX_SAFE_INTEGER
-  return count.toString()
+export function toast({ title, description, variant }: ToastArgs) {
+  const message = toMessage(title, description);
+  const id = variant === "destructive" ? hotToast.error(message) : hotToast.success(message);
+  return { id, dismiss: () => hotToast.dismiss(id), update: () => {} };
 }
 
-type ActionType = typeof actionTypes
+/**
+ * Shape of a queued toast. Always an empty list at runtime — react-hot-toast owns rendering —
+ * but typed as a real object array so the (orphaned) shadcn `<Toaster />` in
+ * components/ui/toaster.tsx still destructures `{ id, title, description, action, ...props }`
+ * without a type error. A bare `[] as const` breaks that rest-element destructuring.
+ */
+export type QueuedToast = {
+  id: string;
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+  action?: unknown;
+};
 
-type Action =
-  | {
-      type: ActionType["ADD_TOAST"]
-      toast: ToasterToast
-    }
-  | {
-      type: ActionType["UPDATE_TOAST"]
-      toast: Partial<ToasterToast>
-    }
-  | {
-      type: ActionType["DISMISS_TOAST"]
-      toastId?: ToasterToast["id"]
-    }
-  | {
-      type: ActionType["REMOVE_TOAST"]
-      toastId?: ToasterToast["id"]
-    }
-
-interface State {
-  toasts: ToasterToast[]
-}
-
-const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
-
-const addToRemoveQueue = (toastId: string) => {
-  if (toastTimeouts.has(toastId)) {
-    return
-  }
-
-  const timeout = setTimeout(() => {
-    toastTimeouts.delete(toastId)
-    dispatch({
-      type: "REMOVE_TOAST",
-      toastId: toastId,
-    })
-  }, TOAST_REMOVE_DELAY)
-
-  toastTimeouts.set(toastId, timeout)
-}
-
-export const reducer = (state: State, action: Action): State => {
-  switch (action.type) {
-    case "ADD_TOAST":
-      return {
-        ...state,
-        toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
-      }
-
-    case "UPDATE_TOAST":
-      return {
-        ...state,
-        toasts: state.toasts.map((t) =>
-          t.id === action.toast.id ? { ...t, ...action.toast } : t
-        ),
-      }
-
-    case "DISMISS_TOAST": {
-      const { toastId } = action
-
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
-      if (toastId) {
-        addToRemoveQueue(toastId)
-      } else {
-        state.toasts.forEach((toast) => {
-          addToRemoveQueue(toast.id)
-        })
-      }
-
-      return {
-        ...state,
-        toasts: state.toasts.map((t) =>
-          t.id === toastId || toastId === undefined
-            ? {
-                ...t,
-                open: false,
-              }
-            : t
-        ),
-      }
-    }
-    case "REMOVE_TOAST":
-      if (action.toastId === undefined) {
-        return {
-          ...state,
-          toasts: [],
-        }
-      }
-      return {
-        ...state,
-        toasts: state.toasts.filter((t) => t.id !== action.toastId),
-      }
-  }
-}
-
-const listeners: Array<(state: State) => void> = []
-
-let memoryState: State = { toasts: [] }
-
-function dispatch(action: Action) {
-  memoryState = reducer(memoryState, action)
-  listeners.forEach((listener) => {
-    listener(memoryState)
-  })
-}
-
-type Toast = Omit<ToasterToast, "id">
-
-function toast({ ...props }: Toast) {
-  const id = genId()
-
-  const update = (props: ToasterToast) =>
-    dispatch({
-      type: "UPDATE_TOAST",
-      toast: { ...props, id },
-    })
-  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
-
-  dispatch({
-    type: "ADD_TOAST",
-    toast: {
-      ...props,
-      id,
-      open: true,
-      onOpenChange: (open) => {
-        if (!open) dismiss()
-      },
-    },
-  })
-
+export function useToast() {
   return {
-    id: id,
-    dismiss,
-    update,
-  }
-}
-
-function useToast() {
-  const [state, setState] = React.useState<State>(memoryState)
-
-  React.useEffect(() => {
-    listeners.push(setState)
-    return () => {
-      const index = listeners.indexOf(setState)
-      if (index > -1) {
-        listeners.splice(index, 1)
-      }
-    }
-  }, [state])
-
-  return {
-    ...state,
     toast,
-    dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
-  }
+    dismiss: (id?: string) => hotToast.dismiss(id),
+    /** Always empty: react-hot-toast owns rendering, so there is no local queue to expose. */
+    toasts: [] as QueuedToast[],
+  };
 }
-
-export { useToast, toast }

@@ -90,29 +90,29 @@ export function ArchiveProjectManageActions({ project, collections }: Props) {
         <div className="grid gap-2">
           <div className="grid gap-2 md:grid-cols-3">
             <Field label="المجموعة">
-              <select value={collectionId} onChange={(event) => setCollectionId(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]">
+              <select value={collectionId} onChange={(event) => setCollectionId(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-brand">
                 <option value="">بدون مجموعة</option>
                 {collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}
               </select>
             </Field>
             <Field label="اسم المشروع">
-              <input value={title} onChange={(event) => setTitle(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]" />
+              <input value={title} onChange={(event) => setTitle(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-brand" />
             </Field>
             <Field label="السنة">
-              <select value={year} onChange={(event) => setYear(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]">
+              <select value={year} onChange={(event) => setYear(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-brand">
                 {withSelectedOption(options.years, year).map((option) => <option key={option} value={option}>{option}</option>)}
               </select>
             </Field>
           </div>
           <div className="grid gap-2 md:grid-cols-4">
-            <Field label="البلد"><select value={country} onChange={(event) => setCountry(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]">{withSelectedOption(options.countries, country).map((option) => <option key={option} value={option}>{option}</option>)}</select></Field>
-            <Field label="المدينة"><select value={city} onChange={(event) => setCity(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]">{withSelectedOption(options.cities, city).map((option) => <option key={option} value={option}>{option}</option>)}</select></Field>
-            <Field label="التصنيف"><select value={theme} onChange={(event) => setTheme(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]">{withSelectedOption(options.themes, theme).map((option) => <option key={option} value={option}>{option}</option>)}</select></Field>
-            <Field label="نوع المشروع"><select value={projectType} onChange={(event) => setProjectType(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]">{withSelectedOption(options.projectTypes, projectType).map((option) => <option key={option} value={option}>{option}</option>)}</select></Field>
+            <Field label="البلد"><select value={country} onChange={(event) => setCountry(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-brand">{withSelectedOption(options.countries, country).map((option) => <option key={option} value={option}>{option}</option>)}</select></Field>
+            <Field label="المدينة"><select value={city} onChange={(event) => setCity(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-brand">{withSelectedOption(options.cities, city).map((option) => <option key={option} value={option}>{option}</option>)}</select></Field>
+            <Field label="التصنيف"><select value={theme} onChange={(event) => setTheme(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-brand">{withSelectedOption(options.themes, theme).map((option) => <option key={option} value={option}>{option}</option>)}</select></Field>
+            <Field label="نوع المشروع"><select value={projectType} onChange={(event) => setProjectType(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-brand">{withSelectedOption(options.projectTypes, projectType).map((option) => <option key={option} value={option}>{option}</option>)}</select></Field>
           </div>
           <div className="grid gap-2 md:grid-cols-2">
-            <Field label="الوصف"><input value={description} onChange={(event) => setDescription(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]" /></Field>
-            <Field label="ملاحظات"><input value={notes} onChange={(event) => setNotes(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]" /></Field>
+            <Field label="الوصف"><input value={description} onChange={(event) => setDescription(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-brand" /></Field>
+            <Field label="ملاحظات"><input value={notes} onChange={(event) => setNotes(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-brand" /></Field>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" onClick={saveChanges} disabled={busy} className="h-8 gap-1.5 px-2.5 text-xs font-bold">

@@ -9,9 +9,10 @@ import type { CommunicationProviderKey, ProviderConnection } from "./communicati
  *
  * FINAL ARCHITECTURE:
  *   WhatsApp → Meta WhatsApp Cloud API   (active)
- *   Email    → Brevo Email               (active)
+ *   Email    → Elastic Email              (active)
  *   SMS TR   → Netgsm                     (active)
  *   SMS int'l→ Brevo SMS                  (active)
+ *   Brevo Email → LEGACY_DISABLED (replaced by Elastic Email)
  *   Twilio   → LEGACY_DISABLED
  *   SendGrid → LEGACY_DISABLED
  * ==========================================================================*/
@@ -33,7 +34,8 @@ export const PROVIDER_REGISTRY: OfficialProvider[] = [
   // WhatsApp
   { key: "META_WHATSAPP", channel: "WHATSAPP", labelAr: "Meta WhatsApp", active: true, legacy: false, scope: "ALL", status: "ACTIVE" },
   // Email
-  { key: "BREVO_EMAIL", channel: "EMAIL", labelAr: "Brevo Email", active: true, legacy: false, scope: "ALL", status: "ACTIVE" },
+  { key: "ELASTIC_EMAIL", channel: "EMAIL", labelAr: "Elastic Email", active: true, legacy: false, scope: "ALL", status: "ACTIVE" },
+  { key: "BREVO_EMAIL", channel: "EMAIL", labelAr: "Brevo Email", active: false, legacy: true, scope: "ALL", status: "DISABLED" },
   { key: "SENDGRID", channel: "EMAIL", labelAr: "SendGrid", active: false, legacy: true, scope: "ALL", status: "DISABLED" },
   // SMS
   { key: "BREVO_SMS", channel: "SMS", labelAr: "Brevo SMS", active: true, legacy: false, scope: "INTERNATIONAL", status: "ACTIVE" },
@@ -63,10 +65,10 @@ export function isProviderActive(key: string): boolean {
 
 export const OFFICIAL_PROVIDER_MATRIX = {
   whatsapp: "META_WHATSAPP",
-  email: "BREVO_EMAIL",
+  email: "ELASTIC_EMAIL",
   smsInternational: "BREVO_SMS",
   smsTurkey: "NETGSM_SMS",
-  legacyDisabled: ["TWILIO", "SENDGRID"],
+  legacyDisabled: ["TWILIO", "SENDGRID", "BREVO_EMAIL"],
 } as const;
 
 /* ============================================================================
@@ -75,12 +77,13 @@ export const OFFICIAL_PROVIDER_MATRIX = {
  * Kept only for the older readiness/overview screens (provider-connections readiness,
  * communication-service overview, operations/messaging page) that consumed the previous
  * `ProviderConnection[]` shape. It is derived from PROVIDER_REGISTRY and contains ONLY the active,
- * user-facing providers whose keys are valid `CommunicationProviderKey` values (Meta / Brevo Email /
- * Brevo SMS). The retired `SMS_FALLBACK` pseudo-provider has been removed; Twilio/SendGrid are never
- * included here (they live in PROVIDER_REGISTRY as legacy-disabled and surface via legacyProviders()).
+ * user-facing providers whose keys are valid `CommunicationProviderKey` values (Meta / Elastic Email /
+ * Brevo SMS). The retired `SMS_FALLBACK` pseudo-provider has been removed; Twilio/SendGrid/Brevo Email
+ * are never included here (they live in PROVIDER_REGISTRY as legacy-disabled and surface via
+ * legacyProviders()).
  * ==========================================================================*/
 
-const COMPAT_KEYS: readonly CommunicationProviderKey[] = ["META_WHATSAPP", "BREVO_EMAIL", "BREVO_SMS"];
+const COMPAT_KEYS: readonly CommunicationProviderKey[] = ["META_WHATSAPP", "ELASTIC_EMAIL", "BREVO_SMS"];
 
 export const communicationProviderRegistry: ProviderConnection[] = PROVIDER_REGISTRY.filter(
   (p): p is OfficialProvider & { key: CommunicationProviderKey } => (COMPAT_KEYS as readonly string[]).includes(p.key)

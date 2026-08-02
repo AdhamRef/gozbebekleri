@@ -16,7 +16,12 @@ type CheckoutBody = {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+    // Without this, an expired/absent session reached `session.user.id` below and threw
+    // `TypeError: Cannot read properties of null` — surfacing as an opaque 500 on the payment
+    // path instead of a 401 the client can act on by re-authenticating.
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const body = (await req.json()) as Partial<CheckoutBody>;
     const donationId = String(body.donationId || "").trim();

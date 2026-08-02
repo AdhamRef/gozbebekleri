@@ -23,8 +23,8 @@ export default async function TransactionalFlowsPage() {
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs font-bold text-[#025EB8]">مركز التواصل</p>
-          <h1 className="mt-1 text-xl font-black text-slate-900">التدفقات التشغيلية</h1>
+          <p className="text-xs font-bold text-brand">مركز التواصل</p>
+          <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">التدفقات التشغيلية</h1>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">محاكاة داخلية لتسلسل رسائل التبرع الناجح، فشل الدفع، الإيصال، والتبرعات الكبيرة.</p>
         </div>
         <Button asChild variant="outline" className="gap-2 font-bold"><Link href="/dashboard/operations/communication">العودة لمركز التواصل <ArrowLeft className="h-4 w-4" /></Link></Button>
@@ -45,7 +45,7 @@ export default async function TransactionalFlowsPage() {
       {overview.flows.map((flow) => <Card key={flow.id}>
         <CardHeader>
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div><CardDescription>{flow.eventKey}</CardDescription><CardTitle className="mt-1 flex items-center gap-2 text-lg"><GitBranch className="h-5 w-5 text-[#025EB8]" /> {flow.title}</CardTitle></div>
+            <div><CardDescription>{flow.eventKey}</CardDescription><CardTitle className="mt-1 flex items-center gap-2 text-lg"><GitBranch className="h-5 w-5 text-brand" /> {flow.title}</CardTitle></div>
             <Badge variant="outline" className={statusClass(flow.status)}>{statusLabel(flow.status)}</Badge>
           </div>
         </CardHeader>

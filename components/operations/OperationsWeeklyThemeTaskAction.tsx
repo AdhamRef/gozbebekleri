@@ -66,7 +66,7 @@ export function OperationsWeeklyThemeTaskAction({ theme }: { theme: WeeklyTheme 
         {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
         {created ? "تم إنشاء مهمة" : "إنشاء مهمة محور"}
       </Button>
-      {created ? <Link href="/dashboard/operations/tasks" className="text-xs font-bold text-[#025EB8] underline-offset-4 hover:underline">فتح المهام</Link> : null}
+      {created ? <Link href="/dashboard/operations/tasks" className="text-xs font-bold text-brand underline-offset-4 hover:underline">فتح المهام</Link> : null}
       {error ? <p className="text-xs font-bold text-rose-600">{error}</p> : null}
     </div>
   );

@@ -18,7 +18,7 @@ export function VariableLibrary({ onInsert }: { onInsert?: (token: string) => vo
   return (
     <div className="rounded-xl border border-slate-200 bg-white">
       <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between gap-2 p-3">
-        <span className="flex items-center gap-2 text-sm font-black text-slate-800"><Braces className="h-4 w-4 text-[#025EB8]" /> مكتبة المتغيرات</span>
+        <span className="flex items-center gap-2 text-sm font-black text-slate-800"><Braces className="h-4 w-4 text-brand" /> مكتبة المتغيرات</span>
         <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open ? (
@@ -37,7 +37,7 @@ export function VariableLibrary({ onInsert }: { onInsert?: (token: string) => vo
                         <span className="font-semibold text-slate-700">{v.label}</span>
                         <code dir="ltr" className="text-[10px] text-slate-400">{token}</code>
                         {onInsert ? (
-                          <button type="button" onClick={() => onInsert(token)} className="rounded bg-[#025EB8]/10 px-1.5 py-0.5 text-[10px] font-bold text-[#025EB8] hover:bg-[#025EB8]/20">إدراج</button>
+                          <button type="button" onClick={() => onInsert(token)} className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand hover:bg-brand/20">إدراج</button>
                         ) : null}
                         <button type="button" onClick={() => { navigator.clipboard?.writeText(token); setCopied(v.key); setTimeout(() => setCopied(null), 1200); }} className="text-slate-400 hover:text-slate-600">
                           {copied === v.key ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}

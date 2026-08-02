@@ -13,7 +13,7 @@ type Props = {
 
 export function ArchiveReferenceSelects({ refs, collectionId, projectId, onCollectionChange, onProjectChange, compact = false }: Props) {
   const projects = refs.projects.filter((project) => !collectionId || project.collectionId === collectionId);
-  const inputClass = `${compact ? "h-8 text-xs" : "h-9 text-sm"} rounded-md border bg-white px-2 outline-none focus:border-[#025EB8]`;
+  const inputClass = `${compact ? "h-8 text-xs" : "h-9 text-sm"} rounded-md border bg-white px-2 outline-none focus:border-brand`;
 
   return (
     <div className={compact ? "grid gap-2" : "grid gap-3 md:grid-cols-2"}>

@@ -75,7 +75,7 @@ export function TemplateRowActions({
               type="button"
               disabled={busy !== null}
               onClick={() => call(`${API}/${id}/variants`, { method: "POST", body: JSON.stringify({ language: l.code }) }, `lang-${l.code}`).then((ok) => ok && setAddingLang(false))}
-              className="inline-flex h-6 items-center rounded border border-[#025EB8]/30 bg-[#025EB8]/5 px-2 text-[11px] font-bold text-[#025EB8] hover:bg-[#025EB8]/10 disabled:opacity-60"
+              className="inline-flex h-6 items-center rounded border border-brand/30 bg-brand/5 px-2 text-[11px] font-bold text-brand hover:bg-brand/10 disabled:opacity-60"
             >
               {busy === `lang-${l.code}` ? <Loader2 className="h-3 w-3 animate-spin" /> : l.label}
             </button>

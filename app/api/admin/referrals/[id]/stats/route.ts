@@ -12,6 +12,7 @@ import {
   donationUsdSumFallback,
 } from "@/lib/dashboard/donation-usd-revenue";
 import { istanbulDateKeysToUtcRange } from "@/lib/admin/istanbul-calendar";
+import { donationFieldEmpty, donationWhereAll } from "@/lib/donations/mongo-null";
 
 function getDateRange(period: string, startParam?: string | null, endParam?: string | null) {
   let endDate: Date;
@@ -94,13 +95,16 @@ export async function GET(
     const allTimeDonationWhere = withCountry(baseAllTimeDonationWhere);
 
     // status=PAID alone includes abandoned checkouts that never settled; require paidAt too.
-    const paidDonationWhere: Prisma.DonationWhereInput = { ...donationWhere, ...PAID_DONATION_FILTER };
-    const failedDonationWhere: Prisma.DonationWhereInput = { ...donationWhere, status: "FAILED" };
-    const oneTimeWhere = { ...paidDonationWhere, subscriptionId: null };
-    const fromSubscriptionWhere = { ...paidDonationWhere, subscriptionId: { not: null } };
+    // Composed with donationWhereAll, not spread: both sides can carry a top-level `OR`
+    // (campaign/category scoping vs PAID_DONATION_FILTER) and spreading drops one silently.
+    const paidDonationWhere: Prisma.DonationWhereInput = donationWhereAll(donationWhere, PAID_DONATION_FILTER);
+    const failedDonationWhere: Prisma.DonationWhereInput = donationWhereAll(donationWhere, { status: "FAILED" });
+    // `{ subscriptionId: null }` misses rows where the field is absent — the majority here.
+    const oneTimeWhere = donationWhereAll(paidDonationWhere, donationFieldEmpty("subscriptionId"));
+    const fromSubscriptionWhere = donationWhereAll(paidDonationWhere, { subscriptionId: { not: null } });
     // All-status splits for the "breakdown" cards ("مرة واحدة (عدد)" / "شهرية (عدد)")
-    const oneTimeAllWhere: Prisma.DonationWhereInput = { ...donationWhere, subscriptionId: null };
-    const monthlyAllWhere: Prisma.DonationWhereInput = { ...donationWhere, subscriptionId: { not: null } };
+    const oneTimeAllWhere: Prisma.DonationWhereInput = donationWhereAll(donationWhere, donationFieldEmpty("subscriptionId"));
+    const monthlyAllWhere: Prisma.DonationWhereInput = donationWhereAll(donationWhere, { subscriptionId: { not: null } });
 
     const subscriptionWhere: Prisma.SubscriptionWhereInput = { referralId };
     if (campaignId && campaignId !== "all") {
@@ -133,8 +137,8 @@ export async function GET(
       ];
     }
     const thisMonthDonationWhere = withCountry(thisMonthBaseWhere);
-    const thisMonthPaidWhere: Prisma.DonationWhereInput = { ...thisMonthDonationWhere, ...PAID_DONATION_FILTER };
-    const allTimePaidWhere: Prisma.DonationWhereInput = { ...allTimeDonationWhere, ...PAID_DONATION_FILTER };
+    const thisMonthPaidWhere: Prisma.DonationWhereInput = donationWhereAll(thisMonthDonationWhere, PAID_DONATION_FILTER);
+    const allTimePaidWhere: Prisma.DonationWhereInput = donationWhereAll(allTimeDonationWhere, PAID_DONATION_FILTER);
 
     const [
       totalDonations,
@@ -290,9 +294,13 @@ export async function GET(
       rows.reduce(
         (acc, r) => {
           const usd = donationRowUsdApprox(r);
-          const total = r.totalAmount || 1;
-          acc.teamSupport += usd * ((r.teamSupport ?? 0) / total);
-          acc.fees += usd * ((r.fees ?? 0) / total);
+          // See app/api/admin/stats/route.ts — `|| 1` made an unproratable row contribute
+          // `usd * teamSupport` instead of its share. Skip such rows entirely.
+          const total = Number(r.totalAmount) || 0;
+          if (total > 0) {
+            acc.teamSupport += usd * ((r.teamSupport ?? 0) / total);
+            acc.fees += usd * ((r.fees ?? 0) / total);
+          }
           return acc;
         },
         { teamSupport: 0, fees: 0 }

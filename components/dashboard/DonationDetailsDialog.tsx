@@ -129,19 +129,19 @@ function FieldCard({
   return (
     <div
       className={cn(
-        "group rounded-xl border border-slate-200 bg-white px-3 py-2.5 transition-colors hover:border-[#025EB8]/40 hover:bg-[#025EB8]/[0.02]",
+        "group rounded-xl border border-slate-200 bg-white px-3 py-2.5 transition-colors hover:border-brand/40 hover:bg-brand/[0.02]",
         def.span === 2 ? "sm:col-span-2" : ""
       )}
     >
       <div className="flex items-center justify-between gap-2 mb-1">
         <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
-          <def.Icon className="w-3.5 h-3.5 text-[#025EB8]" />
+          <def.Icon className="w-3.5 h-3.5 text-brand" />
           <span>{def.label}</span>
         </div>
         <button
           type="button"
           onClick={() => copy(value)}
-          className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-[#025EB8] p-0.5 rounded"
+          className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-brand p-0.5 rounded"
           title="نسخ"
           aria-label={`نسخ ${def.label}`}
         >
@@ -160,7 +160,7 @@ function FieldCard({
             href={value}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[#025EB8] hover:underline inline-flex items-center gap-1"
+            className="text-brand hover:underline inline-flex items-center gap-1"
           >
             <span className="truncate inline-block max-w-full align-bottom">{value}</span>
             <ExternalLink className="w-3 h-3 shrink-0" />
@@ -399,7 +399,7 @@ export default function DonationDetailsDialog({ open, onOpenChange, mode, donati
               ? "bg-gradient-to-l from-red-50 to-white border-red-100"
               : mode === "payment"
                 ? "bg-gradient-to-l from-[#635bff]/5 to-white border-slate-100"
-                : "bg-gradient-to-l from-[#025EB8]/5 to-white border-slate-100"
+                : "bg-gradient-to-l from-brand/5 to-white border-slate-100"
           )}
         >
           <DialogTitle className="text-base font-semibold text-slate-900 text-right">

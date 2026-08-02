@@ -220,7 +220,10 @@ model Category {
   image         String?
   icon          String?
   order         Int?
+  /// Total shown publicly = baselineAmount + settled donation items. See Campaign.currentAmount.
   currentAmount Float    @default(0)
+  /// Offline/legacy money entered by hand; protected from donation-derived recomputes.
+  baselineAmount Float   @default(0)
 
   /// Archive flag. Toggling this from the dashboard cascades to every
   /// member Campaign — archiving the category archives all its campaigns,
@@ -296,7 +299,12 @@ model Campaign {
   slug          String?  @unique
 
   targetAmount  Float
+  /// Total shown publicly = baselineAmount + settled donation items.
+  /// NEVER recompute this from donations alone — that silently destroys baselineAmount.
   currentAmount Float   @default(0)
+  /// Money raised OUTSIDE the site (cash, bank transfer, a legacy system) that an admin
+  /// entered by hand. Kept separate so recomputing from donation rows can't wipe it.
+  baselineAmount Float  @default(0)
   images        String[]
   videoUrl      String?
   isActive         Boolean @default(true)
@@ -523,6 +531,11 @@ model SubscriptionItem {
 
   amount    Float
   amountUSD Float?
+  /// When set, line item was a سهوم (shares) purchase — mirrors DonationItem.shareCount.
+  /// Three creation paths (donations, stripe/intent, cart/payment) already spread this in
+  /// conditionally; without the field Prisma threw PrismaClientValidationError inside the
+  /// transaction, rolling back the whole thing — no subscription AND no donation, just a 500.
+  shareCount Int?
 
   subscription Subscription @relation(fields: [subscriptionId], references: [id])
   campaign     Campaign     @relation(fields: [campaignId], references: [id])
@@ -613,8 +626,10 @@ model Comment {
   donationId String?  @db.ObjectId
   donation   Donation? @relation(fields: [donationId], references: [id])
 
-  campaignId String   @db.ObjectId
-  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  /// Optional: a comment left on a DONATION has no single campaign (a donation can span
+  /// several campaigns, or be category-only). Campaign comments always set it.
+  campaignId String?   @db.ObjectId
+  campaign   Campaign? @relation(fields: [campaignId], references: [id])
 
   createdAt  DateTime @default(now())
 }

@@ -1,5 +1,6 @@
 import { auditActorFromDashboardSession } from "@/lib/audit-log";
 import { getArchiveRepositorySnapshot } from "@/lib/archive/archive-repository";
+import { foundationArchiveData } from "@/lib/archive/archive-service";
 import {
   ARCHIVE_MAX_FILE_BYTES,
   archiveExtension,
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
   if (sizeBytes > ARCHIVE_MAX_FILE_BYTES) return jsonNoStore({ ok: false, error: "حجم الملف كبير جدًا. الحد الحالي 30MB" }, { status: 400 });
   if (!Number.isInteger(totalChunks) || totalChunks <= 0 || totalChunks > 40) return jsonNoStore({ ok: false, error: "عدد أجزاء الملف غير صحيح" }, { status: 400 });
 
-  const snapshot = await getArchiveRepositorySnapshot();
+  const snapshot = await getArchiveRepositorySnapshot(foundationArchiveData());
   const references = buildArchiveUploadReferences(snapshot.collections, snapshot.projects);
   const linkedCollectionId = validArchiveCollectionId(String(body?.linkedCollectionId || ""), references);
   const linkedProjectId = validArchiveProjectId(String(body?.linkedProjectId || ""), references);

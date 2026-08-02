@@ -80,12 +80,12 @@ export async function planCampaignSend(campaignId: string, opts: { batchSize?: n
 
   const providerReady = await isSendEnabled(channel, runtime);
   if (!providerReady) {
-    const blocked = channel === "WHATSAPP" ? runtime.meta.reason : runtime.brevoEmail.reason;
+    const blocked = channel === "WHATSAPP" ? runtime.meta.reason : runtime.elasticEmail.reason;
     return { ...partial, providerReady: false, blocked: blocked ?? "PROVIDER_NOT_CONFIGURED" };
   }
   const senders = await listSenders();
   const senderReady = channel === "EMAIL"
-    ? !!(senders.find((sender) => sender.channel === "EMAIL" && sender.enabled)?.senderEmail || (runtime.brevoEmail.configured && runtime.brevoEmail.values.senderEmail))
+    ? !!(senders.find((sender) => sender.channel === "EMAIL" && sender.enabled)?.senderEmail || (runtime.elasticEmail.configured && runtime.elasticEmail.values.senderEmail))
     : senders.some((sender) => sender.channel === channel && sender.enabled && sender.status === "ACTIVE" && !!sender.phoneNumberId) || (runtime.meta.configured && !!runtime.meta.values.defaultPhoneNumberId);
   if (!senderReady) return { ...partial, providerReady, senderReady: false, blocked: "NO_SENDER_AVAILABLE" };
   return { ...partial, providerReady, senderReady: true, willSend: true };

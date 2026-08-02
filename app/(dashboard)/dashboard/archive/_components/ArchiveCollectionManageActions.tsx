@@ -64,17 +64,17 @@ export function ArchiveCollectionManageActions({ collection }: Props) {
         <div className="grid gap-2">
           <div className="grid gap-2 md:grid-cols-3">
             <Field label="اسم المجموعة">
-              <input value={name} onChange={(event) => setName(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]" />
+              <input value={name} onChange={(event) => setName(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-brand" />
             </Field>
             <Field label="النوع">
-              <input value={type} onChange={(event) => setType(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-[#025EB8]" />
+              <input value={type} onChange={(event) => setType(event.target.value)} className="h-8 rounded-md border px-2 text-xs outline-none focus:border-brand" />
             </Field>
             <Field label="الرابط المختصر">
-              <input dir="ltr" value={slug} onChange={(event) => setSlug(event.target.value)} className="h-8 rounded-md border px-2 text-left font-mono text-xs outline-none focus:border-[#025EB8]" />
+              <input dir="ltr" value={slug} onChange={(event) => setSlug(event.target.value)} className="h-8 rounded-md border px-2 text-left font-mono text-xs outline-none focus:border-brand" />
             </Field>
           </div>
           <Field label="الوصف">
-            <textarea value={description} onChange={(event) => setDescription(event.target.value)} className="min-h-14 rounded-md border px-2 py-2 text-xs outline-none focus:border-[#025EB8]" />
+            <textarea value={description} onChange={(event) => setDescription(event.target.value)} className="min-h-14 rounded-md border px-2 py-2 text-xs outline-none focus:border-brand" />
           </Field>
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" onClick={saveChanges} disabled={busy} className="h-8 gap-1.5 px-2.5 text-xs font-bold">

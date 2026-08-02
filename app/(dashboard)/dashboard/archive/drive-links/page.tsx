@@ -32,10 +32,10 @@ export default async function ArchiveDriveLinksPage() {
         <div className="rounded-2xl border bg-white shadow-sm">
           <div className="grid gap-0 xl:grid-cols-[1.15fr_0.85fr]">
             <div className="border-b p-5 xl:border-b-0 xl:border-l">
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-[#025EB8]">روابط الملفات</p>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-brand">روابط الملفات</p>
               <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                  <h1 className="text-2xl font-black">إدارة روابط الملفات</h1>
+                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight">إدارة روابط الملفات</h1>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
                     متابعة روابط ملفات المشاريع والتأكد من جاهزيتها للاستخدام داخل الأرشيف.
                   </p>
@@ -95,7 +95,7 @@ export default async function ArchiveDriveLinksPage() {
 
 function Metric({ label, value, hint }: { label: string; value: number; hint: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 text-slate-900">
+    <div className="rounded-xl border border-slate-200 bg-white text-slate-900">
       <p className="text-xs font-black uppercase tracking-[0.12em] opacity-60">{label}</p>
       <p className="mt-2 text-3xl font-black">{value}</p>
       <p className="mt-1 text-xs font-bold opacity-70">{hint}</p>
@@ -125,7 +125,7 @@ function HealthGate({ label, value }: { label: string; value: string }) {
 
 function IssueList({ title, emptyText, items }: { title: string; emptyText: string; items: string[] }) {
   return (
-    <div className="rounded-xl border bg-white p-4 text-slate-700">
+    <div className="rounded-xl border bg-white text-slate-700">
       <p className="font-black text-slate-950">{title}</p>
       {items.length === 0 ? (
         <p className="mt-2 text-sm font-semibold leading-6 opacity-75">{emptyText}</p>

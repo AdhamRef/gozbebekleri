@@ -14,7 +14,7 @@ const LOGS = [
 
 export default function LogsPage() {
   return (
-    <main className="space-y-5 p-4 sm:p-6" dir="rtl">
+    <main className="space-y-5" dir="rtl">
       <PageHeader
         eyebrow="ربط المنصات والإرسال / السجلات المتقدمة"
         title="السجلات المتقدمة"
@@ -23,8 +23,8 @@ export default function LogsPage() {
 
       <div className="grid gap-3 sm:grid-cols-2">
         {LOGS.map((l) => (
-          <Link key={l.href} href={l.href} className="flex gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-[#025EB8]/50 hover:shadow">
-            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-[#025EB8]">{l.icon}</span>
+          <Link key={l.href} href={l.href} className="flex gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand/50 hover:shadow">
+            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-brand">{l.icon}</span>
             <span>
               <span className="block text-sm font-bold text-slate-800">{l.label}</span>
               <span className="mt-0.5 block text-xs leading-5 text-slate-500">{l.desc}</span>

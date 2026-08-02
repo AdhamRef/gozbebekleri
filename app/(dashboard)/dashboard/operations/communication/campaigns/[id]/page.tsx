@@ -176,7 +176,7 @@ export default function CampaignWizardPage() {
   }
 
   if (loading || !data) {
-    return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#025EB8]" /></div>;
+    return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-brand" /></div>;
   }
 
   const { campaign, breakdown, templates, coverage, coverageGate, plan } = data;
@@ -201,7 +201,7 @@ export default function CampaignWizardPage() {
         <div>
           <p className="text-xs text-slate-400">التواصل / حملة</p>
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-black text-slate-900">{campaign.name}</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">{campaign.name}</h1>
             <Badge variant="outline" className="border-slate-200 text-slate-600">{statusLabel[campaign.status] ?? campaign.status}</Badge>
           </div>
         </div>
@@ -221,8 +221,8 @@ export default function CampaignWizardPage() {
           const active = step === n;
           const done = step > n;
           return (
-            <button key={label} onClick={() => setStep(n)} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-right text-sm transition ${active ? "border-[#025EB8] bg-blue-50 text-[#025EB8]" : done ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-500"}`}>
-              <span className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-black ${active ? "bg-[#025EB8] text-white" : done ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600"}`}>{done ? "✓" : n}</span>
+            <button key={label} onClick={() => setStep(n)} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-right text-sm transition ${active ? "border-brand bg-blue-50 text-brand" : done ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-500"}`}>
+              <span className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-black ${active ? "bg-brand text-white" : done ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600"}`}>{done ? "✓" : n}</span>
               <span className="truncate font-semibold">{label}</span>
             </button>
           );
@@ -241,7 +241,7 @@ export default function CampaignWizardPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-bold text-slate-500">القناة</p>
-              <Badge variant="outline" className="mt-1 border-[#025EB8]/30 bg-blue-50 text-[#025EB8]">{channelLabel[campaign.channel] ?? campaign.channel}</Badge>
+              <Badge variant="outline" className="mt-1 border-brand/30 bg-blue-50 text-brand">{channelLabel[campaign.channel] ?? campaign.channel}</Badge>
               <p className="mt-1 text-[11px] text-slate-400">لا يمكن تغيير القناة بعد إنشاء الحملة.</p>
             </div>
             <label className="text-sm">
@@ -278,7 +278,7 @@ export default function CampaignWizardPage() {
             <Stat label="مستبعد" value={excluded} tone="text-rose-700" />
           </div>
 
-          <button onClick={() => setShowDetails((v) => !v)} className="flex items-center gap-1 text-xs font-bold text-[#025EB8]"><ChevronDown className={`h-4 w-4 transition ${showDetails ? "rotate-180" : ""}`} /> عرض التفاصيل حسب اللغة</button>
+          <button onClick={() => setShowDetails((v) => !v)} className="flex items-center gap-1 text-xs font-bold text-brand"><ChevronDown className={`h-4 w-4 transition ${showDetails ? "rotate-180" : ""}`} /> عرض التفاصيل حسب اللغة</button>
           {showDetails && breakdown ? (
             <div className="overflow-x-auto rounded-lg border border-slate-100">
               <table className="w-full min-w-[40rem] text-sm">
@@ -350,7 +350,7 @@ export default function CampaignWizardPage() {
               <p className="text-xs font-bold text-slate-500">معاينة القالب</p>
               <div className="flex flex-wrap gap-2">
                 {previewLocales.map((l) => (
-                  <button key={l.locale} onClick={() => preview(l.locale)} className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-[#025EB8]/40">{l.label}</button>
+                  <button key={l.locale} onClick={() => preview(l.locale)} className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-brand/40">{l.label}</button>
                 ))}
               </div>
               {previewText ? (
@@ -384,7 +384,7 @@ export default function CampaignWizardPage() {
               <span className="text-slate-600">حالة المزود</span>
               <span className={`font-bold ${providerStatus.cls}`}>{providerStatus.text}</span>
             </div>
-            <p className="mt-2 text-xs leading-5 text-slate-500">سيتم اختيار رقم الإرسال تلقائيًا حسب اللغة والدولة. <Link href="/dashboard/operations/communication/settings" className="font-bold text-[#025EB8]">تعديل الإعدادات</Link></p>
+            <p className="mt-2 text-xs leading-5 text-slate-500">سيتم اختيار رقم الإرسال تلقائيًا حسب اللغة والدولة. <Link href="/dashboard/operations/communication/settings" className="font-bold text-brand">تعديل الإعدادات</Link></p>
           </div>
 
           <TrackingLinksPanel campaignId={id} report={data.trackingReport ?? null} onChanged={load} />
@@ -407,7 +407,7 @@ export default function CampaignWizardPage() {
             <div className="rounded-xl border border-violet-200 bg-violet-50 p-3 text-sm text-violet-800">
               <p>مجدولة للإرسال في: <b>{new Date(campaign.scheduledAt).toLocaleString("ar")}</b></p>
               <p className="mt-1 text-xs">{data.schedulerConfigured ? "سيتم التنفيذ تلقائيًا عند حلول الموعد." : "سيتم حفظ الموعد، لكن التنفيذ التلقائي يحتاج تفعيل Cron. حتى ذلك الحين شغّلها يدويًا."}</p>
-              <button onClick={runDue} disabled={busy} className="mt-1 text-xs font-bold text-[#025EB8] underline">تشغيل يدوي للحملات المستحقة</button>
+              <button onClick={runDue} disabled={busy} className="mt-1 text-xs font-bold text-brand underline">تشغيل يدوي للحملات المستحقة</button>
             </div>
           ) : null}
 
@@ -448,7 +448,7 @@ export default function CampaignWizardPage() {
 
 function Stat({ label, value, tone = "text-slate-900" }: { label: string; value: number; tone?: string }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-white p-3">
+    <div className="rounded-xl border border-slate-100 bg-white">
       <div className={`text-2xl font-black ${tone}`}>{value.toLocaleString()}</div>
       <div className="mt-0.5 text-xs text-slate-500">{label}</div>
     </div>

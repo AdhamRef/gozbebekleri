@@ -45,7 +45,7 @@ type RuntimeOptions = {
 };
 
 async function resolve<T extends Record<string, string>>(
-  provider: "META_WHATSAPP" | "BREVO" | "NETGSM",
+  provider: "META_WHATSAPP" | "ELASTIC_EMAIL" | "BREVO" | "NETGSM",
   required: readonly string[],
   select: (values: Record<string, string>) => T,
   options: RuntimeOptions = {}
@@ -114,9 +114,18 @@ export function getActiveMetaWebhookConfig(): Promise<ActiveRuntimeConfig<Pick<M
   );
 }
 
-export type BrevoEmailRuntimeValues = { apiKey: string; senderEmail: string; senderName: string };
-export function getActiveBrevoEmailRuntimeConfig(): Promise<ActiveRuntimeConfig<BrevoEmailRuntimeValues>> {
-  return resolve("BREVO", ["API_KEY", "EMAIL_SENDER_EMAIL"], (v) => ({ apiKey: v.API_KEY, senderEmail: v.EMAIL_SENDER_EMAIL, senderName: v.EMAIL_SENDER_NAME ?? "" }));
+export type ElasticEmailRuntimeValues = { apiKey: string; senderEmail: string; senderName: string };
+export function getActiveElasticEmailRuntimeConfig(): Promise<ActiveRuntimeConfig<ElasticEmailRuntimeValues>> {
+  return resolve("ELASTIC_EMAIL", ["API_KEY", "SENDER_EMAIL"], (v) => ({ apiKey: v.API_KEY, senderEmail: v.SENDER_EMAIL, senderName: v.SENDER_NAME ?? "" }));
+}
+
+export function getActiveElasticEmailWebhookSecret(): Promise<ActiveRuntimeConfig<{ secret: string }>> {
+  return resolve(
+    "ELASTIC_EMAIL",
+    ["WEBHOOK_SECRET"],
+    (v) => ({ secret: v.WEBHOOK_SECRET }),
+    { allowDisabled: true, allowDatabaseFallback: true }
+  );
 }
 
 export type BrevoSmsRuntimeValues = { apiKey: string; sender: string };
@@ -140,17 +149,17 @@ export function getActiveBrevoWebhookSecret(): Promise<ActiveRuntimeConfig<{ sec
 
 export type CommunicationRuntimeBundle = {
   meta: ActiveRuntimeConfig<MetaWhatsappRuntimeValues>;
-  brevoEmail: ActiveRuntimeConfig<BrevoEmailRuntimeValues>;
+  elasticEmail: ActiveRuntimeConfig<ElasticEmailRuntimeValues>;
   brevoSms: ActiveRuntimeConfig<BrevoSmsRuntimeValues>;
   netgsm: ActiveRuntimeConfig<NetgsmRuntimeValues>;
 };
 
 export async function getActiveCommunicationRuntimeBundle(): Promise<CommunicationRuntimeBundle> {
-  const [meta, brevoEmail, brevoSms, netgsm] = await Promise.all([
+  const [meta, elasticEmail, brevoSms, netgsm] = await Promise.all([
     getActiveMetaWhatsappRuntimeConfig(),
-    getActiveBrevoEmailRuntimeConfig(),
+    getActiveElasticEmailRuntimeConfig(),
     getActiveBrevoSmsRuntimeConfig(),
     getActiveNetgsmRuntimeConfig(),
   ]);
-  return { meta, brevoEmail, brevoSms, netgsm };
+  return { meta, elasticEmail, brevoSms, netgsm };
 }

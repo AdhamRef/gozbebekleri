@@ -317,7 +317,7 @@ export default function InboundMessagesTab() {
                               type="button"
                               variant="ghost"
                               size="sm"
-                              className="gap-1.5 text-[#025EB8] hover:text-[#025EB8] hover:bg-[#025EB8]/8"
+                              className="gap-1.5 text-brand hover:text-brand hover:bg-brand/8"
                               onClick={() => setSelectedMessage(m)}
                             >
                               <Eye className="w-4 h-4" />

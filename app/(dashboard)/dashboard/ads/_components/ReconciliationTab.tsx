@@ -169,7 +169,7 @@ export function ReconciliationTab({ period, dateFrom, dateTo }: Props) {
             className={cn(
               "h-8 px-3 rounded-lg border text-xs transition-colors",
               groupBy === k
-                ? "bg-[#025EB8] text-white border-[#025EB8]"
+                ? "bg-brand text-white border-brand"
                 : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
             )}
           >

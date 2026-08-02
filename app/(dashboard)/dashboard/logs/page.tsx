@@ -11,6 +11,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { PageHeader } from "@/components/dashboard/PageHeader";
 
 type AuditRow = {
   id: string;
@@ -29,13 +30,13 @@ function RoleIcon({ role }: { role: string }) {
   if (role === "ADMIN")
     return (
       <span title="مدير" className="shrink-0">
-        <ShieldCheck className="w-3.5 h-3.5 text-[#025EB8]" />
+        <ShieldCheck className="w-3.5 h-3.5 text-brand" />
       </span>
     );
   if (role === "STAFF")
     return (
       <span title="طاقم" className="shrink-0">
-        <UserCog className="w-3.5 h-3.5 text-[#FA5D17]" />
+        <UserCog className="w-3.5 h-3.5 text-brand-orange" />
       </span>
     );
   if (role === "DONOR")
@@ -55,7 +56,7 @@ function streamBadge(stream: string | null | undefined) {
   if (stream === "DONOR")
     return <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 ms-1.5">متبرع</span>;
   if (stream === "TEAM")
-    return <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#025EB8]/10 text-[#025EB8] ms-1.5">فريق</span>;
+    return <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand/10 text-brand ms-1.5">فريق</span>;
   return null;
 }
 
@@ -235,7 +236,7 @@ function LogTable({
               : `عرض ${logs.length} من ${total} إجمالي`}
           </p>
           {timePreset === "all" && total > 100 && (
-            <p className="text-xs text-[#025EB8]">
+            <p className="text-xs text-brand">
               يُعرض آخر 100 — اختر نطاقاً زمنياً لعرض المزيد
             </p>
           )}
@@ -254,16 +255,11 @@ export default function DashboardLogsPage() {
 
   return (
     <div className="min-h-0 space-y-5" dir="rtl">
-      {/* Header */}
-      <header className="text-right">
-        <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight flex items-center gap-2 justify-end">
-          <ScrollText className="w-7 h-7 text-[#025EB8] shrink-0" />
-          سجل النشاط
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          سجل موحّد لكل الأحداث — يمكنك تصفية حسب الفريق أو المتبرعين أو النطاق الزمني
-        </p>
-      </header>
+      <PageHeader
+        title="سجل النشاط"
+        description="سجل موحّد لكل الأحداث — يمكنك تصفية حسب الفريق أو المتبرعين أو النطاق الزمني"
+        icon={ScrollText}
+      />
 
       {/* Compact filter bar */}
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 flex flex-wrap items-center gap-2">
@@ -276,7 +272,7 @@ export default function DashboardLogsPage() {
               onClick={() => setStream(value)}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
                 stream === value
-                  ? "bg-[#025EB8] text-white shadow-sm"
+                  ? "bg-brand text-white shadow-sm"
                   : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
               }`}
             >
@@ -297,7 +293,7 @@ export default function DashboardLogsPage() {
               onClick={() => setTimePreset(value)}
               className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
                 timePreset === value
-                  ? "bg-[#025EB8] text-white shadow-sm"
+                  ? "bg-brand text-white shadow-sm"
                   : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
               }`}
             >
@@ -354,8 +350,8 @@ export default function DashboardLogsPage() {
 
       {/* Icon legend */}
       {/* <div className="flex items-center gap-4 text-xs text-slate-500 px-1">
-        <span className="flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5 text-[#025EB8]" /> مدير</span>
-        <span className="flex items-center gap-1"><UserCog className="w-3.5 h-3.5 text-[#FA5D17]" /> طاقم</span>
+        <span className="flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5 text-brand" /> مدير</span>
+        <span className="flex items-center gap-1"><UserCog className="w-3.5 h-3.5 text-brand-orange" /> طاقم</span>
         <span className="flex items-center gap-1"><HandHeart className="w-3.5 h-3.5 text-rose-500" /> متبرع</span>
       </div> */}
 

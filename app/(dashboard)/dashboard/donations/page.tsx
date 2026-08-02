@@ -39,7 +39,10 @@ import {
   Loader2,
   MoreVertical,
   Link2,
+  HandHeart,
 } from 'lucide-react';
+import { PageHeader } from '@/components/dashboard/PageHeader';
+import { PageHeaderSkeleton, FilterBarSkeleton, TableSkeleton } from '@/components/dashboard/skeletons';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Link, useRouter } from "@/i18n/routing";
@@ -200,22 +203,21 @@ export default function DonationsPage() {
   }
 
   return (
-    <div className="space-y-6 p-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">التبرعات</h1>
-          <p className="text-gray-600">إدارة تبرعات التبرع</p>
-        </div>
-        <div className="flex gap-2">
+    <div className="space-y-6">
+      <PageHeader
+        title="التبرعات"
+        description="إدارة تبرعات التبرع"
+        icon={HandHeart}
+        actions={
           <Button
             onClick={() => router.push('/dashboard/donations/new')}
-            className="bg-[#025EB8] hover:bg-[#014fa0] gap-2"
+            className="bg-brand hover:bg-brand-dark gap-2"
           >
             <Plus className="w-4 h-4" />
             تسجيل تبرع
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Filters Section */}
       <Card className="p-4">
@@ -258,7 +260,7 @@ export default function DonationsPage() {
                       setSelectedDonations([]);
                     }
                   }}
-                  className="w-5 h-5 rounded border border-gray-300 text-[#025EB8] focus:ring-[#025EB8]"
+                  className="w-5 h-5 rounded border border-gray-300 text-brand focus:ring-brand"
                 />
               </TableHead>
               <TableHead className="text-right">المتبرع</TableHead>
@@ -300,7 +302,7 @@ export default function DonationsPage() {
       className="w-8 h-8 rounded-full"
     />
   ) : (
-    <div className="w-8 h-8 rounded-full bg-[#025EB8] flex items-center justify-center text-white font-medium">
+    <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-white font-medium">
       {donation.donor.name.charAt(0).toUpperCase()}
     </div>
   )}
@@ -324,8 +326,8 @@ export default function DonationsPage() {
                 <TableCell>
                   <div className="flex flex-col gap-1">
                     {donation.items.map((item) => (
-                      <Link href={`/campaign/${(item.campaign as any).slug || item.campaign.id}`} key={item.campaign.id} className="text-sm text-[#025EB8] flex gap-2">
-                        <Link2 className='w-5 h-5 text-[#025EB8]' />
+                      <Link href={`/campaign/${(item.campaign as any).slug || item.campaign.id}`} key={item.campaign.id} className="text-sm text-brand flex gap-2">
+                        <Link2 className='w-5 h-5 text-brand' />
                         {item.campaign.title}
                       </Link>
                     ))}
@@ -392,9 +394,9 @@ export default function DonationsPage() {
 }
 
 const LoadingSkeleton = () => (
-  <div className="space-y-6 p-8">
-    <div className="h-20 bg-gray-200 rounded-lg animate-pulse" />
-    <div className="h-16 bg-gray-200 rounded-lg animate-pulse" />
-    <div className="h-96 bg-gray-200 rounded-lg animate-pulse" />
+  <div>
+    <PageHeaderSkeleton />
+    <FilterBarSkeleton />
+    <TableSkeleton rows={8} columns={6} />
   </div>
 );

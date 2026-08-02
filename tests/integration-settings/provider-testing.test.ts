@@ -3,6 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   BrevoConnectionTester,
+  ElasticEmailConnectionTester,
   MetaWhatsAppConnectionTester,
   NetgsmConnectionTester,
   SystemCronConnectionTester,
@@ -128,22 +129,20 @@ test("Meta tester requires a locally valid webhook verify token", async () => {
   assert.match(result.messageAr, /محليًا/);
 });
 
-test("Brevo tester validates account and verified email sender without sending", async () => {
+test("Brevo tester validates the SMS account without sending and without touching email endpoints", async () => {
   const calls: string[] = [];
   const fakeFetch: ProviderFetch = async (input) => {
-    const url = String(input);
-    calls.push(url);
-    return url.endsWith("/senders")
-      ? response(200, { senders: [{ email: "verified@example.org", active: true }] })
-      : response(200, { email: "account@example.org" });
+    calls.push(String(input));
+    return response(200, { email: "account@example.org" });
   };
   const result = await new BrevoConnectionTester(fakeFetch).test({
     provider: "BREVO",
     candidateVersion: null,
-    values: { API_KEY: "key", EMAIL_SENDER_EMAIL: "verified@example.org", SMS_SENDER: "GOZBEBEK" },
+    values: { API_KEY: "key", SMS_SENDER: "GOZBEBEK" },
   });
   assert.equal(result.success, true);
-  assert.deepEqual(calls, ["https://api.brevo.com/v3/account", "https://api.brevo.com/v3/senders"]);
+  assert.deepEqual(calls, ["https://api.brevo.com/v3/account"]);
+  assert.equal(calls.some((url) => url.includes("/senders") || url.includes("/smtp")), false);
 });
 
 test("Brevo tester records provider authentication failure safely", async () => {
@@ -151,11 +150,61 @@ test("Brevo tester records provider authentication failure safely", async () => 
   const result = await new BrevoConnectionTester(fakeFetch).test({
     provider: "BREVO",
     candidateVersion: null,
-    values: { API_KEY: "secret-api-key", EMAIL_SENDER_EMAIL: "verified@example.org", SMS_SENDER: "GOZBEBEK" },
+    values: { API_KEY: "secret-api-key", SMS_SENDER: "GOZBEBEK" },
   });
   assert.equal(result.success, false);
   assert.equal(result.failureCode, "BREVO_UNAUTHORIZED");
   assert.equal(JSON.stringify(result).includes("secret-api-key"), false);
+});
+
+test("Elastic Email tester confirms the sender domain is verified without sending", async () => {
+  const calls: string[] = [];
+  const fakeFetch: ProviderFetch = async (input) => {
+    calls.push(String(input));
+    return response(200, [{ Domain: "Gozbebekleri.org.tr", Spf: true, Dkim: true }]);
+  };
+  const result = await new ElasticEmailConnectionTester(fakeFetch).test({
+    provider: "ELASTIC_EMAIL",
+    candidateVersion: null,
+    values: { API_KEY: "elastic-api-key-1234567890", SENDER_EMAIL: "noreply@gozbebekleri.org.tr" },
+  });
+  assert.equal(result.success, true);
+  assert.deepEqual(calls, ["https://api.elasticemail.com/v4/domains"]);
+  assert.equal(calls.some((url) => url.includes("/emails")), false);
+});
+
+test("Elastic Email tester fails when the sender domain is not verified", async () => {
+  const fakeFetch: ProviderFetch = async () => response(200, [{ Domain: "other-domain.org" }]);
+  const result = await new ElasticEmailConnectionTester(fakeFetch).test({
+    provider: "ELASTIC_EMAIL",
+    candidateVersion: null,
+    values: { API_KEY: "elastic-api-key-1234567890", SENDER_EMAIL: "noreply@gozbebekleri.org.tr" },
+  });
+  assert.equal(result.success, false);
+  assert.equal(result.failureCode, "ELASTIC_EMAIL_SENDER_DOMAIN_NOT_VERIFIED");
+});
+
+test("Elastic Email tester reports an invalid key without leaking it", async () => {
+  const fakeFetch: ProviderFetch = async () => response(401, { Error: "unauthorized" });
+  const result = await new ElasticEmailConnectionTester(fakeFetch).test({
+    provider: "ELASTIC_EMAIL",
+    candidateVersion: null,
+    values: { API_KEY: "elastic-secret-key-value-000", SENDER_EMAIL: "noreply@gozbebekleri.org.tr" },
+  });
+  assert.equal(result.success, false);
+  assert.equal(result.failureCode, "ELASTIC_EMAIL_UNAUTHORIZED");
+  assert.equal(JSON.stringify(result).includes("elastic-secret-key-value-000"), false);
+});
+
+test("Elastic Email tester tolerates a send-scoped key that cannot list domains", async () => {
+  const fakeFetch: ProviderFetch = async () => response(403, { Error: "insufficient scope" });
+  const result = await new ElasticEmailConnectionTester(fakeFetch).test({
+    provider: "ELASTIC_EMAIL",
+    candidateVersion: null,
+    values: { API_KEY: "elastic-api-key-1234567890", SENDER_EMAIL: "noreply@gozbebekleri.org.tr" },
+  });
+  assert.equal(result.success, true);
+  assert.match(result.messageAr, /لم يتم التحقق من توثيق نطاق المرسل/);
 });
 
 test("Netgsm tester checks account and header without sending SMS", async () => {

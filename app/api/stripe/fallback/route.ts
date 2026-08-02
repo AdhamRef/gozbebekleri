@@ -15,7 +15,11 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+    // See app/api/stripe/checkout/route.ts — an unauthenticated request previously died with a
+    // TypeError 500 on `session.user.id` rather than a clean 401.
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const body = await req.json() as { donationId?: string; locale?: string };
     const donationId = String(body.donationId || "").trim();

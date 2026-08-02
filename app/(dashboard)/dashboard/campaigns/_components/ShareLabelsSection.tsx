@@ -80,7 +80,7 @@ export const ShareLabelsSection = forwardRef<ShareLabelsSectionRef, Props>(
           <div className="text-right flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-1.5 justify-end">
               تسمية الوحدة (اختياري)
-              <Tag className="w-4 h-4 text-[#FA5D17]" />
+              <Tag className="w-4 h-4 text-brand-orange" />
             </h3>
             <p className="text-[11px] text-slate-500 leading-relaxed mt-1">
               غيّر كلمة «سهم/أسهم» إلى ما يناسب طبيعة المشروع (مثل خروف/خراف، وجبة/وجبات، حقيبة/حقائب).

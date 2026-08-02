@@ -96,8 +96,8 @@ export default function CampaignsPage() {
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-bold text-[#025EB8]">مركز التواصل</p>
-            <h1 className="mt-1 text-xl font-black text-slate-900">حملات التواصل</h1>
+            <p className="text-xs font-bold text-brand">مركز التواصل</p>
+            <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">حملات التواصل</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
               جهّز حملات واتساب أو إيميل أو رسائل خطوة بخطوة: الجمهور، القالب، تغطية اللغات، التوجيه، ثم الاعتماد. لا إرسال فعلي بعد.
             </p>
@@ -124,7 +124,7 @@ export default function CampaignsPage() {
           <CardHeader className="pb-2"><CardTitle className="text-base">حملة جديدة</CardTitle></CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-4">
             <label className="block text-sm md:col-span-2"><span className="mb-1 block text-xs font-bold text-slate-500">اسم الحملة</span>
-              <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#025EB8]" /></label>
+              <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand" /></label>
             <label className="block text-sm"><span className="mb-1 block text-xs font-bold text-slate-500">القناة</span>
               <select value={channel} onChange={(e) => setChannel(e.target.value)} className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm">
                 <option value="WHATSAPP">واتساب</option><option value="EMAIL">إيميل</option><option value="SMS" disabled>رسائل SMS (قريبًا)</option></select></label>
@@ -140,7 +140,7 @@ export default function CampaignsPage() {
       ) : null}
 
       {loading ? (
-        <div className="flex min-h-[12rem] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#025EB8]" /></div>
+        <div className="flex min-h-[12rem] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-brand" /></div>
       ) : failed ? (
         <Card className="border-rose-200 bg-rose-50"><CardContent className="p-6 text-center text-sm font-semibold text-rose-700">تعذّر تحميل الحملات. حدّث الصفحة.</CardContent></Card>
       ) : items.length === 0 ? (
@@ -148,11 +148,11 @@ export default function CampaignsPage() {
       ) : (
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {items.map((c) => (
-            <Card key={c.id} className="h-full transition hover:border-[#025EB8]/40 hover:shadow-sm">
+            <Card key={c.id} className="h-full transition hover:border-brand/40 hover:shadow-sm">
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
                   <Link href={`/dashboard/operations/communication/campaigns/${c.id}`} className="min-w-0 flex-1">
-                    <CardTitle className="flex items-center gap-2 text-base"><Megaphone className="h-4 w-4 shrink-0 text-[#025EB8]" /> <span className="truncate">{c.name}</span></CardTitle>
+                    <CardTitle className="flex items-center gap-2 text-base"><Megaphone className="h-4 w-4 shrink-0 text-brand" /> <span className="truncate">{c.name}</span></CardTitle>
                   </Link>
                   <div className="flex shrink-0 items-center gap-2">
                     <Badge variant="outline" className={statusClass[c.status] ?? "border-slate-200 bg-slate-50 text-slate-600"}>{statusLabel[c.status] ?? c.status}</Badge>

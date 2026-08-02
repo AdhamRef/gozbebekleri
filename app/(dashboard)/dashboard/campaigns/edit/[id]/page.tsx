@@ -728,12 +728,12 @@ export default function EditCampaignPage() {
                       />
                       <label
                         htmlFor={`edit-locale-image-${locale}`}
-                        className={`flex flex-col items-center justify-center w-56 h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#025EB8] transition-colors ${
+                        className={`flex flex-col items-center justify-center w-56 h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-brand transition-colors ${
                           isUploading ? 'opacity-50 cursor-not-allowed' : ''
                         }`}
                       >
                         {isUploading ? (
-                          <Loader2 className="w-6 h-6 animate-spin text-[#025EB8]" />
+                          <Loader2 className="w-6 h-6 animate-spin text-brand" />
                         ) : (
                           <>
                             <Upload className="w-6 h-6 text-gray-400" />
@@ -1006,7 +1006,7 @@ export default function EditCampaignPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-[#025EB8]" />
+        <Loader2 className="w-8 h-8 animate-spin text-brand" />
       </div>
     );
   }
@@ -1017,7 +1017,7 @@ export default function EditCampaignPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">تعديل المشروع</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">تعديل المشروع</h1>
           <p className="text-gray-600">قم بتحديث معلومات المشروع</p>
           
           {/* ✅ Translation Status Badge */}
@@ -1027,7 +1027,7 @@ export default function EditCampaignPage() {
               الترجمات: {translationStatus.completed}/{translationStatus.total}
             </span>
             {translationStatus.hasEn && <span title="English available"><CheckCircle2 className="w-4 h-4 text-green-600" /></span>}
-            {translationStatus.hasFr && <span title="French available"><CheckCircle2 className="w-4 h-4 text-[#025EB8]" /></span>}
+            {translationStatus.hasFr && <span title="French available"><CheckCircle2 className="w-4 h-4 text-brand" /></span>}
             {translationStatus.hasTr && <span title="Turkish available"><CheckCircle2 className="w-4 h-4 text-red-500" /></span>}
             {translationStatus.hasId && <span title="Indonesian available"><CheckCircle2 className="w-4 h-4 text-orange-500" /></span>}
             {translationStatus.hasPt && <span title="Portuguese available"><CheckCircle2 className="w-4 h-4 text-green-700" /></span>}
@@ -1742,10 +1742,10 @@ export default function EditCampaignPage() {
                               }}
                               className={`relative group rounded-lg cursor-move transition-all ${
                                 isMain
-                                  ? 'ring-4 ring-[#025EB8] ring-offset-2 shadow-lg'
-                                  : 'ring-1 ring-gray-200 hover:ring-[#025EB8]/40'
+                                  ? 'ring-4 ring-brand ring-offset-2 shadow-lg'
+                                  : 'ring-1 ring-gray-200 hover:ring-brand/40'
                               } ${isDragging ? 'opacity-40 scale-95' : ''} ${
-                                isDropTarget ? 'ring-4 ring-[#FA5D17] ring-offset-2' : ''
+                                isDropTarget ? 'ring-4 ring-brand-orange ring-offset-2' : ''
                               }`}
                             >
                               <img
@@ -1755,7 +1755,7 @@ export default function EditCampaignPage() {
                                 className="w-full h-32 object-cover rounded-lg pointer-events-none select-none"
                               />
                               {isMain && (
-                                <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-[#025EB8] to-[#025EB8]/0 rounded-t-lg p-2 flex items-center gap-1.5">
+                                <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-brand to-brand/0 rounded-t-lg p-2 flex items-center gap-1.5">
                                   <Star className="w-4 h-4 text-white fill-white" />
                                   <span className="text-white text-xs font-bold drop-shadow">الصورة الرئيسية</span>
                                 </div>
@@ -1775,7 +1775,7 @@ export default function EditCampaignPage() {
                                   type="button"
                                   onClick={() => reorderImages(index, 0)}
                                   title="تعيين كصورة رئيسية"
-                                  className="absolute bottom-2 left-2 px-2 py-1 bg-white text-[#025EB8] text-xs font-semibold rounded shadow opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 hover:bg-[#025EB8] hover:text-white"
+                                  className="absolute bottom-2 left-2 px-2 py-1 bg-white text-brand text-xs font-semibold rounded shadow opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 hover:bg-brand hover:text-white"
                                 >
                                   <Star className="w-3 h-3" />
                                   جعلها الرئيسية
@@ -1800,10 +1800,10 @@ export default function EditCampaignPage() {
                             />
                             <label
                               htmlFor="images"
-                              className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#025EB8] transition-colors"
+                              className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-brand transition-colors"
                             >
                               {uploadingImage ? (
-                                <Loader2 className="w-6 h-6 animate-spin text-[#025EB8]" />
+                                <Loader2 className="w-6 h-6 animate-spin text-brand" />
                               ) : (
                                 <>
                                   <Upload className="w-6 h-6 text-gray-400" />
@@ -2064,7 +2064,7 @@ export default function EditCampaignPage() {
               {updates.map((update) => {
                 const hasTrans = (lc: string) => !!update.translations?.find(t => t.locale === lc)?.title;
                 const badges = [
-                  { lc: 'en', label: 'EN', cls: 'bg-[#025EB8]/10 text-[#025EB8]' },
+                  { lc: 'en', label: 'EN', cls: 'bg-brand/10 text-brand' },
                   { lc: 'fr', label: 'FR', cls: 'bg-purple-100 text-purple-700' },
                   { lc: 'tr', label: 'TR', cls: 'bg-red-100 text-red-700' },
                   { lc: 'id', label: 'ID', cls: 'bg-orange-100 text-orange-700' },
@@ -2073,7 +2073,7 @@ export default function EditCampaignPage() {
                 ];
 
                 return (
-                  <Card key={update.id} className="p-4">
+                  <Card key={update.id} className="">
                     <div className="flex justify-between items-start">
                       <div className="space-y-2 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -2093,7 +2093,7 @@ export default function EditCampaignPage() {
                           />
                         )}
                         {update.videoUrl && (
-                          <div className="text-[#025EB8] hover:underline">
+                          <div className="text-brand hover:underline">
                             <a href={update.videoUrl} target="_blank" rel="noopener noreferrer">
                               مشاهدة الفيديو
                             </a>
@@ -2147,7 +2147,7 @@ export default function EditCampaignPage() {
             </Button>
             <Button
               type="submit"
-              className="bg-[#025EB8] hover:bg-[#014fa0]"
+              className="bg-brand hover:bg-brand-dark"
               disabled={saving}
             >
               {saving && <Loader2 className="w-4 h-4 ml-2 animate-spin" />}

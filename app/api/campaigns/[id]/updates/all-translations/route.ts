@@ -3,14 +3,20 @@
 // GET /api/campaigns/[id]/updates/all-translations
 
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { prisma } from "@/lib/prisma";
 
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
-const prisma = globalForPrisma.prisma || new PrismaClient();
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
-
+// Admin-only ("for editing purposes", per the header comment): returns every locale for every
+// update on a campaign. Unauthenticated it exposed all translation drafts by campaign id.
+// Uses the shared prisma singleton instead of a per-module PrismaClient.
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getServerSession(authOptions);
+    const denied = requireAdminOrDashboardPermission(session, "campaigns");
+    if (denied) return denied;
+
     const { id } = await params;
 
     // ✅ Fetch all updates with ALL translations
@@ -40,9 +46,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       },
     });
 
+    // Was `Cache-Control: public, s-maxage=60` — on an authenticated admin response that lets
+    // a shared CDN store per-admin content and potentially serve it to another requester.
+    // Must be private/no-store now that the route is session-guarded.
     return NextResponse.json(updates, {
       headers: {
-        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+        "Cache-Control": "private, no-store",
       },
     });
     

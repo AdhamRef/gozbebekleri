@@ -128,7 +128,7 @@ export function ContentLocalizationPreviewDialog({
       <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto" dir="rtl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-[#025EB8]" />
+            <Sparkles className="h-5 w-5 text-brand" />
             معاينة النصوص والترجمات
           </DialogTitle>
         </DialogHeader>

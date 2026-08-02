@@ -177,7 +177,7 @@ export default function OutboundHistoryTab() {
         </p>
         <Button
           onClick={() => setShowSendDialog(true)}
-          className="bg-[#025EB8] hover:bg-[#014fa0] gap-2 self-start sm:self-auto"
+          className="bg-brand hover:bg-brand-dark gap-2 self-start sm:self-auto"
         >
           <Send className="w-4 h-4" />
           إرسال يدوي
@@ -433,7 +433,7 @@ export default function OutboundHistoryTab() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="gap-1.5 text-[#025EB8] hover:text-[#025EB8] hover:bg-[#025EB8]/8"
+                              className="gap-1.5 text-brand hover:text-brand hover:bg-brand/8"
                               onClick={() => setSelectedId(r.id)}
                             >
                               <Eye className="w-4 h-4" />

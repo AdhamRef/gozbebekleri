@@ -146,7 +146,7 @@ export default function NewCategoryPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">إنشاء حملة جديدة</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">إنشاء حملة جديدة</h1>
           <p className="text-gray-600">قم بإدخال معلومات الحملة</p>
         </div>
         <Button
@@ -325,10 +325,10 @@ export default function NewCategoryPage() {
                             />
                             <label
                               htmlFor="image"
-                              className="flex flex-col items-center justify-center w-40 h-40 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#025EB8] transition-colors"
+                              className="flex flex-col items-center justify-center w-40 h-40 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-brand transition-colors"
                             >
                               {uploadingImage ? (
-                                <Loader2 className="w-6 h-6 animate-spin text-[#025EB8]" />
+                                <Loader2 className="w-6 h-6 animate-spin text-brand" />
                               ) : (
                                 <>
                                   <Upload className="w-6 h-6 text-gray-400" />
@@ -365,8 +365,8 @@ export default function NewCategoryPage() {
                       <div className="space-y-3">
                         {field.value && (
                           <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <div className="w-9 h-9 rounded-lg bg-[#025EB8]/10 flex items-center justify-center">
-                              <CategoryIcon name={field.value} className="w-5 h-5 text-[#025EB8]" />
+                            <div className="w-9 h-9 rounded-lg bg-brand/10 flex items-center justify-center">
+                              <CategoryIcon name={field.value} className="w-5 h-5 text-brand" />
                             </div>
                             <span className="font-medium">{field.value}</span>
                           </div>
@@ -380,8 +380,8 @@ export default function NewCategoryPage() {
                               onClick={() => field.onChange(name)}
                               className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-all ${
                                 field.value === name
-                                  ? 'border-[#025EB8] bg-[#025EB8]/10 text-[#025EB8]'
-                                  : 'border-gray-200 text-gray-500 hover:border-[#025EB8]/50 hover:text-[#025EB8]'
+                                  ? 'border-brand bg-brand/10 text-brand'
+                                  : 'border-gray-200 text-gray-500 hover:border-brand/50 hover:text-brand'
                               }`}
                             >
                               <CategoryIcon name={name} className="w-5 h-5" />
@@ -410,7 +410,7 @@ export default function NewCategoryPage() {
             </Button>
             <Button
               type="submit"
-              className="bg-[#025EB8] hover:bg-[#014fa0]"
+              className="bg-brand hover:bg-brand-dark"
               disabled={saving}
             >
               {saving && <Loader2 className="w-4 h-4 ml-2 animate-spin" />}

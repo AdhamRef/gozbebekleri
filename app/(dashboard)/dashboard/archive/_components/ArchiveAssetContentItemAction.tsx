@@ -53,7 +53,7 @@ export function ArchiveAssetContentItemAction({ assetId, fileName, disabled = fa
           <Layers3 className="h-4 w-4" /> {saving ? "جاري الإنشاء" : "إنشاء عنصر محتوى"}
         </Button>
         {feedback?.tone === "success" ? (
-          <Link href="/dashboard/operations/content" className="inline-flex items-center gap-1 text-xs font-bold text-[#025EB8] hover:underline">
+          <Link href="/dashboard/operations/content" className="inline-flex items-center gap-1 text-xs font-bold text-brand hover:underline">
             فتح إدارة المحتوى <ExternalLink className="h-3.5 w-3.5" />
           </Link>
         ) : null}

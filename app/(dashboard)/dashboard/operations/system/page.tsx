@@ -57,11 +57,11 @@ export default async function OperationsSystemPage() {
   const persistence = await getOperationsPersistenceSnapshot();
 
   return (
-    <div className="space-y-5 p-4 sm:p-6" dir="rtl">
-      <div className="flex flex-col gap-4 rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-5" dir="rtl">
+      <div className="flex flex-col gap-4 rounded-2xl border bg-gradient-to-l from-slate-950 to-brand p-5 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-xs text-white/70">العمليات والمحتوى</p>
-          <h1 className="mt-1.5 text-2xl font-black">حالة تجهيز النظام</h1>
+          <h1 className="mt-1.5 text-xl sm:text-2xl font-bold tracking-tight">حالة تجهيز النظام</h1>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
             متابعة مبسطة لما تم إنجازه، وما يتم تجهيزه الآن، وما سيظهر للفريق في المراحل التالية.
           </p>
@@ -85,15 +85,15 @@ export default async function OperationsSystemPage() {
         ))}
       </div>
 
-      <Card className="border-[#025EB8]/20 bg-blue-50/50">
+      <Card className="border-brand/20 bg-blue-50/50">
         <CardHeader className="gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-[#025EB8]" /> الجاري الآن</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-brand" /> الجاري الآن</CardTitle>
             <CardDescription className="mt-2 leading-6">
               نثبت نظام المحتوى التشغيلي خطوة بخطوة مع بقاء التسجيل الحالي يعمل كخطة أمان.
             </CardDescription>
           </div>
-          <Link href="/dashboard/operations/content" className="inline-flex rounded-md bg-[#025EB8] px-4 py-2 text-sm font-bold text-white hover:bg-[#024f99]">
+          <Link href="/dashboard/operations/content" className="inline-flex rounded-md bg-brand px-4 py-2 text-sm font-bold text-white hover:bg-[#024f99]">
             فتح لوحة المحتوى
           </Link>
         </CardHeader>
@@ -101,7 +101,7 @@ export default async function OperationsSystemPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-[#025EB8]" /> جاهزية بيانات التشغيل</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-brand" /> جاهزية بيانات التشغيل</CardTitle>
           <CardDescription className="leading-6">
             هذا القسم يوضح للفريق أي أجزاء أصبحت محفوظة وقابلة للاستخدام، وأي أجزاء ما زالت في مرحلة التجهيز.
           </CardDescription>
@@ -130,7 +130,7 @@ export default async function OperationsSystemPage() {
               <div key={dataset.key} className="rounded-2xl border bg-slate-50 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-bold text-[#025EB8]">{dataset.label}</p>
+                    <p className="text-xs font-bold text-brand">{dataset.label}</p>
                     <h3 className="mt-1 text-2xl font-black text-slate-900">{dataset.total}</h3>
                   </div>
                   <Badge variant="outline">{readinessLabel(dataset.persistence.mode, dataset.persistence.readyForDb)}</Badge>
@@ -157,7 +157,7 @@ export default async function OperationsSystemPage() {
             <div key={code} className="rounded-2xl border bg-slate-50 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold text-[#025EB8]">{code}</p>
+                  <p className="text-xs font-bold text-brand">{code}</p>
                   <h3 className="mt-1 font-black text-slate-900">{title}</h3>
                 </div>
                 <Badge variant="outline">{state}</Badge>
@@ -185,13 +185,13 @@ export default async function OperationsSystemPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-[#025EB8]" /> الجاري الآن</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5 text-brand" /> الجاري الآن</CardTitle>
             <CardDescription>المرحلة الحالية لتجهيز النظام للاستخدام اليومي.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             {active.map((item) => (
               <div key={item} className="flex gap-2 rounded-xl border bg-blue-50/50 p-3 text-sm text-slate-700">
-                <CircleDashed className="mt-0.5 h-4 w-4 shrink-0 text-[#025EB8]" /> {item}
+                <CircleDashed className="mt-0.5 h-4 w-4 shrink-0 text-brand" /> {item}
               </div>
             ))}
           </CardContent>
@@ -214,7 +214,7 @@ export default async function OperationsSystemPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Megaphone className="h-5 w-5 text-[#025EB8]" /> قاعدة العمل</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Megaphone className="h-5 w-5 text-brand" /> قاعدة العمل</CardTitle>
           <CardDescription>كل مرحلة جديدة يجب أن تظهر داخل اللوحة بصورة مفهومة للفريق، وليس كشرح تقني.</CardDescription>
         </CardHeader>
         <CardContent className="text-sm leading-7 text-slate-700">

@@ -69,15 +69,15 @@ export function OperationsContentPlanCreateAction() {
         <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
           <label className="space-y-1 font-semibold text-slate-600 sm:col-span-2">
             اسم الخطة
-            <input value={form.title} onChange={(event) => setForm((value) => ({ ...value, title: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" />
+            <input value={form.title} onChange={(event) => setForm((value) => ({ ...value, title: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" />
           </label>
           <label className="space-y-1 font-semibold text-slate-600 sm:col-span-2">
             المحور
-            <input value={form.theme} onChange={(event) => setForm((value) => ({ ...value, theme: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" />
+            <input value={form.theme} onChange={(event) => setForm((value) => ({ ...value, theme: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" />
           </label>
           <label className="space-y-1 font-semibold text-slate-600">
             الحالة
-            <select value={form.status} onChange={(event) => setForm((value) => ({ ...value, status: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]">
+            <select value={form.status} onChange={(event) => setForm((value) => ({ ...value, status: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand">
               <option value="PLANNING">تخطيط</option>
               <option value="ACTIVE">نشط</option>
               <option value="DONE">منتهي</option>
@@ -85,15 +85,15 @@ export function OperationsContentPlanCreateAction() {
           </label>
           <label className="space-y-1 font-semibold text-slate-600">
             الفترة
-            <input value={form.date} onChange={(event) => setForm((value) => ({ ...value, date: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" />
+            <input value={form.date} onChange={(event) => setForm((value) => ({ ...value, date: event.target.value }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" />
           </label>
           <label className="space-y-1 font-semibold text-slate-600">
             عدد العناصر
-            <input type="number" value={form.items} onChange={(event) => setForm((value) => ({ ...value, items: event.target.valueAsNumber }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" />
+            <input type="number" value={form.items} onChange={(event) => setForm((value) => ({ ...value, items: event.target.valueAsNumber }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" />
           </label>
           <label className="space-y-1 font-semibold text-slate-600">
             المنجز
-            <input type="number" value={form.published} onChange={(event) => setForm((value) => ({ ...value, published: event.target.valueAsNumber }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" />
+            <input type="number" value={form.published} onChange={(event) => setForm((value) => ({ ...value, published: event.target.valueAsNumber }))} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" />
           </label>
           <div className="flex flex-wrap gap-2 sm:col-span-2">
             <Button type="button" size="sm" disabled={busy} onClick={savePlan}>

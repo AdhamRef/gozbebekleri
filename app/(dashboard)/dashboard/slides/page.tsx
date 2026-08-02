@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { Plus, Pencil, Trash2, Loader2, GripVertical, Eye, EyeOff } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, GripVertical, Eye, EyeOff, Image as ImageIcon } from 'lucide-react';
+import { EmptyState } from '@/components/dashboard/EmptyState';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -142,17 +143,17 @@ export default function SlidesPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
+      <div className="flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">شرائح الهيرو</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">شرائح الهيرو</h1>
           <p className="text-muted-foreground mt-1">إدارة شرائح العرض الرئيسية</p>
         </div>
         <div className="flex items-center gap-3">
@@ -272,16 +273,17 @@ export default function SlidesPage() {
         </DndProvider>
 
         {slides.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-muted-foreground mb-4">
-              <Eye className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p className="text-lg font-medium">لا توجد شرائح</p>
-              <p className="text-sm mt-1">ابدأ بإضافة شريحة جديدة</p>
-            </div>
-            <Button onClick={() => router.push('/dashboard/slides/new')} className="gap-2 mt-4">
-              <Plus className="w-4 h-4" /> إضافة شريحة
-            </Button>
-          </div>
+          <EmptyState
+            variant="inline"
+            icon={ImageIcon}
+            title="لا توجد شرائح"
+            description="الشرائح تتحكم في السلايدر الظاهر على الصفحة الرئيسية للموقع. أضف أول شريحة للبدء."
+            action={
+              <Button onClick={() => router.push('/dashboard/slides/new')} className="gap-2 bg-brand hover:bg-brand-dark">
+                <Plus className="w-4 h-4" /> إضافة شريحة
+              </Button>
+            }
+          />
         )}
       </Card>
 

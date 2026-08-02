@@ -8,6 +8,8 @@ import { getDonorCountryCodeForSnapshot } from "@/lib/donations/donor-country-co
 // because failed donors typically never reach a /success-style page.
 import { sendDonationFailedConversions } from "@/lib/tracking/donation-conversion-server";
 import { dispatchDonationPaid, dispatchEvent } from "@/lib/events/dispatch";
+import { donationFieldEmpty } from "@/lib/donations/mongo-null";
+import { normalizeDonationCurrencyCode } from "@/lib/exchange/convert-amount-in-currency-to-usd";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
@@ -192,20 +194,26 @@ export async function POST(req: NextRequest) {
           // charge into a months-old row instead of creating one — the renewal
           // would then be invisible in every createdAt-ranged dashboard and the
           // subscription would stay permanently one donation short.
+          // `paidAt` is ABSENT (not null) on rows created by the checkout routes, and Prisma's
+          // `{ paidAt: null }` does not match an absent field on MongoDB. That mismatch is what
+          // made this handler miss the row it had already created and insert a duplicate
+          // donation for an invoice it had just recorded — see lib/donations/mongo-null.ts.
           const existingPending =
             (await tx.donation.findFirst({
               where: {
-                subscriptionId: dbSubscription.id,
-                providerOrderId: invoice.id,
-                paidAt: null,
+                AND: [
+                  { subscriptionId: dbSubscription.id, providerOrderId: invoice.id },
+                  donationFieldEmpty("paidAt"),
+                ],
               },
             })) ??
             (isSignupInvoice
               ? await tx.donation.findFirst({
                   where: {
-                    subscriptionId: dbSubscription.id,
-                    status: "PAID",
-                    paidAt: null,
+                    AND: [
+                      { subscriptionId: dbSubscription.id, status: "PAID" },
+                      donationFieldEmpty("paidAt"),
+                    ],
                   },
                   orderBy: { createdAt: "asc" },
                 })
@@ -230,7 +238,16 @@ export async function POST(req: NextRequest) {
             await tx.donation.create({
               data: {
                 amount: dbSubscription.amount,
-                amountUSD: dbSubscription.amountUSD ?? dbSubscription.amount,
+                // NEVER fall back to the raw local amount: that writes e.g. a ₺-denominated
+                // number into the USD column, inflating revenue ~34x. If the subscription is
+                // itself USD, `amount` IS the USD value; otherwise record null and let the
+                // dashboard's USD helpers / a backfill handle it. A null we can detect beats a
+                // wrong number we cannot.
+                amountUSD:
+                  dbSubscription.amountUSD ??
+                  (normalizeDonationCurrencyCode(dbSubscription.currency) === "USD"
+                    ? dbSubscription.amount
+                    : null),
                 teamSupport: dbSubscription.teamSupport,
                 coverFees: dbSubscription.coverFees,
                 currency: dbSubscription.currency,
@@ -345,7 +362,16 @@ export async function POST(req: NextRequest) {
         const failedRecurring = await prisma.donation.create({
           data: {
             amount: dbSubscription.amount,
-            amountUSD: dbSubscription.amountUSD ?? dbSubscription.amount,
+            // NEVER fall back to the raw local amount: that writes e.g. a ₺-denominated
+                // number into the USD column, inflating revenue ~34x. If the subscription is
+                // itself USD, `amount` IS the USD value; otherwise record null and let the
+                // dashboard's USD helpers / a backfill handle it. A null we can detect beats a
+                // wrong number we cannot.
+                amountUSD:
+                  dbSubscription.amountUSD ??
+                  (normalizeDonationCurrencyCode(dbSubscription.currency) === "USD"
+                    ? dbSubscription.amount
+                    : null),
             teamSupport: dbSubscription.teamSupport,
             coverFees: dbSubscription.coverFees,
             currency: dbSubscription.currency,

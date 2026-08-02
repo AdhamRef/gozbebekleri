@@ -48,8 +48,8 @@ export function MessagingTemplateCreate() {
     <div className="rounded-2xl border bg-white p-4 shadow-sm">
       <h2 className="font-black text-slate-900">إضافة قالب رسالة</h2>
       <div className="mt-3 space-y-2 text-sm">
-        <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="اسم القالب" className="w-full rounded-lg border px-3 py-2 outline-none focus:border-[#025EB8]" />
-        <textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="نص الرسالة" className="min-h-24 w-full rounded-lg border px-3 py-2 outline-none focus:border-[#025EB8]" />
+        <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="اسم القالب" className="w-full rounded-lg border px-3 py-2 outline-none focus:border-brand" />
+        <textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="نص الرسالة" className="min-h-24 w-full rounded-lg border px-3 py-2 outline-none focus:border-brand" />
         <Button type="button" disabled={busy || !title || !body} onClick={saveTemplate} className="gap-2 font-bold"><Save className="h-4 w-4" /> حفظ القالب</Button>
         {message ? <p className="text-xs font-semibold text-slate-500">{message}</p> : null}
       </div>

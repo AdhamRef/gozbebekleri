@@ -144,7 +144,7 @@ export default function EditSlidePage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">تعديل الشريحة</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">تعديل الشريحة</h1>
         <Button variant="outline" onClick={() => router.push('/dashboard/slides')} className="gap-2"><ArrowLeft className="w-4 h-4" /> العودة</Button>
       </div>
       <Form {...form}>

@@ -33,12 +33,12 @@ export function PageHeader({
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          {eyebrow ? <p className="text-xs font-bold text-[#025EB8]">{eyebrow}</p> : null}
-          <h1 className="mt-1 text-xl font-black text-slate-900">{title}</h1>
+          {eyebrow ? <p className="text-xs font-bold text-brand">{eyebrow}</p> : null}
+          <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">{title}</h1>
           <p className="mt-1.5 max-w-3xl text-sm leading-6 text-slate-600">{subtitle}</p>
         </div>
         {backHref ? (
-          <Link href={backHref} className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-[#025EB8]/50 hover:text-[#025EB8]">
+          <Link href={backHref} className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-brand/50 hover:text-brand">
             {backLabel} <ArrowLeft className="h-4 w-4" />
           </Link>
         ) : null}
@@ -50,7 +50,7 @@ export function PageHeader({
 
 export function PrimaryLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} className="inline-flex h-10 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#024a92]">
+    <Link href={href} className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white shadow-sm transition hover:bg-brand-700">
       {children}
     </Link>
   );
@@ -58,7 +58,7 @@ export function PrimaryLink({ href, children }: { href: string; children: ReactN
 
 export function GhostLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-[#025EB8]/50 hover:text-[#025EB8]">
+    <Link href={href} className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-brand/50 hover:text-brand">
       {children}
     </Link>
   );
@@ -104,7 +104,7 @@ export function StatusCard({
       </div>
       {detail ? <div className="mt-2 space-y-0.5 text-xs text-slate-500">{detail}</div> : null}
       {lastCheck ? <p className="mt-2 text-[11px] text-slate-400">آخر فحص: {fmtDate(lastCheck)}</p> : null}
-      <Link href={actionHref} className="mt-auto pt-3 inline-block text-xs font-bold text-[#025EB8] hover:underline">{actionLabel} ←</Link>
+      <Link href={actionHref} className="mt-auto pt-3 inline-block text-xs font-bold text-brand hover:underline">{actionLabel} ←</Link>
     </div>
   );
 }
@@ -120,8 +120,8 @@ export function EnvOnlyNote() {
 /** Small "quick link" tile for the روابط سريعة grid. */
 export function QuickLink({ href, label, icon }: { href: string; label: string; icon: ReactNode }) {
   return (
-    <Link href={href} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition hover:border-[#025EB8]/50 hover:shadow">
-      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-[#025EB8]">{icon}</span>
+    <Link href={href} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition hover:border-brand/50 hover:shadow">
+      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-brand">{icon}</span>
       <span className="text-sm font-bold text-slate-800">{label}</span>
     </Link>
   );

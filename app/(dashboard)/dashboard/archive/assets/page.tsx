@@ -18,7 +18,7 @@ export default async function ArchiveAssetsPage() {
       {linkedLegacyAssets.length > 0 ? (
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <div>
-            <p className="text-xs font-bold text-[#025EB8]">الملفات والأصول / مصادر قديمة</p>
+            <p className="text-xs font-bold text-brand">الملفات والأصول / مصادر قديمة</p>
             <h2 className="mt-1 text-xl font-black text-slate-900">أصول مرتبطة سابقًا بقسم الهوية</h2>
             <p className="mt-1.5 text-sm leading-6 text-slate-600">
               عرض قراءة فقط للملفات ذات الروابط الفعلية. لم يتم نسخ الملفات أوتغيير المعرّفات أوالروابط.
@@ -36,7 +36,7 @@ export default async function ArchiveAssetsPage() {
                 </div>
                 <p className="mt-3 text-sm leading-6 text-slate-600">{asset.usage}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <a href={asset.fileUrl ?? "#"} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center rounded-md bg-[#025EB8] px-3 text-xs font-bold text-white hover:bg-[#024a92]">فتح الملف</a>
+                  <a href={asset.fileUrl ?? "#"} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center rounded-md bg-brand px-3 text-xs font-bold text-white hover:bg-brand-700">فتح الملف</a>
                   <span className="inline-flex h-9 items-center rounded-md border bg-white px-3 text-xs font-semibold text-slate-600">ID: {asset.id}</span>
                 </div>
               </article>

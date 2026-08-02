@@ -1,6 +1,6 @@
 export type CommunicationChannel = "WHATSAPP" | "EMAIL" | "SMS";
 export type CommunicationPurpose = "TRANSACTIONAL" | "MARKETING";
-export type CommunicationProviderKey = "META_WHATSAPP" | "BREVO_EMAIL" | "BREVO_SMS" | "SMS_FALLBACK";
+export type CommunicationProviderKey = "META_WHATSAPP" | "ELASTIC_EMAIL" | "BREVO_EMAIL" | "BREVO_SMS" | "SMS_FALLBACK";
 export type ProviderConnectionStatus = "NOT_CONFIGURED" | "CONFIGURED" | "NEEDS_ATTENTION" | "DISABLED";
 export type TemplateReviewStatus = "DRAFT" | "NEEDS_REVIEW" | "APPROVED" | "ARCHIVED";
 export type FlowStatus = "DRAFT" | "ACTIVE" | "PAUSED";

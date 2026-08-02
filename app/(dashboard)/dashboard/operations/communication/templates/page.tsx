@@ -51,7 +51,7 @@ function filterGroups(groups: TemplateGroup[], tab: string): TemplateGroup[] {
 
 function SummaryCard({ label, value, tone }: { label: string; value: number; tone?: "warn" }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="text-xs text-slate-500">{label}</div>
       <div className={`mt-1 text-2xl font-black ${tone === "warn" && value > 0 ? "text-amber-700" : "text-slate-900"}`}>{value.toLocaleString("ar")}</div>
     </div>
@@ -63,7 +63,7 @@ function GroupCard({ g }: { g: TemplateGroup }) {
   const Icon = ch.icon;
   const autoActive = g.usage.some((u) => u.enabled);
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -104,7 +104,7 @@ function GroupCard({ g }: { g: TemplateGroup }) {
 
 function LegacyFrameworkCard({ framework }: { framework: BrandMessageFramework }) {
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <article className="rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="font-black text-slate-900">{framework.name}</h2>
@@ -134,17 +134,17 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
     : [];
 
   return (
-    <main className="space-y-5 p-4 sm:p-6" dir="rtl">
+    <main className="space-y-5" dir="rtl">
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs font-bold text-[#025EB8]">مركز التواصل / القوالب</p>
-            <h1 className="mt-1 text-2xl font-black text-slate-900">القوالب</h1>
+            <p className="text-xs font-bold text-brand">مركز التواصل / القوالب</p>
+            <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">القوالب</h1>
             <p className="mt-1.5 max-w-3xl text-sm leading-6 text-slate-600">قوالب واتساب، الإيميل، والرسائل القصيرة المستخدمة في الحملات والرسائل التلقائية.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href={`${BASE}/new`} className="inline-flex h-10 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white shadow-sm hover:bg-[#024a92]"><Plus className="h-4 w-4" /> إنشاء قالب</Link>
-            <Link href={`${BASE}/layouts`} className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:border-[#025EB8]/50 hover:text-[#025EB8]"><LayoutTemplate className="h-4 w-4" /> تصميم إيميل ثابت</Link>
+            <Link href={`${BASE}/new`} className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white shadow-sm hover:bg-brand-700"><Plus className="h-4 w-4" /> إنشاء قالب</Link>
+            <Link href={`${BASE}/layouts`} className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:border-brand/50 hover:text-brand"><LayoutTemplate className="h-4 w-4" /> تصميم إيميل ثابت</Link>
           </div>
         </div>
       </section>
@@ -160,7 +160,7 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
         {TABS.map((t) => {
           const active = t.key === tab;
           return (
-            <Link key={t.key} href={t.key === "all" ? BASE : `${BASE}?tab=${t.key}`} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${active ? "bg-[#025EB8] text-white" : "border border-slate-200 bg-white text-slate-600 hover:border-[#025EB8]/40"}`}>{t.label}</Link>
+            <Link key={t.key} href={t.key === "all" ? BASE : `${BASE}?tab=${t.key}`} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${active ? "bg-brand text-white" : "border border-slate-200 bg-white text-slate-600 hover:border-brand/40"}`}>{t.label}</Link>
           );
         })}
       </nav>
@@ -175,7 +175,7 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
         <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
           <LayoutTemplate className="h-8 w-8 text-slate-300" />
           <p className="text-sm text-slate-500">لا توجد قوالب في هذا القسم بعد.</p>
-          <Link href={`${BASE}/new`} className="inline-flex h-9 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-xs font-bold text-white hover:bg-[#024a92]"><Plus className="h-4 w-4" /> إنشاء قالب</Link>
+          <Link href={`${BASE}/new`} className="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-4 text-xs font-bold text-white hover:bg-brand-700"><Plus className="h-4 w-4" /> إنشاء قالب</Link>
         </div>
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">

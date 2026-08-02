@@ -35,7 +35,7 @@ function normalizeStep(input: Record<string, unknown>, index: number): Transacti
   return {
     id: stringField(input.id) ?? `flow_step_${Date.now()}_${index}`,
     channel: (stringField(input.channel) as TransactionalFlow["steps"][number]["channel"]) || "EMAIL",
-    providerKey: (stringField(input.providerKey) as TransactionalFlow["steps"][number]["providerKey"]) || "BREVO_EMAIL",
+    providerKey: (stringField(input.providerKey) as TransactionalFlow["steps"][number]["providerKey"]) || "ELASTIC_EMAIL",
     templateId: stringField(input.templateId) ?? "template_pending",
     delayMinutes: numberField(input.delayMinutes, 0),
     requiresConsent: booleanField(input.requiresConsent, true),

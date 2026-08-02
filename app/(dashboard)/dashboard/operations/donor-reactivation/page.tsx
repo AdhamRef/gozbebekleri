@@ -45,11 +45,11 @@ export default async function DonorReactivationPage() {
   const canMutate = overview.persistence.mode === "prisma" && !overview.persistence.readOnly;
 
   return (
-    <div className="space-y-5 p-4 sm:p-6" dir="rtl">
-      <div className="flex flex-col gap-4 rounded-2xl border bg-gradient-to-l from-slate-950 to-[#025EB8] p-5 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-5" dir="rtl">
+      <div className="flex flex-col gap-4 rounded-2xl border bg-gradient-to-l from-slate-950 to-brand p-5 text-white shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-xs text-white/70">العمليات / تنشيط المتبرعين</p>
-          <h1 className="mt-1.5 text-2xl font-black">تنشيط المتبرعين</h1>
+          <h1 className="mt-1.5 text-xl sm:text-2xl font-bold tracking-tight">تنشيط المتبرعين</h1>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
             ترشيح المتبرعين الذين لم يتبرعوا منذ 30 يومًا أو أكثر، مع إجراءات يدوية فقط: تسجيل تواصل، تخطي، استبعاد، أو إنشاء مهمة متابعة.
           </p>
@@ -58,7 +58,7 @@ export default async function DonorReactivationPage() {
             <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">بيانات الاتصال مخفية افتراضيًا</span>
           </div>
         </div>
-        <Link href="/dashboard/operations/tasks" className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-bold text-[#025EB8] shadow-sm hover:bg-white/90">
+        <Link href="/dashboard/operations/tasks" className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-bold text-brand shadow-sm hover:bg-white/90">
           فتح مهام الفريق
           <ArrowLeft className="h-4 w-4" />
         </Link>
@@ -83,13 +83,13 @@ export default async function DonorReactivationPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-[#025EB8]" /> قاعدة الترشيح</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-brand" /> قاعدة الترشيح</CardTitle>
             <CardDescription className="leading-6">آخر تبرع ناجح منذ 30 يومًا أو أكثر، ولا يوجد تواصل مسجّل خلال آخر 30 يومًا.</CardDescription>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-[#025EB8]" /> الحدود</CardTitle>
+            <CardTitle className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-brand" /> الحدود</CardTitle>
             <CardDescription className="leading-6">لا AI generation، لا external platform calls، لا auto-publish، ولا تعديل payment/tracking.</CardDescription>
           </CardHeader>
         </Card>
@@ -97,7 +97,7 @@ export default async function DonorReactivationPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><UsersRound className="h-5 w-5 text-[#025EB8]" /> قائمة التنشيط</CardTitle>
+          <CardTitle className="flex items-center gap-2"><UsersRound className="h-5 w-5 text-brand" /> قائمة التنشيط</CardTitle>
           <CardDescription className="leading-6">ابدأ بالمتبرعين الأقدم في آخر تبرع. استخدم مهمة متابعة عندما تحتاج مراجعة بشرية قبل أي تواصل.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 lg:grid-cols-2">
@@ -120,8 +120,8 @@ export default async function DonorReactivationPage() {
               </div>
 
               <div className="mt-4 grid gap-2 text-sm leading-6 text-slate-600 md:grid-cols-2">
-                <span className="flex items-center gap-2"><Mail className="h-4 w-4 text-[#025EB8]" /> {maskEmail(candidate.donorEmail)}</span>
-                <span className="flex items-center gap-2"><MessageCircle className="h-4 w-4 text-[#025EB8]" /> {maskPhone(candidate.donorPhone)}</span>
+                <span className="flex items-center gap-2"><Mail className="h-4 w-4 text-brand" /> {maskEmail(candidate.donorEmail)}</span>
+                <span className="flex items-center gap-2"><MessageCircle className="h-4 w-4 text-brand" /> {maskPhone(candidate.donorPhone)}</span>
                 <span>اللغة: <b>{candidate.locale}</b></span>
                 <span>الدولة: <b>{candidate.country ?? "غير محدد"}</b></span>
               </div>
@@ -133,7 +133,7 @@ export default async function DonorReactivationPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-[#025EB8]/20 bg-blue-50/60">
+      <Card className="border-brand/20 bg-blue-50/60">
         <CardHeader>
           <CardTitle>ماذا أفعل الآن؟</CardTitle>
           <CardDescription className="leading-6">

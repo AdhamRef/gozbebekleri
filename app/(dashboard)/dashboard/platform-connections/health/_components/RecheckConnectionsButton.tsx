@@ -34,7 +34,7 @@ export function RecheckConnectionsButton({ providers }: { providers: string[] })
 
   return (
     <div className="flex flex-col items-start gap-2">
-      <button type="button" disabled={loading} onClick={recheck} className="inline-flex h-10 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white disabled:opacity-50">
+      <button type="button" disabled={loading} onClick={recheck} className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white disabled:opacity-50">
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
         إعادة فحص الاتصالات
       </button>

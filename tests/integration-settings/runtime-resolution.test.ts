@@ -58,50 +58,50 @@ function resolver(rows: IntegrationSettingRecord[], env: NodeJS.ProcessEnv, unav
 }
 
 test("active database values override environment fallback", async () => {
-  const encrypted = encryptIntegrationSecret("db-active-key-123456789012345", integrationSecretContext("BREVO", "API_KEY"), KEY);
+  const encrypted = encryptIntegrationSecret("db-active-key-123456789012345", integrationSecretContext("ELASTIC_EMAIL", "API_KEY"), KEY);
   const r = resolver([
-    base("BREVO", "API_KEY", { isSecret: true, encryptedValue: encrypted }),
-    base("BREVO", "EMAIL_SENDER_EMAIL", { plainValue: "db@example.org" }),
-    base("BREVO", "SMS_SENDER", { plainValue: "DBSENDER" }),
-  ], { NODE_ENV: "test", BREVO_API_KEY: "env-key", BREVO_EMAIL_SENDER_EMAIL: "env@example.org", BREVO_SMS_SENDER: "ENVSENDER" });
-  const state = await r.getActiveRuntimeResolution("BREVO");
+    base("ELASTIC_EMAIL", "API_KEY", { isSecret: true, encryptedValue: encrypted }),
+    base("ELASTIC_EMAIL", "SENDER_EMAIL", { plainValue: "db@example.org" }),
+    base("ELASTIC_EMAIL", "SENDER_NAME", { plainValue: "DBSENDER" }),
+  ], { NODE_ENV: "test", ELASTIC_EMAIL_API_KEY: "env-key", ELASTIC_EMAIL_SENDER_EMAIL: "env@example.org", ELASTIC_EMAIL_SENDER_NAME: "ENVSENDER" });
+  const state = await r.getActiveRuntimeResolution("ELASTIC_EMAIL");
   assert.equal(state.values.API_KEY, "db-active-key-123456789012345");
-  assert.equal(state.values.EMAIL_SENDER_EMAIL, "db@example.org");
+  assert.equal(state.values.SENDER_EMAIL, "db@example.org");
   assert.equal(state.sources.API_KEY, "DATABASE");
 });
 
 test("environment values fill only missing active fields", async () => {
-  const r = resolver([], { NODE_ENV: "test", BREVO_API_KEY: "env-api-key-123456789012345", BREVO_EMAIL_SENDER_EMAIL: "env@example.org", BREVO_SMS_SENDER: "ENVSENDER" });
-  const state = await r.getActiveRuntimeResolution("BREVO");
+  const r = resolver([], { NODE_ENV: "test", ELASTIC_EMAIL_API_KEY: "env-api-key-123456789012345", ELASTIC_EMAIL_SENDER_EMAIL: "env@example.org", ELASTIC_EMAIL_SENDER_NAME: "ENVSENDER" });
+  const state = await r.getActiveRuntimeResolution("ELASTIC_EMAIL");
   assert.equal(state.databaseAvailable, true);
   assert.equal(state.values.API_KEY, "env-api-key-123456789012345");
   assert.equal(state.sources.API_KEY, "ENVIRONMENT");
 });
 
 test("pending values are never returned by active runtime resolution", async () => {
-  const active = encryptIntegrationSecret("active-api-key-123456789012345", integrationSecretContext("BREVO", "API_KEY"), KEY);
-  const pending = encryptIntegrationSecret("pending-api-key-987654321098765", integrationSecretContext("BREVO", "API_KEY"), KEY);
+  const active = encryptIntegrationSecret("active-api-key-123456789012345", integrationSecretContext("ELASTIC_EMAIL", "API_KEY"), KEY);
+  const pending = encryptIntegrationSecret("pending-api-key-987654321098765", integrationSecretContext("ELASTIC_EMAIL", "API_KEY"), KEY);
   const candidateVersion = "11111111-1111-4111-8111-111111111111";
   const r = resolver([
-    base("BREVO", PROVIDER_STATE_KEY, { candidateVersion }),
-    base("BREVO", "API_KEY", { isSecret: true, encryptedValue: active, pendingEncryptedValue: pending, pendingVersion: 2, pendingCandidateVersion: candidateVersion }),
-    base("BREVO", "EMAIL_SENDER_EMAIL", { plainValue: "active@example.org", pendingPlainValue: "pending@example.org", pendingVersion: 2, pendingCandidateVersion: candidateVersion }),
-    base("BREVO", "SMS_SENDER", { plainValue: "ACTIVE" }),
+    base("ELASTIC_EMAIL", PROVIDER_STATE_KEY, { candidateVersion }),
+    base("ELASTIC_EMAIL", "API_KEY", { isSecret: true, encryptedValue: active, pendingEncryptedValue: pending, pendingVersion: 2, pendingCandidateVersion: candidateVersion }),
+    base("ELASTIC_EMAIL", "SENDER_EMAIL", { plainValue: "active@example.org", pendingPlainValue: "pending@example.org", pendingVersion: 2, pendingCandidateVersion: candidateVersion }),
+    base("ELASTIC_EMAIL", "SENDER_NAME", { plainValue: "ACTIVE" }),
   ], { NODE_ENV: "test" });
-  const state = await r.getActiveRuntimeResolution("BREVO");
+  const state = await r.getActiveRuntimeResolution("ELASTIC_EMAIL");
   assert.equal(state.values.API_KEY, "active-api-key-123456789012345");
-  assert.equal(state.values.EMAIL_SENDER_EMAIL, "active@example.org");
+  assert.equal(state.values.SENDER_EMAIL, "active@example.org");
   assert.equal(JSON.stringify(state).includes("pending-api-key"), false);
   assert.equal(JSON.stringify(state).includes("pending@example.org"), false);
 });
 
 test("corrupt active database secret fails closed and does not use environment", async () => {
   const r = resolver([
-    base("BREVO", "API_KEY", { isSecret: true, encryptedValue: "corrupt-ciphertext" }),
-    base("BREVO", "EMAIL_SENDER_EMAIL", { plainValue: "db@example.org" }),
-    base("BREVO", "SMS_SENDER", { plainValue: "DBSENDER" }),
-  ], { NODE_ENV: "test", BREVO_API_KEY: "valid-environment-key-123456789", BREVO_EMAIL_SENDER_EMAIL: "env@example.org", BREVO_SMS_SENDER: "ENVSENDER" });
-  const state = await r.getActiveRuntimeResolution("BREVO");
+    base("ELASTIC_EMAIL", "API_KEY", { isSecret: true, encryptedValue: "corrupt-ciphertext" }),
+    base("ELASTIC_EMAIL", "SENDER_EMAIL", { plainValue: "db@example.org" }),
+    base("ELASTIC_EMAIL", "SENDER_NAME", { plainValue: "DBSENDER" }),
+  ], { NODE_ENV: "test", ELASTIC_EMAIL_API_KEY: "valid-environment-key-123456789", ELASTIC_EMAIL_SENDER_EMAIL: "env@example.org", ELASTIC_EMAIL_SENDER_NAME: "ENVSENDER" });
+  const state = await r.getActiveRuntimeResolution("ELASTIC_EMAIL");
   assert.deepEqual(state.decryptionFailedFields, ["API_KEY"]);
   assert.equal(state.values.API_KEY, undefined);
   assert.equal(state.sources.API_KEY, "DATABASE");

@@ -353,7 +353,7 @@ export function DiagnosticsTab({ filterQs }: Props) {
             }
             className={cn(
               "rounded-xl border bg-white p-2.5 text-right hover:shadow-sm transition-shadow",
-              statusFilter === k && "ring-2 ring-[#025EB8]",
+              statusFilter === k && "ring-2 ring-brand",
               STATUS_PILL[k]
             )}
           >
@@ -380,7 +380,7 @@ export function DiagnosticsTab({ filterQs }: Props) {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="ابحث في الحملة, المتبرع, الموضع, معرف التبرع..."
-            className="w-full h-9 pr-8 pl-8 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-[#025EB8] focus:outline-none focus:ring-1 focus:ring-[#025EB8]"
+            className="w-full h-9 pr-8 pl-8 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
           />
           {searchInput && (
             <button
@@ -398,7 +398,7 @@ export function DiagnosticsTab({ filterQs }: Props) {
             type="checkbox"
             checked={onlyIssues}
             onChange={(e) => setOnlyIssues(e.target.checked)}
-            className="accent-[#025EB8]"
+            className="accent-brand"
           />
           إظهار التبرعات التي بها مشكلة فقط
         </label>
@@ -446,7 +446,7 @@ export function DiagnosticsTab({ filterQs }: Props) {
               setMinConfidence(0);
               setMaxConfidence(100);
             }}
-            className="text-xs text-[#025EB8] hover:underline"
+            className="text-xs text-brand hover:underline"
           >
             مسح كل الفلاتر
           </button>
@@ -570,7 +570,7 @@ export function DiagnosticsTab({ filterQs }: Props) {
                         <button
                           type="button"
                           onClick={() => openDrawer(r.id)}
-                          className="inline-flex items-center gap-1 text-[#025EB8] hover:underline text-[11px]"
+                          className="inline-flex items-center gap-1 text-brand hover:underline text-[11px]"
                         >
                           إظهار
                         </button>

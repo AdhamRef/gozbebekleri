@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { getAudienceOverview, type AudienceOverview } from "@/lib/communication/audience-service";
 import { listAudienceLists, type AudienceListSummary } from "@/lib/communication/audience-list-service";
 import { AudienceListRowActions } from "./_components/AudienceListRowActions";
+import { EmptyState } from "@/components/dashboard/EmptyState";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(
 
 function Stat({ title, value, icon }: { title: string; value: string; icon: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="flex items-center gap-2 text-xs text-slate-500">{icon}{title}</div>
       <div className="mt-2 text-2xl font-black text-slate-950">{value}</div>
     </div>
@@ -55,7 +56,7 @@ function AutomaticSegments({ overview }: { overview: AudienceOverview }) {
                   <td className="p-3 text-center"><Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">{num(lang.smsEligible)}</Badge></td>
                   <td className="p-3 text-center"><Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">{num(lang.whatsappEligible)}</Badge></td>
                   <td className="p-3 text-center"><Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">{num(lang.whatsappNeedsReview)}</Badge></td>
-                  <td className="p-3 text-center"><Link href={`${BASE.replace("/audiences", "/campaigns")}?locale=${lang.locale}`} className="text-xs font-bold text-[#025EB8]">إنشاء حملة ←</Link></td>
+                  <td className="p-3 text-center"><Link href={`${BASE.replace("/audiences", "/campaigns")}?locale=${lang.locale}`} className="text-xs font-bold text-brand">إنشاء حملة ←</Link></td>
                 </tr>
               ))}
             </tbody>
@@ -70,11 +71,14 @@ function AutomaticSegments({ overview }: { overview: AudienceOverview }) {
 function CustomListsTable({ lists }: { lists: AudienceListSummary[] }) {
   if (lists.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-        <Users className="h-8 w-8 text-slate-300" />
-        <p className="text-sm text-slate-500">لا توجد قوائم مخصصة بعد.</p>
-        <Link href={`${BASE}/new`} className="inline-flex h-9 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-xs font-bold text-white hover:bg-[#024a92]"><Plus className="h-4 w-4" /> إنشاء قائمة</Link>
-      </div>
+      <EmptyState
+        icon={Users}
+        title="لا توجد قوائم مخصصة بعد"
+        description="القوائم المخصصة تتيح استهداف شريحة محددة من المتبرعين برسائل موجّهة."
+        action={
+          <Link href={`${BASE}/new`} className="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-4 text-xs font-bold text-white hover:bg-brand-dark"><Plus className="h-4 w-4" /> إنشاء قائمة</Link>
+        }
+      />
     );
   }
   return (
@@ -87,7 +91,7 @@ function CustomListsTable({ lists }: { lists: AudienceListSummary[] }) {
           <tbody>
             {lists.map((l) => (
               <tr key={l.id} className="border-b last:border-0">
-                <td className="p-3"><Link href={`${BASE}/${l.id}`} className="font-bold text-slate-900 hover:text-[#025EB8]">{l.name}</Link>{l.description ? <div className="text-xs text-slate-400">{l.description}</div> : null}</td>
+                <td className="p-3"><Link href={`${BASE}/${l.id}`} className="font-bold text-slate-900 hover:text-brand">{l.name}</Link>{l.description ? <div className="text-xs text-slate-400">{l.description}</div> : null}</td>
                 <td className="p-3"><Badge variant="outline" className={l.type === "TEST" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-slate-200 bg-slate-50 text-slate-600"}>{l.type === "TEST" ? "اختبار" : "مخصصة"}</Badge></td>
                 <td className="p-3 text-xs text-slate-600">{l.channels.length ? l.channels.map((c) => CHANNEL_AR[c] ?? c).join("، ") : "—"}</td>
                 <td className="p-3 text-center font-black text-slate-900">{num(l.membersCount)}</td>
@@ -106,7 +110,7 @@ function CustomListsTable({ lists }: { lists: AudienceListSummary[] }) {
 function TestListsTable({ lists }: { lists: AudienceListSummary[] }) {
   if (lists.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
+      <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-slate-300 bg-white text-center">
         <FlaskConical className="h-8 w-8 text-slate-300" />
         <p className="text-sm text-slate-500">لا توجد قوائم اختبار بعد. جهّز قائمة اختبار لتجربة الحملات والقوالب قبل الإرسال الحقيقي.</p>
         <Link href={`${BASE}/new?type=test`} className="inline-flex h-9 items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-4 text-xs font-bold text-amber-800 hover:bg-amber-100"><FlaskConical className="h-4 w-4" /> إنشاء قائمة اختبار</Link>
@@ -123,7 +127,7 @@ function TestListsTable({ lists }: { lists: AudienceListSummary[] }) {
           <tbody>
             {lists.map((l) => (
               <tr key={l.id} className="border-b last:border-0">
-                <td className="p-3"><Link href={`${BASE}/${l.id}`} className="font-bold text-slate-900 hover:text-[#025EB8]">{l.name}</Link></td>
+                <td className="p-3"><Link href={`${BASE}/${l.id}`} className="font-bold text-slate-900 hover:text-brand">{l.name}</Link></td>
                 <td className="p-3 text-xs text-slate-600">{l.channels.length ? l.channels.map((c) => CHANNEL_AR[c] ?? c).join("، ") : "—"}</td>
                 <td className="p-3 text-center font-black text-slate-900">{num(l.membersCount)}</td>
                 <td className="p-3 text-xs text-slate-500">{fmtDate(l.lastTestAt)}</td>
@@ -150,17 +154,17 @@ export default async function CommunicationAudiencesPage({ searchParams }: { sea
   const needsReview = active.filter((l) => l.membersCount === 0);
 
   return (
-    <main className="space-y-5 p-4 sm:p-6" dir="rtl">
+    <main className="space-y-5" dir="rtl">
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs font-bold text-[#025EB8]">مركز التواصل / الجمهور</p>
-            <h1 className="mt-1 text-xl font-black text-slate-900">الجمهور</h1>
+            <p className="text-xs font-bold text-brand">مركز التواصل / الجمهور</p>
+            <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">الجمهور</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">أنشئ شرائح تلقائية أو قوائم مخصصة لاختبار الحملات والقوالب قبل الإرسال.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href={`${BASE}/new`} className="inline-flex h-10 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white shadow-sm hover:bg-[#024a92]"><Plus className="h-4 w-4" /> إنشاء قائمة</Link>
-            <Link href={`${BASE}/new?type=test`} className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-[#025EB8]/50 hover:text-[#025EB8]"><FlaskConical className="h-4 w-4" /> إنشاء قائمة اختبار</Link>
+            <Link href={`${BASE}/new`} className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white shadow-sm hover:bg-brand-700"><Plus className="h-4 w-4" /> إنشاء قائمة</Link>
+            <Link href={`${BASE}/new?type=test`} className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-brand/50 hover:text-brand"><FlaskConical className="h-4 w-4" /> إنشاء قائمة اختبار</Link>
           </div>
         </div>
       </section>
@@ -170,7 +174,7 @@ export default async function CommunicationAudiencesPage({ searchParams }: { sea
           const active2 = t.key === tab;
           const count = t.key === "custom" ? customLists.length : t.key === "test" ? testLists.length : t.key === "review" ? needsReview.length : null;
           return (
-            <Link key={t.key} href={t.key === "auto" ? BASE : `${BASE}?tab=${t.key}`} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${active2 ? "bg-[#025EB8] text-white" : "border border-slate-200 bg-white text-slate-600 hover:border-[#025EB8]/40"}`}>{t.label}{count !== null && count > 0 ? ` (${count})` : ""}</Link>
+            <Link key={t.key} href={t.key === "auto" ? BASE : `${BASE}?tab=${t.key}`} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${active2 ? "bg-brand text-white" : "border border-slate-200 bg-white text-slate-600 hover:border-brand/40"}`}>{t.label}{count !== null && count > 0 ? ` (${count})` : ""}</Link>
           );
         })}
       </nav>

@@ -267,7 +267,7 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
     <div className="min-h-0" dir="rtl">
       <div className="space-y-6 sm:space-y-8 p-0 sm:p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto">
         <header className="text-right">
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
             {pageTitle}
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
@@ -278,7 +278,7 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="border border-border shadow-sm" dir="rtl">
             <div className="p-5 flex items-start gap-4">
-              <div className="p-2.5 rounded-lg shrink-0 bg-[#FA5D17]/8 text-[#FA5D17] border border-[#FA5D17]/20">
+              <div className="p-2.5 rounded-lg shrink-0 bg-brand-orange/8 text-brand-orange border border-brand-orange/20">
                 <Users className="w-5 h-5" />
               </div>
               <div className="min-w-0 text-right">
@@ -289,7 +289,7 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
           </Card>
           <Card className="border border-border shadow-sm" dir="rtl">
             <div className="p-5 flex items-start gap-4">
-              <div className="p-2.5 rounded-lg shrink-0 bg-[#025EB8] text-white border border-gray-200">
+              <div className="p-2.5 rounded-lg shrink-0 bg-brand text-white border border-gray-200">
                 <Receipt className="w-5 h-5" />
               </div>
               <div className="min-w-0 text-right">
@@ -419,7 +419,7 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                     size="sm"
                     onClick={() => setSendDialog({ open: true, channel: "email" })}
                     disabled={total === 0}
-                    className="gap-2 bg-[#025EB8] hover:bg-[#025EB8]/90"
+                    className="gap-2 bg-brand hover:bg-brand/90"
                   >
                     <Mail className="w-4 h-4" /> إرسال بريد
                   </Button>
@@ -519,9 +519,9 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                               className={cn(
                                 "inline-block px-2 py-0.5 rounded-full text-xs",
                                 u.role === "ADMIN"
-                                  ? "bg-[#FA5D17]/8 text-[#FA5D17]"
+                                  ? "bg-brand-orange/8 text-brand-orange"
                                   : u.role === "STAFF"
-                                    ? "bg-[#025EB8] text-white"
+                                    ? "bg-brand text-white"
                                     : "bg-slate-100 text-slate-600"
                               )}
                             >
@@ -579,7 +579,7 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                           {scope === "team" && (
                           <td className="py-3 px-4">
                             {u.role === "ADMIN" ? (
-                              <span className="text-xs text-[#FA5D17] bg-[#FA5D17]/8 px-2 py-1 rounded-md">كل الحملات</span>
+                              <span className="text-xs text-brand-orange bg-brand-orange/8 px-2 py-1 rounded-md">كل الحملات</span>
                             ) : (
                               <div className="flex flex-wrap gap-1 max-w-[220px]">
                                 {(u.dashboardPermissions ?? []).map((key) => {
@@ -603,7 +603,7 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                                       key={key}
                                       className={cn(
                                         "inline-block px-2 py-0.5 rounded text-xs text-white",
-                                        isActionPermission ? "bg-slate-600" : "bg-[#025EB8]"
+                                        isActionPermission ? "bg-slate-600" : "bg-brand"
                                       )}
                                     >
                                       {row.title}

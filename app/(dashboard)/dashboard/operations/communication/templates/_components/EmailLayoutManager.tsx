@@ -48,7 +48,7 @@ export function EmailLayoutManager({ initialLayouts }: { initialLayouts: Layout[
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button type="button" onClick={() => setCreating((v) => !v)} className="inline-flex h-9 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white hover:bg-[#024a92]"><Plus className="h-4 w-4" /> تصميم جديد</button>
+        <button type="button" onClick={() => setCreating((v) => !v)} className="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white hover:bg-brand-700"><Plus className="h-4 w-4" /> تصميم جديد</button>
       </div>
 
       {creating ? (
@@ -69,7 +69,7 @@ export function EmailLayoutManager({ initialLayouts }: { initialLayouts: Layout[
           </div>
           {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{error}</p> : null}
           <div className="flex gap-2">
-            <button type="button" disabled={saving} onClick={save} className="inline-flex h-9 items-center gap-2 rounded-md bg-[#025EB8] px-4 text-sm font-bold text-white disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} حفظ التصميم</button>
+            <button type="button" disabled={saving} onClick={save} className="inline-flex h-9 items-center gap-2 rounded-md bg-brand px-4 text-sm font-bold text-white disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} حفظ التصميم</button>
             <button type="button" onClick={() => setCreating(false)} className="inline-flex h-9 items-center rounded-md border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600">إلغاء</button>
           </div>
         </div>

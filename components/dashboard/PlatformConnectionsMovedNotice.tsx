@@ -15,14 +15,14 @@ export function PlatformConnectionsMovedNotice({
   text?: string;
 }) {
   return (
-    <div dir="rtl" className="mb-4 flex flex-col gap-3 rounded-xl border border-[#025EB8]/30 bg-blue-50/70 p-3.5 sm:flex-row sm:items-center sm:justify-between">
+    <div dir="rtl" className="mb-4 flex flex-col gap-3 rounded-xl border border-brand/30 bg-blue-50/70 p-3.5 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
-        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#025EB8]/10 text-[#025EB8]"><Plug className="h-4 w-4" /></span>
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand"><Plug className="h-4 w-4" /></span>
         <p className="text-sm font-semibold leading-6 text-slate-700">
           {text}
         </p>
       </div>
-      <Link href={href} className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md bg-[#025EB8] px-4 text-xs font-bold text-white transition hover:bg-[#024a92]">
+      <Link href={href} className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md bg-brand px-4 text-xs font-bold text-white transition hover:bg-brand-700">
         {label} <ArrowLeft className="h-4 w-4" />
       </Link>
     </div>

@@ -49,7 +49,7 @@ export function DonorReactivationCampaignDraft() {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base"><Megaphone className="h-5 w-5 text-[#025EB8]" /> إنشاء مسودة حملة تنشيط</CardTitle>
+        <CardTitle className="flex items-center gap-2 text-base"><Megaphone className="h-5 w-5 text-brand" /> إنشاء مسودة حملة تنشيط</CardTitle>
         <CardDescription>تُنشأ الحملة كمسودة في مركز التواصل وتمر بالمراجعة والاعتماد. لا إرسال تلقائي.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap items-end gap-3">

@@ -44,7 +44,7 @@ export function TrackingLinksPanel({ campaignId, report, onChanged }: { campaign
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="flex items-center gap-2 text-sm font-black text-slate-800"><Link2 className="h-4 w-4 text-[#025EB8]" /> روابط التتبع</h3>
+        <h3 className="flex items-center gap-2 text-sm font-black text-slate-800"><Link2 className="h-4 w-4 text-brand" /> روابط التتبع</h3>
         {report ? <span className={`rounded-md border px-2 py-0.5 text-[11px] font-bold ${CONF_CLS[report.confidence]}`}>الدقّة: {report.confidence}</span> : null}
       </div>
 
@@ -53,7 +53,7 @@ export function TrackingLinksPanel({ campaignId, report, onChanged }: { campaign
         <div className="mt-3 space-y-2">
           {links.map((l) => (
             <div key={l.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs">
-              <a href={l.url} target="_blank" rel="noreferrer" dir="ltr" className="min-w-0 flex-1 truncate font-mono text-slate-600 hover:text-[#025EB8]">{l.url}</a>
+              <a href={l.url} target="_blank" rel="noreferrer" dir="ltr" className="min-w-0 flex-1 truncate font-mono text-slate-600 hover:text-brand">{l.url}</a>
               <span className="shrink-0 rounded bg-white px-1.5 py-0.5 font-bold text-slate-500">{l.source}</span>
               <ExternalLink className="h-3.5 w-3.5 shrink-0 text-slate-400" />
             </div>
@@ -77,14 +77,14 @@ export function TrackingLinksPanel({ campaignId, report, onChanged }: { campaign
 
       {/* Add options */}
       <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" onClick={() => setMode(mode === "existing" ? "none" : "existing")} className={`rounded-md border px-3 py-1.5 text-xs font-bold ${mode === "existing" ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]" : "border-slate-200 text-slate-600"}`}>اختر رابطًا موجودًا</button>
-        <button type="button" onClick={() => setMode(mode === "create" ? "none" : "create")} className={`inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-bold ${mode === "create" ? "border-[#025EB8] bg-[#025EB8]/5 text-[#025EB8]" : "border-slate-200 text-slate-600"}`}><Plus className="h-3 w-3" /> إنشاء رابط تتبع</button>
+        <button type="button" onClick={() => setMode(mode === "existing" ? "none" : "existing")} className={`rounded-md border px-3 py-1.5 text-xs font-bold ${mode === "existing" ? "border-brand bg-brand/5 text-brand" : "border-slate-200 text-slate-600"}`}>اختر رابطًا موجودًا</button>
+        <button type="button" onClick={() => setMode(mode === "create" ? "none" : "create")} className={`inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-bold ${mode === "create" ? "border-brand bg-brand/5 text-brand" : "border-slate-200 text-slate-600"}`}><Plus className="h-3 w-3" /> إنشاء رابط تتبع</button>
       </div>
 
       {mode === "existing" ? (
         <div className="mt-2 flex gap-2">
           <input value={existingUrl} onChange={(e) => setExistingUrl(e.target.value)} placeholder="ألصق رابط تتبع من مولد الروابط" dir="ltr" className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm" />
-          <button type="button" disabled={busy || !existingUrl.trim()} onClick={() => attach({ existingUrl: existingUrl.trim() })} className="inline-flex h-10 shrink-0 items-center rounded-md bg-[#025EB8] px-3 text-xs font-bold text-white disabled:opacity-60">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "ربط"}</button>
+          <button type="button" disabled={busy || !existingUrl.trim()} onClick={() => attach({ existingUrl: existingUrl.trim() })} className="inline-flex h-10 shrink-0 items-center rounded-md bg-brand px-3 text-xs font-bold text-white disabled:opacity-60">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "ربط"}</button>
         </div>
       ) : null}
 
@@ -92,7 +92,7 @@ export function TrackingLinksPanel({ campaignId, report, onChanged }: { campaign
         <div className="mt-2 space-y-2">
           <div className="flex gap-2">
             <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="رابط صفحة التبرع (مثل صفحة الحملة)" dir="ltr" className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm" />
-            <button type="button" disabled={busy || !baseUrl.trim()} onClick={() => attach({ baseUrl: baseUrl.trim(), createInGenerator: true })} className="inline-flex h-10 shrink-0 items-center rounded-md bg-[#025EB8] px-3 text-xs font-bold text-white disabled:opacity-60">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "إنشاء"}</button>
+            <button type="button" disabled={busy || !baseUrl.trim()} onClick={() => attach({ baseUrl: baseUrl.trim(), createInGenerator: true })} className="inline-flex h-10 shrink-0 items-center rounded-md bg-brand px-3 text-xs font-bold text-white disabled:opacity-60">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "إنشاء"}</button>
           </div>
           <p className="text-[11px] text-slate-400">سيُضاف تلقائيًا: المصدر حسب القناة، الوسيط communication، والحملة مربوطة بهذه الحملة. لا تُنشأ روابط وهمية.</p>
         </div>

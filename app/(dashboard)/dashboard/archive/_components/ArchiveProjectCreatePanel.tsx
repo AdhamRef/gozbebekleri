@@ -98,7 +98,7 @@ export function ArchiveProjectCreatePanel({ collections, defaultYear }: Props) {
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="flex items-center gap-2 text-sm font-black text-slate-950">
-            <FolderKanban className="h-4 w-4 text-[#025EB8]" /> إضافة مشروع
+            <FolderKanban className="h-4 w-4 text-brand" /> إضافة مشروع
           </div>
           <p className="mt-1 text-xs leading-5 text-slate-500">أضف المشروع بسرعة، ثم أضف رابط التوثيق من صفحة المشروع.</p>
         </div>
@@ -110,26 +110,26 @@ export function ArchiveProjectCreatePanel({ collections, defaultYear }: Props) {
 
       <div className="mt-3 grid gap-2 lg:grid-cols-[1fr_1.5fr_0.6fr_0.8fr_0.8fr]">
         <Field label="المجموعة">
-          <select value={collectionId} onChange={(event) => setCollectionId(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-xs font-semibold text-slate-900 outline-none focus:border-[#025EB8]">
+          <select value={collectionId} onChange={(event) => setCollectionId(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-xs font-semibold text-slate-900 outline-none focus:border-brand">
             <option value="">بدون مجموعة</option>
             {collectionOptions.map((collection) => <option key={collection.id} value={collection.id}>{collection.label}</option>)}
           </select>
         </Field>
         <Field label="اسم المشروع">
-          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="مثال: غزة 2026 - توزيع مياه" className="h-9 rounded-md border bg-white px-2 text-xs font-semibold text-slate-900 outline-none focus:border-[#025EB8]" />
+          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="مثال: غزة 2026 - توزيع مياه" className="h-9 rounded-md border bg-white px-2 text-xs font-semibold text-slate-900 outline-none focus:border-brand" />
         </Field>
         <Field label="السنة">
-          <select value={year} onChange={(event) => setYear(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-xs font-semibold text-slate-900 outline-none focus:border-[#025EB8]">
+          <select value={year} onChange={(event) => setYear(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-xs font-semibold text-slate-900 outline-none focus:border-brand">
             {options.years.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
         </Field>
         <Field label="المدينة">
-          <select value={city} onChange={(event) => setCity(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-[#025EB8]">
+          <select value={city} onChange={(event) => setCity(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-brand">
             {options.cities.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
         </Field>
         <Field label="التصنيف">
-          <select value={theme} onChange={(event) => setTheme(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-[#025EB8]">
+          <select value={theme} onChange={(event) => setTheme(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-brand">
             {options.themes.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
         </Field>
@@ -137,20 +137,20 @@ export function ArchiveProjectCreatePanel({ collections, defaultYear }: Props) {
 
       <div className="mt-2 grid gap-2 lg:grid-cols-[0.9fr_0.9fr_1fr_1fr]">
         <Field label="البلد">
-          <select value={country} onChange={(event) => setCountry(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-[#025EB8]">
+          <select value={country} onChange={(event) => setCountry(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-brand">
             {options.countries.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
         </Field>
         <Field label="نوع المشروع">
-          <select value={projectType} onChange={(event) => setProjectType(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-[#025EB8]">
+          <select value={projectType} onChange={(event) => setProjectType(event.target.value)} className="h-9 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-brand">
             {options.projectTypes.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
         </Field>
         <Field label="الوصف">
-          <input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="وصف مختصر" className="h-9 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-[#025EB8]" />
+          <input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="وصف مختصر" className="h-9 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-brand" />
         </Field>
         <Field label="ملاحظات">
-          <input value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="ملاحظات داخلية" className="h-9 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-[#025EB8]" />
+          <input value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="ملاحظات داخلية" className="h-9 rounded-md border bg-white px-2 text-xs text-slate-900 outline-none focus:border-brand" />
         </Field>
       </div>
 

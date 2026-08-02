@@ -228,7 +228,7 @@ export default function ManualSendDialog({ open, onOpenChange, onSent }: Props) 
       >
         <DialogHeader className="px-6 py-4 border-b border-slate-200">
           <DialogTitle className="flex items-center gap-2 text-right">
-            <Send className="w-5 h-5 text-[#025EB8]" />
+            <Send className="w-5 h-5 text-brand" />
             إرسال يدوي لقالب
           </DialogTitle>
           <DialogDescription className="text-right text-xs">
@@ -451,7 +451,7 @@ export default function ManualSendDialog({ open, onOpenChange, onSent }: Props) 
           <Button
             onClick={handleSend}
             disabled={!canSend || Boolean(recipientMissing)}
-            className="bg-[#025EB8] hover:bg-[#014fa0] gap-2 min-w-[140px]"
+            className="bg-brand hover:bg-brand-dark gap-2 min-w-[140px]"
           >
             {sending ? (
               <>
@@ -486,8 +486,8 @@ function ChannelOption({ active, onClick, icon: Icon, label }: ChannelOptionProp
       className={cn(
         "flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-all",
         active
-          ? "border-[#025EB8] bg-[#025EB8] text-white shadow-sm"
-          : "border-slate-200 bg-white text-slate-700 hover:border-[#025EB8]/40 hover:bg-[#025EB8]/5"
+          ? "border-brand bg-brand text-white shadow-sm"
+          : "border-slate-200 bg-white text-slate-700 hover:border-brand/40 hover:bg-brand/5"
       )}
     >
       <Icon className="w-4 h-4" />

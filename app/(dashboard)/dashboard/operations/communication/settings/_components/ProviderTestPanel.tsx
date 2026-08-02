@@ -13,9 +13,12 @@ const reasonAr: Record<string, string> = {
   META_WHATSAPP_NOT_CONFIGURED: "إعداد واتساب غير مكتمل",
   META_WHATSAPP_SENDER_MISSING_PHONE_NUMBER_ID: "المُرسِل بلا رقم",
   EMAIL_PROVIDER_NOT_CONFIGURED: "إعداد الإيميل غير مكتمل",
-  BREVO_EMAIL_NOT_CONFIGURED: "إعداد Brevo للإيميل غير مكتمل",
-  BREVO_EMAIL_SENDER_NOT_CONFIGURED: "بريد المُرسِل غير مُعد في Brevo",
-  BREVO_EMAIL_REQUEST_FAILED: "فشل الطلب لدى Brevo",
+  ELASTIC_EMAIL_NOT_CONFIGURED: "إعداد Elastic Email غير مكتمل",
+  ELASTIC_EMAIL_SENDER_NOT_CONFIGURED: "بريد المُرسِل غير مُعد في Elastic Email",
+  ELASTIC_EMAIL_REQUEST_FAILED: "فشل الطلب لدى Elastic Email",
+  ELASTIC_EMAIL_UNAUTHORIZED: "مفتاح Elastic Email غير صالح",
+  ELASTIC_EMAIL_RATE_LIMITED: "تم تجاوز حد الإرسال لدى Elastic Email",
+  ELASTIC_EMAIL_REJECTED: "رفض Elastic Email الرسالة",
   BREVO_SMS_NOT_CONFIGURED: "إعداد Brevo للرسائل غير مكتمل",
   BREVO_SMS_REQUEST_FAILED: "فشل الطلب لدى Brevo",
   NETGSM_NOT_CONFIGURED: "إعداد Netgsm غير مكتمل",
@@ -166,7 +169,7 @@ export function ProviderTestPanel({
     <div className="grid gap-4 lg:grid-cols-2">
       {/* WhatsApp test */}
       <Card className="border-slate-200">
-        <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><MessageCircle className="h-4 w-4 text-[#025EB8]" /> اختبار واتساب</CardTitle><CardDescription>يرسل قالبًا معتمدًا واحدًا لرقم اختبار. لا إرسال جماعي.</CardDescription></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><MessageCircle className="h-4 w-4 text-brand" /> اختبار واتساب</CardTitle><CardDescription>يرسل قالبًا معتمدًا واحدًا لرقم اختبار. لا إرسال جماعي.</CardDescription></CardHeader>
         <CardContent className="space-y-2 text-sm">
           {senders.length === 0 ? (
             <p className="text-slate-500">أضف رقم واتساب واحدًا على الأقل من صفحة المُرسِلين لتجربة الإرسال.</p>
@@ -190,7 +193,7 @@ export function ProviderTestPanel({
 
       {/* Email test (Brevo) */}
       <Card className="border-slate-200">
-        <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><Mail className="h-4 w-4 text-[#025EB8]" /> اختبار إيميل (Brevo)</CardTitle><CardDescription>يرسل رسالة اختبار واحدة عبر Brevo.{!emailReady ? " — يحتاج إعداد Brevo." : ""}</CardDescription></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><Mail className="h-4 w-4 text-brand" /> اختبار إيميل (Brevo)</CardTitle><CardDescription>يرسل رسالة اختبار واحدة عبر Brevo.{!emailReady ? " — يحتاج إعداد Brevo." : ""}</CardDescription></CardHeader>
         <CardContent className="space-y-2 text-sm">
           <Field label="بريد المستلم"><input value={emailTo} onChange={(e) => setEmailTo(e.target.value)} placeholder="أدخل بريد المستلم" className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" /></Field>
           <Field label="العنوان (اختياري)"><input value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" /></Field>
@@ -201,7 +204,7 @@ export function ProviderTestPanel({
 
       {/* SMS test (Netgsm TR / Brevo international) */}
       <Card className="border-slate-200 lg:col-span-2">
-        <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><MessageSquare className="h-4 w-4 text-[#025EB8]" /> اختبار رسالة قصيرة</CardTitle><CardDescription>يختار المزوّد تلقائيًا حسب الرقم: أرقام تركيا (+90) عبر Netgsm، وبقية الأرقام عبر Brevo. رسالة واحدة فقط.</CardDescription></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><MessageSquare className="h-4 w-4 text-brand" /> اختبار رسالة قصيرة</CardTitle><CardDescription>يختار المزوّد تلقائيًا حسب الرقم: أرقام تركيا (+90) عبر Netgsm، وبقية الأرقام عبر Brevo. رسالة واحدة فقط.</CardDescription></CardHeader>
         <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
           <Field label="رقم المستلم"><input value={smsTo} onChange={(e) => setSmsTo(e.target.value)} placeholder="أدخل الرقم مع رمز الدولة" dir="ltr" className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm" /></Field>
           <Field label="النوع">
@@ -221,7 +224,7 @@ export function ProviderTestPanel({
 
       {/* Webhook info */}
       <Card className="border-slate-200 lg:col-span-2">
-        <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><Webhook className="h-4 w-4 text-[#025EB8]" /> استقبال أحداث واتساب</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><Webhook className="h-4 w-4 text-brand" /> استقبال أحداث واتساب</CardTitle></CardHeader>
         <CardContent className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
             <code dir="ltr" className="min-w-0 flex-1 truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-600">{webhookUrl}</code>

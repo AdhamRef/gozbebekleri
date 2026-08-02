@@ -41,12 +41,12 @@ export default async function ExecutiveSystemOverviewPage() {
   const overview = await getExecutiveOverview();
 
   return (
-    <div className="space-y-5 p-4 sm:p-6" dir="rtl">
-      <div className="rounded-2xl border bg-gradient-to-l from-slate-950 via-[#025EB8] to-slate-900 p-5 text-white shadow-sm">
+    <div className="space-y-5" dir="rtl">
+      <div className="rounded-2xl border bg-gradient-to-l from-slate-950 via-brand to-slate-900 p-5 text-white shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs text-white/70">Executive System Overview</p>
-            <h1 className="mt-1.5 text-2xl font-black">النظرة التنفيذية على النظام</h1>
+            <h1 className="mt-1.5 text-xl sm:text-2xl font-bold tracking-tight">النظرة التنفيذية على النظام</h1>
             <p className="mt-2 max-w-4xl text-sm leading-6 text-white/85">
               لوحة واحدة تجمع إشارات التسويق، التكاملات، المحتوى، الإنتاج، والأرشيف حتى ترى الإدارة أين توجد المخاطر وأين توجد الفرص.
             </p>
@@ -54,7 +54,7 @@ export default async function ExecutiveSystemOverviewPage() {
           <div className="flex flex-wrap gap-2">
             <Link
               href="/dashboard/marketing/command-center"
-              className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-bold text-[#025EB8] shadow-sm hover:bg-white/90"
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-bold text-brand shadow-sm hover:bg-white/90"
             >
               مركز التسويق
               <ArrowLeft className="h-4 w-4" />
@@ -108,7 +108,7 @@ export default async function ExecutiveSystemOverviewPage() {
                     </div>
                     <Link
                       href={risk.href}
-                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-bold text-[#025EB8] hover:bg-slate-50"
+                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-bold text-brand hover:bg-slate-50"
                     >
                       فتح التفاصيل
                       <ArrowLeft className="h-3.5 w-3.5" />
@@ -159,7 +159,7 @@ function SummaryCard({ title, value, icon }: { title: string; value: string | nu
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardDescription>{title}</CardDescription>
-        <span className="text-[#025EB8]">{icon}</span>
+        <span className="text-brand">{icon}</span>
       </CardHeader>
       <CardContent>
         <CardTitle className="text-2xl">{value}</CardTitle>
@@ -170,9 +170,9 @@ function SummaryCard({ title, value, icon }: { title: string; value: string | nu
 
 function QuickLink({ href, title, icon }: { href: string; title: string; icon: React.ReactNode }) {
   return (
-    <Link href={href} className="flex items-center justify-between rounded-xl border bg-white p-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+    <Link href={href} className="flex items-center justify-between rounded-xl border bg-white text-sm font-bold text-slate-700 hover:bg-slate-50">
       <span className="flex items-center gap-2">
-        <span className="text-[#025EB8]">{icon}</span>
+        <span className="text-brand">{icon}</span>
         {title}
       </span>
       <ArrowLeft className="h-4 w-4 text-slate-400" />

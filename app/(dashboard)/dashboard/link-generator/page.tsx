@@ -420,14 +420,14 @@ export default function LinkGeneratorPage() {
   }
 
   if (loading || !bundle) {
-    return <div className="flex min-h-[40vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-[#025EB8]" /></div>;
+    return <div className="flex min-h-[40vh] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-brand" /></div>;
   }
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 pb-12" dir="rtl">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href="/dashboard/referrals" className="hover:text-[#025EB8]">روابط التتبع</Link>
+          <Link href="/dashboard/referrals" className="hover:text-brand">روابط التتبع</Link>
           <span className="opacity-40">/</span>
           <span className="font-medium text-foreground">منشئ روابط الموقع والحملات</span>
         </div>
@@ -437,19 +437,19 @@ export default function LinkGeneratorPage() {
         </div>
       </div>
 
-      <Card className="overflow-hidden border-[#025EB8]/15 shadow-md">
-        <CardHeader className="bg-gradient-to-l from-[#025EB8]/8 to-transparent pb-4">
-          <CardTitle className="flex items-center gap-2 text-xl"><Link2 className="h-6 w-6 text-[#025EB8]" />منشئ روابط الموقع والحملات</CardTitle>
+      <Card className="overflow-hidden border-brand/15 shadow-md">
+        <CardHeader className="bg-gradient-to-l from-brand/8 to-transparent pb-4">
+          <CardTitle className="flex items-center gap-2 text-xl"><Link2 className="h-6 w-6 text-brand" />منشئ روابط الموقع والحملات</CardTitle>
           <CardDescription className="leading-relaxed">أنشئ رابط موقع عادي أو رابط حملة تسويقية، واحفظ الروابط التسويقية في Campaign Registry لتحليل الأداء لاحقًا.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 pt-5">
           <section className="space-y-3">
             <Label className="text-base font-semibold">٠ — نوع الرابط</Label>
             <div className="grid gap-3 sm:grid-cols-2">
-              <button type="button" onClick={() => setLinkMode("standard")} className={cn("rounded-xl border p-4 text-right transition", linkMode === "standard" ? "border-[#025EB8] bg-blue-50 text-[#025EB8]" : "border-border bg-white hover:bg-muted/40")}>
+              <button type="button" onClick={() => setLinkMode("standard")} className={cn("rounded-xl border p-4 text-right transition", linkMode === "standard" ? "border-brand bg-blue-50 text-brand" : "border-border bg-white hover:bg-muted/40")}>
                 <Link2 className="mb-2 h-5 w-5" /><div className="font-bold">رابط موقع عادي</div><p className="mt-1 text-xs text-muted-foreground">صفحة، لغة، عملة، إحالة.</p>
               </button>
-              <button type="button" onClick={() => setLinkMode("marketing")} className={cn("rounded-xl border p-4 text-right transition", linkMode === "marketing" ? "border-[#FA5D17] bg-orange-50 text-[#c7470d]" : "border-border bg-white hover:bg-muted/40")}>
+              <button type="button" onClick={() => setLinkMode("marketing")} className={cn("rounded-xl border p-4 text-right transition", linkMode === "marketing" ? "border-brand-orange bg-orange-50 text-[#c7470d]" : "border-border bg-white hover:bg-muted/40")}>
                 <Megaphone className="mb-2 h-5 w-5" /><div className="font-bold">حملة تسويقية</div><p className="mt-1 text-xs text-muted-foreground">UTM + بيانات منصة + حفظ في سجل الحملات.</p>
               </button>
             </div>
@@ -523,7 +523,7 @@ export default function LinkGeneratorPage() {
             <div className="flex flex-wrap gap-2">
               <Button type="button" onClick={copyUrl} disabled={!fullUrl} className="gap-2"><Copy className="h-4 w-4" />نسخ الرابط</Button>
               <Button type="button" onClick={() => saveRegistryLink(false)} disabled={!fullUrl || saving} variant="outline" className="gap-2">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save to Campaign Registry</Button>
-              <Button type="button" onClick={() => saveRegistryLink(true)} disabled={!fullUrl || saving} className="gap-2 bg-[#FA5D17] hover:bg-[#d94c12]">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}حفظ ونسخ الرابط</Button>
+              <Button type="button" onClick={() => saveRegistryLink(true)} disabled={!fullUrl || saving} className="gap-2 bg-brand-orange hover:bg-[#d94c12]">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}حفظ ونسخ الرابط</Button>
               {fullUrl ? <Button asChild type="button" variant="secondary" className="gap-2"><a href={fullUrl} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" />فتح</a></Button> : null}
             </div>
             {lastSavedLink ? (

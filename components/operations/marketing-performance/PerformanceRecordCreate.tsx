@@ -50,13 +50,13 @@ export function PerformanceRecordCreate() {
 }
 
 function Input({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label className="space-y-1 font-bold text-slate-600">{label}<input value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" /></label>;
+  return <label className="space-y-1 font-bold text-slate-600">{label}<input value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" /></label>;
 }
 
 function NumberInput({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
-  return <label className="space-y-1 font-bold text-slate-600">{label}<input type="number" value={value} onChange={(event) => onChange(event.target.valueAsNumber || 0)} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]" /></label>;
+  return <label className="space-y-1 font-bold text-slate-600">{label}<input type="number" value={value} onChange={(event) => onChange(event.target.valueAsNumber || 0)} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand" /></label>;
 }
 
 function Select({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label className="space-y-1 font-bold text-slate-600">{label}<select value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#025EB8]"><option value="META">Meta</option><option value="GOOGLE">Google</option><option value="TIKTOK">TikTok</option><option value="X">X</option></select></label>;
+  return <label className="space-y-1 font-bold text-slate-600">{label}<select value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-lg border bg-white px-3 py-2 text-slate-900 outline-none focus:border-brand"><option value="META">Meta</option><option value="GOOGLE">Google</option><option value="TIKTOK">TikTok</option><option value="X">X</option></select></label>;
 }

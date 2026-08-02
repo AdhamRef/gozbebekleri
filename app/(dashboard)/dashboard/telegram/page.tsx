@@ -100,7 +100,7 @@ export default function TelegramAdminPage() {
       <div className="space-y-6 p-4 sm:p-6 md:p-8 max-w-3xl mx-auto">
         <header className="flex items-center justify-between gap-4">
           <div className="text-right">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               بوت التيليجرام
             </h1>
             <p className="text-muted-foreground mt-1 text-sm">
@@ -216,7 +216,7 @@ export default function TelegramAdminPage() {
                             navigator.clipboard.writeText(webhookUrl);
                             toast.success("تم النسخ");
                           }}
-                          className="text-slate-400 hover:text-[#025EB8] p-1 rounded shrink-0"
+                          className="text-slate-400 hover:text-brand p-1 rounded shrink-0"
                           title="نسخ"
                         >
                           <Copy className="w-3.5 h-3.5" />
@@ -270,7 +270,7 @@ export default function TelegramAdminPage() {
                 <Button
                   onClick={register}
                   disabled={!status?.configured || busy != null}
-                  className="bg-[#025EB8] hover:bg-[#014fa0] gap-2 order-1 sm:order-2"
+                  className="bg-brand hover:bg-brand-dark gap-2 order-1 sm:order-2"
                 >
                   {busy === "register" ? (
                     <Loader2 className="w-4 h-4 animate-spin" />

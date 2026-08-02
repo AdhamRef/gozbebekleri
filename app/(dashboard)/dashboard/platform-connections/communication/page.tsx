@@ -38,7 +38,7 @@ export default async function CommunicationConnectionsPage() {
   ]);
 
   return (
-    <main className="space-y-5 p-4 sm:p-6" dir="rtl">
+    <main className="space-y-5" dir="rtl">
       <PageHeader
         eyebrow="ربط المنصات والإرسال / المزودون"
         title="مزودو التواصل والإرسال"

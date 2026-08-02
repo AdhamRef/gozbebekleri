@@ -5,7 +5,11 @@ import { useLocale } from 'next-intl';
 import {useRouter} from 'next/navigation';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
-import { Plus, Pencil, Trash2, Loader2, ArrowUpDown, Search, Crown, Archive, PowerOff, RotateCcw } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, ArrowUpDown, Search, Crown, Archive, PowerOff, RotateCcw, Globe } from 'lucide-react';
+import { PageHeader } from '@/components/dashboard/PageHeader';
+import { FilterBar } from '@/components/dashboard/FilterBar';
+import { EmptyState } from '@/components/dashboard/EmptyState';
+import { PageHeaderSkeleton, FilterBarSkeleton, TableSkeleton } from '@/components/dashboard/skeletons';
 import {
   Dialog,
   DialogContent,
@@ -303,66 +307,63 @@ export default function CategoriesPage() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6 p-0 sm:p-2">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground">الحملات</h1>
-          <p className="text-sm text-muted-foreground">إدارة الحملات ومشاريعها</p>
-        </div>
-        <div className="flex flex-wrap gap-2 sm:gap-3">
-          {selectedCategories.length > 0 && (
-            <Button
-              variant="destructive"
-              onClick={handleBulkDelete}
-              disabled={deleteLoading}
-              className="gap-2"
-            >
-              {deleteLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-              حذف ({selectedCategories.length})
-            </Button>
-          )}
-          <ReorderDialog categories={categories} onReorder={fetchCategories} />
-          <Button
-            variant="outline"
-            className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50"
-            onClick={() => setArchiveOpen(true)}
-          >
-            <Archive className="w-4 h-4" />
-            أرشيف الحملات
-            {archivedCategories.length > 0 && (
-              <span className="bg-amber-100 text-amber-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
-                {archivedCategories.length}
-              </span>
+    <div>
+      <PageHeader
+        title="الحملات"
+        description="إدارة الحملات ومشاريعها"
+        icon={Globe}
+        actions={
+          <>
+            {selectedCategories.length > 0 && (
+              <Button
+                variant="destructive"
+                onClick={handleBulkDelete}
+                disabled={deleteLoading}
+                className="gap-2"
+              >
+                {deleteLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                حذف ({selectedCategories.length})
+              </Button>
             )}
-          </Button>
-          <Button
-            onClick={() => router.push('/dashboard/categories/new')}
-            className="bg-[#025EB8] hover:bg-[#014fa0] gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            حملة جديدة
-          </Button>
-        </div>
+            <ReorderDialog categories={categories} onReorder={fetchCategories} />
+            <Button
+              variant="outline"
+              className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+              onClick={() => setArchiveOpen(true)}
+            >
+              <Archive className="w-4 h-4" />
+              أرشيف الحملات
+              {archivedCategories.length > 0 && (
+                <span className="bg-amber-100 text-amber-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
+                  {archivedCategories.length}
+                </span>
+              )}
+            </Button>
+            <Button
+              onClick={() => router.push('/dashboard/categories/new')}
+              className="bg-brand hover:bg-brand-dark gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              حملة جديدة
+            </Button>
+          </>
+        }
+      />
+
+      <div className="mb-4">
+        <ContentLocalizationAuditCard section="categories" />
       </div>
 
-      <ContentLocalizationAuditCard section="categories" />
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 min-w-0">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-          <Input
-            placeholder="ابحث عن حملة..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-4 pr-10"
-          />
-        </div>
+      <FilterBar
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="ابحث عن حملة..."
+      >
         <Select
           value={campaignsFilter}
           onValueChange={(value: 'all' | 'with' | 'without') => setCampaignsFilter(value)}
         >
-          <SelectTrigger className="w-full sm:w-[180px]">
+          <SelectTrigger className="h-9 w-full sm:w-[180px]">
             <SelectValue placeholder="المشاريع" />
           </SelectTrigger>
           <SelectContent>
@@ -371,7 +372,7 @@ export default function CategoriesPage() {
             <SelectItem value="without">حملات بدون مشاريع</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </FilterBar>
 
       <div className="rounded-lg border border-border bg-card overflow-hidden overflow-x-auto">
         <Table>
@@ -473,15 +474,24 @@ export default function CategoriesPage() {
 
             {paginatedCategories.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8">
-                  <p className="text-gray-500">لا توجد حملات</p>
-                  <Button
-                    variant="link"
-                    onClick={() => router.push('/dashboard/categories/new')}
-                    className="mt-2"
-                  >
-                    إضافة حملة جديدة
-                  </Button>
+                <TableCell colSpan={6} className="p-0">
+                  <EmptyState
+                    variant="inline"
+                    icon={Globe}
+                    title="لا توجد حملات"
+                    description={searchQuery || campaignsFilter !== 'all'
+                      ? "لا توجد حملة تطابق التصفية الحالية."
+                      : "الحملات تجمع المشاريع تحت مظلة واحدة. أنشئ أول حملة للبدء."}
+                    action={
+                      <Button
+                        onClick={() => router.push('/dashboard/categories/new')}
+                        className="bg-brand hover:bg-brand-dark gap-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        إضافة حملة جديدة
+                      </Button>
+                    }
+                  />
                 </TableCell>
               </TableRow>
             )}
@@ -644,33 +654,9 @@ export default function CategoriesPage() {
 }
 
 const LoadingSkeleton = () => (
-  <div className="space-y-6 p-8">
-    <div className="flex items-center justify-between">
-      <div className="space-y-2">
-        <div className="h-8 w-32 bg-gray-200 rounded-md animate-pulse" />
-        <div className="h-4 w-48 bg-gray-200 rounded-md animate-pulse" />
-      </div>
-      <div className="h-10 w-32 bg-gray-200 rounded-md animate-pulse" />
-    </div>
-
-    <div className="flex gap-4 mb-6">
-      <div className="h-10 flex-1 bg-gray-200 rounded-md animate-pulse" />
-      <div className="h-10 w-[180px] bg-gray-200 rounded-md animate-pulse" />
-    </div>
-
-    <div className="bg-white rounded-lg shadow">
-      <div className="p-6 space-y-4">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="flex items-center gap-4">
-            <div className="h-10 w-1/6 bg-gray-200 rounded-md animate-pulse" />
-            <div className="h-10 w-1/6 bg-gray-200 rounded-md animate-pulse" />
-            <div className="h-10 w-1/6 bg-gray-200 rounded-md animate-pulse" />
-            <div className="h-10 w-1/6 bg-gray-200 rounded-md animate-pulse" />
-            <div className="h-10 w-1/6 bg-gray-200 rounded-md animate-pulse" />
-            <div className="h-10 w-1/6 bg-gray-200 rounded-md animate-pulse" />
-          </div>
-        ))}
-      </div>
-    </div>
+  <div>
+    <PageHeaderSkeleton />
+    <FilterBarSkeleton />
+    <TableSkeleton rows={6} columns={6} />
   </div>
-); 
+);

@@ -165,7 +165,7 @@ export default function NewCampaignPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-[#025EB8]" />
+        <Loader2 className="w-8 h-8 animate-spin text-brand" />
       </div>
     );
   }
@@ -174,7 +174,7 @@ export default function NewCampaignPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">إنشاء مشروع جديدة</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">إنشاء مشروع جديدة</h1>
           <p className="text-gray-600">قم بإدخال معلومات المشروع</p>
         </div>
         <Button
@@ -341,10 +341,10 @@ export default function NewCampaignPage() {
                             />
                             <label
                               htmlFor="images"
-                              className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-[#025EB8] transition-colors"
+                              className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-brand transition-colors"
                             >
                               {uploadingImage ? (
-                                <Loader2 className="w-6 h-6 animate-spin text-[#025EB8]" />
+                                <Loader2 className="w-6 h-6 animate-spin text-brand" />
                               ) : (
                                 <>
                                   <Upload className="w-6 h-6 text-gray-400" />
@@ -403,7 +403,7 @@ export default function NewCampaignPage() {
             </Button>
             <Button
               type="submit"
-              className="bg-[#025EB8] hover:bg-[#014fa0]"
+              className="bg-brand hover:bg-brand-dark"
               disabled={saving}
             >
               {saving && <Loader2 className="w-4 h-4 ml-2 animate-spin" />}

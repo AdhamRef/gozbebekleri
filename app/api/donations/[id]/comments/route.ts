@@ -35,10 +35,12 @@ export async function GET(
     });
 
     // Get comments with pagination
+    // `Comment` relates to the author via `user`/`userId` — not `donor`/`donorId`. The old
+    // field names threw on every request, so donation comments never loaded or saved.
     const comments = await prisma.comment.findMany({
       where: { donationId: id },
       include: {
-        donor: {
+        user: {
           select: {
             name: true,
             image: true,
@@ -112,11 +114,11 @@ export async function POST(
     const comment = await prisma.comment.create({
       data: {
         text,
-        donorId: session.user.id,
+        userId: session.user.id,
         donationId: id,
       },
       include: {
-        donor: {
+        user: {
           select: {
             name: true,
             image: true,
@@ -184,7 +186,7 @@ export async function DELETE(
     }
 
     const canModerate = userHasDashboardPermission(session.user, 'revenue');
-    if (!canModerate && session.user.id !== comment.donorId) {
+    if (!canModerate && session.user.id !== comment.userId) {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403 }

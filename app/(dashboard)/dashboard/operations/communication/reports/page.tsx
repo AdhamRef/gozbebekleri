@@ -15,6 +15,7 @@ import {
 import { getSchedulerStatus } from "@/lib/communication/scheduler-status";
 import { getCommunicationDonationOverview } from "@/lib/communication/campaign-attribution-service";
 import { getBrevoSmsConfig, getNetgsmSmsConfig } from "@/lib/communication/provider-env";
+import { EmptyState } from "@/components/dashboard/EmptyState";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ const RANGES: { key: ReportRange; label: string }[] = [
 
 const CHANNELS: { key: string; label: string; icon: typeof MessageCircle; color: string }[] = [
   { key: "WHATSAPP", label: "واتساب", icon: MessageCircle, color: "text-emerald-600" },
-  { key: "EMAIL", label: "الإيميل", icon: Mail, color: "text-[#025EB8]" },
+  { key: "EMAIL", label: "الإيميل", icon: Mail, color: "text-brand" },
   { key: "SMS", label: "الرسائل القصيرة", icon: MessageSquare, color: "text-amber-600" },
 ];
 
@@ -72,7 +73,7 @@ function ChannelCard({ label, icon: Icon, color, counts, disabled }: { label: st
         <CardContent className="space-y-2.5">
           <Bar label="أُرسلت" value={sentOut} total={prepared} color="bg-slate-400" />
           <Bar label="وصلت" value={reached} total={prepared} color="bg-emerald-500" />
-          <Bar label="تمت القراءة / فُتحت" value={engaged} total={prepared} color="bg-[#025EB8]" />
+          <Bar label="تمت القراءة / فُتحت" value={engaged} total={prepared} color="bg-brand" />
           <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-xs">
             {counts.replied > 0 ? <span className="text-emerald-700">رد المتبرع: <b>{counts.replied.toLocaleString("ar")}</b></span> : null}
             <span className="text-rose-700">فشلت: <b>{counts.failed.toLocaleString("ar")}</b></span>
@@ -92,7 +93,7 @@ function HeadlineCard({ label, value, caption, tone, href, cta }: { label: strin
         <div className="text-xs text-slate-500">{label}</div>
         <div className={`mt-1 text-2xl font-black ${valueColor}`}>{value.toLocaleString("ar")}</div>
         <div className="mt-0.5 text-[11px] text-slate-400">{caption}</div>
-        {href && cta ? <Link href={href} className="mt-1.5 inline-block text-xs font-semibold text-[#025EB8] underline">{cta}</Link> : null}
+        {href && cta ? <Link href={href} className="mt-1.5 inline-block text-xs font-semibold text-brand underline">{cta}</Link> : null}
       </CardContent>
     </Card>
   );
@@ -131,8 +132,8 @@ export default async function CommunicationReportsPage({ searchParams }: { searc
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs font-bold text-[#025EB8]">مركز التواصل / النتائج</p>
-            <h1 className="mt-1 text-2xl font-black text-slate-900">نتائج التواصل</h1>
+            <p className="text-xs font-bold text-brand">مركز التواصل / النتائج</p>
+            <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">نتائج التواصل</h1>
             <p className="mt-1.5 max-w-3xl text-sm leading-6 text-slate-600">أداء رسائل واتساب، الإيميل، والرسائل القصيرة حسب القناة واللغة.</p>
           </div>
           <Button asChild variant="outline" className="gap-2 font-bold"><Link href={ADVANCED_LOGS}><ScrollText className="h-4 w-4" /> فتح سجل الرسائل</Link></Button>
@@ -142,7 +143,7 @@ export default async function CommunicationReportsPage({ searchParams }: { searc
           {RANGES.map((r) => {
             const active = r.key === range;
             return (
-              <Link key={r.key} href={`?range=${r.key}`} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${active ? "bg-[#025EB8] text-white" : "text-slate-600 hover:bg-slate-200"}`}>{r.label}</Link>
+              <Link key={r.key} href={`?range=${r.key}`} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${active ? "bg-brand text-white" : "text-slate-600 hover:bg-slate-200"}`}>{r.label}</Link>
             );
           })}
         </div>
@@ -150,9 +151,16 @@ export default async function CommunicationReportsPage({ searchParams }: { searc
 
       {empty ? (
         <Card>
-          <CardContent className="flex flex-col items-center gap-4 p-12 text-center">
-            <p className="text-sm text-slate-500">لا توجد رسائل في هذه الفترة بعد.</p>
-            <Button asChild className="gap-2"><Link href={NEW_CAMPAIGN}><Megaphone className="h-4 w-4" /> إنشاء حملة</Link></Button>
+          <CardContent className="p-0">
+            <EmptyState
+              variant="inline"
+              icon={Megaphone}
+              title="لا توجد رسائل في هذه الفترة بعد"
+              description="لم تُرسل أي رسالة ضمن النطاق الزمني المحدد. جرّب توسيع الفترة أو ابدأ حملة جديدة."
+              action={
+                <Button asChild className="gap-2"><Link href={NEW_CAMPAIGN}><Megaphone className="h-4 w-4" /> إنشاء حملة</Link></Button>
+              }
+            />
           </CardContent>
         </Card>
       ) : (
@@ -181,7 +189,7 @@ export default async function CommunicationReportsPage({ searchParams }: { searc
                           <span className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-sm font-black ${a.tone === "bad" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}`}>{a.count.toLocaleString("ar")}</span>
                           <span className="font-semibold text-slate-800">{a.label}</span>
                         </div>
-                        <Link href={a.href} className="shrink-0 text-xs font-bold text-[#025EB8] underline-offset-4 hover:underline">{a.cta} ←</Link>
+                        <Link href={a.href} className="shrink-0 text-xs font-bold text-brand underline-offset-4 hover:underline">{a.cta} ←</Link>
                       </li>
                     ))}
                     {scheduler && pastDue > 0 && !scheduler.configured ? (
@@ -263,13 +271,13 @@ export default async function CommunicationReportsPage({ searchParams }: { searc
                     </li>
                   ))}</ul>
                 )}
-                <Link href={INBOX} className="mt-3 inline-block text-xs font-semibold text-[#025EB8] underline">فتح صندوق الوارد</Link>
+                <Link href={INBOX} className="mt-3 inline-block text-xs font-semibold text-brand underline">فتح صندوق الوارد</Link>
               </CardContent>
             </Card>
 
             {/* 5. Campaigns needing review */}
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><ClipboardCheck className="h-4 w-4 text-[#025EB8]" /> حملات تحتاج مراجعة</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><ClipboardCheck className="h-4 w-4 text-brand" /> حملات تحتاج مراجعة</CardTitle></CardHeader>
               <CardContent>
                 {report!.campaignsNeedingReview.length === 0 ? (
                   <p className="py-4 text-center text-sm text-slate-500">لا توجد حملات تنتظر إجراءً.</p>

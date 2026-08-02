@@ -1,5 +1,5 @@
 import { communicationProviderRegistry } from "./provider-registry";
-import { getActiveCommunicationRuntimeBundle, getActiveBrevoWebhookSecret } from "./runtime-config";
+import { getActiveCommunicationRuntimeBundle, getActiveBrevoWebhookSecret, getActiveElasticEmailWebhookSecret } from "./runtime-config";
 import type { CommunicationProviderKey, ProviderConnection, ProviderConnectionStatus } from "./communication-types";
 
 export type ProviderRequirement = { id: string; label: string; configured: boolean; required: boolean };
@@ -21,7 +21,11 @@ function statusFromRequirements(provider: ProviderConnection, requirements: Prov
 }
 
 export async function getProviderConnectionsReadiness(): Promise<ProviderConnectionReadiness[]> {
-  const [runtime, webhook] = await Promise.all([getActiveCommunicationRuntimeBundle(), getActiveBrevoWebhookSecret()]);
+  const [runtime, emailWebhook, smsWebhook] = await Promise.all([
+    getActiveCommunicationRuntimeBundle(),
+    getActiveElasticEmailWebhookSecret(),
+    getActiveBrevoWebhookSecret(),
+  ]);
   return communicationProviderRegistry.map((provider) => {
     let enabled = true;
     let requirements: ProviderRequirement[];
@@ -33,12 +37,12 @@ export async function getProviderConnectionsReadiness(): Promise<ProviderConnect
         { id: "access_token", label: "صلاحية وصول آمنة", configured: runtime.meta.configured, required: true },
         { id: "webhook_verify", label: "Webhook للتحقق واستقبال الحالات", configured: runtime.meta.configured, required: true },
       ];
-    } else if (provider.key === "BREVO_EMAIL") {
-      enabled = runtime.brevoEmail.enabled;
+    } else if (provider.key === "ELASTIC_EMAIL") {
+      enabled = runtime.elasticEmail.enabled;
       requirements = [
-        { id: "sender", label: "مرسل الإيميل المعتمد", configured: runtime.brevoEmail.configured && !!runtime.brevoEmail.values.senderEmail, required: true },
-        { id: "api_key", label: "صلاحية API آمنة", configured: runtime.brevoEmail.configured, required: true },
-        { id: "webhook", label: "Webhook لحالات الإرسال", configured: webhook.configured, required: false },
+        { id: "sender", label: "مرسل الإيميل المعتمد", configured: runtime.elasticEmail.configured && !!runtime.elasticEmail.values.senderEmail, required: true },
+        { id: "api_key", label: "صلاحية API آمنة", configured: runtime.elasticEmail.configured, required: true },
+        { id: "webhook", label: "Webhook لحالات الإرسال", configured: emailWebhook.configured, required: false },
       ];
     } else if (provider.key === "BREVO_SMS") {
       enabled = runtime.brevoSms.enabled;
@@ -46,6 +50,7 @@ export async function getProviderConnectionsReadiness(): Promise<ProviderConnect
         { id: "sender", label: "اسم أو رقم مرسل SMS", configured: runtime.brevoSms.configured && !!runtime.brevoSms.values.sender, required: true },
         { id: "api_key", label: "صلاحية API آمنة", configured: runtime.brevoSms.configured, required: true },
         { id: "country_rules", label: "التوجيه للأرقام الدولية", configured: true, required: true },
+        { id: "webhook", label: "Webhook لحالات الإرسال", configured: smsWebhook.configured, required: false },
       ];
     } else {
       enabled = false;

@@ -4,8 +4,8 @@
  * keys are missing — WITHOUT ever returning a secret value. Safe to surface to readiness UIs via an
  * operations-guarded API (only booleans + missing key NAMES + a safe label leave this module).
  *
- * Final architecture: WhatsApp = Meta, Email = Brevo, SMS int'l = Brevo, SMS Turkey = Netgsm,
- * Twilio = legacy disabled, SendGrid = legacy disabled.
+ * Final architecture: WhatsApp = Meta, Email = Elastic Email, SMS int'l = Brevo, SMS Turkey = Netgsm,
+ * Brevo Email / Twilio / SendGrid = legacy disabled.
  */
 
 const has = (k: string) => !!process.env[k]?.trim();
@@ -27,11 +27,11 @@ export function getMetaWhatsappConfig(): ProviderConfigStatus {
   return { configured: missing.length === 0, missing, safeLabel: "Meta WhatsApp" };
 }
 
-/** Brevo transactional email (primary email provider). */
-export function getBrevoEmailConfig(): ProviderConfigStatus {
-  const required = ["BREVO_API_KEY", "BREVO_EMAIL_SENDER_EMAIL"];
+/** Elastic Email transactional email (primary — and only — email provider). */
+export function getElasticEmailConfig(): ProviderConfigStatus {
+  const required = ["ELASTIC_EMAIL_API_KEY", "ELASTIC_EMAIL_SENDER_EMAIL"];
   const missing = missingOf(required);
-  return { configured: missing.length === 0, missing, safeLabel: "Brevo Email" };
+  return { configured: missing.length === 0, missing, safeLabel: "Elastic Email" };
 }
 
 /** Brevo transactional SMS (international / non-Turkish numbers). */

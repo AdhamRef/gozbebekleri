@@ -277,13 +277,27 @@ export function DashboardAutoEnhancements() {
     pathname.includes("/dashboard/campaigns/new/");
   const hasTextImprover = Boolean(currentPageType(pathname));
 
+  // This component is mounted by the shell on all 151 dashboard routes, but everything it
+  // does is only meaningful on the campaign/category/blog editors:
+  //   - isProjectForm    -> campaigns/edit + campaigns/new
+  //   - hasTextImprover  -> campaigns/edit, categories/edit, blog  (currentPageType)
+  //   - statusForPath    -> campaigns/edit, categories/edit, blog  (a subset of the union)
+  // Without this gate every other route paid for a global fetch/XMLHttpRequest patch and a
+  // 700ms DOM-polling interval that could never produce a portal.
+  const isEnhanceableRoute = isProjectForm || hasTextImprover;
+
   useEffect(() => {
     setMounted(true);
-    patchNetworkSaveEvents();
   }, []);
 
   useEffect(() => {
-    if (!mounted) return;
+    // Installed lazily on first visit to an editor route. `patchNetworkSaveEvents` guards on
+    // `window.__dashboardSaveStatusPatched`, so this stays a single global install.
+    if (isEnhanceableRoute) patchNetworkSaveEvents();
+  }, [isEnhanceableRoute]);
+
+  useEffect(() => {
+    if (!mounted || !isEnhanceableRoute) return;
     const refreshTargets = () => {
       setStatusNode(ensureHeaderPortal("dashboard-inline-save-status"));
       setSeoNode(isProjectForm ? ensureProjectSeoAnchorPortal("dashboard-project-seo-workbench") : null);
@@ -292,9 +306,10 @@ export function DashboardAutoEnhancements() {
     refreshTargets();
     const timer = window.setInterval(refreshTargets, 700);
     return () => window.clearInterval(timer);
-  }, [mounted, pathname, isProjectForm, hasTextImprover]);
+  }, [mounted, pathname, isProjectForm, hasTextImprover, isEnhanceableRoute]);
 
   useEffect(() => {
+    if (!isEnhanceableRoute) return;
     const listener = (event: Event) => {
       const detail = (event as CustomEvent<SaveEventDetail>).detail;
       const next = statusForPath(pathname, detail);

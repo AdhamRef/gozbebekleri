@@ -1,4 +1,4 @@
-export const INTEGRATION_PROVIDERS = ["META_WHATSAPP", "BREVO", "NETGSM", "SYSTEM"] as const;
+export const INTEGRATION_PROVIDERS = ["META_WHATSAPP", "ELASTIC_EMAIL", "BREVO", "NETGSM", "SYSTEM"] as const;
 export type IntegrationProvider = (typeof INTEGRATION_PROVIDERS)[number];
 
 export const INTEGRATION_VALUE_SOURCES = ["DATABASE", "ENVIRONMENT", "NONE"] as const;
@@ -51,13 +51,23 @@ export const INTEGRATION_PROVIDER_DEFINITIONS: Record<IntegrationProvider, Integ
       { key: "GRAPH_API_VERSION", labelAr: "إصدار Graph API", envKey: "META_GRAPH_VERSION", secret: false, required: true, validation: "GRAPH_VERSION" },
     ],
   },
+  ELASTIC_EMAIL: {
+    provider: "ELASTIC_EMAIL",
+    labelAr: "Elastic Email",
+    fields: [
+      { key: "API_KEY", labelAr: "مفتاح API", envKey: "ELASTIC_EMAIL_API_KEY", secret: true, required: true, validation: "API_KEY" },
+      { key: "SENDER_NAME", labelAr: "اسم مرسل البريد", envKey: "ELASTIC_EMAIL_SENDER_NAME", secret: false, required: false, validation: "SENDER_NAME" },
+      { key: "SENDER_EMAIL", labelAr: "بريد المرسل", envKey: "ELASTIC_EMAIL_SENDER_EMAIL", secret: false, required: true, validation: "EMAIL" },
+      { key: "WEBHOOK_SECRET", labelAr: "مفتاح Webhook", envKey: "ELASTIC_EMAIL_WEBHOOK_SECRET", secret: true, required: false, validation: "WEBHOOK_SECRET" },
+    ],
+  },
+  // Brevo is SMS-only in the final architecture: email moved to Elastic Email, so the Brevo email
+  // sender fields were removed. Brevo remains the international (non-Turkish) SMS provider.
   BREVO: {
     provider: "BREVO",
     labelAr: "Brevo",
     fields: [
       { key: "API_KEY", labelAr: "مفتاح API", envKey: "BREVO_API_KEY", secret: true, required: true, validation: "API_KEY" },
-      { key: "EMAIL_SENDER_NAME", labelAr: "اسم مرسل البريد", envKey: "BREVO_EMAIL_SENDER_NAME", secret: false, required: false, validation: "SENDER_NAME" },
-      { key: "EMAIL_SENDER_EMAIL", labelAr: "بريد المرسل", envKey: "BREVO_EMAIL_SENDER_EMAIL", secret: false, required: true, validation: "EMAIL" },
       { key: "SMS_SENDER", labelAr: "اسم مرسل الرسائل القصيرة", envKey: "BREVO_SMS_SENDER", secret: false, required: true, validation: "SMS_SENDER" },
       { key: "WEBHOOK_SECRET", labelAr: "مفتاح Webhook", envKey: "BREVO_SMS_WEBHOOK_SECRET", secret: true, required: false, validation: "WEBHOOK_SECRET" },
     ],

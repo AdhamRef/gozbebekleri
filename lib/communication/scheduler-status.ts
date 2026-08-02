@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { safeCountValue } from "@/lib/dashboard/safe-count";
 
 export const SCHEDULER_RUN_ACTION = "communication.scheduler.run";
 export const SCHEDULER_RUN_FAILED_ACTION = "communication.scheduler.run.failed";
@@ -20,8 +21,8 @@ export async function getSchedulerStatus(): Promise<SchedulerStatus> {
   if (!process.env.DATABASE_URL) return { configured, scheduledCount: 0, dueCount: 0, lastRunAt: null, lastSuccessfulRunAt: null };
   const now = new Date();
   const [scheduledCount, dueCount, lastRun, lastSuccess] = await Promise.all([
-    prisma.communicationCampaign.count({ where: { status: "SCHEDULED" } }).catch(() => 0),
-    prisma.communicationCampaign.count({ where: { status: "SCHEDULED", scheduledAt: { lte: now } } }).catch(() => 0),
+    safeCountValue("scheduler.scheduled", () => prisma.communicationCampaign.count({ where: { status: "SCHEDULED" } })),
+    safeCountValue("scheduler.due", () => prisma.communicationCampaign.count({ where: { status: "SCHEDULED", scheduledAt: { lte: now } } })),
     prisma.auditLog.findFirst({ where: { action: { in: [SCHEDULER_RUN_ACTION, SCHEDULER_RUN_FAILED_ACTION] } }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }).catch(() => null),
     prisma.auditLog.findFirst({ where: { action: SCHEDULER_RUN_ACTION }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }).catch(() => null),
   ]);

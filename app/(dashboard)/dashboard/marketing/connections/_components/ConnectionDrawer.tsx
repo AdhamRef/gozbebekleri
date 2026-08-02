@@ -328,7 +328,7 @@ export function ConnectionDrawer({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label className="text-[11px] text-slate-600 mb-1 block">اللغات المدعومة</Label>
-                <div className="flex flex-wrap gap-1.5">{SUPPORTED_MARKETING_LOCALES.map((l) => <button type="button" key={l} onClick={() => toggleLocale(l)} className={cn("px-2 py-0.5 rounded-full border text-[11px]", locales.includes(l) ? "bg-[#025EB8] text-white border-[#025EB8]" : "bg-white border-slate-200 text-slate-700")}>{getLocaleLabel(l)}</button>)}</div>
+                <div className="flex flex-wrap gap-1.5">{SUPPORTED_MARKETING_LOCALES.map((l) => <button type="button" key={l} onClick={() => toggleLocale(l)} className={cn("px-2 py-0.5 rounded-full border text-[11px]", locales.includes(l) ? "bg-brand text-white border-brand" : "bg-white border-slate-200 text-slate-700")}>{getLocaleLabel(l)}</button>)}</div>
               </div>
               <div>
                 <Label className="text-[11px] text-slate-600 mb-1 block">الدول المدعومة</Label>
@@ -338,7 +338,7 @@ export function ConnectionDrawer({
 
             <div><Label className="text-[11px] text-slate-600 mb-1 block">ملاحظات</Label><textarea value={form.notes ?? ""} onChange={(e) => setField("notes", e.target.value)} rows={3} className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 bg-slate-50" placeholder="ملاحظات حرة (اختياري)" /></div>
 
-            <label className="inline-flex items-center gap-2 text-xs"><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="accent-[#025EB8]" />تفعيل الاتصال</label>
+            <label className="inline-flex items-center gap-2 text-xs"><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="accent-brand" />تفعيل الاتصال</label>
 
             <div className={cn("rounded-lg border p-3 flex items-start gap-2", checklist.reqMissing.length === 0 ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800")}>
               {checklist.reqMissing.length === 0 ? <CheckCircle2 className="w-4 h-4 mt-0.5" /> : <AlertCircle className="w-4 h-4 mt-0.5" />}

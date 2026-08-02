@@ -186,7 +186,7 @@ export function SeoTextImproverCard({ type, locale = "ar", title, text, keywords
                   <div className="text-sm font-bold text-slate-900">حزمة SEO جاهزة للمراجعة</div>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">بعد المراجعة يمكنك إرسال العنوان والوصف والكلمات والأسئلة إلى أداة SEO الذكي في نفس اللغة.</p>
                 </div>
-                <Button type="button" size="sm" onClick={sendToSeoWorkbench} className="gap-2 bg-[#025EB8] hover:bg-[#014fa0]">
+                <Button type="button" size="sm" onClick={sendToSeoWorkbench} className="gap-2 bg-brand hover:bg-brand-dark">
                   <Send className="h-4 w-4" />
                   {sentToSeo ? "تم الإرسال" : "إرسال إلى SEO الذكي"}
                 </Button>

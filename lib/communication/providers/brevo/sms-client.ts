@@ -43,7 +43,7 @@ export async function sendBrevoSms(input: BrevoSmsInput, runtime?: BrevoSmsRunti
     }).finally(() => clearTimeout(timer));
     const body = await res.json().catch(() => null);
     if (!res.ok) {
-      const { reason, detail } = mapBrevoError("sms", res.status, body);
+      const { reason, detail } = mapBrevoError(res.status, body);
       return { ok: false, reason, detail };
     }
     const idRaw = body && typeof body === "object" ? (body as { messageId?: unknown; reference?: unknown }).messageId ?? (body as { reference?: unknown }).reference : null;

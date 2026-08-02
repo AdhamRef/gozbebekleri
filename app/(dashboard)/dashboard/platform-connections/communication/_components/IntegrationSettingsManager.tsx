@@ -40,14 +40,14 @@ export function IntegrationSettingsManager({ initialProviders, permissions, sche
         notice={state.notice}
         lastCandidateTest={state.lastCandidateTest}
         lastActiveTest={state.lastActiveTest}
-        brevoWebhookReveal={state.brevoWebhookReveal}
+        webhookReveal={state.webhookReveal}
         onDraft={state.updateDraft}
         onSave={state.saveChanges}
         onTestCandidate={state.testCandidate}
         onTestActive={state.testActive}
         onActivate={state.activateCandidate}
         onDiscard={state.discardCandidate}
-        onRotateBrevoWebhook={state.rotateBrevoWebhook}
+        onRotateWebhook={state.rotateWebhook}
         onDelete={state.deleteField}
         onToggle={state.toggleProvider}
         onNotice={state.setNotice}

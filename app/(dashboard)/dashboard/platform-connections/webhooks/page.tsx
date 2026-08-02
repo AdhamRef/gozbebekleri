@@ -22,7 +22,7 @@ export default async function WebhooksPage() {
   const w = await getWebhooksReadiness();
 
   return (
-    <main className="space-y-5 p-4 sm:p-6" dir="rtl">
+    <main className="space-y-5" dir="rtl">
       <PageHeader
         eyebrow="ربط المنصات والإرسال / Webhooks"
         title="Webhooks"
@@ -56,8 +56,8 @@ export default async function WebhooksPage() {
       </Card>
 
       <div className="flex flex-wrap gap-3">
-        <Link href={SETTINGS} className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 hover:border-[#025EB8] hover:text-[#025EB8]">أدوات اختبار Webhook</Link>
-        <Link href={PROVIDER_EVENTS} className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 hover:border-[#025EB8] hover:text-[#025EB8]">عرض أحداث المزود (متقدم)</Link>
+        <Link href={SETTINGS} className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 hover:border-brand hover:text-brand">أدوات اختبار Webhook</Link>
+        <Link href={PROVIDER_EVENTS} className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 hover:border-brand hover:text-brand">عرض أحداث المزود (متقدم)</Link>
       </div>
     </main>
   );

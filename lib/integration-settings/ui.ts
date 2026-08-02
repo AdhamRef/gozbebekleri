@@ -24,18 +24,25 @@ export const INTEGRATION_UI_STATUS_LABEL: Record<IntegrationUiStatus, string> = 
 
 export const PROVIDER_USAGE: Record<IntegrationProvider, string> = {
   META_WHATSAPP: "إرسال واتساب عبر Meta Cloud API",
-  BREVO: "إرسال الإيميل وSMS للأرقام الدولية",
+  ELASTIC_EMAIL: "إرسال جميع رسائل البريد الإلكتروني",
+  BREVO: "إرسال SMS للأرقام الدولية (غير التركية)",
   NETGSM: "إرسال SMS إلى أرقام تركيا +90",
   SYSTEM: "بنية Cron التحتية وحماية الجدولة",
 };
 
 export const PROVIDER_UI_LABEL: Record<IntegrationProvider, string> = {
   META_WHATSAPP: "Meta WhatsApp",
-  BREVO: "Brevo",
+  ELASTIC_EMAIL: "Elastic Email",
+  BREVO: "Brevo SMS",
   NETGSM: "Netgsm",
   SYSTEM: "الجدولة Cron",
 };
 
+/**
+ * Field help is keyed by field key, and the same key can exist on more than one provider
+ * (API_KEY on Elastic Email and Brevo, WEBHOOK_SECRET on both). `fieldHelp()` prefers the
+ * provider-scoped entry and falls back to the shared one.
+ */
 export const FIELD_HELP: Record<string, string> = {
   ACCESS_TOKEN: "من Meta Business Manager ضمن إعدادات WhatsApp API ورمز الوصول الدائم.",
   APP_SECRET: "من إعدادات تطبيق Meta ضمن Basic Settings. يُستخدم للتحقق من App Secret Proof وتوقيع Webhook.",
@@ -43,9 +50,12 @@ export const FIELD_HELP: Record<string, string> = {
   BUSINESS_ACCOUNT_ID: "معرّف WhatsApp Business Account الظاهر في إعدادات WhatsApp Manager.",
   DEFAULT_PHONE_NUMBER_ID: "معرّف رقم الهاتف من صفحة API Setup داخل تطبيق Meta.",
   GRAPH_API_VERSION: "إصدار Graph API المستخدم، مثل v23.0.",
-  API_KEY: "من Brevo: SMTP & API ثم API Keys.",
-  EMAIL_SENDER_NAME: "الاسم الذي يظهر للمستلم في رسائل البريد.",
-  EMAIL_SENDER_EMAIL: "بريد مرسل موثّق ومفعّل داخل Brevo.",
+  API_KEY: "مفتاح API الخاص بالمزود.",
+  "ELASTIC_EMAIL.API_KEY": "من Elastic Email: Settings ثم API Keys — يحتاج صلاحية إرسال البريد.",
+  "ELASTIC_EMAIL.SENDER_NAME": "الاسم الذي يظهر للمستلم في رسائل البريد.",
+  "ELASTIC_EMAIL.SENDER_EMAIL": "بريد مرسل على نطاق موثّق (SPF/DKIM) داخل Elastic Email.",
+  "ELASTIC_EMAIL.WEBHOOK_SECRET": "رمز حماية Webhook يُنشأ داخل السيرفر ويُلصق في رابط إشعارات Elastic Email.",
+  "BREVO.API_KEY": "من Brevo: SMTP & API ثم API Keys.",
   SMS_SENDER: "اسم المرسل الدولي المسجل أو المسموح به داخل Brevo.",
   WEBHOOK_SECRET: "رمز حماية Webhook يتم إنشاؤه وتدويره داخل السيرفر.",
   USERCODE: "رمز مستخدم Netgsm الخاص بالحساب.",
@@ -54,14 +64,23 @@ export const FIELD_HELP: Record<string, string> = {
   CRON_SECRET: "إعداد بنية تحتية يُحفظ داخل Vercel فقط.",
 };
 
+export function fieldHelp(provider: IntegrationProvider, key: string): string {
+  return FIELD_HELP[`${provider}.${key}`] ?? FIELD_HELP[key] ?? "";
+}
+
 export const ERROR_MESSAGES_AR: Record<string, string> = {
   META_UNAUTHORIZED: "رمز الوصول غير صالح أو انتهت صلاحيته.",
   META_APP_SECRET_MISMATCH: "App Secret لا يتوافق مع Access Token.",
   META_BUSINESS_ACCOUNT_UNAVAILABLE: "تعذر الوصول إلى حساب أعمال Meta.",
   META_PHONE_NUMBER_MISMATCH: "رقم واتساب المحدد لا يتبع حساب الأعمال.",
   META_PHONE_NUMBER_UNAVAILABLE: "تعذر الوصول إلى رقم واتساب المحدد.",
+  ELASTIC_EMAIL_UNAUTHORIZED: "مفتاح Elastic Email غير صالح أو انتهت صلاحيته.",
+  ELASTIC_EMAIL_SENDER_DOMAIN_NOT_VERIFIED: "نطاق بريد المرسل غير موثّق داخل Elastic Email.",
+  ELASTIC_EMAIL_SENDER_INVALID: "بريد المرسل غير صالح.",
+  ELASTIC_EMAIL_ACCOUNT_UNAVAILABLE: "تعذر الوصول إلى حساب Elastic Email.",
+  ELASTIC_EMAIL_CONFIGURATION_INCOMPLETE: "بيانات Elastic Email غير مكتملة.",
   BREVO_UNAUTHORIZED: "مفتاح Brevo غير صالح.",
-  BREVO_EMAIL_SENDER_NOT_VERIFIED: "بريد المرسل غير موجود أو غير مفعل داخل Brevo.",
+  BREVO_SMS_SENDER_INVALID: "اسم مرسل SMS غير صالح.",
   NETGSM_AUTH_REJECTED: "بيانات دخول Netgsm غير صحيحة.",
   NETGSM_HEADER_NOT_AVAILABLE: "اسم المرسل غير متاح في حساب Netgsm.",
   CRON_SECRET_INVALID: "مفتاح الجدولة لا يحقق متطلبات الأمان.",

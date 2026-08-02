@@ -68,7 +68,7 @@ export default function TeamSupportDefaultsPage() {
   return (
     <div className="space-y-6" dir="rtl">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
           القيم الافتراضية لدعم الفريق
         </h1>
         <p className="text-sm text-muted-foreground mt-1.5">
@@ -103,7 +103,7 @@ export default function TeamSupportDefaultsPage() {
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="gap-2 bg-[#025EB8] hover:bg-[#014fa0] text-white"
+                className="gap-2 bg-brand hover:bg-brand-dark text-white"
               >
                 {saving ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

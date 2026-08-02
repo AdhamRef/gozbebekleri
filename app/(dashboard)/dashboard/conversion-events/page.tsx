@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Loader2, RefreshCw, Search } from "lucide-react";
+import { Activity, Loader2, RefreshCw, Search } from "lucide-react";
+import { EmptyState } from "@/components/dashboard/EmptyState";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -213,7 +214,7 @@ export default function ConversionEventsPage() {
   return <div className="space-y-5 p-4 sm:p-6" dir="rtl">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-black text-slate-950">أحداث التحويل</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">أحداث التحويل</h1>
         <p className="mt-1 text-sm text-slate-500">سجل ConversionEvent الموحد لفحص إرسال التحويلات حسب المنصة والقناة والحالة، مع Timeline لكل تبرع.</p>
       </div>
       <Button onClick={load} variant="outline" className="gap-2"><RefreshCw className="h-4 w-4" />تحديث</Button>
@@ -253,8 +254,8 @@ export default function ConversionEventsPage() {
       <CardContent>
         {source === "auditLogFallback" ? <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">هذه النتائج من سجل التدقيق الاحتياطي. الأحداث الجديدة بعد آخر تحديث يجب أن تظهر من المصدر الأساسي ConversionEvent.</div> : null}
         {source === "ConversionEvent" ? <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">النتائج الحالية من المصدر الأساسي ConversionEvent.</div> : null}
-        {loading ? <div className="flex min-h-[18rem] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#025EB8]" /></div> : view === "timeline" ? <div className="space-y-3">
-          {timelines.length === 0 ? <div className="rounded-xl border px-3 py-10 text-center text-slate-500">لا توجد أحداث مطابقة.</div> : timelines.map((timeline) => <div key={timeline.key} className="rounded-xl border bg-white p-4">
+        {loading ? <div className="flex min-h-[18rem] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-brand" /></div> : view === "timeline" ? <div className="space-y-3">
+          {timelines.length === 0 ? <EmptyState icon={Activity} title="لا توجد أحداث مطابقة" description="لا يوجد حدث تحويل يطابق التصفية الحالية. جرّب توسيع النطاق الزمني أو تغيير نوع الحدث." /> :timelines.map((timeline) => <div key={timeline.key} className="rounded-xl border bg-white p-4">
             <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-3">
               <div>
                 <div className="text-xs text-slate-500">Donation ID</div>
@@ -263,7 +264,7 @@ export default function ConversionEventsPage() {
               <div className="text-sm text-slate-600">{timeline.amountLabel}</div>
               <div className="text-sm text-slate-600">{timeline.platforms.length ? timeline.platforms.join(" · ") : "—"}</div>
               <div className="text-xs text-slate-500">{statusSummary(timeline.statuses)}</div>
-              {timeline.donationId !== "—" ? <Link href={timelineHref(timeline.donationId)} className="inline-flex items-center rounded-md border px-3 py-2 text-xs font-bold text-[#025EB8] hover:bg-slate-50">فتح Timeline</Link> : null}
+              {timeline.donationId !== "—" ? <Link href={timelineHref(timeline.donationId)} className="inline-flex items-center rounded-md border px-3 py-2 text-xs font-bold text-brand hover:bg-slate-50">فتح Timeline</Link> : null}
               <Button size="sm" variant="outline" disabled={!timeline.canRetry || retryingDonationId === timeline.donationId} onClick={() => retryDonation(timeline.donationId)} className="gap-2">
                 {retryingDonationId === timeline.donationId ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
                 إعادة المحاولة
@@ -298,7 +299,7 @@ export default function ConversionEventsPage() {
               </tr>
             </thead>
             <tbody>
-              {events.length === 0 ? <tr><td colSpan={11} className="px-3 py-10 text-center text-slate-500">لا توجد أحداث مطابقة.</td></tr> : events.map((row, index) => <tr key={rowKey(row, index)} className="border-t">
+              {events.length === 0 ? <tr><td colSpan={11} className="p-0"><EmptyState variant="inline" icon={Activity} title="لا توجد أحداث مطابقة" description="لا يوجد حدث تحويل يطابق التصفية الحالية." /></td></tr> :events.map((row, index) => <tr key={rowKey(row, index)} className="border-t">
                 <td className="whitespace-nowrap px-3 py-2">{renderDate(row.createdAt)}</td>
                 <td className="px-3 py-2 font-semibold">{row.platform ?? "—"}</td>
                 <td className="px-3 py-2">{row.channel ?? "—"}</td>
@@ -309,7 +310,7 @@ export default function ConversionEventsPage() {
                 <td className="max-w-[13rem] truncate px-3 py-2 font-mono text-xs">{row.donationId ?? "—"}</td>
                 <td className="max-w-[16rem] truncate px-3 py-2 font-mono text-xs">{row.eventId ?? "—"}</td>
                 <td className="max-w-[20rem] truncate px-3 py-2 text-xs text-rose-700">{row.error ?? "—"}</td>
-                <td className="px-3 py-2">{row.donationId ? <Link href={timelineHref(row.donationId)} className="text-xs font-bold text-[#025EB8] hover:underline">فتح</Link> : "—"}</td>
+                <td className="px-3 py-2">{row.donationId ? <Link href={timelineHref(row.donationId)} className="text-xs font-bold text-brand hover:underline">فتح</Link> : "—"}</td>
               </tr>)}
             </tbody>
           </table>

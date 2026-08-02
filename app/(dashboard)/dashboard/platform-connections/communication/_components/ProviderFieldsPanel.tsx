@@ -3,16 +3,16 @@
 import Link from "next/link";
 import { CheckCircle2, Clipboard, Loader2, RefreshCw, RotateCcw, Save, ShieldCheck, TestTube2, Trash2, XCircle } from "lucide-react";
 import type { SafeProviderConnectionTestResponse } from "@/lib/integration-settings/types";
-import { FIELD_HELP, INTEGRATION_UI_STATUS_LABEL, PROVIDER_UI_LABEL, safeErrorMessage, uiStatus } from "@/lib/integration-settings/ui";
-import { ADVANCED_LINKS, WEBHOOKS, sourceLabel, type IntegrationUiPermissions, type IntegrationUiSnapshot, type SchedulerUiStatus } from "./model";
+import { fieldHelp, INTEGRATION_UI_STATUS_LABEL, PROVIDER_UI_LABEL, safeErrorMessage, uiStatus } from "@/lib/integration-settings/ui";
+import { ADVANCED_LINKS, WEBHOOKS, ROTATABLE_WEBHOOK_PROVIDERS, sourceLabel, type IntegrationUiPermissions, type IntegrationUiSnapshot, type SchedulerUiStatus } from "./model";
 
 type Notice = { kind: "success" | "error"; text: string } | null;
-type BrevoWebhookReveal = { url: string; candidateVersion: string | null } | null;
+type WebhookReveal = { url: string; candidateVersion: string | null } | null;
 
 export function ProviderFieldsPanel({
   snapshot, permissions, scheduler, drafts, dirty, busy, notice, lastCandidateTest, lastActiveTest,
-  brevoWebhookReveal, onDraft, onSave, onTestCandidate, onTestActive, onActivate, onDiscard,
-  onRotateBrevoWebhook, onDelete, onToggle, onNotice,
+  webhookReveal, onDraft, onSave, onTestCandidate, onTestActive, onActivate, onDiscard,
+  onRotateWebhook, onDelete, onToggle, onNotice,
 }: {
   snapshot: IntegrationUiSnapshot;
   permissions: IntegrationUiPermissions;
@@ -23,14 +23,14 @@ export function ProviderFieldsPanel({
   notice: Notice;
   lastCandidateTest: SafeProviderConnectionTestResponse | null;
   lastActiveTest: SafeProviderConnectionTestResponse | null;
-  brevoWebhookReveal: BrevoWebhookReveal;
+  webhookReveal: WebhookReveal;
   onDraft: (key: string, value: string) => void;
   onSave: () => void;
   onTestCandidate: () => void;
   onTestActive: () => void;
   onActivate: () => void;
   onDiscard: () => void;
-  onRotateBrevoWebhook: () => void;
+  onRotateWebhook: () => void;
   onDelete: (key: string, label: string) => void;
   onToggle: () => void;
   onNotice: (value: Notice) => void;
@@ -40,6 +40,10 @@ export function ProviderFieldsPanel({
   const completed = snapshot.fields.filter((field) => field.configured).length;
   const encryptionBlocked = !snapshot.encryptionKeyConfigured;
   const activeComplete = isCron ? scheduler.configured : snapshot.missingRequiredFields.length === 0;
+  // Providers whose webhook secret is minted server-side: the field is read-only in the form and
+  // rotated through a dedicated one-time-reveal action instead.
+  const rotatableWebhook = ROTATABLE_WEBHOOK_PROVIDERS[provider];
+  const isManagedWebhookField = (key: string) => !!rotatableWebhook && key === "WEBHOOK_SECRET";
 
   async function copyAbsolutePath(path: string) {
     await navigator.clipboard.writeText(`${window.location.origin}${path}`);
@@ -48,14 +52,14 @@ export function ProviderFieldsPanel({
 
   async function copyOneTimeUrl(url: string) {
     await navigator.clipboard.writeText(url);
-    onNotice({ kind: "success", text: "تم نسخ رابط Brevo. احتفظ به الآن لأنه لن يظهر كاملًا مرة أخرى." });
+    onNotice({ kind: "success", text: "تم نسخ الرابط. احتفظ به الآن لأنه لن يظهر كاملًا مرة أخرى." });
   }
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
       <header className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-bold text-[#025EB8]">{PROVIDER_UI_LABEL[provider]}</p>
+          <p className="text-xs font-bold text-brand">{PROVIDER_UI_LABEL[provider]}</p>
           <h2 className="mt-1 text-lg font-black text-slate-900">{isCron ? "بنية الجدولة التحتية" : "إعدادات المزود"}</h2>
           <p className="mt-1 text-xs text-slate-500">
             {isCron ? "يُدار CRON_SECRET داخل Vercel فقط." : `${completed}/${snapshot.fields.length} حقل مكتمل · الحالة: ${INTEGRATION_UI_STATUS_LABEL[uiStatus(snapshot)]}`}
@@ -86,7 +90,7 @@ export function ProviderFieldsPanel({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <label htmlFor={`${provider}-${field.key}`} className="text-sm font-black text-slate-900">{field.labelAr}{field.required ? " *" : ""}</label>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">{FIELD_HELP[field.key]}</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">{fieldHelp(provider, field.key)}</p>
                     </div>
                     <span className="shrink-0 rounded border bg-white px-2 py-1 text-[10px] font-bold text-slate-500">{sourceLabel(field.source)}</span>
                   </div>
@@ -100,12 +104,12 @@ export function ProviderFieldsPanel({
                         onChange={(event) => onDraft(field.key, event.target.value)}
                         placeholder={field.isSecret ? (field.configured ? "اتركه فارغًا للاحتفاظ بالقيمة المحفوظة" : "أدخل القيمة السرية") : "أدخل القيمة"}
                         autoComplete={field.isSecret ? "new-password" : "off"}
-                        disabled={!!busy || (field.isSecret && encryptionBlocked) || (provider === "BREVO" && field.key === "WEBHOOK_SECRET")}
+                        disabled={!!busy || (field.isSecret && encryptionBlocked) || isManagedWebhookField(field.key)}
                         aria-describedby={`${provider}-${field.key}-help`}
-                        className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#025EB8] focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
                       />
                       <p id={`${provider}-${field.key}-help`} className="mt-1.5 text-[11px] text-slate-500">
-                        {provider === "BREVO" && field.key === "WEBHOOK_SECRET"
+                        {isManagedWebhookField(field.key)
                           ? "يتم إنشاؤه وتدويره آليًا من السيرفر."
                           : field.isSecret ? field.configured ? `محفوظ: ${field.maskedValue ?? "قيمة آمنة"}` : "غير محفوظ"
                           : field.hasPendingValue ? "توجد قيمة جديدة بانتظار الاختبار أو الاعتماد."
@@ -118,7 +122,7 @@ export function ProviderFieldsPanel({
                     </div>
                   )}
 
-                  {permissions.canAdmin && field.configured && !(provider === "BREVO" && field.key === "WEBHOOK_SECRET") && (
+                  {permissions.canAdmin && field.configured && !isManagedWebhookField(field.key) && (
                     <div className="mt-3 border-t pt-2 text-left">
                       <button type="button" disabled={!!busy} onClick={() => onDelete(field.key, field.labelAr)} className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" /> حذف الإعداد</button>
                     </div>
@@ -127,20 +131,20 @@ export function ProviderFieldsPanel({
               ))}
             </div>
 
-            {provider === "BREVO" && (
+            {rotatableWebhook && (
               <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-                <p className="text-sm font-black text-blue-950">Brevo Webhook</p>
-                <p className="mt-1 text-xs leading-5 text-blue-900">لا يُعرض رابط ناقص. أنشئ رابطًا محميًا من السيرفر ثم اختبر تغييرات Brevo واعتمدها ليصبح الرابط صالحًا.</p>
-                {brevoWebhookReveal ? (
+                <p className="text-sm font-black text-blue-950">{rotatableWebhook.title}</p>
+                <p className="mt-1 text-xs leading-5 text-blue-900">لا يُعرض رابط ناقص. أنشئ رابطًا محميًا من السيرفر ثم اختبر التغييرات واعتمدها ليصبح الرابط صالحًا.</p>
+                {webhookReveal ? (
                   <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3">
-                    <p className="text-xs font-black text-amber-950">انسخ الرابط الآن وأضفه داخل Brevo. لن يظهر رمز الحماية كاملًا مرة أخرى.</p>
-                    <code className="mt-2 block overflow-x-auto rounded bg-white px-3 py-2 text-xs text-slate-700">{brevoWebhookReveal.url}</code>
-                    <button type="button" onClick={() => copyOneTimeUrl(brevoWebhookReveal.url)} className="mt-2 inline-flex h-9 items-center gap-2 rounded-md border border-amber-400 bg-white px-3 text-xs font-bold text-amber-900"><Clipboard className="h-4 w-4" /> نسخ الرابط</button>
+                    <p className="text-xs font-black text-amber-950">{rotatableWebhook.revealHint}</p>
+                    <code className="mt-2 block overflow-x-auto rounded bg-white px-3 py-2 text-xs text-slate-700">{webhookReveal.url}</code>
+                    <button type="button" onClick={() => copyOneTimeUrl(webhookReveal.url)} className="mt-2 inline-flex h-9 items-center gap-2 rounded-md border border-amber-400 bg-white px-3 text-xs font-bold text-amber-900"><Clipboard className="h-4 w-4" /> نسخ الرابط</button>
                   </div>
                 ) : (
-                  <p className="mt-2 text-xs text-blue-900">{snapshot.fields.find((field) => field.key === "WEBHOOK_SECRET")?.hasPendingValue ? "رابط جديد بانتظار اعتماد إعدادات Brevo." : snapshot.fields.find((field) => field.key === "WEBHOOK_SECRET")?.configured ? "Webhook محمي ومُعد. يمكن تدوير الرابط عند الحاجة." : "Webhook غير مُعد."}</p>
+                  <p className="mt-2 text-xs text-blue-900">{snapshot.fields.find((field) => field.key === "WEBHOOK_SECRET")?.hasPendingValue ? "رابط جديد بانتظار اعتماد الإعدادات." : snapshot.fields.find((field) => field.key === "WEBHOOK_SECRET")?.configured ? "Webhook محمي ومُعد. يمكن تدوير الرابط عند الحاجة." : "Webhook غير مُعد."}</p>
                 )}
-                {permissions.canManage && <ActionButton disabled={!!busy || encryptionBlocked} loading={busy === "brevo-webhook"} onClick={onRotateBrevoWebhook} icon={<RefreshCw className="h-4 w-4" />} label="إنشاء أو تدوير رابط Brevo Webhook" />}
+                {permissions.canManage && <ActionButton disabled={!!busy || encryptionBlocked} loading={busy === "rotate-webhook"} onClick={onRotateWebhook} icon={<RefreshCw className="h-4 w-4" />} label={rotatableWebhook.actionLabel} />}
               </div>
             )}
 
@@ -169,7 +173,7 @@ export function ProviderFieldsPanel({
         )}
 
         {ADVANCED_LINKS[provider]?.length ? (
-          <div className="flex flex-wrap gap-3 border-t pt-4 text-xs font-bold text-[#025EB8]">
+          <div className="flex flex-wrap gap-3 border-t pt-4 text-xs font-bold text-brand">
             {ADVANCED_LINKS[provider]!.map((item) => <Link key={item.href} href={item.href} className="hover:underline">{item.label} ←</Link>)}
           </div>
         ) : null}
@@ -214,7 +218,7 @@ function TestResult({ title, result, fallbackAt, fallbackResult, failure }: { ti
 }
 
 function ActionButton({ disabled, loading, onClick, icon, label, primary, success, danger }: { disabled: boolean; loading: boolean; onClick: () => void; icon: React.ReactNode; label: string; primary?: boolean; success?: boolean; danger?: boolean }) {
-  const style = primary ? "bg-[#025EB8] text-white" : success ? "bg-emerald-600 text-white" : danger ? "border border-rose-300 bg-white text-rose-700" : "border border-blue-300 bg-white text-blue-800";
+  const style = primary ? "bg-brand text-white" : success ? "bg-emerald-600 text-white" : danger ? "border border-rose-300 bg-white text-rose-700" : "border border-blue-300 bg-white text-blue-800";
   return <button type="button" disabled={disabled} onClick={onClick} className={`inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50 ${style}`}>{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : icon}{label}</button>;
 }
 function Stat({ label, value }: { label: string; value: string }) { return <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-[11px] font-bold text-slate-500">{label}</p><p className="mt-1 text-sm font-black text-slate-900">{value}</p></div>; }
