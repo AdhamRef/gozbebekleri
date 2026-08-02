@@ -770,11 +770,17 @@ export default function DashboardPage() {
 
         {/* المؤشرات — تختفي عند عرض تبرعات مستخدم معين عبر الرابط */}
         {!searchParams.get("userId") && (
-        <section className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-4 flex-row-reverse">
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              المؤشرات (حسب الفترة والتصفية)
-            </h2>
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand">
+                <PieChartIcon className="h-[18px] w-[18px]" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-[15px] font-semibold leading-tight text-slate-900">المؤشرات</h2>
+                <p className="text-xs text-slate-500">محسوبة حسب الفترة والتصفية المختارة</p>
+              </div>
+            </div>
             <Tabs
               value={statCardSet}
               onValueChange={(v) => setStatCardSet(v as StatCardSet)}
