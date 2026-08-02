@@ -1790,38 +1790,38 @@ export default function MonthlySubscriptionsDashboardPage() {
               <div className="overflow-x-auto" dir="rtl">
                 <table className="w-full text-xs text-right leading-snug">
                   <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50/80">
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
+                    <tr className="border-b border-slate-200 bg-slate-50">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                         المتبرع
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 min-w-[100px] max-w-[130px]">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[100px] max-w-[130px]">
                         الدولة
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                         التبرع
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                         نوع الدفعة
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                         الحالة
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                         البوابة
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                         دعم الفريق
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                         الإحالة
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[160px]">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 max-w-[160px]">
                         مصدر التبرع
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[110px]">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 max-w-[110px]">
                         المشروع / الفئة
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                         التاريخ
                       </th>
                     </tr>
@@ -1852,7 +1852,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                           onContextMenu={(e) => donationActions.onContextMenu(e, d)}
                           className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
                         >
-                          <td className="py-1.5 px-2">
+                          <td className="py-2.5 px-3">
                             <button
                               type="button"
                               onClick={() => d.donor?.id && openUserProfile(d.donor.id)}
@@ -1868,15 +1868,15 @@ export default function MonthlySubscriptionsDashboardPage() {
                               )}
                             </button>
                           </td>
-                          <td className="py-1.5 px-2 align-middle max-w-[130px]">
+                          <td className="py-2.5 px-3 align-middle max-w-[130px]">
                             <DonationTableCountryColumn countryCode={d.donorCountryCode} />
                           </td>
-                          <td className="py-1.5 px-2 font-medium text-slate-800" dir="rtl">
+                          <td className="py-2.5 px-3 font-medium text-slate-800" dir="rtl">
                             <span dir="ltr">
                               {formatMoney(donationDisplayTotalLocal(d), d.currency, d.amountUSD ?? undefined)}
                             </span>
                           </td>
-                          <td className="py-1.5 px-2 whitespace-nowrap">
+                          <td className="py-2.5 px-3 whitespace-nowrap">
                             {d.type === "MONTHLY" ? (
                               d.isRecurringCharge ? (
                                 <span
@@ -1900,7 +1900,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               <span className="text-[11px] text-slate-400">—</span>
                             )}
                           </td>
-                          <td className="py-1.5 px-2">
+                          <td className="py-2.5 px-3">
                             {d.status === "FAILED" ? (
                               <button
                                 type="button"
@@ -1919,7 +1919,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               </span>
                             )}
                           </td>
-                          <td className="py-1.5 px-2">
+                          <td className="py-2.5 px-3">
                             {d.provider === "STRIPE" || d.provider === "PAYFOR" ? (
                               <button
                                 type="button"
@@ -1943,7 +1943,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               <span className="text-slate-400 text-xs">—</span>
                             )}
                           </td>
-                          <td className="py-1.5 px-2 font-medium text-slate-800" dir="rtl">
+                          <td className="py-2.5 px-3 font-medium text-slate-800" dir="rtl">
                             {(d.teamSupport ?? 0) > 0 ? (
                               <span dir="ltr">
                                 {formatMoney(d.teamSupport ?? 0, d.currency, (d.totalAmount && (d.amountUSD != null)) ? ((d.teamSupport ?? 0) / d.totalAmount) * d.amountUSD : undefined)}
@@ -1952,7 +1952,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               <span className="text-slate-500">—</span>
                             )}
                           </td>
-                          <td className="py-1.5 px-2 align-middle">
+                          <td className="py-2.5 px-3 align-middle">
                             {d.referral ? (
                               <Link
                                 href={`/dashboard/referrals/${d.referral.id}`}
@@ -1964,7 +1964,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               <span className="text-slate-400">—</span>
                             )}
                           </td>
-                          <td className="py-1.5 px-2 align-middle max-w-[160px]">
+                          <td className="py-2.5 px-3 align-middle max-w-[160px]">
                             <button
                               type="button"
                               onClick={() => openDonationDetails("attribution", d)}
@@ -1979,7 +1979,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               />
                             </button>
                           </td>
-                          <td className="py-1.5 px-2 text-slate-600 max-w-[110px]">
+                          <td className="py-2.5 px-3 text-slate-600 max-w-[110px]">
                             {d.campaigns?.length > 0 ? (
                               (() => {
                                 const first = d.campaigns[0];
@@ -2032,7 +2032,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               "—"
                             )}
                           </td>
-                          <td className="py-1.5 px-2 text-slate-500 whitespace-nowrap">
+                          <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">
                             <div className="flex flex-col leading-tight">
                               <span>
                                 {new Date(d.createdAt).toLocaleDateString("en-US", {
@@ -2214,14 +2214,14 @@ export default function MonthlySubscriptionsDashboardPage() {
                 <table className="w-full text-xs text-right leading-snug">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50/90 ">
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">المشترك</th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">المبلغ الشهري</th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">الحالة</th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[160px]">المشروع / الفئة</th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">الإحالة</th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">آخر دفعة</th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">الدفعة القادمة</th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">بدء الاشتراك</th>
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">المشترك</th>
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">المبلغ الشهري</th>
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">الحالة</th>
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 max-w-[160px]">المشروع / الفئة</th>
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">الإحالة</th>
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">آخر دفعة</th>
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">الدفعة القادمة</th>
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">بدء الاشتراك</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2249,7 +2249,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                           key={s.id}
                           className="border-b border-slate-100 /80 hover:bg-gray-50/50 transition-colors"
                         >
-                          <td className="py-1.5 px-2 align-top">
+                          <td className="py-2.5 px-3 align-top">
                             <button
                               type="button"
                               onClick={() => s.donor?.id && openUserProfile(s.donor.id)}
@@ -2261,12 +2261,12 @@ export default function MonthlySubscriptionsDashboardPage() {
                               )}
                             </button>
                           </td>
-                          <td className="py-1.5 px-2 font-semibold text-slate-800 align-top" dir="ltr">
+                          <td className="py-2.5 px-3 font-semibold text-slate-800 align-top" dir="ltr">
                             <span dir="ltr">
                               {formatMoney(s.amount, s.currency, s.amountUSD ?? undefined)}
                             </span>
                           </td>
-                          <td className="py-1.5 px-2 align-top min-w-[118px]">
+                          <td className="py-2.5 px-3 align-top min-w-[118px]">
                             <div className="flex items-center justify-end flex-row-reverse gap-1">
                               <Select
                                 value={s.status}
@@ -2306,7 +2306,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               )}
                             </div>
                           </td>
-                          <td className="py-1.5 px-2 text-slate-600 max-w-[160px] align-top">
+                          <td className="py-2.5 px-3 text-slate-600 max-w-[160px] align-top">
                             {s.campaigns?.length > 0 ? (
                               <span>{s.campaigns.map((c) => c.title).join("، ")}</span>
                             ) : s.categories?.length > 0 ? (
@@ -2315,7 +2315,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               "—"
                             )}
                           </td>
-                          <td className="py-1.5 px-2 align-top">
+                          <td className="py-2.5 px-3 align-top">
                             {s.referral ? (
                               <Link
                                 href={`/dashboard/referrals/${s.referral.id}`}
@@ -2327,7 +2327,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               <span className="text-slate-400">—</span>
                             )}
                           </td>
-                          <td className="py-1.5 px-2 text-slate-600 align-top whitespace-nowrap">
+                          <td className="py-2.5 px-3 text-slate-600 align-top whitespace-nowrap">
                             {s.lastBillingDate
                               ? new Date(s.lastBillingDate).toLocaleDateString("ar-EG", {
                                   year: "numeric",
@@ -2336,7 +2336,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                                 })
                               : "—"}
                           </td>
-                          <td className="py-1.5 px-2 text-slate-600 align-top whitespace-nowrap">
+                          <td className="py-2.5 px-3 text-slate-600 align-top whitespace-nowrap">
                             {s.nextBillingDate
                               ? new Date(s.nextBillingDate).toLocaleDateString("ar-EG", {
                                   year: "numeric",
@@ -2345,7 +2345,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                                 })
                               : "—"}
                           </td>
-                          <td className="py-1.5 px-2 text-slate-500 align-top whitespace-nowrap">
+                          <td className="py-2.5 px-3 text-slate-500 align-top whitespace-nowrap">
                             {new Date(s.createdAt).toLocaleDateString("ar-EG", {
                               year: "numeric",
                               month: "short",

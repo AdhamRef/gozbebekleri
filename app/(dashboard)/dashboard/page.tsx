@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { CHART_THEME } from "@/lib/dashboard/chart-theme";
+import { MetricSummaryBand } from "@/components/dashboard/MetricSummaryBand";
 import { useCurrency } from "@/context/CurrencyContext";
 import {
   ResponsiveContainer,
@@ -776,39 +777,21 @@ export default function DashboardPage() {
             stays on the neutral surface the rest of the shell uses — a coloured slab here
             fights the content instead of framing it. */}
         {!searchParams.get("userId") && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:p-6">
-            <div className="flex flex-wrap items-center gap-x-10 gap-y-5">
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                  إجمالي الإيرادات الناجحة — كل الوقت
-                </p>
-                <p className="mt-1.5 text-3xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-[38px] sm:leading-[1.1]">
-                  {formatInSelectedCurrency(
-                    stats?.paidRevenueAllTimeUnfiltered ??
-                      stats?.allTimeRevenue ??
-                      stats?.totalAmount ??
-                      0,
-                  )}
-                </p>
-                <p className="mt-1.5 text-xs text-slate-400">
-                  لا تتأثر هذه القيمة بالفترة أو التصفية المختارة أدناه.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-x-8 gap-y-4 ms-auto">
-                {[
-                  { label: "تبرعات ناجحة", value: (stats?.paidCount ?? 0).toLocaleString("en-US") },
-                  { label: "اشتراكات نشطة", value: (stats?.activeMonthlyCount ?? 0).toLocaleString("en-US") },
-                  { label: "المتبرعون", value: (stats?.totalUsers ?? 0).toLocaleString("en-US") },
-                ].map((item) => (
-                  <div key={item.label} className="border-s border-slate-100 ps-8 first:border-s-0 first:ps-0">
-                    <p className="text-[11px] font-medium text-slate-400">{item.label}</p>
-                    <p className="mt-1 text-xl font-bold tabular-nums text-slate-800">{item.value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
+          <MetricSummaryBand
+            eyebrow="إجمالي الإيرادات الناجحة — كل الوقت"
+            value={formatInSelectedCurrency(
+              stats?.paidRevenueAllTimeUnfiltered ??
+                stats?.allTimeRevenue ??
+                stats?.totalAmount ??
+                0,
+            )}
+            note="لا تتأثر هذه القيمة بالفترة أو التصفية المختارة أدناه."
+            stats={[
+              { label: "تبرعات ناجحة", value: (stats?.paidCount ?? 0).toLocaleString("en-US") },
+              { label: "اشتراكات نشطة", value: (stats?.activeMonthlyCount ?? 0).toLocaleString("en-US") },
+              { label: "المتبرعون", value: (stats?.totalUsers ?? 0).toLocaleString("en-US") },
+            ]}
+          />
         )}
 
         {/* المؤشرات — تختفي عند عرض تبرعات مستخدم معين عبر الرابط */}
@@ -1950,38 +1933,38 @@ export default function DashboardPage() {
               <div className="overflow-x-auto" dir="rtl">
                 <table className="w-full text-xs text-right leading-snug">
                   <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50/80">
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
+                    <tr className="border-b border-slate-200 bg-slate-50">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                         المتبرع
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 min-w-[100px] max-w-[130px]">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[100px] max-w-[130px]">
                         الدولة
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                         التبرع
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                         الحالة
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                         البوابة
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                         دعم الفريق
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                         النوع
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                         الإحالة
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[160px]">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 max-w-[160px]">
                         مصدر التبرع
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[110px]">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 max-w-[110px]">
                         المشروع / الفئة
                       </th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                         التاريخ
                       </th>
                     </tr>
@@ -2012,7 +1995,7 @@ export default function DashboardPage() {
                           onContextMenu={(e) => donationActions.onContextMenu(e, d)}
                           className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
                         >
-                          <td className="py-1.5 px-2">
+                          <td className="py-2.5 px-3">
                             <button
                               type="button"
                               onClick={() => d.donor?.id && openUserProfile(d.donor.id)}
@@ -2028,15 +2011,15 @@ export default function DashboardPage() {
                               )}
                             </button>
                           </td>
-                          <td className="py-1.5 px-2 align-middle max-w-[130px]">
+                          <td className="py-2.5 px-3 align-middle max-w-[130px]">
                             <DonationTableCountryColumn countryCode={d.donorCountryCode} />
                           </td>
-                          <td className="py-1.5 px-2 font-medium text-slate-800" dir="rtl">
+                          <td className="py-2.5 px-3 font-medium text-slate-800" dir="rtl">
                             <span dir="ltr">
                               {formatMoney(donationDisplayTotalLocal(d), d.currency, d.amountUSD ?? undefined)}
                             </span>
                           </td>
-                          <td className="py-1.5 px-2">
+                          <td className="py-2.5 px-3">
                             {d.status === "FAILED" ? (
                               <button
                                 type="button"
@@ -2064,7 +2047,7 @@ export default function DashboardPage() {
                               </span>
                             )}
                           </td>
-                          <td className="py-1.5 px-2">
+                          <td className="py-2.5 px-3">
                             {d.provider === "STRIPE" || d.provider === "PAYFOR" ? (
                               <button
                                 type="button"
@@ -2099,7 +2082,7 @@ export default function DashboardPage() {
                               <span className="text-slate-400 text-xs">—</span>
                             )}
                           </td>
-                          <td className="py-1.5 px-2 font-medium text-slate-800" dir="rtl">
+                          <td className="py-2.5 px-3 font-medium text-slate-800" dir="rtl">
                             {(d.teamSupport ?? 0) > 0 ? (
                               <span dir="ltr">
                                 {formatMoney(d.teamSupport ?? 0, d.currency, (d.totalAmount && (d.amountUSD != null)) ? ((d.teamSupport ?? 0) / d.totalAmount) * d.amountUSD : undefined)}
@@ -2108,7 +2091,7 @@ export default function DashboardPage() {
                               <span className="text-slate-500">—</span>
                             )}
                           </td>
-                          <td className="py-1.5 px-2">
+                          <td className="py-2.5 px-3">
                             <span
                               className={cn(
                                 "inline-block w-max px-1.5 py-px rounded-full text-[11px]",
@@ -2131,7 +2114,7 @@ export default function DashboardPage() {
                                 : "مرة واحدة"}
                             </span>
                           </td>
-                          <td className="py-1.5 px-2 align-middle">
+                          <td className="py-2.5 px-3 align-middle">
                             {d.referral ? (
                               <Link
                                 href={`/dashboard/referrals/${d.referral.id}`}
@@ -2143,7 +2126,7 @@ export default function DashboardPage() {
                               <span className="text-slate-400">—</span>
                             )}
                           </td>
-                          <td className="py-1.5 px-2 align-middle max-w-[160px]">
+                          <td className="py-2.5 px-3 align-middle max-w-[160px]">
                             <button
                               type="button"
                               onClick={() => openDonationDetails("attribution", d)}
@@ -2158,7 +2141,7 @@ export default function DashboardPage() {
                               />
                             </button>
                           </td>
-                          <td className="py-1.5 px-2 text-slate-600 max-w-[110px]">
+                          <td className="py-2.5 px-3 text-slate-600 max-w-[110px]">
                             {d.campaigns?.length > 0 ? (
                               (() => {
                                 const first = d.campaigns[0];
@@ -2211,7 +2194,7 @@ export default function DashboardPage() {
                               "—"
                             )}
                           </td>
-                          <td className="py-1.5 px-2 text-slate-500 whitespace-nowrap">
+                          <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">
                             <div className="flex flex-col leading-tight">
                               <span>
                                 {new Date(d.createdAt).toLocaleDateString("en-US", {
