@@ -32,6 +32,10 @@ import {
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { CHART_THEME } from "@/lib/dashboard/chart-theme";
 import { MetricSummaryBand } from "@/components/dashboard/MetricSummaryBand";
+import {
+  DashboardFilterBar,
+  type ActiveFilterChip,
+} from "@/components/dashboard/DashboardFilterBar";
 import { useCurrency } from "@/context/CurrencyContext";
 import {
   ResponsiveContainer,
@@ -793,6 +797,68 @@ export default function DashboardPage() {
             ]}
           />
         )}
+
+        {/* Global scope controls. These drive the KPIs AND the charts below, yet they used to
+            live in a card rendered *after* the charts — so changing the period meant scrolling
+            past everything they affect and back again. Hoisted here and made sticky so the
+            active scope is always visible alongside the numbers it produces. */}
+        <div className="sticky top-[4.25rem] z-10 -mx-1 px-1 py-1">
+          <DashboardFilterBar
+            periods={(Object.keys(PERIOD_LABELS) as ChartPeriod[]).map((p) => ({
+              value: p,
+              label: PERIOD_LABELS[p],
+            }))}
+            period={chartPeriod}
+            onPeriodChange={(p) => {
+              setChartPeriod(p);
+              if (p === "custom") {
+                const endKey = istanbulTodayKey();
+                setDateTo(endKey);
+                setDateFrom(istanbulAddCalendarDaysKey(endKey, -30));
+              } else {
+                setDateFrom("");
+                setDateTo("");
+              }
+            }}
+            customValue={"custom" as ChartPeriod}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            onDateFromChange={setDateFrom}
+            onDateToChange={setDateTo}
+            activeFilters={[
+              selectedCategory !== "all" && {
+                id: "category",
+                label: "الحملة",
+                value: categories.find((c) => c.id === selectedCategory)?.name ?? selectedCategory,
+                onClear: () => setSelectedCategory("all"),
+              },
+              selectedCampaign !== "all" && {
+                id: "campaign",
+                label: "المشروع",
+                value: campaigns.find((c) => c.id === selectedCampaign)?.title ?? selectedCampaign,
+                onClear: () => setSelectedCampaign("all"),
+              },
+              selectedUserId !== "all" && {
+                id: "donor",
+                label: "المتبرع",
+                value:
+                  users.find((u) => u.id === selectedUserId)?.name ||
+                  users.find((u) => u.id === selectedUserId)?.email ||
+                  selectedUserId,
+                onClear: () => setSelectedUserId("all"),
+              },
+            ].filter(Boolean) as ActiveFilterChip[]}
+            onClearAll={
+              selectedCategory !== "all" || selectedCampaign !== "all" || selectedUserId !== "all"
+                ? () => {
+                    setSelectedCategory("all");
+                    setSelectedCampaign("all");
+                    setSelectedUserId("all");
+                  }
+                : undefined
+            }
+          />
+        </div>
 
         {/* المؤشرات — تختفي عند عرض تبرعات مستخدم معين عبر الرابط */}
         {!searchParams.get("userId") && (
@@ -1588,61 +1654,9 @@ export default function DashboardPage() {
 
 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
 
-    {/* Period — مع من/إلى/مسح تحته عند مخصص */}
-    <div className="space-y-2 text-right">
-      <label className="text-[11px] font-semibold text-slate-600">
-        الفترة
-      </label>
-      <Select
-        value={chartPeriod === "custom" || (dateFrom && dateTo) ? "custom" : chartPeriod}
-        onValueChange={(v) => {
-          const p = v as ChartPeriod;
-          setChartPeriod(p);
-          if (p === "custom") {
-            const endKey = istanbulTodayKey();
-            const startKey = istanbulAddCalendarDaysKey(endKey, -30);
-            setDateTo(endKey);
-            setDateFrom(startKey);
-          } else {
-            setDateFrom("");
-            setDateTo("");
-          }
-        }}
-      >
-        <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
-          <SelectValue placeholder="اختر الفترة" />
-        </SelectTrigger>
-        <SelectContent>
-          {(Object.keys(PERIOD_LABELS) as ChartPeriod[]).map((p) => (
-            <SelectItem key={p} value={p} className="text-xs">
-              {PERIOD_LABELS[p]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {chartPeriod === "custom" && (
-        <div className="flex gap-2 pt-1 border-slate-100">
-          <div className="space-y-1">
-            <label className="text-[11px] font-semibold text-slate-600">من</label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full min-w-[132px] h-10 px-3 text-[13px] rounded-lg border border-slate-200 bg-white text-slate-800 transition-colors hover:border-slate-300 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[11px] font-semibold text-slate-600">إلى</label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="w-full min-w-[132px] h-10 px-3 text-[13px] rounded-lg border border-slate-200 bg-white text-slate-800 transition-colors hover:border-slate-300 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15"
-            />
-          </div>
-        </div>
-      )}
-    </div>
+    {/* The period + custom-range controls that lived here are now in the sticky toolbar at
+        the top of the page, next to the numbers they scope. Duplicating them would give two
+        controls writing the same state on one screen. */}
 
   {/* Category */}
   <div className="space-y-1 text-right">
