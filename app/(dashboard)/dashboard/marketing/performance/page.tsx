@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
-import { BarChart3 } from "lucide-react";
+import { Activity, BarChart3 } from "lucide-react";
 import { EmptyState } from "@/components/dashboard/EmptyState";
+import { PageHeader } from "@/components/dashboard/PageHeader";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { resolveDashboardPageAccess } from "@/lib/dashboard/page-access";
 import { getMarketingResultsOverview } from "@/lib/marketing/results/results-service";
@@ -19,7 +20,12 @@ export default async function CampaignPerformancePage() {
   const overview = await getMarketingResultsOverview();
 
   return <main className="space-y-5" dir="rtl">
-    <header><p className="text-xs font-bold text-brand">التسويق / أداء الحملات</p><h1 className="mt-1 text-xl sm:text-2xl font-bold tracking-tight">أداء الحملات</h1><p className="mt-2 text-sm leading-6 text-slate-500">قراءة موحدة للحملات من بيانات الإنفاق الفعلية وإسناد التبرعات داخل الموقع.</p></header>
+    <PageHeader
+      eyebrow="التسويق / أداء الحملات"
+      title="أداء الحملات"
+      description="قراءة موحدة للحملات من بيانات الإنفاق الفعلية وإسناد التبرعات داخل الموقع."
+      icon={Activity}
+    />
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <Kpi label="الإنفاق" value={money(overview.summary.totalSpend)} />
       <Kpi label="قيمة التحويلات" value={money(overview.summary.totalRevenue)} />

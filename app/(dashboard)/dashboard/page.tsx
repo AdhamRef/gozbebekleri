@@ -27,7 +27,9 @@ import {
   Plus,
   UploadCloud,
   Landmark,
+  LayoutDashboard,
 } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/PageHeader";
 import { useCurrency } from "@/context/CurrencyContext";
 import {
   ResponsiveContainer,
@@ -744,27 +746,24 @@ export default function DashboardPage() {
   return (
     <div className="min-h-0" dir="rtl">
       <div className="space-y-6 sm:space-y-8 p-0 sm:p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div className="text-right min-w-0 flex-1">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              تحليل الإيرادات
-            </h1>
-            <p className="text-muted-foreground mt-1 text-sm break-words">
-              {searchParams.get("userId") ? (
-                <>
-                  عرض تبرعات:{" "}
-                  <span className="font-medium text-foreground whitespace-normal break-words">
-                    {users.find((u) => u.id === searchParams.get("userId"))?.name ||
-                      users.find((u) => u.id === searchParams.get("userId"))?.email ||
-                      "جاري التحميل..."}
-                  </span>
-                </>
-              ) : (
-                "نظرة شاملة على الإيرادات، التبرعات والتحليلات"
-              )}
-            </p>
-          </div>
-        </header>
+        <PageHeader
+          title="تحليل الإيرادات"
+          icon={LayoutDashboard}
+          description={
+            searchParams.get("userId") ? (
+              <>
+                عرض تبرعات:{" "}
+                <span className="font-medium text-slate-900 whitespace-normal break-words">
+                  {users.find((u) => u.id === searchParams.get("userId"))?.name ||
+                    users.find((u) => u.id === searchParams.get("userId"))?.email ||
+                    "جاري التحميل..."}
+                </span>
+              </>
+            ) : (
+              "نظرة شاملة على الإيرادات، التبرعات والتحليلات"
+            )
+          }
+        />
 
 
 

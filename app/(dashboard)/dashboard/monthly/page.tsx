@@ -25,6 +25,7 @@ import {
   RefreshCw,
   Star,
 } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/PageHeader";
 import { useCurrency } from "@/context/CurrencyContext";
 import {
   ResponsiveContainer,
@@ -726,27 +727,24 @@ export default function MonthlySubscriptionsDashboardPage() {
   return (
     <div className="min-h-0" dir="rtl">
       <div className="space-y-6 sm:space-y-8 p-0 sm:p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div className="text-right min-w-0 flex-1">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              التبرعات الشهرية والاشتراكات
-            </h1>
-            <p className="text-muted-foreground mt-1 text-sm break-words">
-              {searchParams.get("userId") ? (
-                <>
-                  عرض دفعات شهرية للمستخدم:{" "}
-                  <span className="font-medium text-foreground whitespace-normal break-words">
-                    {users.find((u) => u.id === searchParams.get("userId"))?.name ||
-                      users.find((u) => u.id === searchParams.get("userId"))?.email ||
-                      "جاري التحميل..."}
-                  </span>
-                </>
-              ) : (
-                "إيرادات الاشتراكات، دفعات التجديد، والحالة (نشط / موقوف / ملغى)"
-              )}
-            </p>
-          </div>
-        </header>
+        <PageHeader
+          title="التبرعات الشهرية والاشتراكات"
+          icon={Repeat}
+          description={
+            searchParams.get("userId") ? (
+              <>
+                عرض دفعات شهرية للمستخدم:{" "}
+                <span className="font-medium text-slate-900 whitespace-normal break-words">
+                  {users.find((u) => u.id === searchParams.get("userId"))?.name ||
+                    users.find((u) => u.id === searchParams.get("userId"))?.email ||
+                    "جاري التحميل..."}
+                </span>
+              </>
+            ) : (
+              "إيرادات الاشتراكات، دفعات التجديد، والحالة (نشط / موقوف / ملغى)"
+            )
+          }
+        />
 
         {/* المؤشرات — تختفي عند عرض تبرعات مستخدم معين عبر الرابط */}
         {!searchParams.get("userId") && (

@@ -5,7 +5,8 @@ import axios from "axios";
 import { toast } from "react-hot-toast";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { CreditCard, Loader2, Lock, ShieldCheck } from "lucide-react";
+import { CreditCard, Loader2, Lock, Settings, ShieldCheck } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/PageHeader";
 
 type SettingsResponse = {
   payforEnabled?: boolean;
@@ -62,14 +63,11 @@ export default function PaymentGatewaysPage() {
 
   return (
     <div className="space-y-6" dir="rtl">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">بوابات الدفع</h1>
-        <p className="text-sm text-muted-foreground mt-1.5">
-          تحكّم في بوابات الدفع المتاحة للمتبرعين. Stripe مفعّل دائمًا ولا
-          يمكن إيقافه. عند إيقاف PayFor، تمر جميع التبرعات في كل العملات
-          والسيناريوهات عبر Stripe فقط.
-        </p>
-      </div>
+      <PageHeader
+        title="بوابات الدفع"
+        description="تحكّم في بوابات الدفع المتاحة للمتبرعين. Stripe مفعّل دائمًا ولا يمكن إيقافه. عند إيقاف PayFor، تمر جميع التبرعات في كل العملات والسيناريوهات عبر Stripe فقط."
+        icon={Settings}
+      />
 
       {loading ? (
         <Card className="p-8 flex items-center justify-center gap-2 text-muted-foreground">

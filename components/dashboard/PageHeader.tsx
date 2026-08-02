@@ -4,7 +4,12 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   title: string;
-  description?: string;
+  /**
+   * ReactNode rather than string: the revenue and monthly pages render a subtitle that
+   * switches to a highlighted donor name when `?userId=` is present, so it has to carry
+   * markup, not just text.
+   */
+  description?: ReactNode;
   /** Small label above the title — section name, breadcrumb-ish context. */
   eyebrow?: string;
   icon?: LucideIcon;
@@ -46,7 +51,7 @@ export function PageHeader({
               {title}
             </h1>
             {description && (
-              <p className="mt-1 text-sm text-slate-500 leading-6 max-w-3xl">{description}</p>
+              <div className="mt-1 text-sm text-slate-500 leading-6 max-w-3xl break-words">{description}</div>
             )}
           </div>
         </div>
