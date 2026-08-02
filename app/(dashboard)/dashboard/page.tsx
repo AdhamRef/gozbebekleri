@@ -772,21 +772,17 @@ export default function DashboardPage() {
 
 
 
-        {/* Executive hero band. The page previously opened straight into a grid of equal-weight
-            KPI tiles, so nothing told the reader which number actually matters. This promotes
-            the headline figure and keeps its supporting counts adjacent. */}
+        {/* Summary band. Establishes which number matters before the filtered KPI grid, but
+            stays on the neutral surface the rest of the shell uses — a coloured slab here
+            fights the content instead of framing it. */}
         {!searchParams.get("userId") && (
-          <section className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-brand-800 via-brand to-brand-600 p-5 text-white shadow-[0_8px_28px_rgba(2,94,184,0.22)] sm:p-6">
-            <div
-              className="pointer-events-none absolute -top-16 start-1/3 h-56 w-56 rounded-full bg-white/10 blur-3xl"
-              aria-hidden
-            />
-            <div className="relative flex flex-wrap items-end justify-between gap-6">
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:p-6">
+            <div className="flex flex-wrap items-center gap-x-10 gap-y-5">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/70">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
                   إجمالي الإيرادات الناجحة — كل الوقت
                 </p>
-                <p className="mt-2 text-3xl font-bold tabular-nums tracking-tight sm:text-4xl">
+                <p className="mt-1.5 text-3xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-[38px] sm:leading-[1.1]">
                   {formatInSelectedCurrency(
                     stats?.paidRevenueAllTimeUnfiltered ??
                       stats?.allTimeRevenue ??
@@ -794,23 +790,20 @@ export default function DashboardPage() {
                       0,
                   )}
                 </p>
-                <p className="mt-1.5 text-[13px] leading-6 text-white/75">
+                <p className="mt-1.5 text-xs text-slate-400">
                   لا تتأثر هذه القيمة بالفترة أو التصفية المختارة أدناه.
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-stretch gap-3">
+              <div className="flex flex-wrap items-center gap-x-8 gap-y-4 ms-auto">
                 {[
                   { label: "تبرعات ناجحة", value: (stats?.paidCount ?? 0).toLocaleString("en-US") },
                   { label: "اشتراكات نشطة", value: (stats?.activeMonthlyCount ?? 0).toLocaleString("en-US") },
                   { label: "المتبرعون", value: (stats?.totalUsers ?? 0).toLocaleString("en-US") },
                 ].map((item) => (
-                  <div
-                    key={item.label}
-                    className="min-w-[104px] rounded-xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-sm"
-                  >
-                    <p className="text-[11px] font-medium text-white/70">{item.label}</p>
-                    <p className="mt-1 text-xl font-bold tabular-nums">{item.value}</p>
+                  <div key={item.label} className="border-s border-slate-100 ps-8 first:border-s-0 first:ps-0">
+                    <p className="text-[11px] font-medium text-slate-400">{item.label}</p>
+                    <p className="mt-1 text-xl font-bold tabular-nums text-slate-800">{item.value}</p>
                   </div>
                 ))}
               </div>
@@ -1614,7 +1607,7 @@ export default function DashboardPage() {
 
     {/* Period — مع من/إلى/مسح تحته عند مخصص */}
     <div className="space-y-2 text-right">
-      <label className="text-[11px] font-medium text-slate-500">
+      <label className="text-[11px] font-semibold text-slate-600">
         الفترة
       </label>
       <Select
@@ -1633,7 +1626,7 @@ export default function DashboardPage() {
           }
         }}
       >
-        <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
           <SelectValue placeholder="اختر الفترة" />
         </SelectTrigger>
         <SelectContent>
@@ -1647,21 +1640,21 @@ export default function DashboardPage() {
       {chartPeriod === "custom" && (
         <div className="flex gap-2 pt-1 border-slate-100">
           <div className="space-y-1">
-            <label className="text-[11px] font-medium text-slate-500">من</label>
+            <label className="text-[11px] font-semibold text-slate-600">من</label>
             <input
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+              className="w-full min-w-[132px] h-10 px-3 text-[13px] rounded-lg border border-slate-200 bg-white text-slate-800 transition-colors hover:border-slate-300 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15"
             />
           </div>
           <div className="space-y-1">
-            <label className="text-[11px] font-medium text-slate-500">إلى</label>
+            <label className="text-[11px] font-semibold text-slate-600">إلى</label>
             <input
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+              className="w-full min-w-[132px] h-10 px-3 text-[13px] rounded-lg border border-slate-200 bg-white text-slate-800 transition-colors hover:border-slate-300 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15"
             />
           </div>
         </div>
@@ -1670,11 +1663,11 @@ export default function DashboardPage() {
 
   {/* Category */}
   <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
+    <label className="text-[11px] font-semibold text-slate-600">
       الفئة
     </label>
     <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+      <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
         <SelectValue placeholder="اختر الفئة" />
       </SelectTrigger>
       <SelectContent>
@@ -1690,11 +1683,11 @@ export default function DashboardPage() {
 
   {/* Campaign */}
   <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
+    <label className="text-[11px] font-semibold text-slate-600">
       المشروع
     </label>
     <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+      <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
         <SelectValue placeholder="اختر المشروع" />
       </SelectTrigger>
       <SelectContent>
@@ -1726,7 +1719,7 @@ export default function DashboardPage() {
   {/* User — hidden when viewing a specific user via link (?userId=...) */}
   {!searchParams.get("userId") && (
     <div className="space-y-1 text-right">
-      <label className="text-[11px] font-medium text-slate-500">
+      <label className="text-[11px] font-semibold text-slate-600">
         المستخدم
       </label>
       <Select
@@ -1740,7 +1733,7 @@ export default function DashboardPage() {
           }
         }}
       >
-        <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
           <SelectValue placeholder="اختر المستخدم" />
         </SelectTrigger>
         <SelectContent>
@@ -1788,11 +1781,11 @@ export default function DashboardPage() {
 
   {/* Chart Metric */}
   <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
+    <label className="text-[11px] font-semibold text-slate-600">
       القيمة
     </label>
     <Select value={chartMetric} onValueChange={(v) => setChartMetric(v as ChartMetric)}>
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+      <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
         <SelectValue placeholder="اختر القيمة" />
       </SelectTrigger>
       <SelectContent>
@@ -1805,11 +1798,11 @@ export default function DashboardPage() {
 
   {/* Chart Type */}
   <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
+    <label className="text-[11px] font-semibold text-slate-600">
       نوع الرسم
     </label>
     <Select value={chartView} onValueChange={(v) => setChartView(v as ChartViewType)}>
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+      <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
         <SelectValue placeholder="اختر النوع" />
       </SelectTrigger>
       <SelectContent>
@@ -1822,14 +1815,14 @@ export default function DashboardPage() {
 
   {/* Site language (donation row locale) */}
   <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
+    <label className="text-[11px] font-semibold text-slate-600">
       لغة الموقع (التبرع)
     </label>
     <Select
       value={donationLocaleFilter}
       onValueChange={(v) => setDonationLocaleFilter(v as typeof donationLocaleFilter)}
     >
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+      <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
         <SelectValue placeholder="اللغة" />
       </SelectTrigger>
       <SelectContent>
@@ -1849,14 +1842,14 @@ export default function DashboardPage() {
 
   {/* Donor country */}
   <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
+    <label className="text-[11px] font-semibold text-slate-600">
       الدولة
     </label>
     <Select
       value={donationCountryFilter}
       onValueChange={(v) => setDonationCountryFilter(v)}
     >
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+      <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
         <SelectValue placeholder="الدولة" />
       </SelectTrigger>
       <SelectContent>
@@ -1877,11 +1870,11 @@ export default function DashboardPage() {
 
   {/* Donation Status Filter */}
   <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
+    <label className="text-[11px] font-semibold text-slate-600">
       حالة التبرع
     </label>
     <Select value={donationsStatusFilter} onValueChange={(v) => setDonationsStatusFilter(v as typeof donationsStatusFilter)}>
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+      <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
         <SelectValue placeholder="الحالة" />
       </SelectTrigger>
       <SelectContent>
@@ -1894,11 +1887,11 @@ export default function DashboardPage() {
 
   {/* Donation Type Filter (ONE_TIME / MONTHLY) */}
   <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
+    <label className="text-[11px] font-semibold text-slate-600">
       نوع التبرع
     </label>
     <Select value={donationsTypeFilter} onValueChange={(v) => setDonationsTypeFilter(v as typeof donationsTypeFilter)}>
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+      <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
         <SelectValue placeholder="النوع" />
       </SelectTrigger>
       <SelectContent>

@@ -748,13 +748,53 @@ export default function MonthlySubscriptionsDashboardPage() {
           }
         />
 
+        {/* Executive hero band — mirrors /dashboard. This page opened with 17 equal-weight KPI
+            tiles spread across three tabs and no headline figure at all, so there was nothing
+            to anchor on. MRR is the number this page exists to report. */}
+        {!searchParams.get("userId") && (
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:p-6">
+            <div className="flex flex-wrap items-center gap-x-10 gap-y-5">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  الإيراد الشهري المتكرر (MRR)
+                </p>
+                <p className="mt-1.5 text-3xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-[38px] sm:leading-[1.1]">
+                  {formatMoney(stats?.monthlyRecurringRevenue ?? 0)}
+                </p>
+                <p className="mt-1.5 text-xs text-slate-400">
+                  مجموع قيم الاشتراكات النشطة شهريًا.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-8 gap-y-4 ms-auto">
+                {[
+                  { label: "اشتراكات نشطة", value: (stats?.activeMonthlyCount ?? 0).toLocaleString("en-US") },
+                  { label: "اشتراكات جديدة", value: (stats?.newSubscriptionsInPeriod ?? 0).toLocaleString("en-US") },
+                  { label: "ملغاة", value: (stats?.cancelledSubscriptionCount ?? 0).toLocaleString("en-US") },
+                ].map((item) => (
+                  <div key={item.label} className="border-s border-slate-100 ps-8 first:border-s-0 first:ps-0">
+                    <p className="text-[11px] font-medium text-slate-400">{item.label}</p>
+                    <p className="mt-1 text-xl font-bold tabular-nums text-slate-800">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* المؤشرات — تختفي عند عرض تبرعات مستخدم معين عبر الرابط */}
         {!searchParams.get("userId") && (
-        <section className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-4 flex-row-reverse">
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              مؤشرات الاشتراكات والدفعات الشهرية (حسب الفترة والتصفية)
-            </h2>
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand">
+                <Repeat className="h-[18px] w-[18px]" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-[15px] font-semibold leading-tight text-slate-900">مؤشرات الاشتراكات والدفعات</h2>
+                <p className="text-xs text-slate-500">محسوبة حسب الفترة والتصفية المختارة</p>
+              </div>
+            </div>
             <Tabs
               value={statCardSet}
               onValueChange={(v) => setStatCardSet(v as StatCardSet)}
@@ -1451,7 +1491,7 @@ export default function MonthlySubscriptionsDashboardPage() {
 
     {/* Period — مع من/إلى/مسح تحته عند مخصص */}
     <div className="space-y-2 text-right">
-      <label className="text-[11px] font-medium text-slate-500">
+      <label className="text-[11px] font-semibold text-slate-600">
         الفترة
       </label>
       <Select
@@ -1470,7 +1510,7 @@ export default function MonthlySubscriptionsDashboardPage() {
           }
         }}
       >
-        <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
           <SelectValue placeholder="اختر الفترة" />
         </SelectTrigger>
         <SelectContent>
@@ -1484,21 +1524,21 @@ export default function MonthlySubscriptionsDashboardPage() {
       {chartPeriod === "custom" && (
         <div className="flex gap-2 pt-1 border-slate-100">
           <div className="space-y-1">
-            <label className="text-[11px] font-medium text-slate-500">من</label>
+            <label className="text-[11px] font-semibold text-slate-600">من</label>
             <input
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+              className="w-full min-w-[132px] h-10 px-3 text-[13px] rounded-lg border border-slate-200 bg-white text-slate-800 transition-colors hover:border-slate-300 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15"
             />
           </div>
           <div className="space-y-1">
-            <label className="text-[11px] font-medium text-slate-500">إلى</label>
+            <label className="text-[11px] font-semibold text-slate-600">إلى</label>
             <input
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="w-full min-w-[120px] h-9 px-3 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+              className="w-full min-w-[132px] h-10 px-3 text-[13px] rounded-lg border border-slate-200 bg-white text-slate-800 transition-colors hover:border-slate-300 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15"
             />
           </div>
         </div>
@@ -1507,11 +1547,11 @@ export default function MonthlySubscriptionsDashboardPage() {
 
   {/* Category */}
   <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
+    <label className="text-[11px] font-semibold text-slate-600">
       الفئة
     </label>
     <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+      <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
         <SelectValue placeholder="اختر الفئة" />
       </SelectTrigger>
       <SelectContent>
@@ -1527,11 +1567,11 @@ export default function MonthlySubscriptionsDashboardPage() {
 
   {/* Campaign */}
   <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
+    <label className="text-[11px] font-semibold text-slate-600">
       المشروع
     </label>
     <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+      <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
         <SelectValue placeholder="اختر المشروع" />
       </SelectTrigger>
       <SelectContent>
@@ -1563,7 +1603,7 @@ export default function MonthlySubscriptionsDashboardPage() {
   {/* User — hidden when viewing a specific user via link (?userId=...) */}
   {!searchParams.get("userId") && (
     <div className="space-y-1 text-right">
-      <label className="text-[11px] font-medium text-slate-500">
+      <label className="text-[11px] font-semibold text-slate-600">
         المستخدم
       </label>
       <Select
@@ -1577,7 +1617,7 @@ export default function MonthlySubscriptionsDashboardPage() {
           }
         }}
       >
-        <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+        <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
           <SelectValue placeholder="اختر المستخدم" />
         </SelectTrigger>
         <SelectContent>
@@ -1625,11 +1665,11 @@ export default function MonthlySubscriptionsDashboardPage() {
 
   {/* Chart Metric */}
   <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
+    <label className="text-[11px] font-semibold text-slate-600">
       القيمة
     </label>
     <Select value={chartMetric} onValueChange={(v) => setChartMetric(v as ChartMetric)}>
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+      <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
         <SelectValue placeholder="اختر القيمة" />
       </SelectTrigger>
       <SelectContent>
@@ -1642,11 +1682,11 @@ export default function MonthlySubscriptionsDashboardPage() {
 
   {/* Chart Type */}
   <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
+    <label className="text-[11px] font-semibold text-slate-600">
       نوع الرسم
     </label>
     <Select value={chartView} onValueChange={(v) => setChartView(v as ChartViewType)}>
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+      <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
         <SelectValue placeholder="اختر النوع" />
       </SelectTrigger>
       <SelectContent>
@@ -1659,14 +1699,14 @@ export default function MonthlySubscriptionsDashboardPage() {
 
   {/* Donor country (الدفعات فقط) */}
   <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
+    <label className="text-[11px] font-semibold text-slate-600">
       الدولة (الدفعات)
     </label>
     <Select
       value={donationCountryFilter}
       onValueChange={(v) => setDonationCountryFilter(v)}
     >
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+      <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
         <SelectValue placeholder="الدولة" />
       </SelectTrigger>
       <SelectContent>
@@ -1687,11 +1727,11 @@ export default function MonthlySubscriptionsDashboardPage() {
 
   {/* Donation Status Filter */}
   <div className="space-y-1 text-right">
-    <label className="text-[11px] font-medium text-slate-500">
+    <label className="text-[11px] font-semibold text-slate-600">
       حالة الدفعة
     </label>
     <Select value={donationsStatusFilter} onValueChange={(v) => setDonationsStatusFilter(v as typeof donationsStatusFilter)}>
-      <SelectTrigger className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-sm">
+      <SelectTrigger className="w-full h-10 px-3 text-[13px] rounded-lg border-slate-200 bg-white shadow-sm transition-colors hover:border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/15">
         <SelectValue placeholder="الحالة" />
       </SelectTrigger>
       <SelectContent>
@@ -2065,7 +2105,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 sm:items-end flex-row-reverse shrink-0 flex-wrap">
                   <div className="space-y-1 text-right w-full sm:w-auto sm:min-w-[200px]">
-                    <label className="text-[11px] font-medium text-slate-500">المشترك</label>
+                    <label className="text-[11px] font-semibold text-slate-600">المشترك</label>
                     <Select
                       value={selectedUserId}
                       onValueChange={(v) => {
@@ -2124,7 +2164,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                     </Select>
                   </div>
                   <div className="space-y-1 text-right">
-                    <label className="text-[11px] font-medium text-slate-500">الحالة</label>
+                    <label className="text-[11px] font-semibold text-slate-600">الحالة</label>
                     <Select
                       value={subStatusFilter}
                       onValueChange={(v) => setSubStatusFilter(v as SubscriptionStatusFilter)}
