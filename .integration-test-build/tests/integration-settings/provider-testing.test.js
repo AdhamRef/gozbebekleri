@@ -195,6 +195,40 @@ function expectedProof(values = metaValues) {
     strict_1.default.equal(result.success, true);
     strict_1.default.match(result.messageAr, /لم يتم التحقق من توثيق نطاق المرسل/);
 });
+// The two cases below use the responses the live Elastic Email v4 API actually returns.
+// It answers every auth problem with HTTP 400 and never 401/403, so a tester that keys off
+// the status code alone reads a healthy send-only key as a dead account — which is exactly
+// what surfaced on /dashboard/platform-connections/communication.
+(0, node_test_1.default)("Elastic Email tester treats HTTP 400 'Access Denied' as a scope limit, not a dead account", async () => {
+    const fakeFetch = async () => response(400, { Error: "Access Denied." });
+    const result = await new provider_testing_1.ElasticEmailConnectionTester(fakeFetch).test({
+        provider: "ELASTIC_EMAIL",
+        candidateVersion: null,
+        values: { API_KEY: "elastic-api-key-1234567890", SENDER_EMAIL: "noreply@gozbebekleri.org.tr" },
+    });
+    strict_1.default.equal(result.success, true);
+    strict_1.default.match(result.messageAr, /لم يتم التحقق من توثيق نطاق المرسل/);
+});
+(0, node_test_1.default)("Elastic Email tester reports HTTP 400 'APIKey Expired' as an invalid key", async () => {
+    const fakeFetch = async () => response(400, { Error: "APIKey Expired" });
+    const result = await new provider_testing_1.ElasticEmailConnectionTester(fakeFetch).test({
+        provider: "ELASTIC_EMAIL",
+        candidateVersion: null,
+        values: { API_KEY: "elastic-api-key-1234567890", SENDER_EMAIL: "noreply@gozbebekleri.org.tr" },
+    });
+    strict_1.default.equal(result.success, false);
+    strict_1.default.equal(result.failureCode, "ELASTIC_EMAIL_UNAUTHORIZED");
+});
+(0, node_test_1.default)("Elastic Email tester still fails loudly on a genuine server error", async () => {
+    const fakeFetch = async () => response(500, { Error: "Internal Server Error" });
+    const result = await new provider_testing_1.ElasticEmailConnectionTester(fakeFetch).test({
+        provider: "ELASTIC_EMAIL",
+        candidateVersion: null,
+        values: { API_KEY: "elastic-api-key-1234567890", SENDER_EMAIL: "noreply@gozbebekleri.org.tr" },
+    });
+    strict_1.default.equal(result.success, false);
+    strict_1.default.equal(result.failureCode, "ELASTIC_EMAIL_ACCOUNT_UNAVAILABLE");
+});
 (0, node_test_1.default)("Netgsm tester checks account and header without sending SMS", async () => {
     const calls = [];
     const fakeFetch = async (input) => {

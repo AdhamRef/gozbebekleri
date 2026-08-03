@@ -116,6 +116,21 @@ export class MetaWhatsAppConnectionTester implements IntegrationProviderTester {
   }
 }
 
+/**
+ * Elastic Email reports failures as `{"Error":"..."}` with an HTTP 400, so the message
+ * string is the only signal available. Falls back to the raw text when the payload is
+ * not JSON, so a proxy/HTML error page still contributes something to match on.
+ */
+function elasticEmailErrorText(res: { body: unknown; text?: string }): string {
+  const body = res.body;
+  if (body && typeof body === "object") {
+    const row = body as Record<string, unknown>;
+    const value = row.Error ?? row.error ?? row.message ?? row.Message;
+    if (typeof value === "string") return value;
+  }
+  return res.text ?? "";
+}
+
 /** Elastic Email (REST API v4) — the only email provider. Verifies the key without sending mail. */
 export class ElasticEmailConnectionTester implements IntegrationProviderTester {
   constructor(private readonly fetchImpl: ProviderFetch = fetch) {}
@@ -138,13 +153,30 @@ export class ElasticEmailConnectionTester implements IntegrationProviderTester {
         headers: { "X-ElasticEmail-ApiKey": key, accept: "application/json" },
       });
 
-      if (domains.status === 401) return failed("مفتاح Elastic Email غير صالح أو انتهت صلاحيته.", "ELASTIC_EMAIL_UNAUTHORIZED");
+      // Elastic Email v4 answers BOTH "this key is invalid" and "this key may not use
+      // this endpoint" with HTTP 400 — it never returns 401 — so the status code alone
+      // cannot tell them apart. Only the body can:
+      //     {"Error":"APIKey Expired"}   -> key is invalid, missing, or revoked
+      //     {"Error":"Access Denied."}   -> key is valid but not scoped for this endpoint
+      // Matching on 401/403 alone therefore collapsed a working send-only key into
+      // ELASTIC_EMAIL_ACCOUNT_UNAVAILABLE and reported a healthy account as broken.
+      const apiError = elasticEmailErrorText(domains).toLowerCase();
+      const keyRejected =
+        domains.status === 401 ||
+        /apikey\s*(expired|invalid|not\s*found)|invalid\s*api\s*key|unauthorized/.test(apiError);
+      if (keyRejected) return failed("مفتاح Elastic Email غير صالح أو انتهت صلاحيته.", "ELASTIC_EMAIL_UNAUTHORIZED");
 
-      // A send-scoped key may not be allowed to list domains (403) and older accounts may not expose
-      // the endpoint at all (404/405). The key still works for sending, so treat those as "connected
-      // but domain unverified" instead of a false failure.
+      // A send-scoped key may not be allowed to list domains (400 "Access Denied", or 403 on
+      // other plans) and older accounts may not expose the endpoint at all (404/405). The key
+      // still works for sending, so treat those as "connected but domain unverified" instead
+      // of a false failure.
       if (!domains.ok) {
-        if (domains.status === 403 || domains.status === 404 || domains.status === 405) {
+        const scopeLimited =
+          /access denied|not\s*authorized\s*to|permission/.test(apiError) ||
+          domains.status === 403 ||
+          domains.status === 404 ||
+          domains.status === 405;
+        if (scopeLimited) {
           return connected("تم قبول مفتاح Elastic Email. صلاحيات المفتاح لا تسمح بقراءة النطاقات، لذا لم يتم التحقق من توثيق نطاق المرسل تلقائيًا.");
         }
         return failed("تعذر الوصول إلى حساب Elastic Email.", "ELASTIC_EMAIL_ACCOUNT_UNAVAILABLE");

@@ -6,6 +6,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import {
+  PAID_CONTRIBUTING_FILTER,
   PAID_DONATION_FILTER,
   donationRowUsdApprox,
   donationUsdSumFallback,
@@ -46,6 +47,42 @@ function buildDonationChargeBase(
   const base: Prisma.DonationWhereInput = {
     subscriptionId: { not: null },
     createdAt: { gte: startDate, lte: endDate },
+  };
+  if (referralId) base.referralId = referralId;
+  if (campaignId && campaignId !== "all") {
+    base.items = { some: { campaignId } };
+  } else if (categoryId && categoryId !== "all") {
+    base.OR = [
+      { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
+      { categoryItems: { some: { categoryId } } },
+    ];
+  }
+  return base;
+}
+
+/**
+ * Same shape as `buildDonationChargeBase`, but windowed on `paidAt` instead of `createdAt`.
+ *
+ * Revenue is recognised when the money actually settled, which is the rule the overview
+ * chart already follows. The month card used `createdAt` + `PAID_DONATION_FILTER`, and that
+ * filter's `paidAt` arm is vacuous here — it reads `paidAt != null OR subscriptionId != null`
+ * while the base already requires `subscriptionId != null`, so nothing constrained settlement
+ * at all. An abandoned checkout (row written optimistically at status=PAID, never settled)
+ * therefore counted as revenue in the card but not in the chart, and the two disagreed.
+ *
+ * Windowing on `paidAt` fixes both halves at once: it recognises revenue on the settlement
+ * date AND excludes unsettled rows for free, because a null `paidAt` cannot fall in a range.
+ */
+function buildDonationSettledBase(
+  startDate: Date,
+  endDate: Date,
+  categoryId: string | null,
+  campaignId: string | null,
+  referralId: string | null
+): Prisma.DonationWhereInput {
+  const base: Prisma.DonationWhereInput = {
+    subscriptionId: { not: null },
+    paidAt: { gte: startDate, lte: endDate },
   };
   if (referralId) base.referralId = referralId;
   if (campaignId && campaignId !== "all") {
@@ -208,14 +245,16 @@ export async function GET(request: NextRequest) {
     const donationPaidAllTime = donationWhereAll(donationAllTimeBase, PAID_DONATION_FILTER);
 
     const { monthStart, monthEnd } = getCurrentCalendarMonthIstanbulRange();
-    const thisMonthBase = buildDonationChargeBase(
+    const thisMonthBase = buildDonationSettledBase(
       monthStart,
       monthEnd,
       categoryId,
       campaignId,
       referralId
     );
-    const thisMonthPaid = donationWhereAll(thisMonthBase, PAID_DONATION_FILTER);
+    // PAID_CONTRIBUTING_FILTER (status=PAID *and* paidAt set), not the lenient
+    // PAID_DONATION_FILTER — the card must agree with the chart on what counts as revenue.
+    const thisMonthPaid = donationWhereAll(thisMonthBase, PAID_CONTRIBUTING_FILTER);
 
     const [
       totalCampaigns,

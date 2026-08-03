@@ -207,6 +207,43 @@ test("Elastic Email tester tolerates a send-scoped key that cannot list domains"
   assert.match(result.messageAr, /لم يتم التحقق من توثيق نطاق المرسل/);
 });
 
+// The two cases below use the responses the live Elastic Email v4 API actually returns.
+// It answers every auth problem with HTTP 400 and never 401/403, so a tester that keys off
+// the status code alone reads a healthy send-only key as a dead account — which is exactly
+// what surfaced on /dashboard/platform-connections/communication.
+test("Elastic Email tester treats HTTP 400 'Access Denied' as a scope limit, not a dead account", async () => {
+  const fakeFetch: ProviderFetch = async () => response(400, { Error: "Access Denied." });
+  const result = await new ElasticEmailConnectionTester(fakeFetch).test({
+    provider: "ELASTIC_EMAIL",
+    candidateVersion: null,
+    values: { API_KEY: "elastic-api-key-1234567890", SENDER_EMAIL: "noreply@gozbebekleri.org.tr" },
+  });
+  assert.equal(result.success, true);
+  assert.match(result.messageAr, /لم يتم التحقق من توثيق نطاق المرسل/);
+});
+
+test("Elastic Email tester reports HTTP 400 'APIKey Expired' as an invalid key", async () => {
+  const fakeFetch: ProviderFetch = async () => response(400, { Error: "APIKey Expired" });
+  const result = await new ElasticEmailConnectionTester(fakeFetch).test({
+    provider: "ELASTIC_EMAIL",
+    candidateVersion: null,
+    values: { API_KEY: "elastic-api-key-1234567890", SENDER_EMAIL: "noreply@gozbebekleri.org.tr" },
+  });
+  assert.equal(result.success, false);
+  assert.equal(result.failureCode, "ELASTIC_EMAIL_UNAUTHORIZED");
+});
+
+test("Elastic Email tester still fails loudly on a genuine server error", async () => {
+  const fakeFetch: ProviderFetch = async () => response(500, { Error: "Internal Server Error" });
+  const result = await new ElasticEmailConnectionTester(fakeFetch).test({
+    provider: "ELASTIC_EMAIL",
+    candidateVersion: null,
+    values: { API_KEY: "elastic-api-key-1234567890", SENDER_EMAIL: "noreply@gozbebekleri.org.tr" },
+  });
+  assert.equal(result.success, false);
+  assert.equal(result.failureCode, "ELASTIC_EMAIL_ACCOUNT_UNAVAILABLE");
+});
+
 test("Netgsm tester checks account and header without sending SMS", async () => {
   const calls: string[] = [];
   const fakeFetch: ProviderFetch = async (input) => {
