@@ -7,7 +7,6 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import {
   PAID_CONTRIBUTING_FILTER,
-  PAID_DONATION_FILTER,
   donationRowUsdApprox,
   donationUsdSumFallback,
 } from "@/lib/dashboard/donation-usd-revenue";
@@ -143,11 +142,13 @@ function buildDonationItemWhereSub(
   referralId: string | null
 ): Prisma.DonationItemWhereInput {
   // Composed with donationWhereAll: assigning `donation.OR` for the category filter used to
-  // OVERWRITE the `OR` that PAID_DONATION_FILTER contributes, silently stripping the paid guard
+  // OVERWRITE the `OR` that the paid filter contributes, silently stripping the paid guard
   // so abandoned checkouts were counted as revenue whenever a category was selected.
+  // Windowed on `paidAt` + strict filter for the same reason as the headline cards: these are
+  // money totals, so they must agree with the chart on when revenue is recognised.
   const scoped: Prisma.DonationWhereInput = {
     subscriptionId: { not: null },
-    createdAt: { gte: startDate, lte: endDate },
+    paidAt: { gte: startDate, lte: endDate },
   };
   if (referralId) scoped.referralId = referralId;
 
@@ -157,7 +158,7 @@ function buildDonationItemWhereSub(
 
   const donation = donationWhereAll(
     scoped,
-    PAID_DONATION_FILTER,
+    PAID_CONTRIBUTING_FILTER,
     byCategory
       ? {
           OR: [
@@ -181,15 +182,15 @@ function buildDonationCategoryItemWhereSub(
   categoryId: string | null,
   referralId: string | null
 ): Prisma.DonationCategoryItemWhereInput {
-  // Same inverse-collision fix as buildDonationItemWhereSub above.
+  // Same inverse-collision fix, and the same paidAt/strict windowing, as buildDonationItemWhereSub.
   const scoped: Prisma.DonationWhereInput = {
     subscriptionId: { not: null },
-    createdAt: { gte: startDate, lte: endDate },
+    paidAt: { gte: startDate, lte: endDate },
   };
   if (referralId) scoped.referralId = referralId;
 
   if (categoryId && categoryId !== "all") {
-    const donation = donationWhereAll(scoped, PAID_DONATION_FILTER, {
+    const donation = donationWhereAll(scoped, PAID_CONTRIBUTING_FILTER, {
       OR: [
         { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
         { categoryItems: { some: { categoryId } } },
@@ -197,7 +198,7 @@ function buildDonationCategoryItemWhereSub(
     });
     return { donation, categoryId };
   }
-  return { donation: donationWhereAll(scoped, PAID_DONATION_FILTER) };
+  return { donation: donationWhereAll(scoped, PAID_CONTRIBUTING_FILTER) };
 }
 
 /** GET /api/admin/subscriptions/overview/stats — monthly subscriptions + donations from subscriptions */
@@ -234,15 +235,26 @@ export async function GET(request: NextRequest) {
     const activeMonthlyWhere: Prisma.SubscriptionWhereInput = {
       ...subBase,
       status: "ACTIVE",
-      donations: { some: PAID_DONATION_FILTER },
+      donations: { some: PAID_CONTRIBUTING_FILTER },
     };
     const donationChargeBase = buildDonationChargeBase(startDate, endDate, categoryId, campaignId, referralId);
-    // donationWhereAll, not spread — the charge base carries a category `OR` that would
-    // otherwise be overwritten by PAID_DONATION_FILTER's own `OR`.
-    const donationPaidWhere = donationWhereAll(donationChargeBase, PAID_DONATION_FILTER);
+
+    // Revenue and paid counts window on `paidAt` and require settlement, so every money figure on
+    // this page is computed the same way the chart computes it. Windowing these on `createdAt`
+    // (with the lenient filter, whose `paidAt` arm is vacuous once `subscriptionId` is required)
+    // counted abandoned checkouts as income and made the cards disagree with the chart.
+    const donationSettledBase = buildDonationSettledBase(startDate, endDate, categoryId, campaignId, referralId);
+    // donationWhereAll, not spread — the base carries a category `OR` that would
+    // otherwise be overwritten by the paid filter's own `OR`.
+    const donationPaidWhere = donationWhereAll(donationSettledBase, PAID_CONTRIBUTING_FILTER);
+
+    // Failures stay windowed on `createdAt`: a failed charge never settles, so it has no
+    // `paidAt` to bucket by, and windowing it on one would silently report zero failures.
     const donationFailedWhere = donationWhereAll(donationChargeBase, { status: "FAILED" as const });
     const donationAllTimeBase = buildDonationChargeAllTimeBase(categoryId, campaignId, referralId);
-    const donationPaidAllTime = donationWhereAll(donationAllTimeBase, PAID_DONATION_FILTER);
+    // Strict here too — "all-time revenue" must mean money that actually settled, otherwise the
+    // all-time card drifts from the sum of the periods that make it up.
+    const donationPaidAllTime = donationWhereAll(donationAllTimeBase, PAID_CONTRIBUTING_FILTER);
 
     const { monthStart, monthEnd } = getCurrentCalendarMonthIstanbulRange();
     const thisMonthBase = buildDonationSettledBase(
@@ -428,7 +440,7 @@ export async function GET(request: NextRequest) {
     const failedTotalAmount = failedTotalResult._sum?.amountUSD ?? 0;
 
     /** All successful subscription charges ever — ignores category/campaign/referral filters */
-    const globalSubPaidWhere = { subscriptionId: { not: null }, ...PAID_DONATION_FILTER };
+    const globalSubPaidWhere = { subscriptionId: { not: null }, ...PAID_CONTRIBUTING_FILTER };
     let paidRevenueAllTimeUnfiltered =
       (await prisma.donation.aggregate({ _sum: { amountUSD: true }, where: globalSubPaidWhere }))._sum
         ?.amountUSD ?? 0;

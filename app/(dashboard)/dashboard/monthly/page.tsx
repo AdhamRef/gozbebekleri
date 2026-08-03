@@ -60,6 +60,8 @@ import {
   donationDisplayTotalLocal,
 } from "@/lib/dashboard/format-dashboard-money";
 import { formatIstanbulCalendarMonthLong } from "@/lib/admin/current-calendar-month-utc";
+import { formatIstanbulDateKey } from "@/lib/admin/istanbul-calendar";
+import { DailyRevenueTable } from "@/components/dashboard/DailyRevenueTable";
 import { StatsMetricCard } from "@/components/dashboard/StatsMetricCard";
 import { getDashboardChartPeriodLabelAr } from "@/lib/dashboard/chart-period-label-ar";
 import { getPeriodDateKeys } from "@/lib/dashboard/period-date-range";
@@ -279,6 +281,8 @@ export default function MonthlySubscriptionsDashboardPage() {
   }, [searchParams]);
 
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [monthDaily, setMonthDaily] = useState<ChartDataPoint[]>([]);
+  const [monthDailyLoading, setMonthDailyLoading] = useState(true);
   const [chartLoading, setChartLoading] = useState(true);
   const [chartView, setChartView] = useState<ChartViewType>("bar");
   const [chartPeriod, setChartPeriod] = useState<ChartPeriod>("month");
@@ -460,6 +464,43 @@ export default function MonthlySubscriptionsDashboardPage() {
   useEffect(() => {
     fetchChartData();
   }, [fetchChartData]);
+
+  // The daily table always covers the CURRENT calendar month, day 1 to the month's last day,
+  // so it stays a stable "this month, day by day" view no matter which period the charts above
+  // are showing. It still honours the category/campaign/donor filters. The chart endpoint
+  // already returns one filled bucket per day, so it is reused rather than duplicated.
+  const fetchMonthDaily = useCallback(async () => {
+    const userIdFromUrl = searchParams.get("userId");
+    const effectiveUserId =
+      selectedUserId !== "all"
+        ? selectedUserId
+        : userIdFromUrl && userIdFromUrl !== "all"
+          ? userIdFromUrl
+          : "all";
+    setMonthDailyLoading(true);
+    try {
+      const now = new Date();
+      const monthFirst = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      const monthLast = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+      const params = new URLSearchParams();
+      params.set("period", "custom");
+      params.set("start", formatIstanbulDateKey(monthFirst));
+      params.set("end", formatIstanbulDateKey(monthLast));
+      if (selectedCategory !== "all") params.append("categoryId", selectedCategory);
+      if (selectedCampaign !== "all") params.append("campaignId", selectedCampaign);
+      if (effectiveUserId !== "all") params.append("userId", effectiveUserId);
+      const response = await axios.get(`/api/admin/subscriptions/overview/chart?${params}`);
+      setMonthDaily(Array.isArray(response.data) ? response.data : []);
+    } catch {
+      setMonthDaily([]);
+    } finally {
+      setMonthDailyLoading(false);
+    }
+  }, [selectedCategory, selectedCampaign, selectedUserId, searchParams]);
+
+  useEffect(() => {
+    fetchMonthDaily();
+  }, [fetchMonthDaily]);
 
   // Stats — affected by فترة (period + dateFrom/dateTo) and category/campaign filters
   const fetchStats = useCallback(async () => {
@@ -976,7 +1017,16 @@ export default function MonthlySubscriptionsDashboardPage() {
         </section>
         )}
 
-
+        {/* Day-by-day settlement for the current month. Sits directly under the KPI band because
+            it is the breakdown of the same money those cards summarise — both are driven by
+            `paidAt`, so the daily rows add up to the month card exactly. */}
+        <DailyRevenueTable
+          data={monthDaily}
+          loading={monthDailyLoading}
+          monthLabel={formatIstanbulCalendarMonthLong(new Date(), locale || "ar")}
+          todayKey={formatIstanbulDateKey(new Date())}
+          formatMoney={formatMoney}
+        />
 
         {/* التحليلات */}
         <section className="space-y-4">
