@@ -201,10 +201,33 @@ async function main() {
     return acc;
   }, {});
 
+  // Reconcile from STRIPE's side as well. The loop above can only see invoices belonging to a
+  // subscription we already have a `payforToken` for, so a Stripe subscription whose DB row was
+  // never created (or was deleted) is invisible to it — it reports a clean "nothing missing"
+  // while real paid invoices sit unrecorded. This pass enumerates every paid invoice in the
+  // account and reports the ones with no matching Donation, whatever subscription they belong to.
+  const orphanInvoices: Array<{ id: string; date: string; amount: number; currency: string; billingReason: string | null; stripeSubId: string | null }> = [];
+  for await (const inv of stripe.invoices.list({ limit: 100 })) {
+    if (inv.status !== "paid" || (inv.amount_paid ?? 0) <= 0) continue;
+    const match = await prisma.donation.findFirst({ where: { providerOrderId: inv.id }, select: { id: true } });
+    if (match) continue;
+    const parent = (inv as unknown as { parent?: { subscription_details?: { subscription?: string | { id: string } } } }).parent;
+    const rawSub = parent?.subscription_details?.subscription ?? null;
+    orphanInvoices.push({
+      id: inv.id ?? "",
+      date: new Date((inv.created ?? 0) * 1000).toISOString().slice(0, 10),
+      amount: (inv.amount_paid ?? 0) / 100,
+      currency: (inv.currency ?? "").toUpperCase(),
+      billingReason: (inv.billing_reason as string) ?? null,
+      stripeSubId: typeof rawSub === "string" ? rawSub : (rawSub?.id ?? null),
+    });
+  }
+
   console.log(`\n=== ${COMMIT ? "COMMITTED" : "DRY RUN (no writes — pass --commit to apply)"} ===`);
   console.log(JSON.stringify({
     subscriptionsScanned: subs.length,
     skippedNoStripeSub,
+    unmatchedPaidInvoicesInStripe: orphanInvoices.length,
     invoicesAlreadyRecorded: alreadyPresent,
     donationsCreated: created.length,
     renewalsCreated: created.filter((c) => c.billingReason !== "subscription_create").length,
@@ -215,6 +238,18 @@ async function main() {
     categoriesToIncrement: categoryIncrements.size,
     totalCampaignIncrementUSD: Number([...campaignIncrements.values()].reduce((a, b) => a + b, 0).toFixed(2)),
   }, null, 2));
+
+  if (orphanInvoices.length) {
+    // Deliberately reported, never auto-created: these invoices belong to Stripe subscriptions
+    // with no DB row, so there is no donor, campaign or category to attribute them to. Writing
+    // them blind would invent attribution. Decide per subscription, then relink or cancel.
+    console.log(`\n!!! ${orphanInvoices.length} PAID Stripe invoice(s) have NO Donation row and could not be attributed:`);
+    for (const o of orphanInvoices) {
+      console.log(`   ${o.id} ${o.date} ${o.amount} ${o.currency} reason=${o.billingReason ?? "-"} stripeSub=${o.stripeSubId ?? "-"}`);
+    }
+    const subsAffected = new Set(orphanInvoices.map((o) => o.stripeSubId ?? "-"));
+    console.log(`   across ${subsAffected.size} Stripe subscription(s): ${[...subsAffected].join(", ")}`);
+  }
 
   if (created.length) {
     console.log("\n--- donations " + (COMMIT ? "created" : "that would be created") + " ---");

@@ -2,28 +2,33 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 /**
- * Donations are inserted with status='PAID' *before* the gateway confirms,
- * so an abandoned checkout leaves a row with status=PAID and paidAt=null.
- * For one-time donations that combo means "checkout started, never settled" —
- * filter them out of revenue/dashboards.
+ * Donations are inserted with status='PAID' *before* the gateway confirms, so an
+ * abandoned checkout leaves a row with status=PAID and no `paidAt`. Revenue means
+ * settled money, so those rows are filtered out — for one-time AND subscription
+ * donations alike.
  *
- * Subscription-linked donations get the lenient treatment: status='PAID' alone
- * is enough. Recurring charges fire automatically with no donor click, so
- * there's no abandonment moment to guard against, and the legacy strict rule
- * left every monthly donation stuck on قيد التأكيد when webhook settlement
- * lagged or PayFor recurring wasn't wired up.
+ * History: subscription-linked rows used to get lenient treatment (`status='PAID'`
+ * alone, via `OR: [{paidAt: {not: null}}, {subscriptionId: {not: null}}]`). That
+ * existed because the Stripe webhook was never registered, so renewals never got a
+ * `paidAt` and every monthly donation would otherwise have shown as قيد التأكيد.
  *
- * IMPORTANT: this filter governs dashboard/list semantics, NOT campaign
- * currentAmount math. Campaign totals are still recomputed under the strict
- * `PAID_CONTRIBUTING_FILTER` below so the webhook stays the single source of
- * truth for incrementing campaign.currentAmount.
+ * That justification is gone: the webhook is live and 74 of 76 paid subscription
+ * donations carry a `paidAt`. The two that don't were verified against Stripe —
+ * neither has a Stripe subscription or a paid invoice, so neither ever charged.
+ *
+ * The leniency was also actively harmful. Wherever it was composed onto a base that
+ * already required `subscriptionId != null`, its `paidAt` arm became vacuous — the
+ * OR read "paidAt set OR subscriptionId set" while the base guaranteed the second
+ * arm — so the settlement guard silently disappeared and unsettled rows counted as
+ * revenue. That is exactly why /dashboard and /dashboard/monthly disagreed.
+ *
+ * Kept as a separate export from `PAID_CONTRIBUTING_FILTER` (rather than deleted)
+ * because ~18 call sites import it and the two names document different intents:
+ * this one is dashboard/list semantics, that one is campaign currentAmount math.
  */
 export const PAID_DONATION_FILTER: Prisma.DonationWhereInput = {
   status: "PAID",
-  OR: [
-    { paidAt: { not: null } },
-    { subscriptionId: { not: null } },
-  ],
+  paidAt: { not: null },
 };
 
 /**

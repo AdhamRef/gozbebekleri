@@ -148,10 +148,9 @@ export async function GET(
     // long-tail donor doesn't blow up the loop.
     const paidMonthKeys = new Set(
       user.donations
-        .filter(
-          (d) =>
-            d.status === 'PAID' && (d.paidAt != null || d.subscriptionId != null)
-        )
+        // Settlement-only, matching PAID_DONATION_FILTER: an unsettled subscription row
+        // must not mark a month as "donated in" on the donor's streak.
+        .filter((d) => d.status === 'PAID' && d.paidAt != null)
         .map((d) => {
           const dt = d.paidAt ?? d.createdAt;
           return `${dt.getUTCFullYear()}-${dt.getUTCMonth()}`;

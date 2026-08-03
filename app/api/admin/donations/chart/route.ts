@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { requireAdminOrDashboardPermission } from '@/lib/dashboard/api-auth';
-import { donationFieldEmpty } from '@/lib/donations/mongo-null';
 import { donationRowUsdApprox } from '@/lib/dashboard/donation-usd-revenue';
 import {
   eachIstanbulDateKey,
@@ -53,18 +52,13 @@ export async function GET(request: NextRequest) {
     // donation paid at 00:30 Istanbul May 20 lands in May 20's bar even if its
     // checkout row was inserted at 23:55 May 19. Window is the Istanbul day
     // boundary expressed in UTC.
-    // Subscription-linked donations stuck on PAID/paidAt=null still count —
-    // bucket them by `createdAt` since that's the only date we have for them.
+    // Unsettled subscription rows (status=PAID, no `paidAt`) are NOT counted. They used to
+    // be admitted here and bucketed by `createdAt`, which is why this chart reported $17.19
+    // on 2026-08-02 while /dashboard/monthly reported $1.05 for the same day — the extra
+    // $16.14 was an abandoned checkout that never reached Stripe. Both pages now recognise
+    // revenue on settlement only, so their monthly series agree.
     const dateWindowOr = [
       { status: 'PAID', paidAt: { gte: startDate, lte: endDate } },
-      {
-        status: 'PAID',
-        subscriptionId: { not: null },
-        createdAt: { gte: startDate, lte: endDate },
-        // `paidAt` is ABSENT rather than null on most unsettled rows, and Prisma's
-        // `{ paidAt: null }` does not match an absent field — it matched 6 of 431.
-        ...donationFieldEmpty('paidAt'),
-      },
       { status: 'FAILED', createdAt: { gte: startDate, lte: endDate } },
     ];
 
@@ -125,12 +119,11 @@ export async function GET(request: NextRequest) {
     const byDate = new Map<string, Bucket>();
 
     for (const d of donations) {
-      // status=PAID is set at creation, before the gateway confirms. For
-      // one-time donations only paidAt-stamped rows count; for subscription
-      // donations we trust status=PAID alone (recurring charges fire without
-      // a donor click — there's no abandonment moment to guard against).
-      const isPaid =
-        d.status === 'PAID' && (d.paidAt != null || d.subscriptionId != null);
+      // status=PAID is set at creation, before the gateway confirms, so settlement
+      // (`paidAt`) is what makes a row revenue — for subscription rows too. Subscription
+      // rows used to be exempt from this; see the dateWindowOr comment above for why
+      // that exemption was wrong and what it cost.
+      const isPaid = d.status === 'PAID' && d.paidAt != null;
       const isFailed = d.status === 'FAILED';
       if (!isPaid && !isFailed) continue;
 
