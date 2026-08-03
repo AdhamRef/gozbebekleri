@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { PAID_CONTRIBUTING_FILTER } from "@/lib/dashboard/donation-usd-revenue";
 import { formatIstanbulDateKey } from "@/lib/admin/istanbul-calendar";
 
 /**
@@ -53,7 +54,14 @@ export async function GET(request: NextRequest) {
     }
 
     // ---- expected: active subscriptions and the day they bill on ----
-    const subscriptionWhere: Prisma.SubscriptionWhereInput = { status: "ACTIVE" };
+    // `status: ACTIVE` alone is not enough. A subscription whose only charge attempts FAILED
+    // (declined card) stays ACTIVE but has never produced money — 18 of them, worth $217/mo.
+    // The MRR card already requires at least one settled charge; match it, or this view and
+    // that card disagree by exactly those phantom subscriptions.
+    const subscriptionWhere: Prisma.SubscriptionWhereInput = {
+      status: "ACTIVE",
+      donations: { some: PAID_CONTRIBUTING_FILTER },
+    };
     if (referralId) subscriptionWhere.referralId = referralId;
     if (userId && userId !== "all") subscriptionWhere.donorId = userId;
     if (byCampaign) {
