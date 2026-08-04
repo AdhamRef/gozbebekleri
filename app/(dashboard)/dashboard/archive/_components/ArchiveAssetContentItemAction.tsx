@@ -52,11 +52,8 @@ export function ArchiveAssetContentItemAction({ assetId, fileName, disabled = fa
         <Button type="button" size="sm" variant="outline" disabled={disabled || saving} onClick={createContentItem} className="gap-2 font-bold">
           <Layers3 className="h-4 w-4" /> {saving ? "جاري الإنشاء" : "إنشاء عنصر محتوى"}
         </Button>
-        {feedback?.tone === "success" ? (
-          <Link href="/dashboard/operations/content" className="inline-flex items-center gap-1 text-xs font-bold text-brand hover:underline">
-            فتح إدارة المحتوى <ExternalLink className="h-3.5 w-3.5" />
-          </Link>
-        ) : null}
+        {/* The "فتح إدارة المحتوى" link pointed at /dashboard/operations/content, removed with
+            التشغيل. Creation still works; the feedback line below is now the whole result. */}
       </div>
       {disabled && disabledReason ? <p className="mt-2 text-xs font-semibold text-slate-500">{disabledReason}</p> : null}
       {feedback ? (

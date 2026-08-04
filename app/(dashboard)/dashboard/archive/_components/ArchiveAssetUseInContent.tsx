@@ -33,12 +33,10 @@ export function ArchiveAssetUseInContent({ assetId, fileName }: Props) {
     router.refresh();
   }
 
+  // Was a link to /dashboard/operations/content, removed with التشغيل. The content item is still
+  // created by the same API; there is no page left to open, so this confirms and stops there.
   if (done) {
-    return (
-      <Link href="/dashboard/operations/content" className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline">
-        تم — فتح المحتوى <ExternalLink className="h-3.5 w-3.5" />
-      </Link>
-    );
+    return <span className="text-xs font-bold text-emerald-700">تم إنشاء عنصر المحتوى</span>;
   }
 
   return (

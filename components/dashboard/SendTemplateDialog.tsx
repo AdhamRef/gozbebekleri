@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { Dialog, DialogOverlay, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -171,15 +170,10 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
 
         {channel === "whatsapp" && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-800">
-            تم نقل إرسال واتساب إلى <b>مركز التواصل</b> (عبر Meta الرسمي بقوالب معتمدة). يمكنك المعاينة هنا،
-            لكن الإرسال يتم من هناك عبر حملة أو تجربة قالب.{" "}
-            <Link
-              href="/dashboard/operations/communication"
-              onClick={() => onOpenChange(false)}
-              className="font-bold text-brand underline-offset-4 hover:underline"
-            >
-              فتح مركز التواصل
-            </Link>
+            {/* This used to link to مركز التواصل under /dashboard/operations, removed with
+                التشغيل. The notice still explains why sending is unavailable here; the link is
+                dropped because there is no page left to send from. */}
+            إرسال واتساب يتم عبر Meta الرسمي بقوالب معتمدة. يمكنك المعاينة هنا فقط.
           </div>
         )}
 
@@ -272,15 +266,15 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
               إلغاء
             </Button>
+            {/* Was a link to the campaigns page under /dashboard/operations, removed with
+                التشغيل. WhatsApp still cannot be sent from this dialog, so the action is a
+                disabled control that says so — an enabled-looking button going nowhere is worse
+                than an honestly disabled one. */}
             {channel === "whatsapp" ? (
-              <Link
-                href="/dashboard/operations/communication/campaigns"
-                onClick={() => onOpenChange(false)}
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-2 text-sm font-bold text-white hover:bg-brand-700"
-              >
-                <Send className="w-4 h-4" />
-                فتح مركز التواصل
-              </Link>
+              <Button disabled className="bg-brand hover:bg-brand/90">
+                <Send className="w-4 h-4 me-2" />
+                الإرسال غير متاح هنا
+              </Button>
             ) : (
               <Button
                 onClick={send}

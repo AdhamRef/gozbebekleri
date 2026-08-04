@@ -23,12 +23,14 @@ test("unauthenticated users are redirected to sign-in before protected data can 
 });
 
 test("authenticated users without platformConnections are redirected to their first allowed page", () => {
+  // Was ["operations"] -> /dashboard/operations/tasks. That permission key and page went with
+  // التشغيل; "donors" stands in as any permission that is not platformConnections.
   const access = resolveCommunicationConnectionsPageAccess(
-    sessionFor("STAFF", ["operations"]),
+    sessionFor("STAFF", ["donors"]),
   );
   assert.deepEqual(access, {
     allowed: false,
-    redirectTo: "/dashboard/operations/tasks",
+    redirectTo: "/dashboard/users/donors",
   });
 });
 

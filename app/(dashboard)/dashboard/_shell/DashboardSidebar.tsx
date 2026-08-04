@@ -17,14 +17,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-export const INBOX_HREF = '/dashboard/operations/communication/inbox';
-
 type Props = {
   navigation: DashboardNavGroup[];
   activeHref: string | null;
   collapsedGroups: Record<string, boolean>;
   onToggleGroup: (group: string) => void;
-  inboxCount: number;
   user: { name?: string | null; email?: string | null; image?: string | null } | undefined;
   isOpen: boolean;
   onClose: () => void;
@@ -33,7 +30,7 @@ type Props = {
 };
 
 export function DashboardSidebar({
-  navigation, activeHref, collapsedGroups, onToggleGroup, inboxCount,
+  navigation, activeHref, collapsedGroups, onToggleGroup,
   user, isOpen, onClose, onOpenSearch, dir,
 }: Props) {
   const asideRef = useRef<HTMLElement>(null);
@@ -125,7 +122,6 @@ export function DashboardSidebar({
                   {section.items.map((item) => {
                     const Icon = NAV_ICONS[item.icon];
                     const active = item.href === activeHref;
-                    const isInbox = item.href === INBOX_HREF;
                     return (
                       // <Link>, not <button onClick={router.push}> — restores prefetch,
                       // middle-click, ctrl-click and "open in new tab".
@@ -154,11 +150,6 @@ export function DashboardSidebar({
                           <Icon className={cn('w-[17px] h-[17px] shrink-0', active ? 'text-brand' : 'text-slate-400 group-hover:text-slate-600')} />
                           <span className="truncate">{item.title}</span>
                         </span>
-                        {isInbox && inboxCount > 0 && (
-                          <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-brand-orange text-white text-[10px] font-bold flex items-center justify-center shrink-0">
-                            {inboxCount > 99 ? '99+' : inboxCount}
-                          </span>
-                        )}
                       </Link>
                     );
                   })}

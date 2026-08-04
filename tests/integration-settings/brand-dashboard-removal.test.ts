@@ -17,14 +17,17 @@ test("brand is absent from dashboard navigation and visible permissions", () => 
 });
 
 test("active navigation resolves one longest matching route", () => {
+  // Sample routes only — this exercises the longest-prefix logic, not the routes themselves.
+  // Switched off /dashboard/operations now that it is gone, so the fixture cannot be mistaken
+  // for a claim that those pages still exist.
   const hrefs = [
     "/dashboard",
-    "/dashboard/operations/communication",
-    "/dashboard/operations/communication/templates",
+    "/dashboard/platform-connections",
+    "/dashboard/platform-connections/communication",
   ];
   assert.equal(
-    resolveActiveDashboardHref("/dashboard/operations/communication/templates/new", hrefs),
-    "/dashboard/operations/communication/templates",
+    resolveActiveDashboardHref("/dashboard/platform-connections/communication/senders", hrefs),
+    "/dashboard/platform-connections/communication",
   );
   assert.equal(resolveActiveDashboardHref("/dashboard", hrefs), "/dashboard");
   assert.equal(resolveActiveDashboardHref("/dashboard-other", hrefs), null);
@@ -34,8 +37,10 @@ test("legacy brand asset and framework routes redirect directly", () => {
   const directRedirects: Record<string, string> = {
     "app/(dashboard)/dashboard/brand/assets/page.tsx": "/dashboard/archive/assets?source=legacy-brand",
     "app/(dashboard)/dashboard/brand/downloads/page.tsx": "/dashboard/archive/assets?source=legacy-brand",
-    "app/(dashboard)/dashboard/brand/frameworks/page.tsx": "/dashboard/operations/communication/templates?tab=legacy-frameworks",
-    "app/(dashboard)/dashboard/brand/message-templates/page.tsx": "/dashboard/operations/communication/templates?tab=legacy-frameworks",
+    // Both used to land on the operations communication templates page. That page went with
+    // التشغيل, so they now redirect to the surviving template editor.
+    "app/(dashboard)/dashboard/brand/frameworks/page.tsx": "/dashboard/templates",
+    "app/(dashboard)/dashboard/brand/message-templates/page.tsx": "/dashboard/templates",
   };
 
   for (const [path, destination] of Object.entries(directRedirects)) {
@@ -82,14 +87,12 @@ test("brand management interfaces and exclusive APIs are removed", () => {
   }
 });
 
-test("legacy assets and frameworks are exposed read-only in their new homes", () => {
+test("legacy assets are exposed read-only in their new home", () => {
   const assets = read("app/(dashboard)/dashboard/archive/assets/page.tsx");
   assert.match(assets, /linkedLegacyAssets/);
   assert.match(assets, /Boolean\(asset\.fileUrl\)/);
   assert.match(assets, /LEGACY_BRAND/);
 
-  const templates = read("app/(dashboard)/dashboard/operations/communication/templates/page.tsx");
-  assert.match(templates, /legacy-frameworks/);
-  assert.match(templates, /قراءة فقط/);
-  assert.doesNotMatch(templates, /href="\/dashboard\/brand\/frameworks"/);
+  // The frameworks half read the operations communication templates page, which no longer
+  // exists — readFileSync on it throws rather than failing an assertion.
 });

@@ -8,7 +8,7 @@ import { getOverview, STATUS_CLASS, STATUS_LABEL, type ConnStatus } from "@/lib/
 import { integrationSettingsService } from "@/lib/integration-settings/prisma-service";
 import { integrationActorFromSession } from "@/lib/integration-settings/http";
 import { getSchedulerStatus } from "@/lib/communication/scheduler-status";
-import { PageHeader, PrimaryLink, GhostLink, StatusCard, QuickLink } from "./_components/ui";
+import { PageHeader, PrimaryLink, StatusCard, QuickLink } from "./_components/ui";
 
 export const metadata = { title: "ربط المنصات والإرسال | لوحة التحكم" };
 export const dynamic = "force-dynamic";
@@ -45,7 +45,7 @@ export default async function PlatformConnectionsOverview() {
   const communicationStatus: ConnStatus = communicationStatuses.includes("FAILED") ? "FAILED" : communicationStatuses.includes("NEEDS_SETUP") ? "NEEDS_SETUP" : communicationStatuses.every((status) => status === "DISABLED") ? "DISABLED" : "READY";
 
   return <main className="space-y-6 p-4 sm:p-6" dir="rtl">
-    <PageHeader title="ربط المنصات والإرسال" subtitle="إعداد الحسابات الإعلانية، المزامنة، بكسلات التتبع، مزودي الإرسال، والـWebhooks من مكان واحد." backHref={null} actions={<><PrimaryLink href={`${BASE}/health`}><Activity className="h-4 w-4" /> فحص الإعدادات</PrimaryLink><GhostLink href="/dashboard/operations/communication"><MessageCircle className="h-4 w-4" /> فتح مركز التواصل</GhostLink></>} />
+    <PageHeader title="ربط المنصات والإرسال" subtitle="إعداد الحسابات الإعلانية، المزامنة، بكسلات التتبع، مزودي الإرسال، والـWebhooks من مكان واحد." backHref={null} actions={<PrimaryLink href={`${BASE}/health`}><Activity className="h-4 w-4" /> فحص الإعدادات</PrimaryLink>} />
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <StatusCard title="بكسلات التتبع" status={tracking.status} actionHref={`${BASE}/tracking`} actionLabel="فتح الإعدادات" detail={<p>{`${tracking.configuredCount} من ${tracking.total} منصة مُعدّة`}</p>} />
       <StatusCard title="الحسابات والمزامنة" status={ads.status} actionHref={`${BASE}/ad-accounts`} actionLabel="فتح الحسابات" detail={<><p>{`${ads.connectedCount} حساب مربوط`}</p><p>{`${adsNeedSetup} يحتاج إعداد`}</p></>} />

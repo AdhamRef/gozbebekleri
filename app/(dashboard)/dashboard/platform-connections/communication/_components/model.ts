@@ -28,12 +28,14 @@ export const ROTATABLE_WEBHOOK_PROVIDERS: Partial<Record<IntegrationProvider, { 
   },
 };
 
+/**
+ * Every entry here used to point into /dashboard/operations, which was removed with التشغيل.
+ * The sender-management and scheduling-detail pages have no successor, so those providers now
+ * carry no advanced link — the map is Partial precisely so a provider can have none, and an
+ * absent link is better than one that 404s. The message log survives at /dashboard/messages.
+ */
 export const ADVANCED_LINKS: Partial<Record<IntegrationProvider, { href: string; label: string }[]>> = {
-  META_WHATSAPP: [{ href: "/dashboard/operations/communication/senders", label: "إدارة أرقام واتساب والمُرسلين" }],
-  ELASTIC_EMAIL: [{ href: "/dashboard/operations/communication/senders", label: "إدارة مُرسلي البريد" }],
-  BREVO: [{ href: "/dashboard/operations/communication/senders", label: "إدارة مُرسلي الرسائل القصيرة" }],
-  NETGSM: [{ href: "/dashboard/operations/communication/delivery-logs", label: "فتح سجل الرسائل" }],
-  SYSTEM: [{ href: "/dashboard/operations/communication/settings", label: "تفاصيل الجدولة والتشغيل" }],
+  NETGSM: [{ href: "/dashboard/messages", label: "فتح سجل الرسائل" }],
 };
 
 export type IntegrationUiPermissions = {

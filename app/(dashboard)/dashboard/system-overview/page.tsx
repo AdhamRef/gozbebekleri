@@ -60,13 +60,8 @@ export default async function ExecutiveSystemOverviewPage() {
               قيادة التسويق
               <ArrowLeft className="h-4 w-4" />
             </Link>
-            <Link
-              href="/dashboard/operations/command-center"
-              className="inline-flex items-center justify-center gap-2 rounded-md border border-white/30 px-4 py-2 text-sm font-bold text-white hover:bg-white/10"
-            >
-              قيادة المحتوى
-              <Layers3 className="h-4 w-4" />
-            </Link>
+            {/* «قيادة المحتوى» pointed at /dashboard/operations/command-center, removed with
+                التشغيل. No successor page, so the CTA is gone rather than left to 404. */}
           </div>
         </div>
       </div>
@@ -132,10 +127,10 @@ export default async function ExecutiveSystemOverviewPage() {
               <CardDescription>روابط مباشرة للأنظمة التنفيذية.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
+              {/* مركز قيادة المحتوى and لوحة الإنتاج both lived under /dashboard/operations and
+                  went with التشغيل; neither has a successor. */}
               <QuickLink href="/dashboard/marketing/command-center" title="مركز قيادة التسويق" icon={<BarChart3 className="h-4 w-4" />} />
-              <QuickLink href="/dashboard/operations/command-center" title="مركز قيادة المحتوى" icon={<Layers3 className="h-4 w-4" />} />
               <QuickLink href="/dashboard/marketing/connections/catalog" title="صحة التكاملات" icon={<CheckCircle2 className="h-4 w-4" />} />
-              <QuickLink href="/dashboard/operations/production" title="لوحة الإنتاج" icon={<Rocket className="h-4 w-4" />} />
             </CardContent>
           </Card>
 

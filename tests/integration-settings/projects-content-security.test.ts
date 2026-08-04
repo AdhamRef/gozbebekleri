@@ -286,10 +286,9 @@ test("read-only localization audit retains actionable item details", () => {
   assert.doesNotMatch(card, /حقول ناقصة أوفارغة/);
 });
 
-test("operations content permission boundary remains unchanged", () => {
-  const source = readFileSync("app/(dashboard)/dashboard/operations/layout.tsx", "utf8");
-  assert.match(source, /resolveDashboardPageAccess[\s\S]*"operations"/);
-});
+// "operations content permission boundary remains unchanged" read
+// app/(dashboard)/dashboard/operations/layout.tsx, removed with التشغيل. There is no boundary
+// left to assert on — the permission key is gone too.
 
 test("targeted CMS security TypeScript check passes", () => {
   execFileSync(process.execPath, [

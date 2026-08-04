@@ -5,7 +5,9 @@ type UserLike = { role?: string | null; dashboardPermissions?: string[] | null }
 export const DASHBOARD_PERMISSION_KEYS = [
   "revenue", "monthly", "referrals", "bankTransfers", "donors", "team", "logs",
   "badges", "messages", "templates", "campaigns", "categories", "blog", "slides",
-  "ticker", "pixels", "ads", "platformConnections", "operations", "archive",
+  // "operations" was removed with the التشغيل section. Any value still stored on a user row is
+  // simply inert — it maps to no page and grants nothing.
+  "ticker", "pixels", "ads", "platformConnections", "archive",
   "generalSettings", "platformConnectionsTest", "platformConnectionsManage",
   "platformConnectionsAdmin", "archiveUpload", "archiveDelete", "archiveAnalyze",
   "archiveDocuments", "donationsEdit", "reportsExport",
@@ -81,7 +83,6 @@ const PATH_RULES: { prefix: string; key: DashboardPermissionKey }[] = [
   { prefix: "/dashboard/marketing-intelligence", key: "ads" },
   { prefix: "/dashboard/conversion-events", key: "pixels" },
   { prefix: "/dashboard/ads", key: "ads" },
-  { prefix: "/dashboard/operations", key: "operations" },
   { prefix: "/dashboard/archive", key: "archive" },
   { prefix: "/dashboard/monthly", key: "monthly" },
   { prefix: "/dashboard/link-generator", key: "referrals" },

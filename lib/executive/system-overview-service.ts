@@ -49,15 +49,9 @@ export async function buildExecutiveSystemOverview(
     });
   }
 
-  if (operationsCommand.summary.blockedTasks > 0) {
-    risks.push({
-      id: "blocked-production-tasks",
-      level: "HIGH",
-      title: "مهام إنتاج محجوبة",
-      reason: `يوجد ${operationsCommand.summary.blockedTasks} مهمة محجوبة قد تعطل خطة المحتوى أو التسليم للتسويق.`,
-      href: "/dashboard/operations/tasks",
-    });
-  }
+  // The "مهام إنتاج محجوبة" and "مواد جاهزة للتسويق" risks both linked into /dashboard/operations,
+  // removed with التشغيل. A risk card exists to be acted on, and there is no page left to act on
+  // these — the underlying counts still feed the summary figures below.
 
   if (marketing.summary.highPriorityRecommendations > 0) {
     risks.push({
@@ -66,16 +60,6 @@ export async function buildExecutiveSystemOverview(
       title: "توصيات تسويق عاجلة",
       reason: `يوجد ${marketing.summary.highPriorityRecommendations} توصية عالية الأولوية تحتاج قرارًا سريعًا.`,
       href: "/dashboard/marketing/recommendations",
-    });
-  }
-
-  if (operationsCommand.summary.productionReady > 0) {
-    risks.push({
-      id: "ready-content-handoff",
-      level: "LOW",
-      title: "مواد جاهزة للتسويق",
-      reason: `يوجد ${operationsCommand.summary.productionReady} مادة جاهزة يمكن تسليمها للحملات أو النشر.`,
-      href: "/dashboard/operations/production",
     });
   }
 

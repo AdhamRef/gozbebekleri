@@ -28,7 +28,7 @@ import {
   resolveActiveDashboardHref,
 } from "@/lib/dashboard/nav-config";
 import { buildBreadcrumbs } from "@/lib/dashboard/breadcrumbs";
-import { DashboardSidebar, INBOX_HREF } from "./_shell/DashboardSidebar";
+import { DashboardSidebar } from "./_shell/DashboardSidebar";
 import { DashboardTopbar } from "./_shell/DashboardTopbar";
 import { CommandPalette } from "./_shell/CommandPalette";
 import { DashboardAutoEnhancements } from "./_components/DashboardAutoEnhancements";
@@ -119,30 +119,9 @@ function DashboardContent({
     setCollapsedGroups((prev) => (prev[owner.group] ? { ...prev, [owner.group]: false } : prev));
   }, [activeHref]);
 
-  const showInboxBadge = useMemo(
-    () => navigation.some((s) => s.items.some((i) => i.href === INBOX_HREF)),
-    [navigation],
-  );
-  const [inboxCount, setInboxCount] = useState(0);
-  useEffect(() => {
-    if (!showInboxBadge) return;
-    let cancelled = false;
-    const run = async () => {
-      try {
-        // Was '/api/communication/inbox/summary' reading `unreadCount` — that path does not
-        // exist and the field is `count`, so this 404'd every 60s for every admin and the
-        // badge was permanently 0. The 404 returns HTML, .json() throws, and the catch below
-        // masked it as a legitimate zero.
-        const r = await fetch('/api/dashboard/operations/communication/inbox/badge', { cache: 'no-store' });
-        if (!r.ok) { if (!cancelled) setInboxCount(0); return; }
-        const data = await r.json();
-        if (!cancelled) setInboxCount(Number(data?.count ?? 0));
-      } catch { if (!cancelled) setInboxCount(0); }
-    };
-    run();
-    const t = setInterval(run, 60000);
-    return () => { cancelled = true; clearInterval(t); };
-  }, [showInboxBadge]);
+  // The unread-inbox badge polled /api/dashboard/operations/communication/inbox/badge every
+  // 60s for every admin. Both the inbox page and that route were removed with التشغيل, so the
+  // poll could only ever 404 — it is gone rather than left to run against a dead endpoint.
 
   const closeSidebar = useCallback(() => setIsSidebarOpen(false), []);
   const openSearch = useCallback(() => { setIsSidebarOpen(false); setIsSearchOpen(true); }, []);
@@ -168,7 +147,6 @@ function DashboardContent({
         activeHref={activeHref}
         collapsedGroups={collapsedGroups}
         onToggleGroup={toggleGroup}
-        inboxCount={inboxCount}
         user={session?.user}
         isOpen={isSidebarOpen}
         onClose={closeSidebar}

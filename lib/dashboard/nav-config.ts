@@ -51,12 +51,9 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
   {
     group: "التواصل",
     items: [
-      { key: "operations", title: "مركز التواصل", href: "/dashboard/operations/communication", icon: "messageCircle", keywords: ["communication", "hub"] },
-      { key: "operations", title: "حملات الرسائل", href: "/dashboard/operations/communication/campaigns", icon: "megaphone", keywords: ["campaigns", "broadcast", "إرسال جماعي"] },
-      { key: "operations", title: "المحادثات", href: "/dashboard/operations/communication/inbox", icon: "inbox", keywords: ["inbox", "conversations", "chat"] },
-      { key: "operations", title: "الجمهور", href: "/dashboard/operations/communication/audiences", icon: "contact", keywords: ["audiences", "segments", "شرائح"] },
-      { key: "operations", title: "قوالب الرسائل", href: "/dashboard/operations/communication/templates", icon: "layoutTemplate", keywords: ["templates"] },
-      { key: "operations", title: "تقارير الإرسال", href: "/dashboard/operations/communication/reports", icon: "barChart", keywords: ["reports", "delivery", "نتائج"] },
+      // The six "مركز التواصل" entries that lived here pointed into /dashboard/operations, which
+      // has been removed along with the whole التشغيل section. What remains below is the part of
+      // التواصل that is not operations: the template/trigger editor and the send log.
       // Previously unreachable (no nav entry, no inbound link) despite being fully built with
       // working APIs. Titled "قوالب البريد والمحفّزات" rather than "القوالب" to distinguish it
       // from the communication-campaign templates directly above — it is a different page that
@@ -130,7 +127,6 @@ export const DASHBOARD_PERMISSION_ROWS: {
   { key: "monthly", group: "الرئيسية", title: "التبرعات الشهرية" },
   { key: "bankTransfers", group: "الرئيسية", title: "التحويلات البنكية" },
   { key: "donors", group: "الرئيسية", title: "المتبرعون" },
-  { key: "operations", group: "التشغيل / التواصل", title: "التشغيل والتواصل" },
   { key: "campaigns", group: "الحملات والمحتوى", title: "المشاريع" },
   { key: "categories", group: "الحملات والمحتوى", title: "الحملات والدول" },
   { key: "blog", group: "الحملات والمحتوى", title: "المدونة" },
@@ -141,8 +137,9 @@ export const DASHBOARD_PERMISSION_ROWS: {
   { key: "slides", group: "الحملات والمحتوى", title: "الشرائح" },
   { key: "ticker", group: "الحملات والمحتوى", title: "شريط التبرعات" },
   { key: "badges", group: "الحملات والمحتوى", title: "الشارات" },
-  { key: "templates", group: "التشغيل / التواصل", title: "قوالب البريد والمحفّزات" },
-  { key: "messages", group: "التشغيل / التواصل", title: "سجل الرسائل" },
+  // Group was "التشغيل / التواصل"; التشغيل no longer exists, so these two are plain التواصل.
+  { key: "templates", group: "التواصل", title: "قوالب البريد والمحفّزات" },
+  { key: "messages", group: "التواصل", title: "سجل الرسائل" },
   { key: "ads", group: "التسويق", title: "عرض أداء التسويق والتوصيات" },
   { key: "referrals", group: "التسويق", title: "إدارة الروابط والإسناد" },
   { key: "pixels", group: "التسويق", title: "عرض التتبع والتحويلات" },

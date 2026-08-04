@@ -6,8 +6,10 @@ import { CopyButton } from "../_components/CopyButton";
 export const metadata = { title: "Webhooks | ربط المنصات والإرسال" };
 export const dynamic = "force-dynamic";
 
-const SETTINGS = "/dashboard/operations/communication/settings";
-const PROVIDER_EVENTS = "/dashboard/operations/communication/provider-events";
+// Both CTAs used to point into /dashboard/operations, removed with التشغيل. Provider config and
+// its test tools now live on the communication connection page; the raw provider-event viewer
+// has no successor, so that button is gone rather than left to 404.
+const COMMUNICATION_CONNECTION = "/dashboard/platform-connections/communication";
 
 function Info({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
   return (
@@ -56,8 +58,7 @@ export default async function WebhooksPage() {
       </Card>
 
       <div className="flex flex-wrap gap-3">
-        <Link href={SETTINGS} className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 hover:border-brand hover:text-brand">أدوات اختبار Webhook</Link>
-        <Link href={PROVIDER_EVENTS} className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 hover:border-brand hover:text-brand">عرض أحداث المزود (متقدم)</Link>
+        <Link href={COMMUNICATION_CONNECTION} className="inline-flex h-9 items-center rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-800 hover:border-brand hover:text-brand">إعدادات مزودي التواصل</Link>
       </div>
     </main>
   );

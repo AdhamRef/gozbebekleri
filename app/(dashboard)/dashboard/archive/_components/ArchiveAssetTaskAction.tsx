@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ClipboardList, ExternalLink } from "lucide-react";
+import { ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type FeedbackState = {
@@ -50,11 +49,9 @@ export function ArchiveAssetTaskAction({ assetId, fileName }: Props) {
         <Button type="button" size="sm" variant="outline" disabled={saving} onClick={assignTask} className="gap-2 font-bold">
           <ClipboardList className="h-4 w-4" /> {saving ? "جاري إنشاء المهمة" : "إنشاء مهمة"}
         </Button>
-        {feedback?.tone === "success" ? (
-          <Link href="/dashboard/operations/tasks" className="inline-flex items-center gap-1 text-xs font-bold text-brand hover:underline">
-            فتح مهام الفريق <ExternalLink className="h-3.5 w-3.5" />
-          </Link>
-        ) : null}
+        {/* The "فتح مهام الفريق" link pointed at /dashboard/operations/tasks, removed with
+            التشغيل. Creating the task still works — it is written by the same API — there is
+            just no page left to view it on, so the success confirmation below stands alone. */}
       </div>
       <p className="mt-2 text-xs font-semibold text-slate-500">تُستخدم المهمة لتنظيم مراجعة أو تجهيز المادة داخل الفريق.</p>
       {feedback ? (
