@@ -145,8 +145,12 @@ export async function sendAutomaticEmailMessage(
 
   if (!res.ok) {
     const terminal = isTerminalConfigReason(res.reason);
-    await markDeliveryStatus(id, terminal ? "SKIPPED" : "FAILED", { errorMessage: res.reason });
-    await mirrorSentMessage("EMAIL", input, terminal ? "SKIPPED" : "FAILED", { recipientEmail: input.recipientEmail, renderedSubject: input.renderedSubject, renderedBody: input.renderedBody, errorMessage: res.reason });
+    // Store the provider's scrubbed detail with the code. Recording the bare reason cost weeks:
+    // every failed row said only "ELASTIC_EMAIL_REJECTED", so nothing on record revealed that the
+    // provider was actually answering "Access Denied." The detail is already key-redacted.
+    const errorMessage = res.detail ? `${res.reason} — ${res.detail}` : res.reason;
+    await markDeliveryStatus(id, terminal ? "SKIPPED" : "FAILED", { errorMessage });
+    await mirrorSentMessage("EMAIL", input, terminal ? "SKIPPED" : "FAILED", { recipientEmail: input.recipientEmail, renderedSubject: input.renderedSubject, renderedBody: input.renderedBody, errorMessage });
     return { outcome: terminal ? "SKIPPED" : "FAILED", reason: res.reason };
   }
 

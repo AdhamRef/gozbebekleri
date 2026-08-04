@@ -1,16 +1,17 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
+import { Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type SummaryStat = {
   label: string;
   value: string;
-  /** Mark shown in the tinted square — gives each figure a distinct silhouette to scan for. */
+  /** Small mark beside the label — a silhouette to scan for, not decoration. */
   icon?: LucideIcon;
   /** Optional delta, e.g. "+12.4%". Colour is chosen from `trend`. */
   delta?: string;
   trend?: "up" | "down" | "flat";
-  /** Extra qualifier under the value, e.g. "كل الوقت". */
+  /** Short qualifier printed beside the value. Keep it to a couple of words. */
   hint?: string;
 };
 
@@ -19,9 +20,9 @@ type Props = {
   eyebrow: string;
   /** The one number this page exists to report. */
   value: string;
-  /** Clarifies scope, e.g. "لا تتأثر بالفترة أو التصفية". */
+  /** Clarifies scope, e.g. "لا تتأثر بالفترة أو التصفية". Surfaced on the info affordance. */
   note?: string;
-  /** Secondary counts shown to the side, as chips. */
+  /** Secondary figures, shown inline to the side. */
   stats?: SummaryStat[];
   /** Badge on the eyebrow row, e.g. "كل الوقت" — states the figure's scope at a glance. */
   badge?: string;
@@ -38,16 +39,19 @@ const TREND_CLASS: Record<NonNullable<SummaryStat["trend"]>, string> = {
 };
 
 /**
- * The headline band for an analytics page.
+ * The headline band for an analytics page — one row, roughly 80px tall.
  *
- * Hierarchy still comes from typographic scale rather than a colour slab — the figure is the
- * largest thing on the page and sits on a near-white surface so it frames the content instead
- * of fighting it. What the flat version lacked was any sense of being the page's anchor, so
- * this adds depth without weight: a brand wash bled from the leading corner, a soft glow, an
- * icon tile, and the secondary counts promoted from hairline-separated text to real chips.
+ * Everything sits on a single baseline pair: the label row and the figure row. The secondary
+ * figures repeat that rhythm to the side, separated by hairlines rather than wrapped in cards,
+ * because four bordered boxes cost three times the height and read as a second toolbar rather
+ * than as context for the number they belong to.
  *
- * The wash is decorative only. Every value is still slate-900 on white-ish, so contrast never
- * depends on where the gradient happens to land.
+ * The scope note is attached to an info affordance instead of a third line of text — it is
+ * clarification, not content, and a permanent line of small print pushes the page's actual
+ * content below the fold. It stays reachable by pointer (title) and by screen reader (sr-only).
+ *
+ * The wash is decorative only. Every value is slate-900 on white, so contrast never depends on
+ * where the gradient happens to land.
  */
 export function MetricSummaryBand({
   eyebrow,
@@ -63,97 +67,98 @@ export function MetricSummaryBand({
     <section
       className={cn(
         "relative isolate overflow-hidden rounded-2xl border border-slate-200/90 bg-white",
-        "shadow-[0_1px_2px_rgba(16,24,40,0.04),0_12px_32px_-16px_rgba(2,94,184,0.28)]",
+        "shadow-[0_1px_2px_rgba(16,24,40,0.04),0_8px_24px_-18px_rgba(2,94,184,0.35)]",
         className,
       )}
     >
       {/* Decorative only — pointer-events-none so it can never eat a click. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(120%_150%_at_100%_0%,rgba(2,94,184,0.10),transparent_58%)]"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(110%_140%_at_100%_0%,rgba(2,94,184,0.07),transparent_55%)]"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-28 end-[-3rem] -z-10 h-72 w-72 rounded-full bg-brand/10 blur-3xl"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-px bg-gradient-to-l from-transparent via-brand/35 to-transparent"
       />
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-px bg-gradient-to-l from-transparent via-brand/40 to-transparent" />
 
-      <div className="p-5 sm:p-6">
-        <div className="flex flex-wrap items-center gap-x-10 gap-y-6">
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-4 px-5 py-4">
+        {/* Headline: label row over figure row. */}
+        <div className="flex min-w-0 items-center gap-3">
+          {Icon && (
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand text-white shadow-[0_4px_12px_-4px_rgba(2,94,184,0.6)]">
+              <Icon className="h-5 w-5" />
+            </span>
+          )}
           <div className="min-w-0">
-            <div className="flex items-center gap-2.5">
-              {Icon && (
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand text-white shadow-[0_4px_12px_-4px_rgba(2,94,184,0.65)]">
-                  <Icon className="h-[18px] w-[18px]" />
-                </span>
-              )}
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            <div className="flex items-center gap-2">
+              <p className="truncate text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
                 {eyebrow}
               </p>
               {badge && (
-                <span className="rounded-full border border-brand/20 bg-brand/8 px-2 py-0.5 text-[10px] font-semibold text-brand">
+                <span className="shrink-0 rounded-full border border-brand/20 bg-brand/8 px-2 py-0.5 text-[10px] font-semibold text-brand">
                   {badge}
                 </span>
               )}
+              {note && (
+                <span
+                  title={note}
+                  className="inline-flex shrink-0 cursor-help items-center text-slate-300 transition-colors hover:text-brand"
+                >
+                  <Info className="h-3.5 w-3.5" aria-hidden />
+                  <span className="sr-only">{note}</span>
+                </span>
+              )}
             </div>
-
-            <p className="mt-2.5 bg-gradient-to-bl from-slate-900 to-slate-700 bg-clip-text text-4xl font-bold tabular-nums tracking-tight text-transparent sm:text-[44px] sm:leading-[1.05]">
+            <p className="mt-0.5 text-[30px] font-bold leading-tight tabular-nums tracking-tight text-slate-900 sm:text-[34px]">
               {value}
             </p>
-
-            {note && <p className="mt-2 text-xs text-slate-500">{note}</p>}
           </div>
-
-          {stats && stats.length > 0 && (
-            <div className="ms-auto grid w-full grid-cols-2 gap-2.5 sm:w-auto sm:grid-cols-2 lg:grid-cols-4">
-              {stats.map((stat) => {
-                const StatIcon = stat.icon;
-                return (
-                  <div
-                    key={stat.label}
-                    className={cn(
-                      "group/stat relative min-w-[8.5rem] overflow-hidden rounded-xl border border-slate-200/80",
-                      "bg-white/70 px-3.5 py-3 backdrop-blur-sm transition-all duration-200",
-                      "hover:-translate-y-0.5 hover:border-brand/35 hover:bg-white hover:shadow-[0_8px_20px_-12px_rgba(2,94,184,0.45)]",
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      {StatIcon && (
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand/10 text-brand transition-colors group-hover/stat:bg-brand group-hover/stat:text-white">
-                          <StatIcon className="h-3.5 w-3.5" />
-                        </span>
-                      )}
-                      <p className="truncate text-[11px] font-medium text-slate-500">{stat.label}</p>
-                    </div>
-
-                    <div className="mt-1.5 flex items-baseline gap-1.5">
-                      <p className="text-[22px] font-bold leading-none tabular-nums text-slate-900">
-                        {stat.value}
-                      </p>
-                      {stat.delta && (
-                        <span
-                          className={cn(
-                            "text-[11px] font-semibold tabular-nums",
-                            TREND_CLASS[stat.trend ?? "flat"],
-                          )}
-                        >
-                          {stat.delta}
-                        </span>
-                      )}
-                    </div>
-
-                    {stat.hint && (
-                      <p className="mt-1 text-[10px] font-medium text-slate-400">{stat.hint}</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
 
-        {children && <div className="mt-5 border-t border-slate-100 pt-5">{children}</div>}
+        {/* Secondary figures — hairline-separated, same two-line rhythm as the headline. */}
+        {stats && stats.length > 0 && (
+          <div className="ms-auto flex flex-wrap items-center gap-y-3">
+            {stats.map((stat) => {
+              const StatIcon = stat.icon;
+              return (
+                <div
+                  key={stat.label}
+                  className="border-s border-slate-200 px-5 first:border-s-0 first:ps-0 last:pe-0"
+                >
+                  <div className="flex items-center gap-1.5">
+                    {StatIcon && <StatIcon className="h-3.5 w-3.5 shrink-0 text-brand/70" />}
+                    <p className="whitespace-nowrap text-[11px] font-medium text-slate-500">
+                      {stat.label}
+                    </p>
+                  </div>
+                  <div className="mt-0.5 flex items-baseline gap-1.5">
+                    <p className="text-[19px] font-bold leading-tight tabular-nums text-slate-900">
+                      {stat.value}
+                    </p>
+                    {stat.delta && (
+                      <span
+                        className={cn(
+                          "text-[11px] font-semibold tabular-nums",
+                          TREND_CLASS[stat.trend ?? "flat"],
+                        )}
+                      >
+                        {stat.delta}
+                      </span>
+                    )}
+                    {stat.hint && (
+                      <span className="whitespace-nowrap text-[10px] text-slate-400">
+                        {stat.hint}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      {children && <div className="border-t border-slate-100 px-5 py-4">{children}</div>}
     </section>
   );
 }

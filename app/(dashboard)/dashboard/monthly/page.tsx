@@ -24,6 +24,7 @@ import {
   Plus,
   RefreshCw,
   Star,
+  TrendingUp,
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { MetricSummaryBand } from "@/components/dashboard/MetricSummaryBand";
@@ -819,18 +820,25 @@ export default function MonthlySubscriptionsDashboardPage() {
             tiles spread across three tabs and no headline figure at all, so there was nothing
             to anchor on. MRR is the number this page exists to report. */}
         {!searchParams.get("userId") && (
-          <MetricSummaryBand
-            icon={Repeat}
-            eyebrow="الإيراد الشهري المتكرر (MRR)"
-            badge="شهريًا"
-            value={formatMoney(stats?.monthlyRecurringRevenue ?? 0)}
-            note="مجموع قيم الاشتراكات النشطة شهريًا."
-            stats={[
-              { label: "اشتراكات نشطة", value: (stats?.activeMonthlyCount ?? 0).toLocaleString("en-US") },
-              { label: "اشتراكات جديدة", value: (stats?.newSubscriptionsInPeriod ?? 0).toLocaleString("en-US") },
-              { label: "ملغاة", value: (stats?.cancelledSubscriptionCount ?? 0).toLocaleString("en-US") },
-            ]}
-          />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <MetricSummaryBand
+              icon={Repeat}
+              eyebrow="الإيراد الشهري المتكرر (MRR)"
+              badge="شهريًا"
+              value={formatMoney(stats?.monthlyRecurringRevenue ?? 0)}
+              note="مجموع قيم الاشتراكات النشطة شهريًا."
+            />
+            {/* ARR is MRR×12 — a projection of the current book, not money collected. The note
+                says so, because a figure this size sitting beside real revenue invites being
+                read as cash in hand. */}
+            <MetricSummaryBand
+              icon={TrendingUp}
+              eyebrow="الإيراد السنوي المتكرر (ARR)"
+              badge="سنويًا"
+              value={formatMoney((stats?.monthlyRecurringRevenue ?? 0) * 12)}
+              note="توقّع سنوي = الإيراد الشهري المتكرر × ١٢، بافتراض استمرار الاشتراكات النشطة الحالية. ليس مبلغًا محصّلًا."
+            />
+          </div>
         )}
 
         {/* المؤشرات — تختفي عند عرض تبرعات مستخدم معين عبر الرابط */}

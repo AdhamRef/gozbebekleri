@@ -803,29 +803,28 @@ export default function DashboardPage() {
             )}
             note="لا تتأثر هذه القيمة ولا البطاقات المجاورة بالفترة أو التصفية المختارة أدناه."
             stats={[
+              // No hints here: the badge already says كل الوقت, and "اشتراك نشط" would have
+              // repeated the stat sitting right next to it. In a single-row band every extra
+              // word is height the charts below lose.
               {
                 label: "التبرعات الشهرية المتكررة",
                 icon: Repeat,
                 value: formatInSelectedCurrency(stats?.monthlyRecurringRevenueUnfiltered ?? 0),
-                hint: `${(stats?.activeMonthlyCountUnfiltered ?? 0).toLocaleString("en-US")} اشتراك نشط`,
               },
               {
                 label: "عدد التبرعات الناجحة",
                 icon: HandCoins,
                 value: (stats?.paidCountAllTimeUnfiltered ?? 0).toLocaleString("en-US"),
-                hint: "كل الوقت",
               },
               {
                 label: "اشتراكات نشطة",
                 icon: Landmark,
                 value: (stats?.activeMonthlyCountUnfiltered ?? 0).toLocaleString("en-US"),
-                hint: "تتجدّد شهريًا",
               },
               {
                 label: "إجمالي المستخدمين",
                 icon: Users,
                 value: (stats?.totalUsers ?? 0).toLocaleString("en-US"),
-                hint: "كل الحسابات",
               },
             ]}
           />

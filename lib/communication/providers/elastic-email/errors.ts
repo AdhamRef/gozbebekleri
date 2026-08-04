@@ -57,8 +57,15 @@ export function mapElasticEmailError(status: number, body: unknown, secret?: str
     }
   }
 
+  // Elastic Email answers auth/account failures with **400 {"Error":"Access Denied."}**, not
+  // 401/403. Classifying on status alone therefore reported a dead API key as REJECTED — i.e.
+  // "bad payload or unverified sender" — and sent us auditing the request shape while the real
+  // cause was the credential. Verified against the live API: with a rejected key, every
+  // endpoint (transactional send, statistics, domains, v2 account load) returns this same body.
+  const looksUnauthorized = /access denied|unauthorized|invalid\s+api\s*key|apikey.*invalid/i.test(message);
+
   const reason =
-    status === 401 || status === 403
+    status === 401 || status === 403 || (status >= 400 && status < 500 && looksUnauthorized)
       ? ELASTIC_EMAIL_REASONS.UNAUTHORIZED
       : status === 429
         ? ELASTIC_EMAIL_REASONS.RATE_LIMITED
