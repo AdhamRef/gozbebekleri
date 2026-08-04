@@ -26,6 +26,7 @@ import {
   Star,
 } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/PageHeader";
+import { MetricSummaryBand } from "@/components/dashboard/MetricSummaryBand";
 import { CHART_THEME } from "@/lib/dashboard/chart-theme";
 import { useCurrency } from "@/context/CurrencyContext";
 import {
@@ -818,34 +819,18 @@ export default function MonthlySubscriptionsDashboardPage() {
             tiles spread across three tabs and no headline figure at all, so there was nothing
             to anchor on. MRR is the number this page exists to report. */}
         {!searchParams.get("userId") && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:p-6">
-            <div className="flex flex-wrap items-center gap-x-10 gap-y-5">
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                  الإيراد الشهري المتكرر (MRR)
-                </p>
-                <p className="mt-1.5 text-3xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-[38px] sm:leading-[1.1]">
-                  {formatMoney(stats?.monthlyRecurringRevenue ?? 0)}
-                </p>
-                <p className="mt-1.5 text-xs text-slate-400">
-                  مجموع قيم الاشتراكات النشطة شهريًا.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-x-8 gap-y-4 ms-auto">
-                {[
-                  { label: "اشتراكات نشطة", value: (stats?.activeMonthlyCount ?? 0).toLocaleString("en-US") },
-                  { label: "اشتراكات جديدة", value: (stats?.newSubscriptionsInPeriod ?? 0).toLocaleString("en-US") },
-                  { label: "ملغاة", value: (stats?.cancelledSubscriptionCount ?? 0).toLocaleString("en-US") },
-                ].map((item) => (
-                  <div key={item.label} className="border-s border-slate-100 ps-8 first:border-s-0 first:ps-0">
-                    <p className="text-[11px] font-medium text-slate-400">{item.label}</p>
-                    <p className="mt-1 text-xl font-bold tabular-nums text-slate-800">{item.value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
+          <MetricSummaryBand
+            icon={Repeat}
+            eyebrow="الإيراد الشهري المتكرر (MRR)"
+            badge="شهريًا"
+            value={formatMoney(stats?.monthlyRecurringRevenue ?? 0)}
+            note="مجموع قيم الاشتراكات النشطة شهريًا."
+            stats={[
+              { label: "اشتراكات نشطة", value: (stats?.activeMonthlyCount ?? 0).toLocaleString("en-US") },
+              { label: "اشتراكات جديدة", value: (stats?.newSubscriptionsInPeriod ?? 0).toLocaleString("en-US") },
+              { label: "ملغاة", value: (stats?.cancelledSubscriptionCount ?? 0).toLocaleString("en-US") },
+            ]}
+          />
         )}
 
         {/* المؤشرات — تختفي عند عرض تبرعات مستخدم معين عبر الرابط */}

@@ -11,6 +11,7 @@ import {
   DollarSign,
   Heart,
   FolderTree,
+  Wallet,
   Repeat,
   Calendar,
   Receipt,
@@ -787,7 +788,9 @@ export default function DashboardPage() {
             fights the content instead of framing it. */}
         {!searchParams.get("userId") && (
           <MetricSummaryBand
-            eyebrow="إجمالي الإيرادات الناجحة — كل الوقت"
+            icon={Wallet}
+            eyebrow="إجمالي الإيرادات الناجحة"
+            badge="كل الوقت"
             value={formatInSelectedCurrency(
               stats?.paidRevenueAllTimeUnfiltered ??
                 stats?.allTimeRevenue ??
@@ -803,67 +806,6 @@ export default function DashboardPage() {
           />
         )}
 
-        {/* Global scope controls. These drive the KPIs AND the charts below, yet they used to
-            live in a card rendered *after* the charts — so changing the period meant scrolling
-            past everything they affect and back again. Hoisted here and made sticky so the
-            active scope is always visible alongside the numbers it produces. */}
-        <div className="sticky top-[4.25rem] z-10 -mx-1 px-1 py-1">
-          <DashboardFilterBar
-            periods={(Object.keys(PERIOD_LABELS) as ChartPeriod[]).map((p) => ({
-              value: p,
-              label: PERIOD_LABELS[p],
-            }))}
-            period={chartPeriod}
-            onPeriodChange={(p) => {
-              setChartPeriod(p);
-              if (p === "custom") {
-                const endKey = istanbulTodayKey();
-                setDateTo(endKey);
-                setDateFrom(istanbulAddCalendarDaysKey(endKey, -30));
-              } else {
-                setDateFrom("");
-                setDateTo("");
-              }
-            }}
-            customValue={"custom" as ChartPeriod}
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            onDateFromChange={setDateFrom}
-            onDateToChange={setDateTo}
-            activeFilters={[
-              selectedCategory !== "all" && {
-                id: "category",
-                label: "الحملة",
-                value: categories.find((c) => c.id === selectedCategory)?.name ?? selectedCategory,
-                onClear: () => setSelectedCategory("all"),
-              },
-              selectedCampaign !== "all" && {
-                id: "campaign",
-                label: "المشروع",
-                value: campaigns.find((c) => c.id === selectedCampaign)?.title ?? selectedCampaign,
-                onClear: () => setSelectedCampaign("all"),
-              },
-              selectedUserId !== "all" && {
-                id: "donor",
-                label: "المتبرع",
-                value:
-                  users.find((u) => u.id === selectedUserId)?.name ||
-                  users.find((u) => u.id === selectedUserId)?.email ||
-                  selectedUserId,
-                onClear: () => setSelectedUserId("all"),
-              },
-            ].filter(Boolean) as ActiveFilterChip[]}
-            onClearAll={
-              selectedCategory !== "all" || selectedCampaign !== "all" || selectedUserId !== "all"
-                ? () => {
-                    setSelectedCategory("all");
-                    setSelectedCampaign("all");
-                    setSelectedUserId("all");
-                  }
-                : undefined
-            }
-          />
-        </div>
 
         {/* المؤشرات — تختفي عند عرض تبرعات مستخدم معين عبر الرابط */}
         {!searchParams.get("userId") && (
@@ -1656,12 +1598,71 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="pt-0 space-y-4" dir="rtl">
+            {/* Time span lives with the other filters rather than in a sticky bar of its own:
+                one place to change what the page is showing, instead of two controls in two
+                locations writing the same scope. */}
+            <DashboardFilterBar
+              // It renders its own card by default; nested inside this one it must drop that
+              // chrome or the page shows a card inside a card.
+              className="rounded-none border-0 bg-transparent p-0 shadow-none sm:p-0"
+              periods={(Object.keys(PERIOD_LABELS) as ChartPeriod[]).map((p) => ({
+                value: p,
+                label: PERIOD_LABELS[p],
+              }))}
+              period={chartPeriod}
+              onPeriodChange={(p) => {
+                setChartPeriod(p);
+                if (p === "custom") {
+                  const endKey = istanbulTodayKey();
+                  setDateTo(endKey);
+                  setDateFrom(istanbulAddCalendarDaysKey(endKey, -30));
+                } else {
+                  setDateFrom("");
+                  setDateTo("");
+                }
+              }}
+              customValue={"custom" as ChartPeriod}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              onDateFromChange={setDateFrom}
+              onDateToChange={setDateTo}
+              activeFilters={[
+                selectedCategory !== "all" && {
+                  id: "category",
+                  label: "الحملة",
+                  value: categories.find((c) => c.id === selectedCategory)?.name ?? selectedCategory,
+                  onClear: () => setSelectedCategory("all"),
+                },
+                selectedCampaign !== "all" && {
+                  id: "campaign",
+                  label: "المشروع",
+                  value: campaigns.find((c) => c.id === selectedCampaign)?.title ?? selectedCampaign,
+                  onClear: () => setSelectedCampaign("all"),
+                },
+                selectedUserId !== "all" && {
+                  id: "donor",
+                  label: "المتبرع",
+                  value:
+                    users.find((u) => u.id === selectedUserId)?.name ||
+                    users.find((u) => u.id === selectedUserId)?.email ||
+                    selectedUserId,
+                  onClear: () => setSelectedUserId("all"),
+                },
+              ].filter(Boolean) as ActiveFilterChip[]}
+              onClearAll={
+                selectedCategory !== "all" || selectedCampaign !== "all" || selectedUserId !== "all"
+                  ? () => {
+                      setSelectedCategory("all");
+                      setSelectedCampaign("all");
+                      setSelectedUserId("all");
+                    }
+                  : undefined
+              }
+            />
+
 
 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
 
-    {/* The period + custom-range controls that lived here are now in the sticky toolbar at
-        the top of the page, next to the numbers they scope. Duplicating them would give two
-        controls writing the same state on one screen. */}
 
   {/* Category */}
   <div className="space-y-1 text-right">

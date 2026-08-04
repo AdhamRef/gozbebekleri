@@ -56,7 +56,7 @@ function rampStep(amount: number, max: number): number {
 }
 
 export function DayOfMonthRevenueGrid({ collected, expected, loading, formatMoney, filters }: Props) {
-  const [mode, setMode] = useState<Mode>("collected");
+  const [mode, setMode] = useState<Mode>("expected");
   /** Which day's drill-down is open, if any. */
   const [openDay, setOpenDay] = useState<number | null>(null);
   const data = mode === "collected" ? collected : expected;

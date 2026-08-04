@@ -135,11 +135,6 @@ export function DayOfMonthDetailsDialog({ day, mode, filters, formatMoney, onClo
               ? `ما تم تحصيله في اليوم ${day} من كل شهر`
               : `الاشتراكات التي تتجدّد في اليوم ${day} من كل شهر`}
           </DialogTitle>
-          <DialogDescription className="text-xs text-slate-500">
-            {isCollected
-              ? "كل الدفعات الشهرية التي سُدّدت فعليًا في هذا اليوم، عبر كل الشهور."
-              : "الاشتراكات النشطة المجدولة للتجديد في هذا اليوم (دورة شهرية واحدة)."}
-          </DialogDescription>
           {totals && !loading ? (
             <div className="flex flex-wrap gap-4 pt-1.5">
               <span className="text-[11px] text-slate-500">
