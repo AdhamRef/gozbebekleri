@@ -96,15 +96,11 @@ export function DayOfMonthRevenueGrid({ collected, expected, loading, formatMone
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="text-end">
-            <p className="text-[11px] text-slate-500">{mode === "collected" ? "إجمالي المحصّل" : "الإجمالي المتوقع شهريًا"}</p>
-            <p className="text-xl font-bold tabular-nums text-slate-900">{formatMoney(stats.total)}</p>
-          </div>
-          <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+            <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
             {(
               [
-                { key: "collected" as const, label: "المحصّل" },
                 { key: "expected" as const, label: "المتوقع" },
+                { key: "collected" as const, label: "المحصّل" },
               ]
             ).map((opt) => (
               <button
@@ -120,6 +116,11 @@ export function DayOfMonthRevenueGrid({ collected, expected, loading, formatMone
               </button>
             ))}
           </div>
+          <div className="text-end">
+            <p className="text-[11px] text-slate-500">{mode === "collected" ? "إجمالي المحصّل" : "الإجمالي المتوقع شهريًا"}</p>
+            <p className="text-xl font-bold tabular-nums text-slate-900">{formatMoney(stats.total)}</p>
+          </div>
+        
         </div>
       </header>
 

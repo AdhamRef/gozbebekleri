@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     const categoryId = sp.get("categoryId");
     const campaignId = sp.get("campaignId");
     const userId = sp.get("userId");
+    const search = sp.get("search")?.trim();
     const referralIdParam = sp.get("referralId");
     const page = Math.max(1, parseInt(sp.get("page") || "1", 10) || 1);
     const limit = Math.min(Math.max(1, parseInt(sp.get("limit") || "10", 10) || 10), 100);
@@ -52,6 +53,26 @@ export async function GET(request: NextRequest) {
       where.OR = [
         { items: { some: { campaign: { categoryIds: { has: categoryId } } } } },
         { categoryItems: { some: { categoryId } } },
+      ];
+    }
+
+    // Free-text donor search (name OR email). Goes through AND rather than a second
+    // top-level OR, because the category branch above may already own `where.OR` —
+    // assigning it twice would silently drop the category filter.
+    if (search) {
+      const existingAnd = Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : [];
+      where.AND = [
+        ...existingAnd,
+        {
+          donor: {
+            is: {
+              OR: [
+                { name: { contains: search, mode: "insensitive" } },
+                { email: { contains: search, mode: "insensitive" } },
+              ],
+            },
+          },
+        },
       ];
     }
 

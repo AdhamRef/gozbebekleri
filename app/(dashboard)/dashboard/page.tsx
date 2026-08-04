@@ -81,6 +81,7 @@ import {
 } from "@/lib/dashboard/istanbul-client-date";
 import { DonationTableCountryColumn } from "@/components/dashboard/DonationTableCountryColumn";
 import { DonationSourceBadge } from "@/components/dashboard/DonationSourceBadge";
+import { DonorSearchInput } from "@/components/dashboard/DonorSearchInput";
 import { getCountryDisplayNameFromCode } from "@/lib/dashboard/country-display-name";
 import {
   DashboardPieLegendByCount,
@@ -334,6 +335,8 @@ export default function DashboardPage() {
   const [donationsSortOrder, setDonationsSortOrder] = useState<"asc" | "desc">("desc");
   const [showFailed, setShowFailed] = useState(false);
   const [donationsStatusFilter, setDonationsStatusFilter] = useState<"all" | "PAID" | "FAILED">("all");
+  /** Applied donor search (name or email) for the أحدث التبرعات table — server-side, not a page filter. */
+  const [donationsSearch, setDonationsSearch] = useState("");
   const [donationsTypeFilter, setDonationsTypeFilter] = useState<"all" | "ONE_TIME" | "MONTHLY">("all");
   const [donationLocaleFilter, setDonationLocaleFilter] = useState<
     "all" | "ar" | "en" | "fr" | "tr" | "id" | "pt" | "es" | "de" | "__unset"
@@ -559,6 +562,7 @@ export default function DashboardPage() {
         if (donationsTypeFilter !== "all") params.set("donationType", donationsTypeFilter);
         if (donationLocaleFilter !== "all") params.set("locale", donationLocaleFilter);
         if (donationCountryFilter !== "all") params.set("country", donationCountryFilter);
+        if (donationsSearch) params.set("search", donationsSearch);
         const res = await fetch(`/api/donations?${params}`);
         const data = await res.json();
         if (!res.ok) {
@@ -589,6 +593,7 @@ export default function DashboardPage() {
       donationsTypeFilter,
       donationLocaleFilter,
       donationCountryFilter,
+      donationsSearch,
     ]
   );
 
@@ -597,7 +602,7 @@ export default function DashboardPage() {
     if (loading) return;
     setDonationsPage(1);
     fetchDonations(1, false);
-  }, [loading, selectedCategory, selectedCampaign, selectedUserId, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, donationsStatusFilter, donationsTypeFilter, donationLocaleFilter, donationCountryFilter, fetchDonations]);
+  }, [loading, selectedCategory, selectedCampaign, selectedUserId, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, donationsStatusFilter, donationsTypeFilter, donationLocaleFilter, donationCountryFilter, donationsSearch, fetchDonations]);
 
   const loadMoreDonations = () => {
     const next = donationsPage + 1;
@@ -1923,6 +1928,12 @@ export default function DashboardPage() {
                     يعرض الجدول كل المحاولات حسب «حالة التبرع» في تصفية النتائج أعلاه (الكل / ناجح / فاشل / معلق)، مع الفترة والفئة والمشروع.
                   </p>
                 </div>
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-center shrink-0">
+                <DonorSearchInput
+                  value={donationsSearch}
+                  onCommit={setDonationsSearch}
+                  loading={donationsLoading}
+                />
                 <Select
                   value={`${donationsSortBy}-${donationsSortOrder}`}
                   onValueChange={(v) => {
@@ -1941,6 +1952,7 @@ export default function DashboardPage() {
                     <SelectItem value="amount-asc">الأقل مبلغاً</SelectItem>
                   </SelectContent>
                 </Select>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">

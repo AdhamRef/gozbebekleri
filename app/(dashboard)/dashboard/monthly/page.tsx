@@ -71,6 +71,7 @@ import {
 } from "@/lib/dashboard/istanbul-client-date";
 import { DonationTableCountryColumn } from "@/components/dashboard/DonationTableCountryColumn";
 import { DonationSourceBadge } from "@/components/dashboard/DonationSourceBadge";
+import { DonorSearchInput } from "@/components/dashboard/DonorSearchInput";
 import { getCountryDisplayNameFromCode } from "@/lib/dashboard/country-display-name";
 import { DashboardPieLegendByValue } from "@/components/dashboard/DashboardPieLegend";
 import { useViewUserProfile } from "@/context/ViewUserProfileContext";
@@ -294,6 +295,10 @@ export default function MonthlySubscriptionsDashboardPage() {
   const [donationsSortBy, setDonationsSortBy] = useState<"date" | "amount">("date");
   const [donationsSortOrder, setDonationsSortOrder] = useState<"asc" | "desc">("desc");
   const [donationsStatusFilter, setDonationsStatusFilter] = useState<"all" | "PAID" | "FAILED">("all");
+  /** Applied donor search (name or email) for أحدث الدفعات الشهرية — server-side. */
+  const [donationsSearch, setDonationsSearch] = useState("");
+  /** Applied donor search (name or email) for قائمة الاشتراكات — server-side, independent of the table above. */
+  const [subsSearch, setSubsSearch] = useState("");
   const [donationCountryFilter, setDonationCountryFilter] = useState<string>("all");
   const [countryOptions, setCountryOptions] = useState<{ code: string; count: number }[]>([]);
   const [countryUnsetCount, setCountryUnsetCount] = useState(0);
@@ -551,6 +556,7 @@ export default function MonthlySubscriptionsDashboardPage() {
         params.set("subscriptionOnly", "1");
         if (donationsStatusFilter !== "all") params.set("status", donationsStatusFilter);
         if (donationCountryFilter !== "all") params.set("country", donationCountryFilter);
+        if (donationsSearch) params.set("search", donationsSearch);
         const res = await fetch(`/api/donations?${params}`);
         const data = await res.json();
         if (!res.ok) {
@@ -579,6 +585,7 @@ export default function MonthlySubscriptionsDashboardPage() {
       donationsSortOrder,
       donationsStatusFilter,
       donationCountryFilter,
+      donationsSearch,
     ]
   );
 
@@ -587,7 +594,7 @@ export default function MonthlySubscriptionsDashboardPage() {
     if (loading) return;
     setDonationsPage(1);
     fetchDonations(1, false);
-  }, [loading, selectedCategory, selectedCampaign, selectedUserId, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, donationsStatusFilter, donationCountryFilter, fetchDonations]);
+  }, [loading, selectedCategory, selectedCampaign, selectedUserId, chartPeriod, dateFrom, dateTo, donationsSortBy, donationsSortOrder, donationsStatusFilter, donationCountryFilter, donationsSearch, fetchDonations]);
 
   const fetchSubscriptions = useCallback(
     async (page: number, append: boolean) => {
@@ -609,6 +616,7 @@ export default function MonthlySubscriptionsDashboardPage() {
         if (selectedCategory !== "all") params.set("categoryId", selectedCategory);
         if (selectedCampaign !== "all") params.set("campaignId", selectedCampaign);
         if (effectiveUserId !== "all") params.set("userId", effectiveUserId);
+        if (subsSearch) params.set("search", subsSearch);
         const res = await fetch(`/api/admin/subscriptions?${params}`);
         const data = await res.json();
         if (!res.ok) {
@@ -633,6 +641,7 @@ export default function MonthlySubscriptionsDashboardPage() {
       subStatusFilter,
       subsSortBy,
       subsSortOrder,
+      subsSearch,
     ]
   );
 
@@ -674,6 +683,7 @@ export default function MonthlySubscriptionsDashboardPage() {
     subStatusFilter,
     subsSortBy,
     subsSortOrder,
+    subsSearch,
     fetchSubscriptions,
   ]);
 
@@ -1803,6 +1813,12 @@ export default function MonthlySubscriptionsDashboardPage() {
                     الجدول يعرض كل الدفعات حسب «حالة التبرع» في تصفية النتائج (الكل / ناجح / فاشل / معلق)، مع الفترة والفلاتر.
                   </p>
                 </div>
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-center shrink-0">
+                <DonorSearchInput
+                  value={donationsSearch}
+                  onCommit={setDonationsSearch}
+                  loading={donationsLoading}
+                />
                 <Select
                   value={`${donationsSortBy}-${donationsSortOrder}`}
                   onValueChange={(v) => {
@@ -1821,6 +1837,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                     <SelectItem value="amount-asc">الأقل مبلغاً</SelectItem>
                   </SelectContent>
                 </Select>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -2151,6 +2168,15 @@ export default function MonthlySubscriptionsDashboardPage() {
                   </div>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 sm:items-end flex-row-reverse shrink-0 flex-wrap">
+                  <div className="space-y-1 text-right w-full sm:w-auto">
+                    <label className="text-[11px] font-semibold text-slate-600">بحث</label>
+                    <DonorSearchInput
+                      value={subsSearch}
+                      onCommit={setSubsSearch}
+                      loading={subsLoading}
+                      className="sm:w-[240px]"
+                    />
+                  </div>
                   <div className="space-y-1 text-right w-full sm:w-auto sm:min-w-[200px]">
                     <label className="text-[11px] font-semibold text-slate-600">المشترك</label>
                     <Select

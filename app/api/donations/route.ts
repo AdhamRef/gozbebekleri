@@ -72,7 +72,6 @@ export async function GET(request: NextRequest) {
       ...(subscriptionOnly && { subscriptionId: { not: null } }),
       ...(donationTypeFilter === "MONTHLY" && { subscriptionId: { not: null } }),
       ...(!isAdmin && { donorId: session.user.id }),
-      ...(search && isAdmin && { donor: { name: { contains: search } } }),
       ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
       ...(statusFilter && ["PAID", "FAILED"].includes(statusFilter) && { status: statusFilter }),
     };
@@ -82,6 +81,23 @@ export async function GET(request: NextRequest) {
         { categoryItems: { some: { categoryId } } },
       ];
     }
+
+    // Free-text donor search (name OR email), admin-only. Kept OUT of `baseWhere`
+    // and AND-composed below because `baseWhere.OR` is already taken by the
+    // category filter — putting a second OR there would silently overwrite it.
+    const searchWhere =
+      search && isAdmin
+        ? {
+            donor: {
+              is: {
+                OR: [
+                  { name: { contains: search, mode: "insensitive" as const } },
+                  { email: { contains: search, mode: "insensitive" as const } },
+                ],
+              },
+            },
+          }
+        : null;
 
     const localeWhere =
       localeFilter && localeFilter !== "all"
@@ -104,7 +120,7 @@ export async function GET(request: NextRequest) {
         ? { OR: [{ subscriptionId: null }, { subscriptionId: { isSet: false } }] }
         : null;
 
-    const extraFilters = [localeWhere, countryWhere, donationTypeWhere].filter((w) => w != null);
+    const extraFilters = [searchWhere, localeWhere, countryWhere, donationTypeWhere].filter((w) => w != null);
     const where: Record<string, unknown> =
       extraFilters.length > 0 ? { AND: [baseWhere, ...extraFilters] } : baseWhere;
 
