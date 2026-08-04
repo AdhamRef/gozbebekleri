@@ -168,6 +168,10 @@ interface DashboardStats {
   allTimeRevenue?: number;
   /** Sum of all PAID donations (USD) — ignores period / category / campaign filters */
   paidRevenueAllTimeUnfiltered?: number;
+  /** All-time companions to the above — safe to show beside a figure labelled "كل الوقت". */
+  paidCountAllTimeUnfiltered?: number;
+  activeMonthlyCountUnfiltered?: number;
+  monthlyRecurringRevenueUnfiltered?: number;
   paidCount?: number;
   failedCount?: number;
   failedTotalAmount?: number;
@@ -797,11 +801,32 @@ export default function DashboardPage() {
                 stats?.totalAmount ??
                 0,
             )}
-            note="لا تتأثر هذه القيمة بالفترة أو التصفية المختارة أدناه."
+            note="لا تتأثر هذه القيمة ولا البطاقات المجاورة بالفترة أو التصفية المختارة أدناه."
             stats={[
-              { label: "تبرعات ناجحة", value: (stats?.paidCount ?? 0).toLocaleString("en-US") },
-              { label: "اشتراكات نشطة", value: (stats?.activeMonthlyCount ?? 0).toLocaleString("en-US") },
-              { label: "المتبرعون", value: (stats?.totalUsers ?? 0).toLocaleString("en-US") },
+              {
+                label: "التبرعات الشهرية المتكررة",
+                icon: Repeat,
+                value: formatInSelectedCurrency(stats?.monthlyRecurringRevenueUnfiltered ?? 0),
+                hint: `${(stats?.activeMonthlyCountUnfiltered ?? 0).toLocaleString("en-US")} اشتراك نشط`,
+              },
+              {
+                label: "عدد التبرعات الناجحة",
+                icon: HandCoins,
+                value: (stats?.paidCountAllTimeUnfiltered ?? 0).toLocaleString("en-US"),
+                hint: "كل الوقت",
+              },
+              {
+                label: "اشتراكات نشطة",
+                icon: Landmark,
+                value: (stats?.activeMonthlyCountUnfiltered ?? 0).toLocaleString("en-US"),
+                hint: "تتجدّد شهريًا",
+              },
+              {
+                label: "إجمالي المستخدمين",
+                icon: Users,
+                value: (stats?.totalUsers ?? 0).toLocaleString("en-US"),
+                hint: "كل الحسابات",
+              },
             ]}
           />
         )}

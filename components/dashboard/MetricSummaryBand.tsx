@@ -5,9 +5,13 @@ import { cn } from "@/lib/utils";
 export type SummaryStat = {
   label: string;
   value: string;
+  /** Mark shown in the tinted square — gives each figure a distinct silhouette to scan for. */
+  icon?: LucideIcon;
   /** Optional delta, e.g. "+12.4%". Colour is chosen from `trend`. */
   delta?: string;
   trend?: "up" | "down" | "flat";
+  /** Extra qualifier under the value, e.g. "كل الوقت". */
+  hint?: string;
 };
 
 type Props = {
@@ -101,28 +105,49 @@ export function MetricSummaryBand({
           </div>
 
           {stats && stats.length > 0 && (
-            <div className="ms-auto flex flex-wrap items-stretch gap-2.5">
-              {stats.map((stat) => (
-                <div
-                  key={stat.label}
-                  className="min-w-[7.5rem] rounded-xl border border-slate-200/80 bg-slate-50/70 px-4 py-2.5 backdrop-blur-sm transition-colors hover:border-brand/30 hover:bg-white"
-                >
-                  <p className="text-[11px] font-medium text-slate-500">{stat.label}</p>
-                  <div className="mt-1 flex items-baseline gap-1.5">
-                    <p className="text-xl font-bold tabular-nums text-slate-900">{stat.value}</p>
-                    {stat.delta && (
-                      <span
-                        className={cn(
-                          "text-[11px] font-semibold tabular-nums",
-                          TREND_CLASS[stat.trend ?? "flat"],
-                        )}
-                      >
-                        {stat.delta}
-                      </span>
+            <div className="ms-auto grid w-full grid-cols-2 gap-2.5 sm:w-auto sm:grid-cols-2 lg:grid-cols-4">
+              {stats.map((stat) => {
+                const StatIcon = stat.icon;
+                return (
+                  <div
+                    key={stat.label}
+                    className={cn(
+                      "group/stat relative min-w-[8.5rem] overflow-hidden rounded-xl border border-slate-200/80",
+                      "bg-white/70 px-3.5 py-3 backdrop-blur-sm transition-all duration-200",
+                      "hover:-translate-y-0.5 hover:border-brand/35 hover:bg-white hover:shadow-[0_8px_20px_-12px_rgba(2,94,184,0.45)]",
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      {StatIcon && (
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand/10 text-brand transition-colors group-hover/stat:bg-brand group-hover/stat:text-white">
+                          <StatIcon className="h-3.5 w-3.5" />
+                        </span>
+                      )}
+                      <p className="truncate text-[11px] font-medium text-slate-500">{stat.label}</p>
+                    </div>
+
+                    <div className="mt-1.5 flex items-baseline gap-1.5">
+                      <p className="text-[22px] font-bold leading-none tabular-nums text-slate-900">
+                        {stat.value}
+                      </p>
+                      {stat.delta && (
+                        <span
+                          className={cn(
+                            "text-[11px] font-semibold tabular-nums",
+                            TREND_CLASS[stat.trend ?? "flat"],
+                          )}
+                        >
+                          {stat.delta}
+                        </span>
+                      )}
+                    </div>
+
+                    {stat.hint && (
+                      <p className="mt-1 text-[10px] font-medium text-slate-400">{stat.hint}</p>
                     )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

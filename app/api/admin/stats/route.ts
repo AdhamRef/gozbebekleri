@@ -435,6 +435,25 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Companions to `paidRevenueAllTimeUnfiltered`, for the headline band that states it is
+    // NOT affected by the period/category/campaign filters. The filtered `paidCount`,
+    // `activeMonthlyCount` and `monthlyRecurringRevenue` above cannot be shown next to that
+    // claim — on a filtered view they would quietly contradict the figure they sit beside.
+    const globalActiveSubscriptionWhere = {
+      status: 'ACTIVE' as const,
+      donations: { some: PAID_DONATION_FILTER },
+    };
+    const [paidCountAllTimeUnfiltered, activeMonthlyCountUnfiltered, mrrUnfilteredResult] =
+      await Promise.all([
+        prisma.donation.count({ where: globalPaidWhere }),
+        prisma.subscription.count({ where: globalActiveSubscriptionWhere }),
+        prisma.subscription.aggregate({
+          _sum: { amountUSD: true },
+          where: globalActiveSubscriptionWhere,
+        }),
+      ]);
+    const monthlyRecurringRevenueUnfiltered = mrrUnfilteredResult._sum?.amountUSD ?? 0;
+
     return NextResponse.json({
       totalCampaigns,
       totalCategories,
@@ -444,6 +463,9 @@ export async function GET(request: NextRequest) {
       totalAmount,
       allTimeRevenue,
       paidRevenueAllTimeUnfiltered,
+      paidCountAllTimeUnfiltered,
+      activeMonthlyCountUnfiltered,
+      monthlyRecurringRevenueUnfiltered,
       paidCount,
       failedCount,
       failedTotalAmount,

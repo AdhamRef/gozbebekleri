@@ -135,22 +135,6 @@ export function DayOfMonthRevenueGrid({ collected, expected, loading, formatMone
         </div>
       </header>
 
-      <div className="grid grid-cols-2 gap-px border-b border-slate-100 bg-slate-100 sm:grid-cols-3">
-        {[
-          { label: "أيام بها وارد", value: `${stats.activeDays} من 31` },
-          { label: mode === "collected" ? "عدد التبرعات" : "عدد الاشتراكات", value: String(stats.count) },
-          {
-            label: "أعلى يوم",
-            value: stats.peak && stats.peak.amountUSD > 0 ? `${stats.peak.day} — ${formatMoney(stats.peak.amountUSD)}` : "—",
-          },
-        ].map((cell) => (
-          <div key={cell.label} className="bg-white px-4 py-2.5">
-            <p className="text-[11px] text-slate-500">{cell.label}</p>
-            <p className="mt-0.5 truncate text-[13px] font-semibold tabular-nums text-slate-900">{cell.value}</p>
-          </div>
-        ))}
-      </div>
-
       <div className="p-4">
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8">
           {data.map((d) => {

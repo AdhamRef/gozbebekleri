@@ -76,13 +76,10 @@ export function DashboardSidebar({
       )}
     >
       {/* Brand bar */}
-      <div className="h-16 flex items-center justify-between gap-2 px-4 border-b border-slate-200 shrink-0">
+      <div className="h-16 flex items-center justify-between gap-2 px-4 border-b bg-brand shrink-0">
         <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
-          <span className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center shrink-0">
-            <img src="/logo-white.png" alt="" className="h-4 w-auto object-contain brightness-0 invert" />
-          </span>
-          <span className="font-bold text-[15px] text-slate-900 truncate">قرة العيون</span>
-        </Link>
+            <img src="/logo-white.png" alt="" className="h-12 w-auto object-contain brightness-0 invert" />
+          </Link>
         <button
           type="button"
           onClick={onClose}

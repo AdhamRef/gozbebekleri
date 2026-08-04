@@ -58,16 +58,28 @@ const STATUS_CLASS: Record<"ACTIVE" | "PAUSED" | "CANCELLED", string> = {
   CANCELLED: "bg-slate-100 text-slate-600",
 };
 
-function formatDate(value: string | null): string {
-  if (!value) return "—";
+/**
+ * Date over time, matching the cell in the أحدث الدفعات الشهرية table so the two read
+ * the same. Both parts are rendered in Europe/Istanbul — the timezone every other figure
+ * on this page is bucketed by — and they share one locale so the digits don't switch
+ * numeral systems halfway down the cell.
+ */
+function formatDateTime(value: string | null): { date: string; time: string } | null {
+  if (!value) return null;
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("ar-EG", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "Europe/Istanbul",
-  });
+  if (Number.isNaN(d.getTime())) return null;
+  return {
+    date: d.toLocaleDateString("en-US", {
+      dateStyle: "medium",
+      timeZone: "Europe/Istanbul",
+    }),
+    time: d.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "Europe/Istanbul",
+    }),
+  };
 }
 
 /**
@@ -238,7 +250,19 @@ export function DayOfMonthDetailsDialog({ day, mode, filters, formatMoney, onClo
                       {r.referral ? r.referral.code : <span className="text-slate-400">—</span>}
                     </td>
                     <td className="py-2.5 px-3 text-slate-600 tabular-nums whitespace-nowrap">
-                      {formatDate(isCollected ? r.paidAt : r.nextBillingDate)}
+                      {(() => {
+                        const dt = formatDateTime(isCollected ? r.paidAt : r.nextBillingDate);
+                        if (!dt) return <span className="text-slate-400">—</span>;
+                        return (
+                          <div className="flex flex-col leading-tight">
+                            <span>{dt.date}</span>
+                            {/* dir="ltr" so "09:30 PM" can't get reordered by the RTL layout. */}
+                            <span className="text-[10px] text-slate-400" dir="ltr">
+                              {dt.time}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </td>
                   </tr>
                 ))}

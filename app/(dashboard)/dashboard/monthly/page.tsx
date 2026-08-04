@@ -1942,7 +1942,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                                 </span>
                               ) : (
                                 <span
-                                  className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-500"
+                                  className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[11px] font-medium bg-green-100 text-green-700"
                                   title="أول دفعة عند إنشاء الاشتراك"
                                 >
                                   <HandCoins className="w-3 h-3" />
