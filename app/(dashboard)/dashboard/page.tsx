@@ -1924,9 +1924,6 @@ export default function DashboardPage() {
                   <CardTitle className="text-base font-semibold text-slate-900">
                     أحدث التبرعات
                   </CardTitle>
-                  <p className="text-[11px] text-slate-500 max-w-xl">
-                    يعرض الجدول كل المحاولات حسب «حالة التبرع» في تصفية النتائج أعلاه (الكل / ناجح / فاشل / معلق)، مع الفترة والفئة والمشروع.
-                  </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 sm:items-center shrink-0">
                 <DonorSearchInput
@@ -1984,7 +1981,7 @@ export default function DashboardPage() {
                       <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                         الإحالة
                       </th>
-                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 max-w-[160px]">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-px whitespace-nowrap">
                         مصدر التبرع
                       </th>
                       <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 max-w-[110px]">
@@ -2152,7 +2149,7 @@ export default function DashboardPage() {
                               <span className="text-slate-400">—</span>
                             )}
                           </td>
-                          <td className="py-2.5 px-3 align-middle max-w-[160px]">
+                          <td className="py-2.5 px-3 align-middle w-px whitespace-nowrap">
                             <button
                               type="button"
                               onClick={() => openDonationDetails("attribution", d)}

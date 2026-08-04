@@ -505,6 +505,23 @@ export default function MonthlySubscriptionsDashboardPage() {
     fetchDayOfMonth();
   }, [fetchDayOfMonth]);
 
+  // Same filters fetchDayOfMonth sends, handed to the grid so its per-day drill-down
+  // queries the identical population the cells were computed from.
+  const dayOfMonthFilters = useMemo(() => {
+    const userIdFromUrl = searchParams.get("userId");
+    const effectiveUserId =
+      selectedUserId !== "all"
+        ? selectedUserId
+        : userIdFromUrl && userIdFromUrl !== "all"
+          ? userIdFromUrl
+          : "all";
+    return {
+      categoryId: selectedCategory,
+      campaignId: selectedCampaign,
+      userId: effectiveUserId,
+    };
+  }, [selectedCategory, selectedCampaign, selectedUserId, searchParams]);
+
   // Stats — affected by فترة (period + dateFrom/dateTo) and category/campaign filters
   const fetchStats = useCallback(async () => {
     try {
@@ -1809,9 +1826,6 @@ export default function MonthlySubscriptionsDashboardPage() {
                   <CardTitle className="text-base font-semibold text-slate-900">
                     أحدث الدفعات الشهرية
                   </CardTitle>
-                  <p className="text-[11px] text-slate-500 max-w-xl">
-                    الجدول يعرض كل الدفعات حسب «حالة التبرع» في تصفية النتائج (الكل / ناجح / فاشل / معلق)، مع الفترة والفلاتر.
-                  </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 sm:items-center shrink-0">
                 <DonorSearchInput
@@ -1869,7 +1883,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                       <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                         الإحالة
                       </th>
-                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 max-w-[160px]">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-px whitespace-nowrap">
                         مصدر التبرع
                       </th>
                       <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 max-w-[110px]">
@@ -1943,10 +1957,10 @@ export default function MonthlySubscriptionsDashboardPage() {
                                 </span>
                               ) : (
                                 <span
-                                  className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[11px] font-medium bg-brand-orange/10 text-brand-orange"
+                                  className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-500"
                                   title="أول دفعة عند إنشاء الاشتراك"
                                 >
-                                  <Star className="w-3 h-3" />
+                                  <HandCoins className="w-3 h-3" />
                                   أول دفعة
                                 </span>
                               )
@@ -2018,7 +2032,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               <span className="text-slate-400">—</span>
                             )}
                           </td>
-                          <td className="py-2.5 px-3 align-middle max-w-[160px]">
+                          <td className="py-2.5 px-3 align-middle w-px whitespace-nowrap">
                             <button
                               type="button"
                               onClick={() => openDonationDetails("attribution", d)}
@@ -2144,6 +2158,7 @@ export default function MonthlySubscriptionsDashboardPage() {
           expected={dayOfMonth.expected}
           loading={dayOfMonthLoading}
           formatMoney={formatMoney}
+          filters={dayOfMonthFilters}
         />
 
         {/* الاشتراكات — الجدول السفلي */}
@@ -2162,9 +2177,6 @@ export default function MonthlySubscriptionsDashboardPage() {
                     <CardTitle className="text-base font-semibold text-slate-900">
                       قائمة الاشتراكات
                     </CardTitle>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      الفئة والمشروع من أعلى الصفحة · تصفية المشترك أدناه (أو من الأعلى) · افتراضيًا النشطة فقط
-                    </p>
                   </div>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 sm:items-end flex-row-reverse shrink-0 flex-wrap">

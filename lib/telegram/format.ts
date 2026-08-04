@@ -1,5 +1,6 @@
 import { htmlEscape } from "./client";
 import { getCountryDisplayNameFromCode } from "@/lib/dashboard/country-display-name";
+import { describeFailureInArabic } from "./failure-reason-ar";
 
 /** Shape of a donation row this module knows how to render. Mirrors the
  *  Prisma row we fetch in {@link notify.ts} and {@link commands.ts}. */
@@ -18,9 +19,14 @@ export interface FormattableDonation {
   provider: string | null;
   providerOrderId: string | null;
   providerErrorMessage: string | null;
+  /** Gateway return code + raw payload — inputs to the Arabic failure-reason mapper. */
+  providerProcReturnCode?: string | null;
+  providerRaw?: unknown;
   paymentMethod: string | null;
   donorCountryCode: string | null;
   attribution: Record<string, unknown> | null;
+  /** Optional so callers that build this shape without it still typecheck. */
+  donorId?: string;
   donor: { name: string | null; email: string; phone: string | null } | null;
   items: Array<{ campaign: { title: string } }>;
   categoryItems: Array<{ category: { name: string } }>;
@@ -121,11 +127,22 @@ function adCampaignLine(d: FormattableDonation): string | null {
   return [u, s ? `(${s})` : ""].filter(Boolean).map(htmlEscape).join(" ");
 }
 
+export interface DonationNotificationOptions {
+  /**
+   * Donor has no other successful donation — marks the name with a star instead
+   * of the separate "first donation" banner this used to post as a second message.
+   */
+  isNewDonor?: boolean;
+}
+
 /**
  * Notification card for a single donation. Used for DONATION_PAID and DONATION_FAILED.
  * Keep it scan-friendly: emojis lead each line so the eye finds amount/donor fast.
  */
-export function formatDonationNotification(d: FormattableDonation): string {
+export function formatDonationNotification(
+  d: FormattableDonation,
+  options: DonationNotificationOptions = {}
+): string {
   const status = statusBadge(d);
   const headline = d.status === "FAILED" ? "تبرع فاشل" : d.paidAt ? "تبرع جديد ناجح" : "تبرع جديد قيد التأكيد";
   const lines: string[] = [];
@@ -139,7 +156,8 @@ export function formatDonationNotification(d: FormattableDonation): string {
   const amountLine = usd && d.currency !== "USD" ? `${local} (≈ ${usd})` : local;
   lines.push(`💰 <b>المبلغ:</b> ${htmlEscape(amountLine)}`);
 
-  lines.push(`👤 <b>المتبرع:</b> ${donorLine(d.donor)}`);
+  // ⭐ = first-time donor. Inline on the donor line rather than a second message.
+  lines.push(`👤 <b>المتبرع:</b> ${options.isNewDonor ? "⭐ " : ""}${donorLine(d.donor)}`);
   lines.push(`🌍 <b>الدولة:</b> ${countryLine(d.donorCountryCode)}`);
   lines.push(`🎯 <b>الوجهة:</b> ${targetLine(d)}`);
   lines.push(
@@ -156,9 +174,11 @@ export function formatDonationNotification(d: FormattableDonation): string {
   const ad = adCampaignLine(d);
   if (ad) lines.push(`📣 <b>الإعلان:</b> ${ad}`);
 
-  if (d.status === "FAILED" && d.providerErrorMessage) {
+  if (d.status === "FAILED") {
+    // Always Arabic — the gateway localises this to the DONOR's checkout language,
+    // which is meaningless to the admins reading this channel.
     lines.push("");
-    lines.push(`⚠️ <b>سبب الفشل:</b> <i>${htmlEscape(d.providerErrorMessage)}</i>`);
+    lines.push(`⚠️ <b>سبب الفشل:</b> <i>${htmlEscape(describeFailureInArabic(d))}</i>`);
   }
 
   return lines.join("\n");

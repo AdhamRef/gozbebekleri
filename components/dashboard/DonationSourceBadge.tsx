@@ -21,6 +21,17 @@ interface DonationSourceBadgeProps extends DetectSourceInput {
   className?: string;
 }
 
+/**
+ * The pill deliberately shows ONLY the platform ("Meta", "Google Ads", …).
+ *
+ * It used to append "· {utm_campaign}", but ad campaign names are long and
+ * free-form ("Retargeting | Value") while the pill is `whitespace-nowrap` inside
+ * a ~160px table cell — so every ad-sourced row blew past its column and shoved
+ * the neighbouring one out of alignment. The campaign name is still one hover
+ * away in the tooltip below, and in full in the attribution details dialog, so
+ * nothing is lost; it just stops dictating the table's layout.
+ */
+
 const STATUS_DOT_CLASS: Record<DonationSourceResult["status"], string> = {
   verified: "bg-emerald-500",
   "utm-only": "bg-amber-400",
@@ -69,9 +80,6 @@ export function DonationSourceBadge({
               aria-hidden
             />
             {compact ? statusLabel : platformLabel}
-            {result.campaignName && !compact ? (
-              <span className="text-slate-500 font-normal">· {result.campaignName}</span>
-            ) : null}
           </span>
         </TooltipTrigger>
         <TooltipContent

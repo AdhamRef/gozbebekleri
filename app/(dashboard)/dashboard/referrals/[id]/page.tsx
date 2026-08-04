@@ -962,7 +962,7 @@ export default function ReferralAnalyticsPage() {
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700">الحالة</th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">دعم الفريق</th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700">النوع</th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[160px]">مصدر التبرع</th>
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 w-px whitespace-nowrap">مصدر التبرع</th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[110px]">المشروع / الفئة</th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">التاريخ</th>
                     </tr>
@@ -1043,7 +1043,7 @@ export default function ReferralAnalyticsPage() {
                               {d.type === "MONTHLY" ? "شهري" : "مرة واحدة"}
                             </span>
                           </td>
-                          <td className="py-1.5 px-2 align-middle max-w-[160px]">
+                          <td className="py-1.5 px-2 align-middle w-px whitespace-nowrap">
                             <button
                               type="button"
                               onClick={() => openDonationDetails("attribution", d)}

@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
-import { PAID_CONTRIBUTING_FILTER } from "@/lib/dashboard/donation-usd-revenue";
 import { formatIstanbulDateKey } from "@/lib/admin/istanbul-calendar";
+import {
+  buildDayOfMonthFilters,
+  subscriptionBillingDay,
+} from "@/lib/dashboard/day-of-month-filters";
 
 /**
  * GET /api/admin/subscriptions/overview/day-of-month
@@ -31,47 +33,14 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get("userId");
     const referralId = searchParams.get("referralId");
 
-    const byCampaign = Boolean(campaignId && campaignId !== "all");
-    const byCategory = !byCampaign && Boolean(categoryId && categoryId !== "all");
-
-    // ---- collected: settled subscription donations, all time ----
-    const donationWhere: Prisma.DonationWhereInput = {
-      subscriptionId: { not: null },
-      status: "PAID",
-      // Not null implicitly — a null paidAt cannot satisfy a range, and settlement is what
-      // makes a row real money. Same rule the chart and the KPI cards use.
-      paidAt: { not: null },
-    };
-    if (referralId) donationWhere.referralId = referralId;
-    if (userId && userId !== "all") donationWhere.donorId = userId;
-    if (byCampaign) {
-      donationWhere.items = { some: { campaignId: campaignId as string } };
-    } else if (byCategory) {
-      donationWhere.OR = [
-        { items: { some: { campaign: { categoryIds: { has: categoryId as string } } } } },
-        { categoryItems: { some: { categoryId: categoryId as string } } },
-      ];
-    }
-
-    // ---- expected: active subscriptions and the day they bill on ----
-    // `status: ACTIVE` alone is not enough. A subscription whose only charge attempts FAILED
-    // (declined card) stays ACTIVE but has never produced money — 18 of them, worth $217/mo.
-    // The MRR card already requires at least one settled charge; match it, or this view and
-    // that card disagree by exactly those phantom subscriptions.
-    const subscriptionWhere: Prisma.SubscriptionWhereInput = {
-      status: "ACTIVE",
-      donations: { some: PAID_CONTRIBUTING_FILTER },
-    };
-    if (referralId) subscriptionWhere.referralId = referralId;
-    if (userId && userId !== "all") subscriptionWhere.donorId = userId;
-    if (byCampaign) {
-      subscriptionWhere.items = { some: { campaignId: campaignId as string } };
-    } else if (byCategory) {
-      subscriptionWhere.OR = [
-        { items: { some: { campaign: { categoryIds: { has: categoryId as string } } } } },
-        { categoryItems: { some: { categoryId: categoryId as string } } },
-      ];
-    }
+    // Shared with the per-day drill-down so the list behind a cell always matches
+    // the number printed on it. See lib/dashboard/day-of-month-filters.ts.
+    const { donationWhere, subscriptionWhere } = buildDayOfMonthFilters({
+      categoryId,
+      campaignId,
+      userId,
+      referralId,
+    });
 
     const [donations, subscriptions] = await Promise.all([
       prisma.donation.findMany({
@@ -116,12 +85,8 @@ export async function GET(request: NextRequest) {
     }));
 
     for (const s of subscriptions) {
-      // nextBillingDate is the authoritative billing day; the others are only fallbacks for
-      // rows that predate it being populated.
-      const anchor = s.nextBillingDate ?? s.lastBillingDate ?? s.createdAt;
-      if (!anchor) continue;
-      const day = Number(formatIstanbulDateKey(anchor).slice(8, 10));
-      if (!day || day < 1 || day > 31) continue;
+      const day = subscriptionBillingDay(s);
+      if (!day) continue;
       expected[day - 1].amountUSD += Number(s.amountUSD ?? s.amount ?? 0);
       expected[day - 1].count += 1;
     }

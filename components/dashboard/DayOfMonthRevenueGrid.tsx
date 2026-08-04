@@ -2,6 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { CalendarRange, Info } from "lucide-react";
+import {
+  DayOfMonthDetailsDialog,
+  type DayOfMonthDetailFilters,
+} from "@/components/dashboard/DayOfMonthDetailsDialog";
 
 export type DayOfMonthPoint = {
   /** 1..31 */
@@ -19,6 +23,11 @@ type Props = {
   expected: DayOfMonthPoint[];
   loading?: boolean;
   formatMoney: (value: number) => string;
+  /**
+   * The page's active filters. Passed straight through to the drill-down so the
+   * rows it lists are the same population the cells were computed from.
+   */
+  filters?: DayOfMonthDetailFilters;
 };
 
 /**
@@ -46,8 +55,10 @@ function rampStep(amount: number, max: number): number {
   return 5;
 }
 
-export function DayOfMonthRevenueGrid({ collected, expected, loading, formatMoney }: Props) {
+export function DayOfMonthRevenueGrid({ collected, expected, loading, formatMoney, filters }: Props) {
   const [mode, setMode] = useState<Mode>("collected");
+  /** Which day's drill-down is open, if any. */
+  const [openDay, setOpenDay] = useState<number | null>(null);
   const data = mode === "collected" ? collected : expected;
 
   const stats = useMemo(() => {
@@ -151,9 +162,16 @@ export function DayOfMonthRevenueGrid({ collected, expected, loading, formatMone
 
             return (
               <div key={d.day} className="group relative">
-                <div
-                  className={`flex h-[74px] flex-col justify-between rounded-lg p-2 transition-transform duration-150 ${
-                    amount > 0 ? "cursor-default group-hover:-translate-y-0.5" : ""
+                <button
+                  type="button"
+                  // Empty days have nothing to drill into — leave them inert rather than
+                  // opening a dialog that can only say "no data".
+                  disabled={amount <= 0}
+                  onClick={() => setOpenDay(d.day)}
+                  aria-label={`عرض تفاصيل اليوم ${d.day} من الشهر`}
+                  title={amount > 0 ? "اضغط لعرض التفاصيل" : undefined}
+                  className={`flex h-[74px] w-full flex-col justify-between rounded-lg p-2 text-right transition-transform duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1 ${
+                    amount > 0 ? "cursor-pointer group-hover:-translate-y-0.5" : "cursor-default"
                   } ${isPeak ? "ring-2 ring-brand ring-offset-1" : ""}`}
                   style={{ backgroundColor: tone.bg, color: tone.ink }}
                 >
@@ -164,7 +182,7 @@ export function DayOfMonthRevenueGrid({ collected, expected, loading, formatMone
                   <span className="text-[10px] tabular-nums opacity-65">
                     {d.count > 0 ? (mode === "collected" ? `${d.count} تبرع` : `${d.count} اشتراك`) : ""}
                   </span>
-                </div>
+                </button>
 
                 {amount > 0 && (
                   <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden w-max max-w-[220px] -translate-x-1/2 rounded-lg bg-slate-900 px-2.5 py-1.5 text-[11px] leading-snug text-white shadow-lg group-hover:block">
@@ -205,12 +223,23 @@ export function DayOfMonthRevenueGrid({ collected, expected, loading, formatMone
           </div>
           <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
             <Info className="h-3.5 w-3.5 shrink-0" />
-            {mode === "collected"
-              ? "الاشتراك يتجدّد في نفس اليوم من كل شهر، فهذه هي أيام دخول المال فعليًا."
-              : "محسوب من تاريخ التجديد القادم للاشتراكات النشطة."}
+            <span>
+              {mode === "collected"
+                ? "الاشتراك يتجدّد في نفس اليوم من كل شهر، فهذه هي أيام دخول المال فعليًا."
+                : "محسوب من تاريخ التجديد القادم للاشتراكات النشطة."}{" "}
+              <b className="font-semibold text-slate-600">اضغط أي يوم لعرض تفاصيله.</b>
+            </span>
           </p>
         </div>
       </div>
+
+      <DayOfMonthDetailsDialog
+        day={openDay}
+        mode={mode}
+        filters={filters}
+        formatMoney={formatMoney}
+        onClose={() => setOpenDay(null)}
+      />
     </section>
   );
 }
