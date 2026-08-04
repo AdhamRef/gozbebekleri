@@ -46,7 +46,6 @@ const SEGMENT_LABELS: Record<string, string> = {
   content: "المحتوى",
   publishing: "النشر",
   communication: "التواصل",
-  operations: "التشغيل",
   marketing: "التسويق",
   archive: "الأرشيف",
   blog: "المدونة",

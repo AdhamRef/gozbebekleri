@@ -36,17 +36,6 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
     ],
   },
   {
-    group: "التشغيل",
-    items: [
-      { key: "operations", title: "المهام", href: "/dashboard/operations/tasks", icon: "listChecks", keywords: ["tasks", "todo"] },
-      { key: "operations", title: "المحتوى", href: "/dashboard/operations/content", icon: "fileStack", keywords: ["content"] },
-      { key: "operations", title: "التقويم", href: "/dashboard/operations/calendar", icon: "calendar", keywords: ["calendar", "schedule"] },
-      { key: "operations", title: "النشر", href: "/dashboard/operations/publishing", icon: "send", keywords: ["publishing", "publish"] },
-      { key: "operations", title: "إعادة تنشيط المتبرعين", href: "/dashboard/operations/donor-reactivation", icon: "heartHandshake", keywords: ["reactivation", "lapsed", "winback"] },
-      { key: "archive", title: "الأرشيف", href: "/dashboard/archive/collections", icon: "archive", keywords: ["archive", "collections", "files"] },
-    ],
-  },
-  {
     group: "الحملات والمحتوى",
     items: [
       { key: "campaigns", title: "المشاريع", href: "/dashboard/campaigns", icon: "heart", keywords: ["projects", "campaigns", "مشاريع"] },
@@ -142,7 +131,6 @@ export const DASHBOARD_PERMISSION_ROWS: {
   { key: "bankTransfers", group: "الرئيسية", title: "التحويلات البنكية" },
   { key: "donors", group: "الرئيسية", title: "المتبرعون" },
   { key: "operations", group: "التشغيل / التواصل", title: "التشغيل والتواصل" },
-  { key: "archive", group: "التشغيل", title: "الأرشيف" },
   { key: "campaigns", group: "الحملات والمحتوى", title: "المشاريع" },
   { key: "categories", group: "الحملات والمحتوى", title: "الحملات والدول" },
   { key: "blog", group: "الحملات والمحتوى", title: "المدونة" },
