@@ -99,15 +99,6 @@ export function MetricSummaryBand({
                   {badge}
                 </span>
               )}
-              {note && (
-                <span
-                  title={note}
-                  className="inline-flex shrink-0 cursor-help items-center text-slate-300 transition-colors hover:text-brand"
-                >
-                  <Info className="h-3.5 w-3.5" aria-hidden />
-                  <span className="sr-only">{note}</span>
-                </span>
-              )}
             </div>
             <p className="mt-0.5 text-[30px] font-bold leading-tight tabular-nums tracking-tight text-slate-900 sm:text-[34px]">
               {value}

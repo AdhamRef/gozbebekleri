@@ -825,7 +825,7 @@ export default function MonthlySubscriptionsDashboardPage() {
               icon={Repeat}
               eyebrow="الإيراد الشهري المتكرر (MRR)"
               badge="شهريًا"
-              value={formatMoney(stats?.monthlyRecurringRevenue ?? 0)}
+              value={formatMoney(Math.round(stats?.monthlyRecurringRevenue) ?? 0)}
               note="مجموع قيم الاشتراكات النشطة شهريًا."
             />
             {/* ARR is MRR×12 — a projection of the current book, not money collected. The note
@@ -835,7 +835,7 @@ export default function MonthlySubscriptionsDashboardPage() {
               icon={TrendingUp}
               eyebrow="الإيراد السنوي المتكرر (ARR)"
               badge="سنويًا"
-              value={formatMoney((stats?.monthlyRecurringRevenue ?? 0) * 12)}
+              value={formatMoney(Math.round((stats?.monthlyRecurringRevenue ?? 0) * 12))}
               note="توقّع سنوي = الإيراد الشهري المتكرر × ١٢، بافتراض استمرار الاشتراكات النشطة الحالية. ليس مبلغًا محصّلًا."
             />
           </div>
