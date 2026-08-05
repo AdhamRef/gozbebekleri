@@ -12,8 +12,10 @@ import { PageHeader } from "@/components/dashboard/PageHeader";
 import { MetricSummaryBand } from "@/components/dashboard/MetricSummaryBand";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { CHART_THEME, CHART_STATUS, CHART_TOOLTIP_STYLE } from "@/lib/dashboard/chart-theme";
+import { useViewUserProfile } from "@/context/ViewUserProfileContext";
 import {
-  JourneyStrip, FunnelCard, TrackingBanner, SegmentedControl, RowActions, fmtDateTime,
+  DeliveryStatusPill, FunnelCard, TrackingBanner, SegmentedControl, RowActions,
+  RecipientCell, ORIGIN_LABELS, fmtDateTime,
   type JourneyStage, type StageSource,
 } from "../../_shared/channel-ui";
 import { DeliveryPreviewSheet } from "../../_shared/DeliveryPreviewSheet";
@@ -83,6 +85,7 @@ export function buildStages(row: StageSource): JourneyStage[] {
 }
 
 export function EmailChannelDashboard() {
+  const { openUserProfile } = useViewUserProfile();
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -285,15 +288,18 @@ export function EmailChannelDashboard() {
           ) : (
             <>
               <div className="overflow-x-auto">
+                {/* Column widths are explicit so the table cannot distribute leftover space
+                    evenly and leave a gulf beside the action buttons: the subject is the only
+                    greedy column, everything else hugs its content. */}
                 <table className="w-full text-right text-xs">
                   <thead>
-                    <tr className="border-b border-slate-100 bg-slate-50/60">
-                      <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">المستلم</th>
-                      <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">الموضوع / القالب</th>
-                      <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">المسار</th>
-                      <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">المصدر</th>
-                      <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">التاريخ</th>
-                      <th className="px-3 py-2.5" />
+                    <tr className="border-b border-slate-100 bg-slate-50/60 text-[11px] font-semibold text-slate-500">
+                      <th className="whitespace-nowrap px-3 py-2.5 text-right">المستلم</th>
+                      <th className="w-full max-w-0 px-3 py-2.5 text-right">الموضوع / القالب</th>
+                      <th className="whitespace-nowrap px-3 py-2.5 text-right">الحالة</th>
+                      <th className="whitespace-nowrap px-3 py-2.5 text-right">المصدر</th>
+                      <th className="whitespace-nowrap px-3 py-2.5 text-right">التاريخ</th>
+                      <th className="w-px px-3 py-2.5" />
                     </tr>
                   </thead>
                   <tbody>
@@ -305,40 +311,41 @@ export function EmailChannelDashboard() {
                           onClick={() => setPreviewId(row.id)}
                           className="cursor-pointer border-b border-slate-50 transition-colors last:border-0 hover:bg-slate-50/70"
                         >
-                          <td className="px-3 py-2.5">
-                            <div className="flex flex-col leading-tight">
-                              <span className="font-semibold text-slate-800">{row.recipientName || "—"}</span>
-                              <span className="text-[11px] text-slate-400" dir="ltr">{row.recipientEmail || "—"}</span>
-                            </div>
+                          <td className="px-3 py-2.5 align-middle">
+                            <RecipientCell
+                              userId={row.recipientUserId}
+                              name={row.recipientName}
+                              contact={row.recipientEmail}
+                              onOpenProfile={openUserProfile}
+                            />
                           </td>
-                          <td className="max-w-[280px] px-3 py-2.5">
+                          <td className="max-w-0 px-3 py-2.5 align-middle">
                             <div className="flex flex-col leading-tight">
                               <span className="truncate text-slate-700">{row.renderedSubject || "—"}</span>
                               <span className="truncate text-[11px] text-slate-400">{row.templateName || "—"}</span>
                             </div>
                           </td>
-                          <td className="px-3 py-2.5">
-                            <JourneyStrip
+                          <td className="whitespace-nowrap px-3 py-2.5 align-middle">
+                            <DeliveryStatusPill
                               stages={buildStages(row)}
                               failed={row.status === "FAILED" || row.status === "BOUNCED"}
                               skipped={row.status === "SKIPPED"}
-                              skippedReason={row.errorMessage}
                               errorMessage={row.errorMessage}
                               trackingLive={trackingLive}
                             />
                           </td>
-                          <td className="px-3 py-2.5">
+                          <td className="whitespace-nowrap px-3 py-2.5 align-middle">
                             <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
-                              {row.origin}
+                              {ORIGIN_LABELS[row.origin] ?? row.origin}
                             </span>
                           </td>
-                          <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-slate-600">
+                          <td className="whitespace-nowrap px-3 py-2.5 align-middle tabular-nums text-slate-600">
                             <div className="flex flex-col leading-tight">
                               <span>{dt?.date}</span>
                               <span className="text-[10px] text-slate-400" dir="ltr">{dt?.time}</span>
                             </div>
                           </td>
-                          <td className="whitespace-nowrap px-3 py-2.5">
+                          <td className="w-px whitespace-nowrap px-3 py-2.5 align-middle">
                             <RowActions
                               row={row}
                               onPreview={() => setPreviewId(row.id)}

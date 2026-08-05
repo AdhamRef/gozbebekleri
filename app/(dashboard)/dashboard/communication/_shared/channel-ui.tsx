@@ -57,72 +57,153 @@ export function fmtFull(value: string | null): string {
 }
 
 /**
- * The message lifecycle as a strip of pips — the "was it seen?" answer at a glance.
+ * How far each rung is worth trusting, as a visual step up.
  *
- * A dashed pip means the provider has never reported on that stage, which is materially
- * different from a solid empty one meaning it demonstrably did not happen. Collapsing the two
- * would turn "we aren't receiving events" into "nobody read it".
+ * "Handed to the provider" is the weakest claim we can make and stays grey; each confirmed step
+ * beyond it earns more colour, so a column of these reads as a gradient of certainty rather than a
+ * row of equally-loud badges.
  */
-export function JourneyStrip({
+const STAGE_TONES = [
+  "border-slate-200 bg-slate-50 text-slate-600",
+  "border-sky-200 bg-sky-50 text-sky-700",
+  "border-emerald-200 bg-emerald-50 text-emerald-700",
+  "border-brand/25 bg-brand/10 text-brand",
+];
+
+/**
+ * The furthest point a message reached, as one badge.
+ *
+ * This replaced a strip of four pips. The pips showed every rung at once, which meant the reader
+ * had to decode four shapes to answer the only question they actually had — what happened to this
+ * message? A single "قُرئ ✓✓" says it directly, and the full ladder with timestamps is still one
+ * hover (or one معاينة click) away.
+ *
+ * The one nuance kept from the pips: when the provider has never reported an event, the badge is
+ * dashed. Rendering a confident "أُرسل" in that state would let "we aren't receiving tracking"
+ * masquerade as "it was sent and nothing further happened" — opposite meanings, same pixels.
+ */
+export function DeliveryStatusPill({
   stages,
   failed,
   skipped,
-  skippedReason,
   errorMessage,
   trackingLive,
 }: {
   stages: JourneyStage[];
   failed?: boolean;
   skipped?: boolean;
-  skippedReason?: string | null;
   errorMessage?: string | null;
   trackingLive: boolean;
 }) {
-  if (skipped) {
+  if (failed) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-400" title={skippedReason ?? undefined}>
-        <SlashIcon className="h-3 w-3" /> لم تُرسل
+      <span
+        title={errorMessage ?? "فشل الإرسال"}
+        className="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-700"
+      >
+        <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
+        فشل
       </span>
     );
   }
 
+  if (skipped) {
+    return (
+      <span
+        title={errorMessage ?? "تم تخطّي هذه الرسالة قبل الإرسال."}
+        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-500"
+      >
+        <SlashIcon className="h-3.5 w-3.5 shrink-0" />
+        لم تُرسل
+      </span>
+    );
+  }
+
+  // Walk forward, not backward: a provider can confirm a read without ever sending a delivery
+  // event, and taking the *last* truthy rung keeps that ahead of the ones it skipped.
+  let reached = 0;
+  for (let i = 0; i < stages.length; i++) if (stages[i].at) reached = i;
+
+  const stage = stages[reached];
+  const Icon = stage.icon;
+  const blind = !trackingLive && reached === 0;
+  const tone = STAGE_TONES[Math.min(reached, STAGE_TONES.length - 1)];
+
+  // Hovering gives back everything the pips used to show, without spending width on it.
+  const tooltip = stages
+    .map((s) => `${s.label}: ${s.at ? fmtFull(s.at) : blind && !s.local ? "لا توجد بيانات" : "—"}`)
+    .join("\n");
+
   return (
-    <div className="flex items-center gap-1">
-      {stages.map((stage) => {
-        const done = Boolean(stage.at);
-        const dt = fmtDateTime(stage.at);
-        const unknown = !done && !stage.local && !trackingLive;
-        const Icon = stage.icon;
-        return (
-          <span
-            key={stage.key}
-            title={
-              done ? `${stage.label} — ${dt?.date} ${dt?.time}`
-                : unknown ? `${stage.label}: لا توجد بيانات تتبّع`
-                  : `${stage.label}: لم يحدث`
-            }
-            className={cn(
-              "flex h-6 w-6 items-center justify-center rounded-md border transition-colors",
-              done
-                ? "border-brand/25 bg-brand/10 text-brand"
-                : unknown
-                  ? "border-dashed border-slate-300 bg-slate-50 text-slate-300"
-                  : "border-slate-200 bg-slate-50 text-slate-300",
-            )}
-          >
-            <Icon className="h-3 w-3" />
-          </span>
-        );
-      })}
-      {failed && (
-        <span
-          title={errorMessage ?? "فشل الإرسال"}
-          className="ms-1 flex h-6 items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-1.5 text-[10px] font-bold text-rose-700"
-        >
-          <TriangleAlert className="h-3 w-3" /> فشل
-        </span>
+    <span
+      title={tooltip}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-semibold",
+        tone,
+        blind && "border-dashed",
       )}
-    </div>
+    >
+      <Icon className="h-3.5 w-3.5 shrink-0" />
+      {stage.label}
+      {blind && <span className="text-slate-400">؟</span>}
+    </span>
+  );
+}
+
+/** Short Arabic origin labels. The raw enum ("TRIGGER") leaked English into an RTL table. */
+export const ORIGIN_LABELS: Record<string, string> = {
+  TRIGGER: "تلقائي",
+  MANUAL: "يدوي",
+  CAMPAIGN: "حملة",
+  TEST: "تجربة",
+  REACTIVATION: "إعادة تفعيل",
+  SYSTEM: "النظام",
+};
+
+/**
+ * The recipient cell — a button into the donor profile card whenever we know who they are.
+ *
+ * Matches سجل الرسائل: same drawer, same affordance. Rows without a `recipientUserId` render as
+ * plain text rather than a dead button, so a control that looks pressable always is.
+ */
+export function RecipientCell({
+  userId,
+  name,
+  contact,
+  onOpenProfile,
+}: {
+  userId: string | null;
+  name: string | null;
+  contact: string | null;
+  onOpenProfile: (userId: string) => void;
+}) {
+  const label = name || contact || "—";
+  const sub = name && contact ? contact : null;
+
+  const body = (
+    <>
+      <span className="block truncate font-semibold text-slate-800 group-hover:text-brand">{label}</span>
+      {sub && <span className="block truncate text-[11px] text-slate-400" dir="ltr">{sub}</span>}
+    </>
+  );
+
+  if (!userId) {
+    return <div className="max-w-[220px] leading-tight">{body}</div>;
+  }
+
+  return (
+    <button
+      type="button"
+      // The row itself opens the preview, so this must not bubble.
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpenProfile(userId);
+      }}
+      title="عرض ملف المتبرّع"
+      className="group -mx-1 block max-w-[220px] cursor-pointer rounded-md px-1 py-0.5 text-right leading-tight transition-colors hover:bg-brand/8"
+    >
+      {body}
+    </button>
   );
 }
 
