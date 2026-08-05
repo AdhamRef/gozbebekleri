@@ -62,6 +62,7 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
       // Per-channel pages: each answers "what did we send on this channel, and what happened to
       // it afterwards" — the delivery/open/click detail the flat send log cannot show.
       { key: "messages", title: "البريد الإلكتروني", href: "/dashboard/communication/email", icon: "mail", keywords: ["email", "بريد", "elastic"] },
+      { key: "messages", title: "واتساب", href: "/dashboard/communication/whatsapp", icon: "messageCircle", keywords: ["whatsapp", "واتساب", "meta"] },
       { key: "templates", title: "قوالب البريد والمحفّزات", href: "/dashboard/templates", icon: "mail", keywords: ["email", "triggers", "محفزات"] },
       { key: "messages", title: "سجل الرسائل", href: "/dashboard/messages", icon: "history", keywords: ["messages", "log", "history"] },
     ],

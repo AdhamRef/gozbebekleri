@@ -115,8 +115,8 @@ export default function BulkDonationImportPage() {
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-xs font-bold text-brand">المتبرعون / استيراد بالجملة</p>
-            <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">استيراد التبرعات من Excel / CSV</h1>
+            <p className="text-xs font-bold text-brand">المتبرعون / توريد بالجملة</p>
+            <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">توريد التبرعات من Excel / CSV</h1>
             <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-600">
               ارفع ملف مبيعات (مثل تصدير PayFor) لإنشاء تبرعات مرتبطة بالمتبرعين عبر البريد الإلكتروني. تُعرض معاينة قبل الحفظ، ولا يُرسل أي إشعار.
             </p>

@@ -1,32 +1,28 @@
 "use client";
 
-import { Mail, TriangleAlert, SlashIcon } from "lucide-react";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
+import { MessageCircle, TriangleAlert, SlashIcon } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { fmtFull } from "../../_shared/channel-ui";
-import { buildStages, type EmailRow } from "./EmailChannelDashboard";
+import { buildStages, type WhatsappRow } from "./WhatsappChannelDashboard";
 
 type Props = {
-  row: EmailRow | null;
+  row: WhatsappRow | null;
   trackingLive: boolean;
   onClose: () => void;
 };
 
 /**
- * One message's full lifecycle.
+ * One WhatsApp message's full lifecycle.
  *
- * The vertical timeline is deliberately ordered by the stage, not by which timestamps happen to
- * exist — a reader needs to see the gap ("delivered, never opened") as much as the events, and a
- * list that silently omits unreached stages hides exactly that.
+ * Stages that did NOT happen are still listed: "delivered, never read" is the single most useful
+ * thing this view can tell you, and a timeline that only prints the events it has would hide it.
  */
-export function EmailDeliveryDetailsDialog({ row, trackingLive, onClose }: Props) {
+export function WhatsappDeliveryDetailsDialog({ row, trackingLive, onClose }: Props) {
   if (!row) return null;
 
   const failed = row.status === "FAILED" || row.status === "BOUNCED";
   const skipped = row.status === "SKIPPED";
-
   const stages = buildStages(row);
 
   return (
@@ -35,12 +31,12 @@ export function EmailDeliveryDetailsDialog({ row, trackingLive, onClose }: Props
         <DialogHeader className="space-y-1 border-b border-slate-100 px-5 py-4 text-right">
           <DialogTitle className="flex items-center gap-2.5 text-base font-semibold text-slate-900">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand">
-              <Mail className="h-4 w-4" />
+              <MessageCircle className="h-4 w-4" />
             </span>
-            {row.renderedSubject || "رسالة بريد"}
+            {row.templateName || "رسالة واتساب"}
           </DialogTitle>
           <p className="text-[11px] text-slate-500">
-            {row.templateName || "—"} · <span dir="ltr">{row.recipientEmail || "—"}</span>
+            {row.recipientName || "—"} · <span dir="ltr">{row.recipientPhone || "—"}</span>
           </p>
         </DialogHeader>
 
@@ -65,6 +61,15 @@ export function EmailDeliveryDetailsDialog({ row, trackingLive, onClose }: Props
             </div>
           )}
 
+          {row.renderedBody && (
+            <div>
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">نص الرسالة</h3>
+              <div className="whitespace-pre-wrap rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 text-xs leading-6 text-slate-700">
+                {row.renderedBody}
+              </div>
+            </div>
+          )}
+
           <div>
             <h3 className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">المسار الزمني</h3>
             <ol className="relative space-y-0">
@@ -74,14 +79,11 @@ export function EmailDeliveryDetailsDialog({ row, trackingLive, onClose }: Props
                 const Icon = stage.icon;
                 const last = i === stages.length - 1;
                 return (
-                  <li key={stage.label} className="relative flex gap-3 pb-4 last:pb-0">
+                  <li key={stage.key} className="relative flex gap-3 pb-4 last:pb-0">
                     {!last && (
                       <span
                         aria-hidden
-                        className={cn(
-                          "absolute top-7 h-[calc(100%-1.75rem)] w-px",
-                          done ? "bg-brand/25" : "bg-slate-200",
-                        )}
+                        className={cn("absolute top-7 h-[calc(100%-1.75rem)] w-px", done ? "bg-brand/25" : "bg-slate-200")}
                         style={{ insetInlineStart: "0.875rem" }}
                       />
                     )}
@@ -94,15 +96,9 @@ export function EmailDeliveryDetailsDialog({ row, trackingLive, onClose }: Props
                       <Icon className="h-3.5 w-3.5" />
                     </span>
                     <div className="min-w-0 pt-0.5">
-                      <p className={cn("text-xs font-semibold", done ? "text-slate-900" : "text-slate-400")}>
-                        {stage.label}
-                      </p>
-                      <p className="text-[11px] tabular-nums text-slate-500" dir="ltr">
-                        {done ? fmtFull(stage.at) : "—"}
-                      </p>
-                      {blind && (
-                        <p className="text-[10px] text-amber-600">لا توجد بيانات تتبّع لهذه المرحلة</p>
-                      )}
+                      <p className={cn("text-xs font-semibold", done ? "text-slate-900" : "text-slate-400")}>{stage.label}</p>
+                      <p className="text-[11px] tabular-nums text-slate-500" dir="ltr">{done ? fmtFull(stage.at) : "—"}</p>
+                      {blind && <p className="text-[10px] text-amber-600">لا توجد بيانات تتبّع لهذه المرحلة</p>}
                     </div>
                   </li>
                 );
@@ -114,8 +110,8 @@ export function EmailDeliveryDetailsDialog({ row, trackingLive, onClose }: Props
             {[
               { label: "الحالة", value: row.status },
               { label: "المصدر", value: row.origin },
-              { label: "المستلم", value: row.recipientName || "—" },
               { label: "معرّف المزود", value: row.providerMessageId || "—", ltr: true },
+              { label: "معرّف المحادثة", value: row.providerConversationId || "—", ltr: true },
             ].map((item) => (
               <div key={item.label} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
                 <p className="text-[10px] text-slate-400">{item.label}</p>
