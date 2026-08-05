@@ -71,6 +71,19 @@ export const PROVIDER_SUCCESS_STATUSES = [
   "REPLIED",
 ] as const satisfies readonly DeliveryStatusId[];
 
+/**
+ * Statuses a delivery may be re-sent from: it was never accepted by a provider, so sending again
+ * cannot duplicate anything the recipient already has.
+ */
+export const RETRYABLE_STATUSES = ["FAILED", "SKIPPED"] as const satisfies readonly DeliveryStatusId[];
+
+/**
+ * Terminal failures that must NOT be retried. A bounce is the receiving server stating the address
+ * is undeliverable — re-sending does not fix the address, it only accrues bounce rate, which is the
+ * fastest way to get a sending domain throttled or blocklisted.
+ */
+export const NON_RETRYABLE_TERMINAL = ["BOUNCED"] as const satisfies readonly DeliveryStatusId[];
+
 export function isCommunicationChannel(v: unknown): v is CommunicationChannelId {
   return typeof v === "string" && (COMMUNICATION_CHANNELS as readonly string[]).includes(v);
 }

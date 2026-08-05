@@ -5,6 +5,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { getActiveMetaWhatsappRuntimeConfig } from "@/lib/communication/runtime-config";
+import { RETRYABLE_STATUSES } from "@/lib/communication/communication-runtime-types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest) {
 
     const [
       total, byStatus, deliveredCount, readCount, repliedCount, failedCount,
-      allTimeTotal, rows, listTotal, bucketRows, templates, metaConfig,
+      allTimeTotal, rows, listTotal, bucketRows, templates, metaConfig, retryableCount,
     ] = await Promise.all([
       prisma.communicationDelivery.count({ where: rangeWhere }),
       prisma.communicationDelivery.groupBy({ by: ["status"], where: rangeWhere, _count: { _all: true } }),
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest) {
           id: true, status: true, origin: true, templateName: true, renderedBody: true,
           recipientPhone: true, recipientName: true, recipientUserId: true, errorMessage: true,
           providerMessageId: true, providerConversationId: true, createdAt: true, sentAt: true,
-          deliveredAt: true, readAt: true, repliedAt: true, failedAt: true,
+          deliveredAt: true, readAt: true, repliedAt: true, failedAt: true, retriedAt: true,
         },
       }),
       prisma.communicationDelivery.count({ where: listWhere }),
@@ -101,6 +102,14 @@ export async function GET(request: NextRequest) {
         orderBy: { updatedAt: "desc" },
       }),
       getActiveMetaWhatsappRuntimeConfig(),
+      // Re-sendable backlog — see the identical note on the email route for the `isSet` arm.
+      prisma.communicationDelivery.count({
+        where: {
+          ...rangeWhere,
+          status: { in: [...RETRYABLE_STATUSES] },
+          OR: [{ retriedAt: null }, { retriedAt: { isSet: false } }],
+        },
+      }),
     ]);
 
     const statusCounts: Record<string, number> = {};
@@ -158,6 +167,7 @@ export async function GET(request: NextRequest) {
         repliedRate: rate(repliedCount), failedRate: rate(failedCount),
       },
       trackingLive,
+      retryableCount,
       provider: {
         configured: metaConfig.configured,
         reason: metaConfig.configured ? null : metaConfig.reason,

@@ -1530,6 +1530,14 @@ model CommunicationDelivery {
   clickedAt              DateTime?
   repliedAt              DateTime?
   failedAt               DateTime?
+  // Retry linkage. A retry is a NEW row pointing back at the attempt it re-sends, never an edit of
+  // the original: the first failure is evidence, and rewriting it would silently move the historical
+  // failure-rate figures. `retriedAt` is stamped on the ORIGINAL once a retry actually reaches the
+  // provider, which is what stops the same message being sent twice.
+  // Both are optional — MongoDB documents written before this existed have neither field, and a
+  // required column would make every one of them unreadable.
+  retryOfDeliveryId      String?   @db.ObjectId
+  retriedAt              DateTime?
   createdBy              String?   @db.ObjectId
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt

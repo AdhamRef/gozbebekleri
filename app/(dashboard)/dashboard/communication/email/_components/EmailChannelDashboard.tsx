@@ -13,10 +13,11 @@ import { MetricSummaryBand } from "@/components/dashboard/MetricSummaryBand";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { CHART_THEME, CHART_STATUS, CHART_TOOLTIP_STYLE } from "@/lib/dashboard/chart-theme";
 import {
-  JourneyStrip, FunnelCard, TrackingBanner, SegmentedControl, fmtDateTime,
-  type JourneyStage,
+  JourneyStrip, FunnelCard, TrackingBanner, SegmentedControl, RowActions, fmtDateTime,
+  type JourneyStage, type StageSource,
 } from "../../_shared/channel-ui";
-import { EmailDeliveryDetailsDialog } from "./EmailDeliveryDetailsDialog";
+import { DeliveryPreviewSheet } from "../../_shared/DeliveryPreviewSheet";
+import { RetryDialog } from "../../_shared/RetryDialog";
 import { cn } from "@/lib/utils";
 
 export type EmailRow = {
@@ -36,6 +37,7 @@ export type EmailRow = {
   openedAt: string | null;
   clickedAt: string | null;
   failedAt: string | null;
+  retriedAt: string | null;
 };
 
 type Payload = {
@@ -45,6 +47,8 @@ type Payload = {
     deliveredRate: number; openRate: number; clickRate: number; failedRate: number;
   };
   trackingLive: boolean;
+  /** Failed/skipped messages in range that have not been re-sent yet. */
+  retryableCount: number;
   statusCounts: Record<string, number>;
   timeseries: Array<{ date: string; sent: number; delivered: number; opened: number; failed: number }>;
   topTemplates: Array<{ name: string; count: number }>;
@@ -69,12 +73,12 @@ const STATUS_FILTERS = [
 ];
 
 /** Email's rung names for the shared lifecycle strip. `sent` is our own record, never "unknown". */
-export function buildStages(row: EmailRow): JourneyStage[] {
+export function buildStages(row: StageSource): JourneyStage[] {
   return [
     { key: "sent", label: "أُرسل", at: row.sentAt ?? row.createdAt, icon: Send, local: true },
     { key: "delivered", label: "وصل", at: row.deliveredAt, icon: MailCheck },
-    { key: "opened", label: "فُتح", at: row.openedAt, icon: MailOpen },
-    { key: "clicked", label: "نُقر", at: row.clickedAt, icon: MousePointerClick },
+    { key: "opened", label: "فُتح", at: row.openedAt ?? null, icon: MailOpen },
+    { key: "clicked", label: "نُقر", at: row.clickedAt ?? null, icon: MousePointerClick },
   ];
 }
 
@@ -87,7 +91,9 @@ export function EmailChannelDashboard() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [openRow, setOpenRow] = useState<EmailRow | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  // null ids = the whole backlog for the period; an array = just those rows.
+  const [retryIds, setRetryIds] = useState<string[] | null | undefined>(undefined);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -131,15 +137,33 @@ export function EmailChannelDashboard() {
           description="كل رسالة بريد صادرة، وما حدث لها بعد الإرسال — الوصول والفتح والنقر والفشل."
           icon={Mail}
           actions={
-            <button
-              type="button"
-              onClick={() => void load()}
-              disabled={loading}
-              className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:border-brand hover:text-brand disabled:opacity-50"
-            >
-              <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-              تحديث
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Only offered when there is actually a backlog — a permanently-visible send button
+                  invites a click that would do nothing. */}
+              {(data?.retryableCount ?? 0) > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setRetryIds(null)}
+                  disabled={loading}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand px-3 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:opacity-50"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  إعادة إرسال المتعثّرة
+                  <span className="rounded-md bg-white/20 px-1.5 py-0.5 text-[10px] tabular-nums">
+                    {data!.retryableCount.toLocaleString("en-US")}
+                  </span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => void load()}
+                disabled={loading}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:border-brand hover:text-brand disabled:opacity-50"
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+                تحديث
+              </button>
+            </div>
           }
         />
 
@@ -269,6 +293,7 @@ export function EmailChannelDashboard() {
                       <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">المسار</th>
                       <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">المصدر</th>
                       <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">التاريخ</th>
+                      <th className="px-3 py-2.5" />
                     </tr>
                   </thead>
                   <tbody>
@@ -277,7 +302,7 @@ export function EmailChannelDashboard() {
                       return (
                         <tr
                           key={row.id}
-                          onClick={() => setOpenRow(row)}
+                          onClick={() => setPreviewId(row.id)}
                           className="cursor-pointer border-b border-slate-50 transition-colors last:border-0 hover:bg-slate-50/70"
                         >
                           <td className="px-3 py-2.5">
@@ -312,6 +337,13 @@ export function EmailChannelDashboard() {
                               <span>{dt?.date}</span>
                               <span className="text-[10px] text-slate-400" dir="ltr">{dt?.time}</span>
                             </div>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5">
+                            <RowActions
+                              row={row}
+                              onPreview={() => setPreviewId(row.id)}
+                              onRetry={() => setRetryIds([row.id])}
+                            />
                           </td>
                         </tr>
                       );
@@ -356,7 +388,25 @@ export function EmailChannelDashboard() {
         )}
       </div>
 
-      <EmailDeliveryDetailsDialog row={openRow} onClose={() => setOpenRow(null)} trackingLive={trackingLive} />
+      <DeliveryPreviewSheet
+        id={previewId}
+        stagesFor={buildStages}
+        trackingLive={trackingLive}
+        onOpenChange={(open) => !open && setPreviewId(null)}
+        onRetry={(id) => {
+          setPreviewId(null);
+          setRetryIds([id]);
+        }}
+      />
+
+      <RetryDialog
+        open={retryIds !== undefined}
+        channel="EMAIL"
+        ids={retryIds ?? null}
+        days={days}
+        onOpenChange={(open) => !open && setRetryIds(undefined)}
+        onFinished={() => void load()}
+      />
     </div>
   );
 }

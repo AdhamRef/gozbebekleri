@@ -1,7 +1,7 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { CircleAlert, SlashIcon, TriangleAlert } from "lucide-react";
+import { CircleAlert, Eye, RefreshCw, SlashIcon, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -21,6 +21,25 @@ export type JourneyStage = {
   /** Stages known from our own records, not the provider's — never rendered as "unknown". */
   local?: boolean;
 };
+
+/**
+ * The timestamps a lifecycle strip is built from.
+ *
+ * Both the paged table row and the full record fetched for the preview satisfy this, so one
+ * `buildStages` per channel serves both and the two views cannot drift apart. Channel-specific
+ * rungs are optional because email has no `readAt` and WhatsApp has no `openedAt`.
+ */
+export type StageSource = {
+  createdAt: string;
+  sentAt: string | null;
+  deliveredAt: string | null;
+  openedAt?: string | null;
+  clickedAt?: string | null;
+  readAt?: string | null;
+  repliedAt?: string | null;
+};
+
+export type StageBuilder = (row: StageSource) => JourneyStage[];
 
 export function fmtDateTime(value: string | null): { date: string; time: string } | null {
   if (!value) return null;
@@ -172,6 +191,64 @@ export function TrackingBanner({ children }: { children: React.ReactNode }) {
     <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
       <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
       <div className="text-xs leading-5 text-amber-900">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * Whether a row may be re-sent.
+ *
+ * Kept here rather than in each table so the button's presence and the server's decision are read
+ * from the same rule — a row offering a retry the API then refuses is worse than no button at all.
+ * BOUNCED is intentionally absent: re-sending to an address that bounced only accrues bounce rate.
+ */
+export function isRetryable(row: { status: string; retriedAt?: string | null }): boolean {
+  return (row.status === "FAILED" || row.status === "SKIPPED") && !row.retriedAt;
+}
+
+/** Per-row actions: preview always, retry only where it would actually be honoured. */
+export function RowActions({
+  row,
+  onPreview,
+  onRetry,
+}: {
+  row: { status: string; retriedAt?: string | null };
+  onPreview: () => void;
+  onRetry: () => void;
+}) {
+  const retryable = isRetryable(row);
+  // Row clicks open the preview, so every button here must stop the event reaching the <tr>.
+  const stop = (fn: () => void) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    fn();
+  };
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      {row.retriedAt && (
+        <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+          أُعيد إرساله
+        </span>
+      )}
+      {retryable && (
+        <button
+          type="button"
+          onClick={stop(onRetry)}
+          title="إعادة الإرسال"
+          aria-label="إعادة الإرسال"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-brand/8 hover:text-brand"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={stop(onPreview)}
+        className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[11px] font-semibold text-brand transition hover:bg-brand/8"
+      >
+        <Eye className="h-3.5 w-3.5" />
+        معاينة
+      </button>
     </div>
   );
 }

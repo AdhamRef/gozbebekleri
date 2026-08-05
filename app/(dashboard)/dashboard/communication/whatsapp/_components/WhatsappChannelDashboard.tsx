@@ -14,10 +14,11 @@ import { MetricSummaryBand } from "@/components/dashboard/MetricSummaryBand";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { CHART_THEME, CHART_STATUS, CHART_TOOLTIP_STYLE } from "@/lib/dashboard/chart-theme";
 import {
-  JourneyStrip, FunnelCard, TrackingBanner, SegmentedControl, fmtDateTime,
-  type JourneyStage,
+  JourneyStrip, FunnelCard, TrackingBanner, SegmentedControl, RowActions, fmtDateTime,
+  type JourneyStage, type StageSource,
 } from "../../_shared/channel-ui";
-import { WhatsappDeliveryDetailsDialog } from "./WhatsappDeliveryDetailsDialog";
+import { DeliveryPreviewSheet } from "../../_shared/DeliveryPreviewSheet";
+import { RetryDialog } from "../../_shared/RetryDialog";
 import { cn } from "@/lib/utils";
 
 export type WhatsappRow = {
@@ -38,6 +39,7 @@ export type WhatsappRow = {
   readAt: string | null;
   repliedAt: string | null;
   failedAt: string | null;
+  retriedAt: string | null;
 };
 
 type TemplateRow = {
@@ -52,6 +54,8 @@ type Payload = {
     deliveredRate: number; readRate: number; repliedRate: number; failedRate: number;
   };
   trackingLive: boolean;
+  /** Failed/skipped messages in range that have not been re-sent yet. */
+  retryableCount: number;
   provider: { configured: boolean; reason: string | null; missingFields: string[] };
   templates: { total: number; ready: number; rows: TemplateRow[] };
   statusCounts: Record<string, number>;
@@ -83,13 +87,13 @@ const TEMPLATE_STATE_STYLE: Record<string, { label: string; className: string }>
   REJECTED: { label: "مرفوض", className: "border-rose-200 bg-rose-50 text-rose-700" },
 };
 
-export function buildStages(row: WhatsappRow): JourneyStage[] {
+export function buildStages(row: StageSource): JourneyStage[] {
   return [
     // `sent` is our own record of handing the message over — never an "unknown".
     { key: "sent", label: "أُرسل", at: row.sentAt ?? row.createdAt, icon: Send, local: true },
     { key: "delivered", label: "وصل", at: row.deliveredAt, icon: Check },
-    { key: "read", label: "قُرئ", at: row.readAt, icon: CheckCheck },
-    { key: "replied", label: "ردّ", at: row.repliedAt, icon: Reply },
+    { key: "read", label: "قُرئ", at: row.readAt ?? null, icon: CheckCheck },
+    { key: "replied", label: "ردّ", at: row.repliedAt ?? null, icon: Reply },
   ];
 }
 
@@ -177,7 +181,9 @@ export function WhatsappChannelDashboard() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [openRow, setOpenRow] = useState<WhatsappRow | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  // null ids = the whole backlog for the period; an array = just those rows.
+  const [retryIds, setRetryIds] = useState<string[] | null | undefined>(undefined);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -221,6 +227,16 @@ export function WhatsappChannelDashboard() {
 
   const neverSent = Boolean(data && summary && summary.allTimeTotal === 0);
 
+  // Both prerequisites must hold for a retry to have any chance of reaching Meta.
+  const canRetry = Boolean(data?.provider.configured) && (data?.templates.ready ?? 0) > 0;
+  const retryBlockedReason = !data
+    ? null
+    : !data.provider.configured
+      ? "اتصال Meta غير مكتمل — أكمل الإعداد أولًا."
+      : data.templates.ready === 0
+        ? "لا يوجد قالب معتمد من Meta — إعادة الإرسال ستُرفض."
+        : null;
+
   return (
     <div className="min-h-0" dir="rtl">
       <div className="mx-auto max-w-[1600px] space-y-4">
@@ -230,15 +246,35 @@ export function WhatsappChannelDashboard() {
           description="كل رسالة واتساب صادرة، وما حدث لها بعد الإرسال — الوصول والقراءة والردّ والفشل."
           icon={MessageCircle}
           actions={
-            <button
-              type="button"
-              onClick={() => void load()}
-              disabled={loading}
-              className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:border-brand hover:text-brand disabled:opacity-50"
-            >
-              <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-              تحديث
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Unlike email, a WhatsApp retry cannot succeed without an approved template — the
+                  provider refuses free text outright. Firing a doomed batch would fill the report
+                  with identical errors, so the button states the blocker instead. */}
+              {(data?.retryableCount ?? 0) > 0 && (
+                <button
+                  type="button"
+                  onClick={() => canRetry && setRetryIds(null)}
+                  disabled={loading || !canRetry}
+                  title={canRetry ? undefined : retryBlockedReason ?? undefined}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand px-3 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  إعادة إرسال المتعثّرة
+                  <span className="rounded-md bg-white/20 px-1.5 py-0.5 text-[10px] tabular-nums">
+                    {data!.retryableCount.toLocaleString("en-US")}
+                  </span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => void load()}
+                disabled={loading}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:border-brand hover:text-brand disabled:opacity-50"
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+                تحديث
+              </button>
+            </div>
           }
         />
 
@@ -359,6 +395,7 @@ export function WhatsappChannelDashboard() {
                       <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">المسار</th>
                       <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">المصدر</th>
                       <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">التاريخ</th>
+                      <th className="px-3 py-2.5" />
                     </tr>
                   </thead>
                   <tbody>
@@ -367,7 +404,7 @@ export function WhatsappChannelDashboard() {
                       return (
                         <tr
                           key={row.id}
-                          onClick={() => setOpenRow(row)}
+                          onClick={() => setPreviewId(row.id)}
                           className="cursor-pointer border-b border-slate-50 transition-colors last:border-0 hover:bg-slate-50/70"
                         >
                           <td className="px-3 py-2.5">
@@ -400,6 +437,13 @@ export function WhatsappChannelDashboard() {
                               <span>{dt?.date}</span>
                               <span className="text-[10px] text-slate-400" dir="ltr">{dt?.time}</span>
                             </div>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5">
+                            <RowActions
+                              row={row}
+                              onPreview={() => setPreviewId(row.id)}
+                              onRetry={() => setRetryIds([row.id])}
+                            />
                           </td>
                         </tr>
                       );
@@ -444,7 +488,25 @@ export function WhatsappChannelDashboard() {
         )}
       </div>
 
-      <WhatsappDeliveryDetailsDialog row={openRow} onClose={() => setOpenRow(null)} trackingLive={trackingLive} />
+      <DeliveryPreviewSheet
+        id={previewId}
+        stagesFor={buildStages}
+        trackingLive={trackingLive}
+        onOpenChange={(open) => !open && setPreviewId(null)}
+        onRetry={(id) => {
+          setPreviewId(null);
+          setRetryIds([id]);
+        }}
+      />
+
+      <RetryDialog
+        open={retryIds !== undefined}
+        channel="WHATSAPP"
+        ids={retryIds ?? null}
+        days={days}
+        onOpenChange={(open) => !open && setRetryIds(undefined)}
+        onFinished={() => void load()}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { RETRYABLE_STATUSES } from "@/lib/communication/communication-runtime-types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -86,6 +87,7 @@ export async function GET(request: NextRequest) {
       rows,
       listTotal,
       byTemplate,
+      retryableCount,
     ] = await Promise.all([
       prisma.communicationDelivery.count({ where: rangeWhere }),
       prisma.communicationDelivery.groupBy({ by: ["status"], where: rangeWhere, _count: { _all: true } }),
@@ -105,7 +107,7 @@ export async function GET(request: NextRequest) {
           id: true, status: true, origin: true, templateName: true, renderedSubject: true,
           recipientEmail: true, recipientName: true, recipientUserId: true, errorMessage: true,
           providerMessageId: true, createdAt: true, sentAt: true, deliveredAt: true,
-          openedAt: true, clickedAt: true, failedAt: true,
+          openedAt: true, clickedAt: true, failedAt: true, retriedAt: true,
         },
       }),
       prisma.communicationDelivery.count({ where: listWhere }),
@@ -113,6 +115,16 @@ export async function GET(request: NextRequest) {
       // it returned ascending), which combined with `take` would silently return the *least* used
       // templates. Sorted in JS below instead; the distinct-template count is tiny.
       prisma.communicationDelivery.groupBy({ by: ["templateName"], where: rangeWhere, _count: { _all: true } }),
+      // Re-sendable backlog. BOUNCED is excluded (a bounce is not fixed by sending again), and rows
+      // already retried are excluded — on MongoDB `null` matches only an explicit null, so documents
+      // written before the field existed need the `isSet: false` arm or none of them would count.
+      prisma.communicationDelivery.count({
+        where: {
+          ...rangeWhere,
+          status: { in: [...RETRYABLE_STATUSES] },
+          OR: [{ retriedAt: null }, { retriedAt: { isSet: false } }],
+        },
+      }),
     ]);
 
     const statusCounts: Record<string, number> = {};
@@ -168,6 +180,7 @@ export async function GET(request: NextRequest) {
        * not receiving events" instead of presenting an authoritative-looking 0% open rate.
        */
       trackingLive: providerEventCount > 0,
+      retryableCount,
       statusCounts,
       timeseries: [...buckets.values()].sort((a, b) => a.date.localeCompare(b.date)),
       topTemplates: byTemplate
