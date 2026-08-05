@@ -59,6 +59,9 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
       // from the communication-campaign templates directly above — it is a different page that
       // owns the email/WhatsApp templates AND the message triggers, including the
       // DONATION_LAPSED reminder.
+      // Per-channel pages: each answers "what did we send on this channel, and what happened to
+      // it afterwards" — the delivery/open/click detail the flat send log cannot show.
+      { key: "messages", title: "البريد الإلكتروني", href: "/dashboard/communication/email", icon: "mail", keywords: ["email", "بريد", "elastic"] },
       { key: "templates", title: "قوالب البريد والمحفّزات", href: "/dashboard/templates", icon: "mail", keywords: ["email", "triggers", "محفزات"] },
       { key: "messages", title: "سجل الرسائل", href: "/dashboard/messages", icon: "history", keywords: ["messages", "log", "history"] },
     ],

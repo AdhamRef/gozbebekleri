@@ -142,21 +142,6 @@ export function WhatsappTemplateList() {
           <Button
             size="sm"
             variant="outline"
-            onClick={handleImport}
-            disabled={importing}
-            className="gap-2"
-            title="استيراد / مزامنة قوالب WhatsApp من Twilio"
-          >
-            {importing ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <DownloadCloud className="w-4 h-4" />
-            )}
-            استيراد من Twilio
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
             onClick={fetchAll}
             disabled={loading}
             className="gap-2"
@@ -225,7 +210,7 @@ export function WhatsappTemplateList() {
             ) : templates.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-12 text-center text-slate-500">
-                  لا توجد قوالب بعد — اضغط «قالب جديد» للبدء أو «استيراد من Twilio»
+                  لا توجد قوالب بعد — اضغط «قالب جديد» للبدء
                 </td>
               </tr>
             ) : (
