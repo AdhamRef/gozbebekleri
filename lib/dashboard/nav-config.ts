@@ -63,6 +63,7 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
       // it afterwards" — the delivery/open/click detail the flat send log cannot show.
       { key: "messages", title: "البريد الإلكتروني", href: "/dashboard/communication/email", icon: "mail", keywords: ["email", "بريد", "elastic"] },
       { key: "messages", title: "واتساب", href: "/dashboard/communication/whatsapp", icon: "messageCircle", keywords: ["whatsapp", "واتساب", "meta"] },
+      { key: "messages", title: "الرسائل النصية", href: "/dashboard/communication/sms", icon: "messageSquare", keywords: ["sms", "نصية", "netgsm", "brevo"] },
       { key: "templates", title: "قوالب البريد والمحفّزات", href: "/dashboard/templates", icon: "mail", keywords: ["email", "triggers", "محفزات"] },
       { key: "messages", title: "سجل الرسائل", href: "/dashboard/messages", icon: "history", keywords: ["messages", "log", "history"] },
     ],

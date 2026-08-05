@@ -61,7 +61,7 @@ const meta = (code: string) => CODE_META[code] ?? { label: code, icon: AlertTria
 
 type Props = {
   open: boolean;
-  channel: "EMAIL" | "WHATSAPP";
+  channel: "EMAIL" | "WHATSAPP" | "SMS";
   /** Explicit ids for a targeted retry; null runs the backlog for the current period. */
   ids: string[] | null;
   days: number;
@@ -299,7 +299,7 @@ function ConfirmStep({
         <div className="flex items-baseline gap-2">
           <span className="text-3xl font-bold tabular-nums text-slate-900">{count.toLocaleString("en-US")}</span>
           <span className="text-sm text-slate-600">
-            رسالة {channel === "EMAIL" ? "بريد" : "واتساب"} ستُرسل الآن
+            رسالة {channel === "EMAIL" ? "بريد" : channel === "WHATSAPP" ? "واتساب" : "نصية"} ستُرسل الآن
           </span>
         </div>
         {capped && (

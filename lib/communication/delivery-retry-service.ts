@@ -3,10 +3,12 @@ import { createDeliveryRecord, markDeliveryStatus } from "./delivery-log-service
 import { sendPreparedDelivery } from "./provider-router";
 import { resolveTriggerSendConfig, type TriggerSendConfig } from "@/lib/events/dispatch";
 import { resolveMetaTemplateMapping } from "./automatic-message-dispatcher";
+import { resolveSmsProvider } from "./providers/sms/client";
 import {
   RETRYABLE_STATUSES,
   NON_RETRYABLE_TERMINAL,
   type CommunicationChannelId,
+  type CommunicationProviderId,
   type CommunicationPurposeId,
   type DeliveryOriginId,
 } from "./communication-runtime-types";
@@ -203,7 +205,7 @@ export async function retryDelivery(
   // Resolve the channel payload BEFORE writing an attempt row, so a message that cannot be built
   // leaves no misleading extra "failed" delivery behind.
   let payload: Parameters<typeof sendPreparedDelivery>[0];
-  let provider: "ELASTIC_EMAIL" | "META_WHATSAPP";
+  let provider: CommunicationProviderId;
   let senderId: string | null = null;
 
   if (channel === "EMAIL") {
@@ -232,6 +234,16 @@ export async function retryDelivery(
       templateName: meta.name,
       languageCode: meta.language,
     };
+  } else if (channel === "SMS") {
+    if (!row.renderedBody) return result(deliveryId, "NO_RENDERED_BODY", base);
+    // No sender-identity gate here, unlike the other two: the SMS "from" is part of each provider's
+    // own config (Netgsm header / Brevo sender), not a CommunicationSender row. Which carrier gets
+    // the message is decided from the destination number, so it is resolved per recipient rather
+    // than once for the batch — and re-resolved now, since a route unconfigured at the original
+    // send may have been set up since.
+    const route = await resolveSmsProvider(null, recipient);
+    provider = route.provider;
+    payload = { channel: "SMS", to: recipient, html: row.renderedBody };
   } else {
     return result(deliveryId, "NOT_RETRYABLE_STATUS", { ...base, detail: `channel ${row.channel}` });
   }
