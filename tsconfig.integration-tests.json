@@ -40,6 +40,7 @@
     "lib/communication/providers/elastic-email/payload.ts",
     "lib/communication/providers/elastic-email/types.ts",
     "lib/communication/providers/elastic-email/webhook-events.ts",
+    "lib/communication/providers/netgsm/errors.ts",
     "lib/dashboard/permissions.ts",
     "lib/dashboard/nav-config.ts",
     "lib/dashboard/page-access.ts",

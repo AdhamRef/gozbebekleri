@@ -164,6 +164,17 @@ function expectedProof(values = metaValues) {
     strict_1.default.deepEqual(calls, ["https://api.elasticemail.com/v4/domains"]);
     strict_1.default.equal(calls.some((url) => url.includes("/emails")), false);
 });
+(0, node_test_1.default)("Elastic Email tester accepts a domain verified for one sender address", async () => {
+    // Real response shape from the live account: a sender-scoped verification carries the address
+    // inline, which an exact string compare against the bare domain can never match.
+    const fakeFetch = async () => response(200, [{ Domain: "gozbebekleri.org.tr (info@gozbebekleri.org.tr)", Spf: true, Dkim: true }]);
+    const result = await new provider_testing_1.ElasticEmailConnectionTester(fakeFetch).test({
+        provider: "ELASTIC_EMAIL",
+        candidateVersion: null,
+        values: { API_KEY: "elastic-api-key-1234567890", SENDER_EMAIL: "info@gozbebekleri.org.tr" },
+    });
+    strict_1.default.equal(result.success, true);
+});
 (0, node_test_1.default)("Elastic Email tester fails when the sender domain is not verified", async () => {
     const fakeFetch = async () => response(200, [{ Domain: "other-domain.org" }]);
     const result = await new provider_testing_1.ElasticEmailConnectionTester(fakeFetch).test({

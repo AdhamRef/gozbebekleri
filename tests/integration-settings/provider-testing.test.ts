@@ -173,6 +173,19 @@ test("Elastic Email tester confirms the sender domain is verified without sendin
   assert.equal(calls.some((url) => url.includes("/emails")), false);
 });
 
+test("Elastic Email tester accepts a domain verified for one sender address", async () => {
+  // Real response shape from the live account: a sender-scoped verification carries the address
+  // inline, which an exact string compare against the bare domain can never match.
+  const fakeFetch: ProviderFetch = async () =>
+    response(200, [{ Domain: "gozbebekleri.org.tr (info@gozbebekleri.org.tr)", Spf: true, Dkim: true }]);
+  const result = await new ElasticEmailConnectionTester(fakeFetch).test({
+    provider: "ELASTIC_EMAIL",
+    candidateVersion: null,
+    values: { API_KEY: "elastic-api-key-1234567890", SENDER_EMAIL: "info@gozbebekleri.org.tr" },
+  });
+  assert.equal(result.success, true);
+});
+
 test("Elastic Email tester fails when the sender domain is not verified", async () => {
   const fakeFetch: ProviderFetch = async () => response(200, [{ Domain: "other-domain.org" }]);
   const result = await new ElasticEmailConnectionTester(fakeFetch).test({

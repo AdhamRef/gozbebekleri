@@ -1,5 +1,5 @@
 import { getActiveNetgsmRuntimeConfig, RUNTIME_FAILURE, type ActiveRuntimeConfig, type NetgsmRuntimeValues } from "../../runtime-config";
-import { NETGSM_REASONS, mapNetgsmCode, scrubNetgsm } from "./errors";
+import { NETGSM_REASONS, mapNetgsmCode, readNetgsmCode, scrubNetgsm } from "./errors";
 import { isTurkishNumber, type NetgsmSmsInput, type NetgsmSendResult } from "./types";
 
 const DEFAULT_ENDPOINT = "https://api.netgsm.com.tr/sms/rest/v2/send";
@@ -40,7 +40,13 @@ export async function sendNetgsmSms(input: NetgsmSmsInput, countryCode?: string 
       signal: controller.signal,
     }).finally(() => clearTimeout(timer));
     const text = await res.text().catch(() => "");
-    if (!res.ok) return { ok: false, reason: NETGSM_REASONS.REQUEST_FAILED, detail: scrubNetgsm(`${res.status}: ${text}`) };
+    if (!res.ok) {
+      // A non-2xx from Netgsm is usually a rejected send, not an unreachable service: the body
+      // still carries the numeric code. Prefer that over the generic transport reason.
+      const errorCode = readNetgsmCode(text);
+      const reason = errorCode ? mapNetgsmCode(errorCode).reason : NETGSM_REASONS.REQUEST_FAILED;
+      return { ok: false, reason, detail: scrubNetgsm(`${res.status}: ${text}`) };
+    }
     let code: string | null = null;
     let jobid: string | null = null;
     try {

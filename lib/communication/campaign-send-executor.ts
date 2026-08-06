@@ -122,7 +122,14 @@ export async function executeCampaignSend(campaignId: string, opts: { actor?: Ac
     const result = await sendPreparedDelivery({ channel, sender, country: recipient.country, to, templateName: rendered.templateName, languageCode: recipient.locale, subject: rendered.subject, html: rendered.body }, runtime);
     if (!result.ok) {
       const terminal = result.reason.endsWith("_NOT_CONFIGURED") || result.reason.endsWith("_NOT_IMPLEMENTED") || result.reason.includes("SENDER_MISSING") || result.reason === "PROVIDER_DISABLED" || result.reason === "INTEGRATION_DECRYPTION_FAILED" || result.reason === "INTEGRATION_DATABASE_UNAVAILABLE";
-      await markDeliveryStatus(deliveryId, terminal ? "SKIPPED" : "FAILED", { errorMessage: result.reason });
+      // `detail` carries the provider's own answer — the HTTP status and the scrubbed response body
+      // (e.g. `406: {"code":"30","description":"Check the usercode-password information and API
+      // access permission"}`). Dropping it left the send log showing only NETGSM_REQUEST_FAILED,
+      // with the one line that explains the failure existing nowhere at all. The adapters already
+      // scrub credentials out of `detail` before returning it.
+      await markDeliveryStatus(deliveryId, terminal ? "SKIPPED" : "FAILED", {
+        errorMessage: result.detail ? `${result.reason} — ${result.detail}` : result.reason,
+      });
       if (terminal) base.skipped += 1; else base.failed += 1;
       bump(base.reasons, result.reason); continue;
     }

@@ -131,6 +131,19 @@ function elasticEmailErrorText(res: { body: unknown; text?: string }): string {
   return res.text ?? "";
 }
 
+/**
+ * `GET /v4/domains` does not always answer with a bare hostname. When a domain is verified for one
+ * specific sender rather than wholesale, Elastic Email returns the sender scope inline:
+ *
+ *     "Domain": "gozbebekleri.org (info@gozbebekleri.org)"
+ *
+ * Comparing that string to "gozbebekleri.org" never matched, so a correctly verified sender was
+ * reported as ELASTIC_EMAIL_SENDER_DOMAIN_NOT_VERIFIED on the فحص الاتصال page.
+ */
+export function elasticEmailDomainName(raw: string): string {
+  return raw.split("(")[0].trim().toLowerCase();
+}
+
 /** Elastic Email (REST API v4) — the only email provider. Verifies the key without sending mail. */
 export class ElasticEmailConnectionTester implements IntegrationProviderTester {
   constructor(private readonly fetchImpl: ProviderFetch = fetch) {}
@@ -187,7 +200,8 @@ export class ElasticEmailConnectionTester implements IntegrationProviderTester {
         if (!item || typeof item !== "object") return false;
         const row = item as Record<string, unknown>;
         const name = row.Domain ?? row.domain;
-        return typeof name === "string" && name.trim().toLowerCase() === senderDomain;
+        if (typeof name !== "string") return false;
+        return elasticEmailDomainName(name) === senderDomain;
       });
       if (!matched) return failed("نطاق بريد المرسل غير موجود ضمن نطاقات Elastic Email الموثّقة.", "ELASTIC_EMAIL_SENDER_DOMAIN_NOT_VERIFIED");
 
