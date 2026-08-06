@@ -91,7 +91,7 @@ export function CampaignDetailClient({ id }: { id: string }) {
       });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json?.error || "تعذّر تحديث الحالة");
-      toast.success("تم تحديث الحالة");
+      toast.success(action === "CONFIRM" ? "تم تأكيد الحملة — يمكنك إرسالها الآن" : "تم تحديث الحالة");
       await load();
     } catch (e) {
       toast.error((e as Error).message);
@@ -248,16 +248,12 @@ export function CampaignDetailClient({ id }: { id: string }) {
           <Link href="/dashboard/communication/campaigns">رجوع للحملات</Link>
         </Button>
 
-        {campaign.status === "DRAFT" && (
-          <Button size="sm" disabled={busy} onClick={() => transition("SUBMIT_REVIEW")} className="gap-1.5">
-            {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            إرسال للمراجعة
-          </Button>
-        )}
-        {campaign.status === "REVIEW" && (
-          <Button size="sm" disabled={busy} onClick={() => transition("APPROVE")} className="gap-1.5 bg-brand hover:bg-brand/90">
+        {/* One confirmation, then send. مراجعة and اعتماد were two clicks describing the same
+            decision when the author and the approver are the same person. */}
+        {(campaign.status === "DRAFT" || campaign.status === "REVIEW") && (
+          <Button size="sm" disabled={busy} onClick={() => transition("CONFIRM")} className="gap-1.5 bg-brand hover:bg-brand/90">
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-            اعتماد الحملة
+            تأكيد الحملة
           </Button>
         )}
         {campaign.status === "APPROVED" && (
