@@ -3,8 +3,6 @@
 import * as React from "react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import { Dialog, DialogOverlay, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectTrigger,
@@ -13,7 +11,8 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Loader2 } from "lucide-react";
+import { Zap } from "lucide-react";
+import { TemplateDialogShell, FieldLabel } from "./TemplateDialogShell";
 import { EVENT_CATALOG, DEFAULT_COOLDOWN_DAYS, DEFAULT_LAPSE_DAYS } from "@/lib/events/catalog";
 import type { MessageTriggerEvent } from "@/lib/events/dispatch";
 
@@ -100,138 +99,101 @@ export function TriggerEditorDialog({ open, onOpenChange }: Props) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogOverlay className="fixed inset-0 bg-black/50" />
-      <DialogContent
-        className="fixed left-1/2 top-1/2 w-[calc(100%-2rem)] max-w-xl max-h-[90vh] overflow-y-auto p-6 transform -translate-x-1/2 -translate-y-1/2 border border-border rounded-xl shadow-xl bg-card"
-        dir="rtl"
-      >
-        <DialogTitle className="text-lg font-bold mb-1">حدث تلقائي جديد</DialogTitle>
-        <p className="text-sm text-muted-foreground mb-4">
-          اربط حدثًا في النظام بقالب موجود — سيُرسل القالب تلقائيًا للمتبرع المعني عند وقوع الحدث.
-        </p>
-
-        {loading ? (
-          <div className="py-12 flex items-center justify-center text-sm text-muted-foreground">
-            <Loader2 className="w-6 h-6 animate-spin me-2" /> جاري التحميل…
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-600">الحدث</label>
-              <Select value={event} onValueChange={(v) => setEvent(v as MessageTriggerEvent)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="اختر الحدث" />
-                </SelectTrigger>
-                <SelectContent>
-                  {EVENT_CATALOG.map((e) => (
-                    <SelectItem key={e.event} value={e.event}>
-                      {e.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {eventDef && (
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  {eventDef.description}
-                  {eventDef.hasDonation && (
-                    <span className="block mt-0.5 text-brand">
-                      ✓ متاح لهذا الحدث متغيّرات{" "}
-                      <code className="font-mono">{"{{donation.*}}"}</code> و{" "}
-                      <code className="font-mono">{"{{#donation.items}}"}</code>
-                    </span>
-                  )}
+    <TemplateDialogShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title="حدث تلقائي جديد"
+      subtitle="اربط حدثًا في النظام بقالب موجود — سيُرسل تلقائيًا للمتبرع المعني عند وقوع الحدث."
+      icon={<Zap className="h-4 w-4" />}
+      size="sm"
+      loading={loading}
+      onCancel={() => onOpenChange(false)}
+      onSave={save}
+      saving={saving}
+      saveDisabled={!event || !templateId || !timingValid}
+    >
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <FieldLabel>الحدث</FieldLabel>
+          <Select value={event} onValueChange={(v) => setEvent(v as MessageTriggerEvent)}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="اختر الحدث" />
+            </SelectTrigger>
+            <SelectContent>
+              {EVENT_CATALOG.map((e) => (
+                <SelectItem key={e.event} value={e.event}>
+                  {e.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {eventDef && (
+            <div className="rounded-lg border border-border bg-slate-50/70 p-2.5">
+              <p className="text-[11px] leading-relaxed text-slate-600">{eventDef.description}</p>
+              {eventDef.hasDonation && (
+                <p className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-brand">
+                  ✓ متاح لهذا الحدث
+                  <code className="break-all rounded bg-brand/10 px-1 font-mono">{"{{donation.*}}"}</code>
+                  و
+                  <code className="break-all rounded bg-brand/10 px-1 font-mono">{"{{#donation.items}}"}</code>
                 </p>
               )}
             </div>
+          )}
+        </div>
 
-            {isScheduled && (
-              <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
-                <p className="text-[11px] text-amber-900 leading-relaxed">
-                  هذا حدث مجدول — يُفحص يوميًا بدل أن يُطلق فورًا. يُرسل للمتبرّع الذي مضى على آخر تبرّع ناجح له المدة أدناه.
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">يُرسل بعد (يوم من آخر تبرّع)</label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={3650}
-                      value={lapseDays}
-                      onChange={(e) => setLapseDays(e.target.value)}
-                      className="text-right"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-600">لا يتكرّر قبل (يوم)</label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={3650}
-                      value={cooldownDays}
-                      onChange={(e) => setCooldownDays(e.target.value)}
-                      className="text-right"
-                    />
-                  </div>
-                </div>
-                {!timingValid && (
-                  <p className="text-[11px] text-red-600">أدخل عددًا صحيحًا لا يقل عن ١ في الحقلين.</p>
-                )}
+        {isScheduled && (
+          <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+            <p className="text-[11px] leading-relaxed text-amber-900">
+              هذا حدث مجدول — يُفحص يوميًا بدل أن يُطلق فورًا. يُرسل للمتبرّع الذي مضى على آخر تبرّع ناجح له المدة أدناه.
+            </p>
+            {/* Was grid-cols-2 unconditionally, which squeezed two number inputs plus their
+                Arabic labels into a narrow dialog on phones. */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="min-w-0 space-y-1.5">
+                <FieldLabel>يُرسل بعد (يوم)</FieldLabel>
+                <Input type="number" min={1} max={3650} value={lapseDays} onChange={(e) => setLapseDays(e.target.value)} className="text-right" />
               </div>
-            )}
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-600">القناة</label>
-              <Select
-                value={channel}
-                onValueChange={(v) => setChannel(v as "EMAIL" | "WHATSAPP")}
-              >
-                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="EMAIL">بريد إلكتروني</SelectItem>
-                  <SelectItem value="WHATSAPP">واتساب</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="min-w-0 space-y-1.5">
+                <FieldLabel>لا يتكرّر قبل (يوم)</FieldLabel>
+                <Input type="number" min={1} max={3650} value={cooldownDays} onChange={(e) => setCooldownDays(e.target.value)} className="text-right" />
+              </div>
             </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-600">القالب</label>
-              <Select value={templateId} onValueChange={setTemplateId}>
-                <SelectTrigger className="w-full">
-                  <SelectValue
-                    placeholder={
-                      templates.length === 0
-                        ? "لا توجد قوالب — أنشئ قالبًا من تبويبة البريد/الواتساب"
-                        : "اختر قالبًا"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {templates.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-border">
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-                إلغاء
-              </Button>
-              <Button
-                onClick={save}
-                disabled={saving || !event || !templateId || !timingValid}
-                className="bg-brand hover:bg-brand/90"
-              >
-                {saving && <Loader2 className="w-4 h-4 animate-spin me-2" />}
-                حفظ
-              </Button>
-            </div>
+            {!timingValid && <p className="text-[11px] text-red-600">أدخل عددًا صحيحًا لا يقل عن ١ في الحقلين.</p>}
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+
+        <div className="space-y-1.5">
+          <FieldLabel>القناة</FieldLabel>
+          <Select value={channel} onValueChange={(v) => setChannel(v as "EMAIL" | "WHATSAPP")}>
+            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="EMAIL">بريد إلكتروني</SelectItem>
+              <SelectItem value="WHATSAPP">واتساب</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <FieldLabel>القالب</FieldLabel>
+          <Select value={templateId} onValueChange={setTemplateId}>
+            <SelectTrigger className="w-full">
+              <SelectValue
+                placeholder={
+                  templates.length === 0
+                    ? "لا توجد قوالب — أنشئ قالبًا من تبويبة البريد/الواتساب"
+                    : "اختر قالبًا"
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {templates.map((t) => (
+                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </TemplateDialogShell>
   );
 }

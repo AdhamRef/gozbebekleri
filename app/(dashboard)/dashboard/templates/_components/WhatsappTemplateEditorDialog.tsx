@@ -3,20 +3,14 @@
 import * as React from "react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import { Dialog, DialogOverlay, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Trash2 } from "lucide-react";
-import { VARIABLE_CATALOG, mergeText } from "@/lib/templates/variables";
+import { MessageCircle } from "lucide-react";
+import { mergeText } from "@/lib/templates/variables";
 import { SAMPLE_TEMPLATE_CONTEXT } from "@/lib/templates/sample-context";
-import {
-  SUPPORTED_LOCALES,
-  LOCALE_LABELS,
-  DEFAULT_LOCALE,
-  type SupportedLocale,
-} from "@/lib/locales";
-import { cn } from "@/lib/utils";
+import { SUPPORTED_LOCALES, LOCALE_LABELS, DEFAULT_LOCALE, type SupportedLocale } from "@/lib/locales";
+import { TemplateDialogShell, LocaleStrip, FieldLabel } from "./TemplateDialogShell";
+import { VariablePicker } from "./VariablePicker";
 
 interface Props {
   id: string | null;
@@ -152,136 +146,67 @@ export function WhatsappTemplateEditorDialog({ id, open, onOpenChange }: Props) 
   const preview = React.useMemo(() => mergeText(currentBody, SAMPLE_TEMPLATE_CONTEXT), [currentBody]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogOverlay className="fixed inset-0 bg-black/50" />
-      <DialogContent
-        className="fixed left-1/2 top-1/2 w-[calc(100%-2rem)] max-w-3xl max-h-[90vh] overflow-y-auto p-6 transform -translate-x-1/2 -translate-y-1/2 border border-border rounded-xl shadow-xl bg-card"
-        dir="rtl"
-      >
-        <DialogTitle className="text-lg font-bold mb-4">
-          {id ? "تعديل قالب الواتساب" : "قالب واتساب جديد"}
-        </DialogTitle>
+    <TemplateDialogShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title={id ? "تعديل قالب الواتساب" : "قالب واتساب جديد"}
+      subtitle="نص الرسالة ومتغيّراتها — المعاينة على اليسار تعرضه ببيانات تجريبية."
+      icon={<MessageCircle className="h-4 w-4" />}
+      accent="whatsapp"
+      size="lg"
+      loading={loading}
+      onCancel={() => onOpenChange(false)}
+      onSave={save}
+      saving={saving}
+      toolbar={
+        <LocaleStrip
+          accent="whatsapp"
+          enabled={(loc) => bodies[loc] != null}
+          activeLocale={activeLocale}
+          onSelect={setActiveLocale}
+          onEnable={enableLocale}
+          onRemove={removeLocale}
+        />
+      }
+    >
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <FieldLabel hint="لا يظهر للمتبرّع">اسم القالب</FieldLabel>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: شكر التبرع" />
+        </div>
 
-        {loading ? (
-          <div className="py-12 flex items-center justify-center text-sm text-muted-foreground">
-            <Loader2 className="w-6 h-6 animate-spin me-2" /> جاري التحميل…
-          </div>
-        ) : (
-          <div className="space-y-4">
+        {/* min-w-0 on both columns keeps the monospace textarea and the preview from widening
+            the grid track instead of wrapping. */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="min-w-0 space-y-2">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-600">اسم القالب (داخلي)</label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="مثال: شكر التبرع"
+              <FieldLabel hint={LOCALE_LABELS[activeLocale]}>المحتوى</FieldLabel>
+              <Textarea
+                ref={bodyRef}
+                value={currentBody}
+                onChange={(e) => updateCurrentBody(e.target.value)}
+                rows={9}
+                className="resize-y font-mono text-xs leading-relaxed"
+                dir={activeLocale === "ar" ? "rtl" : "ltr"}
+                placeholder="اكتب رسالة الواتساب هنا"
               />
             </div>
+            <VariablePicker onInsert={insertToken} />
+          </div>
 
-            <div className="rounded-md bg-slate-50/60 border border-border px-3 py-2 flex items-center gap-1.5 overflow-x-auto">
-              <span className="text-[11px] font-semibold text-slate-500 me-2 shrink-0">اللغات:</span>
-              {SUPPORTED_LOCALES.map((loc) => {
-                const has = bodies[loc] != null;
-                const active = activeLocale === loc;
-                const isDefault = loc === DEFAULT_LOCALE;
-                return (
-                  <div key={loc} className="flex items-center shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => (has ? setActiveLocale(loc) : enableLocale(loc))}
-                      className={cn(
-                        "px-2.5 py-1 rounded-md text-xs font-medium transition-colors border",
-                        active
-                          ? "bg-[#25D366] text-white border-[#25D366]"
-                          : has
-                            ? "bg-white text-slate-700 border-border hover:border-[#25D366]"
-                            : "bg-transparent text-slate-400 border-dashed border-slate-300 hover:border-slate-500 hover:text-slate-600"
-                      )}
-                    >
-                      {LOCALE_LABELS[loc]}
-                      {!has && <span className="ms-1">+</span>}
-                      {isDefault && <span className="ms-1 text-[9px] opacity-70">افتراضي</span>}
-                    </button>
-                    {has && !isDefault && (
-                      <button
-                        type="button"
-                        onClick={() => removeLocale(loc)}
-                        className="ms-0.5 text-slate-400 hover:text-red-600 p-1"
-                        title={`حذف نسخة ${LOCALE_LABELS[loc]}`}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-600">
-                  المحتوى ({LOCALE_LABELS[activeLocale]})
-                </label>
-                <Textarea
-                  ref={bodyRef}
-                  value={currentBody}
-                  onChange={(e) => updateCurrentBody(e.target.value)}
-                  rows={10}
-                  className="font-mono text-xs"
-                  dir={activeLocale === "ar" ? "rtl" : "ltr"}
-                  placeholder="اكتب رسالة الواتساب هنا"
-                />
-                <div className="rounded-md border border-border bg-slate-50/60 p-2 max-h-44 overflow-y-auto space-y-2">
-                  <p className="text-[10px] font-semibold text-slate-500">المتغيّرات المتاحة (اضغط للإدراج)</p>
-                  {VARIABLE_CATALOG.map((g) => (
-                    <div key={g.group}>
-                      <div className="text-[10px] font-semibold text-slate-500 mb-1">{g.group}</div>
-                      <div className="flex flex-wrap gap-1">
-                        {g.entries.map((e) => (
-                          <button
-                            key={e.token}
-                            type="button"
-                            onClick={() => insertToken(e.token)}
-                            className="text-[11px] font-mono px-2 py-0.5 rounded bg-white border border-border hover:bg-blue-50"
-                            title={e.label}
-                          >
-                            {e.token}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+          <div className="min-w-0 space-y-1.5">
+            <FieldLabel hint="ببيانات تجريبية">المعاينة</FieldLabel>
+            <div className="min-h-[300px] rounded-xl border border-border bg-[#E5DDD5] p-4">
+              <div
+                className="max-w-full whitespace-pre-wrap break-words rounded-lg bg-white p-3 text-sm shadow-sm"
+                dir={activeLocale === "ar" ? "rtl" : "ltr"}
+              >
+                {preview || <span className="italic text-muted-foreground">المعاينة ستظهر هنا</span>}
               </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-600">
-                  معاينة ({LOCALE_LABELS[activeLocale]} — ببيانات تجريبية)
-                </label>
-                <div className="rounded-lg border border-border bg-[#E5DDD5] p-4 min-h-[260px]">
-                  <div
-                    className="bg-white rounded-lg p-3 shadow-sm whitespace-pre-wrap text-sm"
-                    dir={activeLocale === "ar" ? "rtl" : "ltr"}
-                  >
-                    {preview || (
-                      <span className="text-muted-foreground italic">المعاينة ستظهر هنا</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-                إلغاء
-              </Button>
-              <Button onClick={save} disabled={saving} className="bg-[#25D366] hover:bg-[#25D366]/90">
-                {saving && <Loader2 className="w-4 h-4 animate-spin me-2" />}
-                حفظ
-              </Button>
             </div>
           </div>
-        )}
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </TemplateDialogShell>
   );
 }
