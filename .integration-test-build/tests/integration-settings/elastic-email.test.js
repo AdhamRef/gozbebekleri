@@ -155,6 +155,77 @@ const delivery_status_progress_1 = require("../../lib/communication/delivery-sta
     // Shared with the Brevo SMS webhook: a replayed `sent` after delivery is ignored there too.
     strict_1.default.equal((0, delivery_status_progress_1.shouldApplyDeliveryStatus)("DELIVERED", "SENT"), false);
 });
+/* ───────────────────────────── pull-based event feed ───────────────────────────── */
+/**
+ * Verbatim rows from `GET /v4/events` on the live account. The send path can only ever record
+ * "the provider returned 2xx"; these are the events that say what happened afterwards, and they
+ * are the only thing that can turn an over-optimistic SENT row into the truth.
+ */
+const LIVE_EVENT_FEED = [
+    {
+        TransactionID: "f01ce91d-22a4-823d-001d-aef4225c5024",
+        MsgID: "ho3apRyH2qK9s5TBPlMkew2",
+        FromEmail: "info@gozbebekleri.org",
+        To: "salahelnabtity@gamil.com",
+        EventType: "Suppress",
+        EventDate: "2026-08-06T12:47:46Z",
+        MessageCategory: "NotDelivered",
+        Message: "Delivery to this domain is not permitted on your account until the trust level of your mail increases.",
+    },
+    {
+        TransactionID: "f01ce904-1ea4-0149-c004-dced3b45495b",
+        MsgID: "oxqUU2gsBIPZ_UwdTz2w8g2",
+        FromEmail: "info@gozbebekleri.org",
+        To: "theaxhunter303@gmail.com",
+        EventType: "Error",
+        EventDate: "2026-08-06T12:47:41Z",
+        MessageCategory: "AccountProblem",
+        Message: "Delivery failed due to account problem or spam block. Will attempt again at a later date.",
+    },
+    { MsgID: "aaa", To: "x@y.com", EventType: "Sent", EventDate: "2026-08-06T05:59:46Z", MessageCategory: "Unknown", Message: "" },
+    { MsgID: "bbb", To: "x@y.com", EventType: "Open", EventDate: "2026-08-05T23:01:03Z", MessageCategory: "Unknown", Message: "" },
+    { MsgID: "ccc", To: "x@y.com", EventType: "Click", EventDate: "2026-08-05T22:37:16Z", MessageCategory: "Unknown", Message: "" },
+    { MsgID: "ddd", To: "x@y.com", EventType: "Submission", EventDate: "2026-08-06T12:47:41Z", MessageCategory: "Unknown", Message: "" },
+];
+(0, node_test_1.default)("an accepted-then-refused message normalizes to a failure, not a success", () => {
+    const events = (0, webhook_events_1.normalizeElasticEmailEvents)(LIVE_EVENT_FEED);
+    const suppressed = events.find((e) => e.providerMessageId === "ho3apRyH2qK9s5TBPlMkew2");
+    strict_1.default.ok(suppressed, "a Suppress event must not be dropped — it is the whole point of the sync");
+    strict_1.default.equal(suppressed.status, "FAILED");
+    // Without the reason the operator sees a bare FAILED and still cannot act on it.
+    strict_1.default.match(suppressed.errorMessage ?? "", /trust level/);
+    const errored = events.find((e) => e.providerMessageId === "oxqUU2gsBIPZ_UwdTz2w8g2");
+    strict_1.default.equal(errored?.status, "FAILED");
+    strict_1.default.match(errored?.errorMessage ?? "", /account problem or spam block/);
+});
+(0, node_test_1.default)("the pull feed keys on MsgID and maps the tracked lifecycle events", () => {
+    const byId = new Map((0, webhook_events_1.normalizeElasticEmailEvents)(LIVE_EVENT_FEED).map((e) => [e.providerMessageId, e.status]));
+    strict_1.default.equal(byId.get("aaa"), "SENT");
+    strict_1.default.equal(byId.get("bbb"), "OPENED");
+    strict_1.default.equal(byId.get("ccc"), "CLICKED");
+    // "Submission" is Elastic Email accepting the payload — exactly the fact the send already
+    // recorded. Treating it as a delivery state would re-assert the claim under investigation.
+    strict_1.default.equal(byId.has("ddd"), false);
+    strict_1.default.equal(byId.size, 5);
+});
+(0, node_test_1.default)("a success event carries no error text", () => {
+    const sent = (0, webhook_events_1.normalizeElasticEmailEvents)(LIVE_EVENT_FEED).find((e) => e.providerMessageId === "aaa");
+    strict_1.default.equal(sent?.errorMessage, null);
+});
+(0, node_test_1.default)("repeated polls of the same feed produce identical idempotency keys", () => {
+    const first = (0, webhook_events_1.normalizeElasticEmailEvents)(LIVE_EVENT_FEED).map((e) => e.idempotencyKey);
+    const second = (0, webhook_events_1.normalizeElasticEmailEvents)(LIVE_EVENT_FEED).map((e) => e.idempotencyKey);
+    strict_1.default.deepEqual(first, second);
+    strict_1.default.equal(new Set(first).size, first.length);
+});
+(0, node_test_1.default)("the events URL sends a naive UTC timestamp, which the API requires", () => {
+    const url = (0, payload_1.buildElasticEmailEventsUrl)(new Date("2026-08-06T12:00:00.000Z"), 500);
+    strict_1.default.match(url, /^https:\/\/api\.elasticemail\.com\/v4\/events\?/);
+    strict_1.default.match(url, /from=2026-08-06T12%3A00%3A00(?!Z)/);
+    strict_1.default.equal(url.includes("Z&"), false);
+    // The page size is bounded so one poll cannot grow without limit.
+    strict_1.default.match((0, payload_1.buildElasticEmailEventsUrl)(new Date("2026-08-06T12:00:00.000Z"), 10_000), /limit=500/);
+});
 /* ───────────────────────────── webhook token ───────────────────────────── */
 (0, node_test_1.default)("Elastic Email webhook token is server-generated and embedded once", () => {
     const token = (0, provider_webhook_1.generateWebhookToken)();

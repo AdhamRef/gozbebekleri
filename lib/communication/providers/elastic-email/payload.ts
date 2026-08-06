@@ -6,6 +6,20 @@ import { formatSenderIdentity, type ElasticEmailInput } from "./types";
  */
 
 export const ELASTIC_EMAIL_ENDPOINT = "https://api.elasticemail.com/v4/emails/transactional";
+export const ELASTIC_EMAIL_EVENTS_ENDPOINT = "https://api.elasticemail.com/v4/events";
+/** Elastic Email caps a page well below this; the limit only stops one poll growing unbounded. */
+export const MAX_EVENTS_PER_POLL = 500;
+
+/**
+ * Query for the account event feed, used to reconcile delivery rows that the send path could only
+ * record as "accepted". Kept here rather than beside the fetch so it stays testable without pulling
+ * in runtime-config.
+ */
+export function buildElasticEmailEventsUrl(since: Date, limit = MAX_EVENTS_PER_POLL): string {
+  // The API expects a naive `YYYY-MM-DDTHH:mm:ss` timestamp in UTC — a trailing `Z` is rejected.
+  const from = since.toISOString().slice(0, 19);
+  return `${ELASTIC_EMAIL_EVENTS_ENDPOINT}?from=${encodeURIComponent(from)}&limit=${Math.min(limit, MAX_EVENTS_PER_POLL)}`;
+}
 
 export function buildElasticEmailPayload(input: ElasticEmailInput, sender: { email: string; name: string }): Record<string, unknown> {
   const body: Array<Record<string, string>> = [{ ContentType: "HTML", Content: input.html, Charset: "utf-8" }];

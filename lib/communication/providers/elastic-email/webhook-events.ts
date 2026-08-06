@@ -40,13 +40,21 @@ const STATUS_BY_EVENT: Record<string, DeliveryStatusId> = {
   spam: "FAILED",
   complaint: "FAILED",
   suppressed: "FAILED",
+  // The pull feed (`GET /v4/events`) spells this one "Suppress", not "Suppressed" — and it is the
+  // event that says "we accepted your message and then refused to deliver it", i.e. exactly the
+  // outcome a SENT delivery row is wrong about. Dropping it left those rows reading as successful.
+  suppress: "FAILED",
+  notdelivered: "FAILED",
   invalid: "FAILED",
 };
 
 const MESSAGE_ID_KEYS = ["messageid", "msgid", "message_id", "transactionid", "transaction_id"];
 const EVENT_KEYS = ["eventtype", "event_type", "event", "status", "category"];
 const RECIPIENT_KEYS = ["to", "email", "recipient", "toemail"];
-const ERROR_KEYS = ["error", "errormessage", "reason", "statusdetails", "detail"];
+// `message` last: the pull feed carries the provider's explanation there ("Delivery to this domain
+// is not permitted on your account until the trust level of your mail increases."), and it is only
+// ever read for FAILED/BOUNCED events, so it cannot swallow a non-error field.
+const ERROR_KEYS = ["error", "errormessage", "reason", "statusdetails", "detail", "message"];
 const DATE_KEYS = ["date", "eventdate", "timestamp", "datesent", "occurredat"];
 
 /** Case-insensitive, underscore-insensitive field lookup over one raw event object. */

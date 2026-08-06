@@ -13,6 +13,10 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "path": "/api/cron/communication-sync-email-events",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/cron/donation-reminders",
       "schedule": "0 9 * * *"
     },

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { INTEGRATION_PROVIDERS, INTEGRATION_PROVIDER_DEFINITIONS, getProviderDefinition } from "../../lib/integration-settings/catalog";
 import { validateIntegrationSettingValue } from "../../lib/integration-settings/validation";
 import { buildElasticEmailWebhookUrl, generateWebhookToken, webhookTokenMatches } from "../../lib/integration-settings/provider-webhook";
-import { buildElasticEmailPayload, readElasticEmailMessageId } from "../../lib/communication/providers/elastic-email/payload";
+import { buildElasticEmailPayload, buildElasticEmailEventsUrl, readElasticEmailMessageId } from "../../lib/communication/providers/elastic-email/payload";
 import { formatSenderIdentity } from "../../lib/communication/providers/elastic-email/types";
 import { ELASTIC_EMAIL_REASONS, mapElasticEmailError, scrubElasticEmail } from "../../lib/communication/providers/elastic-email/errors";
 import {
@@ -188,6 +188,85 @@ test("engagement statuses only move forward but terminal outcomes always apply",
   assert.equal(shouldApplyDeliveryStatus(null, "DELIVERED"), true);
   // Shared with the Brevo SMS webhook: a replayed `sent` after delivery is ignored there too.
   assert.equal(shouldApplyDeliveryStatus("DELIVERED", "SENT"), false);
+});
+
+/* ───────────────────────────── pull-based event feed ───────────────────────────── */
+
+/**
+ * Verbatim rows from `GET /v4/events` on the live account. The send path can only ever record
+ * "the provider returned 2xx"; these are the events that say what happened afterwards, and they
+ * are the only thing that can turn an over-optimistic SENT row into the truth.
+ */
+const LIVE_EVENT_FEED = [
+  {
+    TransactionID: "f01ce91d-22a4-823d-001d-aef4225c5024",
+    MsgID: "ho3apRyH2qK9s5TBPlMkew2",
+    FromEmail: "info@gozbebekleri.org",
+    To: "salahelnabtity@gamil.com",
+    EventType: "Suppress",
+    EventDate: "2026-08-06T12:47:46Z",
+    MessageCategory: "NotDelivered",
+    Message: "Delivery to this domain is not permitted on your account until the trust level of your mail increases.",
+  },
+  {
+    TransactionID: "f01ce904-1ea4-0149-c004-dced3b45495b",
+    MsgID: "oxqUU2gsBIPZ_UwdTz2w8g2",
+    FromEmail: "info@gozbebekleri.org",
+    To: "theaxhunter303@gmail.com",
+    EventType: "Error",
+    EventDate: "2026-08-06T12:47:41Z",
+    MessageCategory: "AccountProblem",
+    Message: "Delivery failed due to account problem or spam block. Will attempt again at a later date.",
+  },
+  { MsgID: "aaa", To: "x@y.com", EventType: "Sent", EventDate: "2026-08-06T05:59:46Z", MessageCategory: "Unknown", Message: "" },
+  { MsgID: "bbb", To: "x@y.com", EventType: "Open", EventDate: "2026-08-05T23:01:03Z", MessageCategory: "Unknown", Message: "" },
+  { MsgID: "ccc", To: "x@y.com", EventType: "Click", EventDate: "2026-08-05T22:37:16Z", MessageCategory: "Unknown", Message: "" },
+  { MsgID: "ddd", To: "x@y.com", EventType: "Submission", EventDate: "2026-08-06T12:47:41Z", MessageCategory: "Unknown", Message: "" },
+];
+
+test("an accepted-then-refused message normalizes to a failure, not a success", () => {
+  const events = normalizeElasticEmailEvents(LIVE_EVENT_FEED);
+  const suppressed = events.find((e) => e.providerMessageId === "ho3apRyH2qK9s5TBPlMkew2");
+  assert.ok(suppressed, "a Suppress event must not be dropped — it is the whole point of the sync");
+  assert.equal(suppressed.status, "FAILED");
+  // Without the reason the operator sees a bare FAILED and still cannot act on it.
+  assert.match(suppressed.errorMessage ?? "", /trust level/);
+
+  const errored = events.find((e) => e.providerMessageId === "oxqUU2gsBIPZ_UwdTz2w8g2");
+  assert.equal(errored?.status, "FAILED");
+  assert.match(errored?.errorMessage ?? "", /account problem or spam block/);
+});
+
+test("the pull feed keys on MsgID and maps the tracked lifecycle events", () => {
+  const byId = new Map(normalizeElasticEmailEvents(LIVE_EVENT_FEED).map((e) => [e.providerMessageId, e.status]));
+  assert.equal(byId.get("aaa"), "SENT");
+  assert.equal(byId.get("bbb"), "OPENED");
+  assert.equal(byId.get("ccc"), "CLICKED");
+  // "Submission" is Elastic Email accepting the payload — exactly the fact the send already
+  // recorded. Treating it as a delivery state would re-assert the claim under investigation.
+  assert.equal(byId.has("ddd"), false);
+  assert.equal(byId.size, 5);
+});
+
+test("a success event carries no error text", () => {
+  const sent = normalizeElasticEmailEvents(LIVE_EVENT_FEED).find((e) => e.providerMessageId === "aaa");
+  assert.equal(sent?.errorMessage, null);
+});
+
+test("repeated polls of the same feed produce identical idempotency keys", () => {
+  const first = normalizeElasticEmailEvents(LIVE_EVENT_FEED).map((e) => e.idempotencyKey);
+  const second = normalizeElasticEmailEvents(LIVE_EVENT_FEED).map((e) => e.idempotencyKey);
+  assert.deepEqual(first, second);
+  assert.equal(new Set(first).size, first.length);
+});
+
+test("the events URL sends a naive UTC timestamp, which the API requires", () => {
+  const url = buildElasticEmailEventsUrl(new Date("2026-08-06T12:00:00.000Z"), 500);
+  assert.match(url, /^https:\/\/api\.elasticemail\.com\/v4\/events\?/);
+  assert.match(url, /from=2026-08-06T12%3A00%3A00(?!Z)/);
+  assert.equal(url.includes("Z&"), false);
+  // The page size is bounded so one poll cannot grow without limit.
+  assert.match(buildElasticEmailEventsUrl(new Date("2026-08-06T12:00:00.000Z"), 10_000), /limit=500/);
 });
 
 /* ───────────────────────────── webhook token ───────────────────────────── */
