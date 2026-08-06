@@ -897,6 +897,38 @@ model WhatsappTemplate {
   @@index([kind])
 }
 
+/// Plain-text templates for the SMS channel.
+///
+/// Deliberately its own collection rather than a flag on WhatsappTemplate, which is what SMS
+/// borrowed before. The two channels look similar (a text body plus per-locale overrides) but are
+/// authored against opposite constraints: a WhatsApp template carries a header, footer, buttons and
+/// a Meta approval lifecycle and may run to 4096 characters, while an SMS is bare text billed per
+/// 70-character segment in Arabic. One shared body forces a choice between a needlessly terse
+/// WhatsApp message and an SMS that silently costs five segments — and it also made SMS-only drafts
+/// surface in the WhatsApp list as unapproved WhatsApp templates.
+model SmsTemplate {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  /// Canonical Arabic body (also the fallback when a locale variation is missing).
+  body         String
+  /// Per-locale overrides: Record<locale, { body?: string }>.
+  translations Json?
+  createdById  String?  @db.ObjectId
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // ── Template Center taxonomy, mirroring EmailTemplate / WhatsappTemplate.
+  /// "SYSTEM" (platform-event) | "CAMPAIGN" (reusable marketing). Unset = CAMPAIGN.
+  kind         String?  @default("CAMPAIGN")
+  /// "DRAFT" | "READY" | "NEEDS_REVIEW" | "ARCHIVED". Unset = DRAFT.
+  status       String?  @default("DRAFT")
+  /// "MARKETING" | "UTILITY" | "TRANSACTIONAL" | "AUTHENTICATION" (optional).
+  purpose      String?
+
+  @@index([name])
+  @@index([kind])
+}
+
 enum MessageTriggerEvent {
   DONATION_PAID
   DONATION_FAILED

@@ -15,7 +15,10 @@ function jsonNoStore(body: unknown, init: ResponseInit = {}) {
 
 export async function GET() {
   const session = await getServerSession(authOptions);
-  const denied = requireAdminOrDashboardPermission(session, "operations");
+  // "operations" was removed with the التشغيل section, leaving this route pointing at a permission
+  // key that no longer exists. This is an admin-only diagnostics endpoint, so it gates on the
+  // closest surviving key rather than inventing a new one.
+  const denied = requireAdminOrDashboardPermission(session, "logs");
   if (denied) return denied;
 
   return jsonNoStore({ ok: true, dbContracts: getDashboardDbContractsSnapshot() });

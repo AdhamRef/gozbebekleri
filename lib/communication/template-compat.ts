@@ -5,10 +5,14 @@ import { renderTemplatePreview } from "./template-renderer";
 import type { CommunicationChannelId } from "./communication-runtime-types";
 
 /**
- * Compatibility layer over the existing WhatsappTemplate / EmailTemplate models so campaigns can
- * list templates, compute language coverage against `translations`, and render per-locale previews
- * — without a dedicated CommunicationTemplateGroup model (not overbuilt). SMS reuses the WhatsApp
- * text templates (short text bodies); Email uses subject/body.
+ * Compatibility layer over the EmailTemplate / WhatsappTemplate / SmsTemplate models so campaigns
+ * can list templates, compute language coverage against `translations`, and render per-locale
+ * previews — without a dedicated CommunicationTemplateGroup model (not overbuilt).
+ *
+ * SMS used to borrow the WhatsApp store because both are "a text body". That was wrong in practice:
+ * the two are authored against opposite constraints (see the `SmsTemplate` model note), and the
+ * shared store meant SMS drafts appeared in the WhatsApp list as unapproved WhatsApp templates.
+ * Each channel now reads its own store.
  */
 
 export type ChannelTemplateSummary = {
@@ -27,9 +31,31 @@ function localesFromTranslations(base: SupportedLocale, translations: unknown): 
   return [...set];
 }
 
-/** Whether the channel's text templates come from the WhatsApp store (WHATSAPP + SMS) or Email. */
-function usesWhatsappStore(channel: CommunicationChannelId): boolean {
-  return channel === "WHATSAPP" || channel === "SMS";
+/**
+ * The plain-text template stores, read per channel.
+ *
+ * Branched explicitly rather than by picking a Prisma delegate into a variable: the two delegates
+ * are structurally identical here but their generated types are not assignable to one another, so
+ * a shared handle only typechecks behind a cast that would drop the `select` checking entirely.
+ * Email is absent by design — it has a document, not a body.
+ */
+type TextTemplateSummary = { id: string; name: string; translations: unknown; kind: string | null };
+
+async function listTextTemplates(channel: CommunicationChannelId): Promise<TextTemplateSummary[] | null> {
+  const query = { select: { id: true, name: true, translations: true, kind: true }, orderBy: { createdAt: "desc" }, take: 200 } as const;
+  if (channel === "WHATSAPP") return prisma.whatsappTemplate.findMany(query);
+  if (channel === "SMS") return prisma.smsTemplate.findMany(query);
+  return null;
+}
+
+async function findTextTemplate(
+  channel: CommunicationChannelId,
+  id: string,
+): Promise<{ name: string; body: string; translations: unknown } | null> {
+  const query = { where: { id }, select: { name: true, body: true, translations: true } } as const;
+  if (channel === "WHATSAPP") return prisma.whatsappTemplate.findUnique(query);
+  if (channel === "SMS") return prisma.smsTemplate.findUnique(query);
+  return null;
 }
 
 /**
@@ -57,13 +83,9 @@ export async function listChannelTemplates(
     const keep = (row: { id: string; kind?: string | null }) =>
       opts.includeSystem || (row.kind !== "SYSTEM" && !systemIds.has(row.id));
 
-    if (usesWhatsappStore(channel)) {
-      const rows = await prisma.whatsappTemplate.findMany({
-        select: { id: true, name: true, translations: true, kind: true },
-        orderBy: { createdAt: "desc" },
-        take: 200,
-      });
-      return rows.filter(keep).map((t) => ({ id: t.id, name: t.name, availableLocales: localesFromTranslations(DEFAULT_LOCALE, t.translations) }));
+    const textRows = await listTextTemplates(channel);
+    if (textRows) {
+      return textRows.filter(keep).map((t) => ({ id: t.id, name: t.name, availableLocales: localesFromTranslations(DEFAULT_LOCALE, t.translations) }));
     }
     const rows = await prisma.emailTemplate.findMany({
       select: { id: true, name: true, translations: true, kind: true },
@@ -101,8 +123,8 @@ export async function renderChannelTemplate(
 ): Promise<RenderedTemplate | null> {
   if (!process.env.DATABASE_URL) return null;
   try {
-    if (usesWhatsappStore(channel)) {
-      const tpl = await prisma.whatsappTemplate.findUnique({ where: { id: templateId }, select: { name: true, body: true, translations: true } });
+    if (channel === "WHATSAPP" || channel === "SMS") {
+      const tpl = await findTextTemplate(channel, templateId);
       if (!tpl) return null;
       const variant = resolveWhatsappBody(tpl, locale);
       const preview = renderTemplatePreview(variant.body);

@@ -3,9 +3,10 @@
 import * as React from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Mail, MessageCircle, Zap } from "lucide-react";
+import { FileText, Mail, MessageCircle, MessageSquare, Zap } from "lucide-react";
 import { EmailTemplateList } from "./EmailTemplateList";
 import { WhatsappTemplateList } from "./WhatsappTemplateList";
+import { SmsTemplateList } from "./SmsTemplateList";
 import { TriggerList } from "./TriggerList";
 
 export default function TemplatesPageClient() {
@@ -28,12 +29,15 @@ export default function TemplatesPageClient() {
           </CardHeader>
           <CardContent className="pt-0">
             <Tabs defaultValue="email" dir="rtl">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="email" className="gap-2">
                   <Mail className="w-4 h-4" /> البريد
                 </TabsTrigger>
                 <TabsTrigger value="whatsapp" className="gap-2">
                   <MessageCircle className="w-4 h-4" /> واتساب
+                </TabsTrigger>
+                <TabsTrigger value="sms" className="gap-2">
+                  <MessageSquare className="w-4 h-4" /> الرسائل النصية
                 </TabsTrigger>
                 <TabsTrigger value="triggers" className="gap-2">
                   <Zap className="w-4 h-4" /> الأحداث التلقائية
@@ -44,6 +48,9 @@ export default function TemplatesPageClient() {
               </TabsContent>
               <TabsContent value="whatsapp" className="mt-6">
                 <WhatsappTemplateList />
+              </TabsContent>
+              <TabsContent value="sms" className="mt-6">
+                <SmsTemplateList />
               </TabsContent>
               <TabsContent value="triggers" className="mt-6">
                 <TriggerList />

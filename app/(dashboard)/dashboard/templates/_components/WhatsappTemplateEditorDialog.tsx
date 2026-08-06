@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Trash2 } from "lucide-react";
 import { VARIABLE_CATALOG, mergeText } from "@/lib/templates/variables";
+import { SAMPLE_TEMPLATE_CONTEXT } from "@/lib/templates/sample-context";
 import {
   SUPPORTED_LOCALES,
   LOCALE_LABELS,
@@ -22,83 +23,6 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-const SAMPLE_CTX = (() => {
-  const flat: Record<string, string> = {};
-  for (const g of VARIABLE_CATALOG) {
-    for (const e of g.entries) {
-      flat[e.token.replace(/[{}]/g, "").trim()] = e.exampleValue;
-    }
-  }
-  const get = (k: string) => flat[k] ?? "";
-  return {
-    user: {
-      id: "sample",
-      name: get("user.name"),
-      email: get("user.email"),
-      phone: get("user.phone"),
-      countryName: get("user.countryName"),
-      countryCode: get("user.countryCode"),
-      city: get("user.city"),
-      region: "",
-      preferredLang: get("user.preferredLang"),
-    },
-    donations: [
-      {
-        id: "sample-1",
-        amount: get("amount"),
-        amountUSD: get("amountUSD"),
-        currency: get("currency"),
-        totalAmount: get("amount"),
-        status: "PAID",
-        createdAt: get("createdAt"),
-        campaignTitle: get("campaignTitle"),
-        itemCount: "1",
-        items: [
-          {
-            campaignTitle: get("campaignTitle"),
-            amount: get("amount"),
-            amountUSD: get("amountUSD"),
-            currency: get("currency"),
-            shareCount: "",
-          },
-        ],
-      },
-    ],
-    totals: {
-      count: get("totals.count"),
-      amountUSD: get("totals.amountUSD"),
-      lastAt: get("totals.lastAt"),
-    },
-    donation: {
-      id: "sample-1",
-      amount: get("amount"),
-      amountUSD: get("amountUSD"),
-      currency: get("currency"),
-      totalAmount: get("amount"),
-      status: "PAID",
-      createdAt: get("createdAt"),
-      campaignTitle: get("campaignTitle"),
-      itemCount: "2",
-      items: [
-        {
-          campaignTitle: get("campaignTitle"),
-          amount: "25",
-          amountUSD: "25",
-          currency: get("currency"),
-          shareCount: "",
-        },
-        {
-          campaignTitle: "حملة الشتاء",
-          amount: "25",
-          amountUSD: "25",
-          currency: get("currency"),
-          shareCount: "",
-        },
-      ],
-    },
-  };
-})();
 
 type BodiesState = Partial<Record<SupportedLocale, string>>;
 
@@ -225,7 +149,7 @@ export function WhatsappTemplateEditorDialog({ id, open, onOpenChange }: Props) 
     });
   };
 
-  const preview = React.useMemo(() => mergeText(currentBody, SAMPLE_CTX), [currentBody]);
+  const preview = React.useMemo(() => mergeText(currentBody, SAMPLE_TEMPLATE_CONTEXT), [currentBody]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
