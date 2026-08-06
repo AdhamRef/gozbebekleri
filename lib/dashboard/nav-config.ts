@@ -65,6 +65,10 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
       { key: "messages", title: "واتساب", href: "/dashboard/communication/whatsapp", icon: "messageCircle", keywords: ["whatsapp", "واتساب", "meta"] },
       { key: "messages", title: "الرسائل النصية", href: "/dashboard/communication/sms", icon: "messageSquare", keywords: ["sms", "نصية", "netgsm", "brevo"] },
       { key: "templates", title: "قوالب البريد والمحفّزات", href: "/dashboard/templates", icon: "mail", keywords: ["email", "triggers", "محفزات"] },
+      // Was the second tab of /dashboard/messages, behind a page that defaults to the outbound
+      // log — so visitor mail had no sidebar entry and no command-palette hit. It is inbound
+      // human correspondence, not send telemetry, and belongs beside the channels, not inside them.
+      { key: "messages", title: "الرسائل الواردة", href: "/dashboard/inbox", icon: "inbox", keywords: ["inbox", "inbound", "contact", "واردة", "زوار", "تواصل"] },
       { key: "messages", title: "سجل الرسائل", href: "/dashboard/messages", icon: "history", keywords: ["messages", "log", "history"] },
     ],
   },
@@ -144,7 +148,9 @@ export const DASHBOARD_PERMISSION_ROWS: {
   { key: "badges", group: "الحملات والمحتوى", title: "الشارات" },
   // Group was "التشغيل / التواصل"; التشغيل no longer exists, so these two are plain التواصل.
   { key: "templates", group: "التواصل", title: "قوالب البريد والمحفّزات" },
-  { key: "messages", group: "التواصل", title: "سجل الرسائل" },
+  // Both the inbox and the send log ride the same `messages` permission, so this stays one row
+  // rather than implying they can be granted apart.
+  { key: "messages", group: "التواصل", title: "الرسائل الواردة وسجل الرسائل" },
   { key: "ads", group: "التسويق", title: "عرض أداء التسويق والتوصيات" },
   { key: "referrals", group: "التسويق", title: "إدارة الروابط والإسناد" },
   { key: "pixels", group: "التسويق", title: "عرض التتبع والتحويلات" },
