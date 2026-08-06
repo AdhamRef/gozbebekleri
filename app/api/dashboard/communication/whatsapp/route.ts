@@ -46,10 +46,13 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(sp.get("page") || "1"));
     const limit = Math.min(100, Math.max(1, parseInt(sp.get("limit") || "25")));
 
-    const rangeWhere: Prisma.CommunicationDeliveryWhereInput = {
-      channel: CHANNEL,
-      createdAt: { gte: from, lte: to },
-    };
+    // A campaign deep-link scopes the entire page — summary, chart and list — to that campaign,
+    // and drops the date window while doing it. The campaign IS the range; keeping the default
+    // 30 days would report zeros for any campaign sent earlier than that.
+    const campaignId = sp.get("campaign")?.trim() || "";
+    const rangeWhere: Prisma.CommunicationDeliveryWhereInput = campaignId
+      ? { channel: CHANNEL, campaignId }
+      : { channel: CHANNEL, createdAt: { gte: from, lte: to } };
 
     const listWhere: Prisma.CommunicationDeliveryWhereInput = { ...rangeWhere };
     if (status !== "all") {

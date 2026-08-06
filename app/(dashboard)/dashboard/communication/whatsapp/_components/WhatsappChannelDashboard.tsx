@@ -21,6 +21,7 @@ import {
 } from "../../_shared/channel-ui";
 import { DeliveryPreviewSheet } from "../../_shared/DeliveryPreviewSheet";
 import { RetryDialog } from "../../_shared/RetryDialog";
+import { useCampaignScope, CampaignScopeBanner } from "../../_shared/CampaignScope";
 import { cn } from "@/lib/utils";
 
 export type WhatsappRow = {
@@ -188,12 +189,15 @@ export function WhatsappChannelDashboard() {
   // null ids = the whole backlog for the period; an array = just those rows.
   const [retryIds, setRetryIds] = useState<string[] | null | undefined>(undefined);
 
+  const { campaignId, campaignName } = useCampaignScope();
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({ days: String(days), status, page: String(page), limit: "25" });
       if (search) params.set("search", search);
+      if (campaignId) params.set("campaign", campaignId);
       const res = await fetch(`/api/dashboard/communication/whatsapp?${params}`, { cache: "no-store" });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json?.error || "تعذّر تحميل البيانات");
@@ -203,7 +207,7 @@ export function WhatsappChannelDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [days, status, page, search]);
+  }, [days, status, page, search, campaignId]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { setPage(1); }, [days, status, search]);
@@ -280,6 +284,8 @@ export function WhatsappChannelDashboard() {
             </div>
           }
         />
+
+        <CampaignScopeBanner campaignId={campaignId} campaignName={campaignName} clearHref="/dashboard/communication/whatsapp" />
 
         {/* An empty channel that has never sent is a setup story, not a performance story — say so
             before showing a wall of zeroes that invites the wrong conclusion. */}
