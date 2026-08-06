@@ -4,6 +4,7 @@ import type { CommunicationCampaign } from "@prisma/client";
 import { getCampaign } from "./campaign-service";
 import { planCampaignSend, type SendPlan } from "./campaign-send-planner";
 import { renderChannelTemplate } from "./template-compat";
+import { loadContextsForUserIds } from "@/lib/templates/variables";
 import { createDeliveryRecord, recordSkippedDelivery, markDeliveryStatus } from "./delivery-log-service";
 import { resolveProviderForSendWithRuntime, sendPreparedDelivery } from "./provider-router";
 import { EMAIL_PROVIDER_ID } from "./providers/email/client";
@@ -77,9 +78,19 @@ export async function executeCampaignSend(campaignId: string, opts: { actor?: Ac
     base.skipped += 1; bump(base.reasons, skipped.reason);
   }
 
+  // One batched query for every recipient variable set, rather than per-message: without a real
+  // context the renderer falls back to SAMPLE values, which is how campaigns were going out
+  // addressed to the sample donor instead of the actual one.
+  const contexts = await loadContextsForUserIds(plan.recipients.map((r) => r.userId)).catch(() => new Map());
+
   for (const recipient of plan.recipients) {
     if (alreadyDone.has(recipient.userId)) { bump(base.reasons, "ALREADY_PROCESSED"); continue; }
-    const rendered = await renderChannelTemplate(channel, templateId, recipient.locale);
+    const recipientCtx = contexts.get(recipient.userId) ?? null;
+    if (!recipientCtx) {
+      await recordSkippedDelivery({ channel, campaignId, templateId, recipientUserId: recipient.userId, locale: recipient.locale, purpose, origin }, "CONTEXT_LOAD_FAILED");
+      base.skipped += 1; bump(base.reasons, "CONTEXT_LOAD_FAILED"); continue;
+    }
+    const rendered = await renderChannelTemplate(channel, templateId, recipient.locale, recipientCtx);
     if (!rendered) {
       await recordSkippedDelivery({ channel, campaignId, templateId, recipientUserId: recipient.userId, locale: recipient.locale, purpose, origin }, "TEMPLATE_RENDER_FAILED");
       base.skipped += 1; bump(base.reasons, "TEMPLATE_RENDER_FAILED"); continue;

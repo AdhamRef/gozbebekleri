@@ -1,6 +1,10 @@
+import type { TReaderDocument } from "@usewaypoint/email-builder";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_LOCALE, isValidLocale, type SupportedLocale } from "@/lib/locales";
 import { resolveEmailVariant, resolveWhatsappBody } from "@/lib/templates/locale-resolver";
+import { renderEmailHtml, renderEmailSubject } from "@/lib/templates/render";
+import { mergeText, type TemplateContext } from "@/lib/templates/variables";
+import { SAMPLE_TEMPLATE_CONTEXT } from "@/lib/templates/sample-context";
 import { renderTemplatePreview } from "./template-renderer";
 import type { CommunicationChannelId } from "./communication-runtime-types";
 
@@ -115,11 +119,25 @@ export type RenderedTemplate = {
   templateName: string;
 };
 
-/** Render a per-locale preview using sample variable values (no PII, no send). */
+/**
+ * Render a template for one locale.
+ *
+ * Two callers with opposite needs share this function, and conflating them was a live send bug:
+ *
+ *  - **Preview** (no `ctx`): merge sample values, touch no donor data.
+ *  - **Send** (`ctx` supplied): merge that recipient's real data.
+ *
+ * Without `ctx` it previously did preview-only work for *both*, so campaigns went out with sample
+ * variable values — every donor greeted by the sample name — and the email body was a literal
+ * placeholder sentence rather than the template. `ctx` is what separates the two, and the email
+ * branch now renders the actual builder document through the same `renderEmailHtml` the trigger
+ * dispatcher uses, so a campaign email and a triggered email are produced by one code path.
+ */
 export async function renderChannelTemplate(
   channel: CommunicationChannelId,
   templateId: string,
-  locale: SupportedLocale
+  locale: SupportedLocale,
+  ctx?: TemplateContext | null
 ): Promise<RenderedTemplate | null> {
   if (!process.env.DATABASE_URL) return null;
   try {
@@ -134,7 +152,7 @@ export async function renderChannelTemplate(
         resolvedLocale: variant.resolvedLocale,
         usedFallback: variant.resolvedLocale !== locale,
         subject: null,
-        body: preview.rendered,
+        body: ctx ? mergeText(variant.body, ctx) : preview.rendered,
         variables: preview.variables,
         templateName: tpl.name,
       };
@@ -143,13 +161,17 @@ export async function renderChannelTemplate(
     if (!tpl) return null;
     const variant = resolveEmailVariant(tpl, locale);
     const subjectPreview = renderTemplatePreview(variant.subject);
+    // Sample context for previews so the body is real HTML either way — an empty-looking preview
+    // is what let the placeholder survive unnoticed.
+    const renderCtx = ctx ?? SAMPLE_TEMPLATE_CONTEXT;
+    const html = await renderEmailHtml(variant.document as TReaderDocument, renderCtx);
     return {
       channel,
       locale,
       resolvedLocale: variant.resolvedLocale,
       usedFallback: variant.resolvedLocale !== locale,
-      subject: subjectPreview.rendered,
-      body: "معاينة النص الكامل للإيميل تظهر عند تجهيز الإرسال.",
+      subject: ctx ? renderEmailSubject(variant.subject, ctx) : subjectPreview.rendered,
+      body: html,
       variables: subjectPreview.variables,
       templateName: tpl.name,
     };
