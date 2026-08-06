@@ -26,17 +26,6 @@ exports.DASHBOARD_NAV_GROUPS = [
         ],
     },
     {
-        group: "التشغيل",
-        items: [
-            { key: "operations", title: "المهام", href: "/dashboard/operations/tasks", icon: "listChecks", keywords: ["tasks", "todo"] },
-            { key: "operations", title: "المحتوى", href: "/dashboard/operations/content", icon: "fileStack", keywords: ["content"] },
-            { key: "operations", title: "التقويم", href: "/dashboard/operations/calendar", icon: "calendar", keywords: ["calendar", "schedule"] },
-            { key: "operations", title: "النشر", href: "/dashboard/operations/publishing", icon: "send", keywords: ["publishing", "publish"] },
-            { key: "operations", title: "إعادة تنشيط المتبرعين", href: "/dashboard/operations/donor-reactivation", icon: "heartHandshake", keywords: ["reactivation", "lapsed", "winback"] },
-            { key: "archive", title: "الأرشيف", href: "/dashboard/archive/collections", icon: "archive", keywords: ["archive", "collections", "files"] },
-        ],
-    },
-    {
         group: "الحملات والمحتوى",
         items: [
             { key: "campaigns", title: "المشاريع", href: "/dashboard/campaigns", icon: "heart", keywords: ["projects", "campaigns", "مشاريع"] },
@@ -51,42 +40,47 @@ exports.DASHBOARD_NAV_GROUPS = [
     {
         group: "التواصل",
         items: [
-            { key: "badges", title: "الشارات", href: "/dashboard/badges", icon: "award", keywords: ["badges"] },
-            { key: "operations", title: "مركز التواصل", href: "/dashboard/operations/communication", icon: "messageCircle", keywords: ["communication", "hub"] },
-            { key: "operations", title: "حملات الرسائل", href: "/dashboard/operations/communication/campaigns", icon: "megaphone", keywords: ["campaigns", "broadcast", "إرسال جماعي"] },
-            { key: "operations", title: "المحادثات", href: "/dashboard/operations/communication/inbox", icon: "inbox", keywords: ["inbox", "conversations", "chat"] },
-            { key: "operations", title: "الجمهور", href: "/dashboard/operations/communication/audiences", icon: "contact", keywords: ["audiences", "segments", "شرائح"] },
-            { key: "operations", title: "قوالب الرسائل", href: "/dashboard/operations/communication/templates", icon: "layoutTemplate", keywords: ["templates"] },
-            { key: "operations", title: "تقارير الإرسال", href: "/dashboard/operations/communication/reports", icon: "barChart", keywords: ["reports", "delivery", "نتائج"] },
+            // The six "مركز التواصل" entries that lived here pointed into /dashboard/operations, which
+            // has been removed along with the whole التشغيل section. What remains below is the part of
+            // التواصل that is not operations: the template/trigger editor and the send log.
             // Previously unreachable (no nav entry, no inbound link) despite being fully built with
             // working APIs. Titled "قوالب البريد والمحفّزات" rather than "القوالب" to distinguish it
             // from the communication-campaign templates directly above — it is a different page that
             // owns the email/WhatsApp templates AND the message triggers, including the
             // DONATION_LAPSED reminder.
+            // Per-channel pages: each answers "what did we send on this channel, and what happened to
+            // it afterwards" — the delivery/open/click detail the flat send log cannot show.
+            { key: "messages", title: "الحملات التسويقية", href: "/dashboard/communication/campaigns", icon: "megaphone", keywords: ["campaigns", "marketing", "حملات", "تسويق", "broadcast", "bulk"] },
+            { key: "messages", title: "البريد الإلكتروني", href: "/dashboard/communication/email", icon: "mail", keywords: ["email", "بريد", "elastic"] },
+            { key: "messages", title: "واتساب", href: "/dashboard/communication/whatsapp", icon: "messageCircle", keywords: ["whatsapp", "واتساب", "meta"] },
+            { key: "messages", title: "الرسائل النصية", href: "/dashboard/communication/sms", icon: "messageSquare", keywords: ["sms", "نصية", "netgsm", "brevo"] },
             { key: "templates", title: "قوالب البريد والمحفّزات", href: "/dashboard/templates", icon: "mail", keywords: ["email", "triggers", "محفزات"] },
-            { key: "messages", title: "سجل الرسائل", href: "/dashboard/messages", icon: "history", keywords: ["messages", "log", "history"] },
+            // Was the second tab of /dashboard/messages, behind a page that defaults to the outbound
+            // log — so visitor mail had no sidebar entry and no command-palette hit. It is inbound
+            // human correspondence, not send telemetry, and belongs beside the channels, not inside them.
+            { key: "badges", title: "الشارات", href: "/dashboard/badges", icon: "award", keywords: ["badges"] },
+            // The flat outbound send log (/dashboard/messages) is gone. Per-channel delivery detail lives
+            // in البريد الإلكتروني / واتساب / الرسائل النصية above.
+            { key: "messages", title: "الرسائل الواردة", href: "/dashboard/inbox", icon: "inbox", keywords: ["inbox", "inbound", "contact", "واردة", "زوار", "تواصل"], badge: "inboxUnread" },
         ],
     },
     {
         group: "التسويق",
         items: [
-            { key: "ads", title: "نظرة عامة على التسويق", href: "/dashboard/marketing", icon: "trendingUp", keywords: ["marketing", "overview"] },
-            { key: "ads", title: "أداء الحملات", href: "/dashboard/marketing/performance", icon: "activity", keywords: ["performance", "ads"] },
+            // The overview, أداء الحملات and التوصيات pages were removed; what is left is the part of
+            // التسويق that owns real, first-party data: our own links and our own tracking.
             { key: "referrals", title: "الروابط والإسناد", href: "/dashboard/marketing/attribution", icon: "link", keywords: ["attribution", "referrals", "links", "utm"] },
             { key: "pixels", title: "التتبع والتحويلات", href: "/dashboard/marketing/tracking", icon: "target", keywords: ["tracking", "pixels", "conversions", "capi"] },
-            { key: "ads", title: "التوصيات", href: "/dashboard/marketing/recommendations", icon: "lightbulb", keywords: ["recommendations", "insights"] },
         ],
     },
     {
         group: "ربط المنصات والإرسال",
         items: [
-            { key: "platformConnections", title: "نظرة عامة على الربط", href: "/dashboard/platform-connections", icon: "plug", keywords: ["connections", "integrations", "overview"] },
+            // The overview, الحسابات الإعلانية, Webhooks and سجلات المنصات pages were removed. The three
+            // pages left are the ones that configure something: pixels, providers, and the health check.
             { key: "platformConnections", title: "بكسلات التتبع", href: "/dashboard/platform-connections/tracking", icon: "radar", keywords: ["pixels", "meta", "tiktok", "snap"] },
-            { key: "platformConnections", title: "الحسابات الإعلانية", href: "/dashboard/platform-connections/ad-accounts", icon: "briefcase", keywords: ["ad accounts", "google ads", "meta ads"] },
             { key: "platformConnections", title: "مزودو التواصل والإرسال", href: "/dashboard/platform-connections/communication", icon: "server", keywords: ["providers", "twilio", "smtp", "whatsapp"] },
-            { key: "platformConnections", title: "Webhooks", href: "/dashboard/platform-connections/webhooks", icon: "webhook", keywords: ["webhooks", "stripe"] },
             { key: "platformConnections", title: "فحص الاتصال", href: "/dashboard/platform-connections/health", icon: "heartPulse", keywords: ["health", "status", "diagnostics"] },
-            { key: "platformConnections", title: "سجلات المنصات", href: "/dashboard/platform-connections/logs", icon: "fileClock", keywords: ["logs", "platform"] },
             // No dedicated "telegram" permission key exists, and inventing one would need a matching
             // grant UI. It is an outbound integration, so it sits under platformConnections with the
             // other providers. Donation notifications depend on this page being configurable.
@@ -121,8 +115,6 @@ exports.DASHBOARD_PERMISSION_ROWS = [
     { key: "monthly", group: "الرئيسية", title: "التبرعات الشهرية" },
     { key: "bankTransfers", group: "الرئيسية", title: "التحويلات البنكية" },
     { key: "donors", group: "الرئيسية", title: "المتبرعون" },
-    { key: "operations", group: "التشغيل / التواصل", title: "التشغيل والتواصل" },
-    { key: "archive", group: "التشغيل", title: "الأرشيف" },
     { key: "campaigns", group: "الحملات والمحتوى", title: "المشاريع" },
     { key: "categories", group: "الحملات والمحتوى", title: "الحملات والدول" },
     { key: "blog", group: "الحملات والمحتوى", title: "المدونة" },
@@ -132,10 +124,17 @@ exports.DASHBOARD_PERMISSION_ROWS = [
     // pages are linked in the nav above, they must also be grantable.
     { key: "slides", group: "الحملات والمحتوى", title: "الشرائح" },
     { key: "ticker", group: "الحملات والمحتوى", title: "شريط التبرعات" },
-    { key: "badges", group: "الحملات والمحتوى", title: "الشارات" },
-    { key: "templates", group: "التشغيل / التواصل", title: "قوالب البريد والمحفّزات" },
-    { key: "messages", group: "التشغيل / التواصل", title: "سجل الرسائل" },
-    { key: "ads", group: "التسويق", title: "عرض أداء التسويق والتوصيات" },
+    // Group was "التشغيل / التواصل"; التشغيل no longer exists, so these two are plain التواصل.
+    { key: "templates", group: "التواصل", title: "قوالب البريد والمحفّزات" },
+    // The outbound send log page is gone; `messages` now grants the inbox and the per-channel
+    // communication pages, which all check the same key.
+    { key: "badges", group: "التواصل", title: "الشارات" },
+    { key: "messages", group: "التواصل", title: "الرسائل الواردة والتواصل" },
+    // No sidebar item carries `ads` any more — the marketing overview, performance and
+    // recommendations pages were removed. The key stays grantable because the route guard still
+    // maps the /dashboard/marketing prefix to it, so revoking it here would silently strand any
+    // staffer whose only grant is `ads`.
+    { key: "ads", group: "التسويق", title: "عرض صفحات التسويق" },
     { key: "referrals", group: "التسويق", title: "إدارة الروابط والإسناد" },
     { key: "pixels", group: "التسويق", title: "عرض التتبع والتحويلات" },
     { key: "platformConnections", group: "ربط المنصات والإرسال", title: "ربط المنصات والإرسال" },

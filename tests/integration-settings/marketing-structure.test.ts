@@ -19,23 +19,20 @@ function sessionFor(permissions: string[]): Session {
   } as Session;
 }
 
-test("marketing navigation exposes exactly five approved pages", () => {
+test("marketing navigation exposes exactly the two approved pages", () => {
   const marketing = DASHBOARD_NAV_GROUPS.find((group) => group.group === "التسويق");
   assert.ok(marketing);
   assert.deepEqual(marketing.items.map((item) => item.href), [
-    "/dashboard/marketing",
-    "/dashboard/marketing/performance",
     "/dashboard/marketing/attribution",
     "/dashboard/marketing/tracking",
-    "/dashboard/marketing/recommendations",
   ]);
 });
 
 test("marketing routes preserve independent permission boundaries", () => {
-  assert.equal(pathToDashboardPermission("/dashboard/marketing/performance"), "ads");
   assert.equal(pathToDashboardPermission("/dashboard/marketing/attribution"), "referrals");
   assert.equal(pathToDashboardPermission("/dashboard/marketing/tracking"), "pixels");
-  assert.equal(pathToDashboardPermission("/dashboard/marketing/recommendations"), "ads");
+  // Anything else under /dashboard/marketing still falls back to `ads`.
+  assert.equal(pathToDashboardPermission("/dashboard/marketing"), "ads");
 });
 
 test("generic server guard rejects unauthenticated and unauthorized users", () => {
@@ -50,11 +47,9 @@ test("generic server guard rejects unauthenticated and unauthorized users", () =
 });
 
 test("server pages guard before protected reads", () => {
+  // The marketing overview/performance/recommendations pages and the platform-connections
+  // overview were removed; only pages that still exist can be asserted on here.
   const cases = [
-    ["app/(dashboard)/dashboard/marketing/page.tsx", "getMarketingResultsOverview()"],
-    ["app/(dashboard)/dashboard/marketing/performance/page.tsx", "getMarketingResultsOverview()"],
-    ["app/(dashboard)/dashboard/marketing/recommendations/page.tsx", "getRecommendationOverview()"],
-    ["app/(dashboard)/dashboard/platform-connections/page.tsx", "integrationActorFromSession(access.session)"],
     ["app/(dashboard)/dashboard/platform-connections/health/page.tsx", "integrationActorFromSession(session)"],
   ] as const;
 

@@ -5,7 +5,7 @@
  * lifecycle can evolve safely on MongoDB). Import these instead of hardcoding literals.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PROVIDER_SUCCESS_STATUSES = exports.DELIVERY_STATUSES = exports.DELIVERY_ORIGINS = exports.CAMPAIGN_STATUSES = exports.SENDER_ROUTING_MODES = exports.SENDER_STATUSES = exports.COMMUNICATION_PURPOSES = exports.COMMUNICATION_PROVIDERS = exports.COMMUNICATION_CHANNELS = void 0;
+exports.NON_RETRYABLE_TERMINAL = exports.RETRYABLE_STATUSES = exports.PROVIDER_SUCCESS_STATUSES = exports.DELIVERY_STATUSES = exports.DELIVERY_ORIGINS = exports.CAMPAIGN_STATUSES = exports.SENDER_ROUTING_MODES = exports.SENDER_STATUSES = exports.COMMUNICATION_PURPOSES = exports.COMMUNICATION_PROVIDERS = exports.COMMUNICATION_CHANNELS = void 0;
 exports.isCommunicationChannel = isCommunicationChannel;
 exports.isCommunicationProvider = isCommunicationProvider;
 exports.isDeliveryStatus = isDeliveryStatus;
@@ -61,6 +61,17 @@ exports.PROVIDER_SUCCESS_STATUSES = [
     "CLICKED",
     "REPLIED",
 ];
+/**
+ * Statuses a delivery may be re-sent from: it was never accepted by a provider, so sending again
+ * cannot duplicate anything the recipient already has.
+ */
+exports.RETRYABLE_STATUSES = ["FAILED", "SKIPPED"];
+/**
+ * Terminal failures that must NOT be retried. A bounce is the receiving server stating the address
+ * is undeliverable — re-sending does not fix the address, it only accrues bounce rate, which is the
+ * fastest way to get a sending domain throttled or blocklisted.
+ */
+exports.NON_RETRYABLE_TERMINAL = ["BOUNCED"];
 function isCommunicationChannel(v) {
     return typeof v === "string" && exports.COMMUNICATION_CHANNELS.includes(v);
 }

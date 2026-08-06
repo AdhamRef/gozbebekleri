@@ -24,10 +24,12 @@ function sessionFor(role, dashboardPermissions) {
     strict_1.default.deepEqual(access, { allowed: false, redirectTo: "/ar/auth/signin" });
 });
 (0, node_test_1.default)("authenticated users without platformConnections are redirected to their first allowed page", () => {
-    const access = (0, page_access_1.resolveCommunicationConnectionsPageAccess)(sessionFor("STAFF", ["operations"]));
+    // Was ["operations"] -> /dashboard/operations/tasks. That permission key and page went with
+    // التشغيل; "donors" stands in as any permission that is not platformConnections.
+    const access = (0, page_access_1.resolveCommunicationConnectionsPageAccess)(sessionFor("STAFF", ["donors"]));
     strict_1.default.deepEqual(access, {
         allowed: false,
-        redirectTo: "/dashboard/operations/tasks",
+        redirectTo: "/dashboard/users/donors",
     });
 });
 (0, node_test_1.default)("authenticated users without any allowed dashboard page are redirected home", () => {

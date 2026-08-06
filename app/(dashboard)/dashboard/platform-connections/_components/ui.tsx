@@ -19,8 +19,10 @@ export function PageHeader({
   title,
   subtitle,
   actions,
-  backHref = "/dashboard/platform-connections",
-  backLabel = "العودة للنظرة العامة",
+  // Defaulted to the ربط المنصات overview until that page was removed. There is no hub to go back
+  // to now, so the back link is opt-in: pass a backHref explicitly if a page needs one.
+  backHref = null,
+  backLabel = "رجوع",
 }: {
   eyebrow?: string;
   title: string;

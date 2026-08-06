@@ -25,9 +25,8 @@ const operationalFiles = [
     "app/api/webhooks/meta/whatsapp/route.ts",
     "app/api/webhooks/brevo/transactional/route.ts",
     "app/api/webhooks/elastic-email/route.ts",
-    "app/api/dashboard/operations/communication/providers/email/test/route.ts",
-    "app/api/dashboard/operations/communication/providers/sms/test/route.ts",
-    "app/api/dashboard/operations/communication/providers/whatsapp/test-template/route.ts",
+    // The three provider test routes that were here lived under app/api/dashboard/operations and
+    // were removed with التشغيل. Their credential-handling contract went with them.
     "app/api/templates/email/send/route.ts",
     "app/api/auth/register/route.ts",
     "app/api/auth/resend-otp/route.ts",

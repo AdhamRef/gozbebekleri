@@ -92,7 +92,7 @@ const PATH_RULES: { prefix: string; key: DashboardPermissionKey }[] = [
   { prefix: "/dashboard/users/team", key: "team" },
   { prefix: "/dashboard/logs", key: "logs" },
   { prefix: "/dashboard/badges", key: "badges" },
-  { prefix: "/dashboard/messages", key: "messages" },
+  { prefix: "/dashboard/communication", key: "messages" },
   // Without its own rule /dashboard/inbox fell through to the "/dashboard → revenue" catch-all,
   // so the route guard demanded `revenue` while the sidebar entry and the API both check
   // `messages` — a staffer granted the inbox was bounced straight back out of it.

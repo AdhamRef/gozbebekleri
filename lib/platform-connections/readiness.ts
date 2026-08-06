@@ -133,11 +133,12 @@ export async function getOverview() {
   const base = "/dashboard/platform-connections";
   if (!tracking.rows.find((item) => item.key === "meta_pixel")?.configured) issues.push({ title: "بكسل ميتا غير مُعد", severity: "NEEDS_SETUP", href: `${base}/tracking`, action: "إعداد" });
   if (!tracking.rows.find((item) => item.key === "meta_capi")?.configured) issues.push({ title: "Meta Conversions API غير مُعد", severity: "NEEDS_SETUP", href: `${base}/tracking`, action: "إعداد" });
-  for (const account of ads.rows) if (account.status === "FAILED") issues.push({ title: `فشل آخر مزامنة: ${account.label}`, severity: "FAILED", href: `${base}/ad-accounts`, action: "مراجعة" });
-  if (!ads.connectedCount) issues.push({ title: "لا توجد حسابات إعلانية مربوطة", severity: "NEEDS_SETUP", href: `${base}/ad-accounts`, action: "ربط" });
+  // The dedicated الحسابات الإعلانية page was removed, so ad-account issues point at فحص الاتصال.
+  for (const account of ads.rows) if (account.status === "FAILED") issues.push({ title: `فشل آخر مزامنة: ${account.label}`, severity: "FAILED", href: `${base}/health`, action: "مراجعة" });
+  if (!ads.connectedCount) issues.push({ title: "لا توجد حسابات إعلانية مربوطة", severity: "NEEDS_SETUP", href: `${base}/health`, action: "ربط" });
   if (comm.whatsapp.status !== "READY") issues.push({ title: "إعداد واتساب غير مكتمل", severity: comm.whatsapp.status, href: `${base}/communication`, action: "إعداد" });
   if (comm.whatsapp.sendersMissingNumber > 0) issues.push({ title: "يوجد مُرسِل واتساب بلا رقم مُعرّف", severity: "NEEDS_SETUP", href: `${base}/communication`, action: "مراجعة" });
-  if (!webhooks.signatureConfigured) issues.push({ title: "توقيع Webhook غير مفعّل", severity: webhooks.status, href: `${base}/webhooks`, action: "تأمين" });
+  if (!webhooks.signatureConfigured) issues.push({ title: "توقيع Webhook غير مفعّل", severity: webhooks.status, href: `${base}/communication`, action: "تأمين" });
   if (comm.sms.status !== "READY") issues.push({ title: "إعداد SMS غير مكتمل", severity: comm.sms.status, href: `${base}/communication`, action: "تفاصيل" });
   return { tracking, ads, comm, webhooks, issues: issues.slice(0, 6) };
 }

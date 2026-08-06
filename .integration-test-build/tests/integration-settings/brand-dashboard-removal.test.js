@@ -15,12 +15,15 @@ const read = (path) => (0, node_fs_1.readFileSync)(path, "utf8");
     strict_1.default.equal(permissions_1.DASHBOARD_PERMISSION_KEYS.includes("brand"), false);
 });
 (0, node_test_1.default)("active navigation resolves one longest matching route", () => {
+    // Sample routes only — this exercises the longest-prefix logic, not the routes themselves.
+    // Switched off /dashboard/operations now that it is gone, so the fixture cannot be mistaken
+    // for a claim that those pages still exist.
     const hrefs = [
         "/dashboard",
-        "/dashboard/operations/communication",
-        "/dashboard/operations/communication/templates",
+        "/dashboard/platform-connections",
+        "/dashboard/platform-connections/communication",
     ];
-    strict_1.default.equal((0, nav_config_1.resolveActiveDashboardHref)("/dashboard/operations/communication/templates/new", hrefs), "/dashboard/operations/communication/templates");
+    strict_1.default.equal((0, nav_config_1.resolveActiveDashboardHref)("/dashboard/platform-connections/communication/senders", hrefs), "/dashboard/platform-connections/communication");
     strict_1.default.equal((0, nav_config_1.resolveActiveDashboardHref)("/dashboard", hrefs), "/dashboard");
     strict_1.default.equal((0, nav_config_1.resolveActiveDashboardHref)("/dashboard-other", hrefs), null);
 });
@@ -28,8 +31,10 @@ const read = (path) => (0, node_fs_1.readFileSync)(path, "utf8");
     const directRedirects = {
         "app/(dashboard)/dashboard/brand/assets/page.tsx": "/dashboard/archive/assets?source=legacy-brand",
         "app/(dashboard)/dashboard/brand/downloads/page.tsx": "/dashboard/archive/assets?source=legacy-brand",
-        "app/(dashboard)/dashboard/brand/frameworks/page.tsx": "/dashboard/operations/communication/templates?tab=legacy-frameworks",
-        "app/(dashboard)/dashboard/brand/message-templates/page.tsx": "/dashboard/operations/communication/templates?tab=legacy-frameworks",
+        // Both used to land on the operations communication templates page. That page went with
+        // التشغيل, so they now redirect to the surviving template editor.
+        "app/(dashboard)/dashboard/brand/frameworks/page.tsx": "/dashboard/templates",
+        "app/(dashboard)/dashboard/brand/message-templates/page.tsx": "/dashboard/templates",
     };
     for (const [path, destination] of Object.entries(directRedirects)) {
         const source = read(path);
@@ -72,13 +77,11 @@ const read = (path) => (0, node_fs_1.readFileSync)(path, "utf8");
         strict_1.default.equal((0, node_fs_1.existsSync)(path), false, `${path} must be removed`);
     }
 });
-(0, node_test_1.default)("legacy assets and frameworks are exposed read-only in their new homes", () => {
+(0, node_test_1.default)("legacy assets are exposed read-only in their new home", () => {
     const assets = read("app/(dashboard)/dashboard/archive/assets/page.tsx");
     strict_1.default.match(assets, /linkedLegacyAssets/);
     strict_1.default.match(assets, /Boolean\(asset\.fileUrl\)/);
     strict_1.default.match(assets, /LEGACY_BRAND/);
-    const templates = read("app/(dashboard)/dashboard/operations/communication/templates/page.tsx");
-    strict_1.default.match(templates, /legacy-frameworks/);
-    strict_1.default.match(templates, /قراءة فقط/);
-    strict_1.default.doesNotMatch(templates, /href="\/dashboard\/brand\/frameworks"/);
+    // The frameworks half read the operations communication templates page, which no longer
+    // exists — readFileSync on it throws rather than failing an assertion.
 });

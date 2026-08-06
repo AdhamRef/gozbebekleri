@@ -54,7 +54,7 @@ export default async function HealthPage() {
     { label: "Brevo SMS", status: activeStatus(brevo), detail: brevo.activeTest.lastFailureReasonSafe || "التكوين العامل لـSMS الدولي دون إرسال.", lastTest: brevo.activeTest.lastTestAt, href: `${BASE}/communication` },
     { label: "Netgsm SMS", status: activeStatus(netgsm), detail: netgsm.activeTest.lastFailureReasonSafe || "التكوين العامل لحساب Netgsm.", lastTest: netgsm.activeTest.lastTestAt, href: `${BASE}/communication` },
     { label: "Cron", status: cronStatus, detail: scheduler.configured ? "حماية Route مضبوطة داخل Vercel." : "CRON_SECRET يحتاج إعدادًا داخل Vercel.", lastTest: cron.activeTest.lastTestAt, href: `${BASE}/communication` },
-    { label: "Webhooks", status: webhooks.signatureConfigured ? "READY" as ConnStatus : "NEEDS_SETUP" as ConnStatus, detail: webhooks.signatureConfigured ? "توقيع Webhook مُفعّل." : "توقيع Webhook يحتاج إعدادًا.", lastTest: webhooks.lastWebhookAt, href: `${BASE}/webhooks` },
+    { label: "Webhooks", status: webhooks.signatureConfigured ? "READY" as ConnStatus : "NEEDS_SETUP" as ConnStatus, detail: webhooks.signatureConfigured ? "توقيع Webhook مُفعّل." : "توقيع Webhook يحتاج إعدادًا.", lastTest: webhooks.lastWebhookAt, href: `${BASE}/communication` },
   ];
   const readyCount = checks.filter((item) => item.status === "READY").length;
   const canTest = userHasDashboardPermission(session.user, "platformConnectionsTest");

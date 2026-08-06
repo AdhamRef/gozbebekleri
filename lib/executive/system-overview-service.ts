@@ -53,15 +53,9 @@ export async function buildExecutiveSystemOverview(
   // removed with التشغيل. A risk card exists to be acted on, and there is no page left to act on
   // these — the underlying counts still feed the summary figures below.
 
-  if (marketing.summary.highPriorityRecommendations > 0) {
-    risks.push({
-      id: "high-priority-recommendations",
-      level: "HIGH",
-      title: "توصيات تسويق عاجلة",
-      reason: `يوجد ${marketing.summary.highPriorityRecommendations} توصية عالية الأولوية تحتاج قرارًا سريعًا.`,
-      href: "/dashboard/marketing/recommendations",
-    });
-  }
+  // The "توصيات تسويق عاجلة" risk linked into /dashboard/marketing/recommendations, which was
+  // removed along with the marketing overview and performance pages — same reasoning as above:
+  // a risk card with nowhere to go is not a risk card. The count still feeds the summary below.
 
   return {
     source: "executive-system-overview-v1",

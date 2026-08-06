@@ -31,6 +31,7 @@ exports.NAV_ICONS = {
     mail: lucide_react_1.Mail,
     megaphone: lucide_react_1.Megaphone,
     messageCircle: lucide_react_1.MessageCircle,
+    messageSquare: lucide_react_1.MessageSquare,
     penLine: lucide_react_1.PenLine,
     plug: lucide_react_1.Plug,
     radar: lucide_react_1.Radar,

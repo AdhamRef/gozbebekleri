@@ -21,22 +21,19 @@ function sessionFor(permissions) {
         },
     };
 }
-(0, node_test_1.default)("marketing navigation exposes exactly five approved pages", () => {
+(0, node_test_1.default)("marketing navigation exposes exactly the two approved pages", () => {
     const marketing = nav_config_1.DASHBOARD_NAV_GROUPS.find((group) => group.group === "التسويق");
     strict_1.default.ok(marketing);
     strict_1.default.deepEqual(marketing.items.map((item) => item.href), [
-        "/dashboard/marketing",
-        "/dashboard/marketing/performance",
         "/dashboard/marketing/attribution",
         "/dashboard/marketing/tracking",
-        "/dashboard/marketing/recommendations",
     ]);
 });
 (0, node_test_1.default)("marketing routes preserve independent permission boundaries", () => {
-    strict_1.default.equal((0, permissions_1.pathToDashboardPermission)("/dashboard/marketing/performance"), "ads");
     strict_1.default.equal((0, permissions_1.pathToDashboardPermission)("/dashboard/marketing/attribution"), "referrals");
     strict_1.default.equal((0, permissions_1.pathToDashboardPermission)("/dashboard/marketing/tracking"), "pixels");
-    strict_1.default.equal((0, permissions_1.pathToDashboardPermission)("/dashboard/marketing/recommendations"), "ads");
+    // Anything else under /dashboard/marketing still falls back to `ads`.
+    strict_1.default.equal((0, permissions_1.pathToDashboardPermission)("/dashboard/marketing"), "ads");
 });
 (0, node_test_1.default)("generic server guard rejects unauthenticated and unauthorized users", () => {
     strict_1.default.deepEqual((0, page_access_1.resolveDashboardPageAccess)(null, "ads"), {
@@ -49,11 +46,9 @@ function sessionFor(permissions) {
     strict_1.default.equal(allowed.allowed, true);
 });
 (0, node_test_1.default)("server pages guard before protected reads", () => {
+    // The marketing overview/performance/recommendations pages and the platform-connections
+    // overview were removed; only pages that still exist can be asserted on here.
     const cases = [
-        ["app/(dashboard)/dashboard/marketing/page.tsx", "getMarketingResultsOverview()"],
-        ["app/(dashboard)/dashboard/marketing/performance/page.tsx", "getMarketingResultsOverview()"],
-        ["app/(dashboard)/dashboard/marketing/recommendations/page.tsx", "getRecommendationOverview()"],
-        ["app/(dashboard)/dashboard/platform-connections/page.tsx", "integrationActorFromSession(access.session)"],
         ["app/(dashboard)/dashboard/platform-connections/health/page.tsx", "integrationActorFromSession(session)"],
     ];
     for (const [path, protectedRead] of cases) {

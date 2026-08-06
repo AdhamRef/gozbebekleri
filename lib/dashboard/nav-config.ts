@@ -80,30 +80,28 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
       // log — so visitor mail had no sidebar entry and no command-palette hit. It is inbound
       // human correspondence, not send telemetry, and belongs beside the channels, not inside them.
       { key: "badges", title: "الشارات", href: "/dashboard/badges", icon: "award", keywords: ["badges"] },
-      { key: "messages", title: "سجل الرسائل", href: "/dashboard/messages", icon: "history", keywords: ["messages", "log", "history"] },
+      // The flat outbound send log (/dashboard/messages) is gone. Per-channel delivery detail lives
+      // in البريد الإلكتروني / واتساب / الرسائل النصية above.
       { key: "messages", title: "الرسائل الواردة", href: "/dashboard/inbox", icon: "inbox", keywords: ["inbox", "inbound", "contact", "واردة", "زوار", "تواصل"], badge: "inboxUnread" },
     ],
   },
   {
     group: "التسويق",
     items: [
-      { key: "ads", title: "نظرة عامة على التسويق", href: "/dashboard/marketing", icon: "trendingUp", keywords: ["marketing", "overview"] },
-      { key: "ads", title: "أداء الحملات", href: "/dashboard/marketing/performance", icon: "activity", keywords: ["performance", "ads"] },
+      // The overview, أداء الحملات and التوصيات pages were removed; what is left is the part of
+      // التسويق that owns real, first-party data: our own links and our own tracking.
       { key: "referrals", title: "الروابط والإسناد", href: "/dashboard/marketing/attribution", icon: "link", keywords: ["attribution", "referrals", "links", "utm"] },
       { key: "pixels", title: "التتبع والتحويلات", href: "/dashboard/marketing/tracking", icon: "target", keywords: ["tracking", "pixels", "conversions", "capi"] },
-      { key: "ads", title: "التوصيات", href: "/dashboard/marketing/recommendations", icon: "lightbulb", keywords: ["recommendations", "insights"] },
     ],
   },
   {
     group: "ربط المنصات والإرسال",
     items: [
-      { key: "platformConnections", title: "نظرة عامة على الربط", href: "/dashboard/platform-connections", icon: "plug", keywords: ["connections", "integrations", "overview"] },
+      // The overview, الحسابات الإعلانية, Webhooks and سجلات المنصات pages were removed. The three
+      // pages left are the ones that configure something: pixels, providers, and the health check.
       { key: "platformConnections", title: "بكسلات التتبع", href: "/dashboard/platform-connections/tracking", icon: "radar", keywords: ["pixels", "meta", "tiktok", "snap"] },
-      { key: "platformConnections", title: "الحسابات الإعلانية", href: "/dashboard/platform-connections/ad-accounts", icon: "briefcase", keywords: ["ad accounts", "google ads", "meta ads"] },
       { key: "platformConnections", title: "مزودو التواصل والإرسال", href: "/dashboard/platform-connections/communication", icon: "server", keywords: ["providers", "twilio", "smtp", "whatsapp"] },
-      { key: "platformConnections", title: "Webhooks", href: "/dashboard/platform-connections/webhooks", icon: "webhook", keywords: ["webhooks", "stripe"] },
       { key: "platformConnections", title: "فحص الاتصال", href: "/dashboard/platform-connections/health", icon: "heartPulse", keywords: ["health", "status", "diagnostics"] },
-      { key: "platformConnections", title: "سجلات المنصات", href: "/dashboard/platform-connections/logs", icon: "fileClock", keywords: ["logs", "platform"] },
       // No dedicated "telegram" permission key exists, and inventing one would need a matching
       // grant UI. It is an outbound integration, so it sits under platformConnections with the
       // other providers. Donation notifications depend on this page being configurable.
@@ -159,11 +157,15 @@ export const DASHBOARD_PERMISSION_ROWS: {
   { key: "ticker", group: "الحملات والمحتوى", title: "شريط التبرعات" },
   // Group was "التشغيل / التواصل"; التشغيل no longer exists, so these two are plain التواصل.
   { key: "templates", group: "التواصل", title: "قوالب البريد والمحفّزات" },
-  // Both the inbox and the send log ride the same `messages` permission, so this stays one row
-  // rather than implying they can be granted apart.
+  // The outbound send log page is gone; `messages` now grants the inbox and the per-channel
+  // communication pages, which all check the same key.
   { key: "badges", group: "التواصل", title: "الشارات" },
-  { key: "messages", group: "التواصل", title: "الرسائل الواردة وسجل الرسائل" },
-  { key: "ads", group: "التسويق", title: "عرض أداء التسويق والتوصيات" },
+  { key: "messages", group: "التواصل", title: "الرسائل الواردة والتواصل" },
+  // No sidebar item carries `ads` any more — the marketing overview, performance and
+  // recommendations pages were removed. The key stays grantable because the route guard still
+  // maps the /dashboard/marketing prefix to it, so revoking it here would silently strand any
+  // staffer whose only grant is `ads`.
+  { key: "ads", group: "التسويق", title: "عرض صفحات التسويق" },
   { key: "referrals", group: "التسويق", title: "إدارة الروابط والإسناد" },
   { key: "pixels", group: "التسويق", title: "عرض التتبع والتحويلات" },
   { key: "platformConnections", group: "ربط المنصات والإرسال", title: "ربط المنصات والإرسال" },

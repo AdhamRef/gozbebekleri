@@ -6,7 +6,7 @@ import { Plug, ArrowLeft } from "lucide-react";
  * «ربط المنصات والإرسال». The old page keeps working; this only points users to the new hub.
  */
 export function PlatformConnectionsMovedNotice({
-  href = "/dashboard/platform-connections",
+  href = "/dashboard/platform-connections/tracking",
   label = "فتح ربط المنصات والإرسال",
   text = "تم نقل إدارة هذا الإعداد إلى «ربط المنصات والإرسال».",
 }: {

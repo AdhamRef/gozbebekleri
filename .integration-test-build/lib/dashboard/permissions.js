@@ -19,7 +19,9 @@ exports.getFirstAllowedDashboardHref = getFirstAllowedDashboardHref;
 exports.DASHBOARD_PERMISSION_KEYS = [
     "revenue", "monthly", "referrals", "bankTransfers", "donors", "team", "logs",
     "badges", "messages", "templates", "campaigns", "categories", "blog", "slides",
-    "ticker", "pixels", "ads", "platformConnections", "operations", "archive",
+    // "operations" was removed with the التشغيل section. Any value still stored on a user row is
+    // simply inert — it maps to no page and grants nothing.
+    "ticker", "pixels", "ads", "platformConnections", "archive",
     "generalSettings", "platformConnectionsTest", "platformConnectionsManage",
     "platformConnectionsAdmin", "archiveUpload", "archiveDelete", "archiveAnalyze",
     "archiveDocuments", "donationsEdit", "reportsExport",
@@ -95,7 +97,6 @@ const PATH_RULES = [
     { prefix: "/dashboard/marketing-intelligence", key: "ads" },
     { prefix: "/dashboard/conversion-events", key: "pixels" },
     { prefix: "/dashboard/ads", key: "ads" },
-    { prefix: "/dashboard/operations", key: "operations" },
     { prefix: "/dashboard/archive", key: "archive" },
     { prefix: "/dashboard/monthly", key: "monthly" },
     { prefix: "/dashboard/link-generator", key: "referrals" },
@@ -105,7 +106,11 @@ const PATH_RULES = [
     { prefix: "/dashboard/users/team", key: "team" },
     { prefix: "/dashboard/logs", key: "logs" },
     { prefix: "/dashboard/badges", key: "badges" },
-    { prefix: "/dashboard/messages", key: "messages" },
+    { prefix: "/dashboard/communication", key: "messages" },
+    // Without its own rule /dashboard/inbox fell through to the "/dashboard → revenue" catch-all,
+    // so the route guard demanded `revenue` while the sidebar entry and the API both check
+    // `messages` — a staffer granted the inbox was bounced straight back out of it.
+    { prefix: "/dashboard/inbox", key: "messages" },
     { prefix: "/dashboard/templates", key: "templates" },
     { prefix: "/dashboard/campaigns", key: "campaigns" },
     { prefix: "/dashboard/categories", key: "categories" },

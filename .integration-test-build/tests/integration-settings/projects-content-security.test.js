@@ -224,10 +224,9 @@ for (const ownPermission of protectedSections) {
     strict_1.default.match(card, /label="حقول فارغة" value=\{totals\.emptyFields\}/);
     strict_1.default.doesNotMatch(card, /حقول ناقصة أوفارغة/);
 });
-(0, node_test_1.default)("operations content permission boundary remains unchanged", () => {
-    const source = (0, node_fs_1.readFileSync)("app/(dashboard)/dashboard/operations/layout.tsx", "utf8");
-    strict_1.default.match(source, /resolveDashboardPageAccess[\s\S]*"operations"/);
-});
+// "operations content permission boundary remains unchanged" read
+// app/(dashboard)/dashboard/operations/layout.tsx, removed with التشغيل. There is no boundary
+// left to assert on — the permission key is gone too.
 (0, node_test_1.default)("targeted CMS security TypeScript check passes", () => {
     (0, node_child_process_1.execFileSync)(process.execPath, [
         "node_modules/typescript/bin/tsc",
