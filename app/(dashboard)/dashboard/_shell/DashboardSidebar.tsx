@@ -17,8 +17,33 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
+/**
+ * The unread pill. Brand blue rather than the usual notification red — this is "there is work
+ * here", not "something is wrong", and red beside a nav label reads as an error state.
+ *
+ * Capped at 99+ so a long-neglected inbox cannot widen the item and push the label into an
+ * ellipsis. `tabular-nums` keeps the pill from twitching as the number changes under the poll.
+ */
+function NavCountBadge({ count, label }: { count: number; label: string }) {
+  return (
+    <span
+      className={cn(
+        'shrink-0 min-w-[1.25rem] h-5 px-1.5 inline-flex items-center justify-center',
+        'rounded-full bg-brand text-white text-[10.5px] font-bold leading-none tabular-nums',
+        'shadow-sm shadow-brand/30',
+      )}
+      // The digits alone are meaningless to a screen reader sitting after "الرسائل الواردة".
+      aria-label={`${count} ${label}`}
+    >
+      <span aria-hidden>{count > 99 ? '99+' : count}</span>
+    </span>
+  );
+}
+
 type Props = {
   navigation: DashboardNavGroup[];
+  /** Live counts keyed by `DashboardNavItem.badge`. Missing or 0 renders no pill. */
+  badgeCounts?: Record<string, number>;
   activeHref: string | null;
   collapsedGroups: Record<string, boolean>;
   onToggleGroup: (group: string) => void;
@@ -30,7 +55,7 @@ type Props = {
 };
 
 export function DashboardSidebar({
-  navigation, activeHref, collapsedGroups, onToggleGroup,
+  navigation, badgeCounts, activeHref, collapsedGroups, onToggleGroup,
   user, isOpen, onClose, onOpenSearch, dir,
 }: Props) {
   const asideRef = useRef<HTMLElement>(null);
@@ -105,16 +130,24 @@ export function DashboardSidebar({
       <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-4 sidebar-scroll-light">
         {navigation.map((section) => {
           const collapsed = collapsedGroups[section.group] ?? false;
+          // A count hidden inside a folded group is a count nobody sees, so the group header
+          // carries the total of its own items while it is closed.
+          const groupCount = collapsed
+            ? section.items.reduce((sum, i) => sum + (i.badge ? badgeCounts?.[i.badge] ?? 0 : 0), 0)
+            : 0;
           return (
             <div key={section.group}>
               <button
                 type="button"
                 onClick={() => onToggleGroup(section.group)}
                 aria-expanded={!collapsed}
-                className="w-full px-2 py-1 mb-1 flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider hover:text-slate-600 transition-colors"
+                className="w-full px-2 py-1 mb-1 flex items-center justify-between gap-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider hover:text-slate-600 transition-colors"
               >
-                <span>{section.group}</span>
-                <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', collapsed && '-rotate-90')} />
+                <span className="truncate">{section.group}</span>
+                <span className="flex items-center gap-1.5 shrink-0">
+                  {groupCount > 0 && <NavCountBadge count={groupCount} label="عنصر غير مقروء" />}
+                  <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', collapsed && '-rotate-90')} />
+                </span>
               </button>
 
               {!collapsed && (
@@ -122,6 +155,7 @@ export function DashboardSidebar({
                   {section.items.map((item) => {
                     const Icon = NAV_ICONS[item.icon];
                     const active = item.href === activeHref;
+                    const count = item.badge ? badgeCounts?.[item.badge] ?? 0 : 0;
                     return (
                       // <Link>, not <button onClick={router.push}> — restores prefetch,
                       // middle-click, ctrl-click and "open in new tab".
@@ -148,8 +182,21 @@ export function DashboardSidebar({
                         )}
                         <span className="flex items-center gap-2.5 min-w-0">
                           <Icon className={cn('w-[17px] h-[17px] shrink-0', active ? 'text-brand' : 'text-slate-400 group-hover:text-slate-600')} />
-                          <span className="truncate">{item.title}</span>
+                          {/* Unread items read as unread: a heavier label, matching the way the
+                              cards inside the inbox weight an unopened message. The darkening
+                              is skipped on the active item, whose brand colour already carries
+                              more emphasis than slate-900 would. */}
+                          <span
+                            className={cn(
+                              'truncate',
+                              count > 0 && 'font-bold',
+                              count > 0 && !active && 'text-slate-900',
+                            )}
+                          >
+                            {item.title}
+                          </span>
                         </span>
+                        {count > 0 && <NavCountBadge count={count} label="رسالة غير مقروءة" />}
                       </Link>
                     );
                   })}

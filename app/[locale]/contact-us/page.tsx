@@ -67,7 +67,11 @@ const ContactPage = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           subject: formData.messageType,
-          body: `${formData.message}${formData.phone ? `\n\nPhone: ${formData.phone}` : ""}`,
+          // The phone rides its own field now instead of being appended to the message text —
+          // the dashboard inbox needs it as data to build a WhatsApp reply link, and the admin
+          // reading the message should not have to see a "Phone:" line stapled to the end.
+          body: formData.message,
+          contactPhone: formData.phone,
           locale,
           guestName: formData.name,
           guestEmail: formData.email,

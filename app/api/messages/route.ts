@@ -25,6 +25,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Unlike guestName/guestEmail this is kept for signed-in senders too: it is the number they
+    // asked to be reached on for THIS message, which the dashboard inbox turns into a WhatsApp
+    // reply link. It used to be appended to the body as a "Phone: …" line instead.
+    const contactPhone =
+      typeof body.contactPhone === "string" ? body.contactPhone.trim().slice(0, 32) || null : null;
+
     const data: {
       body: string;
       locale: string;
@@ -53,6 +59,7 @@ export async function POST(request: NextRequest) {
         userId: data.userId ?? null,
         guestName: data.guestName ?? null,
         guestEmail: data.guestEmail ?? null,
+        contactPhone,
       },
     });
 

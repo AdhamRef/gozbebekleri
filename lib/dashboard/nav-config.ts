@@ -9,7 +9,18 @@ export type DashboardNavItem = {
   icon: NavIconName;
   /** Extra search terms for the command palette — English slugs, synonyms, provider names. */
   keywords?: string[];
+  /**
+   * Opts this item into a live count pill in the sidebar.
+   *
+   * A slug, not a number: this module is plain serialisable data that server components import,
+   * so it must not reach for a session, a database or a fetch. `DashboardLayoutClient` maps the
+   * slug to a poller and hands the resolved numbers back down.
+   */
+  badge?: DashboardNavBadgeKey;
 };
+
+/** Counters the sidebar knows how to fetch. */
+export type DashboardNavBadgeKey = "inboxUnread";
 
 export type DashboardNavGroup = { group: string; items: DashboardNavItem[] };
 
@@ -45,7 +56,6 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
       // PUBLIC site renders, so leaving them unlinked meant no one could edit live UI.
       { key: "slides", title: "الشرائح", href: "/dashboard/slides", icon: "images", keywords: ["slides", "slider", "hero"] },
       { key: "ticker", title: "شريط التبرعات", href: "/dashboard/ticker", icon: "ticket", keywords: ["ticker", "marquee"] },
-      { key: "badges", title: "الشارات", href: "/dashboard/badges", icon: "award", keywords: ["badges"] },
     ],
   },
   {
@@ -61,16 +71,17 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
       // DONATION_LAPSED reminder.
       // Per-channel pages: each answers "what did we send on this channel, and what happened to
       // it afterwards" — the delivery/open/click detail the flat send log cannot show.
+      { key: "messages", title: "الحملات التسويقية", href: "/dashboard/communication/campaigns", icon: "megaphone", keywords: ["campaigns", "marketing", "حملات", "تسويق", "broadcast", "bulk"] },
       { key: "messages", title: "البريد الإلكتروني", href: "/dashboard/communication/email", icon: "mail", keywords: ["email", "بريد", "elastic"] },
       { key: "messages", title: "واتساب", href: "/dashboard/communication/whatsapp", icon: "messageCircle", keywords: ["whatsapp", "واتساب", "meta"] },
       { key: "messages", title: "الرسائل النصية", href: "/dashboard/communication/sms", icon: "messageSquare", keywords: ["sms", "نصية", "netgsm", "brevo"] },
-      { key: "messages", title: "الحملات التسويقية", href: "/dashboard/communication/campaigns", icon: "megaphone", keywords: ["campaigns", "marketing", "حملات", "تسويق", "broadcast", "bulk"] },
       { key: "templates", title: "قوالب البريد والمحفّزات", href: "/dashboard/templates", icon: "mail", keywords: ["email", "triggers", "محفزات"] },
       // Was the second tab of /dashboard/messages, behind a page that defaults to the outbound
       // log — so visitor mail had no sidebar entry and no command-palette hit. It is inbound
       // human correspondence, not send telemetry, and belongs beside the channels, not inside them.
-      { key: "messages", title: "الرسائل الواردة", href: "/dashboard/inbox", icon: "inbox", keywords: ["inbox", "inbound", "contact", "واردة", "زوار", "تواصل"] },
+      { key: "badges", title: "الشارات", href: "/dashboard/badges", icon: "award", keywords: ["badges"] },
       { key: "messages", title: "سجل الرسائل", href: "/dashboard/messages", icon: "history", keywords: ["messages", "log", "history"] },
+      { key: "messages", title: "الرسائل الواردة", href: "/dashboard/inbox", icon: "inbox", keywords: ["inbox", "inbound", "contact", "واردة", "زوار", "تواصل"], badge: "inboxUnread" },
     ],
   },
   {
@@ -146,11 +157,11 @@ export const DASHBOARD_PERMISSION_ROWS: {
   // pages are linked in the nav above, they must also be grantable.
   { key: "slides", group: "الحملات والمحتوى", title: "الشرائح" },
   { key: "ticker", group: "الحملات والمحتوى", title: "شريط التبرعات" },
-  { key: "badges", group: "الحملات والمحتوى", title: "الشارات" },
   // Group was "التشغيل / التواصل"; التشغيل no longer exists, so these two are plain التواصل.
   { key: "templates", group: "التواصل", title: "قوالب البريد والمحفّزات" },
   // Both the inbox and the send log ride the same `messages` permission, so this stays one row
   // rather than implying they can be granted apart.
+  { key: "badges", group: "التواصل", title: "الشارات" },
   { key: "messages", group: "التواصل", title: "الرسائل الواردة وسجل الرسائل" },
   { key: "ads", group: "التسويق", title: "عرض أداء التسويق والتوصيات" },
   { key: "referrals", group: "التسويق", title: "إدارة الروابط والإسناد" },

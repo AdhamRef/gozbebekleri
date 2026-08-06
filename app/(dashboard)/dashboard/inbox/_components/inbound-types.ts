@@ -1,4 +1,5 @@
 import type { MessageSubject } from "@/lib/messages/subjects";
+import type { MessageReplyChannel } from "@/lib/messages/inbox-status";
 
 /** One row from `GET /api/admin/messages`, after the route decodes the legacy `[SUBJECT:…]` prefix. */
 export interface InboundMessage {
@@ -10,12 +11,35 @@ export interface InboundMessage {
   guestName: string | null;
   guestEmail: string | null;
   createdAt: string;
+
+  /** Triage state — see lib/messages/inbox-status.ts. Null means "not yet". */
+  readAt: string | null;
+  repliedAt: string | null;
+  repliedVia: MessageReplyChannel | null;
+  repliedByName: string | null;
+
+  /**
+   * Resolved server-side from the message's own number, the legacy "Phone: …" body trailer, or
+   * the sender's account. `phone` is what to show; `whatsapp` is E.164 digits and is null when
+   * no dependable wa.me link could be built from it.
+   */
+  phone: string | null;
+  whatsapp: string | null;
+
   user?: {
     id: string;
     name: string | null;
     email: string | null;
     image: string | null;
   } | null;
+}
+
+/** Counts for the status tabs, taken against the other active filters. */
+export interface InboxCounts {
+  all: number;
+  unread: number;
+  pending: number;
+  replied: number;
 }
 
 /** Who wrote it, resolved once so the card and the dialog cannot disagree. */

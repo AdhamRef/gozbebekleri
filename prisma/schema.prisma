@@ -158,9 +158,32 @@ model Message {
   userId    String?  @db.ObjectId // optional: guest can send without account
   guestName String?
   guestEmail String?
+  /// The number the sender asked to be reached on FOR THIS MESSAGE. Unlike guestName/guestEmail
+  /// it is kept for signed-in senders too — a registered donor may want the reply on a different
+  /// number than the one on their profile. Before this column existed the contact form smuggled
+  /// it into `body` as a trailing "Phone: …" line, which the inbox still parses for old rows.
+  contactPhone String?
   createdAt DateTime @default(now())
 
+  // Inbox triage state. All of these are null on arrival: unread and unanswered.
+  /// Set the first time an admin opens the message in /dashboard/inbox.
+  readAt     DateTime?
+  /// Set when an admin actually answers — or marks it answered by hand.
+  repliedAt  DateTime?
+  repliedVia MessageReplyChannel?
+  /// Who answered. Plain scalars, not a relation: the inbox only ever displays them, and a
+  /// relation here would put a back-reference on User for something never queried from that side.
+  repliedById   String? @db.ObjectId
+  repliedByName String?
+
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+enum MessageReplyChannel {
+  EMAIL
+  WHATSAPP
+  /// Answered somewhere this app cannot see (phone call, in person, another inbox).
+  MANUAL
 }
 
 enum MessageSubject {

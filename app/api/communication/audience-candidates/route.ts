@@ -6,6 +6,9 @@ import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { prisma } from "@/lib/prisma";
 import { donorChannelEligibility } from "@/lib/communication/audience-service";
 import { isCommunicationChannel } from "@/lib/communication/communication-runtime-types";
+import { getUserIdsMatchingBadge, getBadgeIdsByUser } from "@/lib/badge-criteria";
+import { resolveUserCountry } from "@/lib/dashboard/resolve-user-country";
+import { getCountryDisplayNameFromCode } from "@/lib/dashboard/country-display-name";
 import { isValidLocale, DEFAULT_LOCALE } from "@/lib/locales";
 
 export const runtime = "nodejs";
@@ -21,12 +24,92 @@ export const dynamic = "force-dynamic";
  * campaign's channel, and the counts distinguish "matched your filter" from "can actually receive
  * this".
  *
- * `NEEDS_REVIEW` is WhatsApp-specific and is kept distinct from `UNAVAILABLE` rather than folded
- * into it: those donors have a phone but no recorded opt-in, which is a consent decision for a
- * human, not a filtering accident.
+ * `NEEDS_REVIEW` is WhatsApp-specific and stays distinct from `UNAVAILABLE` rather than folded into
+ * it: those donors have a phone but no recorded opt-in, which is a consent decision for a human,
+ * not a filtering accident.
+ *
+ * Country, badges and language mirror the المتبرعون table so the same audience can be reasoned
+ * about the same way in both places. Facets (the filter dropdowns' options) are returned from here
+ * rather than fetched separately, so the whole screen needs one permission — `messages` — instead
+ * of also requiring `badges` just to populate a filter.
  */
 
 const PAGE_SIZE_MAX = 100;
+const SELECT_ALL_CEILING = 5000;
+
+const donorSelect = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  image: true,
+  preferredLang: true,
+  country: true,
+  countryCode: true,
+  countryName: true,
+} satisfies Prisma.UserSelect;
+
+type DonorRow = Prisma.UserGetPayload<{ select: typeof donorSelect }>;
+
+/** Extra fields eligibility needs but the table never renders. */
+const eligibilitySelect = {
+  id: true,
+  email: true,
+  phone: true,
+  emailNotifications: true,
+  smsNotifications: true,
+} satisfies Prisma.UserSelect;
+
+type FilterInput = {
+  search?: string | null;
+  locale?: string | null;
+  country?: string | null;
+  badgeId?: string | null;
+};
+
+/**
+ * Build the donor `where` for the current filters.
+ *
+ * Badge membership is computed, not stored — there is no User↔Badge row to join — so a badge filter
+ * has to resolve to an id list first, exactly as the المتبرعون endpoint does. An empty result is
+ * passed through as `id: { in: [] }` rather than dropped, otherwise "badge with no members" would
+ * silently widen to "every donor".
+ */
+async function buildWhere(f: FilterInput): Promise<Prisma.UserWhereInput> {
+  const where: Prisma.UserWhereInput = { role: "DONOR" };
+
+  if (f.locale && f.locale !== "all" && isValidLocale(f.locale)) where.preferredLang = f.locale;
+  if (f.country && f.country !== "all") where.countryCode = f.country;
+
+  const search = f.search?.trim();
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { email: { contains: search, mode: "insensitive" } },
+      { phone: { contains: search } },
+    ];
+  }
+
+  if (f.badgeId && f.badgeId !== "all") {
+    const badge = await prisma.badge.findUnique({ where: { id: f.badgeId }, select: { criteria: true } });
+    where.id = { in: badge ? await getUserIdsMatchingBadge(badge.criteria) : [] };
+  }
+
+  return where;
+}
+
+type ConsentProfile = { doNotContact: boolean; emailOptIn: boolean; smsOptIn: boolean; whatsappOptIn: boolean };
+
+async function eligibilityProfiles(userIds: string[]): Promise<Map<string, ConsentProfile>> {
+  if (userIds.length === 0) return new Map();
+  const rows = await prisma.donorCommunicationProfile
+    .findMany({
+      where: { userId: { in: userIds } },
+      select: { userId: true, whatsappOptIn: true, emailOptIn: true, smsOptIn: true, doNotContact: true },
+    })
+    .catch(() => []);
+  return new Map(rows.map((r) => [r.userId, r]));
+}
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -39,75 +122,87 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "channel must be EMAIL, WHATSAPP or SMS" }, { status: 400 });
   }
 
-  const search = sp.get("search")?.trim() || "";
-  const localeFilter = sp.get("locale") || "all";
-  const countryFilter = sp.get("country") || "all";
-  const eligibilityFilter = sp.get("eligibility") || "all"; // all | eligible | ineligible
+  const eligibilityFilter = sp.get("eligibility") || "all";
   const page = Math.max(1, parseInt(sp.get("page") || "1"));
   const limit = Math.min(PAGE_SIZE_MAX, Math.max(1, parseInt(sp.get("limit") || "25")));
 
-  const where: Prisma.UserWhereInput = { role: "DONOR" };
-  if (localeFilter !== "all" && isValidLocale(localeFilter)) where.preferredLang = localeFilter;
-  if (countryFilter !== "all") where.countryCode = countryFilter;
-  if (search) {
-    where.OR = [
-      { name: { contains: search, mode: "insensitive" } },
-      { email: { contains: search, mode: "insensitive" } },
-      { phone: { contains: search } },
-    ];
-  }
+  const where = await buildWhere({
+    search: sp.get("search"),
+    locale: sp.get("locale"),
+    country: sp.get("country"),
+    badgeId: sp.get("badgeId"),
+  });
 
-  const select = {
-    id: true,
-    name: true,
-    email: true,
-    phone: true,
-    image: true,
-    preferredLang: true,
-    countryCode: true,
-    countryName: true,
-    emailNotifications: true,
-    smsNotifications: true,
-  } satisfies Prisma.UserSelect;
+  const [total, rows, allBadges] = await Promise.all([
+    prisma.user.count({ where }),
+    prisma.user.findMany({
+      where,
+      select: { ...donorSelect, ...eligibilitySelect },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.badge.findMany({
+      select: { id: true, name: true, color: true, criteria: true, translations: { select: { locale: true, name: true } } },
+      orderBy: { order: "asc" },
+    }),
+  ]);
 
-  /** Attach per-channel eligibility, preferring the consent profile over the legacy User flags. */
-  const decorate = async (rows: Prisma.UserGetPayload<{ select: typeof select }>[]) => {
-    const profiles = rows.length
-      ? await prisma.donorCommunicationProfile
-          .findMany({
-            where: { userId: { in: rows.map((r) => r.id) } },
-            select: { userId: true, whatsappOptIn: true, emailOptIn: true, smsOptIn: true, doNotContact: true },
-          })
-          .catch(() => [])
-      : [];
-    const byUser = new Map(profiles.map((p) => [p.userId, p]));
-    return rows.map((u) => ({
+  const pageIds = rows.map((r) => r.id);
+  const [profiles, badgeIdsByUser] = await Promise.all([
+    eligibilityProfiles(pageIds),
+    pageIds.length ? getBadgeIdsByUser(pageIds, allBadges) : Promise.resolve(new Map<string, string[]>()),
+  ]);
+
+  let donors = rows.map((u) => {
+    const resolved = resolveUserCountry(u as DonorRow);
+    return {
       id: u.id,
       name: u.name,
       email: u.email,
       phone: u.phone,
       image: u.image,
       locale: u.preferredLang && isValidLocale(u.preferredLang) ? u.preferredLang : DEFAULT_LOCALE,
-      countryCode: u.countryCode,
-      countryName: u.countryName,
+      countryCode: resolved.code,
+      countryName: resolved.name,
+      badgeIds: badgeIdsByUser.get(u.id) ?? [],
       eligibility: donorChannelEligibility(
         { email: u.email, phone: u.phone, emailNotifications: u.emailNotifications, smsNotifications: u.smsNotifications },
         channel,
-        byUser.get(u.id) ?? null,
+        profiles.get(u.id) ?? null,
       ),
-    }));
-  };
+    };
+  });
 
-  const [total, rows] = await Promise.all([
-    prisma.user.count({ where }),
-    prisma.user.findMany({ where, select, orderBy: { createdAt: "desc" }, skip: (page - 1) * limit, take: limit }),
-  ]);
-
-  let donors = await decorate(rows);
   if (eligibilityFilter === "eligible") donors = donors.filter((d) => d.eligibility === "ELIGIBLE");
   else if (eligibilityFilter === "ineligible") donors = donors.filter((d) => d.eligibility !== "ELIGIBLE");
 
-  return NextResponse.json({ ok: true, donors, pagination: { total, page, limit } });
+  // Facets are computed over ALL donors, not the current filter, so narrowing by one dimension
+  // never empties the other dropdowns and strands the operator with no way back.
+  const countryGroups = await prisma.user.groupBy({
+    by: ["countryCode"],
+    where: { role: "DONOR", countryCode: { not: null } },
+    _count: { id: true },
+  });
+  const countries = countryGroups
+    .filter((c): c is typeof c & { countryCode: string } => Boolean(c.countryCode))
+    .map((c) => ({ code: c.countryCode, name: getCountryDisplayNameFromCode(c.countryCode, "ar"), count: c._count.id }))
+    // Busiest first: with 70+ countries an alphabetical list buries the handful anyone uses.
+    .sort((a, b) => b.count - a.count);
+
+  return NextResponse.json({
+    ok: true,
+    donors,
+    pagination: { total, page, limit },
+    facets: {
+      countries,
+      badges: allBadges.map((b) => ({
+        id: b.id,
+        name: b.translations.find((t) => t.locale === "ar")?.name || b.name,
+        color: b.color,
+      })),
+    },
+  });
 }
 
 /**
@@ -122,52 +217,32 @@ export async function POST(request: NextRequest) {
   const denied = requireAdminOrDashboardPermission(session, "messages");
   if (denied) return denied;
 
-  let body: { channel?: string; search?: string; locale?: string; country?: string; eligibility?: string };
+  let body: FilterInput & { channel?: string; eligibility?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
   }
-  if (!isCommunicationChannel(body.channel)) {
+  const channel = body.channel;
+  if (!isCommunicationChannel(channel)) {
     return NextResponse.json({ ok: false, error: "channel must be EMAIL, WHATSAPP or SMS" }, { status: 400 });
   }
 
-  const where: Prisma.UserWhereInput = { role: "DONOR" };
-  if (body.locale && body.locale !== "all" && isValidLocale(body.locale)) where.preferredLang = body.locale;
-  if (body.country && body.country !== "all") where.countryCode = body.country;
-  if (body.search?.trim()) {
-    where.OR = [
-      { name: { contains: body.search.trim(), mode: "insensitive" } },
-      { email: { contains: body.search.trim(), mode: "insensitive" } },
-      { phone: { contains: body.search.trim() } },
-    ];
-  }
+  const where = await buildWhere(body);
+  const rows = await prisma.user.findMany({ where, select: eligibilitySelect, take: SELECT_ALL_CEILING });
+  const profiles = await eligibilityProfiles(rows.map((r) => r.id));
 
-  const rows = await prisma.user.findMany({
-    where,
-    select: { id: true, email: true, phone: true, emailNotifications: true, smsNotifications: true },
-    take: 5000,
-  });
-  const profiles = await prisma.donorCommunicationProfile
-    .findMany({
-      where: { userId: { in: rows.map((r) => r.id) } },
-      select: { userId: true, whatsappOptIn: true, emailOptIn: true, smsOptIn: true, doNotContact: true },
-    })
-    .catch(() => []);
-  const byUser = new Map(profiles.map((p) => [p.userId, p]));
-
-  const wantEligibleOnly = body.eligibility !== "all" && body.eligibility !== "ineligible";
   const ids = rows
     .filter((u) => {
-      if (body.eligibility === "all") return true;
+      if (!body.eligibility || body.eligibility === "all") return true;
       const e = donorChannelEligibility(
         { email: u.email, phone: u.phone, emailNotifications: u.emailNotifications, smsNotifications: u.smsNotifications },
-        body.channel as "EMAIL" | "SMS" | "WHATSAPP",
-        byUser.get(u.id) ?? null,
+        channel,
+        profiles.get(u.id) ?? null,
       );
-      return wantEligibleOnly ? e === "ELIGIBLE" : e !== "ELIGIBLE";
+      return body.eligibility === "ineligible" ? e !== "ELIGIBLE" : e === "ELIGIBLE";
     })
     .map((u) => u.id);
 
-  return NextResponse.json({ ok: true, ids, truncated: rows.length >= 5000 });
+  return NextResponse.json({ ok: true, ids, truncated: rows.length >= SELECT_ALL_CEILING });
 }

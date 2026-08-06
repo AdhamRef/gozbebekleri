@@ -46,12 +46,12 @@ exports.DASHBOARD_NAV_GROUPS = [
             // PUBLIC site renders, so leaving them unlinked meant no one could edit live UI.
             { key: "slides", title: "الشرائح", href: "/dashboard/slides", icon: "images", keywords: ["slides", "slider", "hero"] },
             { key: "ticker", title: "شريط التبرعات", href: "/dashboard/ticker", icon: "ticket", keywords: ["ticker", "marquee"] },
-            { key: "badges", title: "الشارات", href: "/dashboard/badges", icon: "award", keywords: ["badges"] },
         ],
     },
     {
         group: "التواصل",
         items: [
+            { key: "badges", title: "الشارات", href: "/dashboard/badges", icon: "award", keywords: ["badges"] },
             { key: "operations", title: "مركز التواصل", href: "/dashboard/operations/communication", icon: "messageCircle", keywords: ["communication", "hub"] },
             { key: "operations", title: "حملات الرسائل", href: "/dashboard/operations/communication/campaigns", icon: "megaphone", keywords: ["campaigns", "broadcast", "إرسال جماعي"] },
             { key: "operations", title: "المحادثات", href: "/dashboard/operations/communication/inbox", icon: "inbox", keywords: ["inbox", "conversations", "chat"] },

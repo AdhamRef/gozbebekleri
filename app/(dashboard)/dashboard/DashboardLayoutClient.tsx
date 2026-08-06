@@ -28,6 +28,7 @@ import {
   resolveActiveDashboardHref,
 } from "@/lib/dashboard/nav-config";
 import { buildBreadcrumbs } from "@/lib/dashboard/breadcrumbs";
+import { INBOX_UNREAD_EVENT } from "@/lib/messages/inbox-status";
 import { DashboardSidebar } from "./_shell/DashboardSidebar";
 import { DashboardTopbar } from "./_shell/DashboardTopbar";
 import { CommandPalette } from "./_shell/CommandPalette";
@@ -119,9 +120,57 @@ function DashboardContent({
     setCollapsedGroups((prev) => (prev[owner.group] ? { ...prev, [owner.group]: false } : prev));
   }, [activeHref]);
 
-  // The unread-inbox badge polled /api/dashboard/operations/communication/inbox/badge every
-  // 60s for every admin. Both the inbox page and that route were removed with التشغيل, so the
-  // poll could only ever 404 — it is gone rather than left to run against a dead endpoint.
+  /**
+   * Live counts for nav items that declare a `badge` slug.
+   *
+   * Only polled when the item is actually in this user's filtered navigation: a staffer without
+   * the `messages` permission would otherwise poll an endpoint that can only answer 403.
+   *
+   * `inboxCountEvent` lets the inbox page push the number down the instant the admin opens a
+   * message, instead of leaving a stale badge until the next 60s tick.
+   */
+  const badgeKeys = useMemo(
+    () => navigation.flatMap((s) => s.items.filter((i) => i.badge).map((i) => i.badge!)),
+    [navigation],
+  );
+  const wantsInboxBadge = badgeKeys.includes('inboxUnread');
+  const [navCounts, setNavCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!wantsInboxBadge) return;
+    let cancelled = false;
+    const setInbox = (n: number) =>
+      setNavCounts((prev) => (prev.inboxUnread === n ? prev : { ...prev, inboxUnread: n }));
+
+    const run = async () => {
+      try {
+        const res = await fetch('/api/admin/messages/unread-count', { cache: 'no-store' });
+        if (!res.ok) { if (!cancelled) setInbox(0); return; }
+        const data = await res.json();
+        // ok:false means the count failed server-side; show no badge rather than a false "0 left".
+        if (!cancelled) setInbox(data?.ok === false ? 0 : Number(data?.count ?? 0));
+      } catch {
+        if (!cancelled) setInbox(0);
+      }
+    };
+
+    run();
+    const timer = setInterval(run, 60000);
+    const onLocalChange = (e: Event) => {
+      const delta = (e as CustomEvent<{ delta?: number }>).detail?.delta;
+      if (typeof delta !== 'number' || !Number.isFinite(delta)) return;
+      setNavCounts((prev) => ({
+        ...prev,
+        inboxUnread: Math.max(0, (prev.inboxUnread ?? 0) + delta),
+      }));
+    };
+    window.addEventListener(INBOX_UNREAD_EVENT, onLocalChange);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener(INBOX_UNREAD_EVENT, onLocalChange);
+    };
+  }, [wantsInboxBadge]);
 
   const closeSidebar = useCallback(() => setIsSidebarOpen(false), []);
   const openSearch = useCallback(() => { setIsSidebarOpen(false); setIsSearchOpen(true); }, []);
@@ -144,6 +193,7 @@ function DashboardContent({
 
       <DashboardSidebar
         navigation={navigation}
+        badgeCounts={navCounts}
         activeHref={activeHref}
         collapsedGroups={collapsedGroups}
         onToggleGroup={toggleGroup}
