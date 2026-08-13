@@ -28,6 +28,8 @@ function mapApiUserToProfileCard(data: unknown): UserProfileCardData | null {
     region: (u.region as string | null) ?? null,
     city: (u.city as string | null) ?? null,
     phone: (u.phone as string | null) ?? null,
+    gender: (u.gender as string | null) ?? null,
+    birthdate: (u.birthdate as string | null) ?? null,
     createdAt:
       u.createdAt instanceof Date
         ? u.createdAt.toISOString()

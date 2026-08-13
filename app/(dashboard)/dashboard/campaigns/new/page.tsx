@@ -8,6 +8,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { toast } from 'react-hot-toast';
+import { errorMessage } from '@/lib/dashboard/client-error-message';
+import { validateImageFile } from '@/lib/uploads/image-file-rules';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -391,7 +393,7 @@ export default function NewCampaignPage() {
       router.push('/dashboard/campaigns');
     } catch (error) {
       console.error('Error creating campaign:', error);
-      toast.error('فشل في إنشاء المشروع');
+      toast.error(errorMessage(error, 'فشل في إنشاء المشروع'));
     } finally {
       setSaving(false);
     }
@@ -414,8 +416,9 @@ export default function NewCampaignPage() {
     const file = e.target.files?.[0];
     if (e.target) e.target.value = '';
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      toast.error('الملف ليس صورة');
+    const rejection = validateImageFile(file);
+    if (rejection) {
+      toast.error(rejection);
       return;
     }
     setUploadingLocale(locale);
@@ -429,7 +432,7 @@ export default function NewCampaignPage() {
       toast.success('تم رفع الصورة');
     } catch (err) {
       console.error('Locale image upload error:', err);
-      toast.error('فشل رفع الصورة');
+      toast.error(errorMessage(err, 'فشل رفع الصورة'));
     } finally {
       setUploadingLocale(null);
     }

@@ -24,14 +24,14 @@ export async function GET(request: NextRequest) {
         ].filter((c) => Object.keys(c).length > 0),
       },
       include: {
-        donations: {
-          select: {
-            amount: true,
-            createdAt: true,
-          },
-        },
+        // `donations: { select: { amount, createdAt } }` used to be joined here,
+        // which loaded EVERY settled DonationItem for EVERY campaign on every
+        // dashboard list render — and no caller ever read it (the pages use the
+        // pre-aggregated `currentAmount` column). Dropping it is the single
+        // biggest win on the campaigns list; the running total is unaffected.
         categories: true, // Include all categories (m2m)
       },
+      orderBy: { createdAt: 'desc' },
     });
 
     // Preserve the legacy `category` field shape for callers that still expect

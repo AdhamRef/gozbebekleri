@@ -49,7 +49,7 @@ export async function generateMetadata({
     title: { default: seo.title, template: seo.titleTemplate },
     description: seo.description,
     keywords: seo.keywords,
-    icons: { icon: "/logo.png" },
+    icons: { icon: "/logometa.avif" },
     alternates,
     openGraph: {
       title: seo.title,

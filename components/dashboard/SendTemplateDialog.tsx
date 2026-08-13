@@ -21,7 +21,14 @@ export type SendTarget =
   | { kind: "user"; userId: string }
   | {
       kind: "filtered";
-      filters: { search?: string; preferredLang?: string; badgeId?: string };
+      filters: {
+        search?: string;
+        preferredLang?: string;
+        badgeId?: string;
+        gender?: string;
+        minAge?: number;
+        maxAge?: number;
+      };
     };
 
 interface Props {
@@ -78,6 +85,9 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
     if (target.filters.preferredLang)
       params.set("preferredLang", target.filters.preferredLang);
     if (target.filters.badgeId) params.set("badgeId", target.filters.badgeId);
+    if (target.filters.gender) params.set("gender", target.filters.gender);
+    if (target.filters.minAge !== undefined) params.set("minAge", String(target.filters.minAge));
+    if (target.filters.maxAge !== undefined) params.set("maxAge", String(target.filters.maxAge));
     axios
       .get(`/api/users?${params}`)
       .then((res) => setRecipientCount(res.data?.pagination?.total ?? 0))

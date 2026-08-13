@@ -38,7 +38,9 @@ export default async function CommunicationConnectionsPage() {
   ]);
 
   return (
-    <main className="space-y-5" dir="rtl">
+    // Same gutters as the sibling health/tracking pages — this one had none, so
+    // the section's three pages sat at different insets.
+    <main className="space-y-4 p-4 sm:p-6" dir="rtl">
       <PageHeader
         eyebrow="ربط المنصات والإرسال / المزودون"
         title="مزودو التواصل والإرسال"

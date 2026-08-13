@@ -20,13 +20,21 @@ import { processElasticEmailEvents, type EmailWebhookSummary } from "./email-web
 
 /** How far back a poll looks. Comfortably wider than the cron interval so a skipped run self-heals. */
 export const DEFAULT_LOOKBACK_MINUTES = 180;
+/**
+ * Ceiling for an explicit backfill (30 days). Anything the routine 3-hour window missed — because
+ * the cron was not deployed yet, or was down longer than the window — stays wrong forever
+ * otherwise: nothing re-examines a delivery once its send call returned. One poll still returns at
+ * most `MAX_EVENTS_PER_POLL` events, so a wide backfill can be truncated; the returned `received`
+ * count is what tells you whether it was.
+ */
+export const MAX_LOOKBACK_MINUTES = 30 * 24 * 60;
 
 export type EmailEventSyncResult =
   | ({ ok: true; since: string } & EmailWebhookSummary)
   | { ok: false; reason: string; detail?: string };
 
 export async function syncElasticEmailEvents(opts: { lookbackMinutes?: number } = {}): Promise<EmailEventSyncResult> {
-  const lookback = Math.max(5, opts.lookbackMinutes ?? DEFAULT_LOOKBACK_MINUTES);
+  const lookback = Math.min(MAX_LOOKBACK_MINUTES, Math.max(5, opts.lookbackMinutes ?? DEFAULT_LOOKBACK_MINUTES));
   const since = new Date(Date.now() - lookback * 60_000);
 
   const fetched = await fetchElasticEmailEvents(since);

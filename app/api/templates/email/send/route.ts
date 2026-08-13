@@ -23,7 +23,17 @@ const sendSchema = z.object({
   locale: z.string().optional(),
   target: z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("user"), userId: z.string().min(1) }),
-    z.object({ kind: z.literal("filtered"), filters: z.object({ search: z.string().optional(), preferredLang: z.string().optional(), badgeId: z.string().optional() }) }),
+    z.object({
+      kind: z.literal("filtered"),
+      filters: z.object({
+        search: z.string().optional(),
+        preferredLang: z.string().optional(),
+        badgeId: z.string().optional(),
+        gender: z.string().optional(),
+        minAge: z.number().int().min(0).max(130).optional(),
+        maxAge: z.number().int().min(0).max(130).optional(),
+      }),
+    }),
   ]),
 });
 

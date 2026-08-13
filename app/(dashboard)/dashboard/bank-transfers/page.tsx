@@ -18,7 +18,15 @@ type TransactionStatus = "PENDING_REVIEW" | "APPROVED" | "IMPORTED" | "IGNORED" 
 type BankStats = { operationCount: number; totals: Record<string, number>; localeTotals: Record<string, Record<string, number>> };
 type Bank = { id: string | null; code: string | null; nameAr: string; nameEn: string | null; nameTr: string | null; accountName: string | null; ibanLast4: string | null; currency: Currency; isActive: boolean; displayOrder: number; stats?: BankStats };
 type PreviewRow = { rowNumber: number; transactionDate: string | null; description: string; donorName: string | null; amount: number | null; currency: Currency; donorLocale?: DonorLocale; direction: "CREDIT" | "DEBIT" | "UNKNOWN"; reference: string | null; suggestedProject: string; confidence: "LOW" | "MEDIUM" | "HIGH"; transactionHash?: string; raw: string[] };
-type PreviewResponse = { fileName: string; bankId: string | null; currency: Currency; donorLocale: DonorLocale; parser: "spreadsheet" | "pdf"; fileHash: string; bankIban: string | null; rowCount: number; rows: PreviewRow[]; warning: string | null };
+type AmountColumnInfo = { source: "header:tutar" | "header:credit" | "header:amount" | "detected" | "none"; header: string | null };
+type PreviewResponse = { fileName: string; bankId: string | null; currency: Currency; donorLocale: DonorLocale; parser: "spreadsheet" | "pdf"; fileHash: string; bankIban: string | null; rowCount: number; rows: PreviewRow[]; amountColumn?: AmountColumnInfo; warning: string | null };
+
+/** Where the importer read the money from — shown so a wrong column is caught before committing. */
+function amountColumnLabel(info: AmountColumnInfo | undefined) {
+  if (!info || info.source === "none") return { text: "لم يُحدَّد عمود المبلغ", tone: "bad" as const };
+  if (info.source === "detected") return { text: "عمود المبلغ: مُستنتَج من البيانات", tone: "warn" as const };
+  return { text: `عمود المبلغ: ${info.header ?? "—"}`, tone: "good" as const };
+}
 type ImportedTransaction = { id: string | null; bankId: string | null; bankIban: string | null; transactionDate: string | null; donorName: string | null; description: string; amount: number | null; currency: string; donorLocale: string; transferMethod: string; suggestedProject: string; finalProject?: string | null; confidence: string; reference: string | null; status: TransactionStatus; reviewedByName?: string | null; approvedAt?: string | null; ignoredAt?: string | null; createdAt: string | null };
 type FormState = { nameAr: string; nameEn: string; nameTr: string; accountName: string; ibanLast4: string; currency: Currency };
 type EditState = { donorName: string; donorLocale: DonorLocale; finalProject: string };
@@ -258,11 +266,29 @@ export default function BankTransfersPage() {
         {preview && (
           <div className="border-t border-slate-100 bg-slate-50/50 p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
-              <span>
-                {preview.fileName} • IBAN: {preview.bankIban ?? "لم يتم التقاطه"} • المعروض{" "}
-                <b className="tabular-nums text-slate-900">{visiblePreviewRows.length}</b> من{" "}
-                <b className="tabular-nums text-slate-900">{preview.rowCount}</b>
-                {excludedPreviewHashes.size > 0 && <> • محذوف <b className="tabular-nums">{excludedPreviewHashes.size}</b></>}
+              <span className="flex flex-wrap items-center gap-2">
+                <span>
+                  {preview.fileName} • IBAN: {preview.bankIban ?? "لم يتم التقاطه"} • المعروض{" "}
+                  <b className="tabular-nums text-slate-900">{visiblePreviewRows.length}</b> من{" "}
+                  <b className="tabular-nums text-slate-900">{preview.rowCount}</b>
+                  {excludedPreviewHashes.size > 0 && <> • محذوف <b className="tabular-nums">{excludedPreviewHashes.size}</b></>}
+                </span>
+                {preview.parser === "spreadsheet" && (() => {
+                  const label = amountColumnLabel(preview.amountColumn);
+                  return (
+                    <span
+                      className={
+                        label.tone === "good"
+                          ? "rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
+                          : label.tone === "warn"
+                          ? "rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700"
+                          : "rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700"
+                      }
+                    >
+                      {label.text}
+                    </span>
+                  );
+                })()}
               </span>
               {excludedPreviewHashes.size > 0 && (
                 <Button size="sm" variant="outline" onClick={() => setExcludedPreviewHashes(new Set())}>
@@ -270,6 +296,12 @@ export default function BankTransfersPage() {
                 </Button>
               )}
             </div>
+
+            {preview.warning && (
+              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                {preview.warning}
+              </div>
+            )}
 
             <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
               <table className="min-w-full text-right text-xs">

@@ -14,7 +14,8 @@ import {
   showCampaignProgress,
 } from "@/lib/campaign/campaign-modes";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
-import { writeAuditLog } from "@/lib/audit-log";
+import { queueAuditLog } from "@/lib/audit-log";
+import { writeErrorMessage } from "@/lib/dashboard/write-error-message";
 import { parseIncludeInactive } from "@/lib/campaign/include-inactive-query";
 import { NOT_SOFT_DELETED } from "@/lib/campaign/soft-delete-filter";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
@@ -345,7 +346,7 @@ export async function POST(request: NextRequest) {
 
     const actor = session!.user;
     const createdRecord = created as { id?: string; title?: string } | null;
-    await writeAuditLog({
+    queueAuditLog({
       stream: "TEAM",
       actorId: actor.id,
       actorName: actor.name,
@@ -357,7 +358,10 @@ export async function POST(request: NextRequest) {
       entityId: createdRecord?.id,
     });
 
-    return NextResponse.json(created, { status: 201 });
+    return NextResponse.json(created, {
+      status: 201,
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
     if (error instanceof CampaignCreateValidationError) {
       return NextResponse.json(
@@ -369,6 +373,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
     console.error("Error creating campaign:", error);
-    return NextResponse.json({ error: "Failed to create campaign" }, { status: 500 });
+    return NextResponse.json(
+      { error: writeErrorMessage(error, "تعذّر إنشاء المشروع") },
+      { status: 500 },
+    );
   }
 }

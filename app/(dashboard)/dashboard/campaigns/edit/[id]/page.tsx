@@ -8,6 +8,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, type FieldErrors } from 'react-hook-form';
 import * as z from 'zod';
 import { toast } from 'react-hot-toast';
+import { errorMessage } from '@/lib/dashboard/client-error-message';
+import { validateImageFile } from '@/lib/uploads/image-file-rules';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -389,13 +391,21 @@ export default function EditCampaignPage() {
       if (!params?.id) return;
       
       try {
-        const [campaignRes, categoriesRes] = await Promise.all([
+        // `fresh=1` opts this read out of the 5-minute shared cache the public
+        // campaign page relies on — the editor must always load what was last
+        // saved, not a CDN copy from before the save.
+        //
+        // The translations call used to run only after these two resolved, for
+        // no reason: it depends on neither. Three round trips became one wait.
+        const [campaignRes, categoriesRes, allTranslationsRes] = await Promise.all([
           axios.get(`/api/campaigns/${params.id}`, {
+            params: { fresh: 1 },
             headers: { 'x-locale': locale },
           }),
           axios.get('/api/categories', {
             headers: { 'x-locale': locale },
-          })
+          }),
+          axios.get(`/api/campaigns/${params.id}/translations`),
         ]);
 
         const campaign = campaignRes.data;
@@ -405,8 +415,6 @@ export default function EditCampaignPage() {
         setShareCountsSeed(parseSuggestedShareCounts(campaign.suggestedShareCounts));
         setShareLabelsSeed(parseShareLabels(campaign.shareLabels));
 
-        // ✅ Fetch all translations for the campaign
-        const allTranslationsRes = await axios.get(`/api/campaigns/${params.id}/translations`);
         const allTranslations = allTranslationsRes.data;
 
         const getTr = (locale: string) => allTranslations.find((t: any) => t.locale === locale);
@@ -618,7 +626,7 @@ export default function EditCampaignPage() {
       //router.push('/dashboard/campaigns');
     } catch (error) {
       console.error('Error updating campaign:', error);
-      toast.error('فشل في تحديث المشروع');
+      toast.error(errorMessage(error, 'فشل في تحديث المشروع'));
     } finally {
       setSaving(false);
     }
@@ -647,8 +655,9 @@ export default function EditCampaignPage() {
     const file = e.target.files?.[0];
     if (e.target) e.target.value = '';
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      toast.error('الملف ليس صورة');
+    const rejection = validateImageFile(file);
+    if (rejection) {
+      toast.error(rejection);
       return;
     }
     setUploadingLocale(locale);
@@ -662,7 +671,7 @@ export default function EditCampaignPage() {
       toast.success('تم رفع الصورة');
     } catch (err) {
       console.error('Locale image upload error:', err);
-      toast.error('فشل رفع الصورة');
+      toast.error(errorMessage(err, 'فشل رفع الصورة'));
     } finally {
       setUploadingLocale(null);
     }
@@ -903,7 +912,7 @@ export default function EditCampaignPage() {
       toast.success('تم إضافة التحديث بنجاح');
     } catch (error) {
       console.error('Error adding update:', error);
-      toast.error('فشل في إضافة التحديث');
+      toast.error(errorMessage(error, 'فشل في إضافة التحديث'));
     } finally {
       setUpdateLoading(false);
     }
@@ -942,7 +951,7 @@ export default function EditCampaignPage() {
       toast.success('تم تحديث التحديث بنجاح');
     } catch (error) {
       console.error('Error editing update:', error);
-      toast.error('فشل في تحديث التحديث');
+      toast.error(errorMessage(error, 'فشل في تحديث التحديث'));
     } finally {
       setUpdateLoading(false);
     }
@@ -957,7 +966,7 @@ export default function EditCampaignPage() {
       toast.success('تم حذف التحديث بنجاح');
     } catch (error) {
       console.error('Error deleting update:', error);
-      toast.error('فشل في حذف التحديث');
+      toast.error(errorMessage(error, 'فشل في حذف التحديث'));
     }
   };
 

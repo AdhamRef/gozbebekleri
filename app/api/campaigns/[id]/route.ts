@@ -4,7 +4,8 @@
 // PUT /api/campaigns/[id] - Updates campaign data
 
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from "../../auth/[...nextauth]/options";
 import {
@@ -26,7 +27,8 @@ import {
   FUNDRAISING_SHARES,
 } from "@/lib/campaign/campaign-modes";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
-import { writeAuditLog } from "@/lib/audit-log";
+import { queueAuditLog } from "@/lib/audit-log";
+import { writeErrorMessage } from "@/lib/dashboard/write-error-message";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 import {
   generateUniqueSlug,
@@ -40,10 +42,12 @@ import { NOT_SOFT_DELETED } from "@/lib/campaign/soft-delete-filter";
 import { setCampaignDisplayTotal } from "@/lib/campaign/current-amount";
 import { PAID_DONATION_FILTER } from "@/lib/dashboard/donation-usd-revenue";
 
-// ✅ Prisma Singleton - Reuse connection across requests
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
-const prisma = globalForPrisma.prisma || new PrismaClient();
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+// This file used to build its own `new PrismaClient()` behind a global that is
+// only assigned when NODE_ENV !== "production". The comment claimed it was a
+// singleton, but in production it was the opposite: a second connection pool,
+// separate from `@/lib/prisma`, opened per serverless instance. Under load that
+// is how a MongoDB deployment runs out of connections and starts erroring on
+// perfectly ordinary saves.
 
 export async function GET(
   request: NextRequest,
@@ -288,11 +292,19 @@ export async function GET(
       updatedAt: campaign.updatedAt.toISOString(),
     };
 
-    // Return with cache headers
+    // Return with cache headers.
+    //
+    // The 5-minute shared cache is right for the public campaign page, but it
+    // was also serving the dashboard edit form — so an admin who saved and
+    // reopened a campaign could be handed their own pre-edit copy and conclude
+    // the save had silently failed. `?fresh=1` (sent by the dashboard) opts that
+    // one caller out; the URL differs, so public traffic still hits the cache.
+    const wantsFresh = url.searchParams.get("fresh") === "1";
     return NextResponse.json(transformedCampaign, {
       headers: {
-        // Browser & CDN can cache for 5 minutes
-        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+        "Cache-Control": wantsFresh
+          ? "no-store"
+          : "public, s-maxage=300, stale-while-revalidate=600",
       },
     });
     
@@ -319,9 +331,19 @@ export async function PUT(
     const body = await request.json();
 
     // ✅ STEP 1: Validate campaign exists (param may be id, base slug, or locale slug)
+    // `categoryPriorities` is selected here even though only the category branch
+    // needs it: it costs nothing to carry on a row we are already reading, and
+    // it removes a second findUnique for the same document further down. On this
+    // deployment a round trip is ~0.5s, so every avoided one is visible.
     const existingCampaign = await prisma.campaign.findFirst({
       where: whereByIdOrLocaleSlug(idOrSlug, "ar"),
-      select: { id: true, fundraisingMode: true, goalType: true, title: true },
+      select: {
+        id: true,
+        fundraisingMode: true,
+        goalType: true,
+        title: true,
+        categoryPriorities: true,
+      },
     });
 
     if (!existingCampaign) {
@@ -382,13 +404,11 @@ export async function PUT(
 
       // Prune `categoryPriorities` entries that point at categories the
       // campaign no longer belongs to, so the per-category ordering map stays
-      // in sync with the relation.
-      const existingCampaign = await prisma.campaign.findUnique({
-        where: { id },
-        select: { categoryPriorities: true },
-      });
+      // in sync with the relation. (Read as part of STEP 1 — this used to be a
+      // second findUnique for the row we had already fetched, and it shadowed
+      // the outer `existingCampaign` binding while doing so.)
       const currentPriorities = parseCategoryPriorities(
-        existingCampaign?.categoryPriorities
+        existingCampaign.categoryPriorities
       );
       const keptPriorities: Record<string, number> = {};
       for (const [catId, order] of Object.entries(currentPriorities)) {
@@ -532,11 +552,29 @@ export async function PUT(
       }
     }
 
-    // ✅ STEP 4: Execute update in transaction (higher timeout: default 5s is too low for
-    // cold DB / many locales; parallel upserts reduce wall time)
-    const updatedCampaign = await prisma.$transaction(
+    // Read every existing translation ONCE, before the transaction opens.
+    // The loop below used to issue a `findUnique` per locale inside the
+    // transaction — 7 extra sequential round trips (~3.5s here) to fetch rows a
+    // single query returns, while holding the transaction open the whole time.
+    const existingTranslations = translationUpdates.length
+      ? await prisma.campaignTranslation.findMany({
+          where: {
+            campaignId: id,
+            locale: { in: translationUpdates.map((t) => t.locale) },
+          },
+          select: { id: true, locale: true, title: true, description: true, slug: true },
+        })
+      : [];
+    const existingByLocale = new Map(existingTranslations.map((t) => [t.locale, t]));
+
+    // ✅ STEP 4: Execute update in transaction. The generous timeout stays because
+    // the per-locale slug generation below genuinely has to run in order; what
+    // used to make it necessary — a findUnique per locale — has moved out.
+    // The transaction's return value is not bound to a name: STEP 5 re-reads the
+    // row with the full select the client needs.
+    await prisma.$transaction(
       async (tx) => {
-        const campaign = await tx.campaign.update({
+        await tx.campaign.update({
           where: { id },
           data: updateData,
         });
@@ -550,10 +588,7 @@ export async function PUT(
         // Process upserts sequentially because the locale-slug uniqueness check inside
         // generateUniqueLocaleSlug must see prior writes within this transaction.
         for (const { locale, data } of translationUpdates) {
-          const existingTrans = await tx.campaignTranslation.findUnique({
-            where: { campaignId_locale: { campaignId: id, locale } },
-            select: { id: true, title: true, description: true, slug: true },
-          });
+          const existingTrans = existingByLocale.get(locale);
 
           const translationData: Record<string, string | null> = {};
           if (data.title !== undefined) translationData.title = data.title;
@@ -585,8 +620,18 @@ export async function PUT(
           // dedupe; omitted slug → keep existing when set; empty/null slug in body →
           // auto-generate from merged title (never persist null).
           const slugKeyPresent = Object.prototype.hasOwnProperty.call(data, "slug");
-          if (slugKeyPresent) {
-            const userSlug = normalizeUserSlug((data as Record<string, unknown>).slug);
+          const existingSlug = existingTrans?.slug?.trim() || "";
+          const userSlug = slugKeyPresent
+            ? normalizeUserSlug((data as Record<string, unknown>).slug)
+            : null;
+
+          // The edit form posts every locale's slug back on every save, so the
+          // usual case is "unchanged". Re-running the uniqueness search for a
+          // slug that already belongs to this very row is a guaranteed-miss
+          // query per locale; when it is unchanged there is nothing to check.
+          if (slugKeyPresent && userSlug && userSlug === existingSlug) {
+            // Leave `translationData.slug` unset — the stored value stands.
+          } else if (slugKeyPresent) {
             const baseForSlug = userSlug ?? mergedTitle;
             translationData.slug = await generateUniqueLocaleSlug(
               tx.campaignTranslation as any,
@@ -597,7 +642,7 @@ export async function PUT(
                 currentTranslationId: existingTrans?.id,
               }
             );
-          } else if (!existingTrans?.slug?.trim()) {
+          } else if (!existingSlug) {
             translationData.slug = await generateUniqueLocaleSlug(
               tx.campaignTranslation as any,
               mergedTitle,
@@ -642,8 +687,6 @@ export async function PUT(
             },
           });
         }
-
-        return campaign;
       },
       { maxWait: 10_000, timeout: 60_000 }
     );
@@ -688,7 +731,7 @@ export async function PUT(
 
     const actor = session!.user;
     const t = fullCampaign?.title ?? body.title ?? "مشروع";
-    await writeAuditLog({
+    queueAuditLog({
       actorId: actor.id,
       actorName: actor.name,
       actorRole: actor.role ?? "ADMIN",
@@ -701,11 +744,15 @@ export async function PUT(
 
     return NextResponse.json(fullCampaign, {
       status: 200,
+      // A save must never be answered from, or land in, a shared cache — the GET
+      // below advertises s-maxage=300, and without this an admin who saved and
+      // reopened the campaign could be handed their pre-edit copy.
+      headers: { "Cache-Control": "no-store" },
     });
 
   } catch (error) {
     console.error("Error updating campaign:", error);
-    
+
     // Handle specific Prisma errors
     if (error instanceof Error) {
       if (error.message.includes("Foreign key constraint")) {
@@ -717,7 +764,7 @@ export async function PUT(
     }
 
     return NextResponse.json(
-      { error: "Failed to update campaign" },
+      { error: writeErrorMessage(error, "تعذّر حفظ المشروع") },
       { status: 500 }
     );
   }
@@ -749,14 +796,20 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
     const id = camp.id;
 
-    await prisma.campaign.update({
-      where: { id },
-      data: { isDeleted: true, isActive: false },
-    });
-    await prisma.cartItem.deleteMany({ where: { campaignId: id } });
+    // Both writes in one batch transaction: previously they were two separate
+    // awaited round trips, so a failure on the second left the campaign flagged
+    // deleted while stale carts still held it. The array form is a single
+    // batched call — atomic and half the latency of the sequential pair.
+    await prisma.$transaction([
+      prisma.campaign.update({
+        where: { id },
+        data: { isDeleted: true, isActive: false },
+      }),
+      prisma.cartItem.deleteMany({ where: { campaignId: id } }),
+    ]);
 
     const actor = session!.user;
-    await writeAuditLog({
+    queueAuditLog({
       actorId: actor.id,
       actorName: actor.name,
       actorRole: actor.role ?? "ADMIN",
@@ -766,10 +819,13 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       entityId: id,
     });
 
-    return NextResponse.json({ message: 'تم مسح المشروع' }, { status: 200 });
+    return NextResponse.json(
+      { message: 'تم مسح المشروع' },
+      { status: 200, headers: { "Cache-Control": "no-store" } }
+    );
   } catch (error) {
     console.error('Error soft-deleting campaign:', error);
-    return NextResponse.json({ error: 'Failed to delete campaign' }, { status: 500 });
+    return NextResponse.json({ error: writeErrorMessage(error, 'تعذّر حذف المشروع') }, { status: 500 });
   }
 }
 

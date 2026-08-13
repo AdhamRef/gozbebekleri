@@ -25,12 +25,31 @@ import { generateUniqueSlug, generateUniqueLocaleSlug } from "../lib/slug";
 
 const prisma = new PrismaClient();
 
+/** `--dry-run` prints what would change and writes nothing. */
+const DRY_RUN = process.argv.includes("--dry-run");
+
+/**
+ * A row needs a slug when the field is absent, null, or blank.
+ *
+ * This must be decided in application code, not in a `where` clause. Prisma's
+ * MongoDB connector translates `{ slug: null }` into a filter that only matches
+ * documents where the field EXISTS and is null — documents that omit `slug`
+ * entirely are not matched. Every base-model backfill here used that filter and
+ * so silently skipped exactly the rows that break the unique index:
+ * `PostCategory` had three slug-less documents and `{ slug: null }` returned
+ * none of them, which is why `prisma db push` kept failing with
+ * `E11000 ... PostCategory_slug_key dup key: { slug: null }`.
+ */
+function slugIsMissing(slug: string | null | undefined): boolean {
+  return slug == null || String(slug).trim() === "";
+}
+
 async function backfillCampaigns() {
-  const rows = await prisma.campaign.findMany({
-    where: { slug: null },
+  const all = await prisma.campaign.findMany({
     select: {
       id: true,
       title: true,
+      slug: true,
       translations: {
         where: { locale: "en" },
         select: { title: true },
@@ -38,6 +57,7 @@ async function backfillCampaigns() {
       },
     },
   });
+  const rows = all.filter((row) => slugIsMissing(row.slug));
   if (rows.length === 0) {
     console.log("[Campaign] nothing to backfill.");
     return;
@@ -49,9 +69,13 @@ async function backfillCampaigns() {
       fallbackPrefix: "campaign",
       currentId: row.id,
     });
+    if (DRY_RUN) {
+      console.log(`[Campaign] would set ${row.id} (${row.title ?? "—"}) -> "${slug}"`);
+      continue;
+    }
     await prisma.campaign.update({ where: { id: row.id }, data: { slug } });
   }
-  console.log(`[Campaign] backfilled ${rows.length} row(s).`);
+  console.log(`[Campaign] ${DRY_RUN ? "would backfill" : "backfilled"} ${rows.length} row(s).`);
 }
 
 function translationSlugIsMissing(slug: string | null | undefined): boolean {
@@ -105,20 +129,24 @@ async function backfillCampaignTranslationSlugs() {
       fallbackPrefix: "campaign",
       currentTranslationId: row.id,
     });
+    if (DRY_RUN) {
+      console.log(`[CampaignTranslation] would set ${row.id} (${row.locale}) -> "${slug}"`);
+      continue;
+    }
     await prisma.campaignTranslation.update({
       where: { id: row.id },
       data: { slug },
     });
   }
-  console.log(`[CampaignTranslation] backfilled ${rows.length} row(s).`);
+  console.log(`[CampaignTranslation] ${DRY_RUN ? "would backfill" : "backfilled"} ${rows.length} row(s).`);
 }
 
 async function backfillCategories() {
-  const rows = await prisma.category.findMany({
-    where: { slug: null },
+  const all = await prisma.category.findMany({
     select: {
       id: true,
       name: true,
+      slug: true,
       translations: {
         where: { locale: "en" },
         select: { name: true },
@@ -126,6 +154,7 @@ async function backfillCategories() {
       },
     },
   });
+  const rows = all.filter((row) => slugIsMissing(row.slug));
   if (rows.length === 0) {
     console.log("[Category] nothing to backfill.");
     return;
@@ -137,17 +166,21 @@ async function backfillCategories() {
       fallbackPrefix: "category",
       currentId: row.id,
     });
+    if (DRY_RUN) {
+      console.log(`[Category] would set ${row.id} (${row.name}) -> "${slug}"`);
+      continue;
+    }
     await prisma.category.update({ where: { id: row.id }, data: { slug } });
   }
-  console.log(`[Category] backfilled ${rows.length} row(s).`);
+  console.log(`[Category] ${DRY_RUN ? "would backfill" : "backfilled"} ${rows.length} row(s).`);
 }
 
 async function backfillPosts() {
-  const rows = await prisma.post.findMany({
-    where: { slug: null },
+  const all = await prisma.post.findMany({
     select: {
       id: true,
       title: true,
+      slug: true,
       translations: {
         where: { locale: "en" },
         select: { title: true },
@@ -155,6 +188,7 @@ async function backfillPosts() {
       },
     },
   });
+  const rows = all.filter((row) => slugIsMissing(row.slug));
   if (rows.length === 0) {
     console.log("[Post] nothing to backfill.");
     return;
@@ -166,17 +200,21 @@ async function backfillPosts() {
       fallbackPrefix: "post",
       currentId: row.id,
     });
+    if (DRY_RUN) {
+      console.log(`[Post] would set ${row.id} (${row.title ?? "—"}) -> "${slug}"`);
+      continue;
+    }
     await prisma.post.update({ where: { id: row.id }, data: { slug } });
   }
-  console.log(`[Post] backfilled ${rows.length} row(s).`);
+  console.log(`[Post] ${DRY_RUN ? "would backfill" : "backfilled"} ${rows.length} row(s).`);
 }
 
 async function backfillPostCategories() {
-  const rows = await prisma.postCategory.findMany({
-    where: { slug: null },
+  const all = await prisma.postCategory.findMany({
     select: {
       id: true,
       name: true,
+      slug: true,
       translations: {
         where: { locale: "en" },
         select: { name: true },
@@ -184,6 +222,7 @@ async function backfillPostCategories() {
       },
     },
   });
+  const rows = all.filter((row) => slugIsMissing(row.slug));
   if (rows.length === 0) {
     console.log("[PostCategory] nothing to backfill.");
     return;
@@ -195,9 +234,13 @@ async function backfillPostCategories() {
       fallbackPrefix: "blog-category",
       currentId: row.id,
     });
+    if (DRY_RUN) {
+      console.log(`[PostCategory] would set ${row.id} (${row.name}) -> "${slug}"`);
+      continue;
+    }
     await prisma.postCategory.update({ where: { id: row.id }, data: { slug } });
   }
-  console.log(`[PostCategory] backfilled ${rows.length} row(s).`);
+  console.log(`[PostCategory] ${DRY_RUN ? "would backfill" : "backfilled"} ${rows.length} row(s).`);
 }
 
 async function main() {

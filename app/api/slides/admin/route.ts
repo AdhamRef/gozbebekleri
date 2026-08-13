@@ -3,11 +3,19 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from "../../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
-import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
+import { queueAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
+import { SLIDE_WITH_TRANSLATIONS_SELECT, buildSlideScalars, parseSlideTranslations } from "@/lib/slides/slide-write";
+import { writeErrorMessage } from "@/lib/dashboard/write-error-message";
 
 export async function GET(request: NextRequest) {
   try {
+    // This listing returns inactive slides too, so unlike the public `/api/slides`
+    // it must be behind the same permission gate as the rest of the dashboard.
+    const session = await getServerSession(authOptions);
+    const denied = requireAdminOrDashboardPermission(session, 'slides');
+    if (denied) return denied;
+
     const params = request.nextUrl.searchParams;
     const locale = params.get('locale') || 'ar';
 
@@ -55,57 +63,31 @@ export async function POST(request: NextRequest) {
     const denied = requireAdminOrDashboardPermission(session, 'slides');
     if (denied) return denied;
     const data = await request.json();
-    const { title, description, image, showButton, buttonText, buttonLink, isActive, order, translations } = data;
-    if (!title) return NextResponse.json({ error: 'Title required' }, { status: 400 });
+    const scalars = buildSlideScalars(data);
+    if (!scalars.title) return NextResponse.json({ error: 'العنوان بالعربية مطلوب' }, { status: 400 });
 
-    const translationData: { locale: string; title: string; description?: string; buttonText?: string }[] = [];
-    if (translations && typeof translations === 'object') {
-      for (const [locale, t] of Object.entries(translations)) {
-        if (locale !== 'ar' && t && typeof t === 'object' && (t as any).title) {
-          const tt = t as any;
-          translationData.push({ locale, title: tt.title, description: tt.description || '', buttonText: tt.buttonText || '' });
-        }
-      }
-    }
+    const { write } = parseSlideTranslations(data.translations);
 
-    const slide = await prisma.$transaction(async (tx) => {
-      const created = await tx.slide.create({
-        data: {
-          title,
-          description: description ?? '',
-          image: image ?? '',
-          showButton: showButton ?? true,
-          buttonText: buttonText ?? '',
-          buttonLink: buttonLink ?? '',
-          isActive: isActive !== false,
-          order: order ?? 0,
-        },
-      });
-      if (translationData.length) {
-        await tx.slideTranslation.createMany({
-          data: translationData.map(t => ({ slideId: created.id, locale: t.locale, title: t.title, description: t.description ?? '', buttonText: t.buttonText ?? '' })),
-        });
-      }
-      return created;
-    });
-
-    const full = await prisma.slide.findUnique({
-      where: { id: slide.id },
-      select: { id: true, title: true, description: true, image: true, showButton: true, buttonText: true, buttonLink: true, isActive: true, order: true, translations: { select: { locale: true, title: true, description: true, buttonText: true } } },
+    const full = await prisma.slide.create({
+      data: {
+        ...scalars,
+        ...(write.length ? { translations: { create: write } } : {}),
+      },
+      select: SLIDE_WITH_TRANSLATIONS_SELECT,
     });
 
     const actor = auditActorFromDashboardSession(session!);
-    await writeAuditLog({
+    queueAuditLog({
       ...actor,
       action: "SLIDE_CREATE",
-      messageAr: `${actor.actorName ?? "مسؤول"} أنشأ شريحة هيرو (لوحة الشرائح): ${full?.title ?? title}`,
+      messageAr: `${actor.actorName ?? "مسؤول"} أنشأ شريحة هيرو (لوحة الشرائح): ${full.title}`,
       entityType: "Slide",
-      entityId: slide.id,
+      entityId: full.id,
     });
 
     return NextResponse.json(full, { status: 201 });
   } catch (error) {
     console.error('Error creating slide:', error);
-    return NextResponse.json({ error: 'Failed to create slide' }, { status: 500 });
+    return NextResponse.json({ error: writeErrorMessage(error, 'تعذّر إنشاء الشريحة') }, { status: 500 });
   }
 }

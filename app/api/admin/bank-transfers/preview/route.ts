@@ -60,6 +60,9 @@ export async function POST(request: NextRequest) {
       rowCount: rows.length,
       rows,
       smartAnalysis: true,
+      // Lets the preview state plainly which column the money was read from,
+      // so a wrong pick is caught before the import rather than after.
+      amountColumn: parsed.amountColumn,
       warning: parsed.warning,
     });
   } catch (error) {

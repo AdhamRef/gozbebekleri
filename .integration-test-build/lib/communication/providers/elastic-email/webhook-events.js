@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.suppressionForEvent = suppressionForEvent;
 exports.mapElasticEmailEventStatus = mapElasticEmailEventStatus;
 exports.extractRawEvents = extractRawEvents;
 exports.normalizeElasticEmailEvents = normalizeElasticEmailEvents;
@@ -10,6 +11,7 @@ const STATUS_BY_EVENT = {
     open: "OPENED",
     clicked: "CLICKED",
     click: "CLICKED",
+    linkclicked: "CLICKED",
     unsubscribed: "UNSUBSCRIBED",
     unsubscribe: "UNSUBSCRIBED",
     bounced: "BOUNCED",
@@ -18,10 +20,17 @@ const STATUS_BY_EVENT = {
     softbounce: "BOUNCED",
     error: "FAILED",
     failed: "FAILED",
-    abusereport: "FAILED",
-    abuse: "FAILED",
-    spam: "FAILED",
-    complaint: "FAILED",
+    // A spam complaint is NOT a failure: the message was delivered and then the
+    // recipient pressed "report spam". Filing it under FAILED both overstated the
+    // failure count and, worse, produced no consent consequence — so the same
+    // donor stayed in every future audience and kept being mailed, which is what
+    // damages sender reputation. It is an opt-out, and the strongest kind.
+    abusereport: "UNSUBSCRIBED",
+    abuse: "UNSUBSCRIBED",
+    spam: "UNSUBSCRIBED",
+    spamcomplaint: "UNSUBSCRIBED",
+    complaint: "UNSUBSCRIBED",
+    complained: "UNSUBSCRIBED",
     suppressed: "FAILED",
     // The pull feed (`GET /v4/events`) spells this one "Suppress", not "Suppressed" — and it is the
     // event that says "we accepted your message and then refused to deliver it", i.e. exactly the
@@ -30,6 +39,35 @@ const STATUS_BY_EVENT = {
     notdelivered: "FAILED",
     invalid: "FAILED",
 };
+/**
+ * Only events that prove the address is permanently unusable suppress it.
+ *
+ * A soft bounce (mailbox full, greylisted, temporary DNS) must not — muting a
+ * donor over a full inbox loses a real recipient permanently. Elastic Email's
+ * single "Bounce/Error" checkbox delivers both kinds, so the distinction is made
+ * here, on the event name, and an ambiguous plain "bounce" is treated as soft.
+ */
+const SUPPRESSION_BY_EVENT = {
+    unsubscribed: "unsubscribe",
+    unsubscribe: "unsubscribe",
+    abusereport: "complaint",
+    abuse: "complaint",
+    spam: "complaint",
+    spamcomplaint: "complaint",
+    complaint: "complaint",
+    complained: "complaint",
+    hardbounce: "hard-bounce",
+    invalid: "hard-bounce",
+    notdelivered: "hard-bounce",
+};
+function normalizeEventKey(event) {
+    return event.toLowerCase().replace(/[\s_-]/g, "");
+}
+function suppressionForEvent(event) {
+    if (!event)
+        return "none";
+    return SUPPRESSION_BY_EVENT[normalizeEventKey(event)] ?? "none";
+}
 const MESSAGE_ID_KEYS = ["messageid", "msgid", "message_id", "transactionid", "transaction_id"];
 const EVENT_KEYS = ["eventtype", "event_type", "event", "status", "category"];
 const RECIPIENT_KEYS = ["to", "email", "recipient", "toemail"];
@@ -55,7 +93,7 @@ function pick(row, keys) {
 function mapElasticEmailEventStatus(event) {
     if (!event)
         return null;
-    return STATUS_BY_EVENT[event.toLowerCase().replace(/[\s_-]/g, "")] ?? null;
+    return STATUS_BY_EVENT[normalizeEventKey(event)] ?? null;
 }
 /** Unwrap the payload into a flat list of raw event objects (single object, array, or `{Events:[…]}`). */
 function extractRawEvents(payload) {
@@ -94,14 +132,16 @@ function normalizeElasticEmailEvents(payload) {
         if (!status)
             continue;
         const occurredAt = pick(raw, DATE_KEYS);
+        const resolvedEvent = (eventType ?? status).toLowerCase();
         out.push({
             providerMessageId,
-            eventType: (eventType ?? status).toLowerCase(),
+            eventType: resolvedEvent,
             status,
             recipient: pick(raw, RECIPIENT_KEYS),
             errorMessage: status === "FAILED" || status === "BOUNCED" ? pick(raw, ERROR_KEYS) : null,
             occurredAt,
-            idempotencyKey: `elastic:${providerMessageId}:${(eventType ?? status).toLowerCase()}:${occurredAt ?? ""}`,
+            idempotencyKey: `elastic:${providerMessageId}:${resolvedEvent}:${occurredAt ?? ""}`,
+            suppression: suppressionForEvent(resolvedEvent),
         });
     }
     return out;

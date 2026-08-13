@@ -99,11 +99,47 @@ const delivery_status_progress_1 = require("../../lib/communication/delivery-sta
     strict_1.default.equal((0, webhook_events_1.mapElasticEmailEventStatus)("delivered"), "DELIVERED");
     strict_1.default.equal((0, webhook_events_1.mapElasticEmailEventStatus)("Opened"), "OPENED");
     strict_1.default.equal((0, webhook_events_1.mapElasticEmailEventStatus)("Clicked"), "CLICKED");
-    strict_1.default.equal((0, webhook_events_1.mapElasticEmailEventStatus)("AbuseReport"), "FAILED");
     strict_1.default.equal((0, webhook_events_1.mapElasticEmailEventStatus)("hard_bounce"), "BOUNCED");
     strict_1.default.equal((0, webhook_events_1.mapElasticEmailEventStatus)("Unsubscribed"), "UNSUBSCRIBED");
     strict_1.default.equal((0, webhook_events_1.mapElasticEmailEventStatus)("something-else"), null);
     strict_1.default.equal((0, webhook_events_1.mapElasticEmailEventStatus)(null), null);
+});
+(0, node_test_1.default)("a spam complaint is an opt-out, not a delivery failure", () => {
+    // It used to map to FAILED, which both inflated the failure count and — because
+    // nothing downstream reacts to FAILED — left the complainant in every future
+    // audience. The message reached them; they opted out in the harshest way.
+    for (const name of ["AbuseReport", "abuse", "Spam", "SpamComplaint", "complaint"]) {
+        strict_1.default.equal((0, webhook_events_1.mapElasticEmailEventStatus)(name), "UNSUBSCRIBED", `failed for ${name}`);
+    }
+});
+(0, node_test_1.default)("only permanent failures suppress the address", () => {
+    strict_1.default.equal((0, webhook_events_1.suppressionForEvent)("Unsubscribed"), "unsubscribe");
+    strict_1.default.equal((0, webhook_events_1.suppressionForEvent)("AbuseReport"), "complaint");
+    strict_1.default.equal((0, webhook_events_1.suppressionForEvent)("hard_bounce"), "hard-bounce");
+    strict_1.default.equal((0, webhook_events_1.suppressionForEvent)("NotDelivered"), "hard-bounce");
+    // A soft bounce is a full mailbox or a temporary DNS failure. Suppressing on
+    // it would permanently mute a reachable donor, so it must not.
+    strict_1.default.equal((0, webhook_events_1.suppressionForEvent)("soft_bounce"), "none");
+    strict_1.default.equal((0, webhook_events_1.suppressionForEvent)("Bounced"), "none");
+    strict_1.default.equal((0, webhook_events_1.suppressionForEvent)("Error"), "none");
+    // Engagement never suppresses.
+    for (const name of ["Sent", "Delivered", "Opened", "Clicked"]) {
+        strict_1.default.equal((0, webhook_events_1.suppressionForEvent)(name), "none", `failed for ${name}`);
+    }
+    strict_1.default.equal((0, webhook_events_1.suppressionForEvent)(null), "none");
+});
+(0, node_test_1.default)("normalized events carry their suppression reason", () => {
+    const events = (0, webhook_events_1.normalizeElasticEmailEvents)([
+        { messageid: "m1", eventtype: "Opened", to: "a@b.org" },
+        { messageid: "m2", eventtype: "Unsubscribed", to: "c@d.org" },
+        { messageid: "m3", eventtype: "AbuseReport", to: "e@f.org" },
+        { messageid: "m4", eventtype: "HardBounce", to: "g@h.org" },
+        { messageid: "m5", eventtype: "SoftBounce", to: "i@j.org" },
+    ]);
+    strict_1.default.deepEqual(events.map((e) => e.suppression), ["none", "unsubscribe", "complaint", "hard-bounce", "none"]);
+    // The recipient must survive normalization — it is the only handle the
+    // suppression step has on the donor.
+    strict_1.default.deepEqual(events.map((e) => e.recipient), ["a@b.org", "c@d.org", "e@f.org", "g@h.org", "i@j.org"]);
 });
 (0, node_test_1.default)("payload unwrapping handles single objects, arrays, and wrapped collections", () => {
     strict_1.default.equal((0, webhook_events_1.extractRawEvents)({ messageid: "a", eventtype: "Sent" }).length, 1);

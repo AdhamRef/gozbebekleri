@@ -1,5 +1,6 @@
 import type { Session } from "next-auth";
 import type { Prisma } from "@prisma/client";
+import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export type AuditStream = "TEAM" | "DONOR";
@@ -48,5 +49,25 @@ export async function writeAuditLog(opts: WriteOpts): Promise<void> {
     });
   } catch (e) {
     console.error("writeAuditLog failed", e);
+  }
+}
+
+/**
+ * Same insert, but off the request's critical path.
+ *
+ * The audit row is one more round trip to Atlas, and this cluster answers in
+ * ~0.5s — so `await writeAuditLog(...)` was adding half a second to every
+ * create/update/delete the dashboard performs, purely to record something the
+ * user never waits on. `after()` runs it once the response has been sent.
+ *
+ * Errors are already swallowed inside `writeAuditLog`, so this can never turn a
+ * successful mutation into a failed one. Outside a request scope (scripts,
+ * cron) `after()` throws, and we fall back to firing it directly.
+ */
+export function queueAuditLog(opts: WriteOpts): void {
+  try {
+    after(() => writeAuditLog(opts));
+  } catch {
+    void writeAuditLog(opts);
   }
 }

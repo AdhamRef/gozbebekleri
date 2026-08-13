@@ -1,8 +1,8 @@
 "use client";
 
-import { ShieldAlert } from "lucide-react";
 import { IntegrationProviderCards } from "./IntegrationProviderCards";
 import { ProviderFieldsPanel } from "./ProviderFieldsPanel";
+import { Banner } from "./panel-ui";
 import type { IntegrationUiPermissions, IntegrationUiSnapshot, SchedulerUiStatus } from "./model";
 import { useIntegrationSettings } from "./useIntegrationSettings";
 
@@ -14,19 +14,21 @@ export function IntegrationSettingsManager({ initialProviders, permissions, sche
   const state = useIntegrationSettings(initialProviders);
   const encryptionMissing = !state.providers.filter((item) => item.provider !== "SYSTEM").every((item) => item.encryptionKeyConfigured);
 
+  // The page's <main> already sets the vertical rhythm; a second space-y here
+  // just made the gap depend on which wrapper you happened to look at.
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {encryptionMissing && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950" role="alert">
-          <div className="flex items-start gap-3">
-            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
-            <div>
-              <p className="font-black">يجب إضافة مفتاح تشفير إعدادات التكاملات إلى إعدادات السيرفر قبل حفظ البيانات السرية.</p>
-              <code className="mt-2 inline-block rounded bg-white px-2 py-1 text-xs">INTEGRATION_SETTINGS_ENCRYPTION_KEY</code>
-              <p className="mt-2 text-xs">إعداد أولي يُنفذ مرة واحدة فقط. لا يمكن إدخال المفتاح أو توليده أو عرضه من هذه الصفحة.</p>
-            </div>
-          </div>
-        </div>
+        <Banner
+          tone="pending"
+          role="alert"
+          title="يجب إضافة مفتاح تشفير إعدادات التكاملات إلى إعدادات السيرفر قبل حفظ البيانات السرية."
+          meta="إعداد أولي يُنفذ مرة واحدة فقط. لا يمكن إدخال المفتاح أو توليده أو عرضه من هذه الصفحة."
+        >
+          <code className="inline-block rounded-md border border-amber-200 bg-white px-2 py-1 text-xs" dir="ltr">
+            INTEGRATION_SETTINGS_ENCRYPTION_KEY
+          </code>
+        </Banner>
       )}
 
       <IntegrationProviderCards providers={state.providers} active={state.active} onOpen={state.chooseProvider} />

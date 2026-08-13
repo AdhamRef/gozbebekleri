@@ -13,7 +13,10 @@ import { listSenders, toSenderConfig } from "./sender-service";
 import { listRoutingRules, toRoutingRuleConfig } from "./routing-rule-service";
 import { resolveSender } from "./sender-router";
 import { resolveAudienceOrigin } from "./audience-list-service";
+import { computeFinalStatus, recomputeCampaignCounters } from "./campaign-counter-service";
 import { type CommunicationChannelId, type CommunicationPurposeId } from "./communication-runtime-types";
+
+export { computeFinalStatus };
 
 const PROCESSED_STATUSES = ["RENDERED", "QUEUED", "SENT_TO_PROVIDER", "SENT", "DELIVERED", "READ", "FAILED", "SKIPPED"];
 type Actor = { actorId?: string | null; actorName?: string | null; actorRole?: string | null } | null;
@@ -22,13 +25,6 @@ export type ExecutionSummary = { ok: boolean; campaignId: string; status: string
 
 function bump(reasons: Record<string, number>, key: string) { reasons[key] = (reasons[key] ?? 0) + 1; }
 function coverageDecisions(campaign: CommunicationCampaign): Record<string, string> { return ((campaign.metadata as Record<string, unknown> | null)?.coverageDecisions ?? {}) as Record<string, string>; }
-export function computeFinalStatus(total: number, sent: number, skipped: number, failed: number): string {
-  if (total === 0) return "BLOCKED";
-  if (sent > 0 && failed === 0 && skipped === 0) return "SENT";
-  if (sent > 0) return "SENT_WITH_ISSUES";
-  if (failed > 0) return "FAILED";
-  return "BLOCKED";
-}
 function mergedMetadata(campaign: CommunicationCampaign, lastRun: Record<string, unknown>) { return { ...(campaign.metadata as Record<string, unknown> | null), lastRun } as never; }
 async function auditBlocked(campaign: CommunicationCampaign, reason: string, actor: Actor, mode: SendMode, plan?: SendPlan) {
   await writeAuditLog({ actorId: actor?.actorId ?? undefined, actorName: actor?.actorName ?? undefined, actorRole: actor?.actorRole ?? "ADMIN", action: "communication.campaign.send.blocked", messageAr: `تعذّر إرسال حملة «${campaign.name}» — السبب: ${reason}`, messageEn: `Campaign send blocked: ${campaign.name} — ${reason}`, entityType: "CommunicationCampaign", entityId: campaign.id, metadata: { mode, reason, summary: plan ? { total: plan.total, eligible: plan.eligible, skipped: plan.skipped, reasons: plan.reasons } : undefined, externalCall: false, autoSend: false }, stream: "TEAM" });
@@ -138,7 +134,13 @@ export async function executeCampaignSend(campaignId: string, opts: { actor?: Ac
   }
 
   const finalStatus = computeFinalStatus(base.total, base.sent, base.skipped, base.failed);
-  await prisma.communicationCampaign.update({ where: { id: campaignId }, data: { status: finalStatus, sentCount: { increment: base.sent }, failedCount: { increment: base.failed }, metadata: mergedMetadata(campaign, { ranAt: new Date().toISOString(), mode, total: base.total, sent: base.sent, skipped: base.skipped, failed: base.failed, blocked: null, reasons: base.reasons, truncated: base.truncated }) } }).catch(() => {});
+  await prisma.communicationCampaign.update({ where: { id: campaignId }, data: { status: finalStatus, metadata: mergedMetadata(campaign, { ranAt: new Date().toISOString(), mode, total: base.total, sent: base.sent, skipped: base.skipped, failed: base.failed, blocked: null, reasons: base.reasons, truncated: base.truncated }) } }).catch(() => {});
+  // The counters are derived from the delivery rows rather than incremented by this run's tallies.
+  // `{ increment }` double-counted a re-run and, more importantly, froze `sentCount` at "the
+  // provider accepted it" — the number the event webhook later contradicts. Deriving keeps the
+  // header and the delivery log answering the same question, and it is what lets a later
+  // Suppress/bounce pull `sentCount` back down instead of leaving the campaign claiming success.
+  await recomputeCampaignCounters(campaignId).catch(() => {});
   await writeAuditLog({ actorId: actor?.actorId ?? undefined, actorName: actor?.actorName ?? undefined, actorRole: actor?.actorRole ?? "ADMIN", action: "communication.campaign.send", messageAr: `تنفيذ إرسال حملة «${campaign.name}» — أُرسل ${base.sent}، تخطّي ${base.skipped}، فشل ${base.failed}`, messageEn: `Campaign send executed: ${campaign.name} — sent ${base.sent}, skipped ${base.skipped}, failed ${base.failed}`, entityType: "CommunicationCampaign", entityId: campaignId, metadata: { mode, sent: base.sent, skipped: base.skipped, failed: base.failed, truncated: base.truncated, externalCall: base.sent > 0 }, stream: "TEAM" });
   base.ok = true; base.status = finalStatus; return base;
 }

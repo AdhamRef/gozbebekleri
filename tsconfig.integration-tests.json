@@ -16,6 +16,7 @@
   },
   "include": [
     "types/next-auth.d.ts",
+    "types/pdf-parse.d.ts",
     "lib/integration-settings/active-test-core.ts",
     "lib/integration-settings/api-contracts.ts",
     "lib/integration-settings/brevo-webhook.ts",
@@ -45,8 +46,12 @@
     "lib/dashboard/nav-config.ts",
     "lib/dashboard/page-access.ts",
     "lib/dashboard/page-permission.ts",
+    "lib/dashboard/user-demographics.ts",
     "lib/blog/admin-editor-data-core.ts",
     "lib/campaign/admin-create-core.ts",
+    "lib/bank-transfers/amount-format.ts",
+    "lib/bank-transfers/statement-columns.ts",
+    "lib/bank-transfers/statement-parser.ts",
     "lib/locales.ts",
     "lib/content-localization/access.ts",
     "tests/integration-settings/**/*.ts"

@@ -1,10 +1,18 @@
 import { prisma } from "@/lib/prisma";
 import { getUserIdsMatchingBadge } from "@/lib/badge-criteria";
+import {
+  birthdateRangeForAges,
+  genderQueryValues,
+  parseGenderParam,
+} from "@/lib/dashboard/user-demographics";
 
 export interface DonorFilters {
   search?: string;
   preferredLang?: string;
   badgeId?: string;
+  gender?: string;
+  minAge?: number;
+  maxAge?: number;
 }
 
 /**
@@ -30,6 +38,18 @@ export async function buildDonorWhere(
       { email: { contains: search } },
     ];
   }
+
+  // Kept in step with /api/users so «إرسال للنتائج المُصفّاة» reaches exactly
+  // the rows the table is showing — a send that silently ignores the gender or
+  // age filter would go to a much wider audience than the operator saw.
+  const gender = parseGenderParam(filters.gender);
+  if (gender) where.gender = { in: genderQueryValues(gender) };
+
+  const birthdateRange = birthdateRangeForAges(
+    filters.minAge ?? null,
+    filters.maxAge ?? null
+  );
+  if (birthdateRange) where.birthdate = birthdateRange;
 
   if (filters.badgeId) {
     const badge = await prisma.badge.findUnique({

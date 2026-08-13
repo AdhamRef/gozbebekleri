@@ -10,6 +10,16 @@ import { EmptyState } from "@/components/dashboard/EmptyState";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Users, Check, Loader2, TriangleAlert, ShieldQuestion, X } from "lucide-react";
 import { LOCALE_LABELS, SUPPORTED_LOCALES } from "@/lib/locales";
+import {
+  AgeFilterSelect,
+  GenderFilterSelect,
+  ageBracketBody,
+  ageBracketLabel,
+  applyAgeBracketParams,
+  genderFilterLabel,
+  type AgeBracket,
+  type GenderFilterValue,
+} from "@/components/dashboard/DemographicFilters";
 import { cn } from "@/lib/utils";
 
 export type Eligibility = "ELIGIBLE" | "NEEDS_REVIEW" | "UNAVAILABLE";
@@ -78,6 +88,8 @@ export function DonorPicker({
   const [country, setCountry] = React.useState("all");
   const [badgeId, setBadgeId] = React.useState("all");
   const [eligibility, setEligibility] = React.useState("all");
+  const [gender, setGender] = React.useState<GenderFilterValue>("all");
+  const [ageBracket, setAgeBracket] = React.useState<AgeBracket>("all");
 
   React.useEffect(() => {
     const t = setTimeout(() => setSearch(searchInput.trim()), 400);
@@ -86,7 +98,7 @@ export function DonorPicker({
 
   React.useEffect(() => {
     setPage(1);
-  }, [search, locale, country, badgeId, eligibility]);
+  }, [search, locale, country, badgeId, eligibility, gender, ageBracket]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -96,6 +108,8 @@ export function DonorPicker({
     if (locale !== "all") params.set("locale", locale);
     if (country !== "all") params.set("country", country);
     if (badgeId !== "all") params.set("badgeId", badgeId);
+    if (gender !== "all") params.set("gender", gender);
+    applyAgeBracketParams(params, ageBracket);
 
     fetch(`/api/communication/audience-candidates?${params}`, { cache: "no-store" })
       .then((r) => r.json())
@@ -111,7 +125,7 @@ export function DonorPicker({
     return () => {
       cancelled = true;
     };
-  }, [channel, page, search, locale, country, badgeId, eligibility]);
+  }, [channel, page, search, locale, country, badgeId, eligibility, gender, ageBracket]);
 
   const badgeById = React.useMemo(
     () => new Map(facets.badges.map((b) => [b.id, b])),
@@ -144,7 +158,16 @@ export function DonorPicker({
       const res = await fetch("/api/communication/audience-candidates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channel, search, locale, country, badgeId, eligibility }),
+        body: JSON.stringify({
+          channel,
+          search,
+          locale,
+          country,
+          badgeId,
+          eligibility,
+          ...(gender !== "all" ? { gender } : {}),
+          ...ageBracketBody(ageBracket),
+        }),
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || "تعذّر التحديد");
@@ -164,6 +187,8 @@ export function DonorPicker({
     country !== "all" && { key: "c", label: `الموقع: ${facets.countries.find((c) => c.code === country)?.name ?? country}`, clear: () => setCountry("all") },
     badgeId !== "all" && { key: "b", label: `الشارة: ${badgeById.get(badgeId)?.name ?? badgeId}`, clear: () => setBadgeId("all") },
     eligibility !== "all" && { key: "e", label: eligibility === "eligible" ? "المتاحون فقط" : "غير المتاحين فقط", clear: () => setEligibility("all") },
+    gender !== "all" && { key: "g", label: `الجنس: ${genderFilterLabel(gender)}`, clear: () => setGender("all") },
+    ageBracket !== "all" && { key: "a", label: `العمر: ${ageBracketLabel(ageBracket)}`, clear: () => setAgeBracket("all") },
   ].filter(Boolean) as { key: string; label: string; clear: () => void }[];
 
   const resetAll = () => {
@@ -172,6 +197,8 @@ export function DonorPicker({
     setCountry("all");
     setBadgeId("all");
     setEligibility("all");
+    setGender("all");
+    setAgeBracket("all");
   };
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -232,6 +259,10 @@ export function DonorPicker({
             ))}
           </SelectContent>
         </Select>
+
+        <GenderFilterSelect value={gender} onChange={setGender} className={triggerCls} />
+
+        <AgeFilterSelect value={ageBracket} onChange={setAgeBracket} className={triggerCls} />
 
         <Select value={eligibility} onValueChange={setEligibility}>
           <SelectTrigger aria-label="تصفية بالأهلية" className={cn(triggerCls, "sm:basis-[10rem]")}>

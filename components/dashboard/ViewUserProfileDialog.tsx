@@ -36,6 +36,10 @@ import {
   Copy,
   Check,
   TrendingUp,
+  Cake,
+  Mars,
+  Venus,
+  CircleHelp,
 } from "lucide-react";
 import ReactCountryFlag from "react-country-flag";
 import { useCurrency } from "@/context/CurrencyContext";
@@ -43,6 +47,12 @@ import { cn } from "@/lib/utils";
 import { ACTION_PERMISSION_ROWS, DASHBOARD_PERMISSION_ROWS } from "@/lib/dashboard/nav-config";
 import type { UserProfileCardData } from "@/lib/dashboard/user-profile-card";
 import { resolveUserCountry } from "@/lib/dashboard/resolve-user-country";
+import {
+  GENDER_LABEL_AR,
+  ageFromBirthdate,
+  formatBirthdateAr,
+  normalizeGender,
+} from "@/lib/dashboard/user-demographics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SendTemplateDialog } from "@/components/dashboard/SendTemplateDialog";
@@ -317,6 +327,15 @@ export function ViewUserProfileDialog({
     ? buildGoogleMapsUrl([user.city, user.region, resolvedCountry?.name])
     : null;
 
+  // `gender` is free text on the model, so normalise before picking a label or
+  // an icon; `birthdate` is an ISO string, and the age beside it saves the
+  // reader doing the arithmetic.
+  const normalizedGender = normalizeGender(user?.gender);
+  const genderIcon =
+    normalizedGender === "male" ? Mars : normalizedGender === "female" ? Venus : CircleHelp;
+  const birthdateLabel = formatBirthdateAr(user?.birthdate);
+  const age = ageFromBirthdate(user?.birthdate);
+
   const copyUserId = async () => {
     if (!user?.id) return;
     try {
@@ -467,6 +486,23 @@ export function ViewUserProfileDialog({
                   <div className="space-y-1.5">
                     <InfoRow icon={Languages} label="اللغة">
                       {LOCALE_LABELS[user.preferredLang as keyof typeof LOCALE_LABELS] ?? "—"}
+                    </InfoRow>
+                    {/* Collected at signup, at complete-profile and inside the donation
+                        dialog, but never shown to the team until now. */}
+                    <InfoRow icon={genderIcon} label="الجنس">
+                      {normalizedGender ? GENDER_LABEL_AR[normalizedGender] : "—"}
+                    </InfoRow>
+                    <InfoRow icon={Cake} label="تاريخ الميلاد">
+                      {birthdateLabel ? (
+                        <span>
+                          {birthdateLabel}
+                          {age !== null && (
+                            <span className="text-muted-foreground"> · {age} سنة</span>
+                          )}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </InfoRow>
                     <InfoRow icon={Calendar} label="التسجيل">
                       {formatDateAr(user.createdAt)}

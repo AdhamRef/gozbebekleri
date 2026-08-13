@@ -19,8 +19,6 @@ import {
   PieChart as PieChartIcon,
   Search,
   ChevronDown,
-  Download,
-  Plus,
 } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 import {
@@ -64,6 +62,7 @@ import {
 } from "@/lib/dashboard/istanbul-client-date";
 import { DonationTableCountryColumn } from "@/components/dashboard/DonationTableCountryColumn";
 import { DonationSourceBadge } from "@/components/dashboard/DonationSourceBadge";
+import { DonationsFilterActions } from "@/components/dashboard/DonationsFilterActions";
 import { getCountryDisplayNameFromCode } from "@/lib/dashboard/country-display-name";
 import { DashboardPieLegendByValue } from "@/components/dashboard/DashboardPieLegend";
 import { useViewUserProfile } from "@/context/ViewUserProfileContext";
@@ -739,28 +738,12 @@ export default function ReferralAnalyticsPage() {
                 <Search className="w-4 h-4 shrink-0" />
                 <span>تصفية النتائج</span>
               </CardTitle>
-              <div className="flex items-center gap-2 shrink-0">
-                {canEditDonations && (
-                  <button
-                    type="button"
-                    onClick={() => donationActions.openCreate()}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
-                  >
-                    <Plus className="w-4 h-4" />
-                    تبرع جديد
-                  </button>
-                )}
-                {canExportReports && (
-                  <button
-                    type="button"
-                    onClick={() => setExportOpen(true)}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
-                  >
-                    <Download className="w-4 h-4" />
-                    تصدير التقرير
-                  </button>
-                )}
-              </div>
+              <DonationsFilterActions
+                canEditDonations={canEditDonations}
+                canExportReports={canExportReports}
+                onCreateDonation={() => donationActions.openCreate()}
+                onExportReport={() => setExportOpen(true)}
+              />
             </div>
           </CardHeader>
           <CardContent className="pt-0 space-y-4" dir="rtl">
@@ -962,7 +945,7 @@ export default function ReferralAnalyticsPage() {
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700">الحالة</th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">دعم الفريق</th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700">النوع</th>
-                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 w-px whitespace-nowrap">مصدر التبرع</th>
+                      <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">مصدر التبرع</th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700 max-w-[110px]">المشروع / الفئة</th>
                       <th className="text-right py-1.5 px-2 font-semibold text-slate-700 whitespace-nowrap">التاريخ</th>
                     </tr>
@@ -1043,7 +1026,7 @@ export default function ReferralAnalyticsPage() {
                               {d.type === "MONTHLY" ? "شهري" : "مرة واحدة"}
                             </span>
                           </td>
-                          <td className="py-1.5 px-2 align-middle w-px whitespace-nowrap">
+                          <td className="py-1.5 px-2 align-middle">
                             <button
                               type="button"
                               onClick={() => openDonationDetails("attribution", d)}

@@ -15,6 +15,8 @@ import { ArrowLeft, Loader2, Upload, X } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { errorMessage } from '@/lib/dashboard/client-error-message';
+import { validateImageFile } from '@/lib/uploads/image-file-rules';
 
 const schema = z.object({
   title: z.string().min(1, 'مطلوب'),
@@ -116,7 +118,7 @@ export default function EditSlidePage() {
       toast.success('تم التحديث');
       router.push('/dashboard/slides');
     } catch (e) {
-      toast.error('فشل التحديث');
+      toast.error(errorMessage(e, 'فشل التحديث'));
     } finally {
       setSaving(false);
     }
@@ -125,6 +127,12 @@ export default function EditSlidePage() {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const rejection = validateImageFile(file);
+    if (rejection) {
+      toast.error(rejection);
+      e.target.value = '';
+      return;
+    }
     setUploadingImage(true);
     const fd = new FormData();
     fd.append('file', file);
@@ -132,10 +140,11 @@ export default function EditSlidePage() {
       const res = await axios.post('/api/upload', fd);
       form.setValue('image', res.data.url);
       toast.success('تم رفع الصورة');
-    } catch (e) {
-      toast.error('فشل الرفع');
+    } catch (err) {
+      toast.error(errorMessage(err, 'فشل الرفع'));
     } finally {
       setUploadingImage(false);
+      e.target.value = '';
     }
   };
 

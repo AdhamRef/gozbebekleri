@@ -10,6 +10,7 @@ import {
   extractRawEvents,
   mapElasticEmailEventStatus,
   normalizeElasticEmailEvents,
+  suppressionForEvent,
 } from "../../lib/communication/providers/elastic-email/webhook-events";
 import { shouldApplyDeliveryStatus } from "../../lib/communication/delivery-status-progress";
 
@@ -126,11 +127,55 @@ test("event names map to delivery statuses regardless of casing or separators", 
   assert.equal(mapElasticEmailEventStatus("delivered"), "DELIVERED");
   assert.equal(mapElasticEmailEventStatus("Opened"), "OPENED");
   assert.equal(mapElasticEmailEventStatus("Clicked"), "CLICKED");
-  assert.equal(mapElasticEmailEventStatus("AbuseReport"), "FAILED");
   assert.equal(mapElasticEmailEventStatus("hard_bounce"), "BOUNCED");
   assert.equal(mapElasticEmailEventStatus("Unsubscribed"), "UNSUBSCRIBED");
   assert.equal(mapElasticEmailEventStatus("something-else"), null);
   assert.equal(mapElasticEmailEventStatus(null), null);
+});
+
+test("a spam complaint is an opt-out, not a delivery failure", () => {
+  // It used to map to FAILED, which both inflated the failure count and — because
+  // nothing downstream reacts to FAILED — left the complainant in every future
+  // audience. The message reached them; they opted out in the harshest way.
+  for (const name of ["AbuseReport", "abuse", "Spam", "SpamComplaint", "complaint"]) {
+    assert.equal(mapElasticEmailEventStatus(name), "UNSUBSCRIBED", `failed for ${name}`);
+  }
+});
+
+test("only permanent failures suppress the address", () => {
+  assert.equal(suppressionForEvent("Unsubscribed"), "unsubscribe");
+  assert.equal(suppressionForEvent("AbuseReport"), "complaint");
+  assert.equal(suppressionForEvent("hard_bounce"), "hard-bounce");
+  assert.equal(suppressionForEvent("NotDelivered"), "hard-bounce");
+
+  // A soft bounce is a full mailbox or a temporary DNS failure. Suppressing on
+  // it would permanently mute a reachable donor, so it must not.
+  assert.equal(suppressionForEvent("soft_bounce"), "none");
+  assert.equal(suppressionForEvent("Bounced"), "none");
+  assert.equal(suppressionForEvent("Error"), "none");
+
+  // Engagement never suppresses.
+  for (const name of ["Sent", "Delivered", "Opened", "Clicked"]) {
+    assert.equal(suppressionForEvent(name), "none", `failed for ${name}`);
+  }
+  assert.equal(suppressionForEvent(null), "none");
+});
+
+test("normalized events carry their suppression reason", () => {
+  const events = normalizeElasticEmailEvents([
+    { messageid: "m1", eventtype: "Opened", to: "a@b.org" },
+    { messageid: "m2", eventtype: "Unsubscribed", to: "c@d.org" },
+    { messageid: "m3", eventtype: "AbuseReport", to: "e@f.org" },
+    { messageid: "m4", eventtype: "HardBounce", to: "g@h.org" },
+    { messageid: "m5", eventtype: "SoftBounce", to: "i@j.org" },
+  ]);
+  assert.deepEqual(
+    events.map((e) => e.suppression),
+    ["none", "unsubscribe", "complaint", "hard-bounce", "none"]
+  );
+  // The recipient must survive normalization — it is the only handle the
+  // suppression step has on the donor.
+  assert.deepEqual(events.map((e) => e.recipient), ["a@b.org", "c@d.org", "e@f.org", "g@h.org", "i@j.org"]);
 });
 
 test("payload unwrapping handles single objects, arrays, and wrapped collections", () => {

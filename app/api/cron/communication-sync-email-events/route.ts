@@ -20,24 +20,31 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await syncElasticEmailEvents();
+  // `?lookbackMinutes=` widens the window for a one-off backfill. The scheduled run passes nothing
+  // and keeps the 3-hour default; a delivery whose outcome landed outside that window (cron not yet
+  // deployed, or down longer than the window) is never revisited by anything else.
+  const requested = Number(request.nextUrl.searchParams.get("lookbackMinutes"));
+  const lookbackMinutes = Number.isFinite(requested) && requested > 0 ? requested : undefined;
+
+  const result = await syncElasticEmailEvents({ lookbackMinutes });
   if (!result.ok) {
     // A provider outage or an unconfigured key is not a server fault — answer 200 so the scheduler
     // does not treat a known, reported condition as an incident to retry against.
     return NextResponse.json({ ok: false, reason: result.reason }, { status: 200 });
   }
 
-  if (result.deliveryUpdates > 0) {
+  if (result.deliveryUpdates > 0 || result.campaignUpdates > 0) {
     await writeAuditLog({
       actorRole: "SYSTEM",
       action: "communication.email.events.synced",
-      messageAr: `مزامنة أحداث البريد — تحديث ${result.deliveryUpdates} سجل تسليم`,
-      messageEn: `Email event sync — ${result.deliveryUpdates} delivery record(s) corrected`,
+      messageAr: `مزامنة أحداث البريد — تحديث ${result.deliveryUpdates} سجل تسليم و${result.campaignUpdates} حملة`,
+      messageEn: `Email event sync — ${result.deliveryUpdates} delivery record(s) and ${result.campaignUpdates} campaign(s) corrected`,
       entityType: "CommunicationDelivery",
       metadata: { ...result, externalCall: false },
       stream: "TEAM",
     }).catch(() => {});
   }
 
-  return NextResponse.json({ ok: true, ...result });
+  // `result` already carries `ok: true` — respreading it produced a duplicate key.
+  return NextResponse.json(result);
 }

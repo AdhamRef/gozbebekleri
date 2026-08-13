@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'react-hot-toast';
+import { errorMessage } from '@/lib/dashboard/client-error-message';
 
 interface Slide {
   id: string;
@@ -33,18 +34,23 @@ function DraggableSlideRow({
   slide,
   index,
   moveRow,
-  onToggleActive,
+  commitOrder,
   children,
 }: {
   slide: Slide;
   index: number;
   moveRow: (dragIndex: number, hoverIndex: number) => void;
-  onToggleActive: (slide: Slide) => void;
+  commitOrder: () => void;
   children: React.ReactNode;
 }) {
   const [{ isDragging }, drag, preview] = useDrag({
     type: SLIDE_ROW,
     item: { index },
+    // `hover` fires on every row the pointer crosses, so persisting there sent
+    // one full transaction + audit write per tick — dragging across five rows
+    // meant five overlapping saves whose responses could land out of order.
+    // The reorder is now written once, when the drag actually ends.
+    end: () => commitOrder(),
     collect: (monitor) => ({ isDragging: monitor.isDragging() }),
   });
 
@@ -85,7 +91,10 @@ export default function SlidesPage() {
       const items = res.data?.items ?? [];
       setSlides(Array.isArray(items) ? items.sort((a: Slide, b: Slide) => (a.order ?? 0) - (b.order ?? 0)) : []);
     } catch (e) {
+      // Was a bare console.error, so a failed load looked identical to "no
+      // slides yet" — the empty state rendered and nothing said why.
       console.error(e);
+      toast.error(errorMessage(e, 'تعذّر تحميل الشرائح'));
     } finally {
       setLoading(false);
     }
@@ -93,34 +102,48 @@ export default function SlidesPage() {
 
   useEffect(() => { fetchSlides(); }, []);
 
-  const moveRow = (dragIndex: number, hoverIndex: number) => {
-    const next = [...slides];
-    const [removed] = next.splice(dragIndex, 1);
-    next.splice(hoverIndex, 0, removed);
-    setSlides(next);
+  // `moveRow` only reorders locally while the pointer moves; `commitOrder`
+  // persists once on drop. The ref lets the drag-end callback read the final
+  // order without re-subscribing the drag source on every intermediate render.
+  const latestSlides = useRef(slides);
+  latestSlides.current = slides;
+  const orderDirty = useRef(false);
+
+  const moveRow = useCallback((dragIndex: number, hoverIndex: number) => {
+    orderDirty.current = true;
+    setSlides((prev) => {
+      const next = [...prev];
+      const [removed] = next.splice(dragIndex, 1);
+      next.splice(hoverIndex, 0, removed);
+      return next;
+    });
+  }, []);
+
+  const commitOrder = useCallback(() => {
+    if (!orderDirty.current) return;
+    orderDirty.current = false;
+    const snapshot = latestSlides.current;
     setSavingOrder(true);
     axios
       .post('/api/slides/reorder', {
-        slides: next.map((s, i) => ({ id: s.id, order: i })),
+        slides: snapshot.map((s, i) => ({ id: s.id, order: i })),
       })
-      .then(() => {
-        toast.success('تم تحديث الترتيب');
-      })
-      .catch(() => toast.error('فشل في حفظ الترتيب'))
+      .then(() => toast.success('تم تحديث الترتيب'))
+      .catch((e) => toast.error(errorMessage(e, 'فشل في حفظ الترتيب')))
       .finally(() => setSavingOrder(false));
-  };
+  }, []);
 
   const handleToggleActive = async (slide: Slide) => {
     setTogglingId(slide.id);
+    const nextActive = !slide.isActive;
     try {
-      await axios.put(`/api/slides/${slide.id}`, {
-        ...slide,
-        isActive: !slide.isActive,
-      });
-      setSlides(prev => prev.map(s => s.id === slide.id ? { ...s, isActive: !s.isActive } : s));
-      toast.success(slide.isActive ? 'تم إلغاء التفعيل' : 'تم التفعيل');
+      // Send only the field being changed. Echoing the whole row back meant the
+      // toggle rewrote every column from whatever the list happened to hold.
+      await axios.put(`/api/slides/${slide.id}`, { isActive: nextActive });
+      setSlides(prev => prev.map(s => s.id === slide.id ? { ...s, isActive: nextActive } : s));
+      toast.success(nextActive ? 'تم التفعيل' : 'تم إلغاء التفعيل');
     } catch (e) {
-      toast.error('فشل في تحديث الحالة');
+      toast.error(errorMessage(e, 'فشل في تحديث الحالة'));
     } finally {
       setTogglingId(null);
     }
@@ -135,7 +158,7 @@ export default function SlidesPage() {
       setDeleteTarget(null);
       toast.success('تم الحذف');
     } catch (e) {
-      toast.error('فشل الحذف');
+      toast.error(errorMessage(e, 'فشل الحذف'));
     } finally {
       setDeleting(false);
     }
@@ -189,7 +212,7 @@ export default function SlidesPage() {
                     slide={s}
                     index={index}
                     moveRow={moveRow}
-                    onToggleActive={handleToggleActive}
+                    commitOrder={commitOrder}
                   >
                     <TableCell>
                       <div className="relative w-24 h-16 rounded-lg overflow-hidden bg-muted">

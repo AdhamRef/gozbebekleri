@@ -10,6 +10,12 @@ import { getUserIdsMatchingBadge, getBadgeIdsByUser } from "@/lib/badge-criteria
 import { resolveUserCountry } from "@/lib/dashboard/resolve-user-country";
 import { getCountryDisplayNameFromCode } from "@/lib/dashboard/country-display-name";
 import { isValidLocale, DEFAULT_LOCALE } from "@/lib/locales";
+import {
+  birthdateRangeForAges,
+  genderQueryValues,
+  parseAgeParam,
+  parseGenderParam,
+} from "@/lib/dashboard/user-demographics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,7 +71,15 @@ type FilterInput = {
   locale?: string | null;
   country?: string | null;
   badgeId?: string | null;
+  gender?: string | null;
+  minAge?: string | number | null;
+  maxAge?: string | number | null;
 };
+
+function ageInput(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  return parseAgeParam(typeof value === "number" ? String(value) : value);
+}
 
 /**
  * Build the donor `where` for the current filters.
@@ -89,6 +103,18 @@ async function buildWhere(f: FilterInput): Promise<Prisma.UserWhereInput> {
       { phone: { contains: search } },
     ];
   }
+
+  // Gender is stored free-form (signup, complete-profile and the donation dialog
+  // each write it), so match every spelling rather than one canonical value.
+  const gender = parseGenderParam(f.gender);
+  if (gender) where.gender = { in: genderQueryValues(gender) };
+
+  // `birthdate` is an ISO "YYYY-MM-DD" string and ISO dates sort
+  // lexicographically, so an age range is a plain string range — no computed
+  // field needed. Donors with no birthdate fall out, which is what "aged 25-40"
+  // should mean for a targeted send.
+  const birthdateRange = birthdateRangeForAges(ageInput(f.minAge), ageInput(f.maxAge));
+  if (birthdateRange) where.birthdate = birthdateRange;
 
   if (f.badgeId && f.badgeId !== "all") {
     const badge = await prisma.badge.findUnique({ where: { id: f.badgeId }, select: { criteria: true } });
@@ -131,6 +157,9 @@ export async function GET(request: NextRequest) {
     locale: sp.get("locale"),
     country: sp.get("country"),
     badgeId: sp.get("badgeId"),
+    gender: sp.get("gender"),
+    minAge: sp.get("minAge"),
+    maxAge: sp.get("maxAge"),
   });
 
   const [total, rows, allBadges] = await Promise.all([

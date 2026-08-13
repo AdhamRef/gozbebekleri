@@ -1,4 +1,11 @@
 import crypto from "crypto";
+import { looksLikeIdentifier, looksLikeMoneyText, parseAmount } from "./amount-format";
+import {
+  NO_COLUMNS,
+  findHeaderRow,
+  resolveStatementColumns,
+  type ResolvedColumns,
+} from "./statement-columns";
 
 export const BANK_TRANSFER_CURRENCIES = ["USD", "TRY", "EUR"] as const;
 export const BANK_TRANSFER_DONOR_LOCALES = ["ar", "tr", "en", "fr", "de", "es", "pt", "id"] as const;
@@ -28,6 +35,12 @@ export type ParsedBankStatement = {
   bankIban: string | null;
   rows: ParsedBankTransferRow[];
   warning: string | null;
+  /**
+   * Which column the amounts came from. Surfaced so the admin can confirm the
+   * importer read the right one before committing — a silently wrong amount
+   * column is the failure mode that is hardest to notice after the fact.
+   */
+  amountColumn: { source: ResolvedColumns["amountSource"]; header: string | null };
 };
 
 export function normalizeBankTransferCurrency(value: unknown): BankTransferCurrency {
@@ -61,22 +74,6 @@ export function extractIbanFromText(text: string): string | null {
   return /^TR\d{24}$/.test(iban) ? iban : null;
 }
 
-function parseAmount(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  const raw = normalizeCell(value);
-  if (!raw) return null;
-  const cleaned = raw
-    .replace(/[₺$€]/g, "")
-    .replace(/TRY|TL|USD|EUR/gi, "")
-    .replace(/\s/g, "")
-    .replace(/\.(?=\d{3}(\D|$))/g, "")
-    .replace(/,(?=\d{1,2}$)/, ".")
-    .replace(/[^0-9.-]/g, "");
-  if (!cleaned || cleaned === "-" || cleaned === ".") return null;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
-}
-
 function looksLikeDate(value: unknown): string | null {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   const raw = normalizeCell(value);
@@ -93,8 +90,29 @@ function amountTokens(text: string): number[] {
   return matches.map(parseAmount).filter((x): x is number => typeof x === "number" && Number.isFinite(x));
 }
 
-function findIndex(headers: string[], keywords: string[]) {
-  return headers.findIndex((h) => keywords.some((k) => h.toLowerCase().includes(k.toLowerCase())));
+/**
+ * Last-resort per-row amount pick, used only when the resolved amount column is
+ * blank for this row. Skips the date/reference/description columns and anything
+ * that reads like an identifier, then prefers a money-shaped cell (one with a
+ * decimal part or thousands grouping) over a bare integer.
+ */
+function pickAmountFromRow(row: unknown[], cols: ResolvedColumns): number | null {
+  const skip = new Set([cols.date, cols.description, cols.donor, cols.reference].filter((i) => i >= 0));
+  const candidates: { value: number; money: boolean }[] = [];
+
+  for (let i = 0; i < row.length; i += 1) {
+    if (skip.has(i)) continue;
+    const cell = row[i];
+    if (looksLikeIdentifier(cell)) continue;
+    if (looksLikeDate(cell)) continue;
+    const n = parseAmount(cell);
+    if (n === null || Math.abs(n) === 0) continue;
+    candidates.push({ value: n, money: looksLikeMoneyText(cell) });
+  }
+
+  if (!candidates.length) return null;
+  const moneyShaped = candidates.find((c) => c.money);
+  return (moneyShaped ?? candidates[0]).value;
 }
 
 function extractDonorName(description: string): string | null {
@@ -149,41 +167,49 @@ function makeTransactionHash(input: {
   ].join("|"));
 }
 
-function rowToPreview(row: unknown[], rowNumber: number, args: { currency: BankTransferCurrency; donorLocale: BankTransferDonorLocale; bankId: string; bankIban: string | null; headers?: string[] }): ParsedBankTransferRow | null {
+function rowToPreview(row: unknown[], rowNumber: number, args: { currency: BankTransferCurrency; donorLocale: BankTransferDonorLocale; bankId: string; bankIban: string | null; columns?: ResolvedColumns }): ParsedBankTransferRow | null {
   const cells = row.map(normalizeCell);
   if (cells.every((c) => !c)) return null;
 
-  const normalizedHeaders = args.headers?.map((h) => h.toLowerCase()) ?? [];
-  const dateIndex = args.headers ? findIndex(normalizedHeaders, ["date", "tarih", "تاريخ", "işlem tarihi", "transaction"]) : -1;
-  const descIndex = args.headers ? findIndex(normalizedHeaders, ["description", "açıklama", "aciklama", "الوصف", "بيان", "detail"]) : -1;
-  const donorIndex = args.headers ? findIndex(normalizedHeaders, ["sender", "gönderen", "gonderen", "المرسل", "name", "ad soyad", "donor"]) : -1;
-  const refIndex = args.headers ? findIndex(normalizedHeaders, ["reference", "referans", "fiş", "fis", "ref", "işlem no", "islem no", "رقم", "transaction id"]) : -1;
-  const creditIndex = args.headers ? findIndex(normalizedHeaders, ["credit", "alacak", "gelen", "دائن", "وارد", "deposit", "tutar", "amount"]) : -1;
-  const debitIndex = args.headers ? findIndex(normalizedHeaders, ["debit", "borç", "borc", "مدين", "صادر", "withdrawal"]) : -1;
+  // Columns are resolved once for the whole sheet (see statement-columns.ts)
+  // rather than re-derived per row from a first-keyword-wins scan.
+  const cols = args.columns ?? NO_COLUMNS;
 
-  const transactionDate = dateIndex >= 0 ? looksLikeDate(row[dateIndex]) : cells.map(looksLikeDate).find(Boolean) ?? null;
-  const description = descIndex >= 0 ? cells[descIndex] : cells.slice(0, 10).join(" | ");
-  const donorName = donorIndex >= 0 ? cells[donorIndex] || extractDonorName(description) : extractDonorName(description);
-  const reference = refIndex >= 0 ? cells[refIndex] || null : null;
+  const transactionDate = cols.date >= 0 ? looksLikeDate(row[cols.date]) : cells.map(looksLikeDate).find(Boolean) ?? null;
+  const description = cols.description >= 0 ? cells[cols.description] : cells.slice(0, 10).join(" | ");
+  const donorName = cols.donor >= 0 ? cells[cols.donor] || extractDonorName(description) : extractDonorName(description);
+  const reference = cols.reference >= 0 ? cells[cols.reference] || null : null;
 
-  const credit = creditIndex >= 0 ? parseAmount(row[creditIndex]) : null;
-  const debit = debitIndex >= 0 ? parseAmount(row[debitIndex]) : null;
-  let amount = credit ?? null;
-  let direction: ParsedBankTransferRow["direction"] = credit !== null ? (credit < 0 ? "DEBIT" : "CREDIT") : "UNKNOWN";
-  if (amount === null && debit !== null) {
+  // The resolved amount column wins. When it holds a «Tutar»-style signed
+  // figure the sign carries the direction; an «Alacak»/«Borç» pair carries it
+  // in which of the two is filled.
+  const primary = cols.amount >= 0 ? parseAmount(row[cols.amount]) : null;
+  const debit = cols.debit >= 0 ? parseAmount(row[cols.debit]) : null;
+
+  let amount: number | null = null;
+  let direction: ParsedBankTransferRow["direction"] = "UNKNOWN";
+
+  if (primary !== null && Math.abs(primary) > 0) {
+    amount = primary;
+    direction = primary < 0 ? "DEBIT" : "CREDIT";
+  } else if (debit !== null && Math.abs(debit) > 0) {
     amount = Math.abs(debit);
     direction = "DEBIT";
   }
+
+  // Only when the resolved column is empty on this row do we fall back to
+  // scanning the row — and even then identifiers are excluded, so a reference
+  // number can no longer be imported as the donation figure.
   if (amount === null) {
-    const amounts = row.map(parseAmount).filter((x): x is number => typeof x === "number");
-    const likely = amounts.find((n) => Math.abs(n) > 0);
-    if (likely !== undefined) {
-      amount = Math.abs(likely);
+    const likely = pickAmountFromRow(row, cols);
+    if (likely !== null) {
+      amount = likely;
       direction = likely < 0 ? "DEBIT" : "CREDIT";
     }
   }
 
-  if (description.toLowerCase().includes("devir bakiyesi") || description.toLowerCase().includes("toplam")) return null;
+  const lowerDescription = description.toLowerCase();
+  if (lowerDescription.includes("devir bakiyesi") || lowerDescription.includes("toplam")) return null;
 
   const suggestion = suggestProject(description);
   return {
@@ -237,25 +263,30 @@ function parseTurkishStatementLine(line: string, rowNumber: number, args: { curr
   };
 }
 
-async function parseSpreadsheet(buffer: Buffer, args: { currency: BankTransferCurrency; donorLocale: BankTransferDonorLocale; bankId: string; bankIban: string | null }): Promise<ParsedBankTransferRow[]> {
+async function parseSpreadsheet(
+  buffer: Buffer,
+  args: { currency: BankTransferCurrency; donorLocale: BankTransferDonorLocale; bankId: string; bankIban: string | null }
+): Promise<{ rows: ParsedBankTransferRow[]; columns: ResolvedColumns }> {
   const XLSX = await import("xlsx");
   const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
   const firstSheetName = workbook.SheetNames[0];
-  if (!firstSheetName) return [];
+  if (!firstSheetName) return { rows: [], columns: NO_COLUMNS };
   const sheet = workbook.Sheets[firstSheetName];
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, blankrows: false }) as unknown[][];
 
-  const headerRowIndex = rows.findIndex((row) => {
-    const text = row.map(normalizeCell).join(" ").toLowerCase();
-    return /date|tarih|تاريخ|açıklama|aciklama|description|amount|alacak|دائن|وارد|tutar/.test(text);
-  });
+  const headerRowIndex = findHeaderRow(rows);
   const headers = headerRowIndex >= 0 ? rows[headerRowIndex].map(normalizeCell) : undefined;
-  const dataRows = headerRowIndex >= 0 ? rows.slice(headerRowIndex + 1) : rows;
+  const dataRows = (headerRowIndex >= 0 ? rows.slice(headerRowIndex + 1) : rows).slice(0, 1000);
 
-  return dataRows
-    .slice(0, 1000)
-    .map((row, index) => rowToPreview(row, (headerRowIndex >= 0 ? headerRowIndex + 2 : 1) + index, { ...args, headers }))
+  // Resolve the layout once, from the header plus the data, then apply it to
+  // every row — so all rows agree on which column the money is in.
+  const columns = resolveStatementColumns(headers, dataRows);
+
+  const parsed = dataRows
+    .map((row, index) => rowToPreview(row, (headerRowIndex >= 0 ? headerRowIndex + 2 : 1) + index, { ...args, columns }))
     .filter((row): row is ParsedBankTransferRow => Boolean(row));
+
+  return { rows: parsed, columns };
 }
 
 async function extractPdfText(buffer: Buffer): Promise<string> {
@@ -329,9 +360,17 @@ export async function parseBankStatementFile(args: {
   const bankIban = extractIbanFromText(textForIban);
   const commonArgs = { currency: args.currency, donorLocale: args.donorLocale, bankId: args.bankId, bankIban };
   let rows: ParsedBankTransferRow[];
+  let columns: ResolvedColumns = NO_COLUMNS;
 
   if (lower.endsWith(".xlsx") || lower.endsWith(".xls") || lower.endsWith(".csv")) {
-    rows = await parseSpreadsheet(args.buffer, commonArgs);
+    const result = await parseSpreadsheet(args.buffer, commonArgs);
+    rows = result.rows;
+    columns = result.columns;
+    if (columns.amountSource === "none") {
+      warning = "تعذّر تحديد عمود المبلغ في هذا الملف. راجع القيم قبل الاستيراد.";
+    } else if (columns.amountSource === "detected") {
+      warning = "لم يُعثر على عمود «Tutar»، فتم استنتاج عمود المبلغ من البيانات. راجع القيم قبل الاستيراد.";
+    }
   } else if (lower.endsWith(".pdf")) {
     rows = await parsePdf(args.buffer, commonArgs);
     if (!textForIban.trim() || rows.length === 0) {
@@ -343,5 +382,12 @@ export async function parseBankStatementFile(args: {
     throw new Error("Unsupported file type");
   }
 
-  return { parser, fileHash, bankIban, rows, warning };
+  return {
+    parser,
+    fileHash,
+    bankIban,
+    rows,
+    warning,
+    amountColumn: { source: columns.amountSource, header: columns.amountHeader },
+  };
 }

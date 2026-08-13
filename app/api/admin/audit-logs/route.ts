@@ -21,7 +21,17 @@ export async function GET(request: NextRequest) {
     const dateFrom = searchParams.get("dateFrom");
     const dateTo = searchParams.get("dateTo");
 
-    const where: Record<string, unknown> = {};
+    // This page answers "who did what". Rows written by cron jobs and server
+    // pipelines carry `actorRole: "SYSTEM"` and no actor — the scheduler
+    // heartbeat, Meta CAPI tracing, automatic-message dispatch, webhook
+    // reconciliation. They are excluded wholesale rather than by an action
+    // deny-list, so a new automated writer can never leak into this view by
+    // simply not being on the list.
+    //
+    // The rows are NOT deleted: `getSchedulerStatus()` reads the heartbeat to
+    // show «آخر تشغيل», and the marketing conversion dashboard falls back to the
+    // CAPI rows when the ConversionEvent collection is empty.
+    const where: Record<string, unknown> = { actorRole: { not: "SYSTEM" } };
     if (stream === "TEAM" || stream === "DONOR") where.stream = stream;
     if (dateFrom || dateTo) {
       where.createdAt = {

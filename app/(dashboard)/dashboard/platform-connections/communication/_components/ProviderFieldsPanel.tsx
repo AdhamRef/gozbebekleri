@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle2, Clipboard, Loader2, RefreshCw, RotateCcw, Save, ShieldCheck, TestTube2, Trash2, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, RefreshCw, RotateCcw, Save, ShieldCheck, TestTube2, Trash2 } from "lucide-react";
 import type { SafeProviderConnectionTestResponse } from "@/lib/integration-settings/types";
-import { fieldHelp, INTEGRATION_UI_STATUS_LABEL, PROVIDER_UI_LABEL, safeErrorMessage, uiStatus } from "@/lib/integration-settings/ui";
+import { fieldHelp, PROVIDER_UI_LABEL, safeErrorMessage, uiStatus } from "@/lib/integration-settings/ui";
+import { ActionButton, Banner, CopyableCode, InfoPanel, Stat, StatusChip } from "./panel-ui";
 import { ADVANCED_LINKS, WEBHOOKS, ROTATABLE_WEBHOOK_PROVIDERS, sourceLabel, type IntegrationUiPermissions, type IntegrationUiSnapshot, type SchedulerUiStatus } from "./model";
 
 type Notice = { kind: "success" | "error"; text: string } | null;
@@ -57,42 +58,54 @@ export function ProviderFieldsPanel({
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-      <header className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs font-bold text-brand">{PROVIDER_UI_LABEL[provider]}</p>
-          <h2 className="mt-1 text-lg font-black text-slate-900">{isCron ? "بنية الجدولة التحتية" : "إعدادات المزود"}</h2>
+      <header className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium text-slate-500">{PROVIDER_UI_LABEL[provider]}</p>
+          <h2 className="mt-0.5 text-base font-semibold text-slate-900">
+            {isCron ? "بنية الجدولة التحتية" : "إعدادات المزود"}
+          </h2>
           <p className="mt-1 text-xs text-slate-500">
-            {isCron ? "يُدار CRON_SECRET داخل Vercel فقط." : `${completed}/${snapshot.fields.length} حقل مكتمل · الحالة: ${INTEGRATION_UI_STATUS_LABEL[uiStatus(snapshot)]}`}
+            {isCron ? "يُدار CRON_SECRET داخل Vercel فقط." : `${completed}/${snapshot.fields.length} حقل مكتمل`}
           </p>
         </div>
-        {!isCron && permissions.canAdmin && (
-          <button type="button" disabled={!!busy} onClick={onToggle} className="h-9 rounded-md border border-slate-300 px-3 text-xs font-bold text-slate-700 disabled:opacity-50">
-            {snapshot.enabled ? "تعطيل المزود" : "تفعيل المزود"}
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {!isCron && <StatusChip status={uiStatus(snapshot)} />}
+          {!isCron && permissions.canAdmin && (
+            <button
+              type="button"
+              disabled={!!busy}
+              onClick={onToggle}
+              className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {snapshot.enabled ? "تعطيل المزود" : "تفعيل المزود"}
+            </button>
+          )}
+        </div>
       </header>
 
       <div className="space-y-5 p-4 sm:p-5">
         {notice && (
-          <div role="status" className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${notice.kind === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-rose-200 bg-rose-50 text-rose-900"}`}>
-            {notice.kind === "success" ? <CheckCircle2 className="h-5 w-5 shrink-0" /> : <XCircle className="h-5 w-5 shrink-0" />}
-            <span>{notice.text}</span>
-          </div>
+          <Banner tone={notice.kind === "success" ? "success" : "danger"} title={notice.text} />
         )}
 
         {isCron ? (
           <CronInfrastructure scheduler={scheduler} busy={busy} canTest={permissions.canTest} onTest={onTestActive} />
         ) : (
           <>
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid gap-3 lg:grid-cols-2">
               {snapshot.fields.map((field) => (
                 <div key={field.key} className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <label htmlFor={`${provider}-${field.key}`} className="text-sm font-black text-slate-900">{field.labelAr}{field.required ? " *" : ""}</label>
+                    <div className="min-w-0">
+                      <label htmlFor={`${provider}-${field.key}`} className="text-sm font-semibold text-slate-900">
+                        {field.labelAr}
+                        {field.required ? <span className="text-rose-500"> *</span> : null}
+                      </label>
                       <p className="mt-1 text-xs leading-5 text-slate-500">{fieldHelp(provider, field.key)}</p>
                     </div>
-                    <span className="shrink-0 rounded border bg-white px-2 py-1 text-[10px] font-bold text-slate-500">{sourceLabel(field.source)}</span>
+                    <span className="shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                      {sourceLabel(field.source)}
+                    </span>
                   </div>
 
                   {permissions.canManage ? (
@@ -106,7 +119,7 @@ export function ProviderFieldsPanel({
                         autoComplete={field.isSecret ? "new-password" : "off"}
                         disabled={!!busy || (field.isSecret && encryptionBlocked) || isManagedWebhookField(field.key)}
                         aria-describedby={`${provider}-${field.key}-help`}
-                        className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-brand focus:ring-2 focus:ring-brand/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                       />
                       <p id={`${provider}-${field.key}-help`} className="mt-1.5 text-[11px] text-slate-500">
                         {isManagedWebhookField(field.key)
@@ -117,14 +130,21 @@ export function ProviderFieldsPanel({
                       </p>
                     </div>
                   ) : (
-                    <div className="mt-3 rounded-md border bg-white px-3 py-2 text-sm text-slate-700">
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
                       {field.isSecret ? field.configured ? `محفوظ: ${field.maskedValue}` : "غير محفوظ" : field.displayValue || "غير مضبوط"}
                     </div>
                   )}
 
                   {permissions.canAdmin && field.configured && !isManagedWebhookField(field.key) && (
-                    <div className="mt-3 border-t pt-2 text-left">
-                      <button type="button" disabled={!!busy} onClick={() => onDelete(field.key, field.labelAr)} className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" /> حذف الإعداد</button>
+                    <div className="mt-3 border-t border-slate-200 pt-2.5 text-end">
+                      <button
+                        type="button"
+                        disabled={!!busy}
+                        onClick={() => onDelete(field.key, field.labelAr)}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 transition-colors hover:text-rose-700 disabled:opacity-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> حذف الإعداد
+                      </button>
                     </div>
                   )}
                 </div>
@@ -132,49 +152,74 @@ export function ProviderFieldsPanel({
             </div>
 
             {rotatableWebhook && (
-              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-                <p className="text-sm font-black text-blue-950">{rotatableWebhook.title}</p>
-                <p className="mt-1 text-xs leading-5 text-blue-900">لا يُعرض رابط ناقص. أنشئ رابطًا محميًا من السيرفر ثم اختبر التغييرات واعتمدها ليصبح الرابط صالحًا.</p>
+              <InfoPanel
+                title={rotatableWebhook.title}
+                description="لا يُعرض رابط ناقص. أنشئ رابطًا محميًا من السيرفر ثم اختبر التغييرات واعتمدها ليصبح الرابط صالحًا."
+              >
                 {webhookReveal ? (
-                  <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3">
-                    <p className="text-xs font-black text-amber-950">{rotatableWebhook.revealHint}</p>
-                    <code className="mt-2 block overflow-x-auto rounded bg-white px-3 py-2 text-xs text-slate-700">{webhookReveal.url}</code>
-                    <button type="button" onClick={() => copyOneTimeUrl(webhookReveal.url)} className="mt-2 inline-flex h-9 items-center gap-2 rounded-md border border-amber-400 bg-white px-3 text-xs font-bold text-amber-900"><Clipboard className="h-4 w-4" /> نسخ الرابط</button>
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-xs font-semibold text-amber-900">{rotatableWebhook.revealHint}</p>
+                    <CopyableCode className="mt-2" value={webhookReveal.url} onCopy={() => copyOneTimeUrl(webhookReveal.url)} />
                   </div>
                 ) : (
-                  <p className="mt-2 text-xs text-blue-900">{snapshot.fields.find((field) => field.key === "WEBHOOK_SECRET")?.hasPendingValue ? "رابط جديد بانتظار اعتماد الإعدادات." : snapshot.fields.find((field) => field.key === "WEBHOOK_SECRET")?.configured ? "Webhook محمي ومُعد. يمكن تدوير الرابط عند الحاجة." : "Webhook غير مُعد."}</p>
+                  <p className="text-xs text-brand-800/80">
+                    {snapshot.fields.find((field) => field.key === "WEBHOOK_SECRET")?.hasPendingValue
+                      ? "رابط جديد بانتظار اعتماد الإعدادات."
+                      : snapshot.fields.find((field) => field.key === "WEBHOOK_SECRET")?.configured
+                        ? "Webhook محمي ومُعد. يمكن تدوير الرابط عند الحاجة."
+                        : "Webhook غير مُعد."}
+                  </p>
                 )}
-                {permissions.canManage && <ActionButton disabled={!!busy || encryptionBlocked} loading={busy === "rotate-webhook"} onClick={onRotateWebhook} icon={<RefreshCw className="h-4 w-4" />} label={rotatableWebhook.actionLabel} />}
-              </div>
+                {permissions.canManage && (
+                  <div className="mt-3">
+                    <ActionButton
+                      disabled={!!busy || encryptionBlocked}
+                      loading={busy === "rotate-webhook"}
+                      onClick={onRotateWebhook}
+                      icon={<RefreshCw className="h-4 w-4" />}
+                      label={rotatableWebhook.actionLabel}
+                    />
+                  </div>
+                )}
+              </InfoPanel>
             )}
 
             {WEBHOOKS[provider] && (
-              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-                <p className="text-sm font-black text-blue-950">{WEBHOOKS[provider]!.label}</p>
-                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                  <code className="min-w-0 flex-1 overflow-x-auto rounded bg-white px-3 py-2 text-xs text-slate-700">{WEBHOOKS[provider]!.path}</code>
-                  <button type="button" onClick={() => copyAbsolutePath(WEBHOOKS[provider]!.path)} className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-blue-300 bg-white px-3 text-xs font-bold text-blue-800"><Clipboard className="h-4 w-4" /> نسخ الرابط</button>
-                </div>
-                {provider === "META_WHATSAPP" && <p className="mt-2 text-xs text-blue-900">استخدم Webhook Verify Token نفسه داخل Meta. التحقق منه محلي ولا يعني أن Meta اختبرته خارجيًا.</p>}
-              </div>
+              <InfoPanel
+                title={WEBHOOKS[provider]!.label}
+                description={provider === "META_WHATSAPP" ? "استخدم Webhook Verify Token نفسه داخل Meta. التحقق منه محلي ولا يعني أن Meta اختبرته خارجيًا." : undefined}
+              >
+                <CopyableCode value={WEBHOOKS[provider]!.path} onCopy={() => copyAbsolutePath(WEBHOOKS[provider]!.path)} />
+              </InfoPanel>
             )}
 
-            <TestResult title="فحص التكوين العامل" result={lastActiveTest} fallbackAt={snapshot.activeTest.lastTestAt} fallbackResult={snapshot.activeTest.lastTestResult} failure={snapshot.activeTest.lastFailureReasonSafe} />
-            <TestResult title="اختبار التغييرات" result={lastCandidateTest} fallbackAt={snapshot.candidate.lastTestAt} fallbackResult={snapshot.candidate.lastTestResult} failure={snapshot.candidate.lastFailureReasonSafe} />
+            <div className="grid gap-3 lg:grid-cols-2">
+              <TestResult title="فحص التكوين العامل" result={lastActiveTest} fallbackAt={snapshot.activeTest.lastTestAt} fallbackResult={snapshot.activeTest.lastTestResult} failure={snapshot.activeTest.lastFailureReasonSafe} />
+              <TestResult title="اختبار التغييرات" result={lastCandidateTest} fallbackAt={snapshot.candidate.lastTestAt} fallbackResult={snapshot.candidate.lastTestResult} failure={snapshot.candidate.lastFailureReasonSafe} />
+            </div>
 
-            <div className="flex flex-wrap gap-2 border-t pt-4">
-              {permissions.canManage && <ActionButton disabled={!!busy || dirty.size === 0} loading={busy === "save"} onClick={onSave} icon={<Save className="h-4 w-4" />} label="حفظ التغييرات" primary />}
+            <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+              {permissions.canManage && <ActionButton disabled={!!busy || dirty.size === 0} loading={busy === "save"} onClick={onSave} icon={<Save className="h-4 w-4" />} label="حفظ التغييرات" variant="primary" />}
               {permissions.canTest && activeComplete && <ActionButton disabled={!!busy} loading={busy === "test-active"} onClick={onTestActive} icon={<ShieldCheck className="h-4 w-4" />} label="فحص الإعدادات الحالية" />}
               {permissions.canTest && snapshot.candidate.hasChanges && <ActionButton disabled={!!busy} loading={busy === "test-candidate"} onClick={onTestCandidate} icon={<TestTube2 className="h-4 w-4" />} label="اختبار التغييرات" />}
-              {permissions.canManage && snapshot.candidate.lastTestResult === "SUCCESS" && snapshot.candidate.version && <ActionButton disabled={!!busy} loading={busy === "activate"} onClick={onActivate} icon={<CheckCircle2 className="h-4 w-4" />} label="اعتماد الإعدادات" success />}
-              {permissions.canManage && snapshot.candidate.hasChanges && <ActionButton disabled={!!busy} loading={busy === "discard"} onClick={onDiscard} icon={<RotateCcw className="h-4 w-4" />} label="إلغاء التغييرات" danger />}
+              {permissions.canManage && snapshot.candidate.lastTestResult === "SUCCESS" && snapshot.candidate.version && <ActionButton disabled={!!busy} loading={busy === "activate"} onClick={onActivate} icon={<CheckCircle2 className="h-4 w-4" />} label="اعتماد الإعدادات" variant="success" />}
+              {permissions.canManage && snapshot.candidate.hasChanges && <ActionButton disabled={!!busy} loading={busy === "discard"} onClick={onDiscard} icon={<RotateCcw className="h-4 w-4" />} label="إلغاء التغييرات" variant="danger" />}
             </div>
           </>
         )}
 
         {ADVANCED_LINKS[provider]?.length ? (
-          <div className="flex flex-wrap gap-3 border-t pt-4 text-xs font-bold text-brand">
-            {ADVANCED_LINKS[provider]!.map((item) => <Link key={item.href} href={item.href} className="hover:underline">{item.label} ←</Link>)}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-200 pt-4">
+            {ADVANCED_LINKS[provider]!.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-brand transition-colors hover:text-brand-700"
+              >
+                {item.label}
+                <ArrowLeft className="h-3.5 w-3.5" />
+              </Link>
+            ))}
           </div>
         ) : null}
       </div>
@@ -183,26 +228,32 @@ export function ProviderFieldsPanel({
 }
 
 function CronInfrastructure({ scheduler, busy, canTest, onTest }: { scheduler: SchedulerUiStatus; busy: string | null; canTest: boolean; onTest: () => void }) {
-  return <div className="space-y-4">
-    <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-      <p className="font-black">مفتاح Cron من إعدادات البنية التحتية ويُضبط مرة واحدة داخل Vercel لأن Vercel يرسله تلقائيًا مع طلبات الجدولة.</p>
-      <code className="mt-2 inline-block rounded bg-white px-2 py-1 text-xs">CRON_SECRET</code>
+  return (
+    <div className="space-y-4">
+      <Banner tone="pending" title="مفتاح Cron من إعدادات البنية التحتية ويُضبط مرة واحدة داخل Vercel لأن Vercel يرسله تلقائيًا مع طلبات الجدولة.">
+        <code className="inline-block rounded-md border border-amber-200 bg-white px-2 py-1 text-xs" dir="ltr">CRON_SECRET</code>
+      </Banner>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <Stat label="CRON_SECRET في السيرفر" value={scheduler.configured ? "موجود" : "غير مضبوط"} />
+        <Stat label="حماية Route" value={scheduler.configured ? "Authorization Bearer" : "غير جاهزة"} />
+        <Stat label="آخر تشغيل" value={formatDate(scheduler.lastRunAt)} />
+        <Stat label="آخر تشغيل ناجح" value={formatDate(scheduler.lastSuccessfulRunAt)} />
+        <Stat label="حملات مجدولة" value={String(scheduler.scheduledCount)} />
+        <Stat label="مستحقة الآن" value={String(scheduler.dueCount)} />
+      </div>
+
+      <InfoPanel title="Route الجدولة الرسمي" description="فحص الحماية لا ينفذ الحملات المستحقة.">
+        <code className="block overflow-x-auto rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700" dir="ltr">
+          /api/cron/communication-run-due
+        </code>
+      </InfoPanel>
+
+      {canTest && (
+        <ActionButton disabled={!!busy} loading={busy === "test-active"} onClick={onTest} icon={<ShieldCheck className="h-4 w-4" />} label="فحص حماية Route" />
+      )}
     </div>
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      <Stat label="CRON_SECRET في السيرفر" value={scheduler.configured ? "موجود" : "غير مضبوط"} />
-      <Stat label="حماية Route" value={scheduler.configured ? "Authorization Bearer" : "غير جاهزة"} />
-      <Stat label="آخر تشغيل" value={formatDate(scheduler.lastRunAt)} />
-      <Stat label="آخر تشغيل ناجح" value={formatDate(scheduler.lastSuccessfulRunAt)} />
-      <Stat label="حملات مجدولة" value={String(scheduler.scheduledCount)} />
-      <Stat label="مستحقة الآن" value={String(scheduler.dueCount)} />
-    </div>
-    <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-      <p className="text-sm font-black text-blue-950">Route الجدولة الرسمي</p>
-      <code className="mt-2 block overflow-x-auto rounded bg-white px-3 py-2 text-xs text-slate-700">/api/cron/communication-run-due</code>
-      <p className="mt-2 text-xs text-blue-900">فحص الحماية لا ينفذ الحملات المستحقة.</p>
-    </div>
-    {canTest && <ActionButton disabled={!!busy} loading={busy === "test-active"} onClick={onTest} icon={<ShieldCheck className="h-4 w-4" />} label="فحص حماية Route" />}
-  </div>;
+  );
 }
 
 function TestResult({ title, result, fallbackAt, fallbackResult, failure }: { title: string; result: SafeProviderConnectionTestResponse | null; fallbackAt: string | null; fallbackResult: "SUCCESS" | "FAILED" | null; failure: string | null }) {
@@ -210,16 +261,20 @@ function TestResult({ title, result, fallbackAt, fallbackResult, failure }: { ti
   const failed = result ? !result.success : fallbackResult === "FAILED";
   const at = result?.testedAt ?? fallbackAt;
   if (!at && !result) return null;
-  return <div className={`rounded-xl border p-4 ${success ? "border-emerald-200 bg-emerald-50" : failed ? "border-rose-200 bg-rose-50" : "border-slate-200 bg-slate-50"}`}>
-    <p className="font-black">{title}: {success ? "ناجح" : failed ? "فشل" : "لم يتم"}</p>
-    {(result?.messageAr || failure) && <p className="mt-1 text-sm">{safeErrorMessage(result?.failureCode ?? failure, result?.messageAr ?? failure ?? "")}</p>}
-    {at && <p className="mt-1 text-xs text-slate-600">وقت الفحص: {formatDate(at)}</p>}
-  </div>;
+  const message = (result?.messageAr || failure)
+    ? safeErrorMessage(result?.failureCode ?? failure, result?.messageAr ?? failure ?? "")
+    : null;
+  return (
+    <Banner
+      tone={success ? "success" : failed ? "danger" : "neutral"}
+      title={`${title}: ${success ? "ناجح" : failed ? "فشل" : "لم يتم"}`}
+      meta={at ? `وقت الفحص: ${formatDate(at)}` : undefined}
+    >
+      {message}
+    </Banner>
+  );
 }
 
-function ActionButton({ disabled, loading, onClick, icon, label, primary, success, danger }: { disabled: boolean; loading: boolean; onClick: () => void; icon: React.ReactNode; label: string; primary?: boolean; success?: boolean; danger?: boolean }) {
-  const style = primary ? "bg-brand text-white" : success ? "bg-emerald-600 text-white" : danger ? "border border-rose-300 bg-white text-rose-700" : "border border-blue-300 bg-white text-blue-800";
-  return <button type="button" disabled={disabled} onClick={onClick} className={`inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50 ${style}`}>{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : icon}{label}</button>;
+function formatDate(value: string | null) {
+  return value ? new Date(value).toLocaleString("ar") : "لم يتم";
 }
-function Stat({ label, value }: { label: string; value: string }) { return <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-[11px] font-bold text-slate-500">{label}</p><p className="mt-1 text-sm font-black text-slate-900">{value}</p></div>; }
-function formatDate(value: string | null) { return value ? new Date(value).toLocaleString("ar") : "لم يتم"; }

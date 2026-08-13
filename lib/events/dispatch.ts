@@ -3,6 +3,7 @@ import { track as vercelTrack } from "@vercel/analytics/server";
 import { loadContext, loadContextForDonation, mergeText, type TemplateContext } from "@/lib/templates/variables";
 import { renderEmailHtml, renderEmailSubject } from "@/lib/templates/render";
 import { writeAuditLog } from "@/lib/audit-log";
+import { triggerEventLabelAr } from "@/lib/dashboard/audit-log-display";
 import { pickLocale, resolveEmailVariant, resolveWhatsappBody } from "@/lib/templates/locale-resolver";
 import type { TReaderDocument } from "@usewaypoint/email-builder";
 import { notifyDonationEvent } from "@/lib/telegram/notify";
@@ -87,7 +88,7 @@ export async function dispatchEvent(event: MessageTriggerEvent, input: EventDisp
     if (!triggers.length) return result;
     const ctx: TemplateContext | null = input.donationId ? await loadContextForDonation(input.donationId) : input.userId ? await loadContext(input.userId) : null;
     if (!ctx) {
-      await writeAuditLog({ actorRole: "SYSTEM", action: "EVENT_DISPATCH_NO_CONTEXT", messageAr: `تعذّر تحميل سياق الحدث ${event}`, metadata: { event, ...input }, stream: "TEAM" });
+      await writeAuditLog({ actorRole: "SYSTEM", action: "EVENT_DISPATCH_NO_CONTEXT", messageAr: `تعذّر إرسال الرسائل التلقائية عند «${triggerEventLabelAr(event)}» — بيانات المستلم غير متاحة`, metadata: { event, ...input }, stream: "TEAM" });
       return result;
     }
     const locale = pickLocale({ recipientLang: ctx.user.preferredLang });
@@ -107,7 +108,25 @@ export async function dispatchEvent(event: MessageTriggerEvent, input: EventDisp
         result.errors += 1;
       }
     }
-    await writeAuditLog({ actorRole: "SYSTEM", action: "EVENT_DISPATCH", messageAr: `حدث تلقائي ${event} — ${result.emailsSent} بريد، ${result.whatsappSent} واتساب${result.errors ? `، ${result.errors} فشل` : ""}`, metadata: { event, ...input, ...result }, stream: "TEAM" });
+    // Only record a dispatch that actually did something. A trigger that matched
+    // no recipient produced «حدث تلقائي DONATION_FAILED — 0 بريد، 0 واتساب»,
+    // which says nothing and drowned the rows that do.
+    const didSomething = result.emailsSent > 0 || result.whatsappSent > 0 || result.errors > 0;
+    if (didSomething) {
+      const parts = [
+        result.emailsSent ? `${result.emailsSent} بريد` : null,
+        result.whatsappSent ? `${result.whatsappSent} واتساب` : null,
+        result.errors ? `${result.errors} فشل` : null,
+      ].filter(Boolean);
+      await writeAuditLog({
+        actorRole: "SYSTEM",
+        action: "EVENT_DISPATCH",
+        // The raw enum key used to leak into the message; label it instead.
+        messageAr: `رسائل تلقائية عند «${triggerEventLabelAr(event)}» — ${parts.join("، ")}`,
+        metadata: { event, ...input, ...result },
+        stream: "TEAM",
+      });
+    }
   } catch {
     result.errors += 1;
   }

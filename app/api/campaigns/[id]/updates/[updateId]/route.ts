@@ -9,7 +9,8 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
-import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
+import { queueAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
+import { writeErrorMessage } from "@/lib/dashboard/write-error-message";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 
 type ParamsPromise = { params: Promise<{ id: string; updateId: string }> };
@@ -130,38 +131,27 @@ export async function PATCH(request: NextRequest, { params }: ParamsPromise) {
       }
     }
 
-    // ✅ STEP 5: Execute update in transaction
-    const updatedUpdate = await prisma.$transaction(async (tx) => {
-      // Update main update fields
-      const update = await tx.update.update({
-        where: { id: updateId },
-        data: updateData,
-      });
-
-      // Update or create translations
-      for (const { locale, data: transData } of translationUpdates) {
-        await tx.updateTranslation.upsert({
-          where: {
-            updateId_locale: {
-              updateId: updateId,
-              locale,
-            },
-          },
-          update: transData,
-          create: {
-            updateId: updateId,
-            locale,
-            ...transData,
-          },
-        });
-      }
-
-      return update;
-    });
-
-    // ✅ STEP 6: Fetch updated update with all translations
-    const fullUpdate = await prisma.update.findUnique({
+    // ✅ STEP 5: One nested write.
+    // This was an interactive `$transaction` containing an awaited upsert per
+    // locale, then a separate findUnique to re-read what had just been written.
+    // With 7 locales that is ~9 sequential round trips; Prisma does the same
+    // work atomically in one, and `select` hands back the finished row.
+    const fullUpdate = await prisma.update.update({
       where: { id: updateId },
+      data: {
+        ...updateData,
+        ...(translationUpdates.length
+          ? {
+              translations: {
+                upsert: translationUpdates.map(({ locale, data: transData }) => ({
+                  where: { updateId_locale: { updateId, locale } },
+                  update: transData,
+                  create: { locale, ...transData },
+                })),
+              },
+            }
+          : {}),
+      },
       select: {
         id: true,
         title: true,
@@ -181,21 +171,21 @@ export async function PATCH(request: NextRequest, { params }: ParamsPromise) {
     });
 
     const actor = auditActorFromDashboardSession(session!);
-    await writeAuditLog({
+    queueAuditLog({
       ...actor,
       action: "CAMPAIGN_UPDATE_EDIT",
-      messageAr: `${actor.actorName ?? "مسؤول"} عدّل تحديث المشروع: ${fullUpdate?.title ?? existingUpdate.title}`,
+      messageAr: `${actor.actorName ?? "مسؤول"} عدّل تحديث المشروع: ${fullUpdate.title ?? existingUpdate.title}`,
       entityType: "Update",
       entityId: updateId,
-      metadata: { campaignId: fullUpdate?.campaignId },
+      metadata: { campaignId: fullUpdate.campaignId },
     });
 
-    return NextResponse.json(fullUpdate);
-    
+    return NextResponse.json(fullUpdate, { headers: { "Cache-Control": "no-store" } });
+
   } catch (error) {
     console.error("Error updating update:", error);
     return NextResponse.json(
-      { error: "Failed to modify update" },
+      { error: writeErrorMessage(error, "تعذّر حفظ التحديث") },
       { status: 500 }
     );
   }
@@ -210,26 +200,17 @@ export async function DELETE(request: NextRequest, { params }: ParamsPromise) {
     const denied = requireAdminOrDashboardPermission(session, "campaigns");
     if (denied) return denied;
 
-    // ✅ STEP 2: Validate update exists
-    const existingUpdate = await prisma.update.findUnique({
+    // ✅ STEP 2+3: Delete and read in one call — `delete` returns the row, so the
+    // preceding existence check was a round trip spent on data the delete itself
+    // hands back. A missing row now surfaces as P2025 and is mapped to a 404
+    // below. UpdateTranslation rows cascade (onDelete: Cascade).
+    const existingUpdate = await prisma.update.delete({
       where: { id: updateId },
       select: { id: true, campaignId: true, title: true },
     });
 
-    if (!existingUpdate) {
-      return NextResponse.json(
-        { error: "Update not found" },
-        { status: 404 }
-      );
-    }
-
-    // ✅ STEP 3: Delete update (translations will cascade delete due to onDelete: Cascade)
-    await prisma.update.delete({
-      where: { id: updateId },
-    });
-
     const actor = auditActorFromDashboardSession(session!);
-    await writeAuditLog({
+    queueAuditLog({
       ...actor,
       action: "CAMPAIGN_UPDATE_DELETE",
       messageAr: `${actor.actorName ?? "مسؤول"} حذف تحديثًا من المشروع: ${existingUpdate.title}`,
@@ -245,9 +226,12 @@ export async function DELETE(request: NextRequest, { params }: ParamsPromise) {
     });
     
   } catch (error) {
+    if (error && typeof error === "object" && (error as { code?: string }).code === "P2025") {
+      return NextResponse.json({ error: "Update not found" }, { status: 404 });
+    }
     console.error("Error deleting update:", error);
     return NextResponse.json(
-      { error: "Failed to delete update" },
+      { error: writeErrorMessage(error, "تعذّر حذف التحديث") },
       { status: 500 }
     );
   }

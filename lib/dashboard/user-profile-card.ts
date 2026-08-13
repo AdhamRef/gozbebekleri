@@ -13,6 +13,10 @@ export interface UserProfileCardData {
   region: string | null;
   city: string | null;
   phone: string | null;
+  /** Free-form on the model; normalise with `normalizeGender` before display. */
+  gender: string | null;
+  /** ISO "YYYY-MM-DD" string, not a DateTime — see lib/dashboard/user-demographics.ts. */
+  birthdate: string | null;
   createdAt: string;
   updatedAt: string;
   totalDonationsCount: number;

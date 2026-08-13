@@ -9,7 +9,7 @@ import { FilterBar } from "@/components/dashboard/FilterBar";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Megaphone, Plus, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { CampaignCard } from "./CampaignCard";
+import { CampaignsTable, sortCampaigns, type CampaignSort } from "./CampaignsTable";
 import { type CampaignRow, CHANNEL_META, STATUS_META } from "./campaign-ui";
 
 export function CampaignsListClient() {
@@ -18,6 +18,14 @@ export function CampaignsListClient() {
   const [search, setSearch] = React.useState("");
   const [channel, setChannel] = React.useState("all");
   const [status, setStatus] = React.useState("all");
+  // Newest first: the campaign someone came here to check is almost always the one just sent.
+  const [sort, setSort] = React.useState<CampaignSort>({ key: "date", dir: "desc" });
+
+  // Re-clicking the active column flips direction; a new column starts descending, which is the
+  // useful default for every column here (most recent, most sent, most failed).
+  const toggleSort = React.useCallback((key: CampaignSort["key"]) => {
+    setSort((prev) => (prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
+  }, []);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -37,14 +45,17 @@ export function CampaignsListClient() {
     void load();
   }, [load]);
 
-  // Filtered client-side: the service caps the list at 200 rows, so this is a small in-memory set
-  // and a round trip per keystroke would buy nothing.
-  const filtered = campaigns.filter((c) => {
-    if (channel !== "all" && c.channel !== channel) return false;
-    if (status !== "all" && c.status !== status) return false;
-    if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  // Filtered and sorted client-side: the service caps the list at 200 rows, so this is a small
+  // in-memory set and a round trip per keystroke or column click would buy nothing.
+  const filtered = sortCampaigns(
+    campaigns.filter((c) => {
+      if (channel !== "all" && c.channel !== channel) return false;
+      if (status !== "all" && c.status !== status) return false;
+      if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
+      return true;
+    }),
+    sort,
+  );
 
   const byChannel = (id: string) => campaigns.filter((c) => c.channel === id).length;
 
@@ -97,9 +108,16 @@ export function CampaignsListClient() {
       </FilterBar>
 
       {loading ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-44 animate-pulse rounded-xl border border-slate-200 bg-slate-100" />
+        // Shaped like the table it replaces, so the layout does not jump when rows arrive.
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="h-10 border-b border-slate-100 bg-slate-50/90" />
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 border-b border-slate-50 px-3 py-3 last:border-0">
+              <div className="h-8 w-8 shrink-0 animate-pulse rounded-lg bg-slate-100" />
+              <div className="h-3.5 flex-1 animate-pulse rounded bg-slate-100" />
+              <div className="hidden h-3.5 w-24 animate-pulse rounded bg-slate-100 sm:block" />
+              <div className="hidden h-3.5 w-16 animate-pulse rounded bg-slate-100 md:block" />
+            </div>
           ))}
         </div>
       ) : filtered.length === 0 ? (
@@ -138,12 +156,11 @@ export function CampaignsListClient() {
         <>
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
             {filtered.length} حملة
+            {filtered.length !== campaigns.length && (
+              <span className="font-normal normal-case tracking-normal text-slate-400"> من {campaigns.length}</span>
+            )}
           </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {filtered.map((c) => (
-              <CampaignCard key={c.id} campaign={c} />
-            ))}
-          </div>
+          <CampaignsTable campaigns={filtered} sort={sort} onSort={toggleSort} />
         </>
       )}
     </div>

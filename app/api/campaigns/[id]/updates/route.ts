@@ -8,7 +8,8 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
-import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
+import { queueAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
+import { writeErrorMessage } from "@/lib/dashboard/write-error-message";
 import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 
 type ParamsPromise = { params: Promise<{ id: string }> };
@@ -128,37 +129,28 @@ export async function POST(request: NextRequest, { params }: ParamsPromise) {
       }
     }
 
-    // ✅ STEP 5: Create update with translations in a transaction
-    const update = await prisma.$transaction(async (tx) => {
-      // Create main update (Arabic)
-      const newUpdate = await tx.update.create({
-        data: {
-          title: data.title,
-          description: data.description,
-          image: data.image || null,
-          videoUrl: data.videoUrl || null,
-          campaignId: id,
-        },
-      });
-
-      // Create translations if provided
-      if (translationData.length > 0) {
-        await tx.updateTranslation.createMany({
-          data: translationData.map((t) => ({
-            updateId: newUpdate.id,
-            locale: t.locale,
-            title: t.title,
-            description: t.description,
-          })),
-        });
-      }
-
-      return newUpdate;
-    });
-
-    // ✅ STEP 6: Fetch created update with all translations
-    const fullUpdate = await prisma.update.findUnique({
-      where: { id: update.id },
+    // ✅ STEP 5: Create update + translations in a single nested write.
+    // The interactive transaction plus the follow-up findUnique cost three
+    // round trips to do what Prisma performs atomically in one.
+    const fullUpdate = await prisma.update.create({
+      data: {
+        title: data.title,
+        description: data.description,
+        image: data.image || null,
+        videoUrl: data.videoUrl || null,
+        campaignId: id,
+        ...(translationData.length > 0
+          ? {
+              translations: {
+                create: translationData.map((t) => ({
+                  locale: t.locale,
+                  title: t.title,
+                  description: t.description,
+                })),
+              },
+            }
+          : {}),
+      },
       select: {
         id: true,
         title: true,
@@ -177,21 +169,24 @@ export async function POST(request: NextRequest, { params }: ParamsPromise) {
     });
 
     const actor = auditActorFromDashboardSession(session!);
-    await writeAuditLog({
+    queueAuditLog({
       ...actor,
       action: "CAMPAIGN_UPDATE_POST_CREATE",
-      messageAr: `${actor.actorName ?? "مسؤول"} أضاف تحديثًا للمشروع «${campaign.title}»: ${fullUpdate?.title ?? data.title}`,
+      messageAr: `${actor.actorName ?? "مسؤول"} أضاف تحديثًا للمشروع «${campaign.title}»: ${fullUpdate.title}`,
       entityType: "Update",
-      entityId: update.id,
+      entityId: fullUpdate.id,
       metadata: { campaignId: id },
     });
 
-    return NextResponse.json(fullUpdate, { status: 201 });
-    
+    return NextResponse.json(fullUpdate, {
+      status: 201,
+      headers: { "Cache-Control": "no-store" },
+    });
+
   } catch (error) {
     console.error("Error creating update:", error);
     return NextResponse.json(
-      { error: "Failed to create update" },
+      { error: writeErrorMessage(error, "تعذّر إضافة التحديث") },
       { status: 500 }
     );
   }

@@ -86,6 +86,32 @@ Route: `POST /api/webhooks/elastic-email?token=…` (`app/api/webhooks/elastic-e
   matching `CommunicationDelivery` is advanced through `shouldApplyDeliveryStatus()` so an
   out-of-order `sent` can never downgrade a delivery that already reached `clicked`.
 
+## "Sent" is acceptance, not arrival
+
+A 2xx from `/v4/emails/transactional` means Elastic Email **accepted** the message. The real outcome
+lands minutes later on the event feed and can be `Suppress` ("Delivery to this domain is not
+permitted on your account until the trust level of your mail increases") or `Error` ("Delivery
+failed due to account problem or spam block") — both of which mean the message was never delivered.
+
+Two things keep the dashboard honest about that:
+
+1. `/api/cron/communication-sync-email-events` (every 15 min) pulls `GET /v4/events` and applies the
+   verdicts to the delivery rows. Pass `?lookbackMinutes=` for a one-off backfill wider than the
+   3-hour default (capped at 30 days); one poll still returns at most `MAX_EVENTS_PER_POLL` events,
+   so check the returned `received` count for truncation.
+2. `lib/communication/campaign-counter-service.ts` re-derives `sentCount` / `deliveredCount` /
+   `readCount` / `clickedCount` / `failedCount` and the campaign status **from the delivery rows**,
+   and runs both at the end of a send and after every event batch that moved a delivery. Without it
+   the campaign header kept the optimistic numbers written at send time and reported أُرسلت for
+   mail the provider had refused.
+
+`deliveredCount` counts only rows where arrival is *proven* (DELIVERED/READ/OPENED/CLICKED/REPLIED).
+Elastic Email never emits a `Delivered` event — its `Sent` already means "handed to the recipient's
+mail server" and is counted under `sentCount` — so an open or a click is the only positive evidence.
+
+Historical rows written before this existed: `scripts/reconcile-campaign-counters.ts` (dry run by
+default, `--apply` to write).
+
 ## Tests
 
 `tests/integration-settings/elastic-email.test.ts` covers the catalog contract, field validation,

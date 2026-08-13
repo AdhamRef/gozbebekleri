@@ -74,6 +74,12 @@ export const metadata: Metadata = {
   creator: "Gözbebekleri",
   publisher: "Gözbebekleri",
 
+  // Browser tab + the icon Google shows beside a search result. Declared here
+  // as well as in the locale and dashboard layouts so routes that sit under
+  // neither of those still get an icon instead of falling back to nothing —
+  // there is no `favicon.ico` or `app/icon.*` file in this project.
+  icons: { icon: "/logometa.avif" },
+
   alternates: {
     canonical: `${SITE}/ar`,
     languages: {

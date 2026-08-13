@@ -20,8 +20,6 @@ import {
   HandCoins,
   Percent,
   LayoutList,
-  Download,
-  Plus,
   RefreshCw,
   Star,
   TrendingUp,
@@ -73,6 +71,7 @@ import {
 } from "@/lib/dashboard/istanbul-client-date";
 import { DonationTableCountryColumn } from "@/components/dashboard/DonationTableCountryColumn";
 import { DonationSourceBadge } from "@/components/dashboard/DonationSourceBadge";
+import { DonationsFilterActions } from "@/components/dashboard/DonationsFilterActions";
 import { DonorSearchInput } from "@/components/dashboard/DonorSearchInput";
 import { getCountryDisplayNameFromCode } from "@/lib/dashboard/country-display-name";
 import { DashboardPieLegendByValue } from "@/components/dashboard/DashboardPieLegend";
@@ -1518,28 +1517,12 @@ export default function MonthlySubscriptionsDashboardPage() {
                 <Search className="w-4 h-4 shrink-0" />
                 <span>تصفية النتائج</span>
               </CardTitle>
-              <div className="flex items-center gap-2 shrink-0">
-                {canEditDonations && (
-                  <button
-                    type="button"
-                    onClick={() => donationActions.openCreate()}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
-                  >
-                    <Plus className="w-4 h-4" />
-                    تبرع جديد
-                  </button>
-                )}
-                {canExportReports && (
-                  <button
-                    type="button"
-                    onClick={() => setExportOpen(true)}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
-                  >
-                    <Download className="w-4 h-4" />
-                    تصدير التقرير
-                  </button>
-                )}
-              </div>
+              <DonationsFilterActions
+                canEditDonations={canEditDonations}
+                canExportReports={canExportReports}
+                onCreateDonation={() => donationActions.openCreate()}
+                onExportReport={() => setExportOpen(true)}
+              />
             </div>
           </CardHeader>
           <CardContent className="pt-0 space-y-4" dir="rtl">
@@ -1876,7 +1859,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                       <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                         الإحالة
                       </th>
-                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-px whitespace-nowrap">
+                      <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                         مصدر التبرع
                       </th>
                       <th className="text-right py-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 max-w-[110px]">
@@ -2025,7 +2008,7 @@ export default function MonthlySubscriptionsDashboardPage() {
                               <span className="text-slate-400">—</span>
                             )}
                           </td>
-                          <td className="py-2.5 px-3 align-middle w-px whitespace-nowrap">
+                          <td className="py-2.5 px-3 align-middle">
                             <button
                               type="button"
                               onClick={() => openDonationDetails("attribution", d)}

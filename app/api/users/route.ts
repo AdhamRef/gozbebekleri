@@ -11,6 +11,12 @@ import {
   sessionHasDashboardPermission,
 } from '@/lib/dashboard/permissions';
 import { writeAuditLog } from '@/lib/audit-log';
+import {
+  birthdateRangeForAges,
+  genderQueryValues,
+  parseAgeParam,
+  parseGenderParam,
+} from '@/lib/dashboard/user-demographics';
 
 type UserScope = 'donors' | 'team' | 'all';
 
@@ -64,6 +70,9 @@ export async function GET(request: NextRequest) {
     const preferredLang = searchParams.get('preferredLang') || undefined;
     const badgeId = searchParams.get('badgeId') || undefined;
     const search = searchParams.get('search')?.trim() || undefined;
+    const gender = parseGenderParam(searchParams.get('gender'));
+    const minAge = parseAgeParam(searchParams.get('minAge'));
+    const maxAge = parseAgeParam(searchParams.get('maxAge'));
     const sortBy = (searchParams.get('sortBy') || 'createdAt') as 'createdAt' | 'name' | 'email' | 'donationsCount' | 'totalDonated' | 'role';
     const sortOrder = (searchParams.get('sortOrder') || 'desc') as 'asc' | 'desc';
     const page = parseInt(searchParams.get('page') || '1');
@@ -90,6 +99,21 @@ export async function GET(request: NextRequest) {
 
     if (scope === 'team' && session?.user?.id) {
       where = { ...where, NOT: { id: session.user.id } };
+    }
+
+    // `gender` is free-form on the model, so match every spelling the app has
+    // ever written rather than a single canonical value.
+    if (gender) {
+      where = { ...where, gender: { in: genderQueryValues(gender) } };
+    }
+
+    // `birthdate` is an ISO "YYYY-MM-DD" string, and ISO dates sort
+    // lexicographically — so an age range is a plain string range. Users with no
+    // birthdate recorded drop out of the result, which is the intended meaning
+    // of "donors aged 25-40".
+    const birthdateRange = birthdateRangeForAges(minAge, maxAge);
+    if (birthdateRange) {
+      where = { ...where, birthdate: birthdateRange };
     }
 
     if (badgeId && scope === 'donors') {
@@ -176,6 +200,8 @@ export async function GET(request: NextRequest) {
       region: true,
       city: true,
       phone: true,
+      gender: true,
+      birthdate: true,
       createdAt: true,
       updatedAt: true,
       _count: { select: { donations: true } },

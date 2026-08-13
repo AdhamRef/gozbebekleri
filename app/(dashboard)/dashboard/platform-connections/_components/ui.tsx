@@ -11,7 +11,9 @@ export function fmtDate(iso: string | null | undefined): string {
 }
 
 export function StatusBadge({ status }: { status: ConnStatus }) {
-  return <span className={`inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-bold ${STATUS_CLASS[status]}`}>{STATUS_LABEL[status]}</span>;
+  // Matches the StatusChip shape used on the providers page so the section has
+  // one pill, not two that differ only in radius and weight.
+  return <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${STATUS_CLASS[status]}`}>{STATUS_LABEL[status]}</span>;
 }
 
 export function PageHeader({
@@ -72,9 +74,11 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
 
 export function CardHeader({ title, description, action }: { title: ReactNode; description?: string; action?: ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-3 border-b p-4">
+    <div className="flex items-start justify-between gap-3 border-b border-slate-200 p-4">
       <div>
-        <h2 className="text-base font-black text-slate-900">{title}</h2>
+        {/* Was font-black — heavier than the page's own h1, which reads as the
+            card title outranking the page title. */}
+        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
         {description ? <p className="mt-0.5 text-xs leading-5 text-slate-500">{description}</p> : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
@@ -122,9 +126,11 @@ export function EnvOnlyNote() {
 /** Small "quick link" tile for the روابط سريعة grid. */
 export function QuickLink({ href, label, icon }: { href: string; label: string; icon: ReactNode }) {
   return (
-    <Link href={href} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition hover:border-brand/50 hover:shadow">
-      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-brand">{icon}</span>
-      <span className="text-sm font-bold text-slate-800">{label}</span>
+    <Link href={href} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand/50 hover:shadow">
+      {/* bg-blue-50 is a different hue from brand (#025EB8) and clashed with the
+          brand-coloured icon sitting on it. */}
+      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand">{icon}</span>
+      <span className="text-sm font-semibold text-slate-800">{label}</span>
     </Link>
   );
 }

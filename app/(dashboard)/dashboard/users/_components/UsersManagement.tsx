@@ -37,6 +37,21 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { SendTemplateDialog, type SendTarget } from "@/components/dashboard/SendTemplateDialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { EmptyState } from "@/components/dashboard/EmptyState";
+import {
+  AgeFilterSelect,
+  GenderFilterSelect,
+  ageBracketBody,
+  applyAgeBracketParams,
+  type AgeBracket,
+  type GenderFilterValue,
+} from "@/components/dashboard/DemographicFilters";
+import {
+  GENDER_LABEL_AR,
+  ageFromBirthdate,
+  normalizeGender,
+} from "@/lib/dashboard/user-demographics";
 import ReactCountryFlag from "react-country-flag";
 import { useCurrency } from "@/context/CurrencyContext";
 import { cn } from "@/lib/utils";
@@ -60,10 +75,6 @@ interface BadgeOption {
 
 type Scope = "donors" | "team";
 
-function tableColSpan(scope: Scope): number {
-  return scope === "donors" ? 11 : 8;
-}
-
 export default function UsersManagement({ scope }: { scope: Scope }) {
   const { data: session } = useSession();
   const isFullAdmin = session?.user?.role === "ADMIN";
@@ -82,6 +93,8 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
   const [searchInput, setSearchInput] = useState("");
   const [preferredLangFilter, setPreferredLangFilter] = useState<string>("all");
   const [badgeFilter, setBadgeFilter] = useState<string>("all");
+  const [genderFilter, setGenderFilter] = useState<GenderFilterValue>("all");
+  const [ageFilter, setAgeFilter] = useState<AgeBracket>("all");
   const [sortBy, setSortBy] = useState<
     "createdAt" | "name" | "email" | "donationsCount" | "totalDonated" | "role"
   >("createdAt");
@@ -111,6 +124,8 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
           params.set("preferredLang", preferredLangFilter);
         if (scope === "donors" && badgeFilter && badgeFilter !== "all")
           params.set("badgeId", badgeFilter);
+        if (genderFilter !== "all") params.set("gender", genderFilter);
+        applyAgeBracketParams(params, ageFilter);
         const res = await axios.get(`/api/users?${params}`);
         const list = res.data?.users ?? [];
         setUsers((prev) => (append ? [...prev, ...list] : list));
@@ -123,7 +138,7 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
         setLoadingMore(false);
       }
     },
-    [scope, search, preferredLangFilter, badgeFilter, sortBy, sortOrder]
+    [scope, search, preferredLangFilter, badgeFilter, genderFilter, ageFilter, sortBy, sortOrder]
   );
 
   useEffect(() => {
@@ -134,7 +149,7 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
   useEffect(() => {
     setPage(1);
     fetchUsers(1, false);
-  }, [search, preferredLangFilter, badgeFilter, sortBy, sortOrder, fetchUsers]);
+  }, [search, preferredLangFilter, badgeFilter, genderFilter, ageFilter, sortBy, sortOrder, fetchUsers]);
 
   useEffect(() => {
     if (scope !== "donors") return;
@@ -234,7 +249,6 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
   };
 
   const isAllDisplayedSelected = users.length > 0 && users.every((u) => selectedUserIds.has(u.id));
-  const isSomeDisplayedSelected = users.some((u) => selectedUserIds.has(u.id));
 
   const formatMoney = (n: number) => {
     const r = convertToCurrency(n);
@@ -246,6 +260,21 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
   };
 
   const hasMore = users.length < total && !loadingMore;
+
+  const hasActiveFilters =
+    search !== "" ||
+    preferredLangFilter !== "all" ||
+    badgeFilter !== "all" ||
+    genderFilter !== "all" ||
+    ageFilter !== "all";
+
+  const resetFilters = () => {
+    setSearchInput("");
+    setPreferredLangFilter("all");
+    setBadgeFilter("all");
+    setGenderFilter("all");
+    setAgeFilter("all");
+  };
 
   if (loading && users.length === 0) {
     return (
@@ -308,12 +337,7 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0 space-y-4" dir="rtl">
-            <div
-              className={cn(
-                "grid grid-cols-1 sm:grid-cols-2 gap-4",
-                scope === "donors" ? "lg:grid-cols-5" : "lg:grid-cols-4"
-              )}
-            >
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-2 text-right">
                 <label className="text-[11px] font-medium text-slate-500">بحث (اسم أو بريد)</label>
         <Input
@@ -356,6 +380,26 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                   </SelectContent>
                 </Select>
               </div>
+              {scope === "donors" && (
+              <div className="space-y-2 text-right">
+                <label className="text-[11px] font-medium text-slate-500">الجنس</label>
+                <GenderFilterSelect
+                  value={genderFilter}
+                  onChange={setGenderFilter}
+                  className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50"
+                />
+              </div>
+              )}
+              {scope === "donors" && (
+              <div className="space-y-2 text-right">
+                <label className="text-[11px] font-medium text-slate-500">العمر</label>
+                <AgeFilterSelect
+                  value={ageFilter}
+                  onChange={setAgeFilter}
+                  className="w-full h-9 px-3 text-xs rounded-lg border-slate-200 bg-slate-50"
+                />
+              </div>
+              )}
               <div className="space-y-2 text-right">
                 <label className="text-[11px] font-medium text-slate-500">ترتيب حسب</label>
                 <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
@@ -449,75 +493,108 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
               </div>
             )}
             <CardContent className="p-0">
-              <div className="overflow-x-auto" dir="rtl">
-                <table className="w-full text-sm text-right">
+              {/* Loading and empty are rendered outside the table so they read as
+                  states of the list rather than as a stray full-width row. */}
+              {loading && users.length === 0 ? (
+                <div className="space-y-2 p-4">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="h-12 animate-pulse rounded-lg border border-slate-200 bg-slate-100" />
+                  ))}
+                </div>
+              ) : users.length === 0 ? (
+                <EmptyState
+                  icon={Users}
+                  title="لا يوجد مستخدمين مطابقين"
+                  description="جرّب توسيع التصفية أو مسحها."
+                  action={
+                    hasActiveFilters ? (
+                      <Button variant="outline" size="sm" onClick={resetFilters}>مسح التصفية</Button>
+                    ) : undefined
+                  }
+                />
+              ) : (
+              <div className="overflow-x-auto rounded-lg border border-slate-200" dir="rtl">
+                <table className="w-full min-w-[900px] text-right text-sm">
                   <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50/80">
-                      <th className="text-right py-3 px-2 w-10">
+                    <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-700">
+                      <th className="w-10 px-3 py-2.5">
                         <Checkbox
                           checked={isAllDisplayedSelected}
                           onCheckedChange={(checked: boolean | "indeterminate") => selectAllDisplayed(checked === true)}
                           aria-label="تحديد الكل"
                         />
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700 min-w-[130px]">الاسم</th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">البريد</th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">الدور</th>
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">اللغة المفضلة</th>
+                      <th className="min-w-[210px] px-3 py-2.5 text-right text-xs font-semibold">
+                        {scope === "donors" ? "المتبرع" : "العضو"}
+                      </th>
+                      <th className="px-3 py-2.5 text-right text-xs font-semibold">الدور</th>
+                      <th className="px-3 py-2.5 text-right text-xs font-semibold">اللغة</th>
                       {scope === "donors" && (
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">الموقع</th>
+                      <th className="min-w-[110px] px-3 py-2.5 text-right text-xs font-semibold">الجنس / العمر</th>
                       )}
                       {scope === "donors" && (
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">الشارات</th>
+                      <th className="min-w-[130px] px-3 py-2.5 text-right text-xs font-semibold">الموقع</th>
+                      )}
+                      {scope === "donors" && (
+                      <th className="min-w-[130px] px-3 py-2.5 text-right text-xs font-semibold">الشارات</th>
                       )}
                       {scope === "team" && (
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">حملات لوحة التحكم</th>
+                      <th className="min-w-[180px] px-3 py-2.5 text-right text-xs font-semibold">حملات لوحة التحكم</th>
                       )}
                       {scope === "donors" && (
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">عدد التبرعات</th>
+                      <th className="px-3 py-2.5 text-right text-xs font-semibold">عدد التبرعات</th>
                       )}
                       {scope === "donors" && (
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">إجمالي التبرعات</th>
+                      <th className="px-3 py-2.5 text-right text-xs font-semibold">إجمالي التبرعات</th>
                       )}
-                      <th className="text-right py-3 px-4 font-semibold text-slate-700">التسجيل</th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-700">الإجراءات</th>
+                      <th className="px-3 py-2.5 text-right text-xs font-semibold whitespace-nowrap">التسجيل</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold">الإجراءات</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {loading && users.length === 0 ? (
-                      <tr>
-                        <td colSpan={tableColSpan(scope)} className="py-12 text-center">
-                          <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" />
-                        </td>
-                      </tr>
-                    ) : users.length === 0 ? (
-                      <tr>
-                        <td colSpan={tableColSpan(scope)} className="py-12 text-center text-slate-500">
-                          لا يوجد مستخدمين مطابقين
-                        </td>
-                      </tr>
-                    ) : (
-                      users.map((u) => (
+                    {users.map((u) => {
+                      const selected = selectedUserIds.has(u.id);
+                      const genderKey = normalizeGender(u.gender);
+                      const age = ageFromBirthdate(u.birthdate);
+                      return (
                         <tr
                           key={u.id}
                           className={cn(
-                            "border-b border-slate-100 hover:bg-slate-50/60 transition-colors",
-                            selectedUserIds.has(u.id) && "bg-slate-50/80"
+                            "border-b border-slate-100 transition-colors last:border-0",
+                            selected ? "bg-brand-50" : "hover:bg-slate-50/70"
                           )}
                         >
-                          <td className="py-3 px-2">
+                          <td className="px-3 py-2.5">
                             <Checkbox
-                              checked={selectedUserIds.has(u.id)}
+                              checked={selected}
                               onCheckedChange={() => toggleSelectUser(u.id)}
                               aria-label={`تحديد ${u.name || u.email}`}
                             />
                           </td>
-                          <td className="py-3 px-4 font-medium text-slate-900 min-w-[130px] whitespace-normal">{u.name ?? "—"}</td>
-                          <td className="py-3 px-4 text-slate-600 truncate max-w-[250px] text-xs">{u.email ?? "—"}</td>
-                          <td className="py-3 px-4">
+
+                          {/* Name and contact share one cell: two columns of text with an
+                              empty avatar column between them read as three loose lists. */}
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-8 w-8 shrink-0 rounded-full ring-1 ring-slate-200">
+                                <AvatarImage src={u.image ?? undefined} alt="" />
+                                <AvatarFallback className="rounded-full bg-gradient-to-br from-slate-400 to-slate-600 text-[10px] font-bold text-white">
+                                  {(u.name ?? u.email ?? "؟").charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <p className="truncate text-[13px] font-medium text-slate-900">{u.name ?? "بلا اسم"}</p>
+                                <p className="truncate text-[11px] text-slate-500" title={u.email ?? undefined}>
+                                  {u.email ?? u.phone ?? "—"}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="px-3 py-2.5">
                             <span
                               className={cn(
-                                "inline-block px-2 py-0.5 rounded-full text-xs",
+                                "inline-block rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap",
                                 u.role === "ADMIN"
                                   ? "bg-brand-orange/8 text-brand-orange"
                                   : u.role === "STAFF"
@@ -532,14 +609,33 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                                   : "متبرع"}
                             </span>
                           </td>
-                          <td className="py-3 px-4 text-slate-600">
-                            {LOCALE_LABELS[u.preferredLang as keyof typeof LOCALE_LABELS] ?? "—"}
+
+                          <td className="px-3 py-2.5">
+                            <span className="inline-flex rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-600">
+                              {LOCALE_LABELS[u.preferredLang as keyof typeof LOCALE_LABELS] ?? "—"}
+                            </span>
                           </td>
+
+                          {scope === "donors" && (
+                          <td className="px-3 py-2.5">
+                            {genderKey || age !== null ? (
+                              <span className="flex items-center gap-1.5 text-[12px] text-slate-700 whitespace-nowrap">
+                                {genderKey ? GENDER_LABEL_AR[genderKey] : "—"}
+                                {age !== null && (
+                                  <span className="text-slate-400">· {age} سنة</span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-slate-400">—</span>
+                            )}
+                          </td>
+                          )}
+
                           {scope === "donors" && (() => {
                             const country = resolveUserCountry(u);
                             return (
-                              <td className="py-3 px-4 text-slate-700 max-w-[160px]">
-                                <span className="inline-flex items-center gap-1.5 min-w-0">
+                              <td className="px-3 py-2.5 max-w-[160px]">
+                                <span className="flex items-center gap-1.5 text-[12px] text-slate-700">
                                   {country.code ? (
                                     <ReactCountryFlag
                                       countryCode={country.code}
@@ -555,44 +651,44 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                               </td>
                             );
                           })()}
+
                           {scope === "donors" && (
-                          <td className="py-3 px-4">
+                          <td className="px-3 py-2.5">
                             <div className="flex flex-wrap gap-1">
+                              {(u.badgeIds ?? []).length === 0 && <span className="text-[11px] text-slate-400">—</span>}
                               {(u.badgeIds ?? []).map((bid) => {
                                 const badge = badges.find((b) => b.id === bid);
                                 if (!badge) return null;
+                                const label = badge.translatedName || badge.name;
                                 return (
                                   <span
                                     key={bid}
-                                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white border border-white/20"
-                                    style={{ backgroundColor: badge.color }}
-                                    title={badge.translatedName || badge.name}
+                                    className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px]"
+                                    style={{
+                                      borderColor: `${badge.color}55`,
+                                      backgroundColor: `${badge.color}14`,
+                                      color: badge.color,
+                                    }}
+                                    title={label}
                                   >
-                                    {badge.translatedName || badge.name}
+                                    <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: badge.color }} />
+                                    {label}
                                   </span>
                                 );
                               })}
-                              {(u.badgeIds ?? []).length === 0 && <span className="text-slate-400">—</span>}
                             </div>
                           </td>
                           )}
+
                           {scope === "team" && (
-                          <td className="py-3 px-4">
+                          <td className="px-3 py-2.5">
                             {u.role === "ADMIN" ? (
-                              <span className="text-xs text-brand-orange bg-brand-orange/8 px-2 py-1 rounded-md">كل الحملات</span>
+                              <span className="inline-flex rounded-full border border-brand-orange/20 bg-brand-orange/8 px-1.5 py-0.5 text-[10px] text-brand-orange">
+                                كل الحملات
+                              </span>
                             ) : (
-                              <div className="flex flex-wrap gap-1 max-w-[220px]">
+                              <div className="flex max-w-[220px] flex-wrap gap-1">
                                 {(u.dashboardPermissions ?? []).map((key) => {
-                                  // if (key === "users") {
-                                  //   return (
-                                  //     <span
-                                  //       key="legacy"
-                                  //       className="inline-block px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-700"
-                                  //     >
-                                  //       مستخدمين (قديم)
-                                  //     </span>
-                                  //   );
-                                  // }
                                   const row =
                                     DASHBOARD_PERMISSION_ROWS.find((r) => r.key === key) ??
                                     ACTION_PERMISSION_ROWS.find((r) => r.key === key);
@@ -602,7 +698,7 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                                     <span
                                       key={key}
                                       className={cn(
-                                        "inline-block px-2 py-0.5 rounded text-xs text-white",
+                                        "inline-block rounded px-1.5 py-0.5 text-[10px] text-white",
                                         isActionPermission ? "bg-slate-600" : "bg-brand"
                                       )}
                                     >
@@ -611,24 +707,27 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                                   );
                                 })}
                                 {(u.dashboardPermissions ?? []).length === 0 && (
-                                  <span className="text-slate-400 text-xs">—</span>
+                                  <span className="text-[11px] text-slate-400">—</span>
                                 )}
                               </div>
                             )}
                           </td>
                           )}
+
                           {scope === "donors" && (
-                          <td className="py-3 px-4 font-medium text-slate-800">{u.totalDonationsCount}</td>
+                          <td className="px-3 py-2.5 text-[13px] font-medium text-slate-800 tabular-nums">{u.totalDonationsCount}</td>
                           )}
                           {scope === "donors" && (
-                          <td className="py-3 px-4 font-medium text-slate-800" dir="ltr">
+                          <td className="px-3 py-2.5 text-[13px] font-medium text-slate-800 tabular-nums" dir="ltr">
                             {formatMoney(u.totalDonatedAmountUSD)}
                           </td>
                           )}
-                          <td className="py-3 px-4 text-slate-500">
+
+                          <td className="px-3 py-2.5 text-[12px] text-slate-500 whitespace-nowrap">
                             {new Date(u.createdAt).toLocaleDateString("ar-EG", { dateStyle: "medium" })}
                           </td>
-                          <td className="py-3 px-4 text-left">
+
+                          <td className="px-3 py-2.5 text-left">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button size="sm" variant="outline" className="gap-1 rounded-full">
@@ -666,11 +765,12 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                             </DropdownMenu>
                           </td>
                         </tr>
-                      ))
-                    )}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
+              )}
               {hasMore && (
                 <div className="p-4 border-t border-slate-100 text-center">
                   <Button
@@ -807,6 +907,8 @@ export default function UsersManagement({ scope }: { scope: Scope }) {
                 preferredLang:
                   preferredLangFilter !== "all" ? preferredLangFilter : undefined,
                 badgeId: badgeFilter !== "all" ? badgeFilter : undefined,
+                gender: genderFilter !== "all" ? genderFilter : undefined,
+                ...ageBracketBody(ageFilter),
               },
             } satisfies SendTarget
           }

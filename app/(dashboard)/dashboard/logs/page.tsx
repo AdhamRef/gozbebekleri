@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { PageHeader } from "@/components/dashboard/PageHeader";
+import { displayActorName } from "@/lib/dashboard/audit-log-display";
 
 type AuditRow = {
   id: string;
@@ -25,6 +26,7 @@ type AuditRow = {
 };
 
 type TimePreset = "today" | "7d" | "30d" | "custom" | "all";
+type StreamMode = "all" | "TEAM" | "DONOR";
 
 function RoleIcon({ role }: { role: string }) {
   if (role === "ADMIN")
@@ -52,10 +54,10 @@ function RoleIcon({ role }: { role: string }) {
   );
 }
 
-function streamBadge(stream: string | null | undefined) {
-  if (stream === "DONOR")
+function streamBadge(row: AuditRow) {
+  if (row.stream === "DONOR")
     return <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 ms-1.5">متبرع</span>;
-  if (stream === "TEAM")
+  if (row.stream === "TEAM")
     return <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand/10 text-brand ms-1.5">فريق</span>;
   return null;
 }
@@ -104,7 +106,7 @@ function LogTable({
   customFrom,
   customTo,
 }: {
-  streamMode: "all" | "TEAM" | "DONOR";
+  streamMode: StreamMode;
   userFilter: string;
   timePreset: TimePreset;
   customFrom: string;
@@ -161,7 +163,9 @@ function LogTable({
   const filtered = useMemo(() => {
     if (!userFilter.trim()) return logs;
     const q = userFilter.trim().toLowerCase();
-    return logs.filter((r) => r.actorName?.toLowerCase().includes(q));
+    // Match what the column shows, so searching "النظام" finds automated rows
+    // instead of silently matching nothing.
+    return logs.filter((r) => displayActorName(r).toLowerCase().includes(q));
   }, [logs, userFilter]);
 
   const hasMore = logs.length < total;
@@ -206,9 +210,9 @@ function LogTable({
                       <div className="flex items-center gap-1.5">
                         <RoleIcon role={row.actorRole} />
                         <span className="text-slate-800 font-medium text-sm">
-                          {row.actorName ?? "—"}
+                          {displayActorName(row)}
                         </span>
-                        {showStreamBadge && streamBadge(row.stream)}
+                        {showStreamBadge && streamBadge(row)}
                       </div>
                     </td>
                     <td className="py-3 px-4 text-slate-600 leading-snug">
@@ -247,7 +251,7 @@ function LogTable({
 }
 
 export default function DashboardLogsPage() {
-  const [stream, setStream] = useState<"all" | "TEAM" | "DONOR">("all");
+  const [stream, setStream] = useState<StreamMode>("all");
   const [userFilter, setUserFilter] = useState("");
   const [timePreset, setTimePreset] = useState<TimePreset>("all");
   const [customFrom, setCustomFrom] = useState("");
@@ -257,7 +261,7 @@ export default function DashboardLogsPage() {
     <div className="min-h-0 space-y-5" dir="rtl">
       <PageHeader
         title="سجل النشاط"
-        description="سجل موحّد لكل الأحداث — يمكنك تصفية حسب الفريق أو المتبرعين أو النطاق الزمني"
+        description="سجل ما نفّذه الفريق والمتبرعون. الأحداث التلقائية (الجدولة، التتبّع، الرسائل الآلية) لا تظهر هنا."
         icon={ScrollText}
       />
 

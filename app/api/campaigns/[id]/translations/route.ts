@@ -3,33 +3,34 @@
 // GET /api/campaigns/[id]/translations - Returns all translations (en, fr, etc.)
 
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+// Was `new PrismaClient()` guarded by a global that is only ever populated
+// outside production — so in production this module opened a second connection
+// pool of its own instead of reusing the shared singleton.
+import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/[...nextauth]/options";
-import { whereByIdOrLocaleSlug } from "@/lib/slug";
-
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
-const prisma = globalForPrisma.prisma || new PrismaClient();
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { whereByIdOrAnyLocaleSlug } from "@/lib/slug";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    // This returns every locale's draft copy, so it belongs behind the same gate
+    // as the campaign editor it feeds. The imports were already here but the
+    // check was never performed.
+    const session = await getServerSession(authOptions);
+    const denied = requireAdminOrDashboardPermission(session, "campaigns");
+    if (denied) return denied;
+
     const { id: idOrSlug } = await params;
 
-    // Resolve param (id, base slug, or per-locale translation slug) to the real campaign id.
-    // We don't know which locale the slug came from when this route is hit, so probe each
-    // supported locale until we find a match.
-    const url = new URL(request.url);
-    const hintLocale = url.searchParams.get("locale") || "ar";
-    const probeLocales = [hintLocale, "en", "ar", "fr", "tr", "id", "pt", "es"];
-    let camp: { id: string } | null = null;
-    for (const loc of probeLocales) {
-      camp = await prisma.campaign.findFirst({
-        where: whereByIdOrLocaleSlug(idOrSlug, loc),
-        select: { id: true },
-      });
-      if (camp) break;
-    }
+    // Resolve the param (id, base slug, or a per-locale translation slug) in ONE
+    // query. This used to loop over 8 locales issuing a findFirst each until one
+    // matched — up to 8 sequential round trips (~4s here) to answer a question
+    // `whereByIdOrAnyLocaleSlug` settles in a single locale-agnostic clause.
+    const camp = await prisma.campaign.findFirst({
+      where: whereByIdOrAnyLocaleSlug(idOrSlug),
+      select: { id: true },
+    });
     if (!camp) return NextResponse.json([]);
 
     // ✅ Fetch all translations for the campaign (including per-locale slug for editing)

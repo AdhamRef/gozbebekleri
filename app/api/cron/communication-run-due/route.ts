@@ -21,7 +21,12 @@ export async function GET(request: NextRequest) {
     await writeAuditLog({
       actorRole: "SYSTEM",
       action: SCHEDULER_RUN_ACTION,
-      messageAr: `تشغيل جدولة التواصل — ${results.length} حملة مستحقة`,
+      // Kept on every run — `getSchedulerStatus()` reads these rows to show
+      // «آخر تشغيل», so silence would read as a dead cron. They are classified
+      // as diagnostics instead, and stay out of the activity view.
+      messageAr: results.length
+        ? `تشغيل جدولة التواصل — ${results.length} حملة مستحقة (أُرسل ${totals.sent}، تخطّي ${totals.skipped}، فشل ${totals.failed})`
+        : "تشغيل جدولة التواصل — لا حملات مستحقة",
       messageEn: `Communication scheduler run — ${results.length} due campaign(s)`,
       entityType: "CommunicationScheduler",
       metadata: { ran: results.length, ...totals, externalCall: totals.sent > 0 },

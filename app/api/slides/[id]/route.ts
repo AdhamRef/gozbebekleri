@@ -3,7 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from "../../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
-import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
+import { queueAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
+import {
+  SLIDE_WITH_TRANSLATIONS_SELECT,
+  buildSlideScalarPatch,
+  parseSlideTranslations,
+} from "@/lib/slides/slide-write";
+import { writeErrorMessage } from "@/lib/dashboard/write-error-message";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -40,47 +46,54 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const denied = requireAdminOrDashboardPermission(session, 'slides');
     if (denied) return denied;
     const body = await request.json();
-    const { title, description, image, showButton, buttonText, buttonLink, isActive, order, translations } = body;
-    if (!title) return NextResponse.json({ error: 'Title required' }, { status: 400 });
 
-    await prisma.$transaction(async (tx) => {
-      await tx.slide.update({
-        where: { id },
-        data: {
-          title,
-          description: description ?? '',
-          image: image ?? '',
-          showButton: showButton ?? true,
-          buttonText: buttonText ?? '',
-          buttonLink: buttonLink ?? '',
-          isActive: isActive !== false,
-          order: order ?? 0,
-        },
-      });
-      if (translations && typeof translations === 'object') {
-        for (const [locale, t] of Object.entries(translations)) {
-          if (locale === 'ar' || !t || typeof t !== 'object') continue;
-          const tt = t as any;
-          if (!tt.title) continue;
-          await tx.slideTranslation.upsert({
-            where: { slideId_locale: { slideId: id, locale } },
-            update: { title: tt.title, description: tt.description ?? '', buttonText: tt.buttonText ?? '' },
-            create: { slideId: id, locale, title: tt.title, description: tt.description ?? '', buttonText: tt.buttonText ?? '' },
-          });
-        }
-      }
-    });
+    // A patch, not a full replace: the list page's active-toggle sends only
+    // `{ isActive }`, and an omitted field must keep its stored value.
+    const patch = buildSlideScalarPatch(body);
+    if ('title' in patch && !patch.title) {
+      return NextResponse.json({ error: 'العنوان بالعربية مطلوب' }, { status: 400 });
+    }
 
-    const full = await prisma.slide.findUnique({
+    // `translations` absent (the toggle) => touch no translation rows at all.
+    const { write, clear } = body.translations === undefined
+      ? { write: [], clear: [] as string[] }
+      : parseSlideTranslations(body.translations);
+
+    // Previously this was an interactive `$transaction` with one awaited upsert
+    // per locale — ~10 sequential round trips, which regularly exceeded Prisma's
+    // default 5s transaction timeout on this cluster and surfaced as a generic
+    // failure. A nested write is atomic on Prisma's side and costs one trip.
+    const full = await prisma.slide.update({
       where: { id },
-      select: { id: true, title: true, description: true, image: true, showButton: true, buttonText: true, buttonLink: true, isActive: true, order: true, translations: { select: { locale: true, title: true, description: true, buttonText: true } } },
+      data: {
+        ...patch,
+        ...(write.length || clear.length
+          ? {
+              translations: {
+                ...(write.length
+                  ? {
+                      upsert: write.map((t) => ({
+                        where: { slideId_locale: { slideId: id, locale: t.locale } },
+                        update: { title: t.title, description: t.description, buttonText: t.buttonText },
+                        create: { locale: t.locale, title: t.title, description: t.description, buttonText: t.buttonText },
+                      })),
+                    }
+                  : {}),
+                // Blanking a locale in the form now removes its row; it used to
+                // be skipped, leaving the old text live on the public site.
+                ...(clear.length ? { deleteMany: { locale: { in: clear } } } : {}),
+              },
+            }
+          : {}),
+      },
+      select: SLIDE_WITH_TRANSLATIONS_SELECT,
     });
 
     const actor = auditActorFromDashboardSession(session!);
-    await writeAuditLog({
+    queueAuditLog({
       ...actor,
       action: "SLIDE_UPDATE",
-      messageAr: `${actor.actorName ?? "مسؤول"} عدّل شريحة الهيرو: ${full?.title ?? title}`,
+      messageAr: `${actor.actorName ?? "مسؤول"} عدّل شريحة الهيرو: ${full.title}`,
       entityType: "Slide",
       entityId: id,
     });
@@ -88,7 +101,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json(full);
   } catch (error) {
     console.error('Error updating slide:', error);
-    return NextResponse.json({ error: 'Failed to update slide' }, { status: 500 });
+    return NextResponse.json({ error: writeErrorMessage(error, 'تعذّر تحديث الشريحة') }, { status: 500 });
   }
 }
 
@@ -98,17 +111,19 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const session = await getServerSession(authOptions);
     const denied = requireAdminOrDashboardPermission(session, 'slides');
     if (denied) return denied;
-    const existing = await prisma.slide.findUnique({
+    // `delete` returns the deleted row, so the separate findUnique that existed
+    // only to read the title for the audit message was a wasted round trip.
+    // SlideTranslation rows go with it via `onDelete: Cascade`.
+    const deleted = await prisma.slide.delete({
       where: { id },
       select: { title: true },
     });
-    await prisma.slide.delete({ where: { id } });
 
     const actor = auditActorFromDashboardSession(session!);
-    await writeAuditLog({
+    queueAuditLog({
       ...actor,
       action: "SLIDE_DELETE",
-      messageAr: `${actor.actorName ?? "مسؤول"} حذف شريحة الهيرو: ${existing?.title ?? id}`,
+      messageAr: `${actor.actorName ?? "مسؤول"} حذف شريحة الهيرو: ${deleted.title || id}`,
       entityType: "Slide",
       entityId: id,
     });
@@ -116,6 +131,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     return NextResponse.json({ message: 'Slide deleted' }, { status: 200 });
   } catch (error) {
     console.error('Error deleting slide:', error);
-    return NextResponse.json({ error: 'Failed to delete slide' }, { status: 500 });
+    // Already gone (e.g. a double-click, or deleted in another tab) is not a
+    // failure from the admin's point of view — the row is absent either way.
+    if (error && typeof error === 'object' && (error as { code?: string }).code === 'P2025') {
+      return NextResponse.json({ message: 'Slide already deleted' }, { status: 200 });
+    }
+    return NextResponse.json({ error: writeErrorMessage(error, 'تعذّر حذف الشريحة') }, { status: 500 });
   }
 }
