@@ -53,6 +53,13 @@ const marketingRedirects = [
   ["/dashboard/conversion-events/timeline", "/dashboard/marketing/tracking"],
   ["/dashboard/conversion-events/retry-truth", "/dashboard/marketing/tracking"],
   // Removed pages. Bookmarks and old deep links land on the nearest surviving page instead of 404.
+  // The campaign detail screen is gone: a campaign now opens its channel report
+  // directly. The channel is not in the URL, so this lands on the list, where the
+  // row links through with the right channel.
+  // The `(?!new$)` guard matters: redirects are evaluated before filesystem
+  // routing, so a bare `:id` would also swallow `/campaigns/new` and make it
+  // impossible to create a campaign.
+  ["/dashboard/communication/campaigns/:id((?!new$)[^/]+)", "/dashboard/communication/campaigns"],
   ["/dashboard/messages", "/dashboard/inbox"],
   ["/dashboard/marketing", "/dashboard/marketing/attribution"],
   ["/dashboard/marketing/performance", "/dashboard/marketing/attribution"],

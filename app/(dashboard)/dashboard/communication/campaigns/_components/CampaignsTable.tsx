@@ -3,10 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, ChevronUp, ChevronsUpDown, Users } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronsUpDown, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LOCALE_LABELS } from "@/lib/locales";
 import { type CampaignRow, channelMeta, statusMeta, hasResults, audienceLabel } from "./campaign-ui";
+import { CampaignRowActions } from "./CampaignRowActions";
 
 /**
  * The campaign list as a table.
@@ -97,11 +98,13 @@ function CountCell({ value, show, tone }: { value: number; show: boolean; tone?:
 }
 
 export function CampaignsTable({
-  campaigns, sort, onSort,
+  campaigns, sort, onSort, onChanged,
 }: {
   campaigns: CampaignRow[];
   sort: CampaignSort;
   onSort: (key: SortKey) => void;
+  /** Re-fetch the list after a row action changes a campaign's status. */
+  onChanged: () => void;
 }) {
   const router = useRouter();
 
@@ -132,7 +135,11 @@ export function CampaignsTable({
               const Icon = ch.icon;
               const showResults = hasResults(c);
               const date = rowDate(c);
-              const href = `/dashboard/communication/campaigns/${c.id}`;
+              // Straight to the campaign's report on its own channel page. The
+              // separate detail screen this used to open has been removed — it
+              // showed a summary of numbers the channel page already owns, and
+              // its lifecycle buttons now live in the row menu at the end.
+              const href = `${ch.href}?campaign=${c.id}`;
 
               return (
                 <tr
@@ -188,22 +195,9 @@ export function CampaignsTable({
                   </td>
 
                   <td className="w-px whitespace-nowrap px-3 py-2.5 align-middle">
-                    {showResults ? (
-                      // Jumps to the channel dashboard scoped to this campaign, which is where the
-                      // delivery funnel lives. Rebuilding that funnel here would mean two
-                      // implementations of the same numbers, free to disagree.
-                      <Link
-                        href={`${ch.href}?campaign=${c.id}`}
-                        onClick={(e) => e.stopPropagation()}
-                        title={`عرض الأداء في صفحة ${ch.label}`}
-                        className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-500 transition-colors hover:border-brand/40 hover:bg-brand-50 hover:text-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                      >
-                        الأداء
-                        <ArrowLeft className="h-3 w-3" />
-                      </Link>
-                    ) : (
-                      <span className="text-[11px] text-slate-300">—</span>
-                    )}
+                    <div className="flex items-center justify-end gap-1.5">
+                      <CampaignRowActions campaign={c} onChanged={onChanged} />
+                    </div>
                   </td>
                 </tr>
               );
@@ -214,3 +208,4 @@ export function CampaignsTable({
     </div>
   );
 }
+

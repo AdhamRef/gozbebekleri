@@ -160,7 +160,7 @@ export function CampaignsListClient() {
               <span className="font-normal normal-case tracking-normal text-slate-400"> من {campaigns.length}</span>
             )}
           </p>
-          <CampaignsTable campaigns={filtered} sort={sort} onSort={toggleSort} />
+          <CampaignsTable campaigns={filtered} sort={sort} onSort={toggleSort} onChanged={load} />
         </>
       )}
     </div>

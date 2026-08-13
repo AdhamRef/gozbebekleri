@@ -127,7 +127,9 @@ export function NewCampaignWizard() {
       if (!res.ok || !json.ok) throw new Error(json?.error || "تعذّر إنشاء الحملة");
 
       toast.success(`تم إنشاء الحملة بـ ${listJson.added} متبرعًا`);
-      router.push(`/dashboard/communication/campaigns/${json.campaign.id}`);
+      // Back to the list: a brand-new campaign is a DRAFT with no sends, so the
+      // channel report would be empty, and the list is where it gets confirmed.
+      router.push("/dashboard/communication/campaigns");
     } catch (e) {
       toast.error((e as Error).message);
       setSaving(false);
