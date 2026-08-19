@@ -246,28 +246,26 @@ function placeSeoAsSecondSection() {
   return false;
 }
 
-function collapseProjectSections(projectId: string) {
+/**
+ * Only the SEO section stays foldable. Every other section on the project
+ * editor renders fully expanded, so the page reads top to bottom without
+ * anything hidden behind a toggle.
+ */
+function enhanceProjectSections(projectId: string) {
   const form = getProjectForm();
   if (!form) return false;
   let changed = ensureLocaleLinksSection(projectId);
   if (placeSeoAsSecondSection()) changed = true;
 
   const beforeY = window.scrollY;
-  const sections = Array.from(form.children).filter((child): child is HTMLElement => child instanceof HTMLElement);
-  let index = 0;
-  for (const section of sections) {
-    if (!isSectionCandidate(section)) continue;
-    if (section.dataset.projectCollapsibleSection === "true") {
-      index += 1;
-      continue;
-    }
-    section.dataset.projectCollapsibleSection = "true";
-    section.classList.add("mt-3");
-    const toggle = makeToggle(getSectionTitle(section, index), section);
-    section.insertAdjacentElement("beforebegin", toggle);
-    section.style.display = "none";
+  const seo = document.getElementById(SEO_PORTAL_ID);
+  if (seo && seo.parentElement === form && seo.dataset.projectCollapsibleSection !== "true") {
+    seo.dataset.projectCollapsibleSection = "true";
+    seo.classList.add("mt-3");
+    const toggle = makeToggle(getSectionTitle(seo, 0), seo);
+    seo.insertAdjacentElement("beforebegin", toggle);
+    seo.style.display = "none";
     changed = true;
-    index += 1;
   }
   if (placeSeoAsSecondSection()) changed = true;
   if (changed) window.requestAnimationFrame(() => window.scrollTo({ top: beforeY, behavior: "instant" as ScrollBehavior }));
@@ -285,7 +283,7 @@ export function ProjectEditorSectionsEnhancer() {
     let attempts = 0;
     const run = () => {
       attempts += 1;
-      const changed = collapseProjectSections(projectId);
+      const changed = enhanceProjectSections(projectId);
       if (changed || attempts < 8) {
         window.setTimeout(run, 450);
       }
