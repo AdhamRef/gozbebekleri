@@ -13,7 +13,9 @@ const TRANSLATION_LOCALES = ["en", "fr", "tr", "id", "pt", "es", "de"] as const;
 const SUPPORTED_LOCALES = ["ar", ...TRANSLATION_LOCALES] as const;
 type Locale = (typeof SUPPORTED_LOCALES)[number];
 type TranslationLocale = (typeof TRANSLATION_LOCALES)[number];
-type ItemType = "campaign" | "category" | "post" | "postCategory";
+type ItemType = "campaign" | "category" | "post" | "postCategory" | "slide";
+
+const SLIDE_FIELDS = ["title", "description", "buttonText"] as const;
 
 type PreviewRow = {
   id: string;
@@ -161,6 +163,38 @@ async function loadPreviewRows(
           ? null
           : item.translations.find((row) => row.locale === locale),
       }))
+      .filter((row): row is PreviewRow => Boolean(row))
+      .slice(0, limit);
+  }
+
+  if (section === "slides") {
+    const rows = await prisma.slide.findMany({
+      orderBy: { order: "asc" },
+      include: { translations: true },
+      take: 200,
+    });
+    return rows
+      .map((item) => {
+        const arabic: Record<string, string | null> = {
+          title: item.title,
+          description: item.description,
+          buttonText: item.buttonText,
+        };
+        // Only fields that actually carry Arabic text are worth translating.
+        const fields = SLIDE_FIELDS.filter((field) => normalizeText(arabic[field]));
+        return makeRow({
+          id: item.id,
+          type: "slide",
+          label: item.title || "بدون عنوان",
+          typeLabel: "شريحة",
+          locale,
+          fields,
+          sourceArabic: Object.fromEntries(fields.map((field) => [field, arabic[field]])),
+          translation: locale === "ar"
+            ? null
+            : item.translations.find((row) => row.locale === locale),
+        });
+      })
       .filter((row): row is PreviewRow => Boolean(row))
       .slice(0, limit);
   }
@@ -329,6 +363,7 @@ const SECTION_TYPES: Record<ContentLocalizationSection, ItemType[]> = {
   campaigns: ["campaign"],
   categories: ["category"],
   blog: ["post", "postCategory"],
+  slides: ["slide"],
 };
 
 /** Only these fields may ever be written from this endpoint. */
@@ -337,6 +372,7 @@ const WRITABLE_FIELDS: Record<ItemType, string[]> = {
   category: ["name", "description"],
   post: ["title", "description", "content"],
   postCategory: ["name", "title", "description"],
+  slide: [...SLIDE_FIELDS],
 };
 
 type ApplyItem = {
@@ -405,6 +441,13 @@ async function applyArabicSource(item: ApplyItem) {
     });
     return;
   }
+  if (item.type === "slide") {
+    await prisma.slide.update({
+      where: { id: item.id },
+      data: { ...text("title"), ...text("description"), ...text("buttonText") },
+    });
+    return;
+  }
   await prisma.postCategory.update({
     where: { id: item.id },
     data: { ...text("name"), ...text("title"), ...text("description") },
@@ -453,6 +496,22 @@ async function applyTranslation(item: ApplyItem, locale: TranslationLocale) {
       where: { postId_locale: { postId: item.id, locale } },
       update: data,
       create: { post: { connect: { id: item.id } }, locale, ...data },
+    });
+    return;
+  }
+
+  if (item.type === "slide") {
+    const data = { ...text("title"), ...text("description"), ...text("buttonText") };
+    await prisma.slideTranslation.upsert({
+      where: { slideId_locale: { slideId: item.id, locale } },
+      update: data,
+      create: {
+        slide: { connect: { id: item.id } },
+        locale,
+        title: fields.title ?? "",
+        description: fields.description,
+        buttonText: fields.buttonText,
+      },
     });
     return;
   }

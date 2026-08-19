@@ -43,12 +43,14 @@ const FIELD_LABELS: Record<string, string> = {
   name: "الاسم",
   description: "الوصف",
   content: "المحتوى",
+  buttonText: "نص الزر",
 };
 
 const SECTION_LABELS = {
   campaigns: "المشاريع",
   categories: "الحملات",
   blog: "المقالات",
+  slides: "الشرائح",
 } as const;
 
 type Section = keyof typeof SECTION_LABELS;
@@ -185,7 +187,7 @@ export function ContentLocalizationAuditCard({ section }: { section: Section }) 
               <div>
                 <CardTitle className="text-base sm:text-lg">مراجعة النصوص والترجمات</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  فحص قراءة فقط لقسم {SECTION_LABELS[section]} يكشف نقص الترجمات وملاحظات المحتوى.
+                  فحص قسم {SECTION_LABELS[section]} لكشف نقص الترجمات وملاحظات المحتوى، مع ترجمتها وحفظها.
                 </p>
               </div>
             </div>
@@ -221,12 +223,12 @@ export function ContentLocalizationAuditCard({ section }: { section: Section }) 
                 className="gap-2 bg-brand hover:bg-[#014f9c]"
               >
                 <Sparkles className="h-4 w-4" />
-                فتح المعاينة الآمنة
+                فتح المعاينة والترجمة
               </Button>
             </div>
 
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">
-              <strong>التعديل الجماعي المباشر متوقف مؤقتًا.</strong> المعاينة لا تحفظ أي نص، ولا يوجد Save أوApply حتى اكتمال مسار Preview → Review → Approve → Apply → Rollback.
+              <strong>راجع قبل الحفظ.</strong> الترجمة تُقترح آليًا، ثم تُحفظ في قاعدة البيانات فور ضغط حفظ داخل نافذة المعاينة — بدون تراجع تلقائي.
             </div>
 
             {error ? (

@@ -25,13 +25,14 @@ const FIELD_LABELS: Record<string, string> = {
   name: "الاسم",
   description: "الوصف",
   content: "المحتوى",
+  buttonText: "نص الزر",
 };
 
-type Section = "campaigns" | "categories" | "blog";
+type Section = "campaigns" | "categories" | "blog" | "slides";
 
 type PreviewRow = {
   id: string;
-  type: "campaign" | "category" | "post" | "postCategory";
+  type: "campaign" | "category" | "post" | "postCategory" | "slide";
   label: string;
   typeLabel: string;
   locale: string;

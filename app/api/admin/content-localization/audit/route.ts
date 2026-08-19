@@ -12,6 +12,8 @@ import { prisma } from "@/lib/prisma";
 const TARGET_LOCALES = ["en", "fr", "tr", "id", "pt", "es", "de"] as const;
 type Locale = (typeof TARGET_LOCALES)[number];
 
+const SLIDE_FIELDS = ["title", "description", "buttonText"] as const;
+
 type TranslationStatus = {
   exists: boolean;
   complete: boolean;
@@ -171,6 +173,27 @@ async function loadItems(section: ContentLocalizationSection): Promise<AuditItem
       translations: item.translations,
       fields: ["name", "description"],
     }));
+  }
+  if (section === "slides") {
+    const rows = await prisma.slide.findMany({ orderBy: { order: "asc" }, include: { translations: true } });
+    return rows.map((item) => {
+      const arabicFields = {
+        title: item.title,
+        description: item.description,
+        buttonText: item.buttonText,
+      };
+      return evaluateItem({
+        id: item.id,
+        label: item.title,
+        section,
+        typeLabel: "شريحة",
+        arabicFields,
+        translations: item.translations,
+        // description/buttonText are optional on a slide — a field with no Arabic text has
+        // nothing to translate, so auditing it would flag every slide forever.
+        fields: SLIDE_FIELDS.filter((field) => normalizeText(arabicFields[field])),
+      });
+    });
   }
   const [posts, postCategories] = await Promise.all([
     prisma.post.findMany({ orderBy: { createdAt: "desc" }, include: { translations: true } }),
