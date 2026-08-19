@@ -184,7 +184,7 @@ const Footer = () => {
                     href={`/category/${cat.slug || cat.id}`}
                     className="group flex items-center gap-1.5 text-sm text-white/65 hover:text-white transition-colors"
                   >
-                    <ChevronRight className="w-3.5 h-3.5 text-[#FA5D17] flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                    <ChevronRight className="w-3.5 h-3.5 text-[#FA5D17] flex-shrink-0 ltr:group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5 transition-transform" />
                     {cat.name}
                   </Link>
                 </li>
@@ -204,7 +204,7 @@ const Footer = () => {
                     href={item.href}
                     className="group flex items-center gap-1.5 text-sm text-white/65 hover:text-white transition-colors"
                   >
-                    <ChevronRight className="w-3.5 h-3.5 text-[#FA5D17] flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                    <ChevronRight className="w-3.5 h-3.5 text-[#FA5D17] flex-shrink-0 ltr:group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5 transition-transform" />
                     {item.label}
                   </Link>
                 </li>

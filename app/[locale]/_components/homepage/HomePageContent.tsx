@@ -219,7 +219,7 @@ const HomePage: React.FC<HomePageContentProps> = ({
 
             <div className="sm:hidden text-center mt-6">
               <Link href="/campaigns" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#025EB8]">
-                {t("viewAll") || "View all"} <ArrowRight className="w-4 h-4" />
+                {t("viewAll") || "View all"} <ArrowRight className="w-4 h-4 rtl:rotate-180" />
               </Link>
             </div>
           </div>

@@ -138,7 +138,7 @@ export default function SuggestedCampaigns({
             className="shrink-0 inline-flex items-center gap-1.5 text-sm font-semibold text-[#025EB8] hover:text-[#014fa0] hover:gap-2 transition-all group"
           >
             {t("viewAllInCategory")}
-            <Arrow className="w-4 h-4 transition-transform group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5" />
+            <Arrow className="w-4 h-4 transition-transform ltr:group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5" />
           </Link>
         )}
       </div>

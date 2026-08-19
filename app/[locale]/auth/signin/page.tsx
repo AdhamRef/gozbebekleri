@@ -91,7 +91,7 @@ export default function SignIn() {
             <p className="mt-6 text-center text-sm text-gray-500">
               {labels.noAccount}{" "}
               <Link href="/campaigns" className="text-[#025EB8] font-semibold hover:text-[#FA5D17] transition-colors inline-flex items-center gap-1">
-                {labels.createOne} <ArrowRight className="w-3.5 h-3.5" />
+                {labels.createOne} <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
               </Link>
             </p>
           </div>

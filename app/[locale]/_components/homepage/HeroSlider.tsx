@@ -44,6 +44,7 @@ function buildHeroSrcSet(src: string): string {
 const HeroSlider: React.FC<HeroSliderProps> = ({ initialSlides = [], initialFirstImage }) => {
   const t = useTranslations("HeroSlider");
   const locale = useLocale() as "ar" | "en" | "fr";
+  const isRTL = locale === "ar";
   const [slides, setSlides] = useState<SlideItem[]>(initialSlides);
   const [current, setCurrent] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -184,19 +185,20 @@ const HeroSlider: React.FC<HeroSliderProps> = ({ initialSlides = [], initialFirs
         ))}
       </div>
 
-      {/* Navigation Arrows - Hidden on mobile */}
+      {/* Navigation Arrows - Hidden on mobile. Each button keeps the chevron that
+          matches its physical side, so in RTL the left one advances instead. */}
       <button
-        onClick={prevSlide}
+        onClick={isRTL ? nextSlide : prevSlide}
         className="hidden md:flex absolute left-4 lg:left-6 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/40 text-white p-2 lg:p-3 rounded-full z-30 backdrop-blur-sm transition-all hover:scale-110"
-        aria-label="Previous slide"
+        aria-label={isRTL ? "Next slide" : "Previous slide"}
       >
         <ChevronLeft className="w-5 h-5 lg:w-6 lg:h-6" />
       </button>
 
       <button
-        onClick={nextSlide}
+        onClick={isRTL ? prevSlide : nextSlide}
         className="hidden md:flex absolute right-4 lg:right-6 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/40 text-white p-2 lg:p-3 rounded-full z-30 backdrop-blur-sm transition-all hover:scale-110"
-        aria-label="Next slide"
+        aria-label={isRTL ? "Previous slide" : "Next slide"}
       >
         <ChevronRight className="w-5 h-5 lg:w-6 lg:h-6" />
       </button>

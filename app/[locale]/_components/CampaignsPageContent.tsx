@@ -535,7 +535,7 @@ const CampaignsPage = ({
               className="inline-flex items-center gap-2 bg-[#025EB8] hover:bg-[#014fa0] text-white font-semibold px-8 py-3 rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
             >
               {t("loadMore") || "Load More"}
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 rtl:rotate-180" />
             </button>
           </div>
         )}
