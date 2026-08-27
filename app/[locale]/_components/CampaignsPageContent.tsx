@@ -5,6 +5,7 @@ import Image from "next/image";
 import axios from "axios";
 import { Search, HandHeart, ArrowRight, SlidersHorizontal, X, ChevronRight } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import CampaignCard from "@/app/[locale]/_components/CampaignCard";
 import { useDebounce } from "use-debounce";
 import { useLocale, useTranslations } from "next-intl";
@@ -295,25 +296,26 @@ const CampaignsPage = ({
           <div className="absolute inset-0 opacity-[0.04] bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:20px_20px]" />
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 pt-12 pb-20">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 pt-5 pb-14 sm:pt-12 sm:pb-20">
           {/* Breadcrumb */}
-          <div className="flex items-center gap-1.5 text-white/60 text-xs mb-6">
+          <div className="flex items-center gap-1.5 text-white/60 text-xs mb-2 sm:mb-6">
             <Link href="/" className="hover:text-white transition-colors">{t("home") || "Home"}</Link>
             <ChevronRight className={`w-3 h-3 ${isRTL ? "rotate-180" : ""}`} />
             <span className="text-white/90 font-medium">{t("campaigns") || "Campaigns"}</span>
           </div>
 
-          {/* Title */}
+          {/* Title — hidden below sm so the grid starts higher on phones. The h1 stays
+              in the DOM (screen-reader only) so the page keeps its heading and SEO. */}
           <div className="text-center max-w-2xl mx-auto">
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-1.5 rounded-full text-xs font-semibold text-white/90 mb-4">
+            <div className="hidden sm:inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 px-3 py-1.5 rounded-full text-xs font-semibold text-white/90 mb-4">
               <HandHeart className="w-3.5 h-3.5 text-[#FA5D17]" />
               <span>{t("projects") || "OUR PROJECTS"}</span>
             </div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white leading-tight mb-3">
+            <h1 className="sr-only sm:not-sr-only sm:text-4xl lg:text-5xl font-extrabold text-white leading-tight sm:mb-3">
               {t("browse") || "Browse"}{" "}
               <span className="text-[#FA5D17]">{t("allCampaigns") || "All Campaigns"}</span>
             </h1>
-            <p className="text-white/70 text-sm sm:text-base leading-relaxed">
+            <p className="hidden sm:block text-white/70 text-sm sm:text-base leading-relaxed">
               {t("heroDescription") || "Support meaningful causes and make a lasting difference in people's lives."}
             </p>
           </div>
@@ -415,8 +417,43 @@ const CampaignsPage = ({
 
       {/* ── Category tabs ── */}
       <div className="bg-gray-50 border-b border-gray-100 shadow-sm sticky top-16 lg:top-[104px] z-20">
-        <div className="max-w-7xl mx-auto px-4 pt-6 pb-3">
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+        <div className="max-w-7xl mx-auto px-4 pt-3 pb-3 sm:pt-6">
+          {/* Small screens: one row, one control. A scrolling pill strip hides most
+              categories behind a gesture people don't notice, so use a real select. */}
+          <div className="sm:hidden">
+            <Select value={selectedCategory} onValueChange={handleCategoryChange}>
+              <SelectTrigger
+                dir={isRTL ? "rtl" : "ltr"}
+                aria-label={t("categories") || "Categories"}
+                className="h-11 w-full rounded-xl border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 shadow-sm focus:ring-2 focus:ring-[#025EB8]/20"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent dir={isRTL ? "rtl" : "ltr"} className="max-h-[55vh]">
+                <SelectItem value="all">
+                  <span className="flex items-center gap-2">
+                    <HandHeart className="w-4 h-4 flex-shrink-0 text-[#025EB8]" />
+                    {t("allCampaigns") || "All"}
+                  </span>
+                </SelectItem>
+                {categories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    <span className="flex items-center gap-2">
+                      <CategoryIcon name={cat.icon} className="w-4 h-4 flex-shrink-0 text-[#025EB8]" />
+                      <span className="truncate">{cat.name}</span>
+                      {cat.campaignCount != null && (
+                        <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-500">
+                          {cat.campaignCount}
+                        </span>
+                      )}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-2 overflow-x-auto scrollbar-hide">
             <button
               onClick={() => handleCategoryChange("all")}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition-all whitespace-nowrap flex-shrink-0 border ${

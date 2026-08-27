@@ -18,6 +18,7 @@ import {
   generateUniqueLocaleSlug,
   normalizeUserSlug,
   whereByIdOrSlug,
+  whereByIdOrAnyLocaleSlug,
   whereByIdOrLocaleSlug,
 } from "@/lib/slug";
 
@@ -36,7 +37,7 @@ export async function GET(
     const locale = req.headers.get('x-locale') || qp.get('locale') || qp.get('lang') || 'ar';
 
     const post = await prisma.post.findFirst({
-      where: whereByIdOrLocaleSlug(postIdOrSlug, locale),
+      where: whereByIdOrAnyLocaleSlug(postIdOrSlug),
       select: {
         id: true,
         slug: true,

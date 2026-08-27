@@ -21,6 +21,12 @@ const LiveDonationsTicker = dynamic(() => import("@/components/LiveDonationsTick
   ssr: false,
 });
 
+/** Category tiles are small, so pull a correspondingly small Cloudinary render. */
+function buildTileSrc(src: string, width: number): string {
+  if (!src.includes("res.cloudinary.com")) return src;
+  return src.replace(/\/upload\//, `/upload/f_auto,q_auto:eco,w_${width},c_fill,g_auto/`);
+}
+
 interface CategoryItem {
   id: string;
   slug?: string | null;
@@ -181,7 +187,7 @@ const HomePage: React.FC<HomePageContentProps> = ({
       {/* ── Donation Categories ── */}
       {categories.length > 0 && (
         <section
-          className="bg-gray-50 py-7 border-y border-gray-100"
+          className="bg-gray-50 py-5 sm:py-6 border-y border-gray-100"
           style={{
             backgroundImage: "url('/bg.webp')",
             backgroundRepeat: "repeat",
@@ -190,36 +196,54 @@ const HomePage: React.FC<HomePageContentProps> = ({
           }}
         >
           <div className="max-w-7xl mx-auto px-4">
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center justify-between mb-3">
               <div>
-                <span className="text-sm font-bold text-[#FA5D17] uppercase tracking-widest">{t("weHelp") || "WE HELP"}</span>
-                <h2 className="text-xl font-extrabold text-gray-900 mt-0.5">{t("donationCategories") || "Donation Categories"}</h2>
+                <span className="text-[11px] font-bold text-[#FA5D17] uppercase tracking-widest">{t("weHelp") || "WE HELP"}</span>
+                <h2 className="text-lg sm:text-xl font-extrabold text-gray-900">{t("donationCategories") || "Donation Categories"}</h2>
               </div>
               <Link href="/campaigns" className="hidden sm:inline-flex items-center gap-1 text-xs font-semibold text-[#025EB8] hover:text-[#FA5D17] transition-colors">
                 {t("viewAll") || "View all"} <MoreHorizontal className="w-3.5 h-3.5" />
               </Link>
             </div>
 
-            <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+            <div className="grid grid-cols-3 lg:grid-cols-6 gap-2">
               {categories.slice(0, 6).map((cat) => (
                 <Link
                   key={cat.id}
                   href={`/category/${cat.slug || cat.id}`}
-                  className="group flex flex-col items-center gap-2 p-3 sm:p-4 rounded-xl border border-gray-100 bg-white hover:bg-[#025EB8] hover:border-[#025EB8] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:shadow-[#025EB8]/20"
+                  className="group relative aspect-[4/5] sm:aspect-[3/4] overflow-hidden rounded-xl bg-[#0b3f74] shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#025EB8]/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FA5D17]"
                 >
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-[#025EB8]/8 flex items-center justify-center group-hover:bg-white/15 transition-colors">
-                    <CategoryIcon name={cat.icon} className="w-5 h-5 sm:w-7 sm:h-7 text-[#025EB8] group-hover:text-white transition-colors" />
+                  {cat.image ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={buildTileSrc(cat.image, 400)}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#025EB8] to-[#0b3f74]" />
+                  )}
+
+                  {/* Legibility scrim — dark at the bottom where the name sits. */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/5 transition-opacity duration-300 group-hover:from-[#025EB8]/90 group-hover:via-black/45" />
+
+                  <div className="absolute inset-0 flex flex-col justify-between p-2 sm:p-2.5">
+                    <span className="inline-flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center self-start rounded-lg bg-white/20 backdrop-blur-sm ring-1 ring-white/25 transition-colors group-hover:bg-[#FA5D17] group-hover:ring-[#FA5D17]">
+                      <CategoryIcon name={cat.icon} className="h-4 w-4 sm:h-[18px] sm:w-[18px] text-white" />
+                    </span>
+                    <span className="text-[12px] sm:text-[13px] font-bold leading-tight text-white line-clamp-2 drop-shadow-sm">
+                      {cat.name}
+                    </span>
                   </div>
-                  <span className="text-[13px] sm:text-sm font-medium text-gray-700 group-hover:text-white text-center line-clamp-2 leading-snug transition-colors">
-                    {cat.name}
-                  </span>
                 </Link>
               ))}
             </div>
 
-            <div className="sm:hidden text-center mt-6">
-              <Link href="/campaigns" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#025EB8]">
-                {t("viewAll") || "View all"} <ArrowRight className="w-4 h-4 rtl:rotate-180" />
+            <div className="sm:hidden text-center mt-3">
+              <Link href="/campaigns" className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#025EB8]">
+                {t("viewAll") || "View all"} <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
               </Link>
             </div>
           </div>

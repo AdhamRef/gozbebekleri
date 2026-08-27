@@ -5,11 +5,22 @@ import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CategoryIcon, {
-  CATEGORY_ICON_NAMES,
+  CATEGORY_ICON_GROUPS,
+  CATEGORY_ICON_KEYWORDS,
   parseCategoryIcon,
   toFlagIconValue,
+  type CategoryIconName,
 } from "@/components/CategoryIcon";
 import { buildCountryList } from "@/lib/geo/country-codes";
+
+/** Matches the Arabic keywords as well as the stored English name. */
+function iconMatches(name: CategoryIconName, search: string): boolean {
+  if (!search) return true;
+  return (
+    name.toLowerCase().includes(search) ||
+    CATEGORY_ICON_KEYWORDS[name].includes(search)
+  );
+}
 
 interface CategoryIconPickerProps {
   value?: string | null;
@@ -24,6 +35,14 @@ export function CategoryIconPicker({ value, onChange }: CategoryIconPickerProps)
   const parsed = parseCategoryIcon(value);
   const [tab, setTab] = useState<"icon" | "flag">(parsed?.kind === "flag" ? "flag" : "icon");
   const [query, setQuery] = useState("");
+  const [iconQuery, setIconQuery] = useState("");
+
+  const iconGroups = useMemo(() => {
+    const search = iconQuery.trim().toLowerCase();
+    return CATEGORY_ICON_GROUPS
+      .map((group) => ({ ...group, names: group.names.filter((name) => iconMatches(name, search)) }))
+      .filter((group) => group.names.length > 0);
+  }, [iconQuery]);
 
   const countries = useMemo(() => buildCountryList("ar"), []);
   const filteredCountries = useMemo(() => {
@@ -61,25 +80,46 @@ export function CategoryIconPicker({ value, onChange }: CategoryIconPickerProps)
           <TabsTrigger value="flag">علم دولة</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="icon" className="mt-3">
-          <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
-            {CATEGORY_ICON_NAMES.map((name) => (
-              <button
-                key={name}
-                type="button"
-                title={name}
-                onClick={() => onChange(name)}
-                className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-all ${
-                  parsed?.kind === "lucide" && parsed.name === name
-                    ? "border-brand bg-brand/10 text-brand"
-                    : "border-gray-200 text-gray-500 hover:border-brand/50 hover:text-brand"
-                }`}
-              >
-                <CategoryIcon name={name} className="w-5 h-5" />
-                <span className="text-[9px] leading-tight text-center truncate w-full">{name}</span>
-              </button>
-            ))}
+        <TabsContent value="icon" className="mt-3 space-y-3">
+          <div className="relative">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              value={iconQuery}
+              onChange={(event) => setIconQuery(event.target.value)}
+              placeholder="ابحث بالعربية: مسجد، أضاحي، بئر، خيمة..."
+              className="pr-9"
+            />
           </div>
+
+          {iconGroups.length === 0 ? (
+            <p className="py-6 text-center text-sm text-gray-500">لا توجد أيقونة مطابقة.</p>
+          ) : (
+            <div className="max-h-72 overflow-y-auto rounded-lg border border-gray-100 p-2 space-y-4">
+              {iconGroups.map((group) => (
+                <div key={group.label}>
+                  <p className="mb-2 text-xs font-bold text-gray-500">{group.label}</p>
+                  <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
+                    {group.names.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        title={`${name} — ${CATEGORY_ICON_KEYWORDS[name] || ""}`.trim()}
+                        onClick={() => onChange(name)}
+                        className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-all ${
+                          parsed?.kind === "icon" && parsed.name === name
+                            ? "border-brand bg-brand/10 text-brand"
+                            : "border-gray-200 text-gray-500 hover:border-brand/50 hover:text-brand"
+                        }`}
+                      >
+                        <CategoryIcon name={name} className="w-5 h-5" />
+                        <span className="text-[9px] leading-tight text-center truncate w-full">{name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="flag" className="mt-3 space-y-3">

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/[...nextauth]/options";
 import { userHasDashboardPermission } from '@/lib/dashboard/permissions';
-import { isObjectId } from '@/lib/slug';
+import { isObjectId, whereByIdOrAnyLocaleSlug } from '@/lib/slug';
 import {
   writeAuditLog,
   auditActorFromSiteSession,
@@ -20,12 +20,7 @@ type ParamsPromise = { params: Promise<{ id: string }> };
 async function resolveCampaignId(idOrSlug: string): Promise<string | null> {
   if (isObjectId(idOrSlug)) return idOrSlug;
   const c = await prisma.campaign.findFirst({
-    where: {
-      OR: [
-        { slug: idOrSlug },
-        { translations: { some: { slug: idOrSlug } } },
-      ],
-    },
+    where: whereByIdOrAnyLocaleSlug(idOrSlug),
     select: { id: true },
   });
   return c?.id ?? null;

@@ -10,7 +10,7 @@ import {
   generateUniqueLocaleSlug,
   normalizeUserSlug,
   whereByIdOrSlug,
-  whereByIdOrLocaleSlug,
+  whereByIdOrAnyLocaleSlug,
 } from "@/lib/slug";
 import { NOT_SOFT_DELETED } from "@/lib/campaign/soft-delete-filter";
 
@@ -27,7 +27,7 @@ export async function GET(
     const allTranslations = paramsUrl.get('allTranslations') === 'true';
 
     const category = await prisma.category.findFirst({
-      where: whereByIdOrLocaleSlug(id, locale),
+      where: whereByIdOrAnyLocaleSlug(id),
       select: {
         id: true,
         slug: true,

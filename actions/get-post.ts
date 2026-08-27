@@ -1,26 +1,26 @@
 import { prisma } from "@/lib/prisma";
 import { orderCampaignsByIds } from "@/lib/blog/campaign-ids";
-import { whereByIdOrLocaleSlug } from "@/lib/slug";
+import { whereByIdOrAnyLocaleSlug } from "@/lib/slug";
 
+/**
+ * `locale` is accepted for call-site compatibility but no longer narrows the
+ * lookup: every translation is returned and the caller picks. Resolution must
+ * stay locale-agnostic or a URL the page rendered can fail to resolve here.
+ */
 export default async function getPost(postId: string, locale: string = "ar") {
+  void locale;
   try {
-    // Caller may pass an ID, the base slug, or a per-locale slug. The locale arg lets
-    // the resolver match the right per-locale translation slug; if it doesn't match
-    // we fall back through other locales.
-    const probeLocales = Array.from(
-      new Set([locale, "en", "ar", "fr", "tr", "id", "pt", "es"])
-    );
-    let post = null;
-    for (const loc of probeLocales) {
-      post = await prisma.post.findFirst({
-        where: whereByIdOrLocaleSlug(postId, loc),
-        include: {
-          category: true,
-          translations: true,
-        },
-      });
-      if (post) break;
-    }
+    // Caller may pass an ID, the base slug, or a per-locale slug. One
+    // locale-agnostic clause resolves all three — this used to walk a hardcoded
+    // locale list one query at a time, which cost up to eight round-trips and
+    // silently missed `de`.
+    const post = await prisma.post.findFirst({
+      where: whereByIdOrAnyLocaleSlug(postId),
+      include: {
+        category: true,
+        translations: true,
+      },
+    });
 
     if (!post) return null;
 
