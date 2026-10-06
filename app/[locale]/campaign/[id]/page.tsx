@@ -194,8 +194,13 @@ export default async function CampaignPage({ params }: Props) {
         id: true,
         slug: true,
         translations: { select: { locale: true, slug: true } },
+        impactCampaign: { select: { slug: true } },
       },
     });
+    // An impact builder's hidden settlement campaign is donated to via its builder page.
+    if (campaign?.impactCampaign) {
+      redirect(`/${locale}/impact/${encodeURIComponent(campaign.impactCampaign.slug)}`);
+    }
     if (campaign) {
       const canonical = pickLocaleSlug(campaign.slug, campaign.translations, locale) ?? campaign.id;
       if (id !== canonical && (isObjectId(id) || id !== campaign.id)) {

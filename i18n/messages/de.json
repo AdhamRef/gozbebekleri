@@ -985,5 +985,21 @@
     "dobDayPlaceholder": "Tag",
     "dobMonthPlaceholder": "Monat",
     "dobYearPlaceholder": "Jahr"
+  },
+  "ImpactBuilder": {
+    "regions": "Region wählen",
+    "soon": "Bald",
+    "impact": "Deine Wirkung bisher",
+    "reset": "Zurücksetzen",
+    "cta": "Jetzt spenden",
+    "secure": "Sichere, verschlüsselte Zahlung",
+    "inc": "Erhöhen",
+    "dec": "Verringern",
+    "unit": "Bedarfe",
+    "none": "Noch nichts ausgewählt",
+    "monthly": "Diese Spende monatlich machen",
+    "monthlyNote": "Verlängert sich automatisch jeden Monat, jederzeit kündbar",
+    "perMonth": "pro Monat",
+    "ratesLoading": "Preise werden geladen…"
   }
 }

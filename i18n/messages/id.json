@@ -985,5 +985,21 @@
     "dobDayPlaceholder": "Hari",
     "dobMonthPlaceholder": "Bulan",
     "dobYearPlaceholder": "Tahun"
+  },
+  "ImpactBuilder": {
+    "regions": "Pilih wilayah",
+    "soon": "Segera",
+    "impact": "Dampak Anda sejauh ini",
+    "reset": "Atur ulang",
+    "cta": "Donasi sekarang",
+    "secure": "Pembayaran aman dan terenkripsi",
+    "inc": "Tambah",
+    "dec": "Kurangi",
+    "unit": "kebutuhan",
+    "none": "Belum ada pilihan",
+    "monthly": "Jadikan donasi ini bulanan",
+    "monthlyNote": "Diperbarui otomatis setiap bulan, bisa dihentikan kapan saja",
+    "perMonth": "per bulan",
+    "ratesLoading": "Memuat harga…"
   }
 }

@@ -985,5 +985,21 @@
     "dobDayPlaceholder": "Jour",
     "dobMonthPlaceholder": "Mois",
     "dobYearPlaceholder": "Année"
+  },
+  "ImpactBuilder": {
+    "regions": "Choisissez une région",
+    "soon": "Bientôt",
+    "impact": "Votre impact jusqu'ici",
+    "reset": "Réinitialiser",
+    "cta": "Faire un don",
+    "secure": "Paiement sécurisé et chiffré",
+    "inc": "Augmenter",
+    "dec": "Diminuer",
+    "unit": "besoins",
+    "none": "Rien de sélectionné",
+    "monthly": "Rendre ce don mensuel",
+    "monthlyNote": "Renouvelé automatiquement chaque mois, annulable à tout moment",
+    "perMonth": "par mois",
+    "ratesLoading": "Chargement des prix…"
   }
 }

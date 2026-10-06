@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap">
+<script src="./src/i18n.js"></script>
+<script src="./src/data.js?v=30"></script>
+<script src="./src/services.js?v=30"></script>
+<script src="./src/i18n.js?v=33"></script>
+<script src="./src/services.js?v=33"></script>
+<script src="./src/cart-store.js?v=31"></script>
+<script src="./src/character-engine.js?v=23"></script>
+<script src="./src/cart-store.js"></script>
+<script src="./src/services.js"></script>
+<style>
+  html, body { margin:0; padding:0; background:#fbfcfe; }
+  body { font-family:"Cairo",sans-serif; color:#14283c; }
+  a { color:#0b5ea8; text-decoration:none; }
+  a:hover { color:#f07d22; }
+  button:focus-visible, a:focus-visible { outline:3px solid #f07d22; outline-offset:2px; border-radius:8px; }
+</style>
+</helmet>
+
+<div dir="{{ dir }}" style="background:#fbfcfe;color:#14283c;font-family:'Cairo',sans-serif;min-height:100vh;padding-bottom:calc(96px + env(safe-area-inset-bottom))">
+
+  <header style="position:sticky;top:0;z-index:30;background:#fff;border-bottom:1px solid #e9eef4">
+    <div style="max-width:1280px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:24px">
+      <a href="#" aria-label="Gözbebekleri"><img src="https://www.gozbebekleri.org/logo.png" alt="Gözbebekleri" style="height:44px;width:auto;display:block"></a>
+      <nav style="{{ navStyle }}" aria-label="main">
+        <a href="#" style="color:#14283c">{{ nav.about }}</a>
+        <a href="#" style="color:#14283c">{{ nav.projects }}</a>
+        <a href="التبرع الدوري.dc.html" style="color:#14283c">{{ nav.recurring }}</a>
+        <a href="#" style="color:#0b5ea8" aria-current="page">{{ nav.current }}</a>
+        <a href="#" style="color:#14283c">{{ nav.contact }}</a>
+      </nav>
+      <div style="display:flex;gap:12px;align-items:center;margin-inline-start:auto">
+        <select aria-label="language" value="{{ lang }}" onChange="{{ setLang }}" style="{{ selectStyle }}">
+          <sc-for list="{{ langOptions }}" as="o" hint-placeholder-count="3">
+            <option value="{{ o.value }}">{{ o.label }}</option>
+          </sc-for>
+        </select>
+        <select aria-label="currency" value="{{ currency }}" onChange="{{ setCurrency }}" style="{{ selectStyle }}">
+          <sc-for list="{{ currencyOptions }}" as="o" hint-placeholder-count="3">
+            <option value="{{ o.value }}">{{ o.label }}</option>
+          </sc-for>
+        </select>
+        <div style="background:#eef5fb;border:1px solid #cfe2f3;border-radius:999px;padding:9px 16px;font-weight:800;font-size:14px;color:#0b5ea8;white-space:nowrap">{{ cartLabel }}</div>
+      </div>
+    </div>
+  </header>
+
+  <section style="max-width:1100px;margin:0 auto;padding:44px 20px 0;text-align:center">
+    <h1 style="font-size:clamp(28px,3.8vw,42px);font-weight:900;margin:0 0 10px;line-height:1.15;letter-spacing:-.5px">{{ t.title }}</h1>
+    <p style="font-size:16.5px;line-height:1.75;color:#5d6f80;margin:0 auto 28px;max-width:540px;text-wrap:pretty">{{ t.intro }}</p>
+
+    <div role="tablist" aria-label="{{ t.regions }}" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:0 auto 40px;padding:6px;background:#f1f5f9;border-radius:999px;width:fit-content;max-width:100%">
+      <sc-for list="{{ regions }}" as="r" hint-placeholder-count="5">
+        <button type="button" role="tab" aria-selected="{{ r.selected }}" aria-disabled="{{ r.disabled }}" onClick="{{ r.pick }}" style="{{ r.style }}">{{ r.label }}</button>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="max-width:1280px;margin:0 auto;padding:0 20px">
+    <div style="{{ stageStyle }}">
+
+      <div style="{{ colStyle }}">
+        <sc-for list="{{ colA }}" as="it" hint-placeholder-count="4">
+          <div style="{{ it.cardStyle }}">
+            <div style="{{ it.imgStyle }}" role="img" aria-label="{{ it.label }}"></div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap">
+              <strong style="font-size:16px;line-height:1.3">{{ it.label }}</strong>
+              <span style="{{ it.priceStyle }}">{{ it.price }}</span>
+            </div>
+            <div dir="ltr" style="display:flex;align-items:center;gap:8px;justify-content:center">
+              <button type="button" aria-label="{{ it.decLabel }}" onClick="{{ it.dec }}" style="{{ it.decStyle }}">−</button>
+              <span aria-live="polite" style="{{ it.qtyStyle }}">{{ it.qty }}</span>
+              <button type="button" aria-label="{{ it.incLabel }}" onClick="{{ it.inc }}" style="{{ it.incStyle }}">+</button>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="{{ centerStyle }}">
+        <div style="{{ childStageStyle }}">
+          <div aria-hidden="true" style="position:absolute;left:50%;bottom:2px;transform:translateX(-50%);width:54%;height:26px;z-index:1;background:radial-gradient(ellipse at center,rgba(20,40,60,.14),rgba(20,40,60,0) 70%)"></div>
+          <div style="{{ baseStyle }}" role="img" aria-label="{{ characterAlt }}"></div>
+          <sc-for list="{{ layers }}" as="L" hint-placeholder-count="0">
+            <div style="{{ L.style }}"></div>
+          </sc-for>
+          <sc-if value="{{ hiddenCount }}" hint-placeholder-val="{{ false }}">
+            <span dir="ltr" style="position:absolute;inset-inline-start:6px;top:6px;z-index:200;background:#0b5ea8;color:#fff;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:800;unicode-bidi:isolate">{{ hiddenLabel }}</span>
+          </sc-if>
+        </div>
+
+        <div style="{{ summaryStyle }}">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px">
+            <p style="margin:0;font-size:12px;font-weight:900;letter-spacing:.14em;color:#8b9aa8;text-transform:uppercase">{{ t.impact }}</p>
+            <button type="button" onClick="{{ resetRegion }}" style="{{ resetStyle }}">{{ resetLabel }}</button>
+          </div>
+          <sc-for list="{{ breakdown }}" as="b" hint-placeholder-count="0">
+            <div style="display:flex;justify-content:space-between;font-size:14px;padding:4px 0;color:#5d6f80"><span>{{ b.region }}</span><span dir="ltr" style="unicode-bidi:isolate;white-space:nowrap">{{ b.line }}</span></div>
+          </sc-for>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 0 20px;gap:12px">
+            <span style="color:#7a8794;font-size:14.5px;white-space:nowrap;flex:none">{{ countLabel }}</span>
+            <strong aria-live="polite" style="{{ totalStyle }}">{{ totalLabel }}</strong>
+          </div>
+          <label style="{{ monthlyRowStyle }}">
+            <input type="checkbox" checked="{{ monthly }}" onChange="{{ toggleMonthly }}" style="width:20px;height:20px;accent-color:#f07d22;flex:none;cursor:pointer">
+            <span style="display:grid;gap:2px;text-align:start">
+              <strong style="font-size:14.5px">{{ t.monthly }}</strong>
+              <span style="font-size:12.5px;color:#5d6f80">{{ t.monthlyNote }}</span>
+            </span>
+          </label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <button type="button" onClick="{{ addToCart }}" style="{{ secondaryCtaStyle }}">{{ addLabel }}</button>
+            <button type="button" onClick="{{ checkout }}" style="{{ ctaStyle }}">{{ ctaLabel }}</button>
+          </div>
+          <p style="font-size:12.5px;color:#5d6f80;margin:12px 0 0;text-align:center">{{ t.secure }}</p>
+        </div>
+      </div>
+
+      <div style="{{ colStyle }}">
+        <sc-for list="{{ colB }}" as="it" hint-placeholder-count="4">
+          <div style="{{ it.cardStyle }}">
+            <div style="{{ it.imgStyle }}" role="img" aria-label="{{ it.label }}"></div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap">
+              <strong style="font-size:16px;line-height:1.3">{{ it.label }}</strong>
+              <span style="{{ it.priceStyle }}">{{ it.price }}</span>
+            </div>
+            <div dir="ltr" style="display:flex;align-items:center;gap:8px;justify-content:center">
+              <button type="button" aria-label="{{ it.decLabel }}" onClick="{{ it.dec }}" style="{{ it.decStyle }}">−</button>
+              <span aria-live="polite" style="{{ it.qtyStyle }}">{{ it.qty }}</span>
+              <button type="button" aria-label="{{ it.incLabel }}" onClick="{{ it.inc }}" style="{{ it.incStyle }}">+</button>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section style="{{ devPanelStyle }}">
+    <strong style="display:block;font-size:14px;font-weight:900;margin-bottom:8px;color:#0b5ea8">{{ t.assets }} · dev</strong>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+      <sc-for list="{{ assetStatus }}" as="a" hint-placeholder-count="0">
+        <span style="{{ a.style }}">{{ a.label }}</span>
+      </sc-for>
+    </div>
+
+    <strong style="display:block;font-size:13px;font-weight:900;margin-bottom:8px;color:#0b5ea8">Asset QA</strong>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <sc-for list="{{ qaLayers }}" as="q" hint-placeholder-count="0">
+        <button type="button" onClick="{{ q.pick }}" style="{{ q.style }}">{{ q.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px">
+      <sc-for list="{{ qaModes }}" as="q" hint-placeholder-count="0">
+        <button type="button" onClick="{{ q.pick }}" style="{{ q.style }}">{{ q.label }}</button>
+      </sc-for>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:#5d6f80">
+        opacity
+        <input type="range" min="0" max="100" value="{{ qaOpacity }}" onChange="{{ setQaOpacity }}" onInput="{{ setQaOpacity }}" style="width:140px">
+        <span dir="ltr">{{ qaOpacity }}%</span>
+      </label>
+    </div>
+  </section>
+
+  <div style="height:72px"></div>
+
+  <footer style="background:#0a3c6b;color:rgba(255,255,255,.82)">
+    <div style="max-width:1280px;margin:0 auto;padding:50px 20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:30px">
+      <div>
+        <img src="https://www.gozbebekleri.org/logo-white.png" alt="Gözbebekleri" style="height:50px;width:auto;display:block">
+        <p style="font-size:14px;line-height:1.9;margin:16px 0 0;max-width:300px">{{ t.footerAbout }}</p>
+      </div>
+      <div style="display:grid;gap:10px;font-size:14px"><strong style="color:#f5a623;font-size:13px;letter-spacing:.12em">{{ t.footerLinks }}</strong><a href="#" style="color:rgba(255,255,255,.82)">{{ nav.about }}</a><a href="#" style="color:rgba(255,255,255,.82)">{{ nav.projects }}</a><a href="التبرع الدوري.dc.html" style="color:rgba(255,255,255,.82)">{{ nav.recurring }}</a></div>
+      <div style="display:grid;gap:10px;font-size:14px"><strong style="color:#f5a623;font-size:13px;letter-spacing:.12em">{{ t.footerContact }}</strong><span>{{ t.footerCity }}</span><a href="tel:+902122885930" dir="ltr" style="color:rgba(255,255,255,.82);unicode-bidi:isolate;text-align:right">+90 212 288 59 30</a><a href="mailto:info@gozbebekleri.org.tr" style="color:rgba(255,255,255,.82)">info@gozbebekleri.org.tr</a></div>
+    </div>
+    <div style="border-top:1px solid rgba(255,255,255,.12);padding:16px 20px;text-align:center;font-size:13px">{{ t.rights }}</div>
+  </footer>
+
+  <div style="{{ stickyStyle }}">
+    <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+      <span style="font-size:12.5px;color:#5d6f80;white-space:nowrap">{{ countLabel }}</span>
+      <strong dir="ltr" style="font-size:19px;unicode-bidi:isolate;white-space:nowrap">{{ totalLabel }}</strong>
+    </div>
+    <button type="button" onClick="{{ checkout }}" style="{{ stickyCtaStyle }}">{{ ctaLabel }}</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440},&quot;lang&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ar&quot;,&quot;tr&quot;,&quot;en&quot;],&quot;default&quot;:&quot;ar&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;currency&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;USD&quot;,&quot;EUR&quot;,&quot;TRY&quot;],&quot;default&quot;:&quot;USD&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;forceDevMode&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;وضع التطوير&quot;}}">
+class Component extends DCLogic {
+  state = { region: "gaza", mobile: false, reduce: false, assets: {}, pulse: false, added: false, ready: false, pricing: null,
+    qaLayer: null, qaMode: "both", qaOpacity: 100 };
+
+  componentDidMount() {
+    this.mq = window.matchMedia("(max-width: 1080px)");
+    this.rm = window.matchMedia("(prefers-reduced-motion: reduce)");
+    this.sync = () => this.setState({ mobile: this.mq.matches, reduce: this.rm.matches });
+    this.sync();
+    this.mq.addEventListener("change", this.sync);
+    this.rm.addEventListener("change", this.sync);
+    this.boot();
+  }
+  componentWillUnmount() {
+    if (this.mq) this.mq.removeEventListener("change", this.sync);
+    if (this.rm) this.rm.removeEventListener("change", this.sync);
+    if (this.unsub) this.unsub();
+    clearTimeout(this.tp); clearTimeout(this.tb);
+  }
+
+  boot() {
+    if (!window.GB_DATA || !window.GB_CART || !window.GB_SERVICES) { this.tb = setTimeout(() => this.boot(), 60); return; }
+    this.cart = window.GB_CART.create(id => window.GB_DATA.item(id));
+    this.unsub = this.cart.subscribe(() => this.forceUpdate());
+    this.probe(this.state.region);
+    this.loadPricing(this.state.region);
+    this.setState({ ready: true });
+  }
+
+  loadPricing(region) {
+    const S = window.GB_SERVICES;
+    S.projectService.fetchProjects(region, this.currency())
+      .then(p => this.setState(s => ({ pricing: Object.assign({}, s.pricing, { [region]: p }) })));
+  }
+
+  currency() { return this.state.currency || (window.GB_SERVICES && window.GB_SERVICES.currency.fromUrl()) || this.props.currency || "USD"; }
+  lang() { return this.state.lang || this.props.lang || "ar"; }
+
+  // فحص توفر الأصول: لا صور مكسورة، والطبقة الناقصة تُتجاهل بصريًا.
+  probe(region) {
+    const D = window.GB_DATA, reg = D.region(region);
+    const keys = D.itemsFor(region).filter(i => i.kind !== "prop")
+      .reduce((a, i) => a.concat([i.visualKey], (i.extraVisuals || []).map(x => x.visualKey)), [])
+      .concat(D.PENDING_LAYERS.map(l => l.visualKey));
+    const urls = [["base", reg.base]].concat((D.STATES || []).filter(x => reg[x.key]).map(x => [x.key, reg[x.key]])).concat(keys.map(k => [k, D.layerSrc(region, k)]));
+    urls.forEach(([key, url]) => {
+      const id = region + "|" + key;
+      if (this.state.assets[id] !== undefined) return;
+      const img = new Image();
+      img.onload = () => this.setState(s => ({ assets: Object.assign({}, s.assets, { [id]: true }) }));
+      img.onerror = () => this.setState(s => ({ assets: Object.assign({}, s.assets, { [id]: false }) }));
+      img.src = url;
+    });
+  }
+
+  bump(item, d) {
+    this.cart.change(this.state.region, item, d);
+    this.setState({ pulse: true, added: false });
+    clearTimeout(this.tp);
+    this.tp = setTimeout(() => this.setState({ pulse: false }), 180);
+  }
+
+  renderVals() {
+    const s = this.state, m = s.mobile;
+    const lang = s.lang || this.props.lang || "ar";
+    const T = window.GB_I18N ? window.GB_I18N.t(lang) : null;
+    const D = window.GB_DATA, S = window.GB_SERVICES, E = window.GB_ENGINE;
+    const t = T || { dir: "rtl", nav: {}, trust: [] };
+    const base = {
+      dir: t.dir, lang, t, nav: t.nav || {}, trust: t.trust || [],
+      navStyle: "display:" + (m ? "none" : "flex") + ";gap:20px;font-size:15px;font-weight:700",
+      regions: [], colA: [], colB: [], layers: [], breakdown: [], assetStatus: [],
+      stageStyle: "display:grid;gap:22px", colStyle: "display:grid;gap:16px",
+      centerStyle: "display:flex;flex-direction:column;align-items:center;gap:8px",
+      childStageStyle: "position:relative;width:100%;max-width:500px;height:660px",
+      baseStyle: "position:absolute;inset:0;z-index:40",
+      summaryStyle: "width:100%;max-width:500px;background:#fff;border:1.5px solid #e9eef4;border-radius:22px;padding:24px",
+      totalStyle: "font-size:34px;font-weight:900;white-space:nowrap;direction:ltr;unicode-bidi:isolate",
+      countLabel: "—", totalLabel: "—", cartLabel: (t.cart || "") + " · 0", ctaLabel: t.cta || "",
+      ctaStyle: "width:100%;border:0;border-radius:999px;padding:17px;font-size:19px;font-weight:900;color:#fff;background:#c6cfd8;font-family:inherit",
+      stickyStyle: "display:none", stickyCtaStyle: "display:none", devPanelStyle: "display:none",
+      characterAlt: "", checkout: () => {},
+      hiddenCount: false, hiddenLabel: "", qaLayers: [], qaModes: [], qaOpacity: 100, setQaOpacity: () => {},
+      currency: this.currency(), addLabel: t.addToCart || "", addToCart: () => {},
+      resetLabel: t.reset || "", resetRegion: () => {}, resetStyle: "display:none",
+      monthly: !!s.monthly, toggleMonthly: () => this.setState(p => ({ monthly: !p.monthly, added: false })),
+      monthlyRowStyle: "display:none",
+      secondaryCtaStyle: "display:none",
+      selectStyle: "border:1px solid #cfe2f3;background:#fff;color:#0b5ea8;border-radius:999px;padding:7px 10px;font-family:inherit;font-size:13px;font-weight:800;cursor:pointer",
+      langOptions: (window.GB_SERVICES ? window.GB_SERVICES.LANGS : []).map(([v, l]) => ({ value: v, label: l })),
+      currencyOptions: (window.GB_SERVICES ? window.GB_SERVICES.CURRENCIES : []).map(v => ({ value: v, label: v })),
+      setLang: ev => this.setState({ lang: ev.target.value }),
+      setCurrency: ev => this.setState({ currency: ev.target.value })
+    };
+    if (!s.ready || !D || !E || !this.cart) return base;
+
+    const region = s.region, reg = D.region(region);
+    const cur = this.currency();
+    const fmt = n => S.currency.format(n, cur, lang);
+    const priced = S.projectService.applyPricing(D.itemsFor(region), (s.pricing || {})[region]);
+    const lines = this.cart.lines();
+    const total = lines.reduce((x, l) => x + l.amount, 0);
+    const count = this.cart.count();
+    const avail = (r, k) => s.assets[r + "|" + k] === true;
+
+    const st = E.stateOf(priced, i => this.cart.qty(region, i.id), D.STATES);
+    const stateOn = st && reg[st.key] && avail(region, st.key);
+    const baseSrc = stateOn ? reg[st.key] : reg.base;
+
+    const comp = E.compose({
+      region, items: priced,
+      qtyOf: i => this.cart.qty(region, i.id),
+      isAvailable: avail, srcOf: (r, k) => D.layerSrc(r, k), propSrcOf: D.stagePropSrc,
+      slotZ: D.SLOT_Z, stageSlots: D.STAGE_SLOTS, stageOrder: D.STAGE_ORDER, maxProps: D.MAX_PROPS, aligned: reg.alignedAssets === true,
+      covered: (stateOn && st.covers) || []
+    });
+    const bs = m ? 40 : 42;
+    const round = (bg, border, color) => "width:" + bs + "px;height:" + bs + "px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1.5px solid " + border + ";background:" + bg + ";color:" + color + ";font-size:21px;font-weight:800;cursor:pointer;line-height:1;padding:0;font-family:inherit" + (s.reduce ? "" : ";transition:background .15s,border-color .15s,color .15s");
+
+    const cards = priced.map(it => {
+      const q = this.cart.qty(region, it.id), on = q > 0, name = D.name(it, lang);
+      return {
+        label: name, qty: q, price: fmt(it.price), zakat: it.zakatEligible,
+        incLabel: t.inc + " — " + name, decLabel: t.dec + " — " + name,
+        imgStyle: "width:" + (m ? 64 : 84) + "px;height:" + (m ? 64 : 84) + "px;background:url('" + it.icon + "') center/contain no-repeat" +
+          (s.reduce ? "" : ";transition:transform .2s ease,filter .2s ease") +
+          (on ? "" : ";filter:saturate(.55) opacity(.72)"),
+        priceStyle: "display:inline-block;direction:ltr;unicode-bidi:isolate;white-space:nowrap;font-size:13.5px;font-weight:800;border-radius:999px;padding:2px 10px;" +
+          (on ? "background:#fdeada;color:#98470d" : "background:#f2f5f8;color:#7a8794"),
+        qtyStyle: "min-width:26px;text-align:center;font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;" + (on ? "color:#14283c" : "color:#aeb9c4"),
+        cardStyle: "display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:" + (m ? "6px 4px" : "10px 6px") + ";box-sizing:border-box;",
+        inc: () => this.bump(it, 1), dec: () => this.bump(it, -1),
+        incStyle: round(on ? "#f07d22" : "#0b5ea8", on ? "#f07d22" : "#0b5ea8", "#fff"),
+        decStyle: round(q ? "#fff" : "#f7f9fb", q ? "#cfd8e1" : "#eef2f6", q ? "#14283c" : "#c3ccd6")
+      };
+    });
+    const half = Math.ceil(cards.length / 2);
+
+    const breakdown = D.REGIONS.map(r => {
+      const rl = lines.filter(l => l.region === r.id);
+      if (!rl.length) return null;
+      return { region: D.name(r, lang), line: fmt(rl.reduce((x, l) => x + l.amount, 0)) + " · " + rl.reduce((x, l) => x + l.quantity, 0) + " " + t.unit };
+    }).filter(Boolean);
+
+    const devOn = S.dev.enabled || !!this.props.forceDevMode;
+    const qaOn = devOn && !!s.qaLayer;
+    const alignedKeys = D.PENDING_LAYERS.map(l => l.visualKey);
+    const qaChip = on => "padding:6px 14px;border-radius:999px;font-family:inherit;font-size:12.5px;font-weight:800;cursor:pointer;" +
+      (on ? "background:#0b5ea8;color:#fff;border:1px solid #0b5ea8" : "background:#fff;color:#5d6f80;border:1px solid #e9eef4");
+
+    return Object.assign(base, {
+      cartLabel: t.cart + " · " + count,
+      resetLabel: t.reset,
+      resetRegion: () => { if (lines.some(l => l.region === region)) { this.cart.clearRegion(region); this.setState({ added: false }); } },
+      resetStyle: "border:0;background:none;font-family:inherit;font-size:12.5px;font-weight:800;padding:2px 4px;" +
+        (lines.some(l => l.region === region) ? "color:#0b5ea8;cursor:pointer;text-decoration:underline" : "color:#c2ccd6;cursor:default"),
+      characterAlt: D.name(reg, lang),
+      regions: D.REGIONS.map(r => ({
+        label: r.active ? D.name(r, lang) : D.name(r, lang) + " · " + t.soon,
+        selected: r.id === region, disabled: !r.active,
+        pick: () => { if (r.active && r.id !== region) { this.setState({ region: r.id }); this.probe(r.id); this.loadPricing(r.id); } },
+        style: "padding:10px 22px;border-radius:999px;border:0;font-family:inherit;font-size:14.5px;font-weight:800;" +
+          (s.reduce ? "" : "transition:background .18s,color .18s,box-shadow .18s;") +
+          (r.active
+            ? (r.id === region ? "background:#fff;color:#0b5ea8;box-shadow:0 2px 8px rgba(20,40,60,.1);cursor:pointer" : "background:transparent;color:#6b7c8c;cursor:pointer")
+            : "background:transparent;color:#aab5c0;cursor:not-allowed")
+      })),
+      stageStyle: m ? "display:flex;flex-direction:column;gap:20px"
+        : "display:grid;grid-template-columns:minmax(260px,1fr) minmax(420px,520px) minmax(260px,1fr);gap:30px;align-items:start",
+      colStyle: m ? "display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-content:start" : "display:grid;gap:34px;align-content:start",
+      centerStyle: m ? "display:contents"
+        : "display:flex;flex-direction:column;align-items:center;gap:8px;position:sticky;top:84px;padding-top:64px",
+      childStageStyle: "position:relative;z-index:0;isolation:isolate;width:100%;" + (m ? "order:-1;margin:0 auto;max-width:320px;height:380px" : "max-width:500px;height:660px"),
+      baseStyle: "position:absolute;inset:0;z-index:40;" +
+        (qaOn && s.qaMode === "layer" ? "opacity:0;" : "") +
+        (avail(region, "base") === false ? "border:1px dashed #cfe2f3;border-radius:16px;background:#f5f9fd" : "background:url('" + baseSrc + "') center bottom/contain no-repeat"),
+      hiddenCount: false,
+      hiddenLabel: "+" + comp.hidden,
+      qaLayers: devOn ? alignedKeys.map(k => ({
+        label: k, pick: () => this.setState(st => ({ qaLayer: st.qaLayer === k ? null : k })), style: qaChip(s.qaLayer === k)
+      })) : [],
+      qaModes: devOn ? [["base", "Base only"], ["layer", "Layer only"], ["both", "Base + Layer"]].map(([m, lb]) => ({
+        label: lb, pick: () => this.setState({ qaMode: m }), style: qaChip(s.qaMode === m)
+      })) : [],
+      qaOpacity: s.qaOpacity,
+      setQaOpacity: ev => this.setState({ qaOpacity: Number(ev.target.value) }),
+      layers: (qaOn
+        ? (s.qaMode === "base" ? [] : [{ z: D.SLOT_Z[(D.itemsFor(region).find(i => i.visualKey === s.qaLayer) || {}).slot] || 60, src: D.layerSrc(region, s.qaLayer), placement: null, qa: true }])
+        : comp.layers
+      ).map(L => {
+        const p = L.placement;
+        const bg = p
+          ? "background:url('" + L.src + "') " + p.px + "% " + p.py + "%/" + Math.round(p.k * 100) + "% auto no-repeat"
+          : "background:url('" + L.src + "') center bottom/contain no-repeat"; // wearable: مطابق للكانفس
+        return { style: "position:absolute;inset:0;z-index:" + L.z + ";" + bg +
+          (L.qa ? ";opacity:" + (s.qaOpacity / 100) : "") + (s.reduce ? "" : ";transition:opacity .22s ease") };
+      }),
+      colA: cards.slice(0, half), colB: cards.slice(half),
+      breakdown,
+      countLabel: count === 0 ? t.none || "—" : count + " " + t.unit,
+      totalLabel: fmt(total) + (s.monthly ? " / " + t.perMonth : ""),
+      monthly: !!s.monthly,
+      toggleMonthly: () => this.setState(p => ({ monthly: !p.monthly, added: false })),
+      monthlyRowStyle: "display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:12px 14px;border-radius:14px;cursor:pointer;border:1.5px solid " +
+        (s.monthly ? "#f0a765;background:#fffaf5" : "#e9eef4;background:#fbfcfe"),
+      summaryStyle: "width:100%;" + (m ? "order:9;max-width:none;padding:18px 0 0;border-top:1px solid #e9eef4;margin-top:2px" : "max-width:460px;padding:20px 0 0;border-top:1px solid #e9eef4;margin-top:18px"),
+      totalStyle: "font-size:38px;font-weight:900;letter-spacing:-1px;white-space:nowrap;direction:ltr;unicode-bidi:isolate;color:#14283c;display:inline-block;font-variant-numeric:tabular-nums;" +
+        (s.reduce ? "" : "transition:transform .18s ease;transform:scale(" + (s.pulse ? 1.08 : 1) + ")"),
+      ctaLabel: t.cta,
+      addLabel: s.added ? t.ctaDone : t.addToCart,
+      addToCart: () => { if (total) this.setState({ added: true }); },
+      secondaryCtaStyle: "width:100%;border-radius:999px;padding:16px 10px;font-family:inherit;font-size:16px;font-weight:900;" +
+        (total === 0 ? "border:1.5px solid #e1e8ef;background:#fff;color:#aab5c0;cursor:not-allowed"
+          : (s.added ? "border:1.5px solid #0b5ea8;background:#eef5fb;color:#0b5ea8;cursor:pointer"
+                     : "border:1.5px solid #0b5ea8;background:#fff;color:#0b5ea8;cursor:pointer")),
+      ctaStyle: "width:100%;border:0;border-radius:999px;padding:17px 10px;font-family:inherit;font-size:17px;font-weight:900;color:#fff;" +
+        (total === 0 ? "background:#c6cfd8;cursor:not-allowed" : (s.added ? "background:#0b5ea8;cursor:pointer" : "background:#f07d22;cursor:pointer;box-shadow:0 12px 28px rgba(240,125,34,.28)")),
+      checkout: () => { if (total) S.checkout.proceedToCheckout(lines, { monthly: !!s.monthly }); },
+      currency: cur,
+      selectStyle: "border:1px solid #cfe2f3;background:#fff;color:#0b5ea8;border-radius:999px;padding:7px 10px;font-family:inherit;font-size:13px;font-weight:800;cursor:pointer",
+      langOptions: S.LANGS.map(([v, l]) => ({ value: v, label: l })),
+      currencyOptions: S.CURRENCIES.map(v => ({ value: v, label: v })),
+      setLang: ev => this.setState({ lang: ev.target.value }),
+      setCurrency: ev => this.setState({ currency: ev.target.value }),
+      stickyStyle: (m && total > 0 ? "display:flex" : "display:none") +
+        ";position:fixed;inset-inline:0;bottom:0;z-index:1000;background:#fff;border-top:1px solid #e9eef4;box-shadow:0 -8px 28px rgba(20,40,60,.1);padding:12px 18px calc(12px + env(safe-area-inset-bottom));align-items:center;justify-content:space-between;gap:14px",
+      stickyCtaStyle: "border:0;border-radius:999px;white-space:nowrap;flex:none;padding:14px 26px;font-family:inherit;font-size:16px;font-weight:800;color:#fff;background:#f07d22;cursor:pointer",
+      devPanelStyle: (devOn ? "display:block" : "display:none") + ";max-width:1280px;margin:34px auto 0;padding:18px 20px;border:1px dashed #cfe2f3;border-radius:14px;background:#f8fbff",
+      assetStatus: [{ k: "base", n: "base" }]
+        .concat(D.STATES.map(x => ({ k: x.key, n: x.key })))
+        .concat(alignedKeys.map(k => ({ k, n: k })))
+        .map(a => {
+          const ok = avail(region, a.k);
+          return {
+            label: a.n + " — " + (ok ? "✓" : t.pending),
+            style: "font-size:12.5px;font-weight:800;border-radius:999px;padding:4px 12px;" +
+              (ok ? "background:#e6f3ea;color:#2f7a45" : "background:#fff;color:#8b9aa8;border:1px solid #e9eef4")
+          };
+        })
+    });
+  }
+}
+</script>
+</body>
+</html>

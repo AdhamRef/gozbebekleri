@@ -19,6 +19,13 @@ import { sanitizeDonationAttribution } from "@/lib/attribution/sanitize";
 import { inferLocaleFromRequest } from "@/lib/preferred-lang";
 import { resolveGuestDonor } from "@/lib/users/resolve-guest-donor";
 import { istanbulDateKeysToUtcRange } from "@/lib/admin/istanbul-calendar";
+import {
+  assertImpactAmountMatches,
+  impactLinesCreateData,
+  ImpactSelectionError,
+  resolveImpactSelection,
+  type ResolvedImpactSelection,
+} from "@/lib/impact/server";
 
 // GET /api/donations - Get all donations (admin) or user's donations
 export async function GET(request: NextRequest) {
@@ -230,6 +237,7 @@ export async function POST(request: NextRequest) {
     const {
       items,
       categoryItems,
+      impact,
       currency,
       teamSupport = 0,
       coverFees = false,
@@ -251,6 +259,33 @@ export async function POST(request: NextRequest) {
         { error: "Items or categoryItems, currency, and payment method are required" },
         { status: 400 }
       );
+    }
+
+    // Impact builder ("make an impact for a child"): the single campaign item
+    // targets the builder's hidden backing campaign; the itemised picks are
+    // re-priced from the DB and stored as ImpactDonationLine rows.
+    let impactSelection: ResolvedImpactSelection | null = null;
+    if (impact != null) {
+      try {
+        impactSelection = await resolveImpactSelection(impact);
+        if (
+          hasCategoryItems ||
+          items?.length !== 1 ||
+          items[0]?.campaignId !== impactSelection.campaignId
+        ) {
+          throw new ImpactSelectionError("Impact donations must contain exactly the impact item");
+        }
+        await assertImpactAmountMatches(
+          impactSelection,
+          Number(items[0].amount),
+          normalizeDonationCurrencyCode(currency)
+        );
+      } catch (e) {
+        if (e instanceof ImpactSelectionError) {
+          return NextResponse.json({ error: e.message }, { status: e.status });
+        }
+        throw e;
+      }
     }
 
     // Resolve donorId — authenticated user or guest upsert
@@ -368,7 +403,9 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         );
       }
-      if (campaigns.some((c) => !c.isActive)) {
+      // An impact builder's backing campaign is intentionally inactive (hidden
+      // from public lists); the builder's own isActive was checked above.
+      if (campaigns.some((c) => !c.isActive && c.id !== impactSelection?.campaignId)) {
         return NextResponse.json(
           { error: "One or more campaigns are not active" },
           { status: 400 }
@@ -496,6 +533,14 @@ export async function POST(request: NextRequest) {
                   })),
                 }
               : undefined,
+            impactLines: impactSelection
+              ? {
+                  create: impactLinesCreateData(impactSelection).map((l) => ({
+                    ...l,
+                    subscriptionId: sub.id,
+                  })),
+                }
+              : undefined,
           },
           include: {
             donor: { select: { name: true, email: true } },
@@ -580,6 +625,9 @@ export async function POST(request: NextRequest) {
                   amountUSD: item.amountUSD,
                 })),
               }
+            : undefined,
+          impactLines: impactSelection
+            ? { create: impactLinesCreateData(impactSelection) }
             : undefined,
         },
         include: {

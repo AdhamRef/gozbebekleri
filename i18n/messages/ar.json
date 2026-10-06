@@ -985,5 +985,21 @@
     "dobDayPlaceholder": "اليوم",
     "dobMonthPlaceholder": "الشهر",
     "dobYearPlaceholder": "السنة"
+  },
+  "ImpactBuilder": {
+    "regions": "اختر المنطقة",
+    "soon": "قريبًا",
+    "impact": "أثرك حتى الآن",
+    "reset": "إعادة التعيين",
+    "cta": "تبرع الآن",
+    "secure": "معاملات آمنة ومشفّرة",
+    "inc": "زيادة",
+    "dec": "إنقاص",
+    "unit": "احتياج",
+    "none": "لم تختر بعد",
+    "monthly": "اجعل هذا التبرع شهريًا",
+    "monthlyNote": "يتجدّد تلقائيًا كل شهر، ويمكن إيقافه في أي وقت",
+    "perMonth": "شهريًا",
+    "ratesLoading": "جارٍ تحميل الأسعار…"
   }
 }

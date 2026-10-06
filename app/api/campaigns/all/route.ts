@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/options';
 import { requireAdminOrDashboardPermission } from '@/lib/dashboard/api-auth';
 import { parseIncludeInactive } from '@/lib/campaign/include-inactive-query';
-import { NOT_SOFT_DELETED } from '@/lib/campaign/soft-delete-filter';
+import { NOT_IMPACT_BACKING, NOT_SOFT_DELETED } from '@/lib/campaign/soft-delete-filter';
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,6 +21,8 @@ export async function GET(request: NextRequest) {
         AND: [
           includeInactive ? {} : { isActive: true },
           NOT_SOFT_DELETED,
+          // Impact builders' settlement campaigns are edited under /dashboard/impact.
+          NOT_IMPACT_BACKING,
         ].filter((c) => Object.keys(c).length > 0),
       },
       include: {

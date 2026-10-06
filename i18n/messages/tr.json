@@ -985,5 +985,21 @@
     "dobDayPlaceholder": "Gün",
     "dobMonthPlaceholder": "Ay",
     "dobYearPlaceholder": "Yıl"
+  },
+  "ImpactBuilder": {
+    "regions": "Bölge seç",
+    "soon": "Yakında",
+    "impact": "Şimdiye kadarki etkin",
+    "reset": "Sıfırla",
+    "cta": "Şimdi bağışla",
+    "secure": "Güvenli ve şifreli işlem",
+    "inc": "Artır",
+    "dec": "Azalt",
+    "unit": "ihtiyaç",
+    "none": "Henüz seçim yok",
+    "monthly": "Bu bağışı aylık yap",
+    "monthlyNote": "Her ay otomatik yenilenir, istediğiniz zaman durdurabilirsiniz",
+    "perMonth": "aylık",
+    "ratesLoading": "Fiyatlar yükleniyor…"
   }
 }

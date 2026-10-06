@@ -8,6 +8,7 @@ import {
   type ContentLocalizationSection,
 } from "@/lib/content-localization/access";
 import { prisma } from "@/lib/prisma";
+import { NOT_IMPACT_BACKING } from "@/lib/campaign/soft-delete-filter";
 
 const TARGET_LOCALES = ["en", "fr", "tr", "id", "pt", "es", "de"] as const;
 type Locale = (typeof TARGET_LOCALES)[number];
@@ -151,7 +152,7 @@ function summarize(items: AuditItem[]) {
 
 async function loadItems(section: ContentLocalizationSection): Promise<AuditItem[]> {
   if (section === "campaigns") {
-    const rows = await prisma.campaign.findMany({ orderBy: { createdAt: "desc" }, include: { translations: true } });
+    const rows = await prisma.campaign.findMany({ where: NOT_IMPACT_BACKING, orderBy: { createdAt: "desc" }, include: { translations: true } });
     return rows.map((item) => evaluateItem({
       id: item.id,
       label: item.title,

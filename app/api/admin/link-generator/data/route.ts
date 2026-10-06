@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
+import { NOT_IMPACT_BACKING } from "@/lib/campaign/soft-delete-filter";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { routing } from "@/i18n/routing.config";
 import { URL_CURRENCY_CODES_ORDERED } from "@/lib/currency-link";
@@ -36,6 +37,7 @@ export async function GET() {
 
     const [campaigns, categories, posts, postCategories] = await Promise.all([
       prisma.campaign.findMany({
+        where: NOT_IMPACT_BACKING,
         select: {
           id: true,
           slug: true,

@@ -379,9 +379,65 @@ model Campaign {
   donations         DonationItem[]
   subscriptionItems SubscriptionItem[]
   translations      CampaignTranslation[]
+  /// Set when this row is the hidden settlement campaign of an impact builder
+  /// (fundraisingMode = "IMPACT"). See ImpactCampaign.
+  impactCampaign    ImpactCampaign?
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+/// "Make an impact for a child" — interactive builder campaign type.
+/// Donors pick needs (clothing, food, …) for a region's child character and the
+/// picture changes as they pick. Payments settle through the regular donation
+/// pipeline against `campaign` — a hidden backing Campaign (isActive=false,
+/// fundraisingMode="IMPACT") so webhooks, receipts, reports and currentAmount
+/// keep working unchanged. The itemised breakdown lives in ImpactDonationLine.
+model ImpactCampaign {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  slug        String   @unique
+  /// Builder is publicly reachable and accepts donations only when true.
+  isActive    Boolean  @default(true)
+  /// { "<locale>": string } — "ar" is the fallback.
+  title       Json
+  intro       Json?
+  /// ImpactRegion[] — see lib/impact/config.ts
+  regions     Json
+  /// ImpactNeed[] — see lib/impact/config.ts
+  needs       Json
+  allowMonthly Boolean @default(true)
+
+  campaignId  String   @unique @db.ObjectId
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+
+  lines       ImpactDonationLine[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// One picked need (region × need × quantity) of an impact donation. Attached to
+/// the first Donation and, for monthly gifts, to the Subscription as well.
+model ImpactDonationLine {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  impactCampaignId String   @db.ObjectId
+  donationId       String?  @db.ObjectId
+  subscriptionId   String?  @db.ObjectId
+
+  regionKey    String
+  needKey      String
+  quantity     Int
+  unitPriceUSD Float
+  amountUSD    Float
+
+  impactCampaign ImpactCampaign @relation(fields: [impactCampaignId], references: [id])
+  donation       Donation?      @relation(fields: [donationId], references: [id], onDelete: Cascade)
+  subscription   Subscription?  @relation(fields: [subscriptionId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([impactCampaignId])
+  @@index([donationId])
 }
 
 model CampaignTranslation {
@@ -512,6 +568,7 @@ model Donation {
 
   items         DonationItem[]
   categoryItems DonationCategoryItem[]
+  impactLines   ImpactDonationLine[]
   comments      Comment[]
 }
 
@@ -544,6 +601,7 @@ model Subscription {
 
   items         SubscriptionItem[]
   categoryItems SubscriptionCategoryItem[]
+  impactLines   ImpactDonationLine[]
   donations     Donation[]
 }
 

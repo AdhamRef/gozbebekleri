@@ -8,6 +8,7 @@ import {
   type ContentLocalizationSection,
 } from "@/lib/content-localization/access";
 import { prisma } from "@/lib/prisma";
+import { NOT_IMPACT_BACKING } from "@/lib/campaign/soft-delete-filter";
 
 const TRANSLATION_LOCALES = ["en", "fr", "tr", "id", "pt", "es", "de"] as const;
 const SUPPORTED_LOCALES = ["ar", ...TRANSLATION_LOCALES] as const;
@@ -123,6 +124,7 @@ async function loadPreviewRows(
 ): Promise<PreviewRow[]> {
   if (section === "campaigns") {
     const rows = await prisma.campaign.findMany({
+      where: NOT_IMPACT_BACKING,
       orderBy: { createdAt: "desc" },
       include: { translations: true },
       take: 200,

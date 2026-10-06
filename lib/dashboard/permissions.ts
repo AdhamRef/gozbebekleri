@@ -99,6 +99,7 @@ const PATH_RULES: { prefix: string; key: DashboardPermissionKey }[] = [
   { prefix: "/dashboard/inbox", key: "messages" },
   { prefix: "/dashboard/templates", key: "templates" },
   { prefix: "/dashboard/campaigns", key: "campaigns" },
+  { prefix: "/dashboard/impact", key: "campaigns" },
   { prefix: "/dashboard/categories", key: "categories" },
   { prefix: "/dashboard/blog", key: "blog" },
   { prefix: "/dashboard/slides", key: "slides" },

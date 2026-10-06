@@ -108,6 +108,12 @@ interface DonationDialogProps {
   authCallbackUrl?: string;
   /** Lets the parent persist any props it owns before an auth redirect. */
   onAuthCheckpoint?: () => void;
+  /** Impact builder checkout: amount is fixed by the picked needs (sent as initialDonationAmount)
+   *  and the itemised picks are re-priced server-side. */
+  impact?: {
+    impactCampaignId: string;
+    lines: { regionKey: string; needKey: string; quantity: number }[];
+  } | null;
 }
 
 
@@ -135,6 +141,7 @@ const DonationDialog = ({
   guestMode = false,
   authCallbackUrl,
   onAuthCheckpoint,
+  impact = null,
 }: DonationDialogProps) => {
   const isCategoryMode = Boolean(categoryId);
   const openGoal = goalType === GOAL_TYPE_OPEN;
@@ -718,6 +725,11 @@ const DonationDialog = ({
   };
 
   const handleBack = () => {
+    // Impact checkout: the amount step is locked to the picked needs — close instead.
+    if (impact && currentStep <= 1) {
+      onClose();
+      return;
+    }
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
     }
@@ -1701,6 +1713,7 @@ const DonationDialog = ({
       };
       const refCode = getReferralCode();
       if (refCode) donationData.referralCode = refCode;
+      if (impact) donationData.impact = impact;
       if (isCategoryMode && categoryId) {
         donationData.categoryItems = [
           { categoryId, amount: donationAmount, amountUSD },

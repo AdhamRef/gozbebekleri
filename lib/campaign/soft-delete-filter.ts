@@ -1,3 +1,5 @@
+import type { Prisma } from "@prisma/client";
+
 /**
  * Filter clause that matches campaigns the dashboard hasn't soft-deleted.
  *
@@ -23,6 +25,15 @@ export const NOT_SOFT_DELETED = {
     { isDeleted: { isSet: false } },
   ],
 };
+
+/**
+ * Excludes the hidden backing campaigns of "make an impact" builders
+ * (managed under /dashboard/impact). Filtered through the ImpactCampaign
+ * back-relation rather than `fundraisingMode`, which legacy rows may lack.
+ */
+export const NOT_IMPACT_BACKING = {
+  impactCampaign: { is: null },
+} satisfies Prisma.CampaignWhereInput;
 
 /**
  * Filter clause that matches categories considered active (or never written —
