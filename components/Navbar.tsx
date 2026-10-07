@@ -188,7 +188,6 @@ const Navbar = () => {
   const navLinks = [
     { href: "/about-us", label: t("about") },
     { href: "/campaigns", label: t("projects") },
-    { href: "/impact/make-an-impact", label: t("makeImpact"), highlight: true },
     { href: "/blog", label: t("news") },
     { href: "/bank-transfer", label: t("bankAccounts") },
     { href: "/contact-us", label: t("contact") },
@@ -265,12 +264,10 @@ const Navbar = () => {
                 <Link
                   key={link.href + link.label}
                   href={link.href}
-                  className={`whitespace-nowrap px-2 xl:px-3 py-2 text-[13px] xl:text-sm font-semibold uppercase tracking-wide transition-colors rounded-md ${
+                  className={`px-3 py-2 text-sm font-semibold uppercase tracking-wide transition-colors rounded-md ${
                     pathname === link.href
                       ? "text-[#025EB8]"
-                      : "highlight" in link
-                        ? "text-[#FA5D17] hover:text-[#025EB8]"
-                        : "text-gray-700 hover:text-[#025EB8]"
+                      : "text-gray-700 hover:text-[#025EB8]"
                   }`}
                 >
                   {link.label}
@@ -442,9 +439,7 @@ const Navbar = () => {
                     className={`flex items-center px-4 py-3 text-sm font-semibold uppercase tracking-wide border-b border-gray-100 transition-colors ${
                       pathname === link.href
                         ? "text-[#025EB8] bg-blue-50"
-                        : "highlight" in link
-                          ? "text-[#FA5D17] hover:bg-gray-50"
-                          : "text-gray-700 hover:bg-gray-50"
+                        : "text-gray-700 hover:bg-gray-50"
                     }`}
                   >
                     {link.label}
