@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { unstable_cache } from "next/cache";
+import { pickText, readImpactConfig } from "@/lib/impact/config";
+import { loadFeaturedImpactCampaign } from "@/lib/impact/load";
 import { LOCALE_SEO, buildPageMetadata, SITE_URL } from "@/lib/seo";
 import type { Locale } from "@/lib/seo";
 import HomePageContent from "./_components/homepage/HomePageContent";
@@ -77,6 +80,49 @@ function buildHeroSrc(src: string, width: number): string {
   );
 }
 
+/**
+ * The featured impact builder for the homepage section. Cached for 5 minutes so the
+ * homepage doesn't pay a database round-trip per request, and capped like safeFetch
+ * so a slow database can't hold up the render — the section is simply left out.
+ */
+const getFeaturedImpact = unstable_cache(
+  async () => {
+    const row = await loadFeaturedImpactCampaign();
+    if (!row) return null;
+    const config = readImpactConfig(row);
+    return {
+      slug: row.slug,
+      impactCampaignId: row.id,
+      campaignId: row.campaignId,
+      title: row.title,
+      intro: row.intro,
+      regions: config.regions,
+      needs: config.needs.filter((n) => n.active),
+      allowMonthly: row.allowMonthly,
+    };
+  },
+  ["homepage-featured-impact"],
+  { revalidate: 300, tags: ["impact-campaigns"] }
+);
+
+async function safeFeaturedImpact(locale: string, timeoutMs = 3000) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const row = await Promise.race([
+      getFeaturedImpact(),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), timeoutMs);
+      }),
+    ]);
+    if (!row || !row.needs.length || !row.regions.length) return null;
+    return { ...row, title: pickText(row.title, locale), intro: pickText(row.intro, locale) };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export default async function HomePage({ params }: Props) {
   const { locale } = await params;
   const base = await baseUrl();
@@ -85,7 +131,7 @@ export default async function HomePage({ params }: Props) {
   // as initial state. This eliminates the empty-section → skeleton → real-content swap
   // (which was the root cause of CLS=0.92) and avoids a client waterfall on hydration.
   // All requests run in parallel with a 3 s hard timeout each.
-  const [slidesData, campaignsData, categoriesData, postsData] = await Promise.all([
+  const [slidesData, campaignsData, categoriesData, postsData, featuredImpact] = await Promise.all([
     safeFetch<{ items?: SlideItem[] }>(
       `${base}/api/slides?locale=${locale}`,
       { items: [] }
@@ -102,6 +148,7 @@ export default async function HomePage({ params }: Props) {
       `${base}/api/posts?locale=${locale}&limit=3`,
       { items: [] }
     ),
+    safeFeaturedImpact(locale),
   ]);
 
   const initialSlides = Array.isArray(slidesData?.items) ? slidesData.items : [];
@@ -142,6 +189,7 @@ export default async function HomePage({ params }: Props) {
         initialHasMore={initialHasMore}
         initialCategories={initialCategories}
         initialPosts={initialPosts}
+        featuredImpact={featuredImpact}
       />
     </>
   );
