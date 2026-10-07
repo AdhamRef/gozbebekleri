@@ -13,7 +13,7 @@ import BlogCard from "../BlogCard";
 import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
 import type { CampaignCardData } from "../CampaignCard";
-import ImpactBuilder from "../../impact/_components/ImpactBuilder";
+import ImpactBuilder, { ImpactTexture } from "../../impact/_components/ImpactBuilder";
 import type { ImpactNeed, ImpactRegion } from "@/lib/impact/config";
 
 // LiveDonationsTicker is a non-critical floating widget — keep it client-only
@@ -161,15 +161,8 @@ const HomePage: React.FC<HomePageContentProps> = ({
 
       {/* ── Make an impact for a child — compact builder; picks carry over to the full page. */}
       {featuredImpact && (
-        <section
-          className="bg-gray-50 pb-8 pt-5 sm:pb-10 sm:pt-6"
-          style={{
-            backgroundImage: "url('/bg.webp')",
-            backgroundRepeat: "repeat",
-            backgroundSize: "320px",
-            backgroundBlendMode: "multiply",
-          }}
-        >
+        <section className="relative isolate bg-gray-50 pb-8 pt-5 sm:pb-10 sm:pt-6">
+          <ImpactTexture />
           <div className="max-w-7xl mx-auto px-4">
             <div className="flex items-end justify-between gap-3 mb-4 sm:mb-5">
               <div className="min-w-0">

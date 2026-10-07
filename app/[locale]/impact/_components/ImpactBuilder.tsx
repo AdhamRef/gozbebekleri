@@ -40,6 +40,17 @@ const optimizable = (src: string) => src.startsWith("/") || src.startsWith("http
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 
+/** Faint site texture behind the impact builder, faded out at the top and bottom so it blends into neighbouring sections. */
+export function ImpactTexture() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 -z-10 opacity-[.35] mix-blend-multiply [mask-image:linear-gradient(180deg,transparent_0%,#000_12%,#000_85%,transparent_100%)]"
+      style={{ backgroundImage: "url('/bg.webp')", backgroundRepeat: "repeat", backgroundSize: "320px" }}
+    />
+  );
+}
+
 function usePersistentPicks(key: string): [Picks, (fn: (p: Picks) => Picks) => void] {
   const [picks, setPicks] = useState<Picks>({});
   useEffect(() => {
@@ -402,14 +413,8 @@ export default function ImpactBuilder({
   );
 
   return (
-    <div
-      className={`relative overflow-x-clip text-[#14283c] ${compact ? "" : "bg-[#fbfcfe] pb-28 lg:pb-[72px]"}`}
-      style={
-        compact
-          ? undefined
-          : { backgroundImage: "url('/bg.webp')", backgroundRepeat: "repeat", backgroundSize: "320px", backgroundBlendMode: "multiply" }
-      }
-    >
+    <div className={`relative isolate overflow-x-clip text-[#14283c] ${compact ? "" : "bg-[#fbfcfe] pb-28 lg:pb-[72px]"}`}>
+      {!compact && <ImpactTexture />}
       <section className={`mx-auto max-w-[1100px] text-center ${compact ? "" : "px-4 pt-6 sm:pt-9 lg:pt-11"}`}>
         {!compact && (
           <h1 className="mb-2.5 text-[clamp(26px,3.8vw,42px)] font-black leading-[1.15] tracking-[-.5px]">{title}</h1>
