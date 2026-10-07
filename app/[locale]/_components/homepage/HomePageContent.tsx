@@ -161,7 +161,15 @@ const HomePage: React.FC<HomePageContentProps> = ({
 
       {/* ── Make an impact for a child — compact builder; picks carry over to the full page. */}
       {featuredImpact && (
-        <section className="bg-gray-50 pb-8 pt-5 sm:pb-10 sm:pt-6">
+        <section
+          className="bg-gray-50 pb-8 pt-5 sm:pb-10 sm:pt-6"
+          style={{
+            backgroundImage: "url('/bg.webp')",
+            backgroundRepeat: "repeat",
+            backgroundSize: "320px",
+            backgroundBlendMode: "multiply",
+          }}
+        >
           <div className="max-w-7xl mx-auto px-4">
             <div className="flex items-end justify-between gap-3 mb-4 sm:mb-5">
               <div className="min-w-0">
@@ -193,15 +201,7 @@ const HomePage: React.FC<HomePageContentProps> = ({
       )}
 
       {/* ── Quick Donate — also SSR'd with the categories the server already fetched. */}
-      <section
-        className="relative lg:py-10 sm:py-14 overflow-hidden bg-gray-50"
-        style={{
-          backgroundImage: "url('/bg.webp')",
-          backgroundRepeat: "repeat",
-          backgroundSize: "320px",
-          backgroundBlendMode: "multiply",
-        }}
-      >
+      <section className="relative lg:py-10 sm:py-14 overflow-hidden bg-gray-50">
         <div className="relative z-10 max-w-7xl mx-auto">
           <Suspense fallback={null}>
             <QuickDonate initialCategories={categories} />

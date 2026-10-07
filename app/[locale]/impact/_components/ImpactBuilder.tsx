@@ -402,7 +402,14 @@ export default function ImpactBuilder({
   );
 
   return (
-    <div className={`relative overflow-x-clip text-[#14283c] ${compact ? "" : "bg-[#fbfcfe] pb-28 lg:pb-[72px]"}`}>
+    <div
+      className={`relative overflow-x-clip text-[#14283c] ${compact ? "" : "bg-[#fbfcfe] pb-28 lg:pb-[72px]"}`}
+      style={
+        compact
+          ? undefined
+          : { backgroundImage: "url('/bg.webp')", backgroundRepeat: "repeat", backgroundSize: "320px", backgroundBlendMode: "multiply" }
+      }
+    >
       <section className={`mx-auto max-w-[1100px] text-center ${compact ? "" : "px-4 pt-6 sm:pt-9 lg:pt-11"}`}>
         {!compact && (
           <h1 className="mb-2.5 text-[clamp(26px,3.8vw,42px)] font-black leading-[1.15] tracking-[-.5px]">{title}</h1>
