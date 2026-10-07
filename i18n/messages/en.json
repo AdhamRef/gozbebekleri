@@ -134,6 +134,7 @@
     "readMore": "Read more"
   },
   "Navbar": {
+    "makeImpact": "Make an Impact for a Child",
     "profile": "Profile",
     "dashboard": "Dashboard",
     "projects": "Projects",
@@ -163,6 +164,8 @@
     "bankAccounts": "Our Bank Accounts"
   },
   "HomePage": {
+    "impactEyebrow": "Make an impact",
+    "impactFullPage": "Open full page",
     "donationCategories": "Donation Areas",
     "news": "Our News",
     "newsSubtitle": "Latest news from our association",

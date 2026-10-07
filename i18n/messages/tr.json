@@ -1,5 +1,6 @@
 {
   "Navbar": {
+    "makeImpact": "Bir Çocuk İçin İz Bırak",
     "profile": "Profil",
     "dashboard": "Kontrol Paneli",
     "projects": "Projeler",
@@ -163,6 +164,8 @@
     "readMore": "Devamını oku"
   },
   "HomePage": {
+    "impactEyebrow": "İz bırak",
+    "impactFullPage": "Tam sayfayı aç",
     "donationCategories": "Bağış Alanları",
     "news": "Haberlerimiz",
     "newsSubtitle": "Derneğimizden son haberler",

@@ -1,32 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { buildHreflang } from "@/lib/seo";
 import { pickText, readImpactConfig } from "@/lib/impact/config";
+import { loadImpactCampaign } from "@/lib/impact/load";
 import ImpactBuilder from "../_components/ImpactBuilder";
 
 export const dynamic = "force-dynamic";
 
 interface Props {
   params: Promise<{ slug: string; locale: string }>;
-}
-
-async function loadImpactCampaign(slug: string) {
-  const row = await prisma.impactCampaign.findUnique({
-    where: { slug: decodeURIComponent(slug) },
-    select: {
-      id: true,
-      slug: true,
-      isActive: true,
-      title: true,
-      intro: true,
-      regions: true,
-      needs: true,
-      allowMonthly: true,
-      campaignId: true,
-    },
-  });
-  return row?.isActive ? row : null;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

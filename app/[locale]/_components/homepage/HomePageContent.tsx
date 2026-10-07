@@ -13,6 +13,8 @@ import BlogCard from "../BlogCard";
 import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
 import type { CampaignCardData } from "../CampaignCard";
+import ImpactBuilder from "../../impact/_components/ImpactBuilder";
+import type { ImpactNeed, ImpactRegion } from "@/lib/impact/config";
 
 // LiveDonationsTicker is a non-critical floating widget — keep it client-only
 // and below-the-fold so it doesn't pull its chunk into the LCP critical path.
@@ -46,6 +48,17 @@ interface PostItem {
   createdAt: string;
 }
 
+interface FeaturedImpact {
+  slug: string;
+  impactCampaignId: string;
+  campaignId: string;
+  title: string;
+  intro: string;
+  regions: ImpactRegion[];
+  needs: ImpactNeed[];
+  allowMonthly: boolean;
+}
+
 interface HomePageContentProps {
   firstHeroImage?: string | null;
   initialSlides?: SlideItem[];
@@ -54,6 +67,7 @@ interface HomePageContentProps {
   initialHasMore: boolean;
   initialCategories: CategoryItem[];
   initialPosts: PostItem[];
+  featuredImpact?: FeaturedImpact | null;
 }
 
 const STATS = [
@@ -71,6 +85,7 @@ const HomePage: React.FC<HomePageContentProps> = ({
   initialHasMore,
   initialCategories,
   initialPosts,
+  featuredImpact,
 }) => {
   const t = useTranslations("HomePage");
   const locale = useLocale();
@@ -143,6 +158,39 @@ const HomePage: React.FC<HomePageContentProps> = ({
           </Suspense>
         </div>
       </section>
+
+      {/* ── Make an impact for a child — compact builder; picks carry over to the full page. */}
+      {featuredImpact && (
+        <section className="bg-gray-50 pb-8 pt-5 sm:pb-10 sm:pt-6">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="flex items-end justify-between gap-3 mb-4 sm:mb-5">
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-[#FA5D17] uppercase tracking-wider">{t("impactEyebrow")}</span>
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">{featuredImpact.title}</h2>
+                {featuredImpact.intro && (
+                  <p className="mt-1 hidden text-sm text-gray-500 sm:block">{featuredImpact.intro}</p>
+                )}
+              </div>
+              <Link
+                href={`/impact/${encodeURIComponent(featuredImpact.slug)}`}
+                className="flex flex-none mb-1 items-center gap-1.5 text-sm font-semibold text-[#025EB8] hover:text-[#FA5D17] transition-colors"
+              >
+                {t("impactFullPage")} <ArrowRight className="w-4 h-4 rtl:rotate-180" />
+              </Link>
+            </div>
+            <ImpactBuilder
+              variant="compact"
+              impactCampaignId={featuredImpact.impactCampaignId}
+              campaignId={featuredImpact.campaignId}
+              title={featuredImpact.title}
+              intro={featuredImpact.intro}
+              regions={featuredImpact.regions}
+              needs={featuredImpact.needs}
+              allowMonthly={featuredImpact.allowMonthly}
+            />
+          </div>
+        </section>
+      )}
 
       {/* ── Quick Donate — also SSR'd with the categories the server already fetched. */}
       <section

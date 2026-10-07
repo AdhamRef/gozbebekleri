@@ -1,5 +1,6 @@
 {
   "Navbar": {
+    "makeImpact": "Faça a diferença para uma criança",
     "profile": "Perfil",
     "dashboard": "Painel",
     "projects": "Projetos",
@@ -163,6 +164,8 @@
     "readMore": "Ler mais"
   },
   "HomePage": {
+    "impactEyebrow": "Faça a diferença",
+    "impactFullPage": "Abrir página completa",
     "donationCategories": "Áreas de doação",
     "news": "Nossas notícias",
     "newsSubtitle": "Últimas notícias da nossa associação",

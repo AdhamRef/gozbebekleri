@@ -1,5 +1,6 @@
 {
   "Navbar": {
+    "makeImpact": "Marca la diferencia para un niño",
     "profile": "Perfil",
     "dashboard": "Panel",
     "projects": "Proyectos",
@@ -163,6 +164,8 @@
     "readMore": "Leer más"
   },
   "HomePage": {
+    "impactEyebrow": "Marca la diferencia",
+    "impactFullPage": "Abrir página completa",
     "donationCategories": "Áreas de donación",
     "news": "Nuestras noticias",
     "newsSubtitle": "Últimas noticias de nuestra asociación",

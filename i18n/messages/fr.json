@@ -3,6 +3,7 @@
     "readMore": "Lire la suite"
   },
   "Navbar": {
+    "makeImpact": "Faites la différence pour un enfant",
     "profile": "Profil",
     "dashboard": "Tableau de bord",
     "projects": "Projets",
@@ -163,6 +164,8 @@
     }
   },
   "HomePage": {
+    "impactEyebrow": "Faites la différence",
+    "impactFullPage": "Ouvrir la page complète",
     "donationCategories": "Domaines de don",
     "news": "Nos actualités",
     "newsSubtitle": "Dernières nouvelles de notre association",

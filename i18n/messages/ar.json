@@ -134,6 +134,7 @@
     "readMore": "اقرأ المزيد"
   },
   "Navbar": {
+    "makeImpact": "اصنع أثرًا لطفل",
     "profile": "الحساب",
     "dashboard": "لوحة التحكم",
     "projects": "المشاريع",
@@ -163,6 +164,8 @@
     "bankAccounts": "حساباتنا البنكية"
   },
   "HomePage": {
+    "impactEyebrow": "اصنع أثرًا",
+    "impactFullPage": "افتح الصفحة كاملة",
     "donationCategories": "مجالات التبرع",
     "news": "أخبارنا",
     "newsSubtitle": "آخر أخبار جمعيتنا",

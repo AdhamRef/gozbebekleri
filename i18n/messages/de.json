@@ -134,6 +134,7 @@
     "readMore": "Weiterlesen"
   },
   "Navbar": {
+    "makeImpact": "Bewirke etwas für ein Kind",
     "profile": "Profil",
     "dashboard": "Dashboard",
     "projects": "Projekte",
@@ -163,6 +164,8 @@
     "bankAccounts": "Unsere Bankkonten"
   },
   "HomePage": {
+    "impactEyebrow": "Wirkung zeigen",
+    "impactFullPage": "Ganze Seite öffnen",
     "donationCategories": "Spendenbereiche",
     "news": "Unsere Nachrichten",
     "newsSubtitle": "Neueste Nachrichten unseres Vereins",

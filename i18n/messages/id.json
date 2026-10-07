@@ -1,5 +1,6 @@
 {
   "Navbar": {
+    "makeImpact": "Buat Dampak untuk Anak",
     "profile": "Profil",
     "dashboard": "Dasbor",
     "projects": "Proyek",
@@ -163,6 +164,8 @@
     "readMore": "Baca selengkapnya"
   },
   "HomePage": {
+    "impactEyebrow": "Buat dampak",
+    "impactFullPage": "Buka halaman penuh",
     "donationCategories": "Bidang Donasi",
     "news": "Berita Kami",
     "newsSubtitle": "Berita terbaru dari lembaga kami",
