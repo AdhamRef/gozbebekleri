@@ -7,11 +7,13 @@ exports.CONTENT_LOCALIZATION_SECTIONS = [
     "campaigns",
     "categories",
     "blog",
+    "slides",
 ];
 const SECTION_PERMISSION = {
     campaigns: "campaigns",
     categories: "categories",
     blog: "blog",
+    slides: "slides",
 };
 function parseContentLocalizationSection(value) {
     return typeof value === "string" &&

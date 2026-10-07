@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { AlertTriangle, Loader2, Save, Sparkles, WandSparkles } from "lucide-react";
+import { AlertTriangle, Loader2, ShieldCheck, Sparkles, WandSparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "react-hot-toast";
 
 const LOCALE_LABELS: Record<string, string> = {
@@ -73,18 +72,11 @@ function rowKey(row: PreviewRow) {
   return `${row.type}-${row.id}`;
 }
 
-/** Rich-text fields are edited as raw markup so saving cannot flatten their formatting. */
-function isRichText(value: string | null | undefined) {
-  const raw = value?.trim() || "";
-  return raw.startsWith("{") || /<[^>]+>/.test(raw);
-}
-
 export function ContentLocalizationPreviewDialog({
   section,
   open,
   onOpenChange,
   defaultLocale = "de",
-  onSaved,
 }: {
   section: Section;
   open: boolean;
@@ -94,17 +86,8 @@ export function ContentLocalizationPreviewDialog({
 }) {
   const [locale, setLocale] = useState(defaultLocale);
   const [rows, setRows] = useState<PreviewRow[]>([]);
-  const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>({});
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [savingKey, setSavingKey] = useState<string | null>(null);
-
-  function applyRows(nextRows: PreviewRow[]) {
-    setRows(nextRows);
-    setDrafts(
-      Object.fromEntries(nextRows.map((row) => [rowKey(row), { ...row.suggestedTranslation }])),
-    );
-  }
 
   async function loadRows() {
     setLoading(true);
@@ -112,7 +95,7 @@ export function ContentLocalizationPreviewDialog({
       const response = await axios.get("/api/admin/content-localization/preview", {
         params: { section, locale, limit: 10 },
       });
-      applyRows(response.data?.rows || []);
+      setRows(response.data?.rows || []);
     } catch (error: any) {
       toast.error(error?.response?.data?.error || "تعذر تجهيز المعاينة");
     } finally {
@@ -129,53 +112,13 @@ export function ContentLocalizationPreviewDialog({
         locale,
         limit: 8,
       });
-      applyRows(response.data?.rows || []);
-      toast.success("تم تجهيز الاقتراحات. راجعها ثم اضغط حفظ.");
+      setRows(response.data?.rows || []);
+      toast.success("تم تجهيز معاينة للمراجعة دون حفظ أي تغيير");
     } catch (error: any) {
       toast.error(error?.response?.data?.error || "تعذر توليد المعاينة");
     } finally {
       setGenerating(false);
     }
-  }
-
-  async function saveRows(target: PreviewRow[], key: string) {
-    if (target.length === 0) return;
-    setSavingKey(key);
-    try {
-      const response = await axios.post("/api/admin/content-localization/preview", {
-        action: "apply",
-        section,
-        locale,
-        items: target.map((row) => ({
-          id: row.id,
-          type: row.type,
-          fields: drafts[rowKey(row)] || row.suggestedTranslation,
-        })),
-      });
-
-      const savedCount = Number(response.data?.savedCount || 0);
-      const failed: { error?: string }[] = response.data?.failed || [];
-      if (savedCount > 0) toast.success(`تم حفظ ${savedCount} عنصر`);
-      if (failed.length > 0) {
-        toast.error(failed[0]?.error || `تعذر حفظ ${failed.length} عنصر`);
-      }
-      if (savedCount > 0) {
-        onSaved?.();
-        await loadRows();
-      }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || "تعذر حفظ التغييرات");
-    } finally {
-      setSavingKey(null);
-    }
-  }
-
-  function saveAll() {
-    const message = locale === "ar"
-      ? "سيتم استبدال النص العربي الأصلي لكل العناصر المعروضة. هل تريد المتابعة؟"
-      : `سيتم حفظ ترجمة ${LOCALE_LABELS[locale]} لكل العناصر المعروضة. هل تريد المتابعة؟`;
-    if (!window.confirm(message)) return;
-    void saveRows(rows, "all");
   }
 
   useEffect(() => {
@@ -184,7 +127,6 @@ export function ContentLocalizationPreviewDialog({
   }, [open, locale, section]);
 
   const busy = loading || generating;
-  const saving = savingKey !== null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -198,26 +140,18 @@ export function ContentLocalizationPreviewDialog({
 
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           <div className="flex items-start gap-2">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
-              <p className="font-bold">
-                {locale === "ar"
-                  ? "تحرير النص العربي الأصلي"
-                  : `تحرير ترجمة ${LOCALE_LABELS[locale]}`}
-              </p>
+              <p className="font-bold">وضع قراءة ومعاينة فقط</p>
               <p className="mt-1 leading-6">
-                {locale === "ar"
-                  ? "الحفظ هنا يستبدل النص العربي الأصلي للعنصر مباشرة."
-                  : "الحفظ هنا يكتب الترجمة في قاعدة البيانات مباشرة. النص العربي الأصلي لا يتغير."}
-                {" "}
-                الحقول الغنية (الوصف والمحتوى) تُحرَّر بصيغتها الأصلية HTML حفاظًا على التنسيق.
+                لا يتم حفظ أو تعديل أي نص من هذه النافذة.
               </p>
             </div>
           </div>
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Select value={locale} onValueChange={setLocale} disabled={saving}>
+          <Select value={locale} onValueChange={setLocale}>
             <SelectTrigger className="w-full sm:w-[220px]">
               <SelectValue />
             </SelectTrigger>
@@ -228,22 +162,18 @@ export function ContentLocalizationPreviewDialog({
             </SelectContent>
           </Select>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={loadRows} disabled={busy || saving}>
+            <Button variant="outline" onClick={loadRows} disabled={busy}>
               {loading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : null}
               تحديث المعاينة
             </Button>
             <Button
               variant="outline"
               onClick={generatePreview}
-              disabled={busy || saving}
+              disabled={busy}
               className="gap-2 border-purple-300 text-purple-700 hover:bg-purple-50"
             >
               {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
               توليد ترجمة احترافية
-            </Button>
-            <Button onClick={saveAll} disabled={busy || saving || rows.length === 0} className="gap-2">
-              {savingKey === "all" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              حفظ الكل
             </Button>
           </div>
         </div>
@@ -261,7 +191,6 @@ export function ContentLocalizationPreviewDialog({
           <div className="space-y-4">
             {rows.map((row) => {
               const key = rowKey(row);
-              const draft = drafts[key] || row.suggestedTranslation;
               return (
                 <article key={key} className="rounded-xl border bg-white p-4 shadow-sm">
                   <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -269,23 +198,11 @@ export function ContentLocalizationPreviewDialog({
                       <h3 className="font-semibold">{row.label}</h3>
                       <p className="text-xs text-muted-foreground">{row.typeLabel} · {LOCALE_LABELS[locale]}</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {(row.missingFields.length > 0 || row.emptyFields.length > 0 || row.identicalToArabicFields.length > 0) && (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-700">
-                          <AlertTriangle className="h-3.5 w-3.5" /> يحتاج مراجعة
-                        </span>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-2"
-                        disabled={saving}
-                        onClick={() => saveRows([row], key)}
-                      >
-                        {savingKey === key ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                        حفظ
-                      </Button>
-                    </div>
+                    {(row.missingFields.length > 0 || row.emptyFields.length > 0 || row.identicalToArabicFields.length > 0) && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-700">
+                        <AlertTriangle className="h-3.5 w-3.5" /> يحتاج مراجعة
+                      </span>
+                    )}
                   </div>
 
                   {row.qualityNotes?.length ? (
@@ -302,23 +219,10 @@ export function ContentLocalizationPreviewDialog({
                           <p className="whitespace-pre-wrap text-sm leading-7">{plainText(row.sourceArabic[field]) || "—"}</p>
                         </div>
                         <div className="rounded-lg border bg-white p-3">
-                          <p className="mb-1 text-xs font-medium text-muted-foreground">
-                            النص المحفوظ · {FIELD_LABELS[field] || field}
-                            {isRichText(row.sourceArabic[field]) ? " · HTML" : ""}
+                          <p className="mb-1 text-xs font-medium text-muted-foreground">المعاينة المقترحة · {FIELD_LABELS[field] || field}</p>
+                          <p className="whitespace-pre-wrap text-sm leading-7" dir={locale === "ar" ? "rtl" : "ltr"}>
+                            {plainText(row.suggestedTranslation[field]) || "—"}
                           </p>
-                          <Textarea
-                            value={draft[field] ?? ""}
-                            dir={locale === "ar" ? "rtl" : "ltr"}
-                            rows={field === "content" ? 8 : 3}
-                            disabled={saving}
-                            className="text-sm leading-7"
-                            onChange={(event) =>
-                              setDrafts((prev) => ({
-                                ...prev,
-                                [key]: { ...(prev[key] || row.suggestedTranslation), [field]: event.target.value },
-                              }))
-                            }
-                          />
                         </div>
                       </div>
                     ))}

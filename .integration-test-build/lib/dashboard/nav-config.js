@@ -29,6 +29,8 @@ exports.DASHBOARD_NAV_GROUPS = [
         group: "الحملات والمحتوى",
         items: [
             { key: "campaigns", title: "المشاريع", href: "/dashboard/campaigns", icon: "heart", keywords: ["projects", "campaigns", "مشاريع"] },
+            // Interactive "make an impact for a child" builder — its own campaign type (ImpactCampaign).
+            { key: "campaigns", title: "اصنع أثرًا لطفل", href: "/dashboard/impact", icon: "heartHandshake", keywords: ["impact", "child", "builder", "أثر", "طفل", "احتياجات"] },
             { key: "categories", title: "الحملات والدول", href: "/dashboard/categories", icon: "globe", keywords: ["categories", "countries", "تصنيفات"] },
             { key: "blog", title: "المدونة", href: "/dashboard/blog", icon: "penLine", keywords: ["blog", "posts", "مقالات"] },
             // Built, API-backed, and previously unreachable. Slides and ticker both control what the

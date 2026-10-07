@@ -13,7 +13,6 @@ import { NOT_IMPACT_BACKING } from "@/lib/campaign/soft-delete-filter";
 const TRANSLATION_LOCALES = ["en", "fr", "tr", "id", "pt", "es", "de"] as const;
 const SUPPORTED_LOCALES = ["ar", ...TRANSLATION_LOCALES] as const;
 type Locale = (typeof SUPPORTED_LOCALES)[number];
-type TranslationLocale = (typeof TRANSLATION_LOCALES)[number];
 type ItemType = "campaign" | "category" | "post" | "postCategory" | "slide";
 
 const SLIDE_FIELDS = ["title", "description", "buttonText"] as const;
@@ -49,11 +48,6 @@ function parseLocale(value: unknown): Locale | null {
     (SUPPORTED_LOCALES as readonly string[]).includes(value)
     ? (value as Locale)
     : null;
-}
-
-function isTranslationLocale(locale: Locale): locale is TranslationLocale {
-  return locale !== "ar" &&
-    (TRANSLATION_LOCALES as readonly string[]).includes(locale);
 }
 
 function normalizeText(value: unknown): string {
@@ -341,7 +335,7 @@ async function generateProfessionalTranslation(
     const value = generated[field];
     if (typeof value !== "string") continue;
     // The prompt only carried the first COMPACT_LIMIT characters of this field, so the
-    // model's answer covers part of it. Keeping it would silently truncate saved content.
+    // model's answer covers part of it. Keeping it would silently truncate the content.
     if (isTooLongForOnePass(row.sourceArabic[field])) {
       truncatedFields.push(field);
       continue;
@@ -359,177 +353,6 @@ async function generateProfessionalTranslation(
   }
 
   return { ...row, suggestedTranslation, qualityNotes };
-}
-
-const SECTION_TYPES: Record<ContentLocalizationSection, ItemType[]> = {
-  campaigns: ["campaign"],
-  categories: ["category"],
-  blog: ["post", "postCategory"],
-  slides: ["slide"],
-};
-
-/** Only these fields may ever be written from this endpoint. */
-const WRITABLE_FIELDS: Record<ItemType, string[]> = {
-  campaign: ["title", "description"],
-  category: ["name", "description"],
-  post: ["title", "description", "content"],
-  postCategory: ["name", "title", "description"],
-  slide: [...SLIDE_FIELDS],
-};
-
-type ApplyItem = {
-  id: string;
-  type: ItemType;
-  fields: Record<string, string>;
-};
-
-/**
- * Blank values are dropped rather than written: this endpoint fills in missing
- * translations, it is not a way to erase existing text.
- */
-function parseApplyItems(
-  value: unknown,
-  section: ContentLocalizationSection,
-): ApplyItem[] {
-  if (!Array.isArray(value)) return [];
-  const allowedTypes = SECTION_TYPES[section];
-  const items: ApplyItem[] = [];
-
-  for (const raw of value) {
-    const id = (raw as { id?: unknown } | null)?.id;
-    const type = (raw as { type?: unknown } | null)?.type;
-    if (typeof id !== "string" || !id.trim()) continue;
-    if (typeof type !== "string") continue;
-    if (!allowedTypes.includes(type as ItemType)) continue;
-
-    const source = (raw as { fields?: Record<string, unknown> }).fields || {};
-    const fields: Record<string, string> = {};
-    for (const field of WRITABLE_FIELDS[type as ItemType]) {
-      const text = source[field];
-      if (typeof text === "string" && text.trim()) fields[field] = text.trim();
-    }
-    if (Object.keys(fields).length === 0) continue;
-
-    items.push({ id: id.trim(), type: type as ItemType, fields });
-  }
-
-  return items;
-}
-
-/** Arabic is the source language, so applying it edits the base record itself. */
-async function applyArabicSource(item: ApplyItem) {
-  const { fields } = item;
-  const text = (field: string) =>
-    fields[field] === undefined ? {} : { [field]: fields[field] };
-
-  if (item.type === "campaign") {
-    await prisma.campaign.update({
-      where: { id: item.id },
-      data: { ...text("title"), ...text("description") },
-    });
-    return;
-  }
-  if (item.type === "category") {
-    await prisma.category.update({
-      where: { id: item.id },
-      data: { ...text("name"), ...text("description") },
-    });
-    return;
-  }
-  if (item.type === "post") {
-    await prisma.post.update({
-      where: { id: item.id },
-      data: { ...text("title"), ...text("description"), ...text("content") },
-    });
-    return;
-  }
-  if (item.type === "slide") {
-    await prisma.slide.update({
-      where: { id: item.id },
-      data: { ...text("title"), ...text("description"), ...text("buttonText") },
-    });
-    return;
-  }
-  await prisma.postCategory.update({
-    where: { id: item.id },
-    data: { ...text("name"), ...text("title"), ...text("description") },
-  });
-}
-
-async function applyTranslation(item: ApplyItem, locale: TranslationLocale) {
-  const { fields } = item;
-  const text = (field: string) =>
-    fields[field] === undefined ? {} : { [field]: fields[field] };
-
-  if (item.type === "campaign") {
-    const data = { ...text("title"), ...text("description") };
-    await prisma.campaignTranslation.upsert({
-      where: { campaignId_locale: { campaignId: item.id, locale } },
-      update: data,
-      // title + description are NOT NULL, so a partial apply still needs both on create.
-      create: {
-        campaign: { connect: { id: item.id } },
-        locale,
-        title: fields.title ?? "",
-        description: fields.description ?? "",
-      },
-    });
-    return;
-  }
-
-  if (item.type === "category") {
-    const data = { ...text("name"), ...text("description") };
-    await prisma.categoryTranslation.upsert({
-      where: { categoryId_locale: { categoryId: item.id, locale } },
-      update: data,
-      create: {
-        category: { connect: { id: item.id } },
-        locale,
-        name: fields.name ?? "",
-        description: fields.description,
-      },
-    });
-    return;
-  }
-
-  if (item.type === "post") {
-    const data = { ...text("title"), ...text("description"), ...text("content") };
-    await prisma.postTranslation.upsert({
-      where: { postId_locale: { postId: item.id, locale } },
-      update: data,
-      create: { post: { connect: { id: item.id } }, locale, ...data },
-    });
-    return;
-  }
-
-  if (item.type === "slide") {
-    const data = { ...text("title"), ...text("description"), ...text("buttonText") };
-    await prisma.slideTranslation.upsert({
-      where: { slideId_locale: { slideId: item.id, locale } },
-      update: data,
-      create: {
-        slide: { connect: { id: item.id } },
-        locale,
-        title: fields.title ?? "",
-        description: fields.description,
-        buttonText: fields.buttonText,
-      },
-    });
-    return;
-  }
-
-  const data = { ...text("name"), ...text("title"), ...text("description") };
-  await prisma.postCategoryTranslation.upsert({
-    where: { categoryId_locale: { categoryId: item.id, locale } },
-    update: data,
-    create: {
-      category: { connect: { id: item.id } },
-      locale,
-      name: fields.name ?? "",
-      title: fields.title,
-      description: fields.description,
-    },
-  });
 }
 
 async function authorize(section: ContentLocalizationSection) {
@@ -578,46 +401,11 @@ export async function POST(request: NextRequest) {
     const denied = await authorize(section);
     if (denied) return denied;
 
-    if (body?.action === "apply") {
-      const items = parseApplyItems(body?.items, section);
-      if (items.length === 0) {
-        return NextResponse.json(
-          { error: "لا توجد نصوص صالحة للحفظ" },
-          { status: 400 },
-        );
-      }
-
-      const saved: { id: string; type: ItemType; fields: string[] }[] = [];
-      const failed: { id: string; type: ItemType; error: string }[] = [];
-      for (const item of items) {
-        try {
-          if (locale === "ar") await applyArabicSource(item);
-          else if (isTranslationLocale(locale)) await applyTranslation(item, locale);
-          saved.push({ id: item.id, type: item.type, fields: Object.keys(item.fields) });
-        } catch (error) {
-          failed.push({
-            id: item.id,
-            type: item.type,
-            error: error instanceof Error ? error.message : "Save failed",
-          });
-        }
-      }
-
-      return NextResponse.json({
-        ok: failed.length === 0,
-        action: "apply",
-        section,
-        locale,
-        savedCount: saved.length,
-        saved,
-        failed,
-      });
-    }
-
+    // Preview is read-only: applying or saving content is not supported here.
     if (body?.action !== "generate") {
       return NextResponse.json(
-        { ok: false, error: `Unsupported action: ${String(body?.action ?? "")}` },
-        { status: 400 },
+        { ok: false, error: "Localization preview is read-only; only generate is supported" },
+        { status: 409 },
       );
     }
 
