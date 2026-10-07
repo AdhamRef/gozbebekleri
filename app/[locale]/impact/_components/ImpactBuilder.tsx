@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ChevronLeft, ChevronRight, Minus, Plus, ShieldCheck } from "lucide-react";
+import { Minus, Plus, ShieldCheck } from "lucide-react";
 import DonationDialog from "@/components/DonationDialog";
 import { useCurrency } from "@/context/CurrencyContext";
 import {
@@ -43,14 +43,6 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 const GRAIN =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .08 0 0 0 0 .16 0 0 0 0 .24 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
 
-/** Borderless surfaces: depth comes from shadow, the picked state from a warm tint. */
-const surface = (on: boolean) =>
-  `rounded-2xl transition-[background-color,box-shadow] duration-200 ${
-    on
-      ? "bg-[#fff3e8] shadow-[0_6px_18px_-6px_rgba(240,125,34,.35)]"
-      : "bg-white shadow-[0_2px_12px_-2px_rgba(20,40,60,.08)] hover:shadow-[0_6px_18px_-6px_rgba(20,40,60,.18)]"
-  }`;
-
 function usePersistentPicks(key: string): [Picks, (fn: (p: Picks) => Picks) => void] {
   const [picks, setPicks] = useState<Picks>({});
   useEffect(() => {
@@ -88,10 +80,10 @@ export default function ImpactBuilder({
   allowMonthly,
   variant = "page",
 }: Props) {
+  const compact = variant === "compact";
   const t = useTranslations("ImpactBuilder");
   const locale = useLocale();
   const { convertToCurrency } = useCurrency();
-  const compact = variant === "compact";
 
   const firstActive = regions.find((r) => r.active)?.key ?? regions[0]?.key ?? "";
   const [regionKey, setRegionKey] = useState(firstActive);
@@ -102,8 +94,7 @@ export default function ImpactBuilder({
 
   const region = regions.find((r) => r.key === regionKey) ?? regions[0];
   const needByKey = useMemo(() => new Map(needs.map((n) => [n.key, n])), [needs]);
-  const activeRegions = useMemo(() => regions.filter((r) => r.active), [regions]);
-  const activeRegionKeys = useMemo(() => new Set(activeRegions.map((r) => r.key)), [activeRegions]);
+  const activeRegionKeys = useMemo(() => new Set(regions.filter((r) => r.active).map((r) => r.key)), [regions]);
 
   /** Valid picks only (needs/regions may have been disabled since they were stored). */
   const lines = useMemo(
@@ -163,33 +154,6 @@ export default function ImpactBuilder({
   const resetRegion = () =>
     setPicks((prev) => Object.fromEntries(Object.entries(prev).filter(([id]) => !id.startsWith(`${regionKey}|`))));
 
-  /** Step to the previous/next active character, wrapping around. */
-  const stepRegion = (dir: 1 | -1) => {
-    if (activeRegions.length < 2) return;
-    const i = activeRegions.findIndex((r) => r.key === regionKey);
-    const next = activeRegions[(i + dir + activeRegions.length) % activeRegions.length];
-    setRegionKey(next.key);
-  };
-  const neighbour = (dir: 1 | -1) => {
-    const i = activeRegions.findIndex((r) => r.key === regionKey);
-    return activeRegions[(i + dir + activeRegions.length) % activeRegions.length];
-  };
-
-  // Horizontal swipe on the stage switches character (mirrored in RTL).
-  const touchX = useRef<number | null>(null);
-  const isRTL = locale === "ar";
-  const onTouchStart = (e: TouchEvent) => {
-    touchX.current = e.touches[0]?.clientX ?? null;
-  };
-  const onTouchEnd = (e: TouchEvent) => {
-    const start = touchX.current;
-    touchX.current = null;
-    const end = e.changedTouches[0]?.clientX;
-    if (start == null || end == null || Math.abs(end - start) < 40) return;
-    const forward = end < start ? 1 : -1;
-    stepRegion((isRTL ? -forward : forward) as 1 | -1);
-  };
-
   // ── Stage: character picture for this region's picks + prop icons in fixed slots ──
   const regionPicked = useMemo(
     () => new Set(needs.filter((n) => qtyOf(regionKey, n.key) > 0).map((n) => n.key)),
@@ -236,155 +200,101 @@ export default function ImpactBuilder({
 
   const half = Math.ceil(needs.length / 2);
   const regionHasPicks = lines.some((l) => l.regionKey === regionKey);
-  const totalLabel = canCheckout || totalUSD === 0 ? fmt(totalUSD) + (monthly ? ` / ${t("perMonth")}` : "") : t("ratesLoading");
 
-  // ── Building blocks ──
-
-  const stepper = (need: ImpactNeed, q: number, name: string) => (
-    <div dir="ltr" className="flex flex-none items-center justify-center gap-1">
-      <button
-        type="button"
-        aria-label={`${t("dec")} — ${name}`}
-        onClick={() => bump(need, -1)}
-        disabled={!q}
-        className={`flex h-9 w-9 items-center justify-center rounded-full transition active:scale-90 ${
-          q ? "bg-[#e9eff5] text-[#14283c] hover:bg-[#dde6ee]" : "bg-[#f3f6f9] text-[#c3ccd6]"
-        }`}
-      >
-        <Minus className="h-4 w-4" />
-      </button>
-      <span
-        aria-live="polite"
-        className={`w-7 text-center text-base font-extrabold tabular-nums ${q ? "text-[#14283c]" : "text-[#aeb9c4]"}`}
-      >
-        {q}
-      </span>
-      <button
-        type="button"
-        aria-label={`${t("inc")} — ${name}`}
-        onClick={() => bump(need, 1)}
-        disabled={q >= need.maxQuantity}
-        className={`flex h-9 w-9 items-center justify-center rounded-full text-white shadow-sm transition active:scale-90 disabled:opacity-50 ${
-          q ? "bg-[#f07d22] hover:bg-[#e06f15]" : "bg-[#0b5ea8] hover:bg-[#094f8e]"
-        }`}
-      >
-        <Plus className="h-4 w-4" />
-      </button>
-    </div>
-  );
+  const stepper = (need: ImpactNeed, q: number, name: string, compact: boolean) => {
+    const size = compact ? "h-9 w-9" : "h-10 w-10";
+    return (
+      <div dir="ltr" className="flex flex-none items-center justify-center gap-1.5">
+        <button
+          type="button"
+          aria-label={`${t("dec")} — ${name}`}
+          onClick={() => bump(need, -1)}
+          disabled={!q}
+          className={`flex ${size} items-center justify-center rounded-full border-[1.5px] transition active:scale-90 ${
+            q ? "border-[#cfd8e1] bg-white text-[#14283c] hover:border-[#9fb0c1]" : "border-[#eef2f6] bg-[#f7f9fb] text-[#c3ccd6]"
+          }`}
+        >
+          <Minus className="h-4 w-4" />
+        </button>
+        <span
+          aria-live="polite"
+          className={`min-w-[24px] text-center text-base font-extrabold tabular-nums ${q ? "text-[#14283c]" : "text-[#aeb9c4]"}`}
+        >
+          {q}
+        </span>
+        <button
+          type="button"
+          aria-label={`${t("inc")} — ${name}`}
+          onClick={() => bump(need, 1)}
+          disabled={q >= need.maxQuantity}
+          className={`flex ${size} items-center justify-center rounded-full border-[1.5px] text-white shadow-sm transition active:scale-90 disabled:opacity-50 ${
+            q ? "border-[#f07d22] bg-[#f07d22] hover:bg-[#e06f15]" : "border-[#0b5ea8] bg-[#0b5ea8] hover:bg-[#094f8e]"
+          }`}
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  };
 
   const priceChip = (need: ImpactNeed, on: boolean) => (
     <span
       dir="ltr"
-      className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[12px] font-extrabold ${
-        on ? "bg-[#fde3cc] text-[#98470d]" : "bg-[#eef3f8] text-[#6b7c8c]"
+      className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[12.5px] font-extrabold ${
+        on ? "bg-[#fdeada] text-[#98470d]" : "bg-[#eef3f8] text-[#6b7c8c]"
       }`}
     >
       {fmt(need.priceUSD)}
     </span>
   );
 
+  const cardShell = (on: boolean) =>
+    `rounded-2xl border bg-white/85 shadow-[0_4px_16px_rgba(20,40,60,.06)] backdrop-blur-sm transition ${
+      on ? "border-[#f5b27a] ring-2 ring-[#f07d22]/15" : "border-[#e3eaf2] hover:border-[#cfdbe7]"
+    }`;
+
   const icon = (need: ImpactNeed, on: boolean, box: string) => (
-    <div className={`relative flex-none transition ${box} ${on ? "" : "opacity-80 saturate-[.6]"}`}>
-      <Image src={need.icon} alt="" fill sizes="64px" className="object-contain" unoptimized={!optimizable(need.icon)} />
+    <div className={`relative flex-none transition ${box} ${on ? "" : "opacity-75 saturate-[.6]"}`}>
+      <Image src={need.icon} alt="" fill sizes="72px" className="object-contain" unoptimized={!optimizable(need.icon)} />
     </div>
   );
 
-  /** Horizontal row — the full page's need list at every size. */
-  const renderRow = (need: ImpactNeed) => {
-    const q = qtyOf(regionKey, need.key);
-    const on = q > 0;
-    const name = pickText(need.name, locale);
-    return (
-      <div key={need.key} className={`flex items-center gap-2.5 p-2.5 sm:gap-3 sm:p-3 ${surface(on)}`}>
-        {icon(need, on, "h-11 w-11 sm:h-12 sm:w-12 xl:h-14 xl:w-14")}
-        <div className="flex min-w-0 flex-1 flex-col items-start gap-1 text-start">
-          <strong className="line-clamp-2 text-[14px] leading-tight sm:text-[15px]">{name}</strong>
-          {priceChip(need, on)}
-        </div>
-        {stepper(need, q, name)}
-      </div>
-    );
-  };
-
-  /** Small vertical tile — the homepage section. */
+  /** Compact tile for the phone/tablet grid. */
   const renderTile = (need: ImpactNeed) => {
     const q = qtyOf(regionKey, need.key);
     const on = q > 0;
     const name = pickText(need.name, locale);
     return (
-      <div
-        key={need.key}
-        className={`flex w-[140px] flex-none snap-start flex-col items-center gap-1.5 p-2.5 text-center md:w-auto ${surface(on)}`}
-      >
-        {icon(need, on, "h-11 w-11 sm:h-12 sm:w-12")}
-        <strong className="line-clamp-2 min-h-[2.5em] text-[13px] leading-tight">{name}</strong>
+      <div key={need.key} className={`flex flex-col items-center gap-2 p-2.5 text-center ${cardShell(on)}`}>
+        {icon(need, on, "h-12 w-12 sm:h-14 sm:w-14")}
+        <strong className="line-clamp-2 min-h-[2.5em] text-[13.5px] leading-tight sm:text-sm">{name}</strong>
         {priceChip(need, on)}
-        {stepper(need, q, name)}
+        {stepper(need, q, name, true)}
       </div>
     );
   };
 
-  /** Character switcher. Fixed height so changing character never moves anything else. */
-  const regionTabs =
-    regions.length > 1 ? (
-      <div className="-mx-1 flex-none overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div
-          role="tablist"
-          aria-label={t("regions")}
-          className="mx-auto flex h-11 w-max items-center gap-1 rounded-full bg-white p-1 shadow-[0_2px_12px_-2px_rgba(20,40,60,.1)]"
-        >
-          {regions.map((r) => {
-            const selected = r.key === regionKey;
-            return (
-              <button
-                key={r.key}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                aria-disabled={!r.active}
-                onClick={() => r.active && setRegionKey(r.key)}
-                className={`h-9 whitespace-nowrap rounded-full px-4 text-[13px] font-extrabold transition-colors sm:px-5 ${
-                  !r.active
-                    ? "cursor-not-allowed text-[#aab5c0]"
-                    : selected
-                      ? "bg-[#0b5ea8] text-white shadow-[0_4px_12px_rgba(11,94,168,.3)]"
-                      : "text-[#6b7c8c] hover:text-[#0b5ea8]"
-                }`}
-              >
-                {pickText(r.name, locale)}
-                {!r.active && ` · ${t("soon")}`}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    ) : null;
-
-  const arrow = (dir: 1 | -1) => {
-    const target = neighbour(dir);
-    // Visual side: "previous" sits at the start edge (left in LTR, right in RTL).
-    const Icon = dir === -1 ? ChevronLeft : ChevronRight;
+  /** Short horizontal row for the desktop side columns. */
+  const renderRow = (need: ImpactNeed) => {
+    const q = qtyOf(regionKey, need.key);
+    const on = q > 0;
+    const name = pickText(need.name, locale);
     return (
-      <button
-        type="button"
-        onClick={() => stepRegion(dir)}
-        aria-label={target ? pickText(target.name, locale) : undefined}
-        className={`absolute top-1/2 z-50 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#0b5ea8] shadow-md transition hover:bg-white active:scale-90 ${
-          dir === -1 ? "start-2" : "end-2"
-        }`}
-      >
-        <Icon className="h-5 w-5 rtl:rotate-180" />
-      </button>
+      <div key={need.key} className={`flex items-center gap-3 p-3 ${cardShell(on)}`}>
+        {icon(need, on, "h-14 w-14 xl:h-16 xl:w-16")}
+        <div className="flex min-w-0 flex-1 flex-col items-start gap-1 text-start">
+          <strong className="line-clamp-2 text-[15px] leading-tight">{name}</strong>
+          {priceChip(need, on)}
+        </div>
+        {stepper(need, q, name, false)}
+      </div>
     );
   };
+
+  const totalLabel = canCheckout || totalUSD === 0 ? fmt(totalUSD) + (monthly ? ` / ${t("perMonth")}` : "") : t("ratesLoading");
 
   const stage = (
-    <div
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
-      className="relative isolate h-full w-full touch-pan-y overflow-hidden rounded-[24px] bg-[linear-gradient(180deg,#e4effa_0%,#f3f8fd_52%,#fdf0e3_100%)] shadow-[0_18px_40px_-20px_rgba(11,94,168,.4)] sm:rounded-[28px]"
-    >
+    <div className="relative isolate h-full overflow-hidden rounded-[28px] bg-[linear-gradient(180deg,#e4effa_0%,#f3f8fd_52%,#fdf0e3_100%)] shadow-[0_18px_40px_-18px_rgba(11,94,168,.35)] ring-1 ring-[#d6e3f0]">
       {/* Scene texture: dots, a soft sun and a ground band. */}
       <div
         aria-hidden
@@ -396,7 +306,6 @@ export default function ImpactBuilder({
         className="absolute inset-x-[-10%] bottom-[-14%] -z-10 h-[34%] rounded-[50%] bg-[radial-gradient(ellipse_at_top,#f8dcc0_0%,#fbe9d8_45%,transparent_72%)]"
       />
 
-      {/* The character keeps a fixed aspect box inside the stage, so every region renders the same size. */}
       <div className="relative mx-auto aspect-[25/33] h-full max-w-full pt-3">
         <div className="relative h-full w-full">
           <div
@@ -409,8 +318,8 @@ export default function ImpactBuilder({
               src={img.src}
               alt={img.key === shownStateKey ? pickText(region?.name, locale) : ""}
               fill
-              priority={img.key === "base" && !compact}
-              sizes="(max-width: 1024px) 300px, 440px"
+              priority={img.key === "base"}
+              sizes="(max-width: 1024px) 260px, 420px"
               unoptimized={!optimizable(img.src)}
               className={`z-40 object-contain object-bottom transition-opacity duration-200 ${
                 img.key === shownStateKey ? "opacity-100" : "opacity-0"
@@ -442,16 +351,9 @@ export default function ImpactBuilder({
         </div>
       </div>
 
-      {activeRegions.length > 1 && (
-        <>
-          {arrow(-1)}
-          {arrow(1)}
-        </>
-      )}
-
       {/* Running count on the scene, so phones see progress without scrolling. */}
       {count > 0 && (
-        <div className="absolute start-3 top-3 z-50 rounded-full bg-white/90 px-3 py-1 text-xs font-extrabold text-[#98470d] shadow-sm lg:hidden">
+        <div className="absolute start-3 top-3 z-50 rounded-full bg-white/90 px-3 py-1 text-xs font-extrabold text-[#98470d] shadow-sm ring-1 ring-[#f5d3b5] lg:hidden">
           {`${count} ${t("unit")}`}
         </div>
       )}
@@ -459,8 +361,8 @@ export default function ImpactBuilder({
   );
 
   const summary = (
-    <div className="w-full rounded-3xl bg-white p-4 shadow-[0_10px_30px_-12px_rgba(20,40,60,.2)] sm:p-5">
-      <div className="mb-1 flex items-center justify-between gap-3">
+    <div className="w-full rounded-3xl border border-[#e3eaf2] bg-white/90 p-4 shadow-[0_10px_30px_-12px_rgba(20,40,60,.18)] backdrop-blur-sm sm:p-5">
+      <div className="mb-1.5 flex items-center justify-between gap-3">
         <p className="m-0 text-xs font-black uppercase tracking-[.14em] text-[#8b9aa8]">{t("impact")}</p>
         <button
           type="button"
@@ -471,19 +373,14 @@ export default function ImpactBuilder({
           {t("reset")}
         </button>
       </div>
-      {/* Breakdown scrolls inside a capped box so the summary never grows past its slot. */}
-      {breakdown.length > 0 && (
-        <div className="max-h-[4.5rem] overflow-y-auto">
-          {breakdown.map((b) => (
-            <div key={b.key} className="flex justify-between gap-2 py-0.5 text-sm text-[#5d6f80]">
-              <span className="truncate">{b.name}</span>
-              <span dir="ltr" className="whitespace-nowrap">
-                {fmt(b.usd)} · {b.qty} {t("unit")}
-              </span>
-            </div>
-          ))}
+      {breakdown.map((b) => (
+        <div key={b.key} className="flex justify-between py-0.5 text-sm text-[#5d6f80]">
+          <span>{b.name}</span>
+          <span dir="ltr" className="whitespace-nowrap">
+            {fmt(b.usd)} · {b.qty} {t("unit")}
+          </span>
         </div>
-      )}
+      ))}
       <div className="flex items-baseline justify-between gap-3 pb-3 pt-1">
         <span className="flex-none whitespace-nowrap text-sm text-[#7a8794]">
           {count === 0 ? t("none") : `${count} ${t("unit")}`}
@@ -491,8 +388,8 @@ export default function ImpactBuilder({
         <strong
           aria-live="polite"
           dir="ltr"
-          className="inline-block truncate whitespace-nowrap text-[clamp(22px,2.6vw,30px)] font-black tabular-nums tracking-tight transition-transform duration-200"
-          style={{ transform: `scale(${pulse ? 1.06 : 1})` }}
+          className="inline-block whitespace-nowrap text-[clamp(24px,3vw,32px)] font-black tabular-nums tracking-tight transition-transform duration-200"
+          style={{ transform: `scale(${pulse ? 1.08 : 1})` }}
         >
           {totalLabel}
         </strong>
@@ -500,8 +397,8 @@ export default function ImpactBuilder({
 
       {allowMonthly && (
         <label
-          className={`mb-3 flex cursor-pointer items-center gap-3 rounded-[14px] px-3.5 py-2.5 transition-colors ${
-            monthly ? "bg-[#fff3e8]" : "bg-[#f4f7fa]"
+          className={`mb-3 flex cursor-pointer items-center gap-3 rounded-[14px] border-[1.5px] px-3.5 py-2.5 ${
+            monthly ? "border-[#f0a765] bg-[#fffaf5]" : "border-[#e9eef4] bg-[#fbfcfe]"
           }`}
         >
           <input
@@ -512,7 +409,7 @@ export default function ImpactBuilder({
           />
           <span className="grid gap-0.5 text-start">
             <strong className="text-sm">{t("monthly")}</strong>
-            <span className={`text-xs text-[#5d6f80] ${compact ? "hidden sm:block" : ""}`}>{t("monthlyNote")}</span>
+            <span className="text-xs text-[#5d6f80]">{t("monthlyNote")}</span>
           </span>
         </label>
       )}
@@ -521,64 +418,23 @@ export default function ImpactBuilder({
         type="button"
         onClick={openCheckout}
         disabled={!canCheckout}
-        className="w-full rounded-full bg-[#f07d22] p-3 text-lg font-black text-white shadow-[0_12px_28px_rgba(240,125,34,.28)] transition hover:bg-[#e06f15] disabled:cursor-not-allowed disabled:bg-[#c6cfd8] disabled:shadow-none sm:p-3.5"
+        className="w-full rounded-full bg-[#f07d22] p-3.5 text-lg font-black text-white shadow-[0_12px_28px_rgba(240,125,34,.28)] transition hover:bg-[#e06f15] disabled:cursor-not-allowed disabled:bg-[#c6cfd8] disabled:shadow-none"
       >
         {t("cta")}
       </button>
-      <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs text-[#5d6f80]">
+      <p className="mt-2.5 flex items-center justify-center gap-1.5 text-center text-xs text-[#5d6f80]">
         <ShieldCheck className="h-4 w-4" aria-hidden />
         {t("secure")}
       </p>
     </div>
   );
 
-  // Mounted per open so it always starts from the current total and frequency.
-  const checkout = checkoutOpen && totalLocal != null && (
-    <DonationDialog
-      isOpen
-      onClose={() => setCheckoutOpen(false)}
-      campaignId={campaignId}
-      campaignTitle={title}
-      campaignImage={region?.images[shownStateKey] ?? region?.images.base}
-      goalType="OPEN"
-      initialDonationAmount={totalLocal}
-      monthlyOnly={monthly}
-      oneTimeOnly={!monthly}
-      authCallbackUrl={typeof window !== "undefined" ? window.location.pathname : undefined}
-      impact={{
-        impactCampaignId,
-        lines: lines.map(({ regionKey: rk, needKey, quantity }) => ({ regionKey: rk, needKey, quantity })),
-      }}
-    />
-  );
-
-  // ── Homepage section ──
-  if (compact) {
-    return (
-      <div className="text-[#14283c]">
-        <div className="grid gap-4 md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] md:gap-5 lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)_minmax(260px,300px)] lg:items-start">
-          <div className="flex min-w-0 flex-col gap-2">
-            {regionTabs}
-            <div className="mx-auto h-[clamp(220px,58vw,300px)] w-full max-w-[380px] md:h-[340px] lg:h-[360px]">{stage}</div>
-          </div>
-
-          {/* Phones: one swipeable row under the character. Larger screens: a grid beside it. */}
-          <div className="-mx-4 flex min-w-0 snap-x gap-2.5 overflow-x-auto px-4 pb-2 pt-1 [scrollbar-width:none] md:mx-0 md:grid md:max-h-[400px] md:grid-cols-3 md:content-start md:overflow-y-auto md:overflow-x-visible md:p-1 lg:max-h-[412px] xl:grid-cols-4 [&::-webkit-scrollbar]:hidden">
-            {needs.map(renderTile)}
-          </div>
-
-          <div className="md:col-span-2 lg:col-span-1">{summary}</div>
-        </div>
-        {checkout}
-      </div>
-    );
-  }
-
-  // ── Full page ──
   return (
-    <div className="relative isolate overflow-x-clip bg-[#f4f8fc] pb-[calc(88px+env(safe-area-inset-bottom))] text-[#14283c] lg:pb-0">
+    <div
+      className={`relative isolate overflow-x-clip text-[#14283c] ${compact ? "" : "bg-[#f4f8fc] pb-28 lg:pb-10"}`}
+    >
       {/* Page texture: paper grain, a fading dot grid and soft brand glows. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+      <div aria-hidden className={`pointer-events-none absolute inset-0 -z-10 ${compact ? "hidden" : ""}`}>
         <div className="absolute inset-0 opacity-[.35] mix-blend-multiply" style={{ backgroundImage: GRAIN }} />
         <div className="absolute inset-0 [background-image:radial-gradient(rgba(11,94,168,.13)_1px,transparent_1.3px)] [background-size:22px_22px] [mask-image:radial-gradient(ellipse_at_top,#000_20%,transparent_75%)]" />
         <div className="absolute -top-40 start-[-15%] h-[480px] w-[480px] rounded-full bg-[#0b5ea8]/[.09] blur-3xl" />
@@ -586,48 +442,71 @@ export default function ImpactBuilder({
         <div className="absolute bottom-[-10%] start-[20%] h-[360px] w-[360px] rounded-full bg-[#38bdf8]/[.08] blur-3xl" />
       </div>
 
-      {/* Desktop: the whole builder fits one screen under the navbar (104px); lists scroll inside their columns. */}
-      <div className="mx-auto flex max-w-[1280px] flex-col px-4 lg:h-[calc(100svh-104px)] lg:min-h-[620px] lg:px-6">
-        <header className="flex-none pb-3 pt-4 text-center sm:pt-6 lg:pb-4 lg:pt-5">
-          <h1 className="mb-1 text-[clamp(21px,3vw,32px)] font-black leading-tight tracking-tight">{title}</h1>
-          {intro && (
-            <p className="mx-auto max-w-[600px] text-[13.5px] leading-relaxed text-[#5d6f80] line-clamp-2 sm:text-[15px] lg:line-clamp-none">
-              {intro}
-            </p>
-          )}
-        </header>
+      <section className={`mx-auto max-w-[1100px] text-center ${compact ? "" : "px-4 pt-5 sm:pt-7 lg:pt-6"}`}>
+        {!compact && (
+          <h1 className="mb-1.5 text-[clamp(22px,3vw,34px)] font-black leading-tight tracking-tight">{title}</h1>
+        )}
+        {!compact && intro && (
+          <p className="mx-auto mb-4 max-w-[560px] text-sm leading-relaxed text-[#5d6f80] sm:text-[15px]">{intro}</p>
+        )}
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] md:items-start md:gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(240px,1fr)_minmax(300px,420px)_minmax(240px,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:items-stretch lg:gap-6 lg:pb-5">
-          {/* Desktop start column */}
-          <div className="hidden min-h-0 content-start gap-3 overflow-y-auto p-1 [scrollbar-width:thin] lg:order-1 lg:grid">
-            {needs.slice(0, half).map(renderRow)}
+        {regions.length > 1 && (
+          <div className="-mx-4 mb-3 overflow-x-auto px-4 [scrollbar-width:none] lg:mb-5 [&::-webkit-scrollbar]:hidden">
+            <div
+              role="tablist"
+              aria-label={t("regions")}
+              className="mx-auto flex w-max gap-1 rounded-full border border-[#e3eaf2] bg-white/80 p-1 shadow-sm backdrop-blur-sm"
+            >
+              {regions.map((r) => {
+                const selected = r.key === regionKey;
+                return (
+                  <button
+                    key={r.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    aria-disabled={!r.active}
+                    onClick={() => r.active && setRegionKey(r.key)}
+                    className={`whitespace-nowrap rounded-full px-4 py-2 text-[13.5px] font-extrabold transition sm:px-5 ${
+                      !r.active
+                        ? "cursor-not-allowed text-[#aab5c0]"
+                        : selected
+                          ? "bg-[#0b5ea8] text-white shadow-[0_4px_12px_rgba(11,94,168,.3)]"
+                          : "text-[#6b7c8c] hover:text-[#0b5ea8]"
+                    }`}
+                  >
+                    {pickText(r.name, locale)}
+                    {!r.active && ` · ${t("soon")}`}
+                  </button>
+                );
+              })}
+            </div>
           </div>
+        )}
+      </section>
 
-          {/* Character + switcher stay in view on every screen: pinned under the navbar on phones and tablets. */}
-          <div className="sticky top-16 z-30 -mx-4 flex flex-col gap-2 bg-[#f4f8fc]/85 px-4 pb-2 pt-1 backdrop-blur-md md:top-[76px] md:mx-0 md:bg-transparent md:p-0 md:backdrop-blur-none lg:static lg:order-2 lg:min-h-0 lg:gap-3">
-            {regionTabs}
-            <div className="mx-auto h-[clamp(170px,30svh,300px)] w-full max-w-[440px] md:h-[clamp(240px,calc(100svh-230px),560px)] lg:h-auto lg:min-h-[180px] lg:flex-1">
+      <section className={`mx-auto max-w-[1280px] ${compact ? "" : "px-4 lg:px-6"}`}>
+        <div className="flex flex-col lg:grid lg:grid-cols-[minmax(250px,1fr)_minmax(340px,440px)_minmax(250px,1fr)] lg:items-start lg:gap-6">
+          <div className="hidden content-start gap-3 lg:grid">{needs.slice(0, half).map(renderRow)}</div>
+
+          {/* Character stays in view while adding: under the navbar on phones, beside the lists on desktop. */}
+          <div className="sticky top-16 z-30 -mx-4 bg-[#f4f8fc]/80 px-4 pb-3 pt-1 backdrop-blur-md lg:top-[120px] lg:mx-0 lg:flex lg:flex-col lg:gap-4 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+            <div className="mx-auto h-[clamp(200px,34svh,320px)] w-full max-w-[440px] lg:h-[clamp(300px,calc(100svh-480px),480px)]">
               {stage}
             </div>
-            <div className="hidden flex-none lg:block">{summary}</div>
+            <div className="hidden lg:block">{summary}</div>
           </div>
 
-          {/* Desktop end column */}
-          <div className="hidden min-h-0 content-start gap-3 overflow-y-auto p-1 [scrollbar-width:thin] lg:order-3 lg:grid">
-            {needs.slice(half).map(renderRow)}
-          </div>
+          <div className="hidden content-start gap-3 lg:grid">{needs.slice(half).map(renderRow)}</div>
 
-          {/* Phones / tablets: the list, then the summary. */}
-          <div className="flex min-w-0 flex-col gap-4 lg:hidden">
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-1">{needs.map(renderRow)}</div>
-            <div className="mx-auto w-full max-w-[560px]">{summary}</div>
-          </div>
+          <div className="grid grid-cols-2 gap-2.5 pt-1 sm:grid-cols-3 md:grid-cols-4 lg:hidden">{needs.map(renderTile)}</div>
+          <div className="mx-auto mt-4 w-full max-w-[560px] lg:hidden">{summary}</div>
         </div>
-      </div>
+      </section>
 
       {/* Mobile sticky bar */}
-      {canCheckout && (
-        <div className="fixed inset-x-0 bottom-0 z-[1000] flex items-center justify-between gap-3.5 bg-white/95 px-4 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-8px_28px_rgba(20,40,60,.12)] backdrop-blur-md lg:hidden">
+      {canCheckout && !compact && (
+        <div className="fixed inset-x-0 bottom-0 z-[1000] flex items-center justify-between gap-3.5 border-t border-[#e9eef4] bg-white/95 px-4 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-8px_28px_rgba(20,40,60,.1)] backdrop-blur-md lg:hidden">
           <div className="flex min-w-0 flex-col gap-0.5">
             <span className="whitespace-nowrap text-xs text-[#5d6f80]">{`${count} ${t("unit")}`}</span>
             <strong dir="ltr" className="truncate text-lg">
@@ -644,7 +523,25 @@ export default function ImpactBuilder({
         </div>
       )}
 
-      {checkout}
+      {/* Mounted per open so it always starts from the current total and frequency. */}
+      {checkoutOpen && totalLocal != null && (
+        <DonationDialog
+          isOpen
+          onClose={() => setCheckoutOpen(false)}
+          campaignId={campaignId}
+          campaignTitle={title}
+          campaignImage={region?.images[shownStateKey] ?? region?.images.base}
+          goalType="OPEN"
+          initialDonationAmount={totalLocal}
+          monthlyOnly={monthly}
+          oneTimeOnly={!monthly}
+          authCallbackUrl={typeof window !== "undefined" ? window.location.pathname : undefined}
+          impact={{
+            impactCampaignId,
+            lines: lines.map(({ regionKey: rk, needKey, quantity }) => ({ regionKey: rk, needKey, quantity })),
+          }}
+        />
+      )}
     </div>
   );
 }

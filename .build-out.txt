@@ -1,0 +1,8 @@
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env
+- Experiments (use with caution):
+  ✓ optimizeCss
+  · optimizePackageImports
+  ? turbo (invalid experimental key)
+
+  Creating an optimized production build ...
