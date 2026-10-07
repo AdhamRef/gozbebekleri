@@ -39,9 +39,6 @@ const optimizable = (src: string) => src.startsWith("/") || src.startsWith("http
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/** Fine paper grain behind the page so large empty areas don't read as flat white. */
-const GRAIN =
-  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .08 0 0 0 0 .16 0 0 0 0 .24 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
 
 function usePersistentPicks(key: string): [Picks, (fn: (p: Picks) => Picks) => void] {
   const [picks, setPicks] = useState<Picks>({});
@@ -202,9 +199,9 @@ export default function ImpactBuilder({
   const regionHasPicks = lines.some((l) => l.regionKey === regionKey);
 
   const stepper = (need: ImpactNeed, q: number, name: string, compact: boolean) => {
-    const size = compact ? "h-9 w-9" : "h-10 w-10";
+    const size = compact ? "h-10 w-10" : "h-[42px] w-[42px]";
     return (
-      <div dir="ltr" className="flex flex-none items-center justify-center gap-1.5">
+      <div dir="ltr" className="flex flex-none items-center justify-center gap-2">
         <button
           type="button"
           aria-label={`${t("dec")} — ${name}`}
@@ -218,7 +215,7 @@ export default function ImpactBuilder({
         </button>
         <span
           aria-live="polite"
-          className={`min-w-[24px] text-center text-base font-extrabold tabular-nums ${q ? "text-[#14283c]" : "text-[#aeb9c4]"}`}
+          className={`min-w-[26px] text-center text-lg font-extrabold tabular-nums ${q ? "text-[#14283c]" : "text-[#aeb9c4]"}`}
         >
           {q}
         </span>
@@ -240,53 +237,36 @@ export default function ImpactBuilder({
   const priceChip = (need: ImpactNeed, on: boolean) => (
     <span
       dir="ltr"
-      className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[12.5px] font-extrabold ${
-        on ? "bg-[#fdeada] text-[#98470d]" : "bg-[#eef3f8] text-[#6b7c8c]"
+      className={`inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-[13px] font-extrabold transition-colors sm:text-[13.5px] ${
+        on ? "bg-[#fdeada] text-[#98470d]" : "bg-[#f2f5f8] text-[#7a8794]"
       }`}
     >
       {fmt(need.priceUSD)}
     </span>
   );
 
-  const cardShell = (on: boolean) =>
-    `rounded-2xl border bg-white/85 shadow-[0_4px_16px_rgba(20,40,60,.06)] backdrop-blur-sm transition ${
-      on ? "border-[#f5b27a] ring-2 ring-[#f07d22]/15" : "border-[#e3eaf2] hover:border-[#cfdbe7]"
-    }`;
-
-  const icon = (need: ImpactNeed, on: boolean, box: string) => (
-    <div className={`relative flex-none transition ${box} ${on ? "" : "opacity-75 saturate-[.6]"}`}>
-      <Image src={need.icon} alt="" fill sizes="72px" className="object-contain" unoptimized={!optimizable(need.icon)} />
-    </div>
-  );
-
-  /** Compact tile for the phone/tablet grid. */
-  const renderTile = (need: ImpactNeed) => {
+  /** Borderless centred item: icon, name + price, stepper. Smaller on phones, roomier in the desktop side columns. */
+  const renderCard = (need: ImpactNeed, small: boolean) => {
     const q = qtyOf(regionKey, need.key);
     const on = q > 0;
     const name = pickText(need.name, locale);
     return (
-      <div key={need.key} className={`flex flex-col items-center gap-2 p-2.5 text-center ${cardShell(on)}`}>
-        {icon(need, on, "h-12 w-12 sm:h-14 sm:w-14")}
-        <strong className="line-clamp-2 min-h-[2.5em] text-[13.5px] leading-tight sm:text-sm">{name}</strong>
-        {priceChip(need, on)}
-        {stepper(need, q, name, true)}
-      </div>
-    );
-  };
-
-  /** Short horizontal row for the desktop side columns. */
-  const renderRow = (need: ImpactNeed) => {
-    const q = qtyOf(regionKey, need.key);
-    const on = q > 0;
-    const name = pickText(need.name, locale);
-    return (
-      <div key={need.key} className={`flex items-center gap-3 p-3 ${cardShell(on)}`}>
-        {icon(need, on, "h-14 w-14 xl:h-16 xl:w-16")}
-        <div className="flex min-w-0 flex-1 flex-col items-start gap-1 text-start">
-          <strong className="line-clamp-2 text-[15px] leading-tight">{name}</strong>
+      <div
+        key={need.key}
+        className={`flex flex-col items-center text-center ${small ? "gap-2 px-1 py-1.5" : "gap-2.5 px-1.5 py-2.5"}`}
+      >
+        <div
+          className={`relative flex-none transition duration-200 ${small ? "h-16 w-16" : "h-[84px] w-[84px]"} ${
+            on ? "" : "opacity-[.72] saturate-[.55]"
+          }`}
+        >
+          <Image src={need.icon} alt="" fill sizes="84px" className="object-contain" unoptimized={!optimizable(need.icon)} />
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+          <strong className={`leading-[1.3] ${small ? "text-[14.5px]" : "text-base"}`}>{name}</strong>
           {priceChip(need, on)}
         </div>
-        {stepper(need, q, name, false)}
+        {stepper(need, q, name, small)}
       </div>
     );
   };
@@ -294,23 +274,12 @@ export default function ImpactBuilder({
   const totalLabel = canCheckout || totalUSD === 0 ? fmt(totalUSD) + (monthly ? ` / ${t("perMonth")}` : "") : t("ratesLoading");
 
   const stage = (
-    <div className="relative isolate h-full overflow-hidden rounded-[28px] bg-[linear-gradient(180deg,#e4effa_0%,#f3f8fd_52%,#fdf0e3_100%)] shadow-[0_18px_40px_-18px_rgba(11,94,168,.35)] ring-1 ring-[#d6e3f0]">
-      {/* Scene texture: dots, a soft sun and a ground band. */}
-      <div
-        aria-hidden
-        className="absolute inset-0 -z-10 opacity-60 [background-image:radial-gradient(rgba(11,94,168,.16)_1px,transparent_1.3px)] [background-size:16px_16px] [mask-image:linear-gradient(180deg,#000_0%,transparent_75%)]"
-      />
-      <div aria-hidden className="absolute -top-10 end-6 -z-10 h-40 w-40 rounded-full bg-[#ffd8a8]/50 blur-2xl" />
-      <div
-        aria-hidden
-        className="absolute inset-x-[-10%] bottom-[-14%] -z-10 h-[34%] rounded-[50%] bg-[radial-gradient(ellipse_at_top,#f8dcc0_0%,#fbe9d8_45%,transparent_72%)]"
-      />
-
-      <div className="relative mx-auto aspect-[25/33] h-full max-w-full pt-3">
+    <div className="relative isolate h-full">
+      <div className="relative mx-auto aspect-[25/33] h-full max-w-full">
         <div className="relative h-full w-full">
           <div
             aria-hidden
-            className="absolute bottom-1 left-1/2 z-[1] h-[22px] w-[56%] -translate-x-1/2 bg-[radial-gradient(ellipse_at_center,rgba(20,40,60,.18),rgba(20,40,60,0)_70%)]"
+            className="absolute bottom-0.5 left-1/2 z-[1] h-[26px] w-[54%] -translate-x-1/2 bg-[radial-gradient(ellipse_at_center,rgba(20,40,60,.14),rgba(20,40,60,0)_70%)]"
           />
           {characterImages.map((img) => (
             <Image
@@ -319,7 +288,7 @@ export default function ImpactBuilder({
               alt={img.key === shownStateKey ? pickText(region?.name, locale) : ""}
               fill
               priority={img.key === "base"}
-              sizes="(max-width: 1024px) 260px, 420px"
+              sizes="(max-width: 1024px) 320px, 500px"
               unoptimized={!optimizable(img.src)}
               className={`z-40 object-contain object-bottom transition-opacity duration-200 ${
                 img.key === shownStateKey ? "opacity-100" : "opacity-0"
@@ -353,16 +322,19 @@ export default function ImpactBuilder({
 
       {/* Running count on the scene, so phones see progress without scrolling. */}
       {count > 0 && (
-        <div className="absolute start-3 top-3 z-50 rounded-full bg-white/90 px-3 py-1 text-xs font-extrabold text-[#98470d] shadow-sm ring-1 ring-[#f5d3b5] lg:hidden">
+        <span
+          dir="ltr"
+          className="absolute start-1.5 top-1.5 z-50 rounded-full bg-[#0b5ea8] px-3 py-1 text-[13px] font-extrabold text-white lg:hidden"
+        >
           {`${count} ${t("unit")}`}
-        </div>
+        </span>
       )}
     </div>
   );
 
   const summary = (
-    <div className="w-full rounded-3xl border border-[#e3eaf2] bg-white/90 p-4 shadow-[0_10px_30px_-12px_rgba(20,40,60,.18)] backdrop-blur-sm sm:p-5">
-      <div className="mb-1.5 flex items-center justify-between gap-3">
+    <div className="w-full border-t border-[#e9eef4] pt-5">
+      <div className="mb-2.5 flex items-center justify-between gap-3">
         <p className="m-0 text-xs font-black uppercase tracking-[.14em] text-[#8b9aa8]">{t("impact")}</p>
         <button
           type="button"
@@ -374,21 +346,21 @@ export default function ImpactBuilder({
         </button>
       </div>
       {breakdown.map((b) => (
-        <div key={b.key} className="flex justify-between py-0.5 text-sm text-[#5d6f80]">
+        <div key={b.key} className="flex justify-between py-1 text-sm text-[#5d6f80]">
           <span>{b.name}</span>
           <span dir="ltr" className="whitespace-nowrap">
             {fmt(b.usd)} · {b.qty} {t("unit")}
           </span>
         </div>
       ))}
-      <div className="flex items-baseline justify-between gap-3 pb-3 pt-1">
-        <span className="flex-none whitespace-nowrap text-sm text-[#7a8794]">
+      <div className="flex items-baseline justify-between gap-3 pb-5 pt-1.5">
+        <span className="flex-none whitespace-nowrap text-[14.5px] text-[#7a8794]">
           {count === 0 ? t("none") : `${count} ${t("unit")}`}
         </span>
         <strong
           aria-live="polite"
           dir="ltr"
-          className="inline-block whitespace-nowrap text-[clamp(24px,3vw,32px)] font-black tabular-nums tracking-tight transition-transform duration-200"
+          className="inline-block min-w-0 truncate text-[clamp(28px,3.2vw,38px)] font-black tabular-nums tracking-[-1px] text-[#14283c] transition-transform duration-200 motion-reduce:transition-none"
           style={{ transform: `scale(${pulse ? 1.08 : 1})` }}
         >
           {totalLabel}
@@ -397,7 +369,7 @@ export default function ImpactBuilder({
 
       {allowMonthly && (
         <label
-          className={`mb-3 flex cursor-pointer items-center gap-3 rounded-[14px] border-[1.5px] px-3.5 py-2.5 ${
+          className={`mb-3.5 flex cursor-pointer items-center gap-3 rounded-[14px] border-[1.5px] px-3.5 py-3 ${
             monthly ? "border-[#f0a765] bg-[#fffaf5]" : "border-[#e9eef4] bg-[#fbfcfe]"
           }`}
         >
@@ -408,8 +380,8 @@ export default function ImpactBuilder({
             className="h-5 w-5 flex-none cursor-pointer accent-[#f07d22]"
           />
           <span className="grid gap-0.5 text-start">
-            <strong className="text-sm">{t("monthly")}</strong>
-            <span className="text-xs text-[#5d6f80]">{t("monthlyNote")}</span>
+            <strong className="text-[14.5px]">{t("monthly")}</strong>
+            <span className="text-[12.5px] text-[#5d6f80]">{t("monthlyNote")}</span>
           </span>
         </label>
       )}
@@ -418,11 +390,11 @@ export default function ImpactBuilder({
         type="button"
         onClick={openCheckout}
         disabled={!canCheckout}
-        className="w-full rounded-full bg-[#f07d22] p-3.5 text-lg font-black text-white shadow-[0_12px_28px_rgba(240,125,34,.28)] transition hover:bg-[#e06f15] disabled:cursor-not-allowed disabled:bg-[#c6cfd8] disabled:shadow-none"
+        className="w-full rounded-full bg-[#f07d22] px-2.5 py-4 text-[17px] font-black text-white shadow-[0_12px_28px_rgba(240,125,34,.28)] transition hover:bg-[#e06f15] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#f07d22] disabled:cursor-not-allowed disabled:bg-[#c6cfd8] disabled:shadow-none"
       >
         {t("cta")}
       </button>
-      <p className="mt-2.5 flex items-center justify-center gap-1.5 text-center text-xs text-[#5d6f80]">
+      <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-[12.5px] text-[#5d6f80]">
         <ShieldCheck className="h-4 w-4" aria-hidden />
         {t("secure")}
       </p>
@@ -430,32 +402,23 @@ export default function ImpactBuilder({
   );
 
   return (
-    <div
-      className={`relative isolate overflow-x-clip text-[#14283c] ${compact ? "" : "bg-[#f4f8fc] pb-28 lg:pb-10"}`}
-    >
-      {/* Page texture: paper grain, a fading dot grid and soft brand glows. */}
-      <div aria-hidden className={`pointer-events-none absolute inset-0 -z-10 ${compact ? "hidden" : ""}`}>
-        <div className="absolute inset-0 opacity-[.35] mix-blend-multiply" style={{ backgroundImage: GRAIN }} />
-        <div className="absolute inset-0 [background-image:radial-gradient(rgba(11,94,168,.13)_1px,transparent_1.3px)] [background-size:22px_22px] [mask-image:radial-gradient(ellipse_at_top,#000_20%,transparent_75%)]" />
-        <div className="absolute -top-40 start-[-15%] h-[480px] w-[480px] rounded-full bg-[#0b5ea8]/[.09] blur-3xl" />
-        <div className="absolute end-[-15%] top-[30%] h-[420px] w-[420px] rounded-full bg-[#f07d22]/[.09] blur-3xl" />
-        <div className="absolute bottom-[-10%] start-[20%] h-[360px] w-[360px] rounded-full bg-[#38bdf8]/[.08] blur-3xl" />
-      </div>
-
-      <section className={`mx-auto max-w-[1100px] text-center ${compact ? "" : "px-4 pt-5 sm:pt-7 lg:pt-6"}`}>
+    <div className={`relative overflow-x-clip text-[#14283c] ${compact ? "" : "bg-[#fbfcfe] pb-28 lg:pb-[72px]"}`}>
+      <section className={`mx-auto max-w-[1100px] text-center ${compact ? "" : "px-4 pt-6 sm:pt-9 lg:pt-11"}`}>
         {!compact && (
-          <h1 className="mb-1.5 text-[clamp(22px,3vw,34px)] font-black leading-tight tracking-tight">{title}</h1>
+          <h1 className="mb-2.5 text-[clamp(26px,3.8vw,42px)] font-black leading-[1.15] tracking-[-.5px]">{title}</h1>
         )}
         {!compact && intro && (
-          <p className="mx-auto mb-4 max-w-[560px] text-sm leading-relaxed text-[#5d6f80] sm:text-[15px]">{intro}</p>
+          <p className="mx-auto mb-6 max-w-[540px] text-[15px] leading-[1.75] text-[#5d6f80] [text-wrap:pretty] sm:mb-7 sm:text-[16.5px]">
+            {intro}
+          </p>
         )}
 
         {regions.length > 1 && (
-          <div className="-mx-4 mb-3 overflow-x-auto px-4 [scrollbar-width:none] lg:mb-5 [&::-webkit-scrollbar]:hidden">
+          <div className="-mx-4 mb-4 overflow-x-auto px-4 [scrollbar-width:none] lg:mb-10 [&::-webkit-scrollbar]:hidden">
             <div
               role="tablist"
               aria-label={t("regions")}
-              className="mx-auto flex w-max gap-1 rounded-full border border-[#e3eaf2] bg-white/80 p-1 shadow-sm backdrop-blur-sm"
+              className="mx-auto flex w-max gap-1.5 rounded-full bg-[#f1f5f9] p-1.5 sm:gap-2"
             >
               {regions.map((r) => {
                 const selected = r.key === regionKey;
@@ -467,11 +430,11 @@ export default function ImpactBuilder({
                     aria-selected={selected}
                     aria-disabled={!r.active}
                     onClick={() => r.active && setRegionKey(r.key)}
-                    className={`whitespace-nowrap rounded-full px-4 py-2 text-[13.5px] font-extrabold transition sm:px-5 ${
+                    className={`whitespace-nowrap rounded-full px-4 py-2.5 text-[14px] font-extrabold transition sm:px-[22px] sm:text-[14.5px] ${
                       !r.active
                         ? "cursor-not-allowed text-[#aab5c0]"
                         : selected
-                          ? "bg-[#0b5ea8] text-white shadow-[0_4px_12px_rgba(11,94,168,.3)]"
+                          ? "bg-white text-[#0b5ea8] shadow-[0_2px_8px_rgba(20,40,60,.1)]"
                           : "text-[#6b7c8c] hover:text-[#0b5ea8]"
                     }`}
                   >
@@ -485,38 +448,40 @@ export default function ImpactBuilder({
         )}
       </section>
 
-      <section className={`mx-auto max-w-[1280px] ${compact ? "" : "px-4 lg:px-6"}`}>
-        <div className="flex flex-col lg:grid lg:grid-cols-[minmax(250px,1fr)_minmax(340px,440px)_minmax(250px,1fr)] lg:items-start lg:gap-6">
-          <div className="hidden content-start gap-3 lg:grid">{needs.slice(0, half).map(renderRow)}</div>
+      <section className={`mx-auto max-w-[1280px] ${compact ? "" : "px-4 sm:px-5"}`}>
+        <div className="flex flex-col lg:grid lg:grid-cols-[minmax(220px,1fr)_minmax(380px,500px)_minmax(220px,1fr)] lg:items-start lg:gap-[30px]">
+          <div className="hidden content-start gap-[34px] lg:grid">{needs.slice(0, half).map((n) => renderCard(n, false))}</div>
 
           {/* Character stays in view while adding: under the navbar on phones, beside the lists on desktop. */}
-          <div className="sticky top-16 z-30 -mx-4 bg-[#f4f8fc]/80 px-4 pb-3 pt-1 backdrop-blur-md lg:top-[120px] lg:mx-0 lg:flex lg:flex-col lg:gap-4 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
-            <div className="mx-auto h-[clamp(200px,34svh,320px)] w-full max-w-[440px] lg:h-[clamp(300px,calc(100svh-480px),480px)]">
+          <div className="sticky top-16 z-30 -mx-4 bg-[#fbfcfe]/90 px-4 pb-2 pt-1 backdrop-blur-md sm:-mx-5 sm:px-5 lg:top-[120px] lg:mx-0 lg:flex lg:flex-col lg:items-center lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+            <div className="mx-auto h-[clamp(220px,38svh,380px)] w-full max-w-[320px] lg:h-[clamp(320px,calc(100svh-440px),600px)] lg:max-w-[500px]">
               {stage}
             </div>
-            <div className="hidden lg:block">{summary}</div>
+            <div className="mt-[18px] hidden w-full max-w-[460px] lg:block">{summary}</div>
           </div>
 
-          <div className="hidden content-start gap-3 lg:grid">{needs.slice(half).map(renderRow)}</div>
+          <div className="hidden content-start gap-[34px] lg:grid">{needs.slice(half).map((n) => renderCard(n, false))}</div>
 
-          <div className="grid grid-cols-2 gap-2.5 pt-1 sm:grid-cols-3 md:grid-cols-4 lg:hidden">{needs.map(renderTile)}</div>
-          <div className="mx-auto mt-4 w-full max-w-[560px] lg:hidden">{summary}</div>
+          <div className="grid grid-cols-2 gap-x-3.5 gap-y-5 pt-3 sm:grid-cols-3 md:grid-cols-4 lg:hidden">
+            {needs.map((n) => renderCard(n, true))}
+          </div>
+          <div className="mx-auto mt-5 w-full max-w-[560px] lg:hidden">{summary}</div>
         </div>
       </section>
 
       {/* Mobile sticky bar */}
       {canCheckout && !compact && (
-        <div className="fixed inset-x-0 bottom-0 z-[1000] flex items-center justify-between gap-3.5 border-t border-[#e9eef4] bg-white/95 px-4 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-8px_28px_rgba(20,40,60,.1)] backdrop-blur-md lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-[1000] flex items-center justify-between gap-3.5 border-t border-[#e9eef4] bg-white px-[18px] pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_28px_rgba(20,40,60,.1)] lg:hidden">
           <div className="flex min-w-0 flex-col gap-0.5">
-            <span className="whitespace-nowrap text-xs text-[#5d6f80]">{`${count} ${t("unit")}`}</span>
-            <strong dir="ltr" className="truncate text-lg">
+            <span className="whitespace-nowrap text-[12.5px] text-[#5d6f80]">{`${count} ${t("unit")}`}</span>
+            <strong dir="ltr" className="truncate text-[19px] font-black">
               {totalLabel}
             </strong>
           </div>
           <button
             type="button"
             onClick={openCheckout}
-            className="flex-none whitespace-nowrap rounded-full bg-[#f07d22] px-6 py-3 text-base font-extrabold text-white shadow-[0_8px_20px_rgba(240,125,34,.3)]"
+            className="flex-none whitespace-nowrap rounded-full bg-[#f07d22] px-[26px] py-3.5 text-base font-extrabold text-white"
           >
             {t("cta")}
           </button>
