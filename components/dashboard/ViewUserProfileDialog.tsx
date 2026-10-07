@@ -37,9 +37,8 @@ import {
   Check,
   TrendingUp,
   Cake,
-  Mars,
-  Venus,
   CircleHelp,
+  createLucideIcon,
 } from "lucide-react";
 import ReactCountryFlag from "react-country-flag";
 import { useCurrency } from "@/context/CurrencyContext";
@@ -53,6 +52,19 @@ import {
   formatBirthdateAr,
   normalizeGender,
 } from "@/lib/dashboard/user-demographics";
+
+// Mars/Venus only ship with newer lucide-react releases than the one installed,
+// so build them from lucide's own icon paths.
+const Mars = createLucideIcon("Mars", [
+  ["path", { d: "M16 3h5v5", key: "1806ms" }],
+  ["path", { d: "m21 3-6.75 6.75", key: "pv0uzu" }],
+  ["circle", { cx: "10", cy: "14", r: "6", key: "1qwbdc" }],
+]);
+const Venus = createLucideIcon("Venus", [
+  ["path", { d: "M12 15v7", key: "t2xh3l" }],
+  ["path", { d: "M9 19h6", key: "456am0" }],
+  ["circle", { cx: "12", cy: "9", r: "6", key: "1nw4tq" }],
+]);
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SendTemplateDialog } from "@/components/dashboard/SendTemplateDialog";
