@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import { usePathname } from "next/navigation";
+import { impactRegionPath, resolveImpactRegion } from "@/lib/impact/routing";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Minus, Plus, ShieldCheck } from "lucide-react";
@@ -25,6 +27,8 @@ type Props = {
   regions: ImpactRegion[];
   needs: ImpactNeed[];
   allowMonthly: boolean;
+  campaignSlug?: string;
+  initialRegionKey?: string;
   /** "page" = the full /impact page; "compact" = the homepage section (no title, no fixed bar). */
   variant?: "page" | "compact";
 };
@@ -87,14 +91,34 @@ export default function ImpactBuilder({
   needs,
   allowMonthly,
   variant = "page",
+  campaignSlug,
+  initialRegionKey,
 }: Props) {
   const compact = variant === "compact";
   const t = useTranslations("ImpactBuilder");
   const locale = useLocale();
+  const pathname = usePathname();
   const { convertToCurrency } = useCurrency();
 
   const firstActive = regions.find((r) => r.active)?.key ?? regions[0]?.key ?? "";
-  const [regionKey, setRegionKey] = useState(firstActive);
+  const [selectedRegionKey, setRegionKey] = useState(initialRegionKey ?? firstActive);
+  // Native history updates keep all donation picks mounted. usePathname also
+  // follows Back/Forward, making the URL the source of truth on full pages.
+  const regionKey = !compact && campaignSlug
+    ? (resolveImpactRegion(regions, pathname.split("/")[4] ?? "")?.key ?? firstActive)
+    : selectedRegionKey;
+
+  const selectRegion = (region: ImpactRegion) => {
+    if (!region.active) return;
+    setRegionKey(region.key);
+    if (!compact && campaignSlug) {
+      const url = new URL(window.location.href);
+      const nextPath = impactRegionPath(locale, campaignSlug, region);
+      if (url.pathname === nextPath) return;
+      url.pathname = nextPath;
+      window.history.pushState(null, "", url.pathname + url.search + url.hash);
+    }
+  };
   const [picks, setPicks] = usePersistentPicks(`impact:${impactCampaignId}:picks`);
   const [monthly, setMonthly] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -441,7 +465,7 @@ export default function ImpactBuilder({
                     role="tab"
                     aria-selected={selected}
                     aria-disabled={!r.active}
-                    onClick={() => r.active && setRegionKey(r.key)}
+                    onClick={() => selectRegion(r)}
                     className={`whitespace-nowrap rounded-full px-4 py-2.5 text-[14px] font-extrabold transition sm:px-[22px] sm:text-[14.5px] ${
                       !r.active
                         ? "cursor-not-allowed text-[#aab5c0]"

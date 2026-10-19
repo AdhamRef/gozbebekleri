@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loadImpactCampaign } from "@/lib/impact/load";
+import { readImpactConfig } from "@/lib/impact/config";
+import { impactRegionPath, resolveImpactRegion } from "@/lib/impact/routing";
 import { prisma } from "@/lib/prisma";
 import { LOCALES } from "@/lib/seo";
 import { pickLocaleSlug, whereByIdOrAnyLocaleSlug } from "@/lib/slug";
@@ -65,6 +68,19 @@ export async function GET(req: NextRequest) {
 
   const kind = bodySegments[0];
   const idOrSlug = bodySegments[1];
+
+  if (kind === "impact" && idOrSlug && bodySegments.length === 3) {
+    try {
+      const row = await loadImpactCampaign(idOrSlug);
+      const region = row && resolveImpactRegion(readImpactConfig(row).regions, bodySegments[2]);
+      if (row && region) {
+        return NextResponse.json({ ok: true, path: impactRegionPath(targetLocale, row.slug, region), resolved: true, kind });
+      }
+    } catch (error) {
+      console.error("[resolve-localized-path] impact failed", error);
+    }
+    return NextResponse.json({ ok: true, path: fallback, resolved: false });
+  }
 
   if (!kind || !idOrSlug || !DYNAMIC_ROUTE_KINDS.has(kind)) {
     return NextResponse.json({ ok: true, path: fallback, resolved: false });
