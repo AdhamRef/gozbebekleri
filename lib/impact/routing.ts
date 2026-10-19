@@ -32,6 +32,13 @@ export function impactCampaignPath(locale: string, slug: string): string {
   return `/${locale}/impact/${encodeURIComponent(impactCampaignSlug(slug, locale))}`;
 }
 
+/** Next may expose an escaped route param. Compare decoded NFC text so a
+ * canonical Unicode URL never redirects back to its own escaped spelling. */
+export function impactSlugMatches(actual: string, canonical: string): boolean {
+  try { return decodeURIComponent(actual).normalize("NFC") === canonical.normalize("NFC"); }
+  catch { return false; }
+}
+
 // Stable public slugs, independent of editable display names and internal keys.
 const REGION_SLUGS: Record<string, Record<string, string>> = {
   ar: { gaza: "غزة", quds: "القدس", sudan: "السودان", yemen: "اليمن", syria: "سوريا" },

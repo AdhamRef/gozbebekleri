@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { SITE_URL, LOCALES } from "@/lib/seo";
-import { impactCampaignPath, impactCampaignSlug, impactRegionPath, impactRegionSlug, resolveImpactRegion } from "@/lib/impact/routing";
+import { impactCampaignPath, impactCampaignSlug, impactRegionPath, impactRegionSlug, impactSlugMatches, resolveImpactRegion } from "@/lib/impact/routing";
 import { pickText, readImpactConfig } from "@/lib/impact/config";
 import { loadImpactCampaign } from "@/lib/impact/load";
 import ImpactBuilder from "../_components/ImpactBuilder";
@@ -49,8 +49,8 @@ export default async function ImpactPage({ params, searchParams }: Props) {
   const region = regionSlug ? resolveImpactRegion(config.regions, regionSlug) : undefined;
   if (regionSlug && !region) notFound();
   // Old English URLs and cross-language aliases remain valid entry points.
-  if (slug !== impactCampaignSlug(row.slug, locale)
-    || (region && regionSlug !== impactRegionSlug(region, locale))) {
+  if (!impactSlugMatches(slug, impactCampaignSlug(row.slug, locale))
+    || (region && !impactSlugMatches(regionSlug!, impactRegionSlug(region, locale)))) {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(await searchParams)) {
       if (Array.isArray(value)) value.forEach((item) => query.append(key, item));

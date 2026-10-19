@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DEFAULT_IMPACT_CONFIG } from "../lib/impact/config";
-import { impactCampaignPath, impactCampaignSlug, IMPACT_CAMPAIGN_SLUGS, resolveImpactCampaignSlug, impactRegionPath, impactRegionSlug, resolveImpactRegion } from "../lib/impact/routing";
+import { impactCampaignPath, impactCampaignSlug, IMPACT_CAMPAIGN_SLUGS, resolveImpactCampaignSlug, impactRegionPath, impactRegionSlug, impactSlugMatches, resolveImpactRegion } from "../lib/impact/routing";
 import { SUPPORTED_LOCALES } from "../lib/locales";
 
 const regions = DEFAULT_IMPACT_CONFIG.regions;
@@ -61,4 +61,20 @@ test("custom campaign slugs remain unchanged", () => {
     assert.equal(resolveImpactCampaignSlug("custom-builder"), "custom-builder");
     assert.equal(resolveImpactCampaignSlug("Custom-Builder"), "Custom-Builder");
   }
+});
+
+test("canonical Unicode route params never redirect to themselves, escaped or decoded", () => {
+  for (const locale of SUPPORTED_LOCALES) {
+    const campaign = impactCampaignSlug("make-an-impact", locale);
+    for (const actual of [campaign, encodeURIComponent(campaign), campaign.normalize("NFD")]) {
+      assert.equal(impactSlugMatches(actual, campaign), true);
+    }
+    for (const region of regions) {
+      const slug = impactRegionSlug(region, locale);
+      assert.equal(impactSlugMatches(encodeURIComponent(slug), slug), true);
+      assert.equal(impactSlugMatches(slug, slug), true);
+    }
+  }
+  assert.equal(impactSlugMatches("make-an-impact", "اصنع-أثرا"), false);
+  assert.equal(impactSlugMatches("%E0%A4%A", "اصنع-أثرا"), false);
 });
