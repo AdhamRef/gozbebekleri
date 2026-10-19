@@ -13,6 +13,7 @@ const createSchema = z.object({
   document: z.record(z.unknown()),
   translations: z
     .record(z.object({ subject: z.string().optional(), document: z.record(z.unknown()).optional() }))
+    .nullable()
     .optional(),
 });
 
