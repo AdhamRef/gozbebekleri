@@ -14,7 +14,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
 import type { CampaignCardData } from "../CampaignCard";
 import ImpactBuilder, { ImpactTexture } from "../../impact/_components/ImpactBuilder";
-import { impactCampaignSlug } from "@/lib/impact/routing";
+import { impactCampaignPath } from "@/lib/impact/routing";
 import type { ImpactNeed, ImpactRegion } from "@/lib/impact/config";
 
 // LiveDonationsTicker is a non-critical floating widget — keep it client-only
@@ -174,7 +174,7 @@ const HomePage: React.FC<HomePageContentProps> = ({
                 )}
               </div>
               <Link
-                href={`/impact/${encodeURIComponent(impactCampaignSlug(featuredImpact.slug, locale))}`}
+                href={impactCampaignPath(locale, featuredImpact.slug).slice(locale.length + 1)}
                 className="flex flex-none mb-1 items-center gap-1.5 text-sm font-semibold text-[#025EB8] hover:text-[#FA5D17] transition-colors"
               >
                 {t("impactFullPage")} <ArrowRight className="w-4 h-4 rtl:rotate-180" />

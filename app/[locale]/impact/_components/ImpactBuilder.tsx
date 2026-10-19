@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { impactRegionPath, resolveImpactRegion } from "@/lib/impact/routing";
+import { impactRegionPath, impactRegionFromPath, resolveImpactRegion } from "@/lib/impact/routing";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Minus, Plus, ShieldCheck } from "lucide-react";
@@ -105,7 +105,7 @@ export default function ImpactBuilder({
   // Native history updates keep all donation picks mounted. usePathname also
   // follows Back/Forward, making the URL the source of truth on full pages.
   const regionKey = !compact && campaignSlug
-    ? (resolveImpactRegion(regions, pathname.split("/")[4] ?? "")?.key ?? firstActive)
+    ? (resolveImpactRegion(regions, impactRegionFromPath(pathname))?.key ?? firstActive)
     : selectedRegionKey;
 
   const selectRegion = (region: ImpactRegion) => {

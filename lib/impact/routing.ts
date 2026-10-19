@@ -29,7 +29,8 @@ export function impactCampaignSlug(slug: string, locale: string): string {
 }
 
 export function impactCampaignPath(locale: string, slug: string): string {
-  return `/${locale}/impact/${encodeURIComponent(impactCampaignSlug(slug, locale))}`;
+  const section = resolveImpactCampaignSlug(slug) === FEATURED_IMPACT_SLUG ? "" : "/impact";
+  return `/${locale}${section}/${encodeURIComponent(impactCampaignSlug(slug, locale))}`;
 }
 
 /** Next may expose an escaped route param. Compare decoded NFC text so a
@@ -73,4 +74,10 @@ export function resolveImpactRegion(regions: ImpactRegion[], slug: string): Impa
 
 export function impactRegionPath(locale: string, campaignSlug: string, region: ImpactRegion): string {
   return `${impactCampaignPath(locale, campaignSlug)}/${encodeURIComponent(impactRegionSlug(region, locale))}`;
+}
+
+/** Region segment for the clean featured route or an existing custom builder. */
+export function impactRegionFromPath(pathname: string): string {
+  const segments = pathname.split("/").filter(Boolean);
+  return segments[1] === "impact" ? segments[3] ?? "" : segments[2] ?? "";
 }
