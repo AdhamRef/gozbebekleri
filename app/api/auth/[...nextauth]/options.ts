@@ -12,6 +12,18 @@ import { isValidLocale, DEFAULT_LOCALE, type SupportedLocale } from "@/lib/local
 
 const googleAuthClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+// Run only after a new account is actually persisted. Message configuration or
+// provider failures must never prevent a successful authentication.
+async function notifyNewAccount(userId: string): Promise<void> {
+  try {
+    const { dispatchEvent } = await import("@/lib/events/dispatch");
+    await dispatchEvent("USER_REGISTERED", { userId });
+  } catch {
+    console.error("[auth] new-account notification failed");
+  }
+}
+
+
 /**
  * NextAuth's signIn callback doesn't receive the request, so we read the
  * locale from the next-intl cookie. Falls back to ar.
@@ -113,6 +125,7 @@ providers.push(
           preferredLang,
         },
       });
+      await notifyNewAccount(created.id);
       return { id: created.id, email: created.email, name: created.name, role: created.role };
     },
   })
@@ -202,7 +215,7 @@ export const authOptions: NextAuthOptions = {
           } else {
             // If the user does not exist, create a new user
             const preferredLang = await readLocaleFromCookies();
-            await prisma.user.create({
+            const created = await prisma.user.create({
               data: {
                 email: user.email!,
                 name: user.name!,
@@ -211,6 +224,7 @@ export const authOptions: NextAuthOptions = {
                 preferredLang,
               },
             });
+            await notifyNewAccount(created.id);
           }
           return true;
         }
@@ -224,13 +238,13 @@ export const authOptions: NextAuthOptions = {
       if (session?.user) {
         session.user.id = token.sub!;
         session.user.email = token.email;
-        
+
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.sub },
             select: { role: true, dashboardPermissions: true },
           });
-          
+
           if (dbUser) {
             session.user.role = dbUser.role;
             session.user.dashboardPermissions = dbUser.dashboardPermissions ?? [];

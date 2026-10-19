@@ -76,6 +76,7 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
       { key: "messages", title: "الحملات التسويقية", href: "/dashboard/communication/campaigns", icon: "megaphone", keywords: ["campaigns", "marketing", "حملات", "تسويق", "broadcast", "bulk"] },
       { key: "messages", title: "البريد الإلكتروني", href: "/dashboard/communication/email", icon: "mail", keywords: ["email", "بريد", "elastic"] },
       { key: "messages", title: "واتساب", href: "/dashboard/communication/whatsapp", icon: "messageCircle", keywords: ["whatsapp", "واتساب", "meta"] },
+      { key: "messages", title: "محادثات واتساب", href: "/dashboard/communication/inbox", icon: "messageCircle", keywords: ["whatsapp", "conversations", "محادثات", "واتساب"] },
       { key: "messages", title: "الرسائل النصية", href: "/dashboard/communication/sms", icon: "messageSquare", keywords: ["sms", "نصية", "netgsm", "brevo"] },
       { key: "templates", title: "قوالب البريد والمحفّزات", href: "/dashboard/templates", icon: "mail", keywords: ["email", "triggers", "محفزات"] },
       // Was the second tab of /dashboard/messages, behind a page that defaults to the outbound

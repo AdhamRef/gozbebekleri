@@ -67,6 +67,8 @@ const Venus = createLucideIcon("Venus", [
 ]);
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SmartWhatsappDialog } from "@/components/dashboard/SmartWhatsappDialog";
+import { userHasDashboardPermission } from "@/lib/dashboard/permissions";
 import { SendTemplateDialog } from "@/components/dashboard/SendTemplateDialog";
 import { DonorAttributionJourney } from "@/components/dashboard/DonorAttributionJourney";
 
@@ -307,6 +309,8 @@ export function ViewUserProfileDialog({
 }) {
   const { convertToCurrency } = useCurrency();
   const { data: session } = useSession();
+  const [smartWhatsappOpen, setSmartWhatsappOpen] = React.useState(false);
+  const canMessage = session?.user ? userHasDashboardPermission(session.user, "messages") : false;
   const viewerIsAdmin = session?.user?.role === "ADMIN";
   const [sendDialog, setSendDialog] = React.useState<{
     open: boolean;
@@ -635,8 +639,8 @@ export function ViewUserProfileDialog({
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
-                  onClick={() => setSendDialog({ open: true, channel: "whatsapp" })}
-                  disabled={!user.phone}
+                  onClick={() => setSmartWhatsappOpen(true)}
+                  disabled={!user.phone || !canMessage}
                   title={!user.phone ? "لا يوجد رقم هاتف" : undefined}
                   className="h-8 gap-1.5 bg-[#25D366] hover:bg-[#25D366]/90 text-white"
                 >
@@ -657,6 +661,7 @@ export function ViewUserProfileDialog({
         )}
       </DialogContent>
 
+      {user && <SmartWhatsappDialog open={smartWhatsappOpen} onOpenChange={setSmartWhatsappOpen} userId={user.id} onOpenConversation={() => onOpenChange(false)} />}
       {user && (
         <SendTemplateDialog
           open={sendDialog.open}

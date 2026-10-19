@@ -43,3 +43,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .qodo
+
+# Rebuilt by test:integration-settings
+/.integration-test-build/

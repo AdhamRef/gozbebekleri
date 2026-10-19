@@ -1,8 +1,10 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
 import { DEFAULT_LOCALE, isValidLocale, type SupportedLocale } from "@/lib/locales";
 import { donorChannelEligibility } from "./audience-service";
 import type { CommunicationChannelId } from "./communication-runtime-types";
+import { AUDIENCE_SELECTION_MAX } from "./audience-limits";
 
 /**
  * Custom & TEST audience lists. Automatic language segments are NOT stored here (they are computed
@@ -14,7 +16,7 @@ import type { CommunicationChannelId } from "./communication-runtime-types";
 type Actor = { actorId?: string | null; actorName?: string | null; actorRole?: string | null };
 export type ServiceResult<T = { id: string }> = { ok: true; data: T } | { ok: false; status: number; error: string };
 
-export type AudienceListType = "CUSTOM" | "TEST";
+export type AudienceListType = "CUSTOM" | "TEST" | "SMART";
 export const AUDIENCE_LIST_PREFIX = "list:";
 
 async function audit(actor: Actor, action: string, ar: string, en: string, entityId: string, metadata: Record<string, unknown>) {
@@ -58,11 +60,13 @@ export async function listAudienceLists(): Promise<AudienceListSummary[]> {
     id: l.id,
     name: l.name,
     description: l.description ?? null,
-    type: (l.type === "TEST" ? "TEST" : "CUSTOM") as AudienceListType,
+    type: (l.type === "TEST" ? "TEST" : l.type === "SMART" ? "SMART" : "CUSTOM") as AudienceListType,
     status: l.status,
     locale: l.locale ?? null,
     channels: l.channels ?? [],
-    membersCount: countMap.get(l.id) ?? 0,
+    membersCount: l.type === "SMART"
+      ? Number((l.metadata as { lastMatchedCount?: number } | null)?.lastMatchedCount ?? 0)
+      : countMap.get(l.id) ?? 0,
     owner: l.createdByName ?? null,
     updatedAt: l.updatedAt.toISOString(),
     lastTestAt: (l.metadata as { lastTestAt?: string } | null)?.lastTestAt ?? null,
@@ -101,8 +105,11 @@ export async function getAudienceList(id: string): Promise<{ list: AudienceListS
   });
 
   const summary: AudienceListSummary = {
-    id: l.id, name: l.name, description: l.description ?? null, type: (l.type === "TEST" ? "TEST" : "CUSTOM"),
-    status: l.status, locale: l.locale ?? null, channels: l.channels ?? [], membersCount: members.length,
+    id: l.id, name: l.name, description: l.description ?? null, type: (l.type === "TEST" ? "TEST" : l.type === "SMART" ? "SMART" : "CUSTOM"),
+    status: l.status, locale: l.locale ?? null, channels: l.channels ?? [],
+    membersCount: l.type === "SMART"
+      ? Number((l.metadata as { lastMatchedCount?: number } | null)?.lastMatchedCount ?? 0)
+      : members.length,
     owner: l.createdByName ?? null, updatedAt: l.updatedAt.toISOString(), lastTestAt: (l.metadata as { lastTestAt?: string } | null)?.lastTestAt ?? null,
   };
   return { list: summary, members };
@@ -111,7 +118,7 @@ export async function getAudienceList(id: string): Promise<{ list: AudienceListS
 // ─────────────────────────── Mutations ───────────────────────────
 
 export async function createAudienceList(
-  input: { name: string; description?: string | null; type?: AudienceListType; locale?: string | null; channels?: string[] },
+  input: { name: string; description?: string | null; type?: AudienceListType; locale?: string | null; channels?: string[]; metadata?: Prisma.InputJsonValue | null },
   actor: Actor
 ): Promise<ServiceResult> {
   if (!process.env.DATABASE_URL) return { ok: false, status: 503, error: "DATABASE_URL is not configured." };
@@ -123,12 +130,13 @@ export async function createAudienceList(
       data: {
         name,
         description: input.description ?? null,
-        type: input.type === "TEST" ? "TEST" : "CUSTOM",
+        type: input.type === "TEST" ? "TEST" : input.type === "SMART" ? "SMART" : "CUSTOM",
         status: "ACTIVE",
         locale: input.locale && isValidLocale(input.locale) ? input.locale : null,
         channels,
         createdBy: actor.actorId ?? null,
         createdByName: actor.actorName ?? null,
+        metadata: input.metadata ?? undefined,
       },
       select: { id: true },
     });
@@ -177,6 +185,7 @@ export async function duplicateAudienceList(id: string, actor: Actor): Promise<S
         channels: src.channels ?? [],
         createdBy: actor.actorId ?? null,
         createdByName: actor.actorName ?? null,
+        metadata: src.metadata ?? undefined,
       },
       select: { id: true },
     });
@@ -198,7 +207,7 @@ export async function duplicateAudienceList(id: string, actor: Actor): Promise<S
 export async function addDonorMembers(listId: string, userIds: string[], actor: Actor): Promise<ServiceResult<{ added: number }>> {
   const list = await prisma.communicationAudienceList.findUnique({ where: { id: listId }, select: { id: true } }).catch(() => null);
   if (!list) return { ok: false, status: 404, error: "القائمة غير موجودة." };
-  const ids = [...new Set(userIds.filter(Boolean))].slice(0, 1000);
+  const ids = [...new Set(userIds.filter(Boolean))].slice(0, AUDIENCE_SELECTION_MAX);
   if (ids.length === 0) return { ok: false, status: 400, error: "لا يوجد متبرعون للإضافة." };
   try {
     // Only add donors not already present.
@@ -268,7 +277,7 @@ export type ResolvedListMember = { userId: string | null; name: string | null; e
 /** Resolve a list's ACTIVE members into send-ready contacts (donor data read live). */
 export async function loadListMembers(listId: string): Promise<ResolvedListMember[]> {
   if (!process.env.DATABASE_URL) return [];
-  const rows = await prisma.communicationAudienceMember.findMany({ where: { listId, status: "ACTIVE" }, take: 2000 }).catch(() => []);
+  const rows = await prisma.communicationAudienceMember.findMany({ where: { listId, status: "ACTIVE" }, orderBy: { id: "asc" }, take: AUDIENCE_SELECTION_MAX }).catch(() => []);
   const donorIds = rows.filter((m) => m.contactType === "DONOR" && m.userId).map((m) => m.userId!) as string[];
   const donors = donorIds.length
     ? await prisma.user.findMany({ where: { id: { in: donorIds } }, select: { id: true, name: true, email: true, phone: true, preferredLang: true, countryCode: true, emailNotifications: true, smsNotifications: true } }).catch(() => [])
@@ -292,6 +301,54 @@ export async function loadListMembers(listId: string): Promise<ResolvedListMembe
     }
   }
   return out;
+}
+
+/**
+ * One page of a list's ACTIVE members, ordered by member id so a send can walk the whole list
+ * across several runs. `loadListMembers` above reads the list in one shot for the counts screen;
+ * this is the send path's door, and the only one that must be able to finish a 10,000-member list.
+ *
+ * The cursor is the last member row's id, not a donor id: a list can hold the same donor once and
+ * test contacts with no donor at all, and the member id is the only key that is always there and
+ * always unique.
+ */
+export async function loadListMembersPage(
+  listId: string,
+  opts: { limit: number; cursorId?: string | null }
+): Promise<{ members: (ResolvedListMember & { memberId: string })[]; nextCursor: string | null; exhausted: boolean }> {
+  if (!process.env.DATABASE_URL) return { members: [], nextCursor: null, exhausted: true };
+  const limit = Math.max(1, opts.limit);
+  const rows = await prisma.communicationAudienceMember
+    .findMany({
+      where: { listId, status: "ACTIVE", ...(opts.cursorId ? { id: { gt: opts.cursorId } } : {}) },
+      orderBy: { id: "asc" },
+      take: limit,
+    })
+    .catch(() => []);
+  const exhausted = rows.length < limit;
+  const nextCursor = rows.length ? rows[rows.length - 1].id : opts.cursorId ?? null;
+
+  const donorIds = rows.filter((m) => m.contactType === "DONOR" && m.userId).map((m) => m.userId!) as string[];
+  const donors = donorIds.length
+    ? await prisma.user.findMany({ where: { id: { in: donorIds } }, select: { id: true, name: true, email: true, phone: true, preferredLang: true, countryCode: true, emailNotifications: true, smsNotifications: true } }).catch(() => [])
+    : [];
+  const dMap = new Map(donors.map((d) => [d.id, d]));
+
+  const members: (ResolvedListMember & { memberId: string })[] = [];
+  for (const m of rows) {
+    if (m.contactType === "DONOR" && m.userId) {
+      const d = dMap.get(m.userId);
+      /* A donor deleted since the list was built: the row is walked past (the cursor already
+         advanced) rather than retried forever. */
+      if (!d) continue;
+      const locale = (d.preferredLang && isValidLocale(d.preferredLang) ? d.preferredLang : DEFAULT_LOCALE) as SupportedLocale;
+      members.push({ memberId: m.id, userId: d.id, name: d.name, email: d.email, phone: d.phone, locale, country: d.countryCode, contactType: "DONOR" });
+    } else {
+      const locale = (m.locale && isValidLocale(m.locale) ? m.locale : DEFAULT_LOCALE) as SupportedLocale;
+      members.push({ memberId: m.id, userId: null, name: m.name, email: m.email, phone: m.phone, locale, country: null, contactType: "TEST_CONTACT" });
+    }
+  }
+  return { members, nextCursor, exhausted };
 }
 
 /** Channel eligibility for a resolved member (donors use consent; test contacts just need contact info). */

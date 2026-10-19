@@ -106,6 +106,7 @@ model User {
   cartItems    CartItem[]
   messages     Message[]
   creditCards  CreditCard[]
+  communicationProfile DonorCommunicationProfile?
 }
 
 /* ===================== CREDIT CARDS ===================== */
@@ -921,20 +922,20 @@ model EmailLayout {
 }
 
 model WhatsappTemplate {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  name        String
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
   /// Canonical Arabic body (also the fallback when a locale variation is missing).
-  body        String
+  body         String
   /// Per-locale overrides: Record<locale, { body?: string }>.
   translations Json?
-  createdById String?  @db.ObjectId
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdById  String?  @db.ObjectId
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // ── Twilio / WhatsApp Content metadata (all optional for back-compat)
   /// "TWILIO" when imported from Twilio Content API, "MANUAL" otherwise.
   provider           String?
-  /// "WHATSAPP" — kept explicit for the future Marketing Intelligence module.
+  /// "WHATSAPP"  kept explicit for the future Marketing Intelligence module.
   channel            String?
   /// Twilio Content SID (HX-prefixed) or other provider id.
   externalTemplateId String?
@@ -942,9 +943,9 @@ model WhatsappTemplate {
   templateType       String?
   /// IETF language tag, e.g. "ar", "en".
   language           String?
-  /// WhatsApp template category — MARKETING / UTILITY / AUTHENTICATION (etc.)
+  /// WhatsApp template category  MARKETING / UTILITY / AUTHENTICATION (etc.)
   category           String?
-  /// "approved" | "pending" | "rejected" | "unknown" — Twilio whatsapp/approval state.
+  /// "approved" | "pending" | "rejected" | "unknown"  Twilio whatsapp/approval state.
   approvalStatus     String?
   /// Header descriptor when the template has a header.
   /// Shape: { type, text?, mediaUrl?, mediaSid?, mimeType?, fileName?, previewUrl?, latitude?, longitude?, address? }
@@ -953,6 +954,8 @@ model WhatsappTemplate {
   /// Buttons array. Shape: Array<{ type, text, url?, phoneNumber?, payload?, index }>
   /// type ∈ "url" | "phone" | "quick_reply" | "copy_code" | "donation_cta" | "tracking_url".
   buttons            Json?
+  /// Authentication template studio settings (OTP copy-code / one-tap).
+  authentication     Json?
   /// Template variable catalog. Shape: Array<{ key, exampleValue?, mapping?, validationStatus? }>
   variables          Json?
   /// Last successful sync from Twilio.
@@ -961,16 +964,21 @@ model WhatsappTemplate {
   lastSyncStatus     String?
   /// Last error message from sync (truncated, never includes auth tokens).
   lastSyncError      String?
-  /// Sanitized provider payload — handy for debugging mapping issues.
+  /// Sanitized provider payload  handy for debugging mapping issues.
   providerRaw        Json?
 
   // ── Template Center taxonomy (optional / defaulted for back-compat)
   /// "SYSTEM" (platform-event) | "CAMPAIGN" (reusable marketing). Unset = CAMPAIGN.
-  kind               String?  @default("CAMPAIGN")
+  kind    String? @default("CAMPAIGN")
   /// "DRAFT" | "READY" | "NEEDS_REVIEW" | "ARCHIVED". Unset = DRAFT.
-  status             String?  @default("DRAFT")
+  status  String? @default("DRAFT")
   /// "MARKETING" | "UTILITY" | "TRANSACTIONAL" | "AUTHENTICATION" (optional).
-  purpose            String?
+  purpose String?
+
+  /// Aggregated provider truth kept for backwards compatibility/read-only dashboards.
+  variants WhatsappTemplateVariant[]
+  /// Exact Meta truth per WABA + language. Runtime sending must use this collection.
+  wabaVariants WhatsappTemplateWabaVariant[]
 
   @@index([name])
   @@index([externalTemplateId])
@@ -1026,6 +1034,7 @@ enum MessageTriggerEvent {
 enum MessageChannel {
   EMAIL
   WHATSAPP
+  SMS
 }
 
 model MessageTrigger {
@@ -1559,6 +1568,7 @@ model SenderRoutingRule {
 model DonorCommunicationProfile {
   id                  String    @id @default(auto()) @map("_id") @db.ObjectId
   userId              String    @unique @db.ObjectId
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   preferredLocale     String?
   countryCode         String?
   timezone            String?
@@ -1751,4 +1761,117 @@ model CommunicationCampaignTrackingLink {
   metadata    Json?
 
   @@index([campaignId, status])
+}
+
+
+model WhatsappTemplateVariant {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  templateId String @db.ObjectId
+  /// "META_WHATSAPP". Present so a second provider can be synced alongside rather than over.
+  provider   String
+
+  /// The name Meta knows this template by  what `sendTemplateMessage` must send, which is not
+  /// necessarily what the team calls it locally.
+  providerTemplateName String
+  /// Meta's own id for the language variant, when the listing exposes one.
+  providerTemplateId   String?
+  /// Meta's language tag for this variant, e.g. "ar", "en_US". Sent verbatim as `language.code`.
+  languageCode         String
+  /// The site locale this variant serves, derived from languageCode at sync time.
+  locale               String?
+
+  /// "APPROVED" | "PENDING" | "REJECTED" | "PAUSED" | "DISABLED" | "UNKNOWN", upper-cased from Meta.
+  approvalStatus  String
+  /// Meta's category: MARKETING | UTILITY | AUTHENTICATION.
+  category        String?
+  /// Why Meta rejected it, when it did.
+  rejectionReason String?
+  /// Quality rating Meta reports for the variant (GREEN / YELLOW / RED), when present.
+  qualityRating   String?
+
+  /// The variant's components exactly as Meta describes them, which is what the parameter builder
+  /// reads to know how many BODY parameters exist, whether the HEADER takes one and what type, and
+  /// which buttons are dynamic. Shape: Array<{ type, format?, text?, buttons?, example? }>.
+  componentsSchema Json?
+
+  lastSyncedAt DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  template WhatsappTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  /// One row per language per provider per template  the sync upserts on this.
+  @@unique([templateId, provider, languageCode])
+  @@index([provider, approvalStatus])
+  @@index([providerTemplateName])
+}
+
+
+model WhatsappTemplateWabaVariant {
+  id                String @id @default(auto()) @map("_id") @db.ObjectId
+  templateId        String @db.ObjectId
+  provider          String @default("META_WHATSAPP")
+  businessAccountId String
+  providerTemplateName String
+  providerTemplateId   String?
+  languageCode      String
+  locale            String?
+  approvalStatus    String
+  category          String?
+  rejectionReason   String?
+  qualityRating     String?
+  componentsSchema  Json?
+  lastSyncedAt      DateTime
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  template WhatsappTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, provider, businessAccountId, languageCode])
+  @@index([businessAccountId, approvalStatus])
+  @@index([providerTemplateName])
+}
+
+
+model EmailSuppression {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String   @unique
+  reason    String   // UNSUBSCRIBE | HARD_BOUNCE | COMPLAINT
+  scope     String   // MARKETING | ALL
+  source    String?
+  userId    String?  @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([scope])
+  @@index([reason])
+  @@index([userId])
+}
+
+
+model CommunicationGlobalControl {
+  id            String   @id @map("_id") @db.ObjectId
+  emergencyStop Boolean  @default(false)
+  updatedBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+
+model CommunicationCampaignDeferredRecipient {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  campaignId    String   @db.ObjectId
+  cursorId      String
+  userId        String   @db.ObjectId
+  name          String?
+  email         String?
+  phone         String?
+  locale        String
+  country       String?
+  nextAttemptAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([campaignId, cursorId])
+  @@index([campaignId, nextAttemptAt])
 }

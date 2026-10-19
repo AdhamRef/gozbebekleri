@@ -304,5 +304,5 @@ test("primary Prisma schema validates without modification", () => {
     "validate",
     "--schema",
     "prisma/schema.prisma",
-  ], { stdio: "pipe" });
+  ], { stdio: "pipe", env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL || "mongodb://127.0.0.1:27017/schema_validation_only" } });
 });

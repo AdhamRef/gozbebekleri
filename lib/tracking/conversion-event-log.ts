@@ -1,3 +1,4 @@
+import { rawCommand } from "@/lib/prisma-raw-command";
 import { prisma } from "@/lib/prisma";
 import { ensureConversionEventIndexes } from "@/lib/tracking/conversion-event-indexes";
 
@@ -51,18 +52,18 @@ export async function recordConversionEvent(input: RecordConversionEventInput): 
     addDefined(setDoc, "response", input.response);
     addDefined(setDoc, "sentAt", sentAt ?? undefined);
 
-    await prisma.$runCommandRaw({
+    await prisma.$runCommandRaw(rawCommand({
       update: "ConversionEvent",
       updates: [{
         q: { platform: input.platform, eventId: input.eventId, channel: input.channel },
         u: {
           $set: setDoc,
-          $setOnInsert: { createdAt: now, attempts: 0 },
+          $setOnInsert: { createdAt: now },
           $inc: { attempts: 1 },
         },
         upsert: true,
       }],
-    });
+    }));
   } catch (error) {
     console.error("[conversion-event-log] failed", error);
   }

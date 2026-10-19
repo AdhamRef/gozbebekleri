@@ -1,3 +1,4 @@
+import { donationUsdAmount } from "@/lib/templates/money";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
 import { LOCALES, isValidLocale, type SupportedLocale } from "@/lib/locales";
@@ -9,7 +10,7 @@ import type { CommunicationChannelId } from "./communication-runtime-types";
  *
  * Attribution is NEVER fabricated: it is derived from the donation `attribution` UTM snapshot captured
  * at checkout. A donation is matched to a campaign only when its attribution carries the campaign's
- * UTM values. Failed donation attempts are real rows (DonationStatus = FAILED) — if none exist we show
+ * UTM values. Failed donation attempts are real rows (DonationStatus = FAILED)  if none exist we show
  * "unavailable", never a fake 0. Visits are not stored, so they are always reported as unavailable.
  */
 
@@ -64,7 +65,7 @@ export function decorateUrl(baseUrl: string, params: Record<string, string | und
     for (const [k, v] of Object.entries(params)) if (v) u.searchParams.set(k, v);
     return u.toString();
   } catch {
-    // Not a valid absolute URL — return as-is so we never invent a fake URL.
+    // Not a valid absolute URL  return as-is so we never invent a fake URL.
     return baseUrl;
   }
 }
@@ -90,7 +91,7 @@ export async function attachTrackingLink(
     url = decorateUrl(input.baseUrl.trim(), params);
     try {
       const link = await createOrUpdateCampaignLink({
-        name: `تواصل — ${source} — ${campaign.id}`,
+        name: `تواصل  ${source}  ${campaign.id}`,
         platform: source,
         channel: source,
         url,
@@ -107,7 +108,7 @@ export async function attachTrackingLink(
       linkId = (link as { id?: string; urlHash?: string })?.id ?? (link as { urlHash?: string })?.urlHash ?? null;
     } catch (error) {
       console.error("attachTrackingLink: generator create failed", error);
-      // Fall through — we still record the decorated URL association so reporting works.
+      // Fall through  we still record the decorated URL association so reporting works.
     }
   }
 
@@ -145,11 +146,11 @@ function str(o: Record<string, unknown>, k: string): string | null {
   const v = o[k];
   return typeof v === "string" && v.trim() ? v.trim() : null;
 }
-function valueUSD(d: { amountUSD: number | null; totalAmount: number; amount: number }): number {
-  return d.amountUSD ?? d.totalAmount ?? d.amount ?? 0;
+function valueUSD(d: { amountUSD: number | null; amount: number; currency: string }): number {
+  return donationUsdAmount(d) ?? 0;
 }
 
-type DonationRow = { id: string; status: string; amount: number; amountUSD: number | null; totalAmount: number; attribution: unknown; donorCountryCode?: string | null };
+type DonationRow = { id: string; status: string; amount: number; amountUSD: number | null; totalAmount: number; currency: string; attribution: unknown; donorCountryCode?: string | null };
 
 const COMM_SOURCES = new Set(["whatsapp", "email", "sms"]);
 
@@ -158,7 +159,7 @@ async function loadCommunicationDonations(sinceDays = 180): Promise<DonationRow[
   if (!process.env.DATABASE_URL) return [];
   const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
   const rows = await prisma.donation
-    .findMany({ where: { createdAt: { gte: since } }, select: { id: true, status: true, amount: true, amountUSD: true, totalAmount: true, attribution: true }, orderBy: { createdAt: "desc" }, take: 8000 })
+    .findMany({ where: { createdAt: { gte: since } }, select: { id: true, status: true, amount: true, amountUSD: true, totalAmount: true, currency: true, attribution: true }, orderBy: { createdAt: "desc" }, take: 8000 })
     .catch(() => []);
   return rows.filter((d) => str(attr(d), "utm_medium") === COMMUNICATION_MEDIUM);
 }
@@ -216,6 +217,48 @@ export async function getCampaignDonationReport(campaign: { id: string; channel:
 }
 
 // ─────────────────────────── Communication-wide donation overview (reports page) ───────────────────────────
+
+export type CampaignOutcomeMetric = {
+  donationCount: number;
+  revenue: number;
+  missingUsdCount: number;
+  failedDonationCount: number;
+};
+
+/**
+ * Batch exact-attribution metrics for the campaign list.
+ *
+ * Only donations whose checkout snapshot contains `utm_medium=communication` and an exact
+ * `utm_campaign=<CommunicationCampaign.id>` are credited. There is deliberately no channel-level
+ * fallback here: a list comparing many campaigns must never double-credit the same donation.
+ */
+export async function getCampaignOutcomeMetrics(
+  campaignIds: readonly string[],
+): Promise<Map<string, CampaignOutcomeMetric>> {
+  const ids = new Set(campaignIds.filter(Boolean));
+  const out = new Map<string, CampaignOutcomeMetric>();
+  if (!ids.size) return out;
+
+  const donations = await loadCommunicationDonations();
+  for (const donation of donations) {
+    const campaignId = str(attr(donation), "utm_campaign");
+    if (!campaignId || !ids.has(campaignId)) continue;
+    const current = out.get(campaignId) ?? { donationCount: 0, revenue: 0, missingUsdCount: 0, failedDonationCount: 0 };
+    if (donation.status === "PAID") {
+      current.donationCount += 1;
+      current.revenue += valueUSD(donation);
+      if (donationUsdAmount(donation) === null) current.missingUsdCount += 1;
+    } else if (donation.status === "FAILED") {
+      current.failedDonationCount += 1;
+    }
+    out.set(campaignId, current);
+  }
+
+  for (const [id, metric] of out) {
+    out.set(id, { ...metric, revenue: Math.round(metric.revenue * 100) / 100 });
+  }
+  return out;
+}
 
 export type CommunicationDonationOverview = {
   hasData: boolean;
