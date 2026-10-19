@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import { buildHreflang, SITE_URL, LOCALES } from "@/lib/seo";
-import { impactRegionPath, resolveImpactRegion } from "@/lib/impact/routing";
+import { notFound, redirect } from "next/navigation";
+import { SITE_URL, LOCALES } from "@/lib/seo";
+import { impactCampaignPath, impactCampaignSlug, impactRegionPath, impactRegionSlug, resolveImpactRegion } from "@/lib/impact/routing";
 import { pickText, readImpactConfig } from "@/lib/impact/config";
 import { loadImpactCampaign } from "@/lib/impact/load";
 import ImpactBuilder from "../_components/ImpactBuilder";
@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 
 interface Props {
   params: Promise<{ slug: string; locale: string; region?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -20,13 +21,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const region = regionSlug ? resolveImpactRegion(config.regions, regionSlug) : undefined;
   if (regionSlug && !region) return { robots: { index: false, follow: true } };
   const title = [pickText(row.title, locale), region && pickText(region.name, locale)].filter(Boolean).join(" | ");
-  const alternates = region ? {
-    canonical: SITE_URL + impactRegionPath(locale, row.slug, region),
+  const pathForLocale = (lang: string) => region
+    ? impactRegionPath(lang, row.slug, region)
+    : impactCampaignPath(lang, row.slug);
+  const alternates = {
+    canonical: SITE_URL + pathForLocale(locale),
     languages: Object.fromEntries([
-      ...LOCALES.map((lang) => [lang, SITE_URL + impactRegionPath(lang, row.slug, region)]),
-      ["x-default", SITE_URL + impactRegionPath("ar", row.slug, region)],
+      ...LOCALES.map((lang) => [lang, SITE_URL + pathForLocale(lang)]),
+      ["x-default", SITE_URL + pathForLocale("ar")],
     ]),
-  } : buildHreflang(`/impact/${row.slug}`, locale);
+  };
   const description = pickText(row.intro, locale) || undefined;
   return {
     title,
@@ -36,7 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function ImpactPage({ params }: Props) {
+export default async function ImpactPage({ params, searchParams }: Props) {
   const { slug, locale, region: regionSlug } = await params;
   const row = await loadImpactCampaign(slug);
   if (!row) notFound();
@@ -44,6 +48,17 @@ export default async function ImpactPage({ params }: Props) {
   const config = readImpactConfig(row);
   const region = regionSlug ? resolveImpactRegion(config.regions, regionSlug) : undefined;
   if (regionSlug && !region) notFound();
+  // Old English URLs and cross-language aliases remain valid entry points.
+  if (slug !== impactCampaignSlug(row.slug, locale)
+    || (region && regionSlug !== impactRegionSlug(region, locale))) {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(await searchParams)) {
+      if (Array.isArray(value)) value.forEach((item) => query.append(key, item));
+      else if (value !== undefined) query.append(key, value);
+    }
+    const path = region ? impactRegionPath(locale, row.slug, region) : impactCampaignPath(locale, row.slug);
+    redirect(path + (query.size ? `?${query}` : ""));
+  }
   return (
     <ImpactBuilder
       impactCampaignId={row.id}

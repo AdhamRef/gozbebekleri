@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DEFAULT_IMPACT_CONFIG } from "../lib/impact/config";
-import { impactRegionPath, impactRegionSlug, resolveImpactRegion } from "../lib/impact/routing";
+import { impactCampaignPath, impactCampaignSlug, IMPACT_CAMPAIGN_SLUGS, resolveImpactCampaignSlug, impactRegionPath, impactRegionSlug, resolveImpactRegion } from "../lib/impact/routing";
 import { SUPPORTED_LOCALES } from "../lib/locales";
 
 const regions = DEFAULT_IMPACT_CONFIG.regions;
@@ -21,8 +21,8 @@ test("every region deep link resolves in all eight languages, including encoded 
 test("switching language preserves region identity and translates the final segment", () => {
   const region = resolveImpactRegion(regions, "السودان")!;
   assert.equal(impactRegionPath("en", "make-an-impact", region), "/en/impact/make-an-impact/sudan");
-  assert.equal(impactRegionPath("fr", "make-an-impact", region), "/fr/impact/make-an-impact/soudan");
-  assert.equal(decodeURIComponent(impactRegionPath("ar", "make-an-impact", region)), "/ar/impact/make-an-impact/السودان");
+  assert.equal(impactRegionPath("fr", "make-an-impact", region), "/fr/impact/faites-la-diff%C3%A9rence/soudan");
+  assert.equal(decodeURIComponent(impactRegionPath("ar", "make-an-impact", region)), "/ar/impact/اصنع-أثرا/السودان");
   assert.equal(impactRegionSlug(regions.find((r) => r.key === "syria")!, "tr"), "suriye");
 });
 
@@ -38,4 +38,27 @@ test("custom regions use their localized names and safely encode campaign slugs"
   assert.equal(impactRegionSlug(custom, "ar"), "منطقة-جديدة");
   assert.equal(resolveImpactRegion([custom], "nouvelle-région")?.key, "custom");
   assert.equal(impactRegionPath("fr", "a/b", custom), "/fr/impact/a%2Fb/nouvelle-r%C3%A9gion");
+});
+
+
+test("translated campaign slugs round-trip to the same database campaign in all languages", () => {
+  assert.equal(new Set(Object.values(IMPACT_CAMPAIGN_SLUGS)).size, SUPPORTED_LOCALES.length);
+  for (const locale of SUPPORTED_LOCALES) {
+    const slug = impactCampaignSlug("make-an-impact", locale);
+    assert.equal(slug, IMPACT_CAMPAIGN_SLUGS[locale]);
+    assert.equal(resolveImpactCampaignSlug(slug), "make-an-impact");
+    assert.equal(resolveImpactCampaignSlug(encodeURIComponent(slug)), "make-an-impact");
+    assert.equal(decodeURIComponent(impactCampaignPath(locale, "make-an-impact")), `/${locale}/impact/${slug}`);
+    for (const previous of Object.values(IMPACT_CAMPAIGN_SLUGS)) {
+      assert.equal(impactCampaignSlug(previous, locale), slug);
+    }
+  }
+});
+
+test("custom campaign slugs remain unchanged", () => {
+  for (const locale of SUPPORTED_LOCALES) {
+    assert.equal(impactCampaignSlug("custom-builder", locale), "custom-builder");
+    assert.equal(resolveImpactCampaignSlug("custom-builder"), "custom-builder");
+    assert.equal(resolveImpactCampaignSlug("Custom-Builder"), "Custom-Builder");
+  }
 });

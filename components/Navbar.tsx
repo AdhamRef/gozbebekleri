@@ -17,6 +17,7 @@ import {
   Phone,
   UserCircle,
 } from "lucide-react";
+import { FEATURED_IMPACT_SLUG, impactCampaignSlug } from "@/lib/impact/routing";
 import Image from "next/image";
 import { Link, usePathname, useRouter } from "@/i18n/routing";
 import { useTranslations, useLocale } from "next-intl";
@@ -188,7 +189,7 @@ const Navbar = () => {
   const navLinks = [
     { href: "/about-us", label: t("about") },
     { href: "/campaigns", label: t("projects") },
-    { href: "/impact/make-an-impact", label: t("makeImpact"), highlight: true },
+    { href: `/impact/${encodeURIComponent(impactCampaignSlug(FEATURED_IMPACT_SLUG, locale))}`, label: t("makeImpact"), highlight: true },
     { href: "/blog", label: t("news") },
     { href: "/bank-transfer", label: t("bankAccounts") },
     { href: "/contact-us", label: t("contact") },

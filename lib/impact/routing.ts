@@ -1,4 +1,36 @@
 import type { ImpactRegion } from "./config";
+import type { SupportedLocale } from "../locales";
+
+export const FEATURED_IMPACT_SLUG = "make-an-impact";
+
+export const IMPACT_CAMPAIGN_SLUGS: Record<SupportedLocale, string> = {
+  ar: "اصنع-أثرا",
+  en: FEATURED_IMPACT_SLUG,
+  tr: "iz-bırak",
+  fr: "faites-la-différence",
+  de: "wirkung-erzielen",
+  es: "deja-tu-huella",
+  pt: "faça-a-diferença",
+  id: "buat-dampak",
+};
+
+/** Public translations are aliases for the existing database slug. */
+export function resolveImpactCampaignSlug(slug: string): string {
+  const value = decoded(slug);
+  if (Object.values(IMPACT_CAMPAIGN_SLUGS).includes(value)) return FEATURED_IMPACT_SLUG;
+  try { return decodeURIComponent(slug); }
+  catch { return ""; }
+}
+
+export function impactCampaignSlug(slug: string, locale: string): string {
+  return resolveImpactCampaignSlug(slug) === FEATURED_IMPACT_SLUG
+    ? IMPACT_CAMPAIGN_SLUGS[locale as SupportedLocale] ?? FEATURED_IMPACT_SLUG
+    : slug;
+}
+
+export function impactCampaignPath(locale: string, slug: string): string {
+  return `/${locale}/impact/${encodeURIComponent(impactCampaignSlug(slug, locale))}`;
+}
 
 // Stable public slugs, independent of editable display names and internal keys.
 const REGION_SLUGS: Record<string, Record<string, string>> = {
@@ -33,5 +65,5 @@ export function resolveImpactRegion(regions: ImpactRegion[], slug: string): Impa
 }
 
 export function impactRegionPath(locale: string, campaignSlug: string, region: ImpactRegion): string {
-  return `/${locale}/impact/${encodeURIComponent(campaignSlug)}/${encodeURIComponent(impactRegionSlug(region, locale))}`;
+  return `${impactCampaignPath(locale, campaignSlug)}/${encodeURIComponent(impactRegionSlug(region, locale))}`;
 }

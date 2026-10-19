@@ -1,3 +1,4 @@
+import { impactCampaignPath } from "@/lib/impact/routing";
 import { Metadata } from "next";
 import { redirect } from "next/navigation";
 import MainPageDummy from "../_components/MainPageDummy";
@@ -199,7 +200,7 @@ export default async function CampaignPage({ params }: Props) {
     });
     // An impact builder's hidden settlement campaign is donated to via its builder page.
     if (campaign?.impactCampaign) {
-      redirect(`/${locale}/impact/${encodeURIComponent(campaign.impactCampaign.slug)}`);
+      redirect(impactCampaignPath(locale, campaign.impactCampaign.slug));
     }
     if (campaign) {
       const canonical = pickLocaleSlug(campaign.slug, campaign.translations, locale) ?? campaign.id;
