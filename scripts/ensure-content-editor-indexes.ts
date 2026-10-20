@@ -1,6 +1,10 @@
 import { PrismaClient } from "@prisma/client";
 const indexes = [
  {collection: "Category", key: {previousSlugs: 1}, unique: false},
+ {collection: "CategoryValue", key: {categoryId: 1, order: 1}, unique: false},
+ {collection: "CategoryValueTranslation", key: {valueId: 1, locale: 1}, unique: true},
+ {collection: "CategoryInfoCard", key: {categoryId: 1, order: 1}, unique: false},
+ {collection: "CategoryInfoCardTranslation", key: {cardId: 1, locale: 1}, unique: true},
  {collection: "SuperCategory", key: {slug: 1}, unique: true},
  {collection: "SuperCategoryTranslation", key: {superCategoryId: 1, locale: 1}, unique: true},
  {collection: "SuperCategoryBlock", key: {superCategoryId: 1, order: 1}, unique: false},
@@ -11,7 +15,8 @@ const indexes = [
  {collection: "UrgentBannerTranslation", key: {urgentBannerId: 1, locale: 1}, unique: true},
 ];
 async function run() {
- if (!process.argv.includes("--apply")) { console.log(JSON.stringify({dryRun: true, indexes}, null, 2)); return; }
+ if (process.argv.includes("--production") && process.env.VERCEL_ENV !== "production") { console.log("Content editor indexes: production-only step skipped"); return; }
+ if (!process.argv.includes("--apply") && !process.argv.includes("--production")) { console.log(JSON.stringify({dryRun: true, indexes}, null, 2)); return; }
  const prisma = new PrismaClient();
  try {
   for (const spec of indexes) {
