@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyOtpCode } from "@/lib/otp";
 import { dispatchEvent } from "@/lib/events/dispatch";
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       data: { emailVerified: new Date() },
       select: { id: true },
     });
-    void dispatchEvent("USER_REGISTERED", { userId: verifiedUser.id });
+    after(() => dispatchEvent("USER_REGISTERED", { userId: verifiedUser.id }));
 
     return NextResponse.json({ success: true });
   } catch (err) {

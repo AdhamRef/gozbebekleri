@@ -7,17 +7,18 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { FilterBar } from "@/components/dashboard/FilterBar";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Megaphone, Plus, RefreshCw } from "lucide-react";
+import { Megaphone, Plus, RefreshCw, Send, Eye, MousePointerClick, HandHeart, Banknote } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CampaignsTable, sortCampaigns, type CampaignSort } from "./CampaignsTable";
 import { type CampaignRow, CHANNEL_META, STATUS_META } from "./campaign-ui";
+import { dashDir, dt, dtx } from "@/lib/dashboard/i18n";
 
 export function CampaignsListClient() {
   const [campaigns, setCampaigns] = React.useState<CampaignRow[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
   const [channel, setChannel] = React.useState("all");
-  const [status, setStatus] = React.useState("all");
+  const [status, setStatus] = React.useState("active");
   // Newest first: the campaign someone came here to check is almost always the one just sent.
   const [sort, setSort] = React.useState<CampaignSort>({ key: "date", dir: "desc" });
 
@@ -30,9 +31,9 @@ export function CampaignsListClient() {
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/communication/campaigns", { cache: "no-store" });
+      const res = await fetch("/api/communication/campaigns?includeArchived=true", { cache: "no-store" });
       const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json?.error || "تعذّر تحميل الحملات");
+      if (!res.ok || !json.ok) throw new Error(json?.error || dt("تعذّر تحميل الحملات"));
       setCampaigns(json.campaigns ?? []);
     } catch (e) {
       toast.error((e as Error).message);
@@ -50,7 +51,9 @@ export function CampaignsListClient() {
   const filtered = sortCampaigns(
     campaigns.filter((c) => {
       if (channel !== "all" && c.channel !== channel) return false;
-      if (status !== "all" && c.status !== status) return false;
+      if (status === "active" && c.status === "ARCHIVED") return false;
+      if (status === "archived" && c.status !== "ARCHIVED") return false;
+      if (!["all", "active", "archived"].includes(status) && c.status !== status) return false;
       if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     }),
@@ -59,33 +62,50 @@ export function CampaignsListClient() {
 
   const byChannel = (id: string) => campaigns.filter((c) => c.channel === id).length;
 
+  const analytics = React.useMemo(() => {
+    return filtered.reduce(
+      (acc, campaign) => {
+        acc.sent += campaign.sentCount;
+        acc.engaged += Math.max(campaign.readCount, campaign.clickedCount, campaign.repliedCount);
+        acc.clicked += campaign.clickedCount;
+        acc.donations += campaign.donationCount;
+        acc.revenue += campaign.revenue;
+        acc.missingUsdCount += campaign.missingUsdCount ?? 0;
+        return acc;
+      },
+      { sent: 0, engaged: 0, clicked: 0, donations: 0, revenue: 0, missingUsdCount: 0 },
+    );
+  }, [filtered]);
+
+  const engagementRate = analytics.sent > 0 ? Math.round((analytics.engaged / analytics.sent) * 1000) / 10 : 0;
+  const clickRate = analytics.sent > 0 ? Math.round((analytics.clicked / analytics.sent) * 1000) / 10 : 0;
+
   return (
-    <div dir="rtl">
+    <div dir={dashDir()}>
       <FilterBar
         searchValue={search}
         onSearchChange={setSearch}
-        searchPlaceholder="ابحث باسم الحملة…"
+        searchPlaceholder={dt("ابحث باسم الحملة…")}
         actions={
           <>
             <Button variant="outline" size="sm" className="gap-1.5" onClick={load} disabled={loading}>
               <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-              <span className="hidden sm:inline">تحديث</span>
+              <span className="hidden sm:inline">{dt("تحديث")}</span>
             </Button>
             <Button size="sm" className="gap-1.5 bg-brand hover:bg-brand/90" asChild>
               <Link href="/dashboard/communication/campaigns/new">
                 <Plus className="h-4 w-4" />
-                حملة جديدة
-              </Link>
+                {dt("حملة جديدة")}</Link>
             </Button>
           </>
         }
       >
         <Select value={channel} onValueChange={setChannel}>
-          <SelectTrigger aria-label="تصفية بالقناة" className="h-9 min-w-0 flex-1 rounded-lg border-slate-200 bg-slate-50 px-3 text-xs sm:flex-none sm:basis-[10rem]">
+          <SelectTrigger aria-label={dt("تصفية بالقناة")} className="h-9 min-w-0 flex-1 rounded-lg border-slate-200 bg-slate-50 px-3 text-xs sm:flex-none sm:basis-[10rem]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all" className="text-xs">كل القنوات</SelectItem>
+            <SelectItem value="all" className="text-xs">{dt("كل القنوات")}</SelectItem>
             {Object.entries(CHANNEL_META).map(([id, m]) => (
               <SelectItem key={id} value={id} className="text-xs">
                 {m.label} ({byChannel(id)})
@@ -95,17 +115,47 @@ export function CampaignsListClient() {
         </Select>
 
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger aria-label="تصفية بالحالة" className="h-9 min-w-0 flex-1 rounded-lg border-slate-200 bg-slate-50 px-3 text-xs sm:flex-none sm:basis-[10rem]">
+          <SelectTrigger aria-label={dt("تصفية بالحالة")} className="h-9 min-w-0 flex-1 rounded-lg border-slate-200 bg-slate-50 px-3 text-xs sm:flex-none sm:basis-[10rem]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all" className="text-xs">كل الحالات</SelectItem>
-            {Object.entries(STATUS_META).map(([id, m]) => (
-              <SelectItem key={id} value={id} className="text-xs">{m.label}</SelectItem>
-            ))}
+            <SelectItem value="active" className="text-xs">{dt("الحملات النشطة")}</SelectItem>
+            <SelectItem value="archived" className="text-xs">
+              {dt("المؤرشفة (")}{campaigns.filter((c) => c.status === "ARCHIVED").length})
+            </SelectItem>
+            <SelectItem value="all" className="text-xs">{dt("كل الحالات")}</SelectItem>
+            {Object.entries(STATUS_META)
+              .filter(([id]) => id !== "ARCHIVED")
+              .map(([id, m]) => (
+                <SelectItem key={id} value={id} className="text-xs">{m.label}</SelectItem>
+              ))}
           </SelectContent>
         </Select>
       </FilterBar>
+
+      {!loading && campaigns.length > 0 && (
+        <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-5">
+          {[
+            { label: dt("إجمالي المُرسل"), value: analytics.sent.toLocaleString("en-US"), hint: dt("رسالة مقبولة لدى المزوّد"), icon: Send },
+            { label: dt("تفاعل/فتح"), value: `${analytics.engaged.toLocaleString("en-US")} · ${engagementRate}%`, hint: dt("قراءة/فتح/نقر/رد مثبت"), icon: Eye },
+            { label: dt("ضغطات مسجلة"), value: `${analytics.clicked.toLocaleString("en-US")} · ${clickRate}%`, hint: dt("متاح عندما يرسل المزوّد حدث Click"), icon: MousePointerClick },
+            { label: dt("تبرعات منسوبة"), value: analytics.donations.toLocaleString("en-US"), hint: dt("UTM مطابق للحملة"), icon: HandHeart },
+            { label: dt("إيراد منسوب (USD)"), value: `${analytics.revenue.toLocaleString("en-US", { maximumFractionDigits: 2 })}`, hint: analytics.missingUsdCount ? dt("إجمالي جزئي: تحويل الدولار غير متاح لبعض التبرعات") : dt("تبرعات PAID من روابط الحملة"), icon: Banknote },
+          ].map((item) => {
+            const Icon = item.icon;
+            return (
+              <div key={item.label} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-medium text-slate-500">{item.label}</span>
+                  <Icon className="h-4 w-4 text-slate-400" />
+                </div>
+                <p className="mt-2 text-lg font-bold tabular-nums text-slate-900">{item.value}</p>
+                <p className="mt-1 text-[10px] text-slate-400">{item.hint}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {loading ? (
         // Shaped like the table it replaces, so the layout does not jump when rows arrive.
@@ -123,19 +173,18 @@ export function CampaignsListClient() {
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={Megaphone}
-          title={campaigns.length === 0 ? "لا توجد حملات تسويقية بعد" : "لا توجد حملة مطابقة"}
+          title={campaigns.length === 0 ? dt("لا توجد حملات تسويقية بعد") : dt("لا توجد حملة مطابقة")}
           description={
             campaigns.length === 0
-              ? "الحملة ترسل قالبًا واحدًا لمجموعة متبرعين تختارها — كلٌّ بلغته المفضّلة. ابدأ باختيار القناة."
-              : "جرّب توسيع التصفية أو مسحها."
+              ? dt("الحملة ترسل قالبًا واحدًا لمجموعة متبرعين تختارها  كلٌّ بلغته المفضّلة. ابدأ باختيار القناة.")
+              : dt("جرّب توسيع التصفية أو مسحها.")
           }
           action={
             campaigns.length === 0 ? (
               <Button className="gap-1.5 bg-brand hover:bg-brand/90" asChild>
                 <Link href="/dashboard/communication/campaigns/new">
                   <Plus className="h-4 w-4" />
-                  إنشاء أول حملة
-                </Link>
+                  {dt("إنشاء أول حملة")}</Link>
               </Button>
             ) : (
               <Button
@@ -144,20 +193,18 @@ export function CampaignsListClient() {
                 onClick={() => {
                   setSearch("");
                   setChannel("all");
-                  setStatus("all");
+                  setStatus("active");
                 }}
               >
-                مسح التصفية
-              </Button>
+                {dt("مسح التصفية")}</Button>
             )
           }
         />
       ) : (
         <>
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
-            {filtered.length} حملة
-            {filtered.length !== campaigns.length && (
-              <span className="font-normal normal-case tracking-normal text-slate-400"> من {campaigns.length}</span>
+            {dtx("{0} حملة", [filtered.length])}{filtered.length !== campaigns.length && (
+              <span className="font-normal normal-case tracking-normal text-slate-400"> {dtx(" من {0}", [campaigns.length])}</span>
             )}
           </p>
           <CampaignsTable campaigns={filtered} sort={sort} onSort={toggleSort} onChanged={load} />

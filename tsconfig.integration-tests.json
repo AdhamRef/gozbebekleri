@@ -8,10 +8,14 @@
     "skipLibCheck": true,
     "outDir": ".integration-test-build",
     "rootDir": ".",
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     }
   },
   "include": [
@@ -54,6 +58,10 @@
     "lib/bank-transfers/statement-parser.ts",
     "lib/locales.ts",
     "lib/content-localization/access.ts",
-    "tests/integration-settings/**/*.ts"
+    "tests/integration-settings/**/*.ts",
+    "lib/communication/providers/meta-whatsapp/parameters.ts",
+    "lib/communication/providers/meta-whatsapp/graph.ts",
+    "lib/communication/providers/meta-whatsapp/subscription.ts",
+    "lib/communication/sender-verification.ts"
   ]
 }

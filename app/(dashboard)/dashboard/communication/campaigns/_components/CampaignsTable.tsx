@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { LOCALE_LABELS } from "@/lib/locales";
 import { type CampaignRow, channelMeta, statusMeta, hasResults, audienceLabel } from "./campaign-ui";
 import { CampaignRowActions } from "./CampaignRowActions";
+import { dashIntl, dt } from "@/lib/dashboard/i18n";
 
 /**
  * The campaign list as a table.
@@ -18,7 +19,7 @@ import { CampaignRowActions } from "./CampaignRowActions";
  * anything. Sorting only makes sense once they are columns, which is the other half of the move.
  */
 
-type SortKey = "name" | "channel" | "status" | "sentCount" | "deliveredCount" | "failedCount" | "date";
+type SortKey = "name" | "channel" | "status" | "sentCount" | "deliveredCount" | "readCount" | "clickedCount" | "repliedCount" | "donationCount" | "revenue" | "failedCount" | "date";
 type SortDir = "asc" | "desc";
 export type CampaignSort = { key: SortKey; dir: SortDir };
 
@@ -27,8 +28,8 @@ function rowDate(c: CampaignRow): { iso: string; label: string; caption: string 
   const iso = c.scheduledAt ?? c.updatedAt;
   return {
     iso,
-    label: new Date(iso).toLocaleDateString("ar-EG", { dateStyle: "medium" }),
-    caption: c.scheduledAt ? "موعد الإرسال" : "آخر تحديث",
+    label: new Date(iso).toLocaleDateString(dashIntl("ar-EG"), { dateStyle: "medium" }),
+    caption: c.scheduledAt ? dt("موعد الإرسال") : dt("آخر تحديث"),
   };
 }
 
@@ -68,7 +69,7 @@ function SortHeader({
       <button
         type="button"
         onClick={() => onSort(sortKey)}
-        aria-label={`ترتيب حسب ${label}`}
+        aria-label={dt("ترتيب حسب {0}", [label])}
         className={cn(
           "inline-flex items-center gap-1 rounded transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand",
           align === "left" ? "flex-row-reverse" : "",
@@ -82,10 +83,10 @@ function SortHeader({
   );
 }
 
-/** A count cell. Campaigns that never went out show a dash — a column of zeros reads as broken. */
+/** A count cell. Campaigns that never went out show a dash  a column of zeros reads as broken. */
 function CountCell({ value, show, tone }: { value: number; show: boolean; tone?: string }) {
   return (
-    <td className="whitespace-nowrap px-3 py-2.5 text-left align-middle tabular-nums">
+    <td className="whitespace-nowrap px-3 py-2.5 text-end align-middle tabular-nums">
       {!show ? (
         <span className="text-slate-300">—</span>
       ) : (
@@ -112,19 +113,24 @@ export function CampaignsTable({
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       {/* Wide content scrolls inside its own container so the page body never scrolls sideways. */}
       <div className="overflow-x-auto">
-        <table className="w-full text-right text-xs">
+        <table className="w-full text-start text-xs">
           <thead>
             {/* Sticky so the numeric columns stay labelled while scrolling a long list. */}
             <tr className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/90 text-[11px] font-semibold text-slate-500 backdrop-blur">
-              <SortHeader label="الحملة" sortKey="name" sort={sort} onSort={onSort} className="w-full max-w-0 text-right" />
-              <SortHeader label="القناة" sortKey="channel" sort={sort} onSort={onSort} />
-              <SortHeader label="الحالة" sortKey="status" sort={sort} onSort={onSort} />
-              <SortHeader label="أُرسلت" sortKey="sentCount" sort={sort} onSort={onSort} align="left" className="text-left" />
-              <SortHeader label="وصلت" sortKey="deliveredCount" sort={sort} onSort={onSort} align="left" className="text-left" />
-              <SortHeader label="فشلت" sortKey="failedCount" sort={sort} onSort={onSort} align="left" className="text-left" />
-              <SortHeader label="التاريخ" sortKey="date" sort={sort} onSort={onSort} />
+              <SortHeader label={dt("الحملة")} sortKey="name" sort={sort} onSort={onSort} className="w-full max-w-0 text-start" />
+              <SortHeader label={dt("القناة")} sortKey="channel" sort={sort} onSort={onSort} />
+              <SortHeader label={dt("الحالة")} sortKey="status" sort={sort} onSort={onSort} />
+              <SortHeader label={dt("أُرسلت")} sortKey="sentCount" sort={sort} onSort={onSort} align="left" className="text-end" />
+              <SortHeader label={dt("وصلت")} sortKey="deliveredCount" sort={sort} onSort={onSort} align="left" className="text-end" />
+              <SortHeader label={dt("فتح/قرأ")} sortKey="readCount" sort={sort} onSort={onSort} align="left" className="text-end" />
+              <SortHeader label={dt("ضغط")} sortKey="clickedCount" sort={sort} onSort={onSort} align="left" className="text-end" />
+              <SortHeader label={dt("رد")} sortKey="repliedCount" sort={sort} onSort={onSort} align="left" className="text-end" />
+              <SortHeader label={dt("تبرعات")} sortKey="donationCount" sort={sort} onSort={onSort} align="left" className="text-end" />
+              <SortHeader label={dt("إيراد $")} sortKey="revenue" sort={sort} onSort={onSort} align="left" className="text-end" />
+              <SortHeader label={dt("فشلت")} sortKey="failedCount" sort={sort} onSort={onSort} align="left" className="text-end" />
+              <SortHeader label={dt("التاريخ")} sortKey="date" sort={sort} onSort={onSort} />
               <th scope="col" className="w-px px-3 py-2.5">
-                <span className="sr-only">إجراءات</span>
+                <span className="sr-only">{dt("إجراءات")}</span>
               </th>
             </tr>
           </thead>
@@ -136,7 +142,7 @@ export function CampaignsTable({
               const showResults = hasResults(c);
               const date = rowDate(c);
               // Straight to the campaign's report on its own channel page. The
-              // separate detail screen this used to open has been removed — it
+              // separate detail screen this used to open has been removed  it
               // showed a summary of numbers the channel page already owns, and
               // its lifecycle buttons now live in the row menu at the end.
               const href = `${ch.href}?campaign=${c.id}`;
@@ -178,13 +184,33 @@ export function CampaignsTable({
                   </td>
 
                   <td className="whitespace-nowrap px-3 py-2.5 align-middle">
-                    <span className={cn("inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium", st.tone)}>
-                      {st.label}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className={cn("inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium", st.tone)}>
+                        {st.label}
+                      </span>
+                      {c.metadata?.sendControls?.paused && (
+                        <span className="inline-block rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700">
+                          {dt("متوقفة مؤقتًا")}</span>
+                      )}
+                    </div>
                   </td>
 
                   <CountCell value={c.sentCount} show={showResults} />
                   <CountCell value={c.deliveredCount} show={showResults} tone="text-emerald-700" />
+                  <CountCell value={c.readCount} show={showResults} tone="text-sky-700" />
+                  <CountCell value={c.clickedCount} show={showResults} tone="text-violet-700" />
+                  <CountCell value={c.repliedCount} show={showResults} tone="text-amber-700" />
+                  <CountCell value={c.donationCount} show={showResults} tone="text-emerald-700" />
+                  <td className="whitespace-nowrap px-3 py-2.5 text-end align-middle tabular-nums">
+                    {!showResults ? (
+                      <span className="text-slate-300">—</span>
+                    ) : (
+                      <span className={cn("font-semibold", c.revenue === 0 ? "text-slate-400" : "text-emerald-700")}>
+                        {c.revenue.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                        {!!c.missingUsdCount && <span className="block text-[10px] text-amber-700">{dt("إجمالي جزئي: تحويل الدولار غير متاح لبعض التبرعات")}</span>}
+                      </span>
+                    )}
+                  </td>
                   <CountCell value={c.failedCount} show={showResults} tone="text-rose-700" />
 
                   <td className="whitespace-nowrap px-3 py-2.5 align-middle text-slate-600">
@@ -208,4 +234,3 @@ export function CampaignsTable({
     </div>
   );
 }
-

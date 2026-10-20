@@ -1,4 +1,6 @@
+import { donationUsdAmount, formatTemplateMoney } from "./money";
 import { prisma } from "@/lib/prisma";
+import { donationProjectSummary, type DonationProjectSource } from "./donation-projects";
 
 /** ---------------- types ---------------- */
 
@@ -41,96 +43,49 @@ export interface TemplateTotals {
   lastAt: string;
 }
 
+/**
+ * A campaign update (Update row) as a template sees it  set when an email
+ * campaign was created from an update ("send this update to its donors"),
+ * in the recipient's language. See lib/communication/update-campaign.ts.
+ */
+export interface TemplateUpdate {
+  title: string;
+  description: string;
+  /** Photo URL, or "" (an Image block with an empty URL is dropped). */
+  image: string;
+  /** The video link (YouTube / Vimeo / uploaded file), or "". */
+  videoUrl: string;
+  /** A still of the video for email (videos cannot play inside email), or "". */
+  videoThumbnail: string;
+  /** The photo, else the video still: the one picture an email can always show. */
+  cover: string;
+  date: string;
+  campaignTitle: string;
+  /** The campaign page, opened on its updates, with UTM tags for attribution. */
+  url: string;
+  /** The campaign page's donate link. */
+  donateUrl: string;
+}
+
 export interface TemplateContext {
   user: TemplateUser;
   donations: TemplateDonation[];
   totals: TemplateTotals;
   /** Set for trigger-driven flows where one specific donation is the focus */
   donation?: TemplateDonation;
+  /** Set for a campaign-update email. */
+  update?: TemplateUpdate;
 }
 
 /** ---------------- catalog (UI-facing) ---------------- */
 
-export interface VariableEntry {
-  token: string;
-  label: string;
-  exampleValue: string;
-}
-
-export interface VariableGroup {
-  group: string;
-  entries: VariableEntry[];
-}
-
-export const VARIABLE_CATALOG: VariableGroup[] = [
-  {
-    group: "المتبرع",
-    entries: [
-      { token: "{{user.name}}", label: "الاسم", exampleValue: "أحمد" },
-      { token: "{{user.email}}", label: "البريد", exampleValue: "ahmed@example.com" },
-      { token: "{{user.phone}}", label: "الهاتف", exampleValue: "+90 555 555 5555" },
-      { token: "{{user.countryName}}", label: "الدولة", exampleValue: "تركيا" },
-      { token: "{{user.countryCode}}", label: "رمز الدولة", exampleValue: "TR" },
-      { token: "{{user.city}}", label: "المدينة", exampleValue: "إسطنبول" },
-      { token: "{{user.preferredLang}}", label: "اللغة المفضلة", exampleValue: "ar" },
-    ],
-  },
-  {
-    group: "ملخص التبرعات",
-    entries: [
-      { token: "{{totals.count}}", label: "عدد التبرعات", exampleValue: "5" },
-      { token: "{{totals.amountUSD}}", label: "الإجمالي (USD)", exampleValue: "250" },
-      { token: "{{totals.lastAt}}", label: "تاريخ آخر تبرع", exampleValue: "2026-04-12" },
-    ],
-  },
-  {
-    group: "تكرار التبرعات: {{#donations}} ... {{/donations}}",
-    entries: [
-      { token: "{{amountUSD}}", label: "المبلغ (USD)", exampleValue: "50" },
-      { token: "{{amount}}", label: "المبلغ", exampleValue: "50" },
-      { token: "{{currency}}", label: "العملة", exampleValue: "USD" },
-      { token: "{{createdAt}}", label: "التاريخ", exampleValue: "2026-04-12" },
-      { token: "{{campaignTitle}}", label: "عنوان الحملة", exampleValue: "حملة العيون" },
-      { token: "{{itemCount}}", label: "عدد البنود", exampleValue: "2" },
-    ],
-  },
-  {
-    group: "التبرّعة الحالية (للأحداث التلقائية فقط)",
-    entries: [
-      { token: "{{donation.id}}", label: "معرّف التبرّعة", exampleValue: "65f12abc..." },
-      { token: "{{donation.amount}}", label: "المبلغ", exampleValue: "50" },
-      { token: "{{donation.amountUSD}}", label: "المبلغ (USD)", exampleValue: "50" },
-      { token: "{{donation.currency}}", label: "العملة", exampleValue: "USD" },
-      { token: "{{donation.totalAmount}}", label: "الإجمالي", exampleValue: "55" },
-      { token: "{{donation.itemCount}}", label: "عدد البنود", exampleValue: "2" },
-      { token: "{{donation.createdAt}}", label: "تاريخ التبرّعة", exampleValue: "2026-04-12" },
-      { token: "{{donation.campaignTitle}}", label: "أسماء الحملات (مفصولة)", exampleValue: "حملة العيون، حملة الشتاء" },
-    ],
-  },
-  {
-    group: "بنود التبرّعة الحالية: {{#donation.items}} ... {{/donation.items}}",
-    entries: [
-      { token: "{{campaignTitle}}", label: "عنوان الحملة", exampleValue: "حملة العيون" },
-      { token: "{{amount}}", label: "المبلغ", exampleValue: "25" },
-      { token: "{{amountUSD}}", label: "المبلغ (USD)", exampleValue: "25" },
-      { token: "{{currency}}", label: "العملة", exampleValue: "USD" },
-      { token: "{{shareCount}}", label: "عدد السهوم (إن وجد)", exampleValue: "2" },
-    ],
-  },
-];
+export { VARIABLE_CATALOG } from "./variable-catalog";
+export type { VariableEntry, VariableGroup } from "./variable-catalog";
 
 /** ---------------- formatting helpers ---------------- */
 
 const formatDate = (d: Date | null | undefined): string =>
   d ? new Date(d).toISOString().slice(0, 10) : "";
-
-const formatNumber = (n: number | null | undefined, digits = 0): string =>
-  typeof n === "number"
-    ? n.toLocaleString(undefined, {
-        minimumFractionDigits: digits,
-        maximumFractionDigits: digits,
-      })
-    : "";
 
 /** ---------------- loaders ---------------- */
 
@@ -149,6 +104,7 @@ const userSelect = {
 
 const donationSelect = {
   id: true,
+  locale: true,
   amount: true,
   amountUSD: true,
   currency: true,
@@ -163,9 +119,12 @@ const donationSelect = {
       campaign: { select: { title: true } },
     },
   },
+  categoryItems: {
+    select: { amount: true, amountUSD: true, category: { select: { name: true } } },
+  },
 } as const;
 
-type RawDonation = {
+type RawDonation = DonationProjectSource & {
   id: string;
   amount: number;
   amountUSD: number | null;
@@ -173,38 +132,33 @@ type RawDonation = {
   totalAmount: number;
   status: string;
   createdAt: Date;
-  items: {
-    amount: number;
-    amountUSD: number | null;
-    shareCount: number | null;
-    campaign: { title: string };
-  }[];
 };
 
-function donationToContext(d: RawDonation): TemplateDonation {
-  const items: TemplateDonationItem[] = d.items.map((it) => ({
-    campaignTitle: it.campaign?.title ?? "",
-    amount: formatNumber(it.amount, 0),
-    amountUSD: formatNumber(it.amountUSD ?? 0, 0),
+function donationToContext(d: RawDonation, locale?: string | null): TemplateDonation {
+  const projects = donationProjectSummary({ ...d, locale: locale || d.locale });
+  const items: TemplateDonationItem[] = projects.lines.map((it) => ({
+    campaignTitle: it.campaignTitle,
+    amount: formatTemplateMoney(it.amount, locale || d.locale, d.currency),
+    amountUSD: formatTemplateMoney(donationUsdAmount({ ...it, currency: d.currency }), locale || d.locale, "USD"),
     currency: d.currency,
     shareCount: it.shareCount != null ? String(it.shareCount) : "",
   }));
   return {
     id: d.id,
-    amount: formatNumber(d.amount, 0),
-    amountUSD: formatNumber(d.amountUSD ?? 0, 0),
+    amount: formatTemplateMoney(d.amount, locale || d.locale, d.currency),
+    amountUSD: formatTemplateMoney(donationUsdAmount(d), locale || d.locale, "USD"),
     currency: d.currency,
-    totalAmount: formatNumber(d.totalAmount, 0),
+    totalAmount: formatTemplateMoney(d.totalAmount, locale || d.locale, d.currency),
     status: d.status,
     createdAt: formatDate(d.createdAt),
-    campaignTitle: items.map((it) => it.campaignTitle).filter(Boolean).join("، "),
+    campaignTitle: projects.campaignTitle,
     itemCount: String(items.length),
     items,
   };
 }
 
-function donationsToContext(donations: RawDonation[]): TemplateDonation[] {
-  return donations.map(donationToContext);
+function donationsToContext(donations: RawDonation[], locale?: string | null): TemplateDonation[] {
+  return donations.map((donation) => donationToContext(donation, locale));
 }
 
 function userToContext(
@@ -236,15 +190,16 @@ export async function loadContext(userId: string): Promise<TemplateContext | nul
     orderBy: { createdAt: "desc" },
   });
 
-  const totalUSD = donations.reduce((s, d) => s + (d.amountUSD ?? 0), 0);
+  const usd = donations.map(donationUsdAmount);
+  const totalUSD = usd.some((n) => n === null) ? null : usd.reduce<number>((s, n) => s + (n ?? 0), 0);
   const lastAt = donations[0]?.createdAt ?? null;
 
   return {
     user: userToContext(user),
-    donations: donationsToContext(donations as RawDonation[]),
+    donations: donationsToContext(donations as RawDonation[], user.preferredLang),
     totals: {
       count: String(donations.length),
-      amountUSD: formatNumber(totalUSD, 0),
+      amountUSD: formatTemplateMoney(totalUSD, user.preferredLang, "USD"),
       lastAt: formatDate(lastAt),
     },
   };
@@ -267,7 +222,7 @@ export async function loadContextForDonation(
   if (!base) return null;
   return {
     ...base,
-    donation: donationToContext(donation as RawDonation),
+    donation: donationToContext(donation as RawDonation, base.user.preferredLang),
   };
 }
 
@@ -294,14 +249,15 @@ export async function loadContextsForUserIds(
   const out = new Map<string, TemplateContext>();
   for (const u of users) {
     const ds = byDonor.get(u.id) ?? [];
-    const totalUSD = ds.reduce((s, d) => s + (d.amountUSD ?? 0), 0);
+    const usd = ds.map(donationUsdAmount);
+    const totalUSD = usd.some((n) => n === null) ? null : usd.reduce<number>((s, n) => s + (n ?? 0), 0);
     const lastAt = ds[0]?.createdAt ?? null;
     out.set(u.id, {
       user: userToContext(u),
-      donations: donationsToContext(ds),
+      donations: donationsToContext(ds, u.preferredLang),
       totals: {
         count: String(ds.length),
-        amountUSD: formatNumber(totalUSD, 0),
+        amountUSD: formatTemplateMoney(totalUSD, u.preferredLang, "USD"),
         lastAt: formatDate(lastAt),
       },
     });
@@ -328,7 +284,7 @@ function lookup(path: string, scope: Record<string, unknown>): unknown {
 }
 
 function renderInScope(template: string, scope: Record<string, unknown>): string {
-  // Expand sections (loops) first — recursively, so nested loops work.
+  // Expand sections (loops) first  recursively, so nested loops work.
   const expanded = template.replace(SECTION_RE, (_, path: string, inner: string) => {
     const target = lookup(path, scope);
     if (!Array.isArray(target)) return "";
@@ -355,6 +311,7 @@ export function mergeText(template: string, ctx: TemplateContext): string {
     totals: ctx.totals,
     donations: ctx.donations,
     donation: ctx.donation,
+    update: ctx.update,
   };
   return renderInScope(template, scope);
 }

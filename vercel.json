@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/communication-run-due",
-      "schedule": "*/10 * * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron/communication-sync-email-events",
@@ -23,6 +23,14 @@
     {
       "path": "/api/cron/reconcile-donations",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/communication-sync-whatsapp-templates",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/resume-dispatches",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

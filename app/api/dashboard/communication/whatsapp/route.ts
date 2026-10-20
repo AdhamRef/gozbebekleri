@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { getActiveMetaWhatsappRuntimeConfig } from "@/lib/communication/runtime-config";
 import { RETRYABLE_STATUSES } from "@/lib/communication/communication-runtime-types";
+import { resolveVariantForLocale } from "@/lib/communication/whatsapp-template-sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
  *
  *  1. The engagement ladder ends in READ (the blue ticks) and REPLIED, not opened/clicked. A read
  *     receipt is a genuine provider-confirmed event, so it is trustworthy in a way an email open
- *     pixel is not — but it is also suppressible by the recipient, so absence still is not proof.
+ *     pixel is not  but it is also suppressible by the recipient, so absence still is not proof.
  *  2. Business-initiated sends require a Meta-APPROVED template. A perfectly configured account
  *     with no approved template can send exactly nothing, and that is the single most common
  *     reason this channel sits at zero. Reporting "0 sent" without reporting *why* would make the
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(sp.get("page") || "1"));
     const limit = Math.min(100, Math.max(1, parseInt(sp.get("limit") || "25")));
 
-    // A campaign deep-link scopes the entire page — summary, chart and list — to that campaign,
+    // A campaign deep-link scopes the entire page  summary, chart and list  to that campaign,
     // and drops the date window while doing it. The campaign IS the range; keeping the default
     // 30 days would report zeros for any campaign sent earlier than that.
     const campaignId = sp.get("campaign")?.trim() || "";
@@ -72,7 +73,7 @@ export async function GET(request: NextRequest) {
 
     const [
       total, byStatus, deliveredCount, readCount, repliedCount, failedCount,
-      allTimeTotal, rows, listTotal, bucketRows, templates, metaConfig, retryableCount,
+      allTimeTotal, rows, listTotal, bucketRows, templates, metaConfig, retryableCount, activeSenders,
     ] = await Promise.all([
       prisma.communicationDelivery.count({ where: rangeWhere }),
       prisma.communicationDelivery.groupBy({ by: ["status"], where: rangeWhere, _count: { _all: true } }),
@@ -99,19 +100,33 @@ export async function GET(request: NextRequest) {
         select: { createdAt: true, status: true, deliveredAt: true, readAt: true },
         orderBy: { createdAt: "asc" },
       }),
-      // Template readiness is the usual reason this channel is silent — see the note above.
+      // Template readiness is the usual reason this channel is silent  see the note above.
       prisma.whatsappTemplate.findMany({
-        select: { id: true, name: true, approvalStatus: true, category: true, language: true, externalTemplateId: true, updatedAt: true },
+        select: {
+          id: true, name: true, category: true, updatedAt: true,
+          /* Meta's own answer, per language  the single readiness contract. The local
+             `approvalStatus`/`externalTemplateId` fields are deliberately not read here. */
+          wabaVariants: { select: { businessAccountId: true, languageCode: true, locale: true, approvalStatus: true, category: true, providerTemplateName: true, componentsSchema: true, rejectionReason: true, lastSyncedAt: true } },
+        },
         orderBy: { updatedAt: "desc" },
       }),
       getActiveMetaWhatsappRuntimeConfig(),
-      // Re-sendable backlog — see the identical note on the email route for the `isSet` arm.
+      // Re-sendable backlog  see the identical note on the email route for the `isSet` arm.
       prisma.communicationDelivery.count({
         where: {
           ...rangeWhere,
           status: { in: [...RETRYABLE_STATUSES] },
           OR: [{ retriedAt: null }, { retriedAt: { isSet: false } }],
         },
+      }),
+      prisma.communicationSender.findMany({
+        where: {
+          channel: "WHATSAPP",
+          enabled: true,
+          status: "ACTIVE",
+          businessAccountId: { not: null },
+        },
+        select: { businessAccountId: true },
       }),
     ]);
 
@@ -135,22 +150,78 @@ export async function GET(request: NextRequest) {
       buckets.set(key, bucket);
     }
 
-    // A template can only carry a business-initiated send once Meta has approved it AND we hold
-    // its external id. Anything else is a draft as far as sending is concerned, however complete
-    // it looks in our own editor.
+    /* Readiness comes from `resolveVariantForLocale`  the same function the campaign builder, the
+       trigger preflight and the runtime sender all call. It used to be computed here from the local
+       row's hand-set `approvalStatus` and `externalTemplateId`, which is how this page could report
+       a template READY while every send of it failed with META_TEMPLATE_REQUIRED. Two functions
+       cannot agree; one cannot disagree with itself. */
+    const activeWabaIds = [...new Set(activeSenders.map((sender) => sender.businessAccountId).filter((id): id is string => Boolean(id)))];
     const templateRows = templates.map((t) => {
-      const approval = (t.approvalStatus ?? "").toUpperCase();
-      const registered = Boolean(t.externalTemplateId);
-      const ready = registered && approval === "APPROVED";
+      const byWaba = new Map<string, typeof t.wabaVariants>();
+      for (const variant of t.wabaVariants) {
+        const bucket = byWaba.get(variant.businessAccountId) ?? [];
+        bucket.push(variant);
+        byWaba.set(variant.businessAccountId, bucket);
+      }
+
+      const readinessByWaba = activeWabaIds.map((wabaId) => {
+        const variants = byWaba.get(wabaId) ?? [];
+        // Readiness here is channel-level, not Arabic-only. A template approved
+        // for Turkish/English must not be reported unusable merely because it has
+        // no Arabic variant. Try every locale/language Meta actually returned.
+        const candidates = [...new Set(
+          variants.flatMap((variant) => [variant.locale, variant.languageCode]).filter((value): value is string => Boolean(value)),
+        )];
+        const readiness =
+          candidates.map((candidate) => resolveVariantForLocale(variants, candidate)).find((item) => item.ready)
+          ?? resolveVariantForLocale(variants, candidates[0] ?? "ar");
+        return { wabaId, readiness };
+      });
+      const readyWabas = readinessByWaba.filter((item) => item.readiness.ready).length;
+      const anyReady = readyWabas > 0;
+      const allReady = activeWabaIds.length > 0 && readyWabas === activeWabaIds.length;
+      const partiallyReady = anyReady && !allReady;
+      const canonical = readinessByWaba.find((item) => item.readiness.ready)?.readiness
+        ?? readinessByWaba[0]?.readiness
+        ?? resolveVariantForLocale([], "ar");
+
+      const approvedLanguages = [...new Set(
+        t.wabaVariants.filter((v) => v.approvalStatus === "APPROVED").map((v) => v.languageCode),
+      )];
+      // Freshness is trustworthy only when every registered variant has been
+      // synced. When they all have timestamps, expose the oldest one because the
+      // template is only as fresh as its least-recently-synced variant.
+      const allVariantsSynced = t.wabaVariants.length > 0 && t.wabaVariants.every((v) => Boolean(v.lastSyncedAt));
+      const lastSyncedAt = allVariantsSynced
+        ? t.wabaVariants.reduce<Date | null>(
+            (oldest, v) => (!oldest || v.lastSyncedAt < oldest ? v.lastSyncedAt : oldest),
+            null,
+          )
+        : null;
+
       return {
         id: t.id,
         name: t.name,
-        approvalStatus: t.approvalStatus,
+        approvalStatus: canonical.approvalStatus,
         category: t.category,
-        language: t.language,
-        registered,
-        ready,
-        state: ready ? "READY" : registered ? (approval || "PENDING") : "NOT_REGISTERED",
+        language: canonical.languageCode,
+        registered: t.wabaVariants.length > 0,
+        ready: anyReady,
+        partiallyReady,
+        wabaCoverage: { ready: readyWabas, total: activeWabaIds.length },
+        approvedLanguages,
+        approvedLocales: [...new Set(
+          t.wabaVariants.filter((v) => v.approvalStatus === "APPROVED" && v.locale).map((v) => v.locale as string),
+        )],
+        rejectionReason: canonical.rejectionReason,
+        lastSyncedAt: lastSyncedAt ? lastSyncedAt.toISOString() : null,
+        state: allReady
+          ? "READY"
+          : partiallyReady
+            ? "PARTIAL"
+            : t.wabaVariants.length === 0
+              ? "NOT_REGISTERED"
+              : canonical.approvalStatus ?? "PENDING",
         updatedAt: t.updatedAt.toISOString(),
       };
     });

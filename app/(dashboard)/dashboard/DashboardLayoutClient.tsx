@@ -133,6 +133,8 @@ function DashboardContent({
     () => navigation.flatMap((s) => s.items.filter((i) => i.badge).map((i) => i.badge!)),
     [navigation],
   );
+  const canUseWhatsappInbox = Boolean(session?.user && userHasDashboardPermission(session.user, "messages"));
+  const [whatsappInboxCount, setWhatsappInboxCount] = useState(0);
   const wantsInboxBadge = badgeKeys.includes('inboxUnread');
   const [navCounts, setNavCounts] = useState<Record<string, number>>({});
 
@@ -171,6 +173,24 @@ function DashboardContent({
       window.removeEventListener(INBOX_UNREAD_EVENT, onLocalChange);
     };
   }, [wantsInboxBadge]);
+
+  useEffect(() => {
+    if (!canUseWhatsappInbox) { setWhatsappInboxCount(0); return; }
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const res = await fetch('/api/dashboard/communication/inbox?filter=needsReply&limit=1', { cache: 'no-store' });
+        if (!res.ok) { if (!cancelled) setWhatsappInboxCount(0); return; }
+        const data = await res.json();
+        if (!cancelled) setWhatsappInboxCount(Math.max(0, Number(data?.needsReply ?? 0)));
+      } catch {
+        if (!cancelled) setWhatsappInboxCount(0);
+      }
+    };
+    run();
+    const timer = setInterval(run, 30000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [canUseWhatsappInbox]);
 
   const closeSidebar = useCallback(() => setIsSidebarOpen(false), []);
   const openSearch = useCallback(() => { setIsSidebarOpen(false); setIsSearchOpen(true); }, []);
@@ -219,6 +239,8 @@ function DashboardContent({
           onOpenSidebar={() => setIsSidebarOpen(true)}
           onOpenSearch={openSearch}
           dir={dir}
+          showWhatsappInbox={canUseWhatsappInbox}
+          whatsappInboxCount={whatsappInboxCount}
         />
 
         {/* Content well. Pages own their own surfaces (Card, PageHeader, …) — the shell no

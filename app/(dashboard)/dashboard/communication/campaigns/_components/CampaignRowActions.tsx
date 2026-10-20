@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { toast } from "react-hot-toast";
-import { Ban, Loader2, MoreHorizontal, Send, ShieldCheck } from "lucide-react";
+import { Archive, Ban, Loader2, MoreHorizontal, Send, ShieldCheck, Settings2, Pause, Play } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,13 +20,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { channelMeta, isPreSend, type CampaignRow } from "./campaign-ui";
+import { CampaignControlsDialog } from "./CampaignControlsDialog";
+import { dashDir, dt, dtx } from "@/lib/dashboard/i18n";
 
 /**
  * Campaign lifecycle actions, in the list row.
  *
  * These used to live on `/dashboard/communication/campaigns/[id]`, which was the
  * only place a campaign could be confirmed, sent or cancelled. That page is gone
- * — clicking a campaign now opens its channel report — so the actions moved here
+ *  clicking a campaign now opens its channel report  so the actions moved here
  * rather than disappearing with it.
  *
  * The send confirmation keeps naming the real recipient count and the channel:
@@ -37,14 +39,24 @@ import { channelMeta, isPreSend, type CampaignRow } from "./campaign-ui";
  */
 
 const BLOCKED_LABELS: Record<string, string> = {
-  NOT_APPROVED: "الحملة غير معتمدة — اعتمدها أولًا.",
-  NO_TEMPLATE: "لم يُختَر قالب لهذه الحملة.",
-  NO_AUDIENCE: "لم يُحدَّد جمهور لهذه الحملة.",
-  NO_RECIPIENTS: "لا يوجد مستلم مؤهَّل في هذا الجمهور.",
-  NOT_CONFIGURED: "لا يوجد مزوّد مُعدّ لهذه القناة.",
+  get NOT_APPROVED() { return dt("الحملة غير معتمدة  اعتمدها أولًا."); },
+  get NO_TEMPLATE() { return dt("لم يُختَر قالب لهذه الحملة."); },
+  get NO_AUDIENCE() { return dt("لم يُحدَّد جمهور لهذه الحملة."); },
+  get NO_RECIPIENTS() { return dt("لا يوجد مستلم مؤهَّل في هذا الجمهور."); },
+  get NOT_CONFIGURED() { return dt("لا يوجد مزوّد مُعدّ لهذه القناة."); },
+  get NO_ELIGIBLE_RECIPIENTS() { return dt("لا يوجد مستلم مؤهَّل في هذا الجمهور."); },
+  get ALREADY_RUNNING() { return dt("الحملة قيد الإرسال الآن  انتظر انتهاء الدفعة الجارية."); },
+  get ALREADY_COMPLETE() { return dt("اكتمل إرسال هذه الحملة."); },
+  get NOT_RESUMABLE() { return dt("لا توجد دفعة متوقفة لمتابعتها."); },
+  get PAUSED() { return dt("الحملة متوقفة مؤقتًا من تحكمات الإرسال."); },
+  get QUIET_HOURS() { return dt("الحملة داخل ساعات عدم الإرسال وستستأنف تلقائيًا بعدها."); },
+  get SCHEDULED_STOP() { return dt("الحملة وصلت إلى وقت التوقف المجدول."); },
+  get EMERGENCY_STOP() { return dt("إرسال الحملات متوقف حاليًا بسبب إيقاف الطوارئ العام."); },
+  get DAILY_CAP_REACHED() { return dt("تم بلوغ الحد اليومي المسموح لرسائل واتساب."); },
 };
 
-type SendPlan = { total: number; blocked?: string | null };
+/** `audienceTotal` is the whole audience; `total` is only the first batch. */
+type SendPlan = { total: number; audienceTotal?: number; blocked?: string | null };
 
 export function CampaignRowActions({
   campaign,
@@ -56,11 +68,34 @@ export function CampaignRowActions({
   const [busy, setBusy] = React.useState(false);
   const [plan, setPlan] = React.useState<SendPlan | null>(null);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [controlsOpen, setControlsOpen] = React.useState(false);
 
   const canConfirm = campaign.status === "DRAFT" || campaign.status === "REVIEW";
   const canSend = campaign.status === "APPROVED";
   const canCancel = isPreSend(campaign.status);
-  if (!canConfirm && !canSend && !canCancel) return null;
+  const canControl = campaign.channel === "WHATSAPP" && !["SENT", "FAILED", "CANCELLED", "ARCHIVED"].includes(campaign.status);
+  const canArchive = ["SENT", "SENT_WITH_ISSUES", "FAILED", "BLOCKED", "CANCELLED"].includes(campaign.status);
+  if (!canConfirm && !canSend && !canCancel && !canControl && !canArchive) return null;
+
+  const togglePause = async () => {
+    const currentlyPaused = campaign.metadata?.sendControls?.paused === true;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/communication/campaigns/${campaign.id}/controls`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paused: !currentlyPaused }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json?.error || dt("تعذّر تحديث حالة الإرسال"));
+      toast.success(currentlyPaused ? dt("تم استئناف الحملة") : dt("تم إيقاف الحملة مؤقتًا"));
+      onChanged();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const transition = async (action: string) => {
     setBusy(true);
@@ -71,8 +106,8 @@ export function CampaignRowActions({
         body: JSON.stringify({ action }),
       });
       const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json?.error || "تعذّر تحديث الحالة");
-      toast.success(action === "CONFIRM" ? "تم تأكيد الحملة — يمكنك إرسالها الآن" : "تم تحديث الحالة");
+      if (!res.ok || !json.ok) throw new Error(json?.error || dt("تعذّر تحديث الحالة"));
+      toast.success(action === "CONFIRM" ? dt("تم تأكيد الحملة  يمكنك إرسالها الآن") : dt("تم تحديث الحالة"));
       onChanged();
     } catch (e) {
       toast.error((e as Error).message);
@@ -81,7 +116,7 @@ export function CampaignRowActions({
     }
   };
 
-  /** Resolve the recipient count first — the dialog is worthless without it. */
+  /** Resolve the recipient count first  the dialog is worthless without it. */
   const openSend = async () => {
     setBusy(true);
     try {
@@ -89,11 +124,31 @@ export function CampaignRowActions({
       const json = await res.json().catch(() => null);
       const resolved: SendPlan = json?.ok ? json.plan : { total: 0 };
       if (resolved.blocked) {
-        toast.error(BLOCKED_LABELS[resolved.blocked] ?? `تعذّر الإرسال: ${resolved.blocked}`);
+        toast.error(BLOCKED_LABELS[resolved.blocked] ?? dt("تعذّر الإرسال: {0}", [resolved.blocked]));
         return;
       }
       setPlan(resolved);
       setConfirmOpen(true);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const archive = async () => {
+    if (!window.confirm(dt("أرشفة الحملة «{0}»؟ ستختفي من القائمة النشطة مع الاحتفاظ بكل سجلات الإرسال والتقارير.", [campaign.name]))) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/communication/campaigns/${campaign.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "ARCHIVE" }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) throw new Error(json?.error || dt("تعذّرت أرشفة الحملة"));
+      toast.success(dt("تمت أرشفة الحملة"));
+      onChanged();
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -112,12 +167,16 @@ export function CampaignRowActions({
       });
       const json = await res.json();
       if (json?.summary?.blocked) {
-        toast.error(BLOCKED_LABELS[json.summary.blocked] ?? `تعذّر الإرسال: ${json.summary.blocked}`);
+        toast.error(BLOCKED_LABELS[json.summary.blocked] ?? dt("تعذّر الإرسال: {0}", [json.summary.blocked]));
       } else if (!res.ok || !json.ok) {
-        toast.error(json?.error || "تعذّر الإرسال");
+        toast.error(json?.error || dt("تعذّر الإرسال"));
       } else {
         const s = json.summary;
-        toast.success(`أُرسلت ${s.sent} · تُخطّيت ${s.skipped} · فشلت ${s.failed}`);
+        toast.success(
+          s.hasMore
+            ? dt("الدفعة الأولى: أُرسلت {0} · تُخطّيت {1} · فشلت {2}  تتواصل بقية الدفعات تلقائيًا", [s.sent, s.skipped, s.failed])
+            : dt("أُرسلت {0} · تُخطّيت {1} · فشلت {2}", [s.sent, s.skipped, s.failed]),
+        );
       }
       onChanged();
     } catch (e) {
@@ -136,7 +195,7 @@ export function CampaignRowActions({
             // The row itself navigates to the channel report; the menu must not.
             onClick={(e) => e.stopPropagation()}
             disabled={busy}
-            aria-label={`إجراءات حملة ${campaign.name}`}
+            aria-label={dt("إجراءات حملة {0}", [campaign.name])}
             className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:border-brand/40 hover:bg-brand-50 hover:text-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50"
           >
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MoreHorizontal className="h-3.5 w-3.5" />}
@@ -146,39 +205,68 @@ export function CampaignRowActions({
           {canConfirm && (
             <DropdownMenuItem onClick={() => transition("CONFIRM")}>
               <ShieldCheck className="me-2 h-3.5 w-3.5" />
-              تأكيد الحملة
-            </DropdownMenuItem>
+              {dt("تأكيد الحملة")}</DropdownMenuItem>
           )}
           {canSend && (
             <DropdownMenuItem onClick={openSend}>
               <Send className="me-2 h-3.5 w-3.5" />
-              إرسال الآن
-            </DropdownMenuItem>
+              {dt("إرسال الآن")}</DropdownMenuItem>
+          )}
+          {canControl && (
+            <>
+              <DropdownMenuItem onClick={togglePause}>
+                {campaign.metadata?.sendControls?.paused ? (
+                  <Play className="me-2 h-3.5 w-3.5" />
+                ) : (
+                  <Pause className="me-2 h-3.5 w-3.5" />
+                )}
+                {campaign.metadata?.sendControls?.paused ? dt("استئناف الحملة") : dt("إيقاف مؤقت فورًا")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setControlsOpen(true)}>
+                <Settings2 className="me-2 h-3.5 w-3.5" />
+                {dt("مركز التحكم المتقدم")}</DropdownMenuItem>
+            </>
           )}
           {canCancel && (
             <DropdownMenuItem onClick={() => transition("CANCEL")} className="text-rose-600 focus:text-rose-700">
               <Ban className="me-2 h-3.5 w-3.5" />
-              إلغاء الحملة
-            </DropdownMenuItem>
+              {dt("إلغاء الحملة")}</DropdownMenuItem>
+          )}
+          {canArchive && (
+            <DropdownMenuItem onClick={archive}>
+              <Archive className="me-2 h-3.5 w-3.5" />
+              {dt("أرشفة الحملة")}</DropdownMenuItem>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
 
+      <CampaignControlsDialog
+        open={controlsOpen}
+        onOpenChange={setControlsOpen}
+        campaignId={campaign.id}
+        campaignName={campaign.name}
+        onChanged={onChanged}
+      />
+
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent dir="rtl">
+        <AlertDialogContent dir={dashDir()}>
           <AlertDialogHeader>
-            <AlertDialogTitle>إرسال «{campaign.name}»؟</AlertDialogTitle>
+            <AlertDialogTitle>{dtx("إرسال «{0}»؟", [campaign.name])}</AlertDialogTitle>
             <AlertDialogDescription>
-              سيتم الإرسال عبر {channelMeta(campaign.channel).label} إلى{" "}
-              <b className="font-semibold text-slate-900">{(plan?.total ?? 0).toLocaleString("en-US")}</b> مستلمًا.
-              لا يمكن التراجع بعد الإرسال.
+              {dtx("سيتم الإرسال عبر {0} إلى ", [channelMeta(campaign.channel).label])}
+              <b className="font-semibold text-slate-900">{(plan?.audienceTotal ?? plan?.total ?? 0).toLocaleString("en-US")}</b> {dt(" مستلمًا. لا يمكن التراجع بعد الإرسال.")}{(plan?.audienceTotal ?? 0) > (plan?.total ?? 0) ? (
+                /* A large audience is sent in batches over several scheduler runs, so the operator is
+                   told the send continues in the background instead of reading the first batch's
+                   numbers as the final result. */
+                <span className="mt-2 block text-[11px] text-slate-500">
+                  {dt("سيُرسَل على دفعات، وتتابع المهمة المجدولة الإرسال حتى اكتمال الجمهور.")}</span>
+              ) : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogCancel>{dt("إلغاء")}</AlertDialogCancel>
             <AlertDialogAction onClick={send} className="bg-emerald-600 hover:bg-emerald-700">
-              إرسال الآن
-            </AlertDialogAction>
+              {dt("إرسال الآن")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

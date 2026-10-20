@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyToken, createAutoSignInToken } from "@/lib/otp";
 import { dispatchEvent } from "@/lib/events/dispatch";
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     data: { emailVerified: new Date() },
     select: { id: true },
   });
-  void dispatchEvent("USER_REGISTERED", { userId: verifiedUser.id });
+  after(() => dispatchEvent("USER_REGISTERED", { userId: verifiedUser.id }));
 
   // Create a short-lived auto-sign-in token so the user lands signed in
   const autoToken = await createAutoSignInToken(normalizedEmail);
