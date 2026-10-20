@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm run test:integration-settings && prisma generate && prisma generate --schema prisma/integration-settings.schema.prisma && npm run typecheck:communication-runtime && npm run typecheck:integration-release && TSC_COMPILE_ON_ERROR=true next build",
+    "build": "prisma generate && prisma generate --schema prisma/integration-settings.schema.prisma && npm run test:integration-settings && npm run typecheck:communication-runtime && npm run typecheck:integration-release && TSC_COMPILE_ON_ERROR=true next build",
     "start": "next start",
     "lint": "next lint",
     "test:integration-settings": "rm -rf .integration-test-build && tsc -p tsconfig.integration-tests.json && node --test .integration-test-build/tests/integration-settings/*.test.js",
