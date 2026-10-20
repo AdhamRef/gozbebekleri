@@ -66,12 +66,14 @@ async function fetchCampaignForSeo(idOrSlug: string) {
       title: true,
       description: true,
       images: true,
+      imageAlt: true,
       translations: {
         select: {
           locale: true,
           title: true,
           description: true,
           image: true,
+          imageAlt: true,
           slug: true,
         },
       },
@@ -173,7 +175,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       siteName: seo.siteName,
       locale: OG_LOCALE_MAP[locale as Locale] ?? "en_US",
       type: "website",
-      images: [{ url: image, width: 1200, height: 630, alt: ogTitle }],
+      images: [{ url: image, width: 1200, height: 630, alt: t?.imageAlt || campaign.imageAlt || ogTitle }],
     },
     twitter: {
       card: "summary_large_image",

@@ -1,5 +1,6 @@
 'use client';
 
+import { TranslationOverview } from "@/components/dashboard/content-editor/TranslationOverview";
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import {useRouter} from 'next/navigation';
@@ -308,6 +309,7 @@ export default function CategoriesPage() {
 
   return (
     <div>
+      <TranslationOverview kind="categories" />
       <PageHeader
         title="الحملات"
         description="إدارة الحملات ومشاريعها"
@@ -441,7 +443,7 @@ export default function CategoriesPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => router.push(`/dashboard/categories/edit/${category.id}`)}
+                      onClick={() => router.push(`/dashboard/content/categories/${category.id}`)}
                       className="text-primary hover:bg-primary/10"
                     >
                       <Pencil className="w-4 h-4" />

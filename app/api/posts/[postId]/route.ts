@@ -1,3 +1,4 @@
+import { contentWriteWhere, contentVersionPatch, isContentWriteConflict } from "@/lib/content-editor/legacy-write";
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
@@ -293,7 +294,7 @@ export async function PATCH(
     }
 
     const updated = await prisma.$transaction(async (tx) => {
-      const post = await tx.post.update({ where: { id: postId }, data: updateData });
+      const post = await tx.post.update({ where: contentWriteWhere({ id: postId }, body), data: { ...updateData, ...contentVersionPatch() } });
 
       for (const { locale, data } of translationUpdates) {
         const td: any = {};
@@ -371,6 +372,7 @@ export async function PATCH(
 
     return NextResponse.json(full);
   } catch (error) {
+    if (isContentWriteConflict(error)) return NextResponse.json({ error: "تغير المحتوى لدى زميل. أعد تحميل الصفحة قبل الحفظ." }, { status: 409 });
     console.error('[POST_UPDATE]', error);
     return NextResponse.json({ error: 'Internal Error' }, { status: 500 });
   }

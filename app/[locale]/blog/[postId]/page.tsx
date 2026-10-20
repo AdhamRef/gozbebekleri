@@ -45,11 +45,14 @@ async function fetchPostForSeo(idOrSlug: string) {
       id: true,
       slug: true,
       title: true,
+      metaTitle: true,
+      metaDescription: true,
+      imageAlt: true,
       description: true,
       image: true,
       updatedAt: true,
       translations: {
-        select: { locale: true, title: true, description: true, image: true, slug: true },
+        select: { locale: true, title: true, metaTitle: true, metaDescription: true, imageAlt: true, description: true, image: true, slug: true },
       },
     },
   });
@@ -88,8 +91,8 @@ export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
     }
 
     const t = pickTranslation(post.translations, locale);
-    const titleText = (t?.title || post.title || seo.blog.title).trim();
-    const descriptionText = ((t?.description || post.description) || seo.blog.description).slice(0, 160);
+    const titleText = (t?.metaTitle || (locale === "ar" ? post.metaTitle : null) || t?.title || post.title || seo.blog.title).trim();
+    const descriptionText = ((t?.metaDescription || (locale === "ar" ? post.metaDescription : null) || t?.description || post.description) || seo.blog.description).slice(0, 160);
     const imageUrl =
       (t as { image?: string | null } | undefined)?.image ||
       post.image ||
@@ -119,7 +122,7 @@ export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
       openGraph: {
         title: fullTitle,
         description: descriptionText,
-        images: [{ url: imageUrl, width: 1200, height: 630, alt: titleText }],
+        images: [{ url: imageUrl, width: 1200, height: 630, alt: t?.imageAlt || post.imageAlt || titleText }],
         url: alternates.canonical,
         siteName: seo.siteName,
         locale: OG_LOCALE_MAP[locale as Locale] ?? "en_US",
