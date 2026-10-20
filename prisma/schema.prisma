@@ -249,9 +249,8 @@ model Category {
   /// Offline/legacy money entered by hand; protected from donation-derived recomputes.
   baselineAmount Float   @default(0)
 
-  /// Archive flag. Toggling this from the dashboard cascades to every
-  /// member Campaign — archiving the category archives all its campaigns,
-  /// re-activating reverses it. Pre-existing categories may have this
+  /// Category publication is independent of member campaign publication.
+  /// Archiving never changes campaign activation. Pre-existing categories may have this
   /// field unset; treat unset as active when filtering.
   isActive      Boolean? @default(true)
 
@@ -281,6 +280,13 @@ model Category {
   metaDescription String?
   previousSlugs String[] @default([])
   slugChanges Json?
+  seoKeyword String?
+  ogTitle String?
+  ogDescription String?
+  ogImage String?
+  seoNoIndex String?
+  faqContent String?
+  navigationVisible Boolean? @default(true)
 }
 
 
@@ -312,6 +318,12 @@ model CategoryTranslation {
   imageAlt String?
   metaTitle String?
   metaDescription String?
+  seoKeyword String?
+  ogTitle String?
+  ogDescription String?
+  ogImage String?
+  seoNoIndex String?
+  faqContent String?
 }
 
 
@@ -370,6 +382,8 @@ model Campaign {
   /// receipts, and audit trails stay intact. Pre-existing rows may have the
   /// field unset entirely — treat unset as not deleted when filtering.
   isDeleted        Boolean? @default(false)
+  /// Editorial archive is separate from temporarily disabling donations.
+  editorArchived   Boolean? @default(false)
   priority         Int?
 
   /// { "amounts": number[], "byCurrency"?: Record<string, number[]> } — quick-pick donation amounts; omit/null uses app defaults
@@ -422,6 +436,12 @@ model Campaign {
   imageAlt String?
   seoTitle String?
   seoDescription String?
+  seoKeyword String?
+  ogTitle String?
+  ogDescription String?
+  ogImage String?
+  seoNoIndex String?
+  faqContent String?
 }
 
 /// "Make an impact for a child" — interactive builder campaign type.
@@ -500,6 +520,12 @@ model CampaignTranslation {
   imageAlt String?
   seoTitle String?
   seoDescription String?
+  seoKeyword String?
+  ogTitle String?
+  ogDescription String?
+  ogImage String?
+  seoNoIndex String?
+  faqContent String?
 }
 
 /* ===================== CAMPAIGN UPDATES ===================== */
@@ -840,6 +866,12 @@ model Post {
   imageAlt String?
   metaTitle String?
   metaDescription String?
+  seoKeyword String?
+  ogTitle String?
+  ogDescription String?
+  ogImage String?
+  seoNoIndex String?
+  faqContent String?
 }
 
 model PostTranslation {
@@ -862,6 +894,12 @@ model PostTranslation {
   imageAlt String?
   metaTitle String?
   metaDescription String?
+  seoKeyword String?
+  ogTitle String?
+  ogDescription String?
+  ogImage String?
+  seoNoIndex String?
+  faqContent String?
 }
 
 model LiveDonationTicker {
@@ -2087,6 +2125,12 @@ model SuperCategory {
   editorVersion String?
   editorReviews Json?
   imageAlt String?
+  seoKeyword String?
+  ogTitle String?
+  ogDescription String?
+  ogImage String?
+  seoNoIndex String?
+  faqContent String?
 }
 
 model SuperCategoryTranslation {
@@ -2113,6 +2157,12 @@ model SuperCategoryTranslation {
 
   @@unique([superCategoryId, locale])
   imageAlt String?
+  seoKeyword String?
+  ogTitle String?
+  ogDescription String?
+  ogImage String?
+  seoNoIndex String?
+  faqContent String?
 }
 
 model SuperCategoryBlock {

@@ -1,4 +1,9 @@
 "use server";
+import {
+  applyEditorialSeo,
+  readPublicEditorialSeo,
+} from "@/lib/content-editor/public-seo";
+import { EditorialFaq } from "@/components/content/EditorialFaq";
 
 import axios from "axios";
 import Image from "next/image";
@@ -6,7 +11,11 @@ import { Metadata } from "next";
 import { redirect } from "next/navigation";
 import React from "react";
 import { prisma } from "@/lib/prisma";
-import { isObjectId, pickLocaleSlug, whereByIdOrAnyLocaleSlug } from "@/lib/slug";
+import {
+  isObjectId,
+  pickLocaleSlug,
+  whereByIdOrAnyLocaleSlug,
+} from "@/lib/slug";
 import { pickTranslation } from "@/lib/i18n/translation-fallback";
 import {
   LOCALE_SEO,
@@ -17,7 +26,13 @@ import {
 import type { Locale } from "@/lib/seo";
 // server-side messages loader
 
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
@@ -52,7 +67,16 @@ async function fetchPostForSeo(idOrSlug: string) {
       image: true,
       updatedAt: true,
       translations: {
-        select: { locale: true, title: true, metaTitle: true, metaDescription: true, imageAlt: true, description: true, image: true, slug: true },
+        select: {
+          locale: true,
+          title: true,
+          metaTitle: true,
+          metaDescription: true,
+          imageAlt: true,
+          description: true,
+          image: true,
+          slug: true,
+        },
       },
     },
   });
@@ -60,7 +84,7 @@ async function fetchPostForSeo(idOrSlug: string) {
 
 // Generate metadata for the blog post page (SEO with translated title +
 // per-locale hreflang/canonical using each locale's own translation slug)
-export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
+async function generateBaseMetadata(args: BlogPostProps): Promise<Metadata> {
   const params = await args.params.catch(() => null);
   const locale = (params?.locale as string) || "ar";
   const postId = params?.postId as string | undefined;
@@ -91,8 +115,20 @@ export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
     }
 
     const t = pickTranslation(post.translations, locale);
-    const titleText = (t?.metaTitle || (locale === "ar" ? post.metaTitle : null) || t?.title || post.title || seo.blog.title).trim();
-    const descriptionText = ((t?.metaDescription || (locale === "ar" ? post.metaDescription : null) || t?.description || post.description) || seo.blog.description).slice(0, 160);
+    const titleText = (
+      t?.metaTitle ||
+      (locale === "ar" ? post.metaTitle : null) ||
+      t?.title ||
+      post.title ||
+      seo.blog.title
+    ).trim();
+    const descriptionText = (
+      t?.metaDescription ||
+      (locale === "ar" ? post.metaDescription : null) ||
+      t?.description ||
+      post.description ||
+      seo.blog.description
+    ).slice(0, 160);
     const imageUrl =
       (t as { image?: string | null } | undefined)?.image ||
       post.image ||
@@ -122,7 +158,14 @@ export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
       openGraph: {
         title: fullTitle,
         description: descriptionText,
-        images: [{ url: imageUrl, width: 1200, height: 630, alt: t?.imageAlt || post.imageAlt || titleText }],
+        images: [
+          {
+            url: imageUrl,
+            width: 1200,
+            height: 630,
+            alt: t?.imageAlt || post.imageAlt || titleText,
+          },
+        ],
         url: alternates.canonical,
         siteName: seo.siteName,
         locale: OG_LOCALE_MAP[locale as Locale] ?? "en_US",
@@ -146,7 +189,9 @@ export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
   }
 }
 
-export default async function BlogPost({ params: paramsPromise }: BlogPostProps) {
+export default async function BlogPost({
+  params: paramsPromise,
+}: BlogPostProps) {
   const params = await paramsPromise;
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.org";
   const locale = params.locale || "ar";
@@ -166,8 +211,12 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
       },
     });
     if (post) {
-      const canonical = pickLocaleSlug(post.slug, post.translations, locale) ?? post.id;
-      if (params.postId !== canonical && (isObjectId(params.postId) || params.postId !== post.id)) {
+      const canonical =
+        pickLocaleSlug(post.slug, post.translations, locale) ?? post.id;
+      if (
+        params.postId !== canonical &&
+        (isObjectId(params.postId) || params.postId !== post.id)
+      ) {
         redirect(`/${locale}/blog/${encodeURIComponent(canonical)}`);
       }
     }
@@ -177,7 +226,9 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
   }
 
   // Fetch the post and similar posts (API already returns localized fields)
-  const res = await axios.get(`${baseUrl}/api/posts/${params.postId}`, { params: { locale } });
+  const res = await axios.get(`${baseUrl}/api/posts/${params.postId}`, {
+    params: { locale },
+  });
   const { post, similarPosts } = res.data;
 
   // Helper to pick a localized value: prefer a top-level localized field, then translations array, then post.fieldAR/EN/FR
@@ -209,7 +260,10 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
   return (
     <div className="w-full bg-gray-100">
       <div className="min-h-screen pt-10 pb-10 relative max-w-7xl mx-auto">
-        <Progress className="fixed top-0 left-0 right-0 z-50 h-1 bg-transparent" value={0} />
+        <Progress
+          className="fixed top-0 left-0 right-0 z-50 h-1 bg-transparent"
+          value={0}
+        />
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="md:col-span-2">
@@ -218,31 +272,61 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
                   <div className="flex items-center justify-between">
                     <Badge variant="outline">{categoryName}</Badge>
                     <span className="text-sm text-muted-foreground">
-                      {post.createdAt ? formatDistanceToNow(new Date(post.createdAt), { addSuffix: true, locale: locale === 'ar' ? dateAr : undefined }) : ''}
+                      {post.createdAt
+                        ? formatDistanceToNow(new Date(post.createdAt), {
+                            addSuffix: true,
+                            locale: locale === "ar" ? dateAr : undefined,
+                          })
+                        : ""}
                     </span>
                   </div>
-                  <CardTitle className="text-3xl font-bold leading-tight">{localizedTitle}</CardTitle>
+                  <CardTitle className="text-3xl font-bold leading-tight">
+                    {localizedTitle}
+                  </CardTitle>
                 </CardHeader>
 
                 <div className="relative w-full aspect-video overflow-hidden">
-                  <Image src={post?.image || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"} alt={localizedTitle || "Post Image"} fill sizes="(max-width: 768px) 100vw, 66vw" className="object-cover" />
+                  <Image
+                    src={
+                      post?.image ||
+                      "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"
+                    }
+                    alt={localizedTitle || "Post Image"}
+                    fill
+                    sizes="(max-width: 768px) 100vw, 66vw"
+                    className="object-cover"
+                  />
                 </div>
 
                 <CardContent className="p-6">
-                  {localizedDescription && <p className="lead text-muted-foreground">{localizedDescription}</p>}
+                  {localizedDescription && (
+                    <p className="lead text-muted-foreground">
+                      {localizedDescription}
+                    </p>
+                  )}
                   <Separator className="my-6" />
                   <BlogPostContent content={localizedContent} />
+                  <EditorialFaq
+                    kind="blog"
+                    contentKey={post.id}
+                    locale={locale}
+                  />
                 </CardContent>
 
                 <CardFooter>
-                  <ShareButton label={t('sharePost')} copiedMessage={t('linkCopied')} url={`https://gozbebekleri.org/${locale}/blog/${post?.slug || params.postId}`} />
+                  <ShareButton
+                    label={t("sharePost")}
+                    copiedMessage={t("linkCopied")}
+                    url={`https://gozbebekleri.org/${locale}/blog/${post?.slug || params.postId}`}
+                  />
                 </CardFooter>
               </Card>
             </div>
 
             <aside className="flex flex-col gap-4 sticky top-[6.5rem] self-start">
               {(() => {
-                const raw = post.campaigns ?? (post.campaign ? [post.campaign] : []);
+                const raw =
+                  post.campaigns ?? (post.campaign ? [post.campaign] : []);
                 const list = raw as {
                   id: string;
                   slug?: string | null;
@@ -259,7 +343,9 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
                 return (
                   <Card className="overflow-hidden">
                     <CardHeader>
-                      <CardTitle className="text-lg font-bold">{t("relatedCampaign")}</CardTitle>
+                      <CardTitle className="text-lg font-bold">
+                        {t("relatedCampaign")}
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="p-4 pt-0 flex flex-col gap-4">
                       {list.map((camp) => {
@@ -269,11 +355,15 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
                           ? computeCampaignProgressPercent(
                               camp.currentAmount,
                               camp.targetAmount,
-                              g
+                              g,
                             )
                           : 0;
-                        const remaining = Math.max(0, camp.targetAmount - camp.currentAmount);
-                        const isShares = camp.fundraisingMode === FUNDRAISING_SHARES;
+                        const remaining = Math.max(
+                          0,
+                          camp.targetAmount - camp.currentAmount,
+                        );
+                        const isShares =
+                          camp.fundraisingMode === FUNDRAISING_SHARES;
                         return (
                           <Link
                             key={camp.id}
@@ -282,7 +372,10 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
                           >
                             <div className="relative aspect-[4/2.5] overflow-hidden bg-gray-100">
                               <Image
-                                src={camp.images?.[0] || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"}
+                                src={
+                                  camp.images?.[0] ||
+                                  "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"
+                                }
                                 alt={camp.title}
                                 fill
                                 sizes="(max-width: 768px) 100vw, 400px"
@@ -295,7 +388,9 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
                                 </div>
                               ) : (
                                 <div className="absolute top-2 right-2 rounded-lg bg-white/95 px-2 py-0.5 text-xs font-bold text-violet-700 shadow-sm">
-                                  {isShares ? t("campaignSharesBadge") : t("campaignOpenBadge")}
+                                  {isShares
+                                    ? t("campaignSharesBadge")
+                                    : t("campaignOpenBadge")}
                                 </div>
                               )}
                             </div>
@@ -305,35 +400,50 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
                               </h3>
                               <div className="flex justify-between text-xs mb-1.5 gap-1">
                                 <span className="text-gray-700 whitespace-nowrap">
-                                  <span className="font-bold text-[#025EB8]">{Number(camp.currentAmount).toLocaleString()}</span> {t("campaignDonations")}
+                                  <span className="font-bold text-[#025EB8]">
+                                    {Number(
+                                      camp.currentAmount,
+                                    ).toLocaleString()}
+                                  </span>{" "}
+                                  {t("campaignDonations")}
                                 </span>
                                 {showBar ? (
                                   <span className="text-gray-600 text-right whitespace-nowrap">
                                     {t("campaignRemaining")}{" "}
-                                    <span className="font-semibold">{Number(remaining).toLocaleString()}</span>
+                                    <span className="font-semibold">
+                                      {Number(remaining).toLocaleString()}
+                                    </span>
                                   </span>
-                                ) : isShares && camp.sharePriceUSD != null && camp.sharePriceUSD > 0 ? (
+                                ) : isShares &&
+                                  camp.sharePriceUSD != null &&
+                                  camp.sharePriceUSD > 0 ? (
                                   <span className="text-gray-600 text-right whitespace-nowrap">
                                     {t("sharePriceUsd")}{" "}
                                     <LocalizedSharePrice
                                       className="font-semibold"
                                       sharePriceUSD={Number(camp.sharePriceUSD)}
-                                      suggestedShareCounts={camp.suggestedShareCounts}
+                                      suggestedShareCounts={
+                                        camp.suggestedShareCounts
+                                      }
                                     />
                                   </span>
                                 ) : (
-                                  <span className="text-gray-600 text-right whitespace-nowrap">{t("campaignOpenGoal")}</span>
+                                  <span className="text-gray-600 text-right whitespace-nowrap">
+                                    {t("campaignOpenGoal")}
+                                  </span>
                                 )}
                               </div>
                               {showBar ? (
-                              <div className="w-full bg-gray-100 rounded-full h-1.5">
-                                <div
-                                  className="bg-[#025EB8] h-1.5 rounded-full transition-all duration-500"
-                                  style={{ width: `${progress}%` }}
-                                />
-                              </div>
+                                <div className="w-full bg-gray-100 rounded-full h-1.5">
+                                  <div
+                                    className="bg-[#025EB8] h-1.5 rounded-full transition-all duration-500"
+                                    style={{ width: `${progress}%` }}
+                                  />
+                                </div>
                               ) : null}
-                              <p className="text-center text-xs font-semibold text-[#025EB8] mt-2">{t("donateNow")}</p>
+                              <p className="text-center text-xs font-semibold text-[#025EB8] mt-2">
+                                {t("donateNow")}
+                              </p>
                             </div>
                           </Link>
                         );
@@ -345,30 +455,73 @@ export default async function BlogPost({ params: paramsPromise }: BlogPostProps)
 
               <Card className="overflow-hidden">
                 <CardHeader>
-                  <CardTitle className="text-lg font-bold">{t('similarPosts')}</CardTitle>
+                  <CardTitle className="text-lg font-bold">
+                    {t("similarPosts")}
+                  </CardTitle>
                 </CardHeader>
 
                 <CardContent className="p-4 pt-0 flex flex-col gap-4">
-                  {(similarPosts as { id: string; slug?: string | null; title?: string; image?: string }[]).map((sp) => (
-                    <Link key={sp.id} href={`/${locale}/blog/${sp.slug || sp.id}`} className="group relative rounded-xl overflow-hidden border bg-background shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+                  {(
+                    similarPosts as {
+                      id: string;
+                      slug?: string | null;
+                      title?: string;
+                      image?: string;
+                    }[]
+                  ).map((sp) => (
+                    <Link
+                      key={sp.id}
+                      href={`/${locale}/blog/${sp.slug || sp.id}`}
+                      className="group relative rounded-xl overflow-hidden border bg-background shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+                    >
                       <div className="relative aspect-[4/2.5] overflow-hidden">
-                        <Image src={sp.image || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"} alt={sp.title || ''} fill sizes="600px" className="object-cover transition-transform duration-500 group-hover:scale-110" />
+                        <Image
+                          src={
+                            sp.image ||
+                            "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"
+                          }
+                          alt={sp.title || ""}
+                          fill
+                          sizes="600px"
+                          className="object-cover transition-transform duration-500 group-hover:scale-110"
+                        />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
                       </div>
 
                       <div className="absolute inset-0 flex flex-col justify-end p-4">
-                        <span className="mb-2 inline-block w-fit rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white backdrop-blur">{t('article')}</span>
-                        <h3 className="text-sm font-bold leading-snug text-white line-clamp-3">{(sp && (sp.title || (Array.isArray(sp.translations) ? (sp.translations.find((t2) => t2.locale === locale)?.title) : undefined) || sp.titleAR || sp.titleEN || sp.titleFR))}</h3>
+                        <span className="mb-2 inline-block w-fit rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
+                          {t("article")}
+                        </span>
+                        <h3 className="text-sm font-bold leading-snug text-white line-clamp-3">
+                          {sp &&
+                            (sp.title ||
+                              (Array.isArray(sp.translations)
+                                ? sp.translations.find(
+                                    (t2) => t2.locale === locale,
+                                  )?.title
+                                : undefined) ||
+                              sp.titleAR ||
+                              sp.titleEN ||
+                              sp.titleFR)}
+                        </h3>
                       </div>
                     </Link>
                   ))}
                 </CardContent>
               </Card>
             </aside>
-
           </div>
         </div>
       </div>
     </div>
   );
+}
+
+export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
+  const { postId, locale } = await args.params;
+  const [base, extra] = await Promise.all([
+    generateBaseMetadata(args),
+    readPublicEditorialSeo("blog", decodeURIComponent(postId), locale),
+  ]);
+  return applyEditorialSeo(base, extra);
 }
