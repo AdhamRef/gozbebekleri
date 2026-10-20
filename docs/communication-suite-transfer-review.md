@@ -125,3 +125,35 @@ Tests use isolated fixtures and mocked providers; they are not evidence of real 
 ## Live verification still required before publication
 
 Use an isolated preview database and provider test destinations for the final operational check. Confirm the provider connection, WABA/number ownership and signed webhook, exact template language approval, a category-only donation context, decimal amount/currency, receipt link authorization, a 24-hour-window reply, and consent/suppression. Inspect the resulting archive before a real audience is scheduled. Production send testing and real inbox delivery were not performed here.
+
+## Donor-country lookup transfer — 20 October 2026
+
+Additional user-requested scope: source donor location fixes from main
+`5b5a6ca539e86aef77fafaa14dbfc3ec6a4aab81`.
+
+- Imported `lib/geo/ip-lookup.ts`: three parallel provider lookups (ipinfo,
+  ipapi, country.is), 2.5-second provider timeouts, per-IP bounded memory cache,
+  majority country and provider-order tie breaking. Optional IPINFO_TOKEN belongs
+  to the target environment; no source credential was copied.
+- Imported proxy address precedence and public-address fallback, retaining
+  Vercel/Cloudflare edge country headers as the first geo source.
+- Removed shared CDN caching from `/api/geo/client`, which previously allowed
+  one visitor's location to be served to another. Response field names and route
+  remain compatible with current guest checkout and session flows.
+- Target-specific review corrections: identify the target in the provider
+  User-Agent, never borrow city/region from a different tied country, validate
+  IP syntax and reject the full IPv4 loopback range and IPv6 unspecified address.
+- Compared existing phone-priority resolver, session provider, account location
+  updater and donor-country snapshot helper against source. The target already
+  has those behaviors, so they are retained without replacing authentication,
+  payment processing or country snapshot history.
+- Regression coverage executes the actual provider/request/route source with
+  isolated mocks: majority, ties, failure, placeholder responses, per-IP cache,
+  edge precedence, proxy hops, local/non-routable IPs, response compatibility and
+  separate successive visitors. Additional strict TypeScript gate:
+  `tsconfig.geo.json`.
+- No production donor location was rewritten, historical donation was backfilled,
+  external geo lookup was performed by tests, or payment was submitted.
+- The external-provider fallback remains approximate IP-based location; a phone
+  country is also not proof of current physical residence. This transfer does
+  not claim GPS-level accuracy or update past donation country snapshots.
