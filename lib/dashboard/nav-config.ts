@@ -52,7 +52,9 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
       { key: "campaigns", title: "المشاريع", href: "/dashboard/campaigns", icon: "heart", keywords: ["projects", "campaigns", "مشاريع"] },
       // Interactive "make an impact for a child" builder — its own campaign type (ImpactCampaign).
       { key: "campaigns", title: "اصنع أثرًا لطفل", href: "/dashboard/impact", icon: "heartHandshake", keywords: ["impact", "child", "builder", "أثر", "طفل", "احتياجات"] },
-      { key: "categories", title: "الحملات والدول", href: "/dashboard/categories", icon: "globe", keywords: ["categories", "countries", "تصنيفات"] },
+      { key: "categories", title: "التصنيفات", href: "/dashboard/categories", icon: "globe", keywords: ["categories", "countries", "تصنيفات"] },
+      { key: "siteContent", title: "الأقسام الكبرى", href: "/dashboard/super-categories", icon: "layers" },
+      { key: "siteContent", title: "البانرات", href: "/dashboard/urgent-banners", icon: "alertTriangle" },
       { key: "blog", title: "المدونة", href: "/dashboard/blog", icon: "penLine", keywords: ["blog", "posts", "مقالات"] },
       // Built, API-backed, and previously unreachable. Slides and ticker both control what the
       // PUBLIC site renders, so leaving them unlinked meant no one could edit live UI.
@@ -150,7 +152,7 @@ export const DASHBOARD_PERMISSION_ROWS: {
   { key: "bankTransfers", group: "الرئيسية", title: "التحويلات البنكية" },
   { key: "donors", group: "الرئيسية", title: "المتبرعون" },
   { key: "campaigns", group: "الحملات والمحتوى", title: "المشاريع" },
-  { key: "categories", group: "الحملات والمحتوى", title: "الحملات والدول" },
+  { key: "categories", group: "الحملات والمحتوى", title: "التصنيفات" },
   { key: "blog", group: "الحملات والمحتوى", title: "المدونة" },
   // P3-2: these five keys were valid in DASHBOARD_PERMISSION_KEYS and enforced by the API
   // guards, but appeared in NO grant UI — so they could never actually be granted, and a user

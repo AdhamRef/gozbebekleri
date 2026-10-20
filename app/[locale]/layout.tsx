@@ -1,3 +1,4 @@
+import { ManagedBannerSlots } from "@/components/content/ManagedBannerSlots";
 import type { Metadata } from "next";
 import { LOCALE_SEO, OG_LOCALE_MAP, OG_IMAGE, SITE_URL, buildHreflang } from "@/lib/seo";
 import type { Locale } from "@/lib/seo";
@@ -96,7 +97,9 @@ export default async function Rootlayout({
               <PreferredLangSync />
               <Navbar />
               <main className="pt-16 lg:pt-[104px]">
+                <ManagedBannerSlots locale={locale} slot="top" />
                 {children}
+                <ManagedBannerSlots locale={locale} slot="bottom" />
               </main>
               <Footer />
               <CartReminder />

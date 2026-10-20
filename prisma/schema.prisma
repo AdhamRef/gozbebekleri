@@ -264,7 +264,26 @@ model Category {
   donationItems          DonationCategoryItem[]
   subscriptionCategoryItems SubscriptionCategoryItem[]
   translations           CategoryTranslation[]
+  values CategoryValue[]
+  infoCards CategoryInfoCard[]
+  heroLead String?
+  ctaLabel String?
+  statDoneLabel String?
+  statGoalLabel String?
+  projectsTitle String?
+  donateTitle String?
+  donateNote String?
+  achievementsTitle String?
+  editorVersion String?
+  editorReviews Json?
+  imageAlt String?
+  metaTitle String?
+  metaDescription String?
+  previousSlugs String[] @default([])
+  slugChanges Json?
 }
+
+
 
 model CategoryTranslation {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
@@ -282,7 +301,19 @@ model CategoryTranslation {
   category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@unique([categoryId, locale])
+  heroLead String?
+  ctaLabel String?
+  statDoneLabel String?
+  statGoalLabel String?
+  projectsTitle String?
+  donateTitle String?
+  donateNote String?
+  achievementsTitle String?
+  imageAlt String?
+  metaTitle String?
+  metaDescription String?
 }
+
 
 /* ===================== HERO SLIDES ===================== */
 
@@ -386,6 +417,11 @@ model Campaign {
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  editorVersion String?
+  editorReviews Json?
+  imageAlt String?
+  seoTitle String?
+  seoDescription String?
 }
 
 /// "Make an impact for a child" — interactive builder campaign type.
@@ -461,6 +497,9 @@ model CampaignTranslation {
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   @@unique([campaignId, locale])
+  imageAlt String?
+  seoTitle String?
+  seoDescription String?
 }
 
 /* ===================== CAMPAIGN UPDATES ===================== */
@@ -796,6 +835,11 @@ model Post {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  editorVersion String?
+  editorReviews Json?
+  imageAlt String?
+  metaTitle String?
+  metaDescription String?
 }
 
 model PostTranslation {
@@ -815,6 +859,9 @@ model PostTranslation {
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@unique([postId, locale])
+  imageAlt String?
+  metaTitle String?
+  metaDescription String?
 }
 
 model LiveDonationTicker {
@@ -1874,4 +1921,280 @@ model CommunicationCampaignDeferredRecipient {
 
   @@unique([campaignId, cursorId])
   @@index([campaignId, nextAttemptAt])
+}
+
+
+model CategoryValue {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  categoryId String @db.ObjectId
+  label      String
+  order      Int    @default(0)
+
+  category     Category                   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  translations CategoryValueTranslation[]
+
+  @@index([categoryId, order])
+}
+
+model CategoryValueTranslation {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  valueId String @db.ObjectId
+  locale  String
+  label   String
+
+  value CategoryValue @relation(fields: [valueId], references: [id], onDelete: Cascade)
+
+  @@unique([valueId, locale])
+}
+
+model CategoryInfoCard {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  categoryId String @db.ObjectId
+  /// Which of the drawn icons to show; see `CATEGORY_CARD_ICONS`.
+  icon       String @default("alert")
+  title      String
+  body       String
+  order      Int    @default(0)
+
+  category     Category                      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  translations CategoryInfoCardTranslation[]
+
+  @@index([categoryId, order])
+}
+
+model CategoryInfoCardTranslation {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  cardId String @db.ObjectId
+  locale String
+  title  String
+  body   String
+
+  card CategoryInfoCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, locale])
+}
+
+model UrgentBanner {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  slug              String    @unique
+  title             String
+  description       String?
+  image             String?
+  ctaLabel          String?
+  ctaUrl            String?
+  campaignId        String?   @db.ObjectId
+  /// Price chips on the banner, USD; `amountLabels` names them in the same order.
+  suggestedAmounts  Int[]     @default([])
+  amountLabels      String[]  @default([])
+  /// The one-line strip above the photograph  a verse, a hadith, a slogan.
+  kicker            String?
+  ctaSecondaryLabel String?
+  ctaSecondaryUrl   String?
+  /// Where on the site it shows: `"<page>:<slot>"` pairs from
+  /// `lib/minbar/banner-placements.ts`. Empty = nowhere.
+  placements        String[]  @default([])
+  /// Look: `red` | `navy` | `gold` | `green`; copy on the `start` or `end` side.
+  tone              String    @default("red")
+  textSide          String    @default("start")
+  /// Sort order within a slot, ascending  set by drag-and-drop on the list.
+  priority          Int       @default(0)
+  locales           String[]  @default([])
+  startsAt          DateTime?
+  endsAt            DateTime?
+  isActive          Boolean   @default(true)
+
+  translations UrgentBannerTranslation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, priority])
+  editorVersion String?
+  editorReviews Json?
+  imageAlt String?
+}
+
+model UrgentBannerTranslation {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  urgentBannerId    String   @db.ObjectId
+  locale            String
+  title             String
+  description       String?
+  ctaLabel          String?
+  kicker            String?
+  ctaSecondaryLabel String?
+  amountLabels      String[] @default([])
+
+  urgentBanner UrgentBanner @relation(fields: [urgentBannerId], references: [id], onDelete: Cascade)
+
+  @@unique([urgentBannerId, locale])
+  imageAlt String?
+}
+
+model SuperCategory {
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  slug String @unique
+
+  // ── Hero, Arabic master copy ──
+  title    String
+  subtitle String?
+  /// The paragraph under the heading.
+  intro    String?
+
+  /// The verse the page opens with. Always shown in Arabic, whatever the
+  /// edition  `verseTranslation` is the translation of the meaning and is what
+  /// changes per locale.
+  verseArabic      String?
+  verseTranslation String?
+  verseAttribution String?
+
+  // ── Customisation ──
+  heroImage        String?
+  /// The programme's wordmark. A locale may override it in its translation row
+  /// when the lockup is script-specific.
+  logoImage        String?
+  /// Hero ground, as a CSS colour. Everything else on the page is the site palette.
+  accentColor      String?
+  /// A film embedded in the hero beside the copy.
+  heroVideoId      String?
+  /// Locales the hero film is shown in; empty means every locale. An Arabic
+  /// recording with no subtitled cut should not be played at a reader who
+  /// cannot follow it.
+  heroVideoLocales String[] @default([])
+
+  ctaPrimaryLabel   String?
+  ctaPrimaryHref    String?
+  ctaSecondaryLabel String?
+  ctaSecondaryHref  String?
+  ctaTertiaryLabel  String?
+  ctaTertiaryHref   String?
+
+  // ── Search ──
+  metaTitle       String?
+  metaDescription String?
+
+  order    Int     @default(0)
+  isActive Boolean @default(true)
+
+  blocks       SuperCategoryBlock[]
+  items        SuperCategoryItem[]
+  translations SuperCategoryTranslation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, order])
+  editorVersion String?
+  editorReviews Json?
+  imageAlt String?
+}
+
+model SuperCategoryTranslation {
+  id              String @id @default(auto()) @map("_id") @db.ObjectId
+  superCategoryId String @db.ObjectId
+  locale          String
+
+  title            String
+  subtitle         String?
+  intro            String?
+  verseTranslation String?
+  verseAttribution String?
+  /// Per-locale wordmark; falls back to the parent's when empty.
+  logoImage        String?
+
+  ctaPrimaryLabel   String?
+  ctaSecondaryLabel String?
+  ctaTertiaryLabel  String?
+
+  metaTitle       String?
+  metaDescription String?
+
+  superCategory SuperCategory @relation(fields: [superCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([superCategoryId, locale])
+  imageAlt String?
+}
+
+model SuperCategoryBlock {
+  id              String                 @id @default(auto()) @map("_id") @db.ObjectId
+  superCategoryId String                 @db.ObjectId
+  kind            SuperCategoryBlockKind
+
+  /// Anchor id, so a hero call to action can jump to this block.
+  anchor    String?
+  eyebrow   String?
+  title     String?
+  subtitle  String?
+  body      String?
+  linkLabel String?
+  linkUrl   String?
+  image     String?
+  /// `VIDEO` blocks only.
+  youtubeId String?
+  /// `PLAYLIST_EPISODES` blocks only  the playlist whose episodes are shown.
+  refId     String? @db.ObjectId
+  /// Caps how many linked items a grid block renders; null renders them all.
+  maxItems  Int?
+
+  order    Int     @default(0)
+  isActive Boolean @default(true)
+
+  translations  SuperCategoryBlockTranslation[]
+  superCategory SuperCategory                   @relation(fields: [superCategoryId], references: [id], onDelete: Cascade)
+
+  @@index([superCategoryId, order])
+}
+
+model SuperCategoryBlockTranslation {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  blockId String @db.ObjectId
+  locale  String
+
+  eyebrow   String?
+  title     String?
+  subtitle  String?
+  body      String?
+  linkLabel String?
+
+  block SuperCategoryBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  @@unique([blockId, locale])
+}
+
+model SuperCategoryItem {
+  id              String                @id @default(auto()) @map("_id") @db.ObjectId
+  superCategoryId String                @db.ObjectId
+  kind            SuperCategoryItemKind
+  /// Id of the referenced Campaign / Post / Video / VideoPlaylist / Course /
+  /// Report / Booklet.
+  refId           String                @db.ObjectId
+  order           Int                   @default(0)
+
+  superCategory SuperCategory @relation(fields: [superCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([superCategoryId, kind, refId])
+  @@index([superCategoryId, kind, order])
+}
+
+enum SuperCategoryBlockKind {
+  CAMPAIGNS
+  POSTS
+  VIDEOS
+  PLAYLISTS
+  COURSES
+  REPORTS
+  BOOKLETS
+  TEXT
+  VIDEO
+  PLAYLIST_EPISODES
+}
+
+enum SuperCategoryItemKind {
+  CAMPAIGN
+  POST
+  VIDEO
+  PLAYLIST
+  COURSE
+  REPORT
+  BOOKLET
 }
