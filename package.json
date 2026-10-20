@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm run test:content-editors && npm run typecheck:content-editor-service && prisma generate && prisma generate --schema prisma/integration-settings.schema.prisma && npm run test:integration-settings && npm run typecheck:communication-runtime && npm run typecheck:integration-release && TSC_COMPILE_ON_ERROR=true next build",
+    "build": "prisma generate && prisma generate --schema prisma/integration-settings.schema.prisma && npm run test:content-editors && npm run typecheck:content-editor-service && npm run test:integration-settings && npm run typecheck:communication-runtime && npm run typecheck:integration-release && TSC_COMPILE_ON_ERROR=true next build",
     "start": "next start",
     "lint": "next lint",
     "test:integration-settings": "rm -rf .integration-test-build && tsc -p tsconfig.integration-tests.json && node --test .integration-test-build/tests/integration-settings/*.test.js",
@@ -142,6 +142,7 @@
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "tiptap-markdown": "^0.8.10",
+    "tsx": "4.21.0",
     "twilio": "^6.0.2",
     "use-debounce": "^10.0.0",
     "xlsx": "^0.18.5",
@@ -168,7 +169,6 @@
     "prisma": "^6.19.0",
     "tailwindcss": "^3.4.1",
     "ts-node": "^10.9.2",
-    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }
