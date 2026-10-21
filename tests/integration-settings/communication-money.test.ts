@@ -1,3 +1,4 @@
+import * as projects from "../../lib/templates/donation-projects";
 import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
@@ -30,7 +31,6 @@ test("actual context loader supports category-only donations and this site's Pri
       findUnique: async () => donation,
     },
   };
-  const projects = require("../../lib/templates/donation-projects");
   const dependencies: Record<string, unknown> = { "@/lib/prisma": { prisma }, "./donation-projects": projects, "./money": { donationUsdAmount, formatTemplateMoney }, "./variable-catalog": {} };
   const output = ts.transpileModule(fs.readFileSync("lib/templates/variables.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
   const loaded = { exports: {} };

@@ -1,6 +1,6 @@
 import { donationUsdAmount, formatTemplateMoney } from "./money";
 import { prisma } from "@/lib/prisma";
-import { donationProjectSummary, type DonationProjectSource } from "./donation-projects";
+import { donationProjectSummary, templateDonorName, type DonationProjectSource } from "./donation-projects";
 
 /** ---------------- types ---------------- */
 
@@ -166,7 +166,7 @@ function userToContext(
 ): TemplateUser {
   return {
     id: u.id,
-    name: u.name ?? "",
+    name: templateDonorName(u.name,u.preferredLang),
     email: u.email ?? "",
     phone: u.phone ?? "",
     countryName: u.countryName ?? u.country ?? "",
