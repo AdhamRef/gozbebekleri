@@ -1,13 +1,24 @@
-'use client';
+"use client";
 
-import { useCallback, useRef, type ReactNode } from 'react';
-import { DndProvider, useDrag, useDrop } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
-import { GripVertical } from 'lucide-react';
-import { Card } from '@/components/ui/card';
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { DndProvider, useDrag, useDrop } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
+import { GripVertical } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 /**
  * A drag-to-reorder table for the site-content lists.
@@ -54,7 +65,9 @@ export function SortableTable<T>({
             <TableRow>
               <TableHead className="w-12" />
               {columns.map((c, i) => (
-                <TableHead key={i} className={c.className}>{c.header}</TableHead>
+                <TableHead key={i} className={c.className}>
+                  {c.header}
+                </TableHead>
               ))}
             </TableRow>
           </TableHeader>
@@ -69,7 +82,9 @@ export function SortableTable<T>({
                 onCommit={onCommit}
               >
                 {columns.map((c, i) => (
-                  <TableCell key={i} className={c.className}>{c.cell(row)}</TableCell>
+                  <TableCell key={i} className={c.className}>
+                    {c.cell(row)}
+                  </TableCell>
                 ))}
               </SortableRow>
             ))}
@@ -81,7 +96,12 @@ export function SortableTable<T>({
 }
 
 function SortableRow({
-  index, dragType, dimmed, onMove, onCommit, children,
+  index,
+  dragType,
+  dimmed,
+  onMove,
+  onCommit,
+  children,
 }: {
   index: number;
   dragType: string;
@@ -122,9 +142,12 @@ function SortableRow({
   return (
     <TableRow
       ref={rowRef}
-      className={`${isDragging ? 'opacity-50' : ''} ${dimmed ? 'bg-muted/30' : ''} hover:bg-muted/50 transition-colors`}
+      className={`${isDragging ? "opacity-50" : ""} ${dimmed ? "bg-muted/30" : ""} hover:bg-muted/50 transition-colors`}
     >
-      <TableCell className="w-12 p-2 cursor-grab active:cursor-grabbing" ref={handleRef}>
+      <TableCell
+        className="w-12 p-2 cursor-grab active:cursor-grabbing"
+        ref={handleRef}
+      >
         <GripVertical className="w-5 h-5 text-muted-foreground mx-auto" />
       </TableCell>
       {children}
@@ -141,30 +164,91 @@ export function useReorder<T extends { id: string }>(
   setRows: (fn: (prev: T[]) => T[]) => void,
   persist: (payload: { id: string; order: number }[]) => Promise<void>,
   onError: (e: unknown) => void,
+  manual = false,
 ) {
   const latest = useRef(rows);
   latest.current = rows;
   const dirty = useRef(false);
+  const saving = useRef(false);
+  const originalOrder = useRef<string[]>([]);
+  const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  useEffect(() => {
+    if (!manual || !isDirty) return;
+    const leave = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    const navigate = (event: MouseEvent) => {
+      if (!(event.target instanceof Element) || event.ctrlKey || event.metaKey)
+        return;
+      const link = event.target.closest("a[href]");
+      if (
+        link &&
+        link.getAttribute("target") !== "_blank" &&
+        !window.confirm("لديك ترتيب غير محفوظ. مغادرة الصفحة وإلغاء التغييرات؟")
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    window.addEventListener("beforeunload", leave);
+    document.addEventListener("click", navigate, true);
+    return () => {
+      window.removeEventListener("beforeunload", leave);
+      document.removeEventListener("click", navigate, true);
+    };
+  }, [manual, isDirty]);
 
-  const onMove = useCallback((from: number, to: number) => {
-    dirty.current = true;
-    setRows((prev) => {
-      const next = [...prev];
-      const [removed] = next.splice(from, 1);
-      next.splice(to, 0, removed);
-      return next;
-    });
-  }, [setRows]);
+  const onMove = useCallback(
+    (from: number, to: number) => {
+      if (saving.current || from === to) return;
+      if (!dirty.current)
+        originalOrder.current = latest.current.map((r) => r.id);
+      dirty.current = true;
+      setIsDirty(true);
+      setRows((prev) => {
+        const next = [...prev];
+        const [removed] = next.splice(from, 1);
+        next.splice(to, 0, removed);
+        return next;
+      });
+    },
+    [setRows],
+  );
 
   const onCommit = useCallback(async () => {
-    if (!dirty.current) return;
-    dirty.current = false;
+    if (!dirty.current || saving.current) return;
+    saving.current = true;
+    setIsSaving(true);
     try {
       await persist(latest.current.map((r, i) => ({ id: r.id, order: i })));
+      dirty.current = false;
+      setIsDirty(false);
     } catch (e) {
+      if (!manual) {
+        dirty.current = false;
+        setIsDirty(false);
+      }
       onError(e);
+    } finally {
+      saving.current = false;
+      setIsSaving(false);
     }
-  }, [persist, onError]);
+  }, [persist, onError, manual]);
 
-  return { onMove, onCommit };
+  const cancelOrder = useCallback(() => {
+    if (saving.current) return;
+    const positions = new Map(originalOrder.current.map((id, i) => [id, i]));
+    setRows((prev) =>
+      [...prev].sort(
+        (a, b) =>
+          (positions.get(a.id) ?? Infinity) - (positions.get(b.id) ?? Infinity),
+      ),
+    );
+    dirty.current = false;
+    setIsDirty(false);
+  }, [setRows]);
+
+  return { onMove, onCommit, isDirty, isSaving, cancelOrder };
 }

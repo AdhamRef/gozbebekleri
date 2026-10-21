@@ -38,9 +38,9 @@ import {
 import type { documentFor } from "@/lib/content-editor/service";
 const CategoryOrderDialog = dynamic(
   () =>
-    import(
-      "@/app/(dashboard)/dashboard/categories/_components/CategoryCampaignPriorityDialog"
-    ).then((m) => m.CategoryCampaignPriorityDialog),
+    import("@/app/(dashboard)/dashboard/categories/_components/CategoryCampaignPriorityDialog").then(
+      (m) => m.CategoryCampaignPriorityDialog,
+    ),
   { ssr: false },
 );
 const RichEditor = dynamic(
@@ -580,6 +580,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
           </button>
         </div>
       </header>
+      {languageButtons}
       <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-white p-3">
         <button
           type="button"
@@ -769,11 +770,6 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
               · {LOCALES[locale as keyof typeof LOCALES]?.nativeLabel}
             </small>
           </h2>
-          {["content", "seo", "page", "layout", "links", "media"].includes(
-            section,
-          )
-            ? languageButtons
-            : null}
           {catalogError ? (
             <p role="alert" className="text-sm text-red-700">
               {catalogError}

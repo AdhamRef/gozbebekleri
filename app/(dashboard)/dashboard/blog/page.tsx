@@ -64,8 +64,8 @@ export default function BooksManagement() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <TranslationOverview kind="blog" />
       <ContentLocalizationAuditCard section="blog" />
+      <TranslationOverview kind="blog" />
 
       <Card className="p-8">
         <CardHeader>
