@@ -32,7 +32,11 @@ import {
   ArrowRight,
   Globe2,
   Undo2,
+  MoreHorizontal,
+  Sparkles,
+  ChevronDown,
 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LOCALES, SUPPORTED_LOCALES } from "@/lib/locales";
 import {
   CONFIG,
@@ -122,6 +126,8 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
   const [settingsDraft, setSettingsDraft] = useState<ContentRecord>({});
   const [languageReview, setLanguageReview] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [selectFields, setSelectFields] = useState(false);
   const [uploads, setUploads] = useState(0);
   const onUploadingChange = useCallback(
     (uploading: boolean) =>
@@ -430,7 +436,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
   const languageButtons = (
     <nav
       aria-label="لغات المحتوى"
-      className="flex flex-wrap gap-1.5 rounded-xl border bg-white p-3"
+      className="flex gap-1 overflow-x-auto py-3"
     >
       {SUPPORTED_LOCALES.map((code) => (
         <button
@@ -444,17 +450,19 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
             setReviewed(false);
           }}
           aria-pressed={locale === code}
-          className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${locale === code ? "border-brand bg-brand/5 font-bold text-brand" : "text-slate-500"}`}
+          className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${locale === code ? "bg-brand font-semibold text-white" : "text-slate-500 hover:bg-slate-100"}`}
         >
           <span
             className={`h-1.5 w-1.5 rounded-full ${document.statuses[code].needsUpdate ? "bg-orange-600" : document.statuses[code].reviewed ? "bg-emerald-600" : document.statuses[code].complete ? "bg-amber-500" : "bg-slate-300"}`}
           />
-          {code.toUpperCase()}
+          {LOCALES[code].nativeLabel}
         </button>
       ))}
     </nav>
   );
-  const renderField = (field: ContentField) => (
+  const renderField = (field: ContentField) => {
+    const Control = /(?:^|\.)(?:name|title|subtitle|preTitle|imageAlt|cta\w*|seoTitle|metaTitle|seoKeyword)$/.test(field.key) ? "input" : "textarea";
+    return (
     <section
       key={field.key}
       className="space-y-2 rounded-xl border bg-white p-4"
@@ -466,7 +474,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
         >
           {field.label}
         </label>
-        {!field.locked ? (
+        {!field.locked && selectFields ? (
           <label className="flex items-center gap-2 text-xs">
             <input
               type="checkbox"
@@ -479,11 +487,11 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
                 )
               }
             />
-            ترجمة
+            تضمين في الاقتراح
           </label>
-        ) : (
+        ) : field.locked ? (
           <span className="text-xs text-slate-500">مراجعة يدوية</span>
-        )}
+        ) : null}
       </div>
       {field.key === "image" ? (
         <ImageUploadField label={field.label} value={current.image || ""} onChange={(url) => edit("image", url)} onUploadingChange={onUploadingChange} />
@@ -504,9 +512,9 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
           />
         </div>
       ) : (
-        <textarea
+        <Control
           id={`content-${locale}-${field.key}`}
-          className="min-h-20 w-full rounded-lg border p-3 text-sm"
+          className={`${Control === "input" ? "h-12" : "min-h-28"} w-full rounded-lg border border-slate-200 p-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/10`}
           dir={LOCALES[locale as keyof typeof LOCALES]?.direction || "ltr"}
           disabled={busy === "save" || busy === "slug"}
           value={current[field.key] || ""}
@@ -542,145 +550,70 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
       ) : null}
       {status.missing.includes(field.key) ? (
         <p className="text-xs text-amber-700">
-          هذا الحقل مطلوب لاكتمال الترجمة
+          أضف هذا الحقل لاستكمال محتوى اللغة
         </p>
       ) : null}
     </section>
   );
+  };
   return (
     <div
       dir="rtl"
       className="mx-auto max-w-[1500px] space-y-6 pb-12 text-slate-800"
     >
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Link className="text-sm text-slate-500" href={`/dashboard/${kind}`}>
-            {CONFIG[kind].label}
-          </Link>
-          <h1 className="mt-2 text-2xl font-bold">
-            {current.title || current.name || document.title}
-          </h1>
-          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-            <span>{dirty ? "تعديلات غير محفوظة" : "محفوظ"}</span>
-            <span>
-              {done} / {SUPPORTED_LOCALES.length - 1} ترجمات مكتملة
-            </span>
-            <span>{SUPPORTED_LOCALES.length - 1 - done} تحتاج ترجمة</span>
+      <div className="sticky top-16 z-10 -mx-1 rounded-2xl border border-slate-200 bg-white/95 px-4 shadow-sm backdrop-blur sm:px-6">
+        <header className="flex flex-col gap-3 border-b border-slate-100 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 w-full flex-1">
+            <Link className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-brand" href={`/dashboard/${kind}`}>
+              <ArrowRight size={13} /> {CONFIG[kind].label}
+            </Link>
+            <h1 className="mt-1 truncate text-xl font-bold text-slate-900 sm:text-2xl">{document.title}</h1>
+            <p aria-live="polite" className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+              <span className={`h-1.5 w-1.5 rounded-full ${dirty ? "bg-amber-500" : "bg-emerald-500"}`} />
+              {dirty ? "تعديلات غير محفوظة" : "جميع التغييرات محفوظة"}
+              {reviewed ? " · مراجعة اللغة جاهزة للحفظ" : ""}
+            </p>
           </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={button + " flex items-center gap-2 bg-white"}
-            onClick={() => setLanguageReview(true)}
-          >
-            <Globe2 size={16} />
-            اللغات والمراجعة
-          </button>
-          <button
-            type="button"
-            className={button + " flex items-center gap-2"}
-            disabled={!dirty || Boolean(busy) || uploads > 0}
-            onClick={resetDraft}
-          >
-            <Undo2 size={16} />
-            التراجع
-          </button>
-          <Link
-            className={button + " flex items-center gap-2"}
-            href={`/dashboard/${kind}`}
-          >
-            <ArrowRight size={16} />
-            العودة
-          </Link>
-          <button
-            type="button"
-            className={button + " flex items-center gap-2 bg-white"}
-            onClick={() => setPreviewOpen(true)}
-          >
-            <Eye size={16} />
-            {kind === "campaigns" ? "معاينة المشروع" : "معاينة الصفحة"}
-          </button>
-          <button
-            type="button"
-            className={
-              button +
-              " flex items-center gap-2 bg-brand text-white hover:bg-brand-dark"
-            }
-            disabled={Boolean(busy) || uploads > 0}
-            onClick={save}
-          >
-            <Save size={16} />
-            {uploads
-              ? "جار رفع الصور…"
-              : busy === "save"
-                ? "جار الحفظ…"
-                : "حفظ التغييرات"}
+          <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+            <button type="button" className={button + " flex items-center gap-2 border-slate-200 bg-white"} onClick={() => setPreviewOpen(true)}>
+              <Eye size={16} /> <span className="hidden sm:inline">معاينة</span>
+              <span className="sr-only sm:hidden">معاينة الصفحة</span>
+            </button>
+            <DropdownMenu dir="rtl">
+              <DropdownMenuTrigger asChild><button type="button" aria-label="المزيد من الإجراءات" className={button + " bg-white px-2.5"}><MoreHorizontal size={18} /></button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-56">
+                <DropdownMenuItem disabled={Boolean(busy) || dirty} onSelect={loadHistory}>النسخ السابقة والاسترجاع</DropdownMenuItem>
+                <DropdownMenuItem disabled={!dirty || Boolean(busy) || uploads > 0} onSelect={resetDraft}>إلغاء التعديلات غير المحفوظة</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled={Boolean(busy) || uploads > 0} onSelect={() => { if (!dirty || window.confirm("تحميل النسخة المحفوظة وإلغاء تعديلات المسودة؟")) void initialLoad(); }}>تحميل النسخة المحفوظة</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <button type="button" className={button + " flex items-center gap-2 border-brand bg-brand text-white hover:bg-brand-dark"} disabled={Boolean(busy) || uploads > 0 || (!dirty && !reviewed)} onClick={save}>
+              <Save size={16} />{uploads ? "جار رفع الصور…" : busy === "save" ? "جار الحفظ…" : "حفظ التغييرات"}
+            </button>
+          </div>
+        </header>
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">{languageButtons}</div>
+          <button type="button" aria-label="إدارة الترجمات" title={`${done} من 7 ترجمات مكتملة`} className="inline-flex shrink-0 items-center gap-2 rounded-lg px-2 py-2 text-xs font-semibold text-brand hover:bg-brand/5" onClick={() => setLanguageReview(true)}>
+            <Globe2 size={15} /> <span className="hidden md:inline">إدارة الترجمات</span> <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">{done}/7</span>
           </button>
         </div>
-      </header>
-      {languageButtons}
-      <div data-content-editor="unified"><EditorialWorkflow locale={locale} approved={document.workflow.arabicApproved} needsUpdate={document.statuses[locale].needsUpdate} sourceKnown={document.statuses[locale].sourceKnown} busy={Boolean(busy)} dirty={dirty} lastAction={document.workflow.lastActions[locale]} onAction={suggest} onApprove={approveSource} onArabic={() => { if (!dirty) setLocale("ar"); else setMessage("احفظ مسودتك أولًا قبل تغيير اللغة"); }} onHistory={loadHistory} /></div>
-      {history ? <EditorModal title="النسخ السابقة والاسترجاع" onClose={() => setHistory(null)}><div className="space-y-3"><p className="text-sm">تُحفظ نسخة قبل تغيير النصوص. اختر نسخة لمقارنة النصوص قبل استرجاعها وحفظها.</p>{history.length ? history.map(entry => <button type="button" disabled={Boolean(busy)} key={entry.id} onClick={() => previewHistory(entry.id)} className="block w-full rounded border p-3 text-right">معاينة نسخة {new Date(entry.createdAt).toLocaleString("ar", { timeZone: "Europe/Istanbul" })}</button>) : <p>لا توجد نسخ سابقة بعد. يبدأ السجل مع أول حفظ للنص بعد هذا التحديث.</p>}</div></EditorModal> : null}
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-white p-3">
-        <button
-          type="button"
-          className={button}
-          disabled={Boolean(busy) || uploads > 0}
-          onClick={() => {
-            if (
-              !dirty ||
-              window.confirm("تحميل النسخة المحفوظة وإلغاء تعديلات المسودة؟")
-            )
-              void initialLoad();
-          }}
-        >
-          تحميل النسخة المحفوظة
-        </button>
-        <button
-          type="button"
-          className={button}
-          disabled={Boolean(busy) || locale === "ar" || dirty || !document.workflow.arabicApproved}
-          onClick={() => suggest("translate")}
-        >
-          ترجمة الحقول المحددة
-        </button>
-        <button
-          type="button"
-          className={button}
-          disabled={Boolean(busy) || dirty || !document.workflow.arabicApproved}
-          onClick={() => suggest("translate", true)}
-        >
-          ترجمة اللغات الناقصة أو التي تحتاج تحديثًا
-        </button>
-        <button
-          type="button"
-          className={button}
-          disabled={Boolean(busy) || dirty || (locale !== "ar" && !document.workflow.arabicApproved)}
-          onClick={() => suggest("seo")}
-        >
-          {isBanner ? "اقتراح وصف الصورة" : "اقتراح SEO"}
-        </button>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={reviewed}
-            onChange={(e) => setReviewed(e.target.checked)}
-          />
-          راجعت نص هذه اللغة
-        </label>
-        {busy && busy !== "save" ? (
-          <span role="status" className="text-sm">
-            جار إعداد{" "}
-            {busy === "seo"
-              ? "الاقتراح"
-              : busy === "slug"
-                ? "الرابط"
-                : busy === "approve" ? "اعتماد المصدر" : busy === "history" ? "النسخ السابقة" : EDITORIAL_LABELS[busy as EditorialAction] || "الترجمة"}
-            …
-          </span>
-        ) : null}
       </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+        <p className="text-sm text-slate-500">{locale === "ar" ? "أنت تعدّل المصدر العربي. احفظ النص وراجعه قبل ترجمته." : `أنت تعدّل النسخة ${LOCALES[locale as keyof typeof LOCALES]?.nativeLabel}. تُترجم من المصدر العربي المعتمد.`}</p>
+        <div className="flex flex-wrap gap-2">
+          {locale !== "ar" ? <button type="button" className={button + " inline-flex items-center gap-2 bg-white text-brand"} disabled={Boolean(busy) || dirty || !document.workflow.arabicApproved} onClick={() => suggest("translate")}><Globe2 size={15} /> ترجمة من العربية</button> : null}
+          <button type="button" aria-expanded={toolsOpen} aria-controls="content-tools" className={button + " inline-flex items-center gap-2 bg-white"} onClick={() => setToolsOpen(!toolsOpen)}><Sparkles size={15} /> أدوات تحسين النص <ChevronDown size={14} className={toolsOpen ? "rotate-180" : ""} /></button>
+        </div>
+      </div>
+      {locale !== "ar" && (dirty || !document.workflow.arabicApproved) ? <p className="px-1 text-xs text-amber-700">{dirty ? "احفظ التعديلات أولًا لتتمكن من طلب الترجمة." : "اعتمد المصدر العربي أولًا من أدوات تحسين النص أو من إدارة الترجمات."}</p> : null}
+      {toolsOpen ? <div id="content-tools" data-content-editor="unified" className="rounded-2xl border border-slate-200 bg-white p-5">
+        <EditorialWorkflow locale={locale} approved={document.workflow.arabicApproved} needsUpdate={document.statuses[locale].needsUpdate} sourceKnown={document.statuses[locale].sourceKnown} busy={Boolean(busy)} dirty={dirty} lastAction={document.workflow.lastActions[locale]} onAction={suggest} onApprove={approveSource} onArabic={() => { if (!dirty) { setLocale("ar"); setReviewed(false); } else setMessage("احفظ مسودتك أولًا قبل تغيير اللغة"); }} onHistory={loadHistory} />
+        <label className="mt-4 flex items-center gap-2 border-t pt-4 text-xs text-slate-500"><input type="checkbox" checked={selectFields} onChange={e => { setSelectFields(e.target.checked); if (!e.target.checked) setSelected(document.fields.filter(f => !f.locked).map(f => f.key)); }} /> تحديد حقول معينة للاقتراحات بدل كل النص</label>
+      </div> : null}
+      {history ? <EditorModal title="النسخ السابقة والاسترجاع" onClose={() => setHistory(null)}><div className="space-y-3"><p className="text-sm">تُحفظ نسخة قبل تغيير النصوص. اختر نسخة لمقارنة النصوص قبل استرجاعها وحفظها.</p>{history.length ? history.map(entry => <button type="button" disabled={Boolean(busy)} key={entry.id} onClick={() => previewHistory(entry.id)} className="block w-full rounded border p-3 text-right">معاينة نسخة {new Date(entry.createdAt).toLocaleString("ar", { timeZone: "Europe/Istanbul" })}</button>) : <p>لا توجد نسخ سابقة بعد. يبدأ السجل مع أول حفظ للنص بعد هذا التحديث.</p>}</div></EditorModal> : null}
+      {busy && busy !== "save" ? <p role="status" className="rounded-xl border border-brand/20 bg-brand/5 p-3 text-sm text-brand">جار إعداد {busy === "seo" ? "اقتراحات البحث" : busy === "approve" ? "اعتماد المصدر" : busy === "history" ? "النسخ السابقة" : EDITORIAL_LABELS[busy as EditorialAction] || "الترجمة"}…</p> : null}
       {message ? (
         <p
           role="status"
@@ -775,13 +708,13 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
       ) : null}
       <div
         inert={busy === "save" || busy === "slug" || busy === "approve" || busy === "history"}
-        className="grid items-start gap-5 xl:grid-cols-[190px_minmax(0,1fr)_280px]"
+        className="grid items-start gap-6 lg:grid-cols-[210px_minmax(0,1fr)]"
       >
         <nav
           aria-label="أقسام المحرر"
-          className="flex gap-1 overflow-x-auto rounded-xl border bg-white p-2 xl:sticky xl:top-5 xl:flex-col xl:overflow-visible"
+          className="flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 lg:sticky lg:top-64 lg:flex-col lg:overflow-visible"
         >
-          {EDITOR_SECTIONS[kind].map((item, index) => {
+          {EDITOR_SECTIONS[kind].map((item) => {
             const Icon = sectionIcons[item.icon as keyof typeof sectionIcons];
             return (
               <button
@@ -793,24 +726,16 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
               >
                 <Icon size={17} />
                 <span className="flex-1">{item.label}</span>
-                <small className="text-[10px] opacity-50">
-                  {String(index + 1).padStart(2, "0")}
-                </small>
               </button>
             );
           })}
-          <p className="hidden px-3 py-5 text-xs leading-6 text-slate-400 xl:block">
-            كل الأقسام تخص العنصر نفسه. راجع التغييرات ثم احفظها من الشريط
-            العلوي.
-          </p>
+
         </nav>
         <div className="min-w-0 space-y-5">
-          <h2 className="text-lg font-bold">
-            {EDITOR_SECTIONS[kind].find((s) => s.id === section)?.label}{" "}
-            <small className="font-normal text-slate-400">
-              · {LOCALES[locale as keyof typeof LOCALES]?.nativeLabel}
-            </small>
-          </h2>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div><h2 className="text-lg font-bold">{EDITOR_SECTIONS[kind].find(s => s.id === section)?.label}</h2><p className="mt-1 text-xs text-slate-500">{section === "content" ? "ابدأ بالعنوان والمحتوى، ثم أضف الصور واضبط الخيارات من الأقسام الجانبية." : section === "seo" ? "اضبط عنوان الصفحة ووصفها كما يظهران في نتائج البحث والمشاركة." : section === "media" ? "أضف الوسائط التي تدعم المحتوى، وراجع معاينتها قبل الحفظ." : "تُحفظ تعديلات هذا القسم مع بقية الأقسام من زر الحفظ في الأعلى."}</p></div>
+            {section === "seo" || (isBanner && section === "media") ? <button type="button" className={button + " inline-flex items-center gap-2 bg-white text-brand"} disabled={Boolean(busy) || dirty || (locale !== "ar" && !document.workflow.arabicApproved)} onClick={() => suggest("seo")}><Sparkles size={15} /> {isBanner ? "اقتراح وصف الصورة" : "اقتراح SEO"}</button> : null}
+          </div>
           {catalogError ? (
             <p role="alert" className="text-sm text-red-700">
               {catalogError}
@@ -953,17 +878,9 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
               </button>
             </section>
           ) : null}
-          <section className="rounded-xl border bg-white p-4">
-            <h3 className="font-semibold">حالة اللغة</h3>
-            <p className="mt-2 text-sm">
-              {status.complete
-                ? "المحتوى مكتمل"
-                : `حقول ناقصة: ${status.missing.length}`}{" "}
-              ·{" "}
-              {status.seoComplete
-                ? "إعدادات البحث مكتملة"
-                : "إعدادات البحث تحتاج استكمالًا"}
-            </p>
+          <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+            <p className="text-xs text-slate-500">{status.complete ? "نصوص اللغة مكتملة" : `متبقٍ ${status.missing.length} من الحقول المطلوبة`} · {status.seoComplete ? "إعدادات البحث مكتملة" : "إعدادات البحث تحتاج استكمالًا"}</p>
+            <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={reviewed} disabled={Boolean(busy)} onChange={e => setReviewed(e.target.checked)} /> راجعت نص هذه اللغة</label>
           </section>
           {kind === "categories" && section === "links" ? (
             <section className="space-y-3 rounded-xl border bg-white p-4">
@@ -1007,32 +924,17 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
             </section>
           ) : null}
         </div>
-        <aside className="min-w-0 space-y-4 xl:sticky xl:top-5">
-          <WorkspacePreview
-            kind={kind}
-            values={current}
-            source={source}
-            settings={liveSettings}
-            locale={locale}
-          />
-          <button
-            type="button"
-            className={button + " w-full bg-white"}
-            onClick={() => setPreviewOpen(true)}
-          >
-            عرض الصفحة كاملة
-          </button>
-        </aside>
+
       </div>
       {languageReview ? (
         <EditorModal
-          title="اللغات والمراجعة"
+          title="إدارة الترجمات"
           onClose={() => setLanguageReview(false)}
         >
           <section className="max-h-[85vh] w-full max-w-5xl overflow-auto rounded-2xl bg-white p-6">
             <div className="mb-5 flex items-center justify-between">
               <h2 id="language-review-heading" className="text-xl font-bold">
-                اللغات والمراجعة
+                إدارة الترجمات
               </h2>
               <button
                 type="button"
@@ -1042,65 +944,33 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
                 إغلاق
               </button>
             </div>
-            <p className="mb-4 text-sm text-slate-500">
-              النص البديل عند غياب الترجمة لا يُحسب ترجمة محفوظة.
-            </p>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-start">
-                  <th className="p-3 text-start">اللغة</th>
-                  <th>المحتوى</th>
-                  <th>البحث والمشاركة</th>
-                  <th>المراجعة</th>
-                  <th>التعديل</th>
-                </tr>
-              </thead>
-              <tbody>
-                {SUPPORTED_LOCALES.map((code) => {
-                  const s = document.statuses[code];
-                  return (
-                    <tr key={code} className="border-b">
-                      <td className="p-3">{LOCALES[code].nativeLabel}</td>
-                      <td className="text-center">
-                        {s.complete ? "مكتمل" : "ناقص"}
-                      </td>
-                      <td className="text-center">
-                        {s.seoComplete ? "متاح" : "غير مكتمل"}
-                      </td>
-                      <td className="text-center">
-                        {s.reviewed ? "مراجع" : "مسودة"}
-                      </td>
-                      <td className="text-center">
-                        <button
-                          type="button"
-                          className="p-2 text-brand"
-                          onClick={() => {
-                            setLocale(code);
-                            setSection("content");
-                            setLanguageReview(false);
-                          }}
-                        >
-                          النص
-                        </button>
-                        {!isBanner ? (
-                          <button
-                            type="button"
-                            className="p-2 text-brand"
-                            onClick={() => {
-                              setLocale(code);
-                              setSection("seo");
-                              setLanguageReview(false);
-                            }}
-                          >
-                            SEO
-                          </button>
-                        ) : null}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="mb-5 space-y-3 rounded-xl border bg-slate-50 p-4">
+              <h3 className="font-semibold">ترجم من العربية إلى بقية اللغات</h3>
+              <p className="text-sm text-slate-500">{dirty ? "احفظ تعديلاتك أولًا، ثم استكمل الترجمة." : !document.workflow.arabicApproved ? "المصدر العربي يحتاج اعتمادًا قبل الترجمة. راجعه في أدوات تحسين النص." : "المصدر العربي معتمد. يمكنك استكمال الترجمات الناقصة أو تعديل أي لغة من القائمة أدناه."}</p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className={button + " border-brand bg-brand text-white hover:bg-brand-dark"} disabled={Boolean(busy) || dirty || !document.workflow.arabicApproved} onClick={() => { setLanguageReview(false); void suggest("translate", true); }}>استكمال الترجمات الناقصة</button>
+                {!document.workflow.arabicApproved ? <button type="button" className={button + " bg-white"} disabled={Boolean(busy)} onClick={() => { setLocale("ar"); setReviewed(false); setToolsOpen(true); setLanguageReview(false); }}>مراجعة واعتماد العربية</button> : null}
+              </div>
+            </div>
+            <ul className="space-y-2" aria-label="حالة لغات المحتوى">
+              {SUPPORTED_LOCALES.map(code => {
+                const state = document.statuses[code];
+                return <li key={code} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{LOCALES[code].nativeLabel}</h3>{code === "ar" ? <span className="rounded-full bg-brand/5 px-2 py-1 text-[10px] text-brand">المصدر الرئيسي</span> : null}</div>
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                      <span className={state.needsUpdate ? "text-amber-700" : state.complete ? "text-emerald-700" : "text-slate-500"}>{state.needsUpdate ? "تحتاج تحديثًا من العربية" : state.complete ? "النص مكتمل" : "النص يحتاج استكمالًا"}</span>
+                      <span className="text-slate-500">{state.seoComplete ? "SEO مكتمل" : "SEO غير مكتمل"}</span>
+                      <span className="text-slate-500">{state.reviewed ? "تمت المراجعة" : "لم تُراجع بعد"}</span>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button type="button" disabled={Boolean(busy)} aria-label={`تحرير نص ${LOCALES[code].nativeLabel}`} className={button + " bg-white text-brand"} onClick={() => { setLocale(code); setReviewed(false); setSection("content"); setLanguageReview(false); }}>تحرير النص</button>
+                    {!isBanner ? <button type="button" disabled={Boolean(busy)} aria-label={`إعدادات SEO ${LOCALES[code].nativeLabel}`} className={button + " bg-white"} onClick={() => { setLocale(code); setReviewed(false); setSection("seo"); setLanguageReview(false); }}>SEO</button> : null}
+                  </div>
+                </li>;
+              })}
+            </ul>
           </section>
         </EditorModal>
       ) : null}

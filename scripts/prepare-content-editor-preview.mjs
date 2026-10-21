@@ -119,6 +119,9 @@ const css = (
     tailwindcss({
       content: [
         "components/dashboard/content-editor/*.tsx",
+        "components/ui/*.tsx",
+        "components/dashboard/CategoryIconPicker.tsx",
+        "app/**/wysiwyg/**/*.tsx",
         "app/(dashboard)/dashboard/_components/ImageUploadField.tsx",
       ],
       theme: {
