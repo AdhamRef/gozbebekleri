@@ -252,7 +252,11 @@
     "categories": "الحملات",
     "contactUs": "تواصل معنا",
     "copyright": "© {year} قرة العيون. جميع الحقوق محفوظة.",
-    "developedBy": "تم التطوير في 2026"
+    "developedBy": "تم التطوير في 2026",
+    "onlineDonate": "التبرع الإلكتروني",
+    "privacyPolicy": "سياسة الخصوصية",
+    "termsOfUse": "شروط الاستخدام",
+    "location": "إسطنبول، تركيا"
   },
   "AboutUs": {
     "pageTitle": "من نحن",

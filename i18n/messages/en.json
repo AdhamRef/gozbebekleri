@@ -252,7 +252,11 @@
     "categories": "Campaigns",
     "contactUs": "Contact Us",
     "copyright": "© {year} Qurrat Al-Ayun. All rights reserved.",
-    "developedBy": "Developed in 2026"
+    "developedBy": "Developed in 2026",
+    "onlineDonate": "Donate online",
+    "privacyPolicy": "Privacy policy",
+    "termsOfUse": "Terms of use",
+    "location": "Istanbul, Türkiye"
   },
   "AboutUs": {
     "pageTitle": "About Us",
