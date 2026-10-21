@@ -12,9 +12,10 @@ import { prisma } from "@/lib/prisma";
 import { SITE_URL } from "@/lib/seo";
 import { pickTranslation } from "@/lib/i18n/translation-fallback";
 import { localizeContentHref } from "@/lib/content-editor/urls";
+import { decodeRouteKey } from "@/lib/slug";
 async function read(slug: string) {
   return prisma.superCategory.findFirst({
-    where: { slug, isActive: true },
+    where: { slug: decodeRouteKey(slug), isActive: true },
     include: {
       translations: true,
       blocks: {
@@ -28,7 +29,8 @@ async function read(slug: string) {
 }
 type Props = { params: Promise<{ locale: string; slug: string }> };
 async function generateBaseMetadata({ params }: Props): Promise<Metadata> {
-  const { locale, slug } = await params,
+  const { locale, slug: routeSlug } = await params,
+    slug = decodeRouteKey(routeSlug),
     row = await read(slug);
   if (!row) return { robots: { index: false } };
   const t = pickTranslation(row.translations, locale),
@@ -68,7 +70,8 @@ async function generateBaseMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 export default async function ProgramPage({ params }: Props) {
-  const { locale, slug } = await params,
+  const { locale, slug: routeSlug } = await params,
+    slug = decodeRouteKey(routeSlug),
     row = await read(slug);
   if (!row) notFound();
   const t = pickTranslation(row.translations, locale);
@@ -248,7 +251,7 @@ export async function generateMetadata(args: Props): Promise<Metadata> {
     generateBaseMetadata(args),
     readPublicEditorialSeo(
       "super-categories",
-      decodeURIComponent(slug),
+      decodeRouteKey(slug),
       locale,
     ),
   ]);

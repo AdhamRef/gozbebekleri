@@ -5,6 +5,16 @@ import { validateChanges, fieldsFor } from "../../lib/content-editor/contracts";
 import { currencyForCountry } from "../../lib/geo/country-to-currency";
 import { PUBLIC_CURRENCY_OPTIONS, SUPPORTED_CURRENCY_CODES } from "../../lib/supported-currencies";
 import { ALLOWED_URL_CURRENCIES, URL_CURRENCY_CODES_ORDERED, normalizeCurrencyParamToCookie } from "../../lib/currency-link";
+import { decodeRouteKey, whereByIdOrAnyLocaleSlug } from "../../lib/slug";
+test("Arabic route keys resolve to the same record and canonical segment as decoded slugs", () => {
+  for (const slug of ["مشروع-اطعام-الطعام", "gıda-desteği", "café", "project", "111111111111111111111111"]) {
+    const encoded = encodeURIComponent(slug), decoded = decodeRouteKey(encoded);
+    assert.equal(decoded, slug);
+    assert.deepEqual(whereByIdOrAnyLocaleSlug(decoded), whereByIdOrAnyLocaleSlug(slug));
+    assert.equal(encodeURIComponent(decoded), encoded);
+  }
+  assert.equal(decodeRouteKey("invalid%slug"), "invalid%slug");
+});
 test("SEO fills only missing fields from the same locale and preserves explicit indexing, FAQ and custom copy", () => {
   const row = {title:"مشروع المياه", description:'{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"توفير المياه للأسر المحتاجة"}]}]}', seoTitle:"عنوان محرر يدويًا", ogDescription:"وصف يدوي", seoNoIndex:"true", faqContent:"[]", translations:[{locale:"en",title:"Water project",description:"Clean water for families",seoDescription:"Custom description"},{locale:"fr",title:"مشروع المياه"}]};
   const changes = missingSeoChanges("campaigns", row);

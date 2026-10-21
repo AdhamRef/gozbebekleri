@@ -13,6 +13,7 @@ import React from "react";
 import { prisma } from "@/lib/prisma";
 import {
   isObjectId,
+  decodeRouteKey,
   pickLocaleSlug,
   whereByIdOrAnyLocaleSlug,
 } from "@/lib/slug";
@@ -87,7 +88,7 @@ async function fetchPostForSeo(idOrSlug: string) {
 async function generateBaseMetadata(args: BlogPostProps): Promise<Metadata> {
   const params = await args.params.catch(() => null);
   const locale = (params?.locale as string) || "ar";
-  const postId = params?.postId as string | undefined;
+  const postId = params?.postId ? decodeRouteKey(params.postId) : undefined;
   const seo = LOCALE_SEO[locale as Locale] ?? LOCALE_SEO.en;
   // Always anchor canonical to the requested URL so the parent layout's
   // `/{locale}` canonical can never leak through if metadata building fails.
@@ -192,7 +193,8 @@ async function generateBaseMetadata(args: BlogPostProps): Promise<Metadata> {
 export default async function BlogPost({
   params: paramsPromise,
 }: BlogPostProps) {
-  const params = await paramsPromise;
+  const routeParams = await paramsPromise;
+  const params = {...routeParams, postId: decodeRouteKey(routeParams.postId)};
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://gozbebekleri.org";
   const locale = params.locale || "ar";
   const msgs = await import(`../../../../i18n/messages/${locale}.json`);
@@ -521,7 +523,7 @@ export async function generateMetadata(args: BlogPostProps): Promise<Metadata> {
   const { postId, locale } = await args.params;
   const [base, extra] = await Promise.all([
     generateBaseMetadata(args),
-    readPublicEditorialSeo("blog", decodeURIComponent(postId), locale),
+    readPublicEditorialSeo("blog", decodeRouteKey(postId), locale),
   ]);
   return applyEditorialSeo(base, extra);
 }

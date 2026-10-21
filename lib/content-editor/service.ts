@@ -4,6 +4,7 @@ import { saveWorkspaceRelations } from "./workspace-relations";
 import { SUPPORTED_LOCALES } from "../locales";
 import { pickLocaleSlug } from "../slug";
 import { HAS_IMPACT_BACKING_CAMPAIGNS } from "./site-capabilities";
+import { missingSeoChanges } from "./seo-fill";
 import {
   CONFIG,
   fieldsFor,
@@ -153,6 +154,31 @@ function dataFor(changes: TextValues) {
         : value,
     ]),
   );
+}
+/** One atomic metadata-only save, with a single parent touch/readback for all locales. */
+export async function fillMissingSeo(db: Store, input: {kind: ContentKind; id: string; revision: string}) {
+  return db.transaction(async tx => {
+    const {kind, id} = input, cfg = CONFIG[kind], row = await readContent(tx, kind, id);
+    if (fingerprint(row) !== input.revision) throw new ContentError("تغير المحتوى. أعد تحميله قبل الاستكمال.", 409);
+    const changes = missingSeoChanges(kind, row);
+    const filledFields = Object.values(changes).reduce((sum, values) => sum + Object.keys(values).length, 0);
+    if (!filledFields) return {...documentFor(kind, row), filledFields:0};
+    const fields = fieldsFor(kind, row).filter(f => f.group === "seo");
+    const reviews = {...(row.editorReviews && typeof row.editorReviews === "object" ? row.editorReviews as Record<string,string> : {})};
+    for (const [locale, delta] of Object.entries(changes)) { validateChanges(fields, delta); delete reviews[locale]; }
+    await tx.model(cfg.model).update({where:{id}, data:{editorVersion:randomUUID(), editorReviews:reviews, ...(changes.ar || {})}});
+    for (const [locale, delta] of Object.entries(changes)) {
+      if (locale === "ar") continue;
+      const own = valuesFor(kind, row, locale), titleKey = kind === "categories" ? "name" : "title";
+      await tx.model(cfg.translationModel).upsert({where:{[`${cfg.parentKey}_locale`]:{[cfg.parentKey]:id,locale}}, create:{[cfg.parentKey]:id,locale,[titleKey]:own[titleKey],...(kind === "campaigns" ? {description:own.description || ""} : {}),...delta}, update:delta});
+    }
+    const saved = await readContent(tx, kind, id);
+    for (const [locale, delta] of Object.entries(changes)) {
+      const values = valuesFor(kind, saved, locale);
+      if (Object.entries(delta).some(([key, value]) => values[key] !== value)) throw new ContentError("تعذر التحقق من حفظ SEO", 500);
+    }
+    return {...documentFor(kind, saved), filledFields};
+  });
 }
 export async function saveContent(
   db: Store,

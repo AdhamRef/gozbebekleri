@@ -4,6 +4,11 @@ import type { PrismaClient } from "@prisma/client";
 
 const OBJECT_ID_RE = /^[a-f0-9]{24}$/i;
 
+/** App Router route segments can arrive percent-encoded through locale middleware. */
+export function decodeRouteKey(value: string): string {
+  try { return decodeURIComponent(value); } catch { return value; }
+}
+
 export function isObjectId(value: string): boolean {
   return OBJECT_ID_RE.test(value);
 }
