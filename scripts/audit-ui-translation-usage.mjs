@@ -1,11 +1,16 @@
 // Read-only audit of statically resolvable next-intl calls and ICU arguments.
 import fs from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import path from 'node:path';
 import ts from 'typescript';
 const locales = ['ar','en','fr','tr','id','pt','es','de'];
 const messages = Object.fromEntries(locales.map(l=>[l,JSON.parse(fs.readFileSync(`i18n/messages/${l}.json`,'utf8'))]));
 const valueAt = (obj,key)=>key.split('.').reduce((v,k)=>v?.[k],obj);
-const files=execFileSync('rg',['--files','app','components','hooks','lib'],{encoding:'utf8'}).trim().split('\n').filter(p=>/\.[jt]sx?$/.test(p));
+// Build containers need no external search executable.
+const scan=dir=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(entry=>{
+  const file=path.join(dir,entry.name);
+  return entry.isDirectory()?scan(file):entry.isFile()&&/\.[jt]sx?$/.test(file)?[file]:[];
+});
+const files=['app','components','hooks','lib'].flatMap(scan);
 const uses=[],dynamic=[];
 for(const file of files){
   const source=ts.createSourceFile(file,fs.readFileSync(file,'utf8'),ts.ScriptTarget.Latest,true), bindings=new Map();
