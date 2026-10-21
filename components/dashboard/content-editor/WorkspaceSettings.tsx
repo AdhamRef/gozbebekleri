@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { ImageUploadField } from "@/app/(dashboard)/dashboard/_components/ImageUploadField";
+import { CategoryIconPicker } from "@/components/dashboard/CategoryIconPicker";
 import { BANNER_PAGES } from "@/lib/minbar/banner-placements";
 import { LOCALES, SUPPORTED_LOCALES } from "@/lib/locales";
 import { settingsFields } from "@/lib/content-editor/workspace";
@@ -88,7 +89,8 @@ export function WorkspaceSettings({
             f.section === section &&
             !(
               kind === "campaigns" &&
-              ((settings.goalType === "OPEN" && f.key === "targetAmount") ||
+              (["defaultDonationAmounts", "defaultShareCounts"].includes(f.key) ||
+                (settings.goalType === "OPEN" && f.key === "targetAmount") ||
                 (settings.fundraisingMode !== "SHARES" &&
                   ["sharePriceUSD", "defaultShareCounts"].includes(f.key)) ||
                 (settings.fundraisingMode === "SHARES" &&
@@ -102,6 +104,7 @@ export function WorkspaceSettings({
             ["isActive", "navigationVisible"].includes(f.key)
               ? true
               : undefined);
+          if (kind === "categories" && f.key === "icon") return <section key={f.key} className="rounded-xl border bg-white p-5"><h3 className="mb-3 font-bold">{f.label}</h3><CategoryIconPicker value={String(value || "")} onChange={(icon) => onChange("icon", icon)} /></section>;
           let options: { id: string; title: string }[] = [];
           if (f.key === "categoryIds") options = catalog.categories;
           if (["campaignId", "campaignIds"].includes(f.key))

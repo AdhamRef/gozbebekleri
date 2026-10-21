@@ -8,6 +8,10 @@ import { ProgrammeWorkspace } from "./ProgrammeWorkspace";
 import { WorkspacePreview } from "./WorkspacePreview";
 import { WorkspaceSettings, useEditorCatalog } from "./WorkspaceSettings";
 import { SeoWorkspace } from "./SeoWorkspace";
+import { CampaignAdvancedSettings } from "./CampaignAdvancedSettings";
+import { CampaignAchievements } from "./CampaignAchievements";
+import { ProtectedSettings } from "./ProtectedSettings";
+import { ImageUploadField } from "@/app/(dashboard)/dashboard/_components/ImageUploadField";
 import { EDITOR_SECTIONS, settingsFor } from "@/lib/content-editor/workspace";
 import type { ContentRecord } from "@/lib/content-editor/contracts";
 import {
@@ -401,7 +405,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
           key={code}
           aria-label={LOCALES[code].nativeLabel}
           title={LOCALES[code].nativeLabel}
-          disabled={Boolean(busy)}
+          disabled={Boolean(busy) || uploads > 0}
           onClick={() => {
             setLocale(code);
             setReviewed(false);
@@ -448,7 +452,9 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
           <span className="text-xs text-slate-500">مراجعة يدوية</span>
         )}
       </div>
-      {field.rich ? (
+      {field.key === "image" ? (
+        <ImageUploadField label={field.label} value={current.image || ""} onChange={(url) => edit("image", url)} onUploadingChange={onUploadingChange} />
+      ) : field.rich ? (
         <div
           id={`content-${locale}-${field.key}`}
           aria-label={field.label}
@@ -775,25 +781,14 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
               {catalogError}
             </p>
           ) : null}
-          {kind === "super-categories" &&
-          section === "content" &&
-          Boolean(document.settings.verseArabic) ? (
-            <section className="rounded-xl border bg-amber-50 p-5">
-              <h3 className="text-sm font-semibold">
-                النص العربي المحفوظ · للقراءة فقط
-              </h3>
-              <p lang="ar" dir="rtl" className="mt-4 text-xl leading-10">
-                {String(document.settings.verseArabic)}
-              </p>
-              <p className="mt-3 text-xs text-slate-500">
-                لا يُرسل إلى خدمة الترجمة ولا تغيّره تعديلات الصفحة.
-              </p>
-            </section>
+          {(kind === "super-categories" || kind === "urgent-banners") && section === "content" ? (
+            <ProtectedSettings kind={kind} slug={document.slug} settings={settingsDraft} saved={document.settings} onChange={setSetting} />
           ) : null}
           {["content", "page", "layout", "links", "media"].includes(section) ? (
             <>
               {document.fields
                 .filter((f) => {
+                  if (f.key === "image") return section === "media" && locale !== "ar";
                   if (section === "media")
                     return f.key === "imageAlt" || f.key === "videoUrl";
                   if (f.group !== "content" || f.key === "videoUrl")
@@ -888,65 +883,8 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
               locale={locale}
             />
           ) : null}
-          {section === "donation" ? (
-            <section className="rounded-xl border bg-white p-5">
-              <h3 className="font-bold">المبلغ المحصّل</h3>
-              <p className="my-3 text-2xl font-bold" dir="ltr">
-                $
-                {Number(document.settings.currentAmount || 0).toLocaleString(
-                  "en-US",
-                )}
-              </p>
-              <p className="text-sm leading-7 text-slate-500">
-                للعرض فقط؛ يُحتسب من سجل التبرعات. تعديل المحتوى أو الهدف لا
-                يغيّر المبلغ المحصّل.
-              </p>
-            </section>
-          ) : null}
-          {(kind === "campaigns" &&
-            ["donation", "history"].includes(section)) ||
-          (kind === "categories" && section === "page") ? (
-            <details className="rounded-xl border bg-white p-4">
-              <summary className="cursor-pointer text-sm font-semibold">
-                الأدوات المتخصصة والإعدادات المتقدمة
-              </summary>
-              <p className="my-3 text-xs leading-6 text-slate-500">
-                تخصيصات العملات، وإدارة الإنجازات والبطاقات التفصيلية متاحة في
-                الأدوات الأصلية. احفظ مسودة المحرر أولًا قبل الانتقال.
-              </p>
-              <Link
-                className={button + " inline-block"}
-                href={`/dashboard/${kind}/settings/${id}`}
-              >
-                فتح الإعدادات المتقدمة
-              </Link>
-            </details>
-          ) : null}
-          {section === "history" ? (
-            <section className="space-y-3 rounded-xl border bg-white p-5">
-              <h3 className="font-bold">الإنجازات والتحديثات</h3>
-              {Array.isArray(document.settings.updates) &&
-              document.settings.updates.length ? (
-                document.settings.updates.map((item: ContentRecord) => (
-                  <article key={String(item.id)} className="rounded border p-4">
-                    <h4 className="font-bold">
-                      {String(item.title || "تحديث المشروع")}
-                    </h4>
-                    <p className="mt-2 text-sm">
-                      {previewText(String(item.description || ""))}
-                    </p>
-                    <time className="text-xs text-slate-400">
-                      {String(item.createdAt || "")}
-                    </time>
-                  </article>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">
-                  لا توجد تحديثات منشورة لهذا المشروع.
-                </p>
-              )}
-            </section>
-          ) : null}
+          {kind === "campaigns" && section === "donation" ? <CampaignAdvancedSettings key={document.revision} settings={settingsDraft} saved={document.settings} onChange={setSetting} /> : null}
+          {kind === "campaigns" && section === "history" ? <CampaignAchievements value={settingsDraft.campaignUpdates} locale={locale} onChange={(value) => setSetting("campaignUpdates", value)} onUploadingChange={onUploadingChange} uploading={uploads > 0} /> : null}
           {section === "review" ? (
             <section className="space-y-4 rounded-xl border bg-white p-5">
               <h3 className="font-bold">المراجعة قبل النشر</h3>

@@ -111,6 +111,8 @@ export async function PUT(request: NextRequest, ctx: Context) {
       metadata: {
         locale: body.locale || "ar",
         fields: Object.keys(body.changes || {}),
+        settings: Object.keys(body.settings || {}),
+        ...(body.settings?.financialAdjustment ? { requestedTotal: body.settings.financialAdjustment.desiredTotal, savedTotal: result.settings.currentAmount } : {}),
       },
     });
     revalidatePath("/", "layout");

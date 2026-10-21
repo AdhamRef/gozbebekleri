@@ -178,6 +178,7 @@ export async function saveContent(
     let changes: TextValues, settings: ContentRecord;
     try {
       changes = validateChanges(fieldsFor(kind, row), input.changes);
+      if (kind === "campaigns" && locale === "ar" && "image" in changes) throw new ContentError("الصورة العربية تُدار من معرض صور المشروع");
       settings = validateWorkspaceSettings(kind, row, input.settings);
     } catch (error) {
       throw new ContentError(
@@ -355,13 +356,16 @@ export async function saveWorkspace(
     let revision = input.revision;
     const locales = { ...input.localeChanges, [input.locale]: input.changes };
     const scalarSettings =
-      input.kind === "super-categories" &&
       input.settings &&
       typeof input.settings === "object" &&
       !Array.isArray(input.settings)
         ? Object.fromEntries(
             Object.entries(input.settings).filter(
-              ([key]) => !["blocks", "items"].includes(key),
+              ([key]) => !(
+                (["super-categories", "urgent-banners"].includes(input.kind) && key === "slugAdjustment") ||
+                (input.kind === "super-categories" && ["blocks", "items", "religiousTextAdjustment"].includes(key)) ||
+                (input.kind === "campaigns" && ["campaignUpdates", "financialAdjustment"].includes(key))
+              ),
             ),
           )
         : input.settings;

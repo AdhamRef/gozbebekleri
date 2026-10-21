@@ -56,7 +56,7 @@ export async function POST(
       const selected = fields.filter(
         (f) =>
           !f.locked &&
-          !["seoNoIndex", "ogImage", "faqContent", "videoUrl"].includes(
+          !["seoNoIndex", "ogImage", "image", "faqContent", "videoUrl"].includes(
             f.key,
           ) &&
           hasText(source[f.key]) &&
@@ -116,7 +116,7 @@ export async function POST(
       seoFields = fields.filter(
         (f) =>
           f.group === "seo" &&
-          !["seoNoIndex", "ogImage", "faqContent"].includes(f.key),
+          !["seoNoIndex", "ogImage", "image", "videoUrl", "faqContent"].includes(f.key),
       ),
       key = process.env.OPENAI_API_KEY;
     if (!key)
