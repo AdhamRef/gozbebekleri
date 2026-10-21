@@ -16,10 +16,10 @@
   "DonationFailed": {
     "badge": "Donation could not be processed",
     "title": "Sorry, your donation was not completed",
-    "description": "We were unable to complete your payment. This may happen because of a card decline, a network issue, or an interruption with the payment provider. No amount has been charged.",
+    "description": "The payment could not be completed. This may be due to a declined card, a connection problem or a temporary payment-provider outage. Check the transaction status before trying again.",
     "tryAgain": "Try donating again",
     "manualFallback": "If you prefer not to retry by card, you can complete your donation by bank transfer to one of the accounts below.",
-    "reassurance": "You haven't been charged for the attempt. Let's get this fixed.",
+    "reassurance": "Check the transaction status in your account or with your bank before trying again, especially if an amount is pending.",
     "loading": "Looking up your donation…",
     "severitySoft": "Card issue",
     "severityHard": "Bank declined",
@@ -28,7 +28,7 @@
     "rawCodeLabel": "Code",
     "retry": {
       "title": "Try this donation again",
-      "description": "One tap retries the exact same donation through our secure checkout — no need to re-enter the details.",
+      "description": "You can retry the same donation through a secure checkout page. You may need to enter your card details or complete bank verification.",
       "cta": "Retry donation now",
       "ctaMonthly": "Continue to monthly checkout",
       "amountLabel": "Amount",
@@ -36,7 +36,7 @@
       "moreItems": "+{count} more project(s)",
       "monthly": "Monthly",
       "oneTime": "One-time",
-      "securedBy": "Secure checkout powered by Stripe.",
+      "securedBy": "Secure checkout page.",
       "failed": "We couldn't restart your donation. Please try again or use the bank transfer below.",
       "payforHint": "Please re-enter your card on the campaign page to complete the donation."
     },
@@ -51,7 +51,7 @@
         "tipCheckBalance": "Make sure your card has enough balance for the donation amount.",
         "tipUseAnotherCard": "Try a different card or payment method.",
         "tipContactBank": "Call your bank to ask why the payment was blocked.",
-        "tipUseTransfer": "Use the bank transfer option below — it always works."
+        "tipUseTransfer": "You can use the bank transfer option below instead of trying the card again."
       },
       "insufficientFunds": {
         "title": "Insufficient funds",
@@ -76,7 +76,7 @@
       "incorrectNumber": {
         "title": "The card number looks wrong",
         "reason": "The card number we sent didn't match a valid card at your bank.",
-        "fix": "Re-enter the 16-digit card number carefully and try again."
+        "fix": "Check the card number, carefully enter it again and retry."
       },
       "lostOrStolen": {
         "title": "Card reported lost or stolen",
@@ -105,13 +105,13 @@
       },
       "processingError": {
         "title": "Temporary processing error",
-        "reason": "The payment didn't go through, but it's not a problem with your card — something on the bank's side glitched.",
+        "reason": "An error occurred while processing the payment and the transaction did not complete.",
         "fix": "Wait a minute and retry. Most processing errors clear by themselves."
       },
       "networkError": {
         "title": "Connection problem",
         "reason": "We couldn't reach the bank to process the payment. This is almost always a transient network issue.",
-        "fix": "Check your internet connection, then retry. The exact same card will most likely succeed."
+        "fix": "Check your internet connection and try again."
       },
       "issuerUnavailable": {
         "title": "Your bank's system is unavailable",
@@ -120,7 +120,7 @@
       },
       "fraudSuspected": {
         "title": "Blocked as suspected fraud",
-        "reason": "Your bank's fraud system flagged the donation. Charity donations from a new merchant can trigger this — it's a false positive most of the time.",
+        "reason": "Your bank's security system flagged this transaction as suspicious.",
         "fix": "Call the number on the back of your card, confirm it's really you, and ask them to whitelist this merchant."
       },
       "generic": {
@@ -368,6 +368,9 @@
     "news": "News"
   },
   "CampaignsPage": {
+    "errorTitle": "Unable to load projects",
+    "clearFilters": "Clear filters",
+    "clearSearch": "Clear search",
     "browse": "Browse",
     "campaigns": "Projects",
     "pageDescription": "Discover charitable projects and help support people in need.",
@@ -529,6 +532,7 @@
     "shareText": "Support the project \"{title}\" and help us make a difference! 🤲\n{description}"
   },
   "DonationDialog": {
+    "free": "Free",
     "chooseDonationType": "Choose Donation Type",
     "chooseDonationTypeDesc": "You can choose a one-time or monthly donation.",
     "oneTimeDonation": "One-Time Donation",
@@ -630,6 +634,9 @@
     "certificateNoteBody": "Add your real email address so we can send you the official donation certificate and receipt."
   },
   "DonationSuccess": {
+    "unconfirmedTitle": "Payment is not confirmed yet",
+    "unconfirmedDescription": "We cannot display a payment confirmation or receipt until the transaction is confirmed. The status may take time to update after returning from your bank. Check it before trying to pay again.",
+    "checkStatus": "Check payment status",
     "thankYou": "Thank you very much",
     "thankYouName": "Thank you, {name}",
     "youAreAmazing": "You are amazing! You have helped change someone's life for the better.",

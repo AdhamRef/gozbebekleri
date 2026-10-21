@@ -46,117 +46,117 @@
   "DonationFailed": {
     "badge": "Bağış işlemi tamamlanamadı",
     "title": "Üzgünüz, bağışınız gerçekleştirilemedi",
-    "description": "Ödeme işlemini tamamlayamadık. Bunun nedeni kart reddi, ağ hatası veya ödeme sağlayıcısıyla yaşanan bir kesinti olabilir. Hesabınızdan herhangi bir tutar tahsil edilmemiştir.",
+    "description": "Ödeme tamamlanamadı. Kart reddi, bağlantı sorunu veya ödeme sağlayıcısındaki geçici bir kesinti buna neden olabilir. Yeniden denemeden önce işlemin durumunu kontrol edin.",
     "tryAgain": "Tekrar bağış yap",
     "manualFallback": "Kartla tekrar denemek istemiyorsanız, aşağıdaki banka hesaplarından birine havale yaparak bağışınızı tamamlayabilirsiniz.",
-    "reassurance": "You haven't been charged for the attempt. Let's get this fixed.",
-    "loading": "Looking up your donation…",
-    "severitySoft": "Card issue",
-    "severityHard": "Bank declined",
-    "howToFixTitle": "How to fix it",
-    "rawMessageToggle": "Technical details from the bank",
-    "rawCodeLabel": "Code",
+    "reassurance": "Özellikle bekleyen bir tutar görünüyorsa, yeniden denemeden önce hesabınızdan veya bankanızdan işlemin durumunu kontrol edin.",
+    "loading": "Bağışınız kontrol ediliyor…",
+    "severitySoft": "Ödemede bir sorun oluştu",
+    "severityHard": "İşlem banka tarafından reddedildi",
+    "howToFixTitle": "Şimdi ne yapabilirsiniz?",
+    "rawMessageToggle": "Bankanın teknik açıklaması",
+    "rawCodeLabel": "Kod",
     "retry": {
-      "title": "Try this donation again",
-      "description": "One tap retries the exact same donation through our secure checkout — no need to re-enter the details.",
-      "cta": "Retry donation now",
-      "ctaMonthly": "Continue to monthly checkout",
-      "amountLabel": "Amount",
-      "perMonth": "/ month",
-      "moreItems": "+{count} more project(s)",
-      "monthly": "Monthly",
-      "oneTime": "One-time",
-      "securedBy": "Secure checkout powered by Stripe.",
-      "failed": "We couldn't restart your donation. Please try again or use the bank transfer below.",
-      "payforHint": "Please re-enter your card on the campaign page to complete the donation."
+      "title": "Bu bağışı yeniden deneyin",
+      "description": "Aynı bağışı güvenli ödeme sayfasından yeniden deneyebilirsiniz. Kart bilgilerinizi girmeniz veya banka doğrulamasını tamamlamanız istenebilir.",
+      "cta": "Bağışı yeniden deneyin",
+      "ctaMonthly": "Aylık bağış ödemesine devam edin",
+      "amountLabel": "Tutar",
+      "perMonth": "/ ay",
+      "moreItems": "+{count} proje daha",
+      "monthly": "Aylık bağış",
+      "oneTime": "Tek seferlik bağış",
+      "securedBy": "Güvenli ödeme sayfası.",
+      "failed": "Bağış yeniden başlatılamadı. Tekrar deneyin veya aşağıdaki banka havalesi seçeneğini kullanın.",
+      "payforHint": "Bağışı tamamlamak için proje sayfasında kart bilgilerinizi yeniden girin."
     },
     "noDonation": {
-      "title": "Pick a project to support",
-      "description": "We couldn't find the failed donation. You can start a new donation from any of our projects.",
-      "cta": "Browse projects"
+      "title": "Desteklemek istediğiniz projeyi seçin",
+      "description": "Bağış kaydı bulunamadı. Projelerimizden birini seçerek yeni bir bağış başlatabilirsiniz.",
+      "cta": "Projeleri inceleyin"
     },
     "errors": {
       "commonTips": {
-        "tipRetry": "Try the same card again — temporary errors usually clear within a few minutes.",
-        "tipCheckBalance": "Make sure your card has enough balance for the donation amount.",
-        "tipUseAnotherCard": "Try a different card or payment method.",
-        "tipContactBank": "Call your bank to ask why the payment was blocked.",
-        "tipUseTransfer": "Use the bank transfer option below — it always works."
+        "tipRetry": "Aynı kartla tekrar deneyin; geçici sorunlar birkaç dakika içinde giderilebilir.",
+        "tipCheckBalance": "Kartınızda bağış tutarı için yeterli bakiye bulunduğunu kontrol edin.",
+        "tipUseAnotherCard": "Başka bir kart veya ödeme yöntemi deneyin.",
+        "tipContactBank": "İşlemin neden reddedildiğini öğrenmek için bankanızla görüşün.",
+        "tipUseTransfer": "Kartla tekrar denemek yerine aşağıdaki banka havalesi seçeneğini kullanabilirsiniz."
       },
       "insufficientFunds": {
-        "title": "Insufficient funds",
-        "reason": "Your bank reported that the card doesn't have enough balance to complete this donation.",
-        "fix": "Top up your card, lower the donation amount, or try a different card."
+        "title": "Yetersiz bakiye",
+        "reason": "Banka, kart bakiyenizin bu bağış için yeterli olmadığını bildirdi.",
+        "fix": "Kartınıza bakiye yükleyin, bağış tutarını azaltın veya başka bir kart deneyin."
       },
       "cardDeclined": {
-        "title": "Your bank declined the card",
-        "reason": "Your card issuer refused this transaction. This is the bank's call, not ours — they don't always share the exact reason.",
-        "fix": "Try another card, or contact your bank to find out why it was blocked."
+        "title": "Kart banka tarafından reddedildi",
+        "reason": "Banka bu işlemi reddetti. Kesin ret nedeni her zaman paylaşılmayabilir.",
+        "fix": "Başka bir kart deneyin veya ret nedenini bankanızdan öğrenin."
       },
       "expiredCard": {
-        "title": "The card has expired",
-        "reason": "The card you used is past its expiry date. Banks won't process payments on expired cards.",
-        "fix": "Switch to a valid card. Your bank can issue a replacement if needed."
+        "title": "Kartın son kullanma tarihi geçmiş",
+        "reason": "Kullandığınız kartın son kullanma tarihi geçmiş. Bu kartla ödeme yapılamaz.",
+        "fix": "Geçerli bir kart kullanın. Gerekirse bankanızdan yeni kart isteyin."
       },
       "invalidCvc": {
-        "title": "The security code (CVV) was wrong",
-        "reason": "The 3- or 4-digit CVV/CVC didn't match what your bank has on file.",
-        "fix": "Double-check the security code on the back of your card and try again."
+        "title": "Güvenlik kodu (CVV) hatalı",
+        "reason": "3 veya 4 haneli güvenlik kodu bankadaki kayıtla eşleşmedi.",
+        "fix": "Kartınızdaki güvenlik kodunu kontrol edip yeniden deneyin."
       },
       "incorrectNumber": {
-        "title": "The card number looks wrong",
-        "reason": "The card number we sent didn't match a valid card at your bank.",
-        "fix": "Re-enter the 16-digit card number carefully and try again."
+        "title": "Kart numarası hatalı görünüyor",
+        "reason": "Girilen kart numarası bankadaki geçerli bir kartla eşleşmedi.",
+        "fix": "Kart numarasını kontrol edin, dikkatlice yeniden girin ve tekrar deneyin."
       },
       "lostOrStolen": {
-        "title": "Card reported lost or stolen",
-        "reason": "Your bank flagged this card as lost or stolen and won't allow new payments on it.",
-        "fix": "Contact your bank for a replacement, then try a different card here."
+        "title": "Kart kayıp veya çalıntı olarak bildirilmiş",
+        "reason": "Banka bu kartı kayıp veya çalıntı olarak işaretledi ve yeni işlemlere izin vermiyor.",
+        "fix": "Yeni kart için bankanızla görüşün ve burada başka bir kart kullanın."
       },
       "doNotHonor": {
-        "title": "Generic decline by your bank",
-        "reason": "Your bank refused the transaction without telling us exactly why. This is often a fraud-prevention block on cross-border donations.",
-        "fix": "Call the number on the back of your card and ask them to approve this charity donation, then retry."
+        "title": "Banka işlemi reddetti",
+        "reason": "Banka kesin nedeni belirtmeden işlemi reddetti. Bu durum uluslararası işlem korumalarıyla ilgili olabilir.",
+        "fix": "Kartınızın arkasındaki numaradan bankanızı arayın, bu bağışa onay vermelerini isteyin ve yeniden deneyin."
       },
       "limitExceeded": {
-        "title": "Daily or monthly limit reached",
-        "reason": "Your card's daily spend limit or transaction count for the month has been exceeded.",
-        "fix": "Lower the donation amount, wait until tomorrow, or try a different card."
+        "title": "Günlük veya aylık limit aşıldı",
+        "reason": "Bu dönem için kartınızın harcama veya işlem sayısı limiti aşıldı.",
+        "fix": "Bağış tutarını azaltın, yarına kadar bekleyin veya başka bir kart deneyin."
       },
       "currencyNotSupported": {
-        "title": "Currency not supported by your card",
-        "reason": "Your card can't process payments in the donation currency.",
-        "fix": "Switch the currency from the top-right of the site, or use a card that supports international payments."
+        "title": "Para birimi kartınız tarafından desteklenmiyor",
+        "reason": "Kartınız bağışın para biriminde ödeme yapamıyor.",
+        "fix": "Sayfanın üstünden para birimini değiştirin veya uluslararası işlemlere açık bir kart kullanın."
       },
       "authenticationFailed": {
-        "title": "3-D Secure check failed",
-        "reason": "Your bank's 3-D Secure verification didn't go through. This usually means the SMS/app code was wrong or timed out.",
-        "fix": "Make sure your phone is reachable, then retry. Have the bank's 3DS app ready before you tap retry."
+        "title": "3-D Secure doğrulaması başarısız",
+        "reason": "Bankanın ek doğrulaması tamamlanmadı. SMS kodu hatalı veya süresi dolmuş olabilir.",
+        "fix": "Telefonunuzun hazır olduğundan emin olun, yeniden deneyin ve doğrulama kodunu hemen girmeye hazır olun."
       },
       "processingError": {
-        "title": "Temporary processing error",
-        "reason": "The payment didn't go through, but it's not a problem with your card — something on the bank's side glitched.",
-        "fix": "Wait a minute and retry. Most processing errors clear by themselves."
+        "title": "Geçici işlem hatası",
+        "reason": "Ödeme işlenirken bir hata oluştu ve işlem tamamlanmadı.",
+        "fix": "Bir dakika bekleyip yeniden deneyin. Geçici işlem hataları kendiliğinden giderilebilir."
       },
       "networkError": {
-        "title": "Connection problem",
-        "reason": "We couldn't reach the bank to process the payment. This is almost always a transient network issue.",
-        "fix": "Check your internet connection, then retry. The exact same card will most likely succeed."
+        "title": "Bağlantı sorunu",
+        "reason": "Ödemeyi işlemek için bankaya ulaşılamadı. Bu, geçici bir bağlantı sorunu olabilir.",
+        "fix": "İnternet bağlantınızı kontrol edip yeniden deneyin."
       },
       "issuerUnavailable": {
-        "title": "Your bank's system is unavailable",
-        "reason": "Your card issuer's payment system is temporarily down or unreachable.",
-        "fix": "Wait a few minutes and try again, or use a different card from another bank."
+        "title": "Banka sistemi şu anda kullanılamıyor",
+        "reason": "Kartınızı veren bankanın ödeme sistemine geçici olarak erişilemiyor.",
+        "fix": "Birkaç dakika bekleyip tekrar deneyin veya başka bir bankanın kartını kullanın."
       },
       "fraudSuspected": {
-        "title": "Blocked as suspected fraud",
-        "reason": "Your bank's fraud system flagged the donation. Charity donations from a new merchant can trigger this — it's a false positive most of the time.",
-        "fix": "Call the number on the back of your card, confirm it's really you, and ask them to whitelist this merchant."
+        "title": "Dolandırıcılık şüphesiyle engellendi",
+        "reason": "Bankanın güvenlik sistemi bu işlemi şüpheli olarak işaretledi.",
+        "fix": "Kartınızın arkasındaki numaradan bankanızı arayın, kimliğinizi doğrulayın ve bu işlemin onaylanmasını isteyin."
       },
       "generic": {
-        "title": "Payment didn't go through",
-        "reason": "Something stopped the payment from completing. We weren't given a specific reason.",
-        "fix": "Try again, switch to a different card, or use the bank transfer option below."
+        "title": "Ödeme tamamlanamadı",
+        "reason": "Ödemenin tamamlanmasını engelleyen bir sorun oluştu. Kesin neden bildirilmedi.",
+        "fix": "Tekrar deneyin, başka bir kart kullanın veya aşağıdaki banka havalesi seçeneğini seçin."
       }
     }
   },
@@ -368,6 +368,9 @@
     "news": "Haberler"
   },
   "CampaignsPage": {
+    "errorTitle": "Projeler yüklenemedi",
+    "clearFilters": "Filtreleri temizle",
+    "clearSearch": "Aramayı temizle",
     "browse": "Gözat",
     "campaigns": "Projeler",
     "pageDescription": "Hayır projelerini keşfedin ve ihtiyaç sahiplerini desteklemeye katkıda bulunun.",
@@ -529,6 +532,7 @@
     "shareText": "\"{title}\" projesini destekleyin ve fark yaratmamıza yardım edin! 🤲\n{description}"
   },
   "DonationDialog": {
+    "free": "Ücretsiz",
     "chooseDonationType": "Bağış Türü Seçin",
     "chooseDonationTypeDesc": "Tek seferlik veya aylık bağış seçebilirsiniz.",
     "oneTimeDonation": "Tek Seferlik Bağış",
@@ -630,6 +634,9 @@
     "certificateNoteBody": "Resmi bağış sertifikanızı ve makbuzunuzu gönderebilmemiz için gerçek e-posta adresinizi girin."
   },
   "DonationSuccess": {
+    "unconfirmedTitle": "Ödeme henüz onaylanmadı",
+    "unconfirmedDescription": "İşlem onaylanmadan ödeme onayı veya makbuz gösterilmez. Bankadan dönüşten sonra durumun güncellenmesi zaman alabilir. Yeniden ödeme yapmadan önce durumu kontrol edin.",
+    "checkStatus": "Ödeme durumunu kontrol et",
     "thankYou": "Çok teşekkür ederiz",
     "thankYouName": "Teşekkürler {name}",
     "youAreAmazing": "Harikasınız! Bir insanın hayatını daha iyi hale getirmeye katkıda bulundunuz.",
@@ -701,7 +708,7 @@
       "support": "Destek",
       "supportDesc": "Yardım ve destek alın",
       "logout": "Çıkış Yap",
-      "settingsDesc": "Security, password and notification preferences"
+      "settingsDesc": "Güvenlik, şifre ve bildirim tercihleri"
     },
     "toast": {
       "accountDeleted": "Hesap silindi",
@@ -716,7 +723,7 @@
       "allReceiptsDownloadSuccess": "Tüm makbuzlar başarıyla indirildi",
       "allReceiptsDownloadFailed": "Bazı makbuzlar indirilemedi",
       "subscriptionCancelled": "Abonelik iptal edildi",
-      "notificationsUpdated": "Notification preferences saved"
+      "notificationsUpdated": "Bildirim tercihleri kaydedildi"
     },
     "account": {
       "name": "Ad",
@@ -733,8 +740,8 @@
       "personalInfo": "Kişisel Bilgiler",
       "security": "Güvenlik ve Tercihler",
       "gender": "Cinsiyet",
-      "namePlaceholder": "Your name",
-      "addressTitle": "Address"
+      "namePlaceholder": "Adınız",
+      "addressTitle": "Adres"
     },
     "editDialog": {
       "notSpecified": "Belirtilmemiş",
@@ -752,7 +759,7 @@
       "deleteAccount": "Hesabı Sil",
       "deleteAccountWarning": "Hesabınızı silmek tüm verilerinizi kalıcı olarak kaldıracaktır. Bu işlem geri alınamaz.",
       "deleteAccountButton": "Hesabı Sil",
-      "securityTitle": "Security & password"
+      "securityTitle": "Güvenlik ve şifre"
     },
     "deleteDialog": {
       "title": "Hesabınızı silmek istediğinizden emin misiniz?",
@@ -888,26 +895,26 @@
       "requestLabel": "Talep #{id}",
       "closed": "Kapalı",
       "requestDetailsPreview": "Talep detayları burada görünür...",
-      "newTitle": "Open a support request",
-      "newSubtitle": "Our team will get back to you by email.",
-      "subjectLabel": "Topic",
-      "bodyLabel": "Your message",
-      "bodyPlaceholder": "Tell us what's going on…",
-      "bodyHint": "{remaining} characters remaining",
-      "submit": "Send request",
-      "sent": "Your message was sent",
-      "failed": "Could not send your message",
-      "errorMin": "Message must be at least 3 characters",
-      "historyTitle": "Your previous requests",
-      "historySubtitle": "The last 50 messages you've sent through this form.",
-      "historyEmpty": "You haven't sent any support messages yet.",
+      "newTitle": "Destek talebi oluştur",
+      "newSubtitle": "Ekibimiz size e-posta ile dönüş yapacaktır.",
+      "subjectLabel": "Konu",
+      "bodyLabel": "Mesajınız",
+      "bodyPlaceholder": "Talebinizin ayrıntılarını buraya yazın…",
+      "bodyHint": "{remaining} karakter kaldı",
+      "submit": "Talebi gönder",
+      "sent": "Mesajınız gönderildi",
+      "failed": "Mesajınız gönderilemedi",
+      "errorMin": "Mesaj en az 3 karakter olmalıdır",
+      "historyTitle": "Önceki talepleriniz",
+      "historySubtitle": "Bu formdan gönderdiğiniz son 50 mesaj.",
+      "historyEmpty": "Henüz destek mesajı göndermediniz.",
       "subjects": {
-        "COMPLAINT": "Complaint",
-        "DONATION_ISSUE": "Donation issue",
-        "CAMPAIGN_SUPPORT": "Project / campaign question",
-        "PARTNERSHIP": "Partnership",
-        "VOLUNTEERING": "Volunteering",
-        "GENERAL": "General"
+        "COMPLAINT": "Şikâyet",
+        "DONATION_ISSUE": "Bağışla ilgili sorun",
+        "CAMPAIGN_SUPPORT": "Proje hakkında soru",
+        "PARTNERSHIP": "İş birliği",
+        "VOLUNTEERING": "Gönüllülük",
+        "GENERAL": "Genel"
       }
     },
     "misc": {
@@ -918,55 +925,55 @@
       "closeMenu": "Menüyü kapat"
     },
     "avatar": {
-      "change": "Change photo",
-      "remove": "Remove photo",
-      "updated": "Profile photo updated",
-      "removed": "Profile photo removed",
-      "failed": "Could not update your photo",
-      "notImage": "Please pick an image file",
-      "tooLarge": "Image must be smaller than 2 MB"
+      "change": "Fotoğrafı değiştir",
+      "remove": "Fotoğrafı kaldır",
+      "updated": "Profil fotoğrafı güncellendi",
+      "removed": "Profil fotoğrafı kaldırıldı",
+      "failed": "Fotoğraf güncellenemedi",
+      "notImage": "Lütfen bir görsel dosyası seçin",
+      "tooLarge": "Görsel boyutu 2 MB’tan küçük olmalıdır"
     },
     "countryPicker": {
-      "title": "Choose your country",
-      "search": "Search countries…",
-      "noResults": "No countries match your search",
-      "none": "Not specified"
+      "title": "Ülkenizi seçin",
+      "search": "Ülke arayın…",
+      "noResults": "Aramanızla eşleşen ülke yok",
+      "none": "Belirtilmemiş"
     },
     "password": {
-      "label": "Password",
-      "descSet": "Your account is protected with a password. You can change it any time.",
-      "descUnset": "You signed in with a social provider. Set a password to also sign in with email.",
-      "change": "Change password",
-      "set": "Set a password",
-      "currentLabel": "Current password",
-      "newLabel": "New password",
-      "confirmLabel": "Confirm new password",
-      "hint": "At least 8 characters. Mix letters, numbers and a symbol for a strong password.",
-      "show": "Show password",
-      "hide": "Hide password",
-      "save": "Save password",
-      "cancel": "Cancel",
-      "success": "Password updated",
-      "failed": "Could not update your password",
-      "errorMinLength": "Password must be at least 8 characters",
-      "errorMismatch": "New passwords do not match",
-      "strengthWeak": "Weak",
-      "strengthOk": "OK",
-      "strengthStrong": "Strong"
+      "label": "Şifre",
+      "descSet": "Hesabınız bir şifreyle korunuyor. Şifrenizi istediğiniz zaman değiştirebilirsiniz.",
+      "descUnset": "Sosyal hesabınızla giriş yaptınız. E-posta ile de giriş yapabilmek için bir şifre belirleyin.",
+      "change": "Şifreyi değiştir",
+      "set": "Şifre belirle",
+      "currentLabel": "Mevcut şifre",
+      "newLabel": "Yeni şifre",
+      "confirmLabel": "Yeni şifreyi doğrulayın",
+      "hint": "En az 8 karakter kullanın. Güçlü bir şifre için harf, rakam ve simgeleri birleştirin.",
+      "show": "Şifreyi göster",
+      "hide": "Şifreyi gizle",
+      "save": "Şifreyi kaydet",
+      "cancel": "İptal",
+      "success": "Şifre güncellendi",
+      "failed": "Şifre güncellenemedi",
+      "errorMinLength": "Şifre en az 8 karakter olmalıdır",
+      "errorMismatch": "Yeni şifreler eşleşmiyor",
+      "strengthWeak": "Zayıf",
+      "strengthOk": "Orta",
+      "strengthStrong": "Güçlü"
     },
     "impact": {
-      "totalGiven": "Total given",
-      "monthlyMrr": "Monthly giving",
-      "supportedCampaigns": "Supported projects",
-      "streak": "Streak",
-      "acrossDonations": "across {count} donation(s)",
-      "acrossSubs": "across {count} subscription(s)",
-      "distinctCampaigns": "Distinct projects you've supported",
-      "monthsStreak": "{count} month(s) in a row",
-      "noStreak": "Start a streak",
-      "lastDonation": "Last donation",
-      "badgesEarned": "{count} badge(s) earned",
-      "badgesHint": "View your badges on the homepage donor board"
+      "totalGiven": "Toplam bağışınız",
+      "monthlyMrr": "Aylık bağışınız",
+      "supportedCampaigns": "Desteklediğiniz projeler",
+      "streak": "Bağış seriniz",
+      "acrossDonations": "{count} bağışta",
+      "acrossSubs": "{count} abonelikte",
+      "distinctCampaigns": "Desteklediğiniz farklı proje sayısı",
+      "monthsStreak": "{count} ay üst üste",
+      "noStreak": "Düzenli bağışa başlayın",
+      "lastDonation": "Son bağış",
+      "badgesEarned": "{count} rozet kazandınız",
+      "badgesHint": "Rozetlerinizi ana sayfadaki bağışçı panosunda görebilirsiniz"
     }
   },
   "MessageSubjects": {

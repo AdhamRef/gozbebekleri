@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma generate --schema prisma/integration-settings.schema.prisma && npm run test:content-editors && npm run typecheck:content-editor-service && npm run test:integration-settings && npm run typecheck:communication-runtime && npm run typecheck:integration-release && TSC_COMPILE_ON_ERROR=true next build && node --import tsx scripts/ensure-content-editor-indexes.ts --production",
+    "build": "prisma generate && prisma generate --schema prisma/integration-settings.schema.prisma && npm run test:content-editors && npm run test:site-qa && npm run typecheck:content-editor-service && npm run test:integration-settings && npm run typecheck:communication-runtime && npm run typecheck:integration-release && TSC_COMPILE_ON_ERROR=true next build && node --import tsx scripts/ensure-content-editor-indexes.ts --production",
     "start": "next start",
     "lint": "next lint",
     "test:integration-settings": "rm -rf .integration-test-build && tsc -p tsconfig.integration-tests.json && node --test .integration-test-build/tests/integration-settings/*.test.js",
@@ -25,6 +25,8 @@
     "exchange-rates:refresh": "tsx scripts/refresh-exchange-rates.ts",
     "cleanup:orphan-donation-items": "tsx scripts/cleanup-orphan-donation-items.ts",
     "migrate:integration-settings": "prisma generate --schema prisma/integration-settings.schema.prisma && tsx prisma/mongodb-migrations/20260714-integration-settings.ts",
+    "test:site-qa": "node --import tsx --test tests/*.test.ts",
+    "i18n:usage:strict": "node scripts/audit-ui-translation-usage.mjs --strict",
     "test:content-editors": "node --import tsx --test tests/content-editor/*.test.ts",
     "test:content-editors:browser": "node --import tsx scripts/content-editor-browser-test.mjs",
     "typecheck:content-editor-service": "tsc -p tsconfig.content-editor.json"

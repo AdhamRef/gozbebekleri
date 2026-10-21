@@ -413,14 +413,14 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({ editor }) => {
       <ToolButton
         title="Undo"
         disabled={!editor.can().undo()}
-        onClick={() => editor.chain().focus().undo().run()}
+        onClick={() => { editor.commands.undo(); editor.commands.focus(); }}
       >
         <Undo2 className="h-4 w-4" />
       </ToolButton>
       <ToolButton
         title="Redo"
         disabled={!editor.can().redo()}
-        onClick={() => editor.chain().focus().redo().run()}
+        onClick={() => { editor.commands.redo(); editor.commands.focus(); }}
       >
         <Redo2 className="h-4 w-4" />
       </ToolButton>

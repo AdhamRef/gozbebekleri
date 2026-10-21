@@ -49,117 +49,117 @@
   "DonationFailed": {
     "badge": "Le don n'a pas pu être traité",
     "title": "Désolé, votre don n'a pas pu être effectué",
-    "description": "Nous n'avons pas pu finaliser votre paiement. Cela peut être dû à un refus de carte, à un problème réseau ou à une interruption chez le prestataire de paiement. Aucun montant n'a été débité.",
+    "description": "Le paiement n’a pas pu être finalisé. Cela peut venir d’une carte refusée, d’un problème de connexion ou d’une indisponibilité temporaire du prestataire. Vérifiez le statut de l’opération avant de réessayer.",
     "tryAgain": "Réessayer le don",
     "manualFallback": "Si vous préférez ne pas réessayer par carte, vous pouvez finaliser votre don par virement bancaire vers l'un des comptes ci-dessous.",
-    "reassurance": "You haven't been charged for the attempt. Let's get this fixed.",
-    "loading": "Looking up your donation…",
-    "severitySoft": "Card issue",
-    "severityHard": "Bank declined",
-    "howToFixTitle": "How to fix it",
-    "rawMessageToggle": "Technical details from the bank",
+    "reassurance": "Avant de réessayer, vérifiez le statut de l’opération dans votre compte ou auprès de votre banque, surtout si un montant est en attente.",
+    "loading": "Vérification de votre don…",
+    "severitySoft": "Problème de paiement",
+    "severityHard": "Opération refusée par la banque",
+    "howToFixTitle": "Que faire maintenant ?",
+    "rawMessageToggle": "Détails techniques de la banque",
     "rawCodeLabel": "Code",
     "retry": {
-      "title": "Try this donation again",
-      "description": "One tap retries the exact same donation through our secure checkout — no need to re-enter the details.",
-      "cta": "Retry donation now",
-      "ctaMonthly": "Continue to monthly checkout",
-      "amountLabel": "Amount",
-      "perMonth": "/ month",
-      "moreItems": "+{count} more project(s)",
-      "monthly": "Monthly",
-      "oneTime": "One-time",
-      "securedBy": "Secure checkout powered by Stripe.",
-      "failed": "We couldn't restart your donation. Please try again or use the bank transfer below.",
-      "payforHint": "Please re-enter your card on the campaign page to complete the donation."
+      "title": "Réessayez ce don",
+      "description": "Vous pouvez réessayer le même don depuis une page de paiement sécurisée. La saisie des données de carte ou une vérification bancaire peut être nécessaire.",
+      "cta": "Réessayer le don",
+      "ctaMonthly": "Continuer vers le don mensuel",
+      "amountLabel": "Montant",
+      "perMonth": "/ mois",
+      "moreItems": "+{count} autre(s) projet(s)",
+      "monthly": "Don mensuel",
+      "oneTime": "Don ponctuel",
+      "securedBy": "Page de paiement sécurisée.",
+      "failed": "Impossible de relancer le don. Réessayez ou utilisez le virement bancaire ci-dessous.",
+      "payforHint": "Veuillez saisir à nouveau votre carte sur la page du projet pour finaliser le don."
     },
     "noDonation": {
-      "title": "Pick a project to support",
-      "description": "We couldn't find the failed donation. You can start a new donation from any of our projects.",
-      "cta": "Browse projects"
+      "title": "Choisissez un projet à soutenir",
+      "description": "Ce don est introuvable. Vous pouvez commencer un nouveau don depuis l’un de nos projets.",
+      "cta": "Voir les projets"
     },
     "errors": {
       "commonTips": {
-        "tipRetry": "Try the same card again — temporary errors usually clear within a few minutes.",
-        "tipCheckBalance": "Make sure your card has enough balance for the donation amount.",
-        "tipUseAnotherCard": "Try a different card or payment method.",
-        "tipContactBank": "Call your bank to ask why the payment was blocked.",
-        "tipUseTransfer": "Use the bank transfer option below — it always works."
+        "tipRetry": "Réessayez avec la même carte ; un problème temporaire peut se résoudre en quelques minutes.",
+        "tipCheckBalance": "Vérifiez que le solde de votre carte couvre le montant du don.",
+        "tipUseAnotherCard": "Essayez une autre carte ou un autre moyen de paiement.",
+        "tipContactBank": "Contactez votre banque pour connaître le motif du refus.",
+        "tipUseTransfer": "Vous pouvez choisir le virement bancaire ci-dessous plutôt que de réessayer par carte."
       },
       "insufficientFunds": {
-        "title": "Insufficient funds",
-        "reason": "Your bank reported that the card doesn't have enough balance to complete this donation.",
-        "fix": "Top up your card, lower the donation amount, or try a different card."
+        "title": "Solde insuffisant",
+        "reason": "Votre banque indique que le solde de la carte ne suffit pas pour ce don.",
+        "fix": "Approvisionnez votre carte, réduisez le montant du don ou essayez une autre carte."
       },
       "cardDeclined": {
-        "title": "Your bank declined the card",
-        "reason": "Your card issuer refused this transaction. This is the bank's call, not ours — they don't always share the exact reason.",
-        "fix": "Try another card, or contact your bank to find out why it was blocked."
+        "title": "Carte refusée par la banque",
+        "reason": "Votre banque a refusé cette opération et ne communique pas toujours le motif précis.",
+        "fix": "Essayez une autre carte ou contactez votre banque pour connaître le motif du refus."
       },
       "expiredCard": {
-        "title": "The card has expired",
-        "reason": "The card you used is past its expiry date. Banks won't process payments on expired cards.",
-        "fix": "Switch to a valid card. Your bank can issue a replacement if needed."
+        "title": "Carte expirée",
+        "reason": "La date de validité de la carte est dépassée ; elle ne peut plus servir au paiement.",
+        "fix": "Utilisez une carte valide. Votre banque peut la renouveler si nécessaire."
       },
       "invalidCvc": {
-        "title": "The security code (CVV) was wrong",
-        "reason": "The 3- or 4-digit CVV/CVC didn't match what your bank has on file.",
-        "fix": "Double-check the security code on the back of your card and try again."
+        "title": "Code de sécurité (CVV) incorrect",
+        "reason": "Le code de sécurité à 3 ou 4 chiffres ne correspond pas à celui enregistré par la banque.",
+        "fix": "Vérifiez le code de sécurité de votre carte, puis réessayez."
       },
       "incorrectNumber": {
-        "title": "The card number looks wrong",
-        "reason": "The card number we sent didn't match a valid card at your bank.",
-        "fix": "Re-enter the 16-digit card number carefully and try again."
+        "title": "Numéro de carte incorrect",
+        "reason": "Le numéro saisi ne correspond pas à une carte valide auprès de la banque.",
+        "fix": "Vérifiez le numéro de carte, saisissez-le à nouveau avec soin, puis réessayez."
       },
       "lostOrStolen": {
-        "title": "Card reported lost or stolen",
-        "reason": "Your bank flagged this card as lost or stolen and won't allow new payments on it.",
-        "fix": "Contact your bank for a replacement, then try a different card here."
+        "title": "Carte signalée perdue ou volée",
+        "reason": "La banque a signalé cette carte comme perdue ou volée et bloque toute nouvelle opération.",
+        "fix": "Contactez votre banque pour un remplacement et utilisez une autre carte ici."
       },
       "doNotHonor": {
-        "title": "Generic decline by your bank",
-        "reason": "Your bank refused the transaction without telling us exactly why. This is often a fraud-prevention block on cross-border donations.",
-        "fix": "Call the number on the back of your card and ask them to approve this charity donation, then retry."
+        "title": "Opération refusée par la banque",
+        "reason": "La banque a refusé l’opération sans motif précis. Cela peut être lié à ses protections sur les paiements internationaux.",
+        "fix": "Appelez le numéro au dos de votre carte, demandez l’autorisation de ce don, puis réessayez."
       },
       "limitExceeded": {
-        "title": "Daily or monthly limit reached",
-        "reason": "Your card's daily spend limit or transaction count for the month has been exceeded.",
-        "fix": "Lower the donation amount, wait until tomorrow, or try a different card."
+        "title": "Plafond quotidien ou mensuel atteint",
+        "reason": "Le plafond de dépenses ou le nombre d’opérations autorisées pour cette période est dépassé.",
+        "fix": "Réduisez le montant du don, attendez demain ou essayez une autre carte."
       },
       "currencyNotSupported": {
-        "title": "Currency not supported by your card",
-        "reason": "Your card can't process payments in the donation currency.",
-        "fix": "Switch the currency from the top-right of the site, or use a card that supports international payments."
+        "title": "Devise non prise en charge par votre carte",
+        "reason": "Votre carte ne permet pas les paiements dans la devise du don.",
+        "fix": "Changez la devise en haut de page ou utilisez une carte acceptant les paiements internationaux."
       },
       "authenticationFailed": {
-        "title": "3-D Secure check failed",
-        "reason": "Your bank's 3-D Secure verification didn't go through. This usually means the SMS/app code was wrong or timed out.",
-        "fix": "Make sure your phone is reachable, then retry. Have the bank's 3DS app ready before you tap retry."
+        "title": "Échec de la vérification 3-D Secure",
+        "reason": "La vérification supplémentaire de la banque n’a pas abouti. Le code SMS peut être incorrect ou expiré.",
+        "fix": "Gardez votre téléphone à portée de main, réessayez et préparez-vous à saisir le code de vérification."
       },
       "processingError": {
-        "title": "Temporary processing error",
-        "reason": "The payment didn't go through, but it's not a problem with your card — something on the bank's side glitched.",
-        "fix": "Wait a minute and retry. Most processing errors clear by themselves."
+        "title": "Erreur temporaire de traitement",
+        "reason": "Une erreur est survenue pendant le traitement du paiement et l’opération n’a pas abouti.",
+        "fix": "Patientez une minute, puis réessayez. Une erreur temporaire peut se résoudre d’elle-même."
       },
       "networkError": {
-        "title": "Connection problem",
-        "reason": "We couldn't reach the bank to process the payment. This is almost always a transient network issue.",
-        "fix": "Check your internet connection, then retry. The exact same card will most likely succeed."
+        "title": "Problème de connexion",
+        "reason": "Impossible de joindre la banque pour traiter le paiement. Il peut s’agir d’un problème de connexion temporaire.",
+        "fix": "Vérifiez votre connexion Internet, puis réessayez."
       },
       "issuerUnavailable": {
-        "title": "Your bank's system is unavailable",
-        "reason": "Your card issuer's payment system is temporarily down or unreachable.",
-        "fix": "Wait a few minutes and try again, or use a different card from another bank."
+        "title": "Système bancaire indisponible",
+        "reason": "Le système de paiement de votre banque est temporairement indisponible.",
+        "fix": "Attendez quelques minutes et réessayez, ou utilisez une carte d’une autre banque."
       },
       "fraudSuspected": {
-        "title": "Blocked as suspected fraud",
-        "reason": "Your bank's fraud system flagged the donation. Charity donations from a new merchant can trigger this — it's a false positive most of the time.",
-        "fix": "Call the number on the back of your card, confirm it's really you, and ask them to whitelist this merchant."
+        "title": "Blocage pour suspicion de fraude",
+        "reason": "Le système de sécurité de la banque a signalé cette opération comme suspecte.",
+        "fix": "Appelez le numéro au dos de votre carte, confirmez votre identité et demandez l’autorisation de cette opération."
       },
       "generic": {
-        "title": "Payment didn't go through",
-        "reason": "Something stopped the payment from completing. We weren't given a specific reason.",
-        "fix": "Try again, switch to a different card, or use the bank transfer option below."
+        "title": "Le paiement n’a pas abouti",
+        "reason": "Un problème a empêché le paiement. Aucun motif précis ne nous a été communiqué.",
+        "fix": "Réessayez, utilisez une autre carte ou choisissez le virement bancaire ci-dessous."
       }
     }
   },
@@ -368,6 +368,9 @@
     "news": "Actualités"
   },
   "CampaignsPage": {
+    "errorTitle": "Impossible de charger les projets",
+    "clearFilters": "Effacer les filtres",
+    "clearSearch": "Effacer la recherche",
     "browse": "Parcourir",
     "campaigns": "Projets",
     "pageDescription": "Découvrez les projets caritatifs et contribuez à soutenir les personnes dans le besoin.",
@@ -529,6 +532,7 @@
     "shareText": "Soutenez le projet \"{title}\" et aidez-nous à faire la différence ! 🤲\n{description}"
   },
   "DonationDialog": {
+    "free": "Gratuit",
     "chooseDonationType": "Choisir le type de don",
     "chooseDonationTypeDesc": "Vous pouvez choisir un don unique ou un don mensuel.",
     "oneTimeDonation": "Don unique",
@@ -630,6 +634,9 @@
     "certificateNoteBody": "Indiquez votre vraie adresse e-mail afin que nous puissions vous envoyer le certificat officiel de don et votre reçu."
   },
   "DonationSuccess": {
+    "unconfirmedTitle": "Le paiement n’est pas encore confirmé",
+    "unconfirmedDescription": "Aucune confirmation ni aucun reçu ne peut être affiché avant la confirmation de l’opération. La mise à jour peut prendre du temps après le retour de votre banque. Vérifiez le statut avant de payer à nouveau.",
+    "checkStatus": "Vérifier le statut du paiement",
     "thankYou": "Merci beaucoup",
     "thankYouName": "Merci {name}",
     "youAreAmazing": "Vous êtes formidable ! Vous avez contribué à améliorer la vie d'une personne.",
@@ -698,10 +705,10 @@
       "settings": "Paramètres du compte",
       "subscriptions": "Dons récurrents",
       "receipts": "Reçus",
-      "support": "Support",
+      "support": "Assistance",
       "supportDesc": "Obtenir de l'aide et du support",
       "logout": "Déconnexion",
-      "settingsDesc": "Security, password and notification preferences"
+      "settingsDesc": "Sécurité, mot de passe et préférences de notification"
     },
     "toast": {
       "accountDeleted": "Compte supprimé",
@@ -716,7 +723,7 @@
       "allReceiptsDownloadSuccess": "Tous les reçus ont été téléchargés avec succès",
       "allReceiptsDownloadFailed": "Certains reçus n'ont pas pu être téléchargés",
       "subscriptionCancelled": "Abonnement annulé",
-      "notificationsUpdated": "Notification preferences saved"
+      "notificationsUpdated": "Préférences de notification enregistrées"
     },
     "account": {
       "name": "Nom",
@@ -733,8 +740,8 @@
       "personalInfo": "Informations personnelles",
       "security": "Sécurité et préférences",
       "gender": "Genre",
-      "namePlaceholder": "Your name",
-      "addressTitle": "Address"
+      "namePlaceholder": "Votre nom",
+      "addressTitle": "Adresse"
     },
     "editDialog": {
       "notSpecified": "Non spécifié",
@@ -752,7 +759,7 @@
       "deleteAccount": "Supprimer le compte",
       "deleteAccountWarning": "La suppression de votre compte supprimera définitivement toutes vos données. Cette action est irréversible.",
       "deleteAccountButton": "Supprimer le compte",
-      "securityTitle": "Security & password"
+      "securityTitle": "Sécurité et mot de passe"
     },
     "deleteDialog": {
       "title": "Êtes-vous sûr de vouloir supprimer votre compte ?",
@@ -888,26 +895,26 @@
       "requestLabel": "Demande #{id}",
       "closed": "Fermé",
       "requestDetailsPreview": "Les détails de la demande apparaîtront ici...",
-      "newTitle": "Open a support request",
-      "newSubtitle": "Our team will get back to you by email.",
-      "subjectLabel": "Topic",
-      "bodyLabel": "Your message",
-      "bodyPlaceholder": "Tell us what's going on…",
-      "bodyHint": "{remaining} characters remaining",
-      "submit": "Send request",
-      "sent": "Your message was sent",
-      "failed": "Could not send your message",
-      "errorMin": "Message must be at least 3 characters",
-      "historyTitle": "Your previous requests",
-      "historySubtitle": "The last 50 messages you've sent through this form.",
-      "historyEmpty": "You haven't sent any support messages yet.",
+      "newTitle": "Ouvrir une demande d’assistance",
+      "newSubtitle": "Notre équipe vous répondra par e-mail.",
+      "subjectLabel": "Sujet",
+      "bodyLabel": "Votre message",
+      "bodyPlaceholder": "Décrivez votre demande ici…",
+      "bodyHint": "{remaining} caractères restants",
+      "submit": "Envoyer la demande",
+      "sent": "Votre message a été envoyé",
+      "failed": "Impossible d’envoyer votre message",
+      "errorMin": "Le message doit contenir au moins 3 caractères",
+      "historyTitle": "Vos demandes précédentes",
+      "historySubtitle": "Les 50 derniers messages envoyés via ce formulaire.",
+      "historyEmpty": "Vous n’avez pas encore envoyé de demande d’assistance.",
       "subjects": {
-        "COMPLAINT": "Complaint",
-        "DONATION_ISSUE": "Donation issue",
-        "CAMPAIGN_SUPPORT": "Project / campaign question",
-        "PARTNERSHIP": "Partnership",
-        "VOLUNTEERING": "Volunteering",
-        "GENERAL": "General"
+        "COMPLAINT": "Réclamation",
+        "DONATION_ISSUE": "Problème avec un don",
+        "CAMPAIGN_SUPPORT": "Question sur un projet",
+        "PARTNERSHIP": "Partenariat",
+        "VOLUNTEERING": "Bénévolat",
+        "GENERAL": "Général"
       }
     },
     "misc": {
@@ -918,55 +925,55 @@
       "closeMenu": "Fermer le menu"
     },
     "avatar": {
-      "change": "Change photo",
-      "remove": "Remove photo",
-      "updated": "Profile photo updated",
-      "removed": "Profile photo removed",
-      "failed": "Could not update your photo",
-      "notImage": "Please pick an image file",
-      "tooLarge": "Image must be smaller than 2 MB"
+      "change": "Modifier la photo",
+      "remove": "Supprimer la photo",
+      "updated": "Photo de profil modifiée",
+      "removed": "Photo de profil supprimée",
+      "failed": "Impossible de modifier la photo",
+      "notImage": "Veuillez choisir un fichier image",
+      "tooLarge": "L’image doit faire moins de 2 Mo"
     },
     "countryPicker": {
-      "title": "Choose your country",
-      "search": "Search countries…",
-      "noResults": "No countries match your search",
-      "none": "Not specified"
+      "title": "Choisissez votre pays",
+      "search": "Rechercher un pays…",
+      "noResults": "Aucun pays ne correspond à votre recherche",
+      "none": "Non précisé"
     },
     "password": {
-      "label": "Password",
-      "descSet": "Your account is protected with a password. You can change it any time.",
-      "descUnset": "You signed in with a social provider. Set a password to also sign in with email.",
-      "change": "Change password",
-      "set": "Set a password",
-      "currentLabel": "Current password",
-      "newLabel": "New password",
-      "confirmLabel": "Confirm new password",
-      "hint": "At least 8 characters. Mix letters, numbers and a symbol for a strong password.",
-      "show": "Show password",
-      "hide": "Hide password",
-      "save": "Save password",
-      "cancel": "Cancel",
-      "success": "Password updated",
-      "failed": "Could not update your password",
-      "errorMinLength": "Password must be at least 8 characters",
-      "errorMismatch": "New passwords do not match",
-      "strengthWeak": "Weak",
-      "strengthOk": "OK",
-      "strengthStrong": "Strong"
+      "label": "Mot de passe",
+      "descSet": "Votre compte est protégé par un mot de passe que vous pouvez modifier à tout moment.",
+      "descUnset": "Vous vous êtes connecté avec un compte social. Définissez un mot de passe pour vous connecter aussi par e-mail.",
+      "change": "Modifier le mot de passe",
+      "set": "Définir un mot de passe",
+      "currentLabel": "Mot de passe actuel",
+      "newLabel": "Nouveau mot de passe",
+      "confirmLabel": "Confirmez le nouveau mot de passe",
+      "hint": "Au moins 8 caractères. Combinez lettres, chiffres et symboles pour renforcer votre mot de passe.",
+      "show": "Afficher le mot de passe",
+      "hide": "Masquer le mot de passe",
+      "save": "Enregistrer le mot de passe",
+      "cancel": "Annuler",
+      "success": "Mot de passe modifié",
+      "failed": "Impossible de modifier le mot de passe",
+      "errorMinLength": "Le mot de passe doit contenir au moins 8 caractères",
+      "errorMismatch": "Les nouveaux mots de passe ne correspondent pas",
+      "strengthWeak": "Faible",
+      "strengthOk": "Moyen",
+      "strengthStrong": "Fort"
     },
     "impact": {
-      "totalGiven": "Total given",
-      "monthlyMrr": "Monthly giving",
-      "supportedCampaigns": "Supported projects",
-      "streak": "Streak",
-      "acrossDonations": "across {count} donation(s)",
-      "acrossSubs": "across {count} subscription(s)",
-      "distinctCampaigns": "Distinct projects you've supported",
-      "monthsStreak": "{count} month(s) in a row",
-      "noStreak": "Start a streak",
-      "lastDonation": "Last donation",
-      "badgesEarned": "{count} badge(s) earned",
-      "badgesHint": "View your badges on the homepage donor board"
+      "totalGiven": "Total de vos dons",
+      "monthlyMrr": "Votre don mensuel",
+      "supportedCampaigns": "Projets soutenus",
+      "streak": "Votre série",
+      "acrossDonations": "sur {count} don(s)",
+      "acrossSubs": "sur {count} abonnement(s)",
+      "distinctCampaigns": "Nombre de projets différents soutenus",
+      "monthsStreak": "{count} mois consécutifs",
+      "noStreak": "Commencez une série",
+      "lastDonation": "Dernier don",
+      "badgesEarned": "{count} badge(s) obtenu(s)",
+      "badgesHint": "Retrouvez vos badges sur le tableau des donateurs de la page d’accueil"
     }
   },
   "MessageSubjects": {
