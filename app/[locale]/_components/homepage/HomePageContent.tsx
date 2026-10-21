@@ -3,7 +3,14 @@
 import React, { Suspense, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import axios from "axios";
-import { Globe, MoreHorizontal, Baby, Home, Map, ArrowRight } from "lucide-react";
+import {
+  Globe,
+  MoreHorizontal,
+  Baby,
+  Home,
+  Map,
+  ArrowRight,
+} from "lucide-react";
 import CategoryIcon from "@/components/CategoryIcon";
 
 import HeroSlider, { type SlideItem } from "./HeroSlider";
@@ -13,21 +20,29 @@ import BlogCard from "../BlogCard";
 import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
 import type { CampaignCardData } from "../CampaignCard";
-import ImpactBuilder, { ImpactTexture } from "../../impact/_components/ImpactBuilder";
+import ImpactBuilder, {
+  ImpactTexture,
+} from "../../impact/_components/ImpactBuilder";
 import { impactCampaignPath } from "@/lib/impact/routing";
 import type { ImpactNeed, ImpactRegion } from "@/lib/impact/config";
 
 // LiveDonationsTicker is a non-critical floating widget — keep it client-only
 // and below-the-fold so it doesn't pull its chunk into the LCP critical path.
-const LiveDonationsTicker = dynamic(() => import("@/components/LiveDonationsTicker"), {
-  loading: () => null,
-  ssr: false,
-});
+const LiveDonationsTicker = dynamic(
+  () => import("@/components/LiveDonationsTicker"),
+  {
+    loading: () => null,
+    ssr: false,
+  },
+);
 
 /** Category tiles are small, so pull a correspondingly small Cloudinary render. */
 function buildTileSrc(src: string, width: number): string {
   if (!src.includes("res.cloudinary.com")) return src;
-  return src.replace(/\/upload\//, `/upload/f_auto,q_auto:eco,w_${width},c_fill,g_auto/`);
+  return src.replace(
+    /\/upload\//,
+    `/upload/f_auto,q_auto:eco,w_${width},c_fill,g_auto/`,
+  );
 }
 
 interface CategoryItem {
@@ -72,8 +87,18 @@ interface HomePageContentProps {
 }
 
 const STATS = [
-  { icon: Home, valueKey: "stat1Value", labelKey: "stat1Label", value: "100K+" },
-  { icon: Baby, valueKey: "stat2Value", labelKey: "stat2Label", value: "500K+" },
+  {
+    icon: Home,
+    valueKey: "stat1Value",
+    labelKey: "stat1Label",
+    value: "100K+",
+  },
+  {
+    icon: Baby,
+    valueKey: "stat2Value",
+    labelKey: "stat2Label",
+    value: "500K+",
+  },
   { icon: Globe, valueKey: "stat3Value", labelKey: "stat3Label", value: "20" },
   { icon: Map, valueKey: "stat4Value", labelKey: "stat4Label", value: "4" },
 ];
@@ -94,13 +119,16 @@ const HomePage: React.FC<HomePageContentProps> = ({
   // Mirror SSR-provided data into local state. If SSR's internal fetches failed
   // (e.g. base-URL resolution mismatch, internal API timeout), we'll populate them
   // from the browser as a fallback so the homepage is never blank.
-  const [categories, setCategories] = useState<CategoryItem[]>(initialCategories);
+  const [categories, setCategories] =
+    useState<CategoryItem[]>(initialCategories);
   const [posts, setPosts] = useState<PostItem[]>(initialPosts);
 
   useEffect(() => {
     if (categories.length > 0) return;
     let cancelled = false;
-    fetch(`/api/categories?locale=${locale}&limit=12&sortBy=order`)
+    fetch(
+      `/api/categories?locale=${locale}&limit=12&sortBy=order&navigation=true`,
+    )
       .then((r) => (r.ok ? r.json() : { items: [] }))
       .then((data) => {
         if (cancelled) return;
@@ -134,7 +162,10 @@ const HomePage: React.FC<HomePageContentProps> = ({
   return (
     <div className="bg-white">
       {/* ── Hero Slider ── */}
-      <HeroSlider initialSlides={initialSlides} initialFirstImage={firstHeroImage ?? null} />
+      <HeroSlider
+        initialSlides={initialSlides}
+        initialFirstImage={firstHeroImage ?? null}
+      />
 
       {/* ── Featured Campaigns Slider — fully SSR'd from server-fetched data, so the
               cards render in the initial HTML and there's nothing to shift in. */}
@@ -142,11 +173,19 @@ const HomePage: React.FC<HomePageContentProps> = ({
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-end justify-between mb-6">
             <div>
-              <span className="text-xs font-bold text-[#FA5D17] uppercase tracking-wider">{t("featuredProjects") || "ÖNE ÇIKAN PROJELER"}</span>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">{t("currentProjects") || "Güncel Projeler"}</h2>
+              <span className="text-xs font-bold text-[#FA5D17] uppercase tracking-wider">
+                {t("featuredProjects") || "ÖNE ÇIKAN PROJELER"}
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
+                {t("currentProjects") || "Güncel Projeler"}
+              </h2>
             </div>
-            <Link href="/campaigns" className="flex mb-1 items-center gap-1.5 text-sm font-semibold text-[#025EB8] hover:text-[#FA5D17] transition-colors">
-              {t("viewAll") || "Tümünü Gör"} <MoreHorizontal className="w-4 h-4" />
+            <Link
+              href="/campaigns"
+              className="flex mb-1 items-center gap-1.5 text-sm font-semibold text-[#025EB8] hover:text-[#FA5D17] transition-colors"
+            >
+              {t("viewAll") || "Tümünü Gör"}{" "}
+              <MoreHorizontal className="w-4 h-4" />
             </Link>
           </div>
           {/* Suspense boundary required because CampaignCard descendants call useSearchParams. */}
@@ -167,17 +206,26 @@ const HomePage: React.FC<HomePageContentProps> = ({
           <div className="max-w-7xl mx-auto px-4">
             <div className="flex items-end justify-between gap-3 mb-4 sm:mb-5">
               <div className="min-w-0">
-                <span className="text-xs font-bold text-[#FA5D17] uppercase tracking-wider">{t("impactEyebrow")}</span>
-                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">{featuredImpact.title}</h2>
+                <span className="text-xs font-bold text-[#FA5D17] uppercase tracking-wider">
+                  {t("impactEyebrow")}
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
+                  {featuredImpact.title}
+                </h2>
                 {featuredImpact.intro && (
-                  <p className="mt-1 hidden text-sm text-gray-500 sm:block">{featuredImpact.intro}</p>
+                  <p className="mt-1 hidden text-sm text-gray-500 sm:block">
+                    {featuredImpact.intro}
+                  </p>
                 )}
               </div>
               <Link
-                href={impactCampaignPath(locale, featuredImpact.slug).slice(locale.length + 1)}
+                href={impactCampaignPath(locale, featuredImpact.slug).slice(
+                  locale.length + 1,
+                )}
                 className="flex flex-none mb-1 items-center gap-1.5 text-sm font-semibold text-[#025EB8] hover:text-[#FA5D17] transition-colors"
               >
-                {t("impactFullPage")} <ArrowRight className="w-4 h-4 rtl:rotate-180" />
+                {t("impactFullPage")}{" "}
+                <ArrowRight className="w-4 h-4 rtl:rotate-180" />
               </Link>
             </div>
             <ImpactBuilder
@@ -216,10 +264,17 @@ const HomePage: React.FC<HomePageContentProps> = ({
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
             {STATS.map((stat, i) => (
-              <div key={i} className="flex flex-col items-center text-center text-white">
+              <div
+                key={i}
+                className="flex flex-col items-center text-center text-white"
+              >
                 <stat.icon className="w-10 h-10 mb-2" />
-                <span className="text-4xl sm:text-5xl font-extrabold">{stat.value}</span>
-                <span className="text-sm text-white/80 mt-1 font-medium">{t(stat.labelKey as Parameters<typeof t>[0]) || stat.labelKey}</span>
+                <span className="text-4xl sm:text-5xl font-extrabold">
+                  {stat.value}
+                </span>
+                <span className="text-sm text-white/80 mt-1 font-medium">
+                  {t(stat.labelKey as Parameters<typeof t>[0]) || stat.labelKey}
+                </span>
               </div>
             ))}
           </div>
@@ -240,11 +295,19 @@ const HomePage: React.FC<HomePageContentProps> = ({
           <div className="max-w-7xl mx-auto px-4">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <span className="text-[11px] font-bold text-[#FA5D17] uppercase tracking-widest">{t("weHelp") || "WE HELP"}</span>
-                <h2 className="text-lg sm:text-xl font-extrabold text-gray-900">{t("donationCategories") || "Donation Categories"}</h2>
+                <span className="text-[11px] font-bold text-[#FA5D17] uppercase tracking-widest">
+                  {t("weHelp") || "WE HELP"}
+                </span>
+                <h2 className="text-lg sm:text-xl font-extrabold text-gray-900">
+                  {t("donationCategories") || "Donation Categories"}
+                </h2>
               </div>
-              <Link href="/campaigns" className="hidden sm:inline-flex items-center gap-1 text-xs font-semibold text-[#025EB8] hover:text-[#FA5D17] transition-colors">
-                {t("viewAll") || "View all"} <MoreHorizontal className="w-3.5 h-3.5" />
+              <Link
+                href="/campaigns"
+                className="hidden sm:inline-flex items-center gap-1 text-xs font-semibold text-[#025EB8] hover:text-[#FA5D17] transition-colors"
+              >
+                {t("viewAll") || "View all"}{" "}
+                <MoreHorizontal className="w-3.5 h-3.5" />
               </Link>
             </div>
 
@@ -273,7 +336,10 @@ const HomePage: React.FC<HomePageContentProps> = ({
 
                   <div className="absolute inset-0 flex flex-col justify-between p-2 sm:p-2.5">
                     <span className="inline-flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center self-start rounded-lg bg-white/20 backdrop-blur-sm ring-1 ring-white/25 transition-colors group-hover:bg-[#FA5D17] group-hover:ring-[#FA5D17]">
-                      <CategoryIcon name={cat.icon} className="h-4 w-4 sm:h-[18px] sm:w-[18px] text-white" />
+                      <CategoryIcon
+                        name={cat.icon}
+                        className="h-4 w-4 sm:h-[18px] sm:w-[18px] text-white"
+                      />
                     </span>
                     <span className="text-[12px] sm:text-[13px] font-bold leading-tight text-white line-clamp-2 drop-shadow-sm">
                       {cat.name}
@@ -284,8 +350,12 @@ const HomePage: React.FC<HomePageContentProps> = ({
             </div>
 
             <div className="sm:hidden text-center mt-3">
-              <Link href="/campaigns" className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#025EB8]">
-                {t("viewAll") || "View all"} <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
+              <Link
+                href="/campaigns"
+                className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#025EB8]"
+              >
+                {t("viewAll") || "View all"}{" "}
+                <ArrowRight className="w-3.5 h-3.5 rtl:rotate-180" />
               </Link>
             </div>
           </div>
@@ -298,11 +368,19 @@ const HomePage: React.FC<HomePageContentProps> = ({
           <div className="max-w-7xl mx-auto px-4">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <span className="text-xs font-bold text-[#FA5D17] uppercase tracking-wider">{t("latestNews") || "SON HABERLER"}</span>
-                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">{t("news") || "Haberler"}</h2>
+                <span className="text-xs font-bold text-[#FA5D17] uppercase tracking-wider">
+                  {t("latestNews") || "SON HABERLER"}
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
+                  {t("news") || "Haberler"}
+                </h2>
               </div>
-              <Link href="/blog" className="hidden sm:flex items-center gap-1.5 text-sm font-semibold text-[#025EB8] hover:text-[#FA5D17] transition-colors">
-                {t("viewAll") || "Tümünü Gör"} <MoreHorizontal className="w-4 h-4" />
+              <Link
+                href="/blog"
+                className="hidden sm:flex items-center gap-1.5 text-sm font-semibold text-[#025EB8] hover:text-[#FA5D17] transition-colors"
+              >
+                {t("viewAll") || "Tümünü Gör"}{" "}
+                <MoreHorizontal className="w-4 h-4" />
               </Link>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -310,14 +388,21 @@ const HomePage: React.FC<HomePageContentProps> = ({
                 <BlogCard
                   key={post.id}
                   title={post.title}
-                  image={post.image || "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"}
+                  image={
+                    post.image ||
+                    "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg"
+                  }
                   link={`/blog/${post.slug || post.id}`}
                 />
               ))}
             </div>
             <div className="mt-6 text-center sm:hidden">
-              <Link href="/blog" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#025EB8]">
-                {t("viewAll") || "Tümünü Gör"} <MoreHorizontal className="w-4 h-4" />
+              <Link
+                href="/blog"
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#025EB8]"
+              >
+                {t("viewAll") || "Tümünü Gör"}{" "}
+                <MoreHorizontal className="w-4 h-4" />
               </Link>
             </div>
           </div>

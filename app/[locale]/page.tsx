@@ -51,7 +51,12 @@ async function baseUrl(): Promise<string> {
  * ERROR with no LCP value — capping each upstream request at 3 s keeps total SSR latency
  * bounded even under degraded backends.
  */
-async function safeFetch<T>(url: string, fallback: T, revalidateSeconds = 300, timeoutMs = 3000): Promise<T> {
+async function safeFetch<T>(
+  url: string,
+  fallback: T,
+  revalidateSeconds = 300,
+  timeoutMs = 3000,
+): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -76,7 +81,7 @@ function buildHeroSrc(src: string, width: number): string {
   if (!src.includes("res.cloudinary.com")) return src;
   return src.replace(
     /\/upload\//,
-    `/upload/f_auto,q_auto:eco,w_${width},c_limit/`
+    `/upload/f_auto,q_auto:eco,w_${width},c_limit/`,
   );
 }
 
@@ -102,7 +107,7 @@ const getFeaturedImpact = unstable_cache(
     };
   },
   ["homepage-featured-impact"],
-  { revalidate: 300, tags: ["impact-campaigns"] }
+  { revalidate: 300, tags: ["impact-campaigns"] },
 );
 
 async function safeFeaturedImpact(locale: string, timeoutMs = 3000) {
@@ -115,7 +120,11 @@ async function safeFeaturedImpact(locale: string, timeoutMs = 3000) {
       }),
     ]);
     if (!row || !row.needs.length || !row.regions.length) return null;
-    return { ...row, title: pickText(row.title, locale), intro: pickText(row.intro, locale) };
+    return {
+      ...row,
+      title: pickText(row.title, locale),
+      intro: pickText(row.intro, locale),
+    };
   } catch {
     return null;
   } finally {
@@ -131,33 +140,49 @@ export default async function HomePage({ params }: Props) {
   // as initial state. This eliminates the empty-section → skeleton → real-content swap
   // (which was the root cause of CLS=0.92) and avoids a client waterfall on hydration.
   // All requests run in parallel with a 3 s hard timeout each.
-  const [slidesData, campaignsData, categoriesData, postsData, featuredImpact] = await Promise.all([
-    safeFetch<{ items?: SlideItem[] }>(
-      `${base}/api/slides?locale=${locale}`,
-      { items: [] }
-    ),
-    safeFetch<{ items?: unknown[]; nextCursor?: string | null; hasMore?: boolean }>(
-      `${base}/api/campaigns?limit=5&sortBy=priority&locale=${locale}`,
-      { items: [], hasMore: false }
-    ),
-    safeFetch<{ items?: unknown[] }>(
-      `${base}/api/categories?locale=${locale}&limit=12&sortBy=order`,
-      { items: [] }
-    ),
-    safeFetch<{ items?: unknown[] }>(
-      `${base}/api/posts?locale=${locale}&limit=3`,
-      { items: [] }
-    ),
-    safeFeaturedImpact(locale),
-  ]);
+  const [slidesData, campaignsData, categoriesData, postsData, featuredImpact] =
+    await Promise.all([
+      safeFetch<{ items?: SlideItem[] }>(
+        `${base}/api/slides?locale=${locale}`,
+        { items: [] },
+      ),
+      safeFetch<{
+        items?: unknown[];
+        nextCursor?: string | null;
+        hasMore?: boolean;
+      }>(`${base}/api/campaigns?limit=5&sortBy=priority&locale=${locale}`, {
+        items: [],
+        hasMore: false,
+      }),
+      safeFetch<{ items?: unknown[] }>(
+        `${base}/api/categories?locale=${locale}&limit=12&sortBy=order&navigation=true`,
+        { items: [] },
+      ),
+      safeFetch<{ items?: unknown[] }>(
+        `${base}/api/posts?locale=${locale}&limit=3`,
+        { items: [] },
+      ),
+      safeFeaturedImpact(locale),
+    ]);
 
-  const initialSlides = Array.isArray(slidesData?.items) ? slidesData.items : [];
+  const initialSlides = Array.isArray(slidesData?.items)
+    ? slidesData.items
+    : [];
   const firstHeroImage = initialSlides[0]?.image ?? null;
-  const initialCampaigns = (campaignsData?.items as Parameters<typeof HomePageContent>[0]["initialCampaigns"]) ?? [];
+  const initialCampaigns =
+    (campaignsData?.items as Parameters<
+      typeof HomePageContent
+    >[0]["initialCampaigns"]) ?? [];
   const initialNextCursor = campaignsData?.nextCursor ?? null;
   const initialHasMore = Boolean(campaignsData?.hasMore);
-  const initialCategories = (categoriesData?.items as Parameters<typeof HomePageContent>[0]["initialCategories"]) ?? [];
-  const initialPosts = (postsData?.items as Parameters<typeof HomePageContent>[0]["initialPosts"]) ?? [];
+  const initialCategories =
+    (categoriesData?.items as Parameters<
+      typeof HomePageContent
+    >[0]["initialCategories"]) ?? [];
+  const initialPosts =
+    (postsData?.items as Parameters<
+      typeof HomePageContent
+    >[0]["initialPosts"]) ?? [];
 
   // Preload the LCP image with a srcset that matches what the browser will actually
   // request. We use Cloudinary URLs directly (not the /_next/image proxy) so the

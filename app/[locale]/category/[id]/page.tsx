@@ -1,9 +1,18 @@
+import {
+  applyEditorialSeo,
+  readPublicEditorialSeo,
+} from "@/lib/content-editor/public-seo";
+import { EditorialFaq } from "@/components/content/EditorialFaq";
 import React from "react";
 import { Metadata } from "next";
 import { redirect, permanentRedirect } from "next/navigation";
 import MainPage from "./_components/MainPage";
 import { prisma } from "@/lib/prisma";
-import { isObjectId, pickLocaleSlug, whereByIdOrAnyLocaleSlug } from "@/lib/slug";
+import {
+  isObjectId,
+  pickLocaleSlug,
+  whereByIdOrAnyLocaleSlug,
+} from "@/lib/slug";
 import { pickTranslation } from "@/lib/i18n/translation-fallback";
 import {
   LOCALE_SEO,
@@ -30,13 +39,21 @@ async function fetchCategoryForSeo(idOrSlug: string) {
       description: true,
       image: true,
       translations: {
-        select: { locale: true, name: true, imageAlt: true, metaTitle: true, metaDescription: true, description: true, slug: true },
+        select: {
+          locale: true,
+          name: true,
+          imageAlt: true,
+          metaTitle: true,
+          metaDescription: true,
+          description: true,
+          slug: true,
+        },
       },
     },
   });
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+async function generateBaseMetadata({ params }: Props): Promise<Metadata> {
   const { id, locale } = await params;
   const seo = LOCALE_SEO[locale as Locale] ?? LOCALE_SEO.en;
   // Always anchor canonical to the requested URL so the parent layout's
@@ -61,8 +78,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const t = pickTranslation(category.translations, locale);
   const name = t?.name || category.name;
-  const description =
-    (t?.metaDescription || (locale === "ar" ? category.metaDescription : null) || t?.description || category.description || seo.campaigns.description).slice(0, 200);
+  const description = (
+    t?.metaDescription ||
+    (locale === "ar" ? category.metaDescription : null) ||
+    t?.description ||
+    category.description ||
+    seo.campaigns.description
+  ).slice(0, 200);
   const image = category.image || `${SITE_URL}/og-image.jpg`;
 
   let alternates: { canonical: string; languages?: Record<string, string> };
@@ -79,7 +101,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     alternates = { canonical: requestedCanonical };
   }
 
-  const title = t?.metaTitle || (locale === "ar" ? category.metaTitle : null) || `${name} | ${seo.siteName}`;
+  const title =
+    t?.metaTitle ||
+    (locale === "ar" ? category.metaTitle : null) ||
+    `${name} | ${seo.siteName}`;
 
   return {
     title,
@@ -93,7 +118,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       siteName: seo.siteName,
       locale: OG_LOCALE_MAP[locale as Locale] ?? "en_US",
       type: "website",
-      images: [{ url: image, width: 1200, height: 630, alt: t?.imageAlt || category.imageAlt || name }],
+      images: [
+        {
+          url: image,
+          width: 1200,
+          height: 630,
+          alt: t?.imageAlt || category.imageAlt || name,
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
@@ -107,12 +139,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CategoryPage({ params }: Props) {
   const { id, locale } = await params;
-  const oldLink = await prisma.category.findFirst({ where: { previousSlugs: { has: decodeURIComponent(id) } }, select: { id: true, slug: true, translations: { select: { locale: true, slug: true } } } });
+  const oldLink = await prisma.category.findFirst({
+    where: { previousSlugs: { has: decodeURIComponent(id) } },
+    select: {
+      id: true,
+      slug: true,
+      translations: { select: { locale: true, slug: true } },
+    },
+  });
   if (oldLink) {
-    const canonical = pickLocaleSlug(oldLink.slug, oldLink.translations, locale) || oldLink.id;
-    if (canonical !== decodeURIComponent(id)) permanentRedirect(`/${locale}/category/${encodeURIComponent(canonical)}`);
+    const canonical =
+      pickLocaleSlug(oldLink.slug, oldLink.translations, locale) || oldLink.id;
+    if (canonical !== decodeURIComponent(id))
+      permanentRedirect(`/${locale}/category/${encodeURIComponent(canonical)}`);
   }
-
 
   // Redirect to the canonical per-locale slug when the URL doesn't match —
   // e.g. after a language switch keeps the previous locale's slug, or when
@@ -127,7 +167,9 @@ export default async function CategoryPage({ params }: Props) {
       },
     });
     if (category) {
-      const canonical = pickLocaleSlug(category.slug, category.translations, locale) ?? category.id;
+      const canonical =
+        pickLocaleSlug(category.slug, category.translations, locale) ??
+        category.id;
       if (id !== canonical && (isObjectId(id) || id !== category.id)) {
         redirect(`/${locale}/category/${encodeURIComponent(canonical)}`);
       }
@@ -137,5 +179,23 @@ export default async function CategoryPage({ params }: Props) {
     console.error("Failed to resolve canonical category slug", err);
   }
 
-  return <MainPage id={id} locale={locale} />;
+  return (
+    <>
+      <MainPage id={id} locale={locale} />
+      <EditorialFaq
+        kind="categories"
+        contentKey={decodeURIComponent(id)}
+        locale={locale}
+      />
+    </>
+  );
+}
+
+export async function generateMetadata(args: Props): Promise<Metadata> {
+  const { id, locale } = await args.params;
+  const [base, extra] = await Promise.all([
+    generateBaseMetadata(args),
+    readPublicEditorialSeo("categories", decodeURIComponent(id), locale),
+  ]);
+  return applyEditorialSeo(base, extra);
 }
