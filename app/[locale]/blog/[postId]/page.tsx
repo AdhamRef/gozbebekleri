@@ -152,7 +152,7 @@ async function generateBaseMetadata(args: BlogPostProps): Promise<Metadata> {
     const fullTitle = `${titleText} | ${seo.siteName}`;
 
     return {
-      title: fullTitle,
+      title: { absolute: fullTitle },
       description: descriptionText,
       keywords: seo.keywords,
       alternates,
