@@ -55,3 +55,9 @@ export function donationProjectSummary(donation: DonationProjectSource): {
     lines,
   };
 }
+
+const DONOR_LABELS:Record<string,string>={ar:"الداعم الكريم",tr:"Bağışçımız",en:"Supporter",fr:"cher donateur",de:"liebe Unterstützerin, lieber Unterstützer",es:"donante",id:"Donatur",pt:"doador",ur:"معزز عطیہ دہندہ",sq:"donator",it:"donatore",nl:"donateur",sv:"givare",no:"giver",da:"donor",ms:"Penderma",ja:"ご支援者様",zh:"爱心捐赠者",hi:"प्रिय दानदाता"};
+/** A neutral salutation is not a fabricated personal name. Never persist it on the user. */
+export function templateDonorName(name:string|null|undefined,locale?:string|null):string{
+ const key=String(locale || "ar").toLowerCase().split(/[-_]/)[0];return name?.trim() || DONOR_LABELS[key==="nb"?"no":key] || DONOR_LABELS.ar;
+}
