@@ -10,14 +10,16 @@ interface CategoryProps {
   }>;
 }
 
+type CategoryMetadata = { name: string; title?: string | null; description?: string | null; image?: string | null; slug?: string | null };
+
 // Generate metadata for the category page
 export async function generateMetadata(args: CategoryProps): Promise<Metadata> {
   const params = await args.params;
-  const fetchCategoryData = async (): Promise<Category> => {
+  const fetchCategoryData = async (): Promise<CategoryMetadata> => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
       const locale = params.locale || 'ar';
-      const response = await axios.get(
+      const response = await axios.get<CategoryMetadata>(
         `${baseUrl}/api/post-categories/${params.categoryId}`,
         { params: { locale } }
       );
@@ -29,32 +31,34 @@ export async function generateMetadata(args: CategoryProps): Promise<Metadata> {
   };
 
   const category = await fetchCategoryData();
+  const title = category.title || category.name;
+  const description = category.description || "";
 
   return {
-    title: `${category.title} - قرة العيون`,
-    description: category.description,
+    title: `${title} - قرة العيون`,
+    description,
     openGraph: {
-      title: `${category.title} - قرة العيون`,
-      description: category.description,
+      title: `${title} - قرة العيون`,
+      description,
       images: [
         {
           url: category.image || "/default-category-bg.jpg",
           width: 1200,
           height: 630,
-          alt: category.title,
+          alt: title,
         },
       ],
-      url: `https://gozbebekleri.org/${params.locale || "ar"}/blog/category/${(category as any)?.slug || params.categoryId}`,
+      url: `https://gozbebekleri.org/${params.locale || "ar"}/blog/category/${category.slug || params.categoryId}`,
       type: "website",
     },
     twitter: {
       card: "summary_large_image",
-      title: `${category.title} - قرة العيون`,
-      description: category.description,
+      title: `${title} - قرة العيون`,
+      description,
       images: [category.image || "/default-category-bg.jpg"],
     },
     alternates: {
-      canonical: `https://gozbebekleri.org/${params.locale || "ar"}/blog/category/${(category as any)?.slug || params.categoryId}`,
+      canonical: `https://gozbebekleri.org/${params.locale || "ar"}/blog/category/${category.slug || params.categoryId}`,
     },
   };
 }
