@@ -190,8 +190,17 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
       setMessage("انتظر اكتمال رفع الصور قبل الحفظ");
       return;
     }
-    const captured = { ...values[locale] },
-      target = locale;
+    // Settings and achievement translations are independent of page translations.
+    // Saving those alone must not create a blank translation for the selected tab.
+    const localeChanges = Object.fromEntries(Object.entries(values).flatMap(([code, value]) => {
+      const changes = Object.fromEntries(Object.entries(value).filter(([key, text]) =>
+        !(code === "ar" && ["campaigns", "blog"].includes(kind) && key === "image") &&
+        text !== document.values[code]?.[key],
+      ));
+      return Object.keys(changes).length ? [[code, changes]] : [];
+    }));
+    const target = reviewed || localeChanges[locale] ? locale : "ar",
+      captured = localeChanges[target] || {};
     setBusy("save");
     setMessage("");
     try {
@@ -202,12 +211,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
           locale: target,
           changes: captured,
           reviewed,
-          localeChanges: Object.fromEntries(
-            Object.entries(values).filter(
-              ([code, v]) =>
-                JSON.stringify(v) !== JSON.stringify(document.values[code]),
-            ),
-          ),
+          localeChanges,
           settings: Object.fromEntries(
             Object.entries(settingsDraft).filter(
               ([key, v]) =>

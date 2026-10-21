@@ -45,6 +45,17 @@ test("forged Arabic campaign image cannot overwrite the native gallery", async (
   await assert.rejects(saveWorkspace(m.store,{kind:"campaigns",id,revision:fingerprint(initial),locale:"ar",changes:{image:"/forged.jpg"}}));
   assert.deepEqual(m.read(),initial);
 });
+test("full Arabic campaign snapshots save without writing a translated image onto the campaign", async () => {
+  const initial={id,title:"مشروع",description:"وصف",goalType:"OPEN",translations:[],updates:[],images:["/original.jpg"],currentAmount:100};
+  const m=memory("campaigns",initial);
+  const full=valuesFor("campaigns",initial,"ar");
+  assert.equal(full.image,"");
+  const saved=await saveWorkspace(m.store,{kind:"campaigns",id,revision:fingerprint(initial),locale:"ar",changes:{...full,title:"عنوان جديد"},settings:{suggestedDonations:{amounts:[20],byCurrency:{TRY:[500]}}}});
+  assert.equal(saved.values.ar.title,"عنوان جديد");
+  assert.equal("image" in m.read(),false);
+  assert.deepEqual(m.read().images,["/original.jpg"]);
+  assert.equal(m.read().currentAmount,100);
+});
 test("legacy category publication matches public readers without overriding explicit false", () => {
   for (const isActive of [undefined, null, true]) {
     assert.equal(settingsFor("categories", { isActive }).isActive, true);
