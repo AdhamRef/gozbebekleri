@@ -142,6 +142,7 @@ function CurrencySelectorInner({
   };
 
   const current =
+    visibleCurrencies.find((c) => c.code === selectedCurrency) ??
     SUPPORTED_CURRENCY_OPTIONS.find((c) => c.code === selectedCurrency) ??
     visibleCurrencies.find((c) => c.code === "USD");
 

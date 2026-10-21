@@ -569,17 +569,9 @@ const DonationDialog = ({
   })();
 
   const progress =
-    openGoal ||
-    !targetAmount ||
-    convertToCurrency(targetAmount).convertedValue == null ||
-    convertToCurrency(targetAmount).convertedValue === 0
+    openGoal || !targetAmount
       ? 0
-      : Math.min(
-          100,
-          ((amountRaised + donationAmount) /
-            (convertToCurrency(targetAmount).convertedValue as number)) *
-            100
-        );
+      : Math.min(100, Math.max(0, (amountRaised / targetAmount) * 100));
   const fees = (donationAmount + (teamSupport ?? 0)) * 0.03;
   const totalAmount = donationAmount + (teamSupport ?? 0) + (coverFees ? fees : 0);
 
@@ -845,11 +837,11 @@ const DonationDialog = ({
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">
                     {t("collected")}{" "}
-                    <span dir="ltr">{formatNumber((convertToCurrency(Math.round(amountRaised)).convertedValue ?? 0) + donationAmount)} {getCurrency()}</span>
+                    <span dir="ltr">{formatNumber(convertToCurrency(amountRaised).convertedValue ?? 0)} {getCurrency()}</span>
                   </span>
                   <span className="text-gray-600">
                     {t("goal")}{" "}
-                    <span dir="ltr">{formatNumber(convertToCurrency(Math.round(targetAmount)).convertedValue ?? 0)} {getCurrency()}</span>
+                    <span dir="ltr">{formatNumber(convertToCurrency(targetAmount).convertedValue ?? 0)} {getCurrency()}</span>
                   </span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2">
