@@ -12,6 +12,7 @@ import { CampaignAdvancedSettings } from "./CampaignAdvancedSettings";
 import { CampaignAchievements } from "./CampaignAchievements";
 import { ProtectedSettings } from "./ProtectedSettings";
 import { EditorialWorkflow } from "./EditorialWorkflow";
+import { prepareEditorSave, type ReviewedProposalSave } from "@/lib/content-editor/save-plan";
 import { EDITORIAL_LABELS, type EditorialAction } from "@/lib/content-localization/editorial-policy";
 import { ImageUploadField } from "@/app/(dashboard)/dashboard/_components/ImageUploadField";
 import { EDITOR_SECTIONS, settingsFor } from "@/lib/content-editor/workspace";
@@ -198,23 +199,14 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
     setProposal(null);
     setReviewed(false);
   };
-  const save = async () => {
+  const save = async (proposalSave?: ReviewedProposalSave) => {
     if (!document) return;
     if (uploads) {
       setMessage("انتظر اكتمال رفع الصور قبل الحفظ");
       return;
     }
-    // Settings and achievement translations are independent of page translations.
-    // Saving those alone must not create a blank translation for the selected tab.
-    const localeChanges = Object.fromEntries(Object.entries(values).flatMap(([code, value]) => {
-      const changes = Object.fromEntries(Object.entries(value).filter(([key, text]) =>
-        !(code === "ar" && ["campaigns", "blog"].includes(kind) && key === "image") &&
-        text !== document.values[code]?.[key],
-      ));
-      return Object.keys(changes).length ? [[code, changes]] : [];
-    }));
-    const target = reviewed || localeChanges[locale] ? locale : "ar",
-      captured = localeChanges[target] || {};
+    if (busy || (proposalSave && proposal?.revision !== document.revision)) return;
+    const plan = prepareEditorSave(kind, document.values, values, locale, reviewed, proposalSave);
     setBusy("save");
     setMessage("");
     try {
@@ -222,11 +214,8 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
         method: "PUT",
         body: JSON.stringify({
           revision: document.revision,
-          locale: target,
-          changes: captured,
-          reviewed,
-          editorialAction: draftAction || undefined,
-          localeChanges,
+          ...plan,
+          editorialAction: proposalSave?.action || draftAction || undefined,
           settings: Object.fromEntries(
             Object.entries(settingsDraft).filter(
               ([key, v]) =>
@@ -244,10 +233,17 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
       setDocument(read);
       setValues(read.values);
       setSettingsDraft(settingsFor(kind, read.settings));
-      setProposal(null);
+      if (proposalSave && proposalSave.locale !== "ar" && !plan.localeChanges.ar) {
+        setProposal(prev => {
+          if (!prev) return null;
+          const remaining = Object.fromEntries(Object.entries(prev.proposals).filter(([code]) => code !== proposalSave.locale));
+          return Object.keys(remaining).length ? { ...prev, revision: read.revision, proposals: remaining } : null;
+        });
+      } else setProposal(null);
       setDraftAction("");
       setReviewed(false);
-      setMessage("تم الحفظ والتحقق من النسخة المحفوظة");
+      if (proposalSave) setLocale(proposalSave.locale);
+      setMessage(proposalSave ? `تم حفظ ${proposalSave.locale === "ar" ? "النص العربي" : `ترجمة ${LOCALES[proposalSave.locale as keyof typeof LOCALES]?.nativeLabel || proposalSave.locale}`} بعد المراجعة والتحقق من النسخة المحفوظة` : "تم الحفظ والتحقق من النسخة المحفوظة");
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -588,7 +584,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
                 <DropdownMenuItem disabled={Boolean(busy) || uploads > 0} onSelect={() => { if (!dirty || window.confirm("تحميل النسخة المحفوظة وإلغاء تعديلات المسودة؟")) void initialLoad(); }}>تحميل النسخة المحفوظة</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <button type="button" className={button + " flex items-center gap-2 border-brand bg-brand text-white hover:bg-brand-dark"} disabled={Boolean(busy) || uploads > 0 || (!dirty && !reviewed)} onClick={save}>
+            <button type="button" className={button + " flex items-center gap-2 border-brand bg-brand text-white hover:bg-brand-dark"} disabled={Boolean(busy) || uploads > 0 || (!dirty && !reviewed)} onClick={() => void save()}>
               <Save size={16} />{uploads ? "جار رفع الصور…" : busy === "save" ? "جار الحفظ…" : "حفظ التغييرات"}
             </button>
           </div>
@@ -625,7 +621,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
       {proposal ? (
         <section className="space-y-3 rounded-xl border border-sky-200 bg-sky-50 p-4">
           <div className="flex justify-between">
-            <h2 className="font-bold">مراجعة الاقتراحات</h2>
+            <div><h2 className="font-bold">مراجعة الاقتراحات</h2><p className="mt-1 text-sm text-slate-600">راجع النص المقترح، ثم اضغط حفظ الترجمة أسفل اللغة لحفظه مباشرة. الإضافة إلى المسودة وحدها لا تحفظه في الموقع.</p></div>
             <button
               type="button"
               className={button}
@@ -702,6 +698,12 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
                   </button>
                 </article>
               ))}
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand/20 bg-white p-3">
+                <p className="text-xs text-slate-500">يحفظ النص المعروض وعلامة المراجعة، ثم يتحقق من النسخة المحفوظة. يتضمن الحفظ أي تعديلات أضفتها إلى المسودة.</p>
+                <button type="button" aria-label={`حفظ ${code === "ar" ? "النص العربي" : `ترجمة ${LOCALES[code as keyof typeof LOCALES]?.nativeLabel || code}`} بعد المراجعة`} disabled={Boolean(busy) || uploads > 0} className={button + " inline-flex items-center gap-2 border-brand bg-brand text-white hover:bg-brand-dark"} onClick={() => void save({ locale: code, values: item.values, action: proposal.action })}>
+                  <Save size={16} />{busy === "save" ? "جار الحفظ…" : code === "ar" ? "حفظ النص بعد المراجعة" : "حفظ الترجمة بعد المراجعة"}
+                </button>
+              </div>
             </div>
           ))}
         </section>

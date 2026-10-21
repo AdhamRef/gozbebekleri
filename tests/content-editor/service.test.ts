@@ -1,3 +1,4 @@
+import { prepareEditorSave } from "../../lib/content-editor/save-plan";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -856,4 +857,22 @@ test("legacy settings writes compare the version loaded with the form", async ()
   );
   assert.deepEqual(contentWriteWhere({ id }, {}), { id });
   assert.throws(() => contentWriteWhere({ id }, { expectedEditorVersion: 1 }));
+});
+
+ test("reviewed proposals saved from the Arabic tab persist per language and remain reviewed after readback", async () => {
+  const initial = {id, title:"المصدر", description:"وصف المشروع", goalType:"OPEN", currentAmount:125, translations:[], updates:[]};
+  const m = memory("campaigns", initial);
+  let doc = await approveArabicSource(m.store,{kind:"campaigns",id,revision:fingerprint(initial)});
+  for (const [locale,title] of [["fr","Titre relu"],["de","Geprüfter Titel"]]) {
+    const plan = prepareEditorSave("campaigns",doc.values,doc.values,"ar",false,{locale,values:{title,description:"Reviewed project description"},action:"translate"});
+    doc = await saveWorkspace(m.store,{kind:"campaigns",id,revision:doc.revision,...plan,editorialAction:"translate"});
+    const readback = documentFor("campaigns",m.read());
+    assert.equal(readback.values[locale].title,title);
+    assert.equal(readback.statuses[locale].reviewed,true);
+  }
+  const readback = documentFor("campaigns",m.read());
+  assert.equal(readback.statuses.fr.reviewed,true);
+  assert.equal(readback.statuses.de.reviewed,true);
+  assert.equal(readback.values.ar.title,initial.title);
+  assert.equal(m.read().currentAmount,125);
 });
