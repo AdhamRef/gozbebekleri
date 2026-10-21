@@ -252,7 +252,11 @@
     "categories": "Kampanyalar",
     "contactUs": "İletişim",
     "copyright": "© {year} Gözbebekleri. Tüm hakları saklıdır.",
-    "developedBy": "2026'da geliştirildi"
+    "developedBy": "2026'da geliştirildi",
+    "onlineDonate": "Online Bağış",
+    "privacyPolicy": "Gizlilik Politikası",
+    "termsOfUse": "Kullanım Şartları",
+    "location": "İstanbul, Türkiye"
   },
   "AboutUs": {
     "pageTitle": "Hakkımızda",

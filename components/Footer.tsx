@@ -30,7 +30,8 @@ const LOGO_URL = "logo-white.png";
 
 const Footer = () => {
   const t = useTranslations("Footer");
-  const locale = useLocale() as "ar" | "en" | "fr" | "tr";
+  const locale = useLocale();
+  const nav = useTranslations("Navbar");
   const { data: session } = useSession();
   const pathname = usePathname();
   const router = useRouter();
@@ -181,45 +182,14 @@ const Footer = () => {
     }
   };
 
-  const isTr = locale === "tr";
-  const isAr = locale === "ar";
-
-  // Built dynamically from the API — see useEffect above
-
   const quickLinks = [
-    {
-      label: isTr ? "Hakkımızda" : isAr ? "من نحن" : "About Us",
-      href: "/about-us",
-    },
-    {
-      label: isTr ? "Projeler" : isAr ? "المشاريع" : "Projects",
-      href: "/campaigns",
-    },
-    { label: isTr ? "Haberler" : isAr ? "الأخبار" : "News", href: "/blog" },
-    {
-      label: isTr ? "Faaliyetler" : isAr ? "الأنشطة" : "Activities",
-      href: "/campaigns",
-    },
-    {
-      label: isTr ? "İletişim" : isAr ? "اتصل بنا" : "Contact",
-      href: "/contact-us",
-    },
-    {
-      label: isTr
-        ? "Gizlilik Politikası"
-        : isAr
-          ? "سياسة الخصوصية"
-          : "Privacy Policy",
-      href: "/privacy",
-    },
-    {
-      label: isTr
-        ? "Kullanım Şartları"
-        : isAr
-          ? "شروط الاستخدام"
-          : "Terms of Use",
-      href: "/terms",
-    },
+    { label: nav("about"), href: "/about-us" },
+    { label: nav("projects"), href: "/campaigns" },
+    { label: nav("news"), href: "/blog" },
+    { label: nav("activities"), href: "/campaigns" },
+    { label: nav("contact"), href: "/contact-us" },
+    { label: t("privacyPolicy"), href: "/privacy" },
+    { label: t("termsOfUse"), href: "/terms" },
   ];
 
   const social = getSocialLinks(locale);
@@ -267,11 +237,7 @@ const Footer = () => {
           {/* ── Online Donate ── */}
           <div>
             <h4 className="text-xs font-bold uppercase tracking-widest mb-5 text-white/50 border-b border-white/10 pb-3">
-              {isTr
-                ? "Online Bağış"
-                : isAr
-                  ? "التبرع الإلكتروني"
-                  : "Online Donate"}
+              {t("onlineDonate")}
             </h4>
             <ul className="space-y-2.5">
               {categories.map((cat) => (
@@ -291,7 +257,7 @@ const Footer = () => {
           {/* ── Quick Links ── */}
           <div>
             <h4 className="text-xs font-bold uppercase tracking-widest mb-5 text-white/50 border-b border-white/10 pb-3">
-              {isTr ? "Bağlantılar" : isAr ? "روابط سريعة" : "Quick Links"}
+              {t("quickLinks")}
             </h4>
             <ul className="space-y-2.5">
               {quickLinks.map((item) => (
@@ -311,18 +277,14 @@ const Footer = () => {
           {/* ── Contact + Message ── */}
           <div className="sm:col-span-2 lg:col-span-1">
             <h4 className="text-xs font-bold uppercase tracking-widest mb-5 text-white/50 border-b border-white/10 pb-3">
-              {isTr ? "İletişim" : isAr ? "تواصل معنا" : "Contact"}
+              {t("contactUs")}
             </h4>
 
             {/* Contact info */}
             <ul className="space-y-3 mb-6">
               <li className="flex items-start gap-3 text-sm text-white/70">
                 <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0 text-[#FA5D17]" />
-                {isTr
-                  ? "İstanbul, Türkiye"
-                  : isAr
-                    ? "إسطنبول، تركيا"
-                    : "Istanbul, Turkey"}
+                {t("location")}
               </li>
               <li>
                 <a
@@ -350,6 +312,7 @@ const Footer = () => {
               className="flex flex-col gap-2"
             >
               <textarea
+                aria-label={t("messageLabel")}
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 placeholder={t("messagePlaceholder")}
