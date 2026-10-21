@@ -44,6 +44,7 @@ export default function WysiwygEditor({
 
   const editor = useEditor({
     editable: isEditable,
+    content: defaultValue,
     extensions: [...defaultExtensions, ...extensions],
     editorProps: {
       ...defaultEditorProps,

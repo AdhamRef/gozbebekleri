@@ -10,7 +10,6 @@ import {
   Heading1,
   Heading2,
   Heading3,
-  Highlighter,
   Image as ImageIcon,
   Italic as ItalicIcon,
   Link as LinkIcon,
@@ -338,9 +337,7 @@ export const EditorToolbar: FC<EditorToolbarProps> = ({ editor }) => {
         className="h-8 rounded border border-stone-200 bg-white px-1 text-xs text-stone-700"
         defaultValue=""
       >
-        <option value="">
-          <Highlighter className="inline h-3 w-3" />
-        </option>
+        <option value="">Highlight</option>
         {HIGHLIGHT_COLORS.map((c) => (
           <option key={c.name} value={c.value ?? ""}>
             {c.name}

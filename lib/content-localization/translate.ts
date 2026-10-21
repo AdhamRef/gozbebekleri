@@ -1,5 +1,6 @@
 import { SUPPORTED_LOCALES, isValidLocale, type SupportedLocale } from "@/lib/locales";
 import { missingProtectedTokens } from "./protected-tokens";
+import { editorialLanguagePolicy } from "./editorial-policy";
 
 /**
  * Machine translation for the dashboard forms  Arabic master copy in, one
@@ -171,6 +172,7 @@ async function askModel(userContent: string): Promise<Record<string, unknown>> {
 
 /** Translate one item into one locale. */
 export async function translateItem(input: TranslateInput, targetLocale: string): Promise<TranslateOutput> {
+  if ((input.sourceLocale && input.sourceLocale !== "ar") || targetLocale === "ar") throw new Error("العربية هي المصدر الوحيد للترجمة؛ اختر لغة مستهدفة أخرى");
   const target = LOCALE_ENGLISH_NAMES[targetLocale] ?? targetLocale;
   const source = LOCALE_ENGLISH_NAMES[input.sourceLocale ?? "ar"] ?? "Arabic";
 
@@ -206,6 +208,7 @@ export async function translateItem(input: TranslateInput, targetLocale: string)
   const parsed = await askModel(
     [
       `Translate from ${source} to ${target} (${targetLocale}).`,
+      editorialLanguagePolicy(targetLocale),
       input.itemLabel ? `Item type: ${input.itemLabel}.` : "",
       policyInstruction(policy),
       "Never translate Qur'anic Arabic text. If a source fragment is a Qur'anic verse, return it unchanged.",
@@ -269,6 +272,7 @@ export async function translateToLocales(
   locales: readonly string[],
   concurrency = 4
 ): Promise<{ translations: Record<string, TranslateOutput>; errors: Record<string, string> }> {
+  if(input.sourceLocale && input.sourceLocale !== "ar")throw new Error("العربية هي المصدر الوحيد للترجمة");
   const targets = locales.filter((l) => isValidLocale(l) && l !== (input.sourceLocale ?? "ar"));
   const translations: Record<string, TranslateOutput> = {};
   const errors: Record<string, string> = {};

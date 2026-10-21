@@ -5,6 +5,7 @@ import { LOCALES, SUPPORTED_LOCALES } from "@/lib/locales";
 import { CONFIG, type ContentKind } from "@/lib/content-editor/contracts";
 import { FillMissingSeo } from "./FillMissingSeo";
 type Status = {
+  needsUpdate?: boolean;
   complete: boolean;
   missing: string[];
   seoComplete: boolean;
@@ -186,7 +187,7 @@ export function TranslationOverview({
                         /{SUPPORTED_LOCALES.length - 1}
                       </td>
                       <td>
-                        {row.statuses[language]?.complete
+                        {row.statuses[language]?.needsUpdate ? "يحتاج تحديثًا من العربية" : row.statuses[language]?.complete
                           ? "مكتمل"
                           : `ناقص (${row.statuses[language]?.missing.length || 0})`}
                       </td>

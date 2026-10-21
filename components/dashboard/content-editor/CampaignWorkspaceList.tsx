@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { SUPPORTED_LOCALES } from "@/lib/locales";
 import { ContentLocalizationAuditCard } from "@/app/(dashboard)/dashboard/_components/ContentLocalizationAuditCard";
-type State = { complete: boolean; seoComplete: boolean; reviewed: boolean };
+type State = { complete: boolean; seoComplete: boolean; reviewed: boolean; needsUpdate?:boolean };
 type Row = {
   id: string;
   title: string;
@@ -692,8 +692,8 @@ export function CampaignWorkspaceList() {
                             (l) => (
                               <span
                                 key={l}
-                                title={`${l.toUpperCase()} · ${row.statuses[l]?.reviewed ? "مراجع" : row.statuses[l]?.complete ? "مكتمل" : "ناقص"}`}
-                                className={`h-1.5 w-1.5 rounded-full ${row.statuses[l]?.reviewed ? "bg-emerald-600" : row.statuses[l]?.complete ? "bg-amber-500" : "bg-slate-200"}`}
+                                title={`${l.toUpperCase()} · ${row.statuses[l]?.needsUpdate ? "يحتاج تحديثًا من العربية" : row.statuses[l]?.reviewed ? "مراجع" : row.statuses[l]?.complete ? "مكتمل" : "ناقص"}`}
+                                className={`h-1.5 w-1.5 rounded-full ${row.statuses[l]?.needsUpdate ? "bg-orange-600" : row.statuses[l]?.reviewed ? "bg-emerald-600" : row.statuses[l]?.complete ? "bg-amber-500" : "bg-slate-200"}`}
                               />
                             ),
                           )}

@@ -261,6 +261,7 @@ function statusForPath(pathname: string, detail: SaveEventDetail): SaveStatusSta
 
 export function DashboardAutoEnhancements() {
   const pathname = usePathname();
+  const unifiedEditor = /\/dashboard\/(?:content\/|campaigns\/edit\/|campaigns\/[^/]+\/seo|categories\/edit\/|blog\/create\/|super-categories\/edit\/|urgent-banners\/edit\/)/.test(pathname);
   const [mounted, setMounted] = useState(false);
   const [statusNode, setStatusNode] = useState<HTMLElement | null>(null);
   const [seoNode, setSeoNode] = useState<HTMLElement | null>(null);
@@ -271,11 +272,11 @@ export function DashboardAutoEnhancements() {
 
   // SEO workbench shows on both new + edit campaign pages. Placement is
   // controlled by the page's <div id="dashboard-project-seo-anchor" /> sentinel.
-  const isProjectForm =
+  const isProjectForm = !unifiedEditor && (
     pathname.includes("/dashboard/campaigns/edit/") ||
     pathname.endsWith("/dashboard/campaigns/new") ||
-    pathname.includes("/dashboard/campaigns/new/");
-  const hasTextImprover = Boolean(currentPageType(pathname));
+    pathname.includes("/dashboard/campaigns/new/"));
+  const hasTextImprover = !unifiedEditor && Boolean(currentPageType(pathname));
 
   // This component is mounted by the shell on all 151 dashboard routes, but everything it
   // does is only meaningful on the campaign/category/blog editors:

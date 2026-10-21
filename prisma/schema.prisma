@@ -9,6 +9,16 @@ datasource db {
 
 /* ===================== AUTH ===================== */
 
+model ContentEditorRevision {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  kind String
+  entityId String @db.ObjectId
+  revision String
+  values Json
+  createdAt DateTime @default(now())
+  @@index([kind, entityId, createdAt])
+}
+
 model Account {
   id                String  @id @default(auto()) @map("_id") @db.ObjectId
   userId            String  @db.ObjectId
@@ -275,6 +285,7 @@ model Category {
   achievementsTitle String?
   editorVersion String?
   editorReviews Json?
+  editorWorkflow Json?
   imageAlt String?
   metaTitle String?
   metaDescription String?
@@ -433,6 +444,7 @@ model Campaign {
   updatedAt     DateTime @updatedAt
   editorVersion String?
   editorReviews Json?
+  editorWorkflow Json?
   imageAlt String?
   seoTitle String?
   seoDescription String?
@@ -863,6 +875,7 @@ model Post {
   updatedAt DateTime @updatedAt
   editorVersion String?
   editorReviews Json?
+  editorWorkflow Json?
   imageAlt String?
   metaTitle String?
   metaDescription String?
@@ -2049,6 +2062,7 @@ model UrgentBanner {
   @@index([isActive, priority])
   editorVersion String?
   editorReviews Json?
+  editorWorkflow Json?
   imageAlt String?
 }
 
@@ -2124,6 +2138,7 @@ model SuperCategory {
   @@index([isActive, order])
   editorVersion String?
   editorReviews Json?
+  editorWorkflow Json?
   imageAlt String?
   seoKeyword String?
   ogTitle String?
