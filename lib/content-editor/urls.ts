@@ -21,6 +21,15 @@ export function localizeContentHref(url: string, locale: string): string {
   const known = new RegExp(`^/(${SUPPORTED_LOCALES.join("|")})(?=/|\\?|#|$)`);
   return `/${locale}${path.replace(known, "")}`;
 }
+export function istanbulScheduleInput(value: unknown): string {
+  if (!value) return "";
+  const raw = String(value);
+  // datetime-local drafts already represent Istanbul wall time. Reinterpreting
+  // them in the browser timezone shifts the time on every controlled render.
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(raw)) return raw;
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? "" : new Date(date.getTime() + 3 * 3600000).toISOString().slice(0,16);
+}
 export function parseIstanbulSchedule(value: unknown): Date | null {
   if (typeof value !== "string" || !value.trim()) return null;
   const raw = value.trim();

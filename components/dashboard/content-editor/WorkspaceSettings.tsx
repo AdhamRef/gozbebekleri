@@ -5,6 +5,7 @@ import { CategoryIconPicker } from "@/components/dashboard/CategoryIconPicker";
 import { BANNER_PAGES } from "@/lib/minbar/banner-placements";
 import { LOCALES, SUPPORTED_LOCALES } from "@/lib/locales";
 import { settingsFields } from "@/lib/content-editor/workspace";
+import { istanbulScheduleInput } from "@/lib/content-editor/urls";
 import type {
   ContentKind,
   ContentRecord,
@@ -60,12 +61,6 @@ export function useEditorCatalog(kind: ContentKind) {
 }
 const inputClass =
   "w-full rounded-lg border bg-white p-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/10";
-function istanbulInput(value: unknown) {
-  if (!value) return "";
-  const d = new Date(String(value));
-  if (Number.isNaN(d.getTime())) return "";
-  return new Date(d.getTime() + 3 * 3600000).toISOString().slice(0, 16);
-}
 export function WorkspaceSettings({
   kind,
   section,
@@ -381,7 +376,7 @@ export function WorkspaceSettings({
                   }
                   value={
                     f.type === "date"
-                      ? istanbulInput(value)
+                      ? istanbulScheduleInput(value)
                       : Array.isArray(value)
                         ? value.join(", ")
                         : String(value ?? "")
