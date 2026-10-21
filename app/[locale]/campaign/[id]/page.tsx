@@ -22,6 +22,7 @@ import {
   buildLocalizedAlternates,
 } from "@/lib/seo";
 import type { Locale } from "@/lib/seo";
+import { seoPlainText } from "@/lib/content-editor/seo-fill";
 import {
   buildSeoFallback,
   compactSeoFields,
@@ -137,8 +138,9 @@ async function generateBaseMetadata({ params }: Props): Promise<Metadata> {
 
   const t = pickTranslation(campaign.translations, locale);
   const localeTitle = t?.title || campaign.title || seo.campaigns.title;
-  const localeDescription =
-    t?.description || campaign.description || seo.campaigns.description;
+  const localeDescription = seoPlainText(
+    t?.description || campaign.description || seo.campaigns.description,
+  );
   const localeImage =
     (t as { image?: string | null } | undefined)?.image ||
     campaign.images?.[0] ||
@@ -165,7 +167,7 @@ async function generateBaseMetadata({ params }: Props): Promise<Metadata> {
     localeImage,
     campaignFields: storedSeo.campaignSeo,
     campaignTitle: campaign.title,
-    campaignDescription: campaign.description,
+    campaignDescription: seoPlainText(campaign.description || ""),
     campaignImage: campaign.images?.[0] || `${SITE_URL}/og-image.jpg`,
   });
 
@@ -210,7 +212,7 @@ async function generateBaseMetadata({ params }: Props): Promise<Metadata> {
   const fullOgTitle = `${prefix}${ogTitle} | ${seo.siteName}`;
 
   return {
-    title: fullTitle,
+    title: { absolute: fullTitle },
     description,
     keywords: seo.keywords,
     alternates,
