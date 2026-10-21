@@ -1,0 +1,34 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false
+  },
+  "include": [
+    "next-env.d.ts",
+    "types/**/*.d.ts",
+    "app/(dashboard)/dashboard/marketing/attribution/page.tsx",
+    "app/(dashboard)/dashboard/marketing/tracking/page.tsx",
+    "app/(dashboard)/dashboard/platform-connections/tracking/page.tsx",
+    "app/(dashboard)/dashboard/platform-connections/health/page.tsx",
+    "app/(dashboard)/dashboard/marketing/attribution/_components/CampaignLinksPanel.tsx",
+    "app/(dashboard)/dashboard/marketing/attribution/_components/TrackingLinkBuilder.tsx",
+    "app/(dashboard)/dashboard/marketing/tracking/_components/ConversionEventsPanel.tsx",
+    "app/(dashboard)/dashboard/platform-connections/tracking/_components/TrackingSettingsManager.tsx",
+    "app/(dashboard)/dashboard/platform-connections/_components/ui.tsx",
+    "app/(dashboard)/dashboard/platform-connections/health/_components/RecheckConnectionsButton.tsx",
+    "app/api/admin/conversion-events/route.ts",
+    "app/api/admin/conversion-events/retry/route.ts",
+    "app/api/admin/tracking/route.ts",
+    "app/api/admin/tracking/test/route.ts",
+    "app/api/admin/tracking/diagnostics/route.ts",
+    "app/api/admin/marketing-intelligence/campaign-links/export/route.ts",
+    "app/api/admin/marketing-intelligence/campaign-links/route.ts",
+    "lib/marketing/campaign-links/campaign-link-performance-service.ts",
+    "lib/platform-connections/readiness.ts",
+    "app/(dashboard)/dashboard/pixels/page.tsx",
+    "app/(dashboard)/dashboard/conversion-events/page.tsx",
+    "app/(dashboard)/dashboard/link-generator/page.tsx",
+    "lib/platform-connections/health-state.ts"
+  ]
+}

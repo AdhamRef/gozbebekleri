@@ -1,4 +1,5 @@
-import { PAID_DONATION_FILTER, donationRowUsdApprox } from "@/lib/dashboard/donation-usd-revenue";
+import { donationUsdAmount } from "@/lib/templates/money";
+import { PAID_DONATION_FILTER } from "@/lib/dashboard/donation-usd-revenue";
 import { prisma } from "@/lib/prisma";
 import {
   listCampaignLinks,
@@ -359,9 +360,9 @@ export async function buildCampaignLinkPerformanceReport(query: CampaignLinkPerf
   const [links, donations] = await Promise.all([
     listCampaignLinks({ limit: query.limit, platform, status: query.status }),
     prisma.donation.findMany({
-      where: { createdAt: { gte: from, lte: to }, ...PAID_DONATION_FILTER },
+      where: { AND: [PAID_DONATION_FILTER, { paidAt: { gte: from, lte: to } }] },
       select: { id: true, amount: true, amountUSD: true, currency: true, createdAt: true, paidAt: true, conversionEventsSentAt: true, attribution: true },
-      orderBy: { createdAt: "desc" },
+      orderBy: { paidAt: "desc" },
       take: 5000,
     }),
   ]);
@@ -370,12 +371,13 @@ export async function buildCampaignLinkPerformanceReport(query: CampaignLinkPerf
     const id = link.id || `${link.platform || "UNKNOWN"}:${link.campaignId || link.utmCampaign || link.url || "link"}`;
     let donationsCount = 0;
     let revenue = 0;
+    let missingCurrencyConversions = 0;
     let strongMatches = 0;
     let mediumMatches = 0;
     let weakMatches = 0;
     let matchedDonationsMissingConversions = 0;
     const matchReasons = new Map<string, number>();
-    const sampleDonations: Array<{ id: string; revenue: number; score: number; quality: string; reasons: string[]; createdAt: string; conversionEventsSentAt: string | null }> = [];
+    const sampleDonations: Array<{ id: string; revenue: number | null; score: number; quality: string; reasons: string[]; createdAt: string; conversionEventsSentAt: string | null }> = [];
     const matchedDonationIds: string[] = [];
     const clickIdDonationIds: string[] = [];
 
@@ -383,9 +385,10 @@ export async function buildCampaignLinkPerformanceReport(query: CampaignLinkPerf
       for (const donation of donations) {
         const match = scoreMatch(link, donation.attribution);
         if (match.score < 2) continue;
-        const value = donationRowUsdApprox(donation);
+        const value = donationUsdAmount(donation);
         donationsCount += 1;
-        revenue += value;
+        if (value === null) missingCurrencyConversions += 1;
+        else revenue += value;
         matchedDonationIds.push(donation.id);
         if (hasClickId(donation.attribution)) clickIdDonationIds.push(donation.id);
         const quality = qualityFromScore(match.score);
@@ -453,7 +456,9 @@ export async function buildCampaignLinkPerformanceReport(query: CampaignLinkPerf
       performance: {
         donations: donationsCount,
         revenue,
-        averageDonation: donationsCount > 0 ? revenue / donationsCount : 0,
+        missingCurrencyConversions,
+        revenueComplete: missingCurrencyConversions === 0,
+        averageDonation: donationsCount > missingCurrencyConversions ? revenue / (donationsCount - missingCurrencyConversions) : null,
         matchQuality: { strong: strongMatches, medium: mediumMatches, weak: weakMatches },
         matchReasons: Object.fromEntries([...matchReasons.entries()].sort((a, b) => b[1] - a[1])),
       },
@@ -503,7 +508,7 @@ export async function buildCampaignLinkPerformanceReport(query: CampaignLinkPerf
 
   return {
     ok: true,
-    range: { from: dateKey(from), to: dateKey(to), days: query.days, dateBasis: "createdAt" },
+    range: { from: dateKey(from), to: dateKey(to), days: query.days, dateBasis: "paidAt" },
     status: query.status,
     links: visibleRows,
     summary: {
@@ -513,6 +518,9 @@ export async function buildCampaignLinkPerformanceReport(query: CampaignLinkPerf
       deletedLinks: visibleRows.filter((row) => row.status === "DELETED").length,
       linksWithDonations: visibleRows.filter((row) => row.performance.donations > 0).length,
       donationsConsidered: donations.length,
+      donationReadLimit: 5000,
+      donationReadLimitReached: donations.length === 5000,
+      missingCurrencyConversions: visibleRows.reduce((sum, row) => sum + row.performance.missingCurrencyConversions, 0),
       revenueMatched: visibleRows.reduce((sum, row) => sum + row.performance.revenue, 0),
       linksWithMissingConversions: visibleRows.filter((row) => row.intelligence.conversionGaps.matchedDonationsMissingConversions > 0).length,
       highPriorityActions: visibleRows.reduce((sum, row) => sum + row.intelligence.actionQueue.filter((item) => item.priority === "HIGH").length, 0),

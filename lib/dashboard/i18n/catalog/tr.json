@@ -6664,5 +6664,10 @@
  "تعذر فك تشفير قيم محفوظة. تحقق من مفتاح تشفير الإعدادات.": "Kayıtlı değerlerin şifresi çözülemedi. Ayarların şifreleme anahtarını kontrol edin.",
  "{0} متر وقف": "{0} metre vakıf",
  "{0} سهم وقف": "{0} vakıf hissesi",
- "أسطر الوقف جزء من قيمة التبرع ولا تُعدَّل من هنا.": "Vakıf satırları bağış tutarının parçasıdır ve buradan düzenlenemez."
+ "أسطر الوقف جزء من قيمة التبرع ولا تُعدَّل من هنا.": "Vakıf satırları bağış tutarının parçasıdır ve buradan düzenlenemez.",
+ "إجمالي جزئي: بعض التبرعات بلا قيمة دولار مسجلة": "Kısmi toplam: bazı bağışların kayıtlı USD değeri yok",
+ "جزئي: {0} تبرعات بلا تحويل مسجل": "Kısmi: {0} bağışın kayıtlı kur dönüşümü yok",
+ "الأحداث المطابقة ضمن السجلات المقروءة: {0}": "Okunan kayıtlardaki eşleşen olaylar: {0}",
+ "— النتائج محدودة؛ ضيّق الفترة أو أضف فلترًا": "— Sonuçlar sınırlı; tarih aralığını daraltın veya filtre ekleyin",
+ "فشل تحميل إعدادات التتبع. أعد التحميل قبل التعديل أو الاختبار.": "Takip ayarları yüklenemedi. Düzenlemeden veya test etmeden önce yeniden yükleyin."
 }

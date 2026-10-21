@@ -6664,5 +6664,10 @@
  "تعذر فك تشفير قيم محفوظة. تحقق من مفتاح تشفير الإعدادات.": "Could not decrypt saved values. Check the settings encryption key.",
  "{0} متر وقف": "{0} waqf metre(s)",
  "{0} سهم وقف": "{0} waqf share(s)",
- "أسطر الوقف جزء من قيمة التبرع ولا تُعدَّل من هنا.": "Waqf lines are part of the donation amount and cannot be edited here."
+ "أسطر الوقف جزء من قيمة التبرع ولا تُعدَّل من هنا.": "Waqf lines are part of the donation amount and cannot be edited here.",
+ "إجمالي جزئي: بعض التبرعات بلا قيمة دولار مسجلة": "Partial total: some donations have no stored USD value",
+ "جزئي: {0} تبرعات بلا تحويل مسجل": "Partial: {0} donations have no stored conversion",
+ "الأحداث المطابقة ضمن السجلات المقروءة: {0}": "Matching events within the records read: {0}",
+ "— النتائج محدودة؛ ضيّق الفترة أو أضف فلترًا": "— Limited results; narrow the date range or add a filter",
+ "فشل تحميل إعدادات التتبع. أعد التحميل قبل التعديل أو الاختبار.": "Tracking settings could not be loaded. Reload before editing or testing."
 }

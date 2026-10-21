@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
+import { rawCommand } from "@/lib/prisma-raw-command";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
+import { getRawTrackingSettings, TRACKING_SETTINGS_COLLECTION } from "@/lib/tracking/tracking-settings";
 import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 
-const COLLECTION = "TrackingSettings";
 
 const PLAIN_FIELDS = [
   "facebookPixelId",
@@ -85,18 +86,6 @@ function sanitizeScalar(value: unknown): string | boolean | null {
     return trimmed.length ? trimmed : null;
   }
   return null;
-}
-
-async function getRawTrackingSettings(): Promise<TrackingRaw | null> {
-  const result = await prisma.$runCommandRaw({
-    find: COLLECTION,
-    limit: 1,
-    sort: { createdAt: 1 },
-  });
-  const batch = isPlainObject(result) && isPlainObject(result.cursor) && Array.isArray(result.cursor.firstBatch)
-    ? result.cursor.firstBatch
-    : [];
-  return (batch[0] as TrackingRaw | undefined) ?? null;
 }
 
 function serializeSettings(raw: TrackingRaw | null) {
@@ -186,7 +175,7 @@ async function persistRawSettings(update: { $set: Record<string, unknown>; $unse
 
   if (id) {
     const command: Record<string, unknown> = {
-      update: COLLECTION,
+      update: TRACKING_SETTINGS_COLLECTION,
       updates: [
         {
           q: { _id: { $oid: id } },
@@ -198,7 +187,7 @@ async function persistRawSettings(update: { $set: Record<string, unknown>; $unse
         },
       ],
     };
-    await prisma.$runCommandRaw(command);
+    await prisma.$runCommandRaw(rawCommand(command));
     return getRawTrackingSettings();
   }
 
@@ -208,14 +197,14 @@ async function persistRawSettings(update: { $set: Record<string, unknown>; $unse
     updatedAt: now,
     metaDonateEventName: update.$set.metaDonateEventName ?? "Donate",
   };
-  await prisma.$runCommandRaw({ insert: COLLECTION, documents: [insertDoc] });
+  await prisma.$runCommandRaw(rawCommand({ insert: TRACKING_SETTINGS_COLLECTION, documents: [insertDoc] }));
   return getRawTrackingSettings();
 }
 
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    const denied = requireAdminOrDashboardPermission(session, "pixels");
+    const denied = requireAdminOrDashboardPermission(session, "platformConnections");
     if (denied) return denied;
 
     const settings = await getRawTrackingSettings();
@@ -229,7 +218,7 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const denied = requireAdminOrDashboardPermission(session, "pixels");
+    const denied = requireAdminOrDashboardPermission(session, "platformConnectionsManage");
     if (denied) return denied;
 
     const bodyRaw = await request.json().catch(() => null);
@@ -260,6 +249,19 @@ export async function PUT(request: NextRequest) {
       metadata: {
         changedFields: update.changedFields,
         secretFieldsChanged: update.secretFieldsChanged,
+        // Before/after for the non-secret fields (pixel ids, tag ids, event names), so a
+        // wrong pixel can be traced and reverted. Secrets are never written to the log.
+        plainChanges: Object.fromEntries(
+          update.changedFields
+            .filter((f) => (PLAIN_FIELDS as readonly string[]).includes(f))
+            .map((f) => [
+              f,
+              {
+                before: (existing as Record<string, unknown> | null)?.[f] ?? null,
+                after: (saved as Record<string, unknown> | null)?.[f] ?? null,
+              },
+            ])
+        ),
       },
     });
 
