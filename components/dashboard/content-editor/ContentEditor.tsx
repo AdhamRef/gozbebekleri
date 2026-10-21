@@ -928,13 +928,13 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
       </div>
       {languageReview ? (
         <EditorModal
-          title="اللغات والمراجعة"
+          title="إدارة الترجمات"
           onClose={() => setLanguageReview(false)}
         >
           <section className="max-h-[85vh] w-full max-w-5xl overflow-auto rounded-2xl bg-white p-6">
             <div className="mb-5 flex items-center justify-between">
               <h2 id="language-review-heading" className="text-xl font-bold">
-                اللغات والمراجعة
+                إدارة الترجمات
               </h2>
               <button
                 type="button"
@@ -946,70 +946,31 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
             </div>
             <div className="mb-5 space-y-3 rounded-xl border bg-slate-50 p-4">
               <h3 className="font-semibold">ترجم من العربية إلى بقية اللغات</h3>
-              <p className="text-sm text-slate-500">{dirty ? "احفظ تعديلاتك أولًا، ثم استكمل الترجمة." : !document.workflow.arabicApproved ? "المصدر العربي يحتاج اعتمادًا قبل الترجمة. راجعه في أدوات تحسين النص." : "المصدر العربي معتمد. يمكنك استكمال الترجمات الناقصة أو تعديل أي لغة من الجدول."}</p>
+              <p className="text-sm text-slate-500">{dirty ? "احفظ تعديلاتك أولًا، ثم استكمل الترجمة." : !document.workflow.arabicApproved ? "المصدر العربي يحتاج اعتمادًا قبل الترجمة. راجعه في أدوات تحسين النص." : "المصدر العربي معتمد. يمكنك استكمال الترجمات الناقصة أو تعديل أي لغة من القائمة أدناه."}</p>
               <div className="flex flex-wrap gap-2">
                 <button type="button" className={button + " border-brand bg-brand text-white hover:bg-brand-dark"} disabled={Boolean(busy) || dirty || !document.workflow.arabicApproved} onClick={() => { setLanguageReview(false); void suggest("translate", true); }}>استكمال الترجمات الناقصة</button>
                 {!document.workflow.arabicApproved ? <button type="button" className={button + " bg-white"} disabled={Boolean(busy)} onClick={() => { setLocale("ar"); setReviewed(false); setToolsOpen(true); setLanguageReview(false); }}>مراجعة واعتماد العربية</button> : null}
               </div>
             </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-start">
-                  <th className="p-3 text-start">اللغة</th>
-                  <th>المحتوى</th>
-                  <th>البحث والمشاركة</th>
-                  <th>المراجعة</th>
-                  <th>التعديل</th>
-                </tr>
-              </thead>
-              <tbody>
-                {SUPPORTED_LOCALES.map((code) => {
-                  const s = document.statuses[code];
-                  return (
-                    <tr key={code} className="border-b">
-                      <td className="p-3">{LOCALES[code].nativeLabel}</td>
-                      <td className="text-center">
-                        {s.complete ? "مكتمل" : "ناقص"}
-                      </td>
-                      <td className="text-center">
-                        {s.seoComplete ? "متاح" : "غير مكتمل"}
-                      </td>
-                      <td className="text-center">
-                        {s.reviewed ? "مراجع" : "مسودة"}
-                      </td>
-                      <td className="text-center">
-                        <button
-                          type="button"
-                          className="p-2 text-brand"
-                          onClick={() => {
-                            setLocale(code);
-                            setReviewed(false);
-                            setSection("content");
-                            setLanguageReview(false);
-                          }}
-                        >
-                          النص
-                        </button>
-                        {!isBanner ? (
-                          <button
-                            type="button"
-                            className="p-2 text-brand"
-                            onClick={() => {
-                              setLocale(code);
-                              setReviewed(false);
-                              setSection("seo");
-                              setLanguageReview(false);
-                            }}
-                          >
-                            SEO
-                          </button>
-                        ) : null}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <ul className="space-y-2" aria-label="حالة لغات المحتوى">
+              {SUPPORTED_LOCALES.map(code => {
+                const state = document.statuses[code];
+                return <li key={code} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{LOCALES[code].nativeLabel}</h3>{code === "ar" ? <span className="rounded-full bg-brand/5 px-2 py-1 text-[10px] text-brand">المصدر الرئيسي</span> : null}</div>
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                      <span className={state.needsUpdate ? "text-amber-700" : state.complete ? "text-emerald-700" : "text-slate-500"}>{state.needsUpdate ? "تحتاج تحديثًا من العربية" : state.complete ? "النص مكتمل" : "النص يحتاج استكمالًا"}</span>
+                      <span className="text-slate-500">{state.seoComplete ? "SEO مكتمل" : "SEO غير مكتمل"}</span>
+                      <span className="text-slate-500">{state.reviewed ? "تمت المراجعة" : "لم تُراجع بعد"}</span>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button type="button" disabled={Boolean(busy)} aria-label={`تحرير نص ${LOCALES[code].nativeLabel}`} className={button + " bg-white text-brand"} onClick={() => { setLocale(code); setReviewed(false); setSection("content"); setLanguageReview(false); }}>تحرير النص</button>
+                    {!isBanner ? <button type="button" disabled={Boolean(busy)} aria-label={`إعدادات SEO ${LOCALES[code].nativeLabel}`} className={button + " bg-white"} onClick={() => { setLocale(code); setReviewed(false); setSection("seo"); setLanguageReview(false); }}>SEO</button> : null}
+                  </div>
+                </li>;
+              })}
+            </ul>
           </section>
         </EditorModal>
       ) : null}
