@@ -1,3 +1,6 @@
+import { deleteContentSafely } from "@/lib/content-editor/deletion";
+import { contentStore } from "@/lib/content-editor/store";
+import { ContentError } from "@/lib/content-editor/service";
 import { contentWriteWhere, contentVersionPatch, isContentWriteConflict } from "@/lib/content-editor/legacy-write";
 // app/api/campaigns/[id]/route.ts
 // Campaign detail endpoint with GET and PUT operations
@@ -804,17 +807,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
     const id = camp.id;
 
-    // Both writes in one batch transaction: previously they were two separate
-    // awaited round trips, so a failure on the second left the campaign flagged
-    // deleted while stale carts still held it. The array form is a single
-    // batched call — atomic and half the latency of the sequential pair.
-    await prisma.$transaction([
-      prisma.campaign.update({
-        where: { id },
-        data: { isDeleted: true, isActive: false },
-      }),
-      prisma.cartItem.deleteMany({ where: { campaignId: id } }),
-    ]);
+    const deletionInput=await request.json().catch(()=>({}));
+    await deleteContentSafely(contentStore,{kind:"campaigns",id:id,confirmation:String(deletionInput.confirmation || ""),revision:typeof deletionInput.revision === "string" ? deletionInput.revision : undefined});
 
     const actor = session!.user;
     queueAuditLog({
@@ -832,6 +826,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       { status: 200, headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
+    if(error instanceof ContentError)return NextResponse.json({error:error.message},{status:error.status});
     console.error('Error soft-deleting campaign:', error);
     return NextResponse.json({ error: writeErrorMessage(error, 'تعذّر حذف المشروع') }, { status: 500 });
   }

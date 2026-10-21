@@ -1,3 +1,6 @@
+import { deleteContentSafely } from "@/lib/content-editor/deletion";
+import { contentStore } from "@/lib/content-editor/store";
+import { ContentError } from "@/lib/content-editor/service";
 import {
   contentWriteWhere,
   contentVersionPatch,
@@ -389,7 +392,8 @@ export async function DELETE(
       );
     }
 
-    await prisma.category.delete({ where: { id } });
+    const deletionInput=await request.json().catch(()=>({}));
+    await deleteContentSafely(contentStore,{kind:"categories",id:id,confirmation:String(deletionInput.confirmation || ""),revision:typeof deletionInput.revision === "string" ? deletionInput.revision : undefined});
 
     const actor = auditActorFromDashboardSession(session!);
     await writeAuditLog({
@@ -405,6 +409,7 @@ export async function DELETE(
       { status: 200 },
     );
   } catch (error) {
+    if(error instanceof ContentError)return NextResponse.json({error:error.message},{status:error.status});
     console.error("Error deleting category:", error);
     return NextResponse.json(
       { error: "Failed to delete category" },

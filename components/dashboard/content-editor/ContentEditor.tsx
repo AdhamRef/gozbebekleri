@@ -1,4 +1,5 @@
 "use client";
+import { DeleteContentDialog } from "./DeleteContentDialog";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -126,6 +127,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
   const [section, setSection] = useState("content");
   const [settingsDraft, setSettingsDraft] = useState<ContentRecord>({});
   const [languageReview, setLanguageReview] = useState(false);
+  const [deleteOpen,setDeleteOpen]=useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [selectFields, setSelectFields] = useState(false);
@@ -557,6 +559,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
       dir="rtl"
       className="mx-auto max-w-[1500px] space-y-6 pb-12 text-slate-800"
     >
+      {deleteOpen ? <DeleteContentDialog kind={kind} id={id} onClose={()=>setDeleteOpen(false)} onDeleted={()=>{ window.location.assign(`/dashboard/${kind}`); }} /> : null}
       <div className="sticky top-16 z-10 -mx-1 rounded-2xl border border-slate-200 bg-white/95 px-4 shadow-sm backdrop-blur sm:px-6">
         <header className="flex flex-col gap-3 border-b border-slate-100 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 w-full flex-1">
@@ -580,6 +583,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
               <DropdownMenuContent align="end" className="min-w-56">
                 <DropdownMenuItem disabled={Boolean(busy) || dirty} onSelect={loadHistory}>النسخ السابقة والاسترجاع</DropdownMenuItem>
                 <DropdownMenuItem disabled={!dirty || Boolean(busy) || uploads > 0} onSelect={resetDraft}>إلغاء التعديلات غير المحفوظة</DropdownMenuItem>
+                {["campaigns","categories","blog"].includes(kind) ? <DropdownMenuItem className="text-red-600" disabled={Boolean(busy)||dirty||uploads>0} onSelect={()=>setDeleteOpen(true)}>حذف المحتوى…</DropdownMenuItem> : null}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem disabled={Boolean(busy) || uploads > 0} onSelect={() => { if (!dirty || window.confirm("تحميل النسخة المحفوظة وإلغاء تعديلات المسودة؟")) void initialLoad(); }}>تحميل النسخة المحفوظة</DropdownMenuItem>
               </DropdownMenuContent>
@@ -621,7 +625,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
       {proposal ? (
         <section className="space-y-3 rounded-xl border border-sky-200 bg-sky-50 p-4">
           <div className="flex justify-between">
-            <div><h2 className="font-bold">مراجعة الاقتراحات</h2><p className="mt-1 text-sm text-slate-600">راجع النص المقترح، ثم اضغط حفظ الترجمة أسفل اللغة لحفظه مباشرة. الإضافة إلى المسودة وحدها لا تحفظه في الموقع.</p></div>
+            <div><h2 className="font-bold">مراجعة الاقتراحات</h2><p className="mt-1 text-sm text-slate-600">راجع النص المقترح، ثم اضغط زر الحفظ أسفل اللغة لحفظه مباشرة. الإضافة إلى المسودة وحدها لا تحفظه في الموقع.</p></div>
             <button
               type="button"
               className={button}
@@ -838,6 +842,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
           ) : null}
           {section === "seo" ? (
             <SeoWorkspace
+              onNavigateField={key=>{setSection("content");requestAnimationFrame(()=>{const element=window.document.getElementById(`content-${locale}-${key}`);element?.scrollIntoView({block:"center",behavior:"smooth"});element?.focus();});}}
               onUploadingChange={onUploadingChange}
               values={current}
               fields={document.fields}

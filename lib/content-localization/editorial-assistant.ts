@@ -36,9 +36,9 @@ const layout = layouts.get(index); if (!layout) { formatted.push(node); return; 
   });
   return JSON.stringify({ ...doc, content: formatted });
 }
-export async function reviewTranslationNotes(input: { locale: string; arabic: TextValues; current: TextValues; fields: ContentField[] }): Promise<string[]> {
+export async function reviewTranslationNotes(input: { locale: string; arabic: TextValues; current: TextValues; fields: ContentField[] }, signal=AbortSignal.timeout(90000)): Promise<string[]> {
   const context = input.fields.filter(f => !f.locked && f.group === "content" && hasText(input.arabic[f.key])).map(f => ({ field: f.label, arabic: seoPlainText(input.arabic[f.key]), current: seoPlainText(input.current[f.key] || "") }));
-  const result = await model({ locale: input.locale, fields: context }, editorialLanguagePolicy(input.locale) + '\nCompare the existing target translation against Arabic. Identify mistranslations, missing/added facts, wrong numbers, terminology inconsistencies and unnatural literal grammar. Return {"issues":["short specific explanations in Arabic"]}. An empty array means no correction was identified. These are editorial observations, not external fact verification.', AbortSignal.timeout(90000));
+  const result = await model({ locale: input.locale, fields: context }, editorialLanguagePolicy(input.locale) + '\nCompare the existing target translation against Arabic. Identify mistranslations, missing/added facts, wrong numbers, terminology inconsistencies and unnatural literal grammar. Return {"issues":["short specific explanations in Arabic"]}. An empty array means no correction was identified. These are editorial observations, not external fact verification.', signal);
   if (!Array.isArray(result.issues) || result.issues.some(v => typeof v !== "string")) throw new Error("تعذر استكمال مراجعة الترجمة");
   return (result.issues as string[]).slice(0, 20).map(v => v.slice(0, 1000));
 }
@@ -46,7 +46,7 @@ export async function suggestEditorial(input: { action: EditorialAction; locale:
   const { action, locale, fields, values, arabic } = input;
   if (action === "proofread" && locale !== "ar") throw new Error("التدقيق العربي متاح في تبويب العربية فقط");
   const output: TextValues = {}, warnings: string[] = [], signal = AbortSignal.timeout(100000);
-  const instruction = editorialLanguagePolicy(locale) + "\n" + ({ proofread: "Proofread spelling, grammar, agreement, punctuation and clarity. Do not expand content or change tone unnecessarily.", improve: "Improve coherence, clarity, professional register and beneficiary/impact explanation only where supplied. Remove repetition; preserve every fact and qualifying condition. Do not invent a CTA benefit.", format: "", "content-seo": "Improve the actual body for readability and search intent, coherent introduction, natural terminology and clear CTA where supported. Use a supplied keyword naturally, never stuff keywords or invent search volumes. Preserve all factual content.", "review-translation": "Review the target copy against its Arabic source, correcting mistranslation and awkward literal phrasing. Arabic alone is authoritative. Produce a complete professional corrected copy." }[action]);
+  const instruction = editorialLanguagePolicy(locale) + "\n" + ({ prepare: "Run a complete editorial pass: correct spelling, grammar, punctuation and agreement; improve coherent introduction, native professional terminology, paragraph transitions, clarity and search intent. Preserve every source fact and qualifying condition; use only supplied keywords naturally. Do not expand thin content with imagined details. A separate structural formatting pass will follow for rich fields.", proofread: "Proofread spelling, grammar, agreement, punctuation and clarity. Do not expand content or change tone unnecessarily.", improve: "Improve coherence, clarity, professional register and beneficiary/impact explanation only where supplied. Remove repetition; preserve every fact and qualifying condition. Do not invent a CTA benefit.", format: "", "content-seo": "Improve the actual body for readability and search intent, coherent introduction, natural terminology and clear CTA where supported. Use a supplied keyword naturally, never stuff keywords or invent search volumes. Preserve all factual content.", "review-translation": "Review the target copy against its Arabic source, correcting mistranslation and awkward literal phrasing. Arabic alone is authoritative. Produce a complete professional corrected copy." }[action]);
   for (const field of fields) {
     if (field.locked || field.group !== "content" || !hasText(values[field.key])) continue;
     try {
@@ -62,7 +62,7 @@ const answer = await model({ locale, field: field.label, keyword: input.keyword 
       if (missingProtectedTokens(source, result, { sourceLocale: locale, targetLocale: locale }).length) throw new Error("تغيّرت أرقام أو روابط أو نصوص محمية؛ رُفض الاقتراح");
       if (missingProtectedTokens(result, source, { sourceLocale: locale, targetLocale: locale }).length) throw new Error("أُضيفت أرقام أو روابط أو نصوص محمية غير موجودة؛ رُفض الاقتراح");
       if (locale !== "ar" && missingProtectedTokens(seoPlainText(arabic[field.key] || ""), result, { sourceLocale: "ar", targetLocale: locale }).length) throw new Error("القيم لا تطابق المصدر العربي؛ راجع الترجمة أولًا");
-      if (doc) { nodes.forEach((node, index) => { node.text = changed[index]; }); output[field.key] = JSON.stringify(doc); } else output[field.key] = changed[0];
+      if (doc) { nodes.forEach((node, index) => { node.text = changed[index]; }); const edited=JSON.stringify(doc); output[field.key] = action === "prepare" ? await formatRichContent(edited,locale,signal) : edited; } else output[field.key] = changed[0];
     } catch (error) { warnings.push(`${field.label}: ${error instanceof Error ? error.message : "تعذر إعداد الاقتراح"}`); }
   }
   return { values: output, warnings };

@@ -1,3 +1,4 @@
+import { deleteContentSafely } from "@/lib/content-editor/deletion";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
@@ -139,4 +140,17 @@ export async function PUT(request: NextRequest, ctx: Context) {
   } catch (error) {
     return failure(error);
   }
+}
+
+export async function DELETE(request:NextRequest,ctx:Context) {
+  try {
+    const {kind,id,denied,session}=await access(ctx);
+    if(denied)return denied;
+    const body=await request.json();
+    if(typeof body.revision!=="string")throw new ContentError("أعد فتح نافذة الحذف قبل التأكيد");
+    const result=await deleteContentSafely(contentStore,{kind,id,revision:body.revision,confirmation:String(body.confirmation || "")});
+    queueAuditLog({...auditActorFromDashboardSession(session!),action:"CONTENT_EDITOR_DELETE",entityType:CONFIG[kind].model,entityId:id,messageAr:`حذف المحتوى بعد تأكيد الاسم: ${result.title}`});
+    revalidatePath("/","layout");
+    return NextResponse.json(result,{headers:{"Cache-Control":"no-store"}});
+  }catch(error){return failure(error);}
 }

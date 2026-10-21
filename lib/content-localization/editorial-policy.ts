@@ -1,7 +1,7 @@
-export const EDITORIAL_ACTIONS = ["proofread", "improve", "format", "content-seo", "review-translation"] as const;
+export const EDITORIAL_ACTIONS = ["prepare", "proofread", "improve", "format", "content-seo", "review-translation"] as const;
 export type EditorialAction = typeof EDITORIAL_ACTIONS[number];
 export const EDITORIAL_LABELS: Record<EditorialAction, string> = {
-  proofread: "تدقيق العربية", improve: "تحسين المحتوى", format: "تنسيق المحتوى", "content-seo": "تحسين المحتوى لـ SEO", "review-translation": "مراجعة الترجمة",
+  prepare: "تهيئة شاملة للنشر", proofread: "تدقيق العربية", improve: "تحسين المحتوى", format: "تنسيق المحتوى", "content-seo": "تحسين المحتوى لـ SEO", "review-translation": "مراجعة الترجمة",
 };
 const terms: Record<string, string> = {
   ar: "القدس؛ المسجد الأقصى؛ الزكاة؛ الوقف. فصحى واضحة وسليمة، بلا مبالغة أو تعبيرات ركيكة.",
