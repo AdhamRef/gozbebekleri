@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { AlertTriangle, Loader2, ShieldCheck, Sparkles, WandSparkles } from "lucide-react";
+import { AlertTriangle, Loader2, ShieldCheck, Save, Sparkles, WandSparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -42,6 +42,8 @@ type PreviewRow = {
   emptyFields: string[];
   identicalToArabicFields: string[];
   qualityNotes?: string[];
+  editorKind?: "campaigns" | "categories" | "blog";
+  editorRevision?: string;
 };
 
 function plainText(value: string | null | undefined): string {
@@ -77,6 +79,7 @@ export function ContentLocalizationPreviewDialog({
   open,
   onOpenChange,
   defaultLocale = "de",
+  onSaved,
 }: {
   section: Section;
   open: boolean;
@@ -88,22 +91,29 @@ export function ContentLocalizationPreviewDialog({
   const [rows, setRows] = useState<PreviewRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [savingKey, setSavingKey] = useState("");
+  const [savedKeys, setSavedKeys] = useState<string[]>([]);
+  const requestRef = useRef(0);
 
   async function loadRows() {
+    const requestId = ++requestRef.current;
     setLoading(true);
     try {
       const response = await axios.get("/api/admin/content-localization/preview", {
         params: { section, locale, limit: 10 },
       });
+      if (requestId !== requestRef.current) return;
       setRows(response.data?.rows || []);
+      setSavedKeys([]);
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || "تعذر تجهيز المعاينة");
+      if (requestId === requestRef.current) toast.error(error?.response?.data?.error || "تعذر تجهيز المعاينة");
     } finally {
-      setLoading(false);
+      if (requestId === requestRef.current) setLoading(false);
     }
   }
 
   async function generatePreview() {
+    const requestId = ++requestRef.current;
     setGenerating(true);
     try {
       const response = await axios.post("/api/admin/content-localization/preview", {
@@ -112,24 +122,53 @@ export function ContentLocalizationPreviewDialog({
         locale,
         limit: 8,
       });
+      if (requestId !== requestRef.current) return;
       setRows(response.data?.rows || []);
+      setSavedKeys([]);
       toast.success("تم تجهيز معاينة للمراجعة دون حفظ أي تغيير");
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || "تعذر توليد المعاينة");
+      if (requestId === requestRef.current) toast.error(error?.response?.data?.error || "تعذر توليد المعاينة");
     } finally {
-      setGenerating(false);
+      if (requestId === requestRef.current) setGenerating(false);
     }
+  }
+
+  async function saveRow(row: PreviewRow) {
+    if (savingKey || !row.editorKind || !row.editorRevision) return;
+    const key = rowKey(row);
+    setSavingKey(key);
+    try {
+      const endpoint = `/api/admin/content-editor/${row.editorKind}/${row.id}`;
+      const saved = await axios.put(endpoint, {
+        revision: row.editorRevision,
+        locale: row.locale,
+        changes: row.suggestedTranslation,
+        reviewed: true,
+        editorialAction: row.locale === "ar" ? "proofread" : "translate",
+      });
+      const read = await axios.get(endpoint, {headers:{"Cache-Control":"no-store"}});
+      if (read.data.revision !== saved.data.revision) throw new Error("تغيرت النسخة بعد الحفظ. حدّث المعاينة للتحقق من آخر محتوى.");
+      const stored = read.data.values[row.locale] as Record<string,string>;
+      setRows(prev => prev.map(item => rowKey(item) === key ? {...item,editorRevision:read.data.revision,currentTranslation:stored,missingFields:[],emptyFields:Object.keys(item.sourceArabic).filter(field => !stored[field]?.trim()),identicalToArabicFields:row.locale === "ar" ? [] : Object.keys(item.sourceArabic).filter(field => stored[field]?.trim() === item.sourceArabic[field]?.trim())} : item));
+      setSavedKeys(prev => [...prev,key]);
+      toast.success("تم الحفظ بعد المراجعة والتحقق من النسخة المحفوظة");
+      onSaved?.();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || error?.message || "تعذر الحفظ؛ المعاينة ما زالت متاحة لإعادة المحاولة");
+    } finally { setSavingKey(""); }
   }
 
   useEffect(() => {
     if (open) void loadRows();
+    else { setLoading(false); setGenerating(false); }
+    return () => { requestRef.current++; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, locale, section]);
 
-  const busy = loading || generating;
+  const busy = loading || generating || Boolean(savingKey);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={value => { if (!savingKey) onOpenChange(value); }}>
       <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto" dir="rtl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -142,16 +181,16 @@ export function ContentLocalizationPreviewDialog({
           <div className="flex items-start gap-2">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
-              <p className="font-bold">وضع قراءة ومعاينة فقط</p>
+              <p className="font-bold">{section === "slides" ? "معاينة الشرائح" : "راجع الترجمة ثم احفظها"}</p>
               <p className="mt-1 leading-6">
-                لا يتم حفظ أو تعديل أي نص من هذه النافذة.
+                {section === "slides" ? "هذه معاينة للشرائح؛ تُحفظ تعديلاتها من محرر الشريحة." : "توليد المعاينة لا يحفظ تلقائيًا. بعد مراجعة كل عنصر، اضغط «حفظ بعد المراجعة» أسفله لحفظ نصوصه وعلامة المراجعة."}
               </p>
             </div>
           </div>
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Select value={locale} onValueChange={setLocale}>
+          <Select value={locale} onValueChange={setLocale} disabled={busy}>
             <SelectTrigger className="w-full sm:w-[220px]">
               <SelectValue />
             </SelectTrigger>
@@ -178,7 +217,7 @@ export function ContentLocalizationPreviewDialog({
           </div>
         </div>
 
-        {busy ? (
+        {loading || generating ? (
           <div className="flex items-center justify-center py-12 text-muted-foreground">
             <Loader2 className="ml-2 h-5 w-5 animate-spin" />
             جاري تجهيز المعاينة…
@@ -226,6 +265,13 @@ export function ContentLocalizationPreviewDialog({
                         </div>
                       </div>
                     ))}
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+                    {savedKeys.includes(key) ? <p role="status" className="text-sm font-medium text-emerald-700">تم الحفظ بعد المراجعة</p> : <p className="text-xs text-muted-foreground">{!row.editorKind ? "الحفظ المباشر متاح للمشاريع والتصنيفات والمقالات." : !row.editorRevision ? "حدّث المعاينة للحصول على نسخة صالحة للحفظ." : !Object.values(row.suggestedTranslation).some(value => value.trim()) ? "ولّد ترجمة أولًا ليتاح الحفظ." : "يحفظ نصوص هذا العنصر فقط؛ تبقى بقية العناصر للمراجعة."}</p>}
+                    {row.editorKind ? <Button aria-label={`حفظ ${row.label} بعد المراجعة`} disabled={busy || savedKeys.includes(key) || !row.editorRevision || !Object.values(row.suggestedTranslation).some(value => value.trim())} onClick={() => void saveRow(row)}>
+                      {savingKey === key ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
+                      {savedKeys.includes(key) ? "تم الحفظ" : savingKey === key ? "جار الحفظ…" : "حفظ بعد المراجعة"}
+                    </Button> : null}
                   </div>
                 </article>
               );

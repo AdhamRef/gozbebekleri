@@ -9,6 +9,9 @@ import {
 } from "@/lib/content-localization/access";
 import { prisma } from "@/lib/prisma";
 import { NOT_IMPACT_BACKING } from "@/lib/campaign/soft-delete-filter";
+import { documentFor, readContent } from "@/lib/content-editor/service";
+import { contentStore } from "@/lib/content-editor/store";
+import type { ContentKind } from "@/lib/content-editor/contracts";
 import { missingProtectedTokens } from "@/lib/content-localization/protected-tokens";
 
 const TRANSLATION_LOCALES = ["en", "fr", "tr", "id", "pt", "es", "de"] as const;
@@ -31,6 +34,8 @@ type PreviewRow = {
   emptyFields: string[];
   identicalToArabicFields: string[];
   qualityNotes?: string[];
+  editorKind?: ContentKind;
+  editorRevision?: string;
 };
 
 const LOCALE_NAMES: Record<Locale, string> = {
@@ -247,6 +252,22 @@ async function loadPreviewRows(
     .slice(0, limit);
 }
 
+// Capture a canonical editor revision before generation so the existing
+// transactional save endpoint rejects concurrent source or translation edits.
+async function withEditorRevisions(rows: PreviewRow[]): Promise<PreviewRow[]> {
+  const kinds: Partial<Record<ItemType, ContentKind>> = {campaign:"campaigns",category:"categories",post:"blog"};
+  return Promise.all(rows.map(async row => {
+    const kind = kinds[row.type];
+    if (!kind) return row;
+    const doc = documentFor(kind, await readContent(contentStore,kind,row.id));
+    const unchanged = Object.keys(row.sourceArabic).every(key =>
+      (row.sourceArabic[key] || "").trim() === (doc.values.ar[key] || "").trim() &&
+      (row.currentTranslation[key] || "").trim() === (doc.values[row.locale][key] || "").trim(),
+    );
+    return unchanged ? {...row,editorKind:kind,editorRevision:doc.revision} : {...row,qualityNotes:[...(row.qualityNotes || []),"تغير المحتوى أثناء تحميل المعاينة. حدّثها قبل التوليد والحفظ."]};
+  }));
+}
+
 const COMPACT_LIMIT = 9000;
 
 function compactText(value: string | null | undefined, max = COMPACT_LIMIT): string {
@@ -387,7 +408,7 @@ export async function GET(request: NextRequest) {
       Math.max(Number(request.nextUrl.searchParams.get("limit") || 10), 1),
       25,
     );
-    const rows = await loadPreviewRows(section, locale, limit);
+    const rows = await withEditorRevisions(await loadPreviewRows(section, locale, limit));
     return NextResponse.json({ ok: true, section, locale, rows });
   } catch (error) {
     console.error("Content localization preview failed:", error);
@@ -409,7 +430,7 @@ export async function POST(request: NextRequest) {
     const denied = await authorize(section);
     if (denied) return denied;
 
-    // Preview is read-only: applying or saving content is not supported here.
+    // Generation stays read-only. Reviewed rows save through the guarded editor PUT endpoint.
     if (body?.action !== "generate") {
       return NextResponse.json(
         { ok: false, error: "Localization preview is read-only; only generate is supported" },
@@ -418,7 +439,7 @@ export async function POST(request: NextRequest) {
     }
 
     const limit = Math.min(Math.max(Number(body?.limit || 8), 1), 10);
-    const sourceRows = await loadPreviewRows(section, locale, limit);
+    const sourceRows = await withEditorRevisions(await loadPreviewRows(section, locale, limit));
     const rows: PreviewRow[] = [];
     for (const row of sourceRows) {
       rows.push(await generateProfessionalTranslation(row, locale));
