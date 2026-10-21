@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 const indexes = [
+ {collection: "ContentEditorRevision", key: {kind: 1, entityId: 1, createdAt: 1}, unique: false},
  {collection: "Category", key: {previousSlugs: 1}, unique: false},
  {collection: "CategoryValue", key: {categoryId: 1, order: 1}, unique: false},
  {collection: "CategoryValueTranslation", key: {valueId: 1, locale: 1}, unique: true},

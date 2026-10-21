@@ -17,6 +17,7 @@ import {
   saveContent,
   saveWorkspace,
   fillMissingSeo,
+  approveArabicSource,
   type Delegate,
   type Store,
 } from "../../lib/content-editor/service";
@@ -35,6 +36,32 @@ import {
   safeEditorUrl,
 } from "../../lib/content-editor/workspace-settings";
 const id = "111111111111111111111111";
+test("Arabic approval, field-level provenance and stale translations survive partial edits without touching money",async()=>{
+  const initial={id,title:"مشروع",description:"وصف",goalType:"OPEN",currentAmount:864.603,translations:[{locale:"en",title:"Project",description:"Description"}],updates:[]};
+  const m=memory("campaigns",initial);
+  assert.equal(documentFor("campaigns",initial).workflow.arabicApproved,false);
+  assert.equal(documentFor("campaigns",initial).statuses.en.sourceKnown,false);
+  let doc=await approveArabicSource(m.store,{kind:"campaigns",id,revision:fingerprint(initial)});
+  assert.equal(doc.workflow.arabicApproved,true);
+  doc=await saveWorkspace(m.store,{kind:"campaigns",id,revision:doc.revision,locale:"en",changes:{title:"New project",description:"Full description"},editorialAction:"translate"});
+  assert.equal(doc.statuses.en.sourceKnown,true);assert.equal(doc.statuses.en.needsUpdate,false);
+  assert.equal(m.history().length,1);
+  assert.equal((m.history()[0].values as Record<string,Record<string,string>>).en.title,"Project");
+  doc=await saveWorkspace(m.store,{kind:"campaigns",id,revision:doc.revision,locale:"ar",changes:{description:"وصف جديد"}});
+  assert.equal(doc.workflow.arabicApproved,false);assert.equal(doc.statuses.en.needsUpdate,true);
+  doc=await approveArabicSource(m.store,{kind:"campaigns",id,revision:doc.revision});
+  doc=await saveWorkspace(m.store,{kind:"campaigns",id,revision:doc.revision,locale:"en",changes:{title:"Only the title reviewed"}});
+  assert.equal(doc.statuses.en.needsUpdate,true);assert.equal(doc.statuses.en.sourceKnown,false);
+  doc=await saveWorkspace(m.store,{kind:"campaigns",id,revision:doc.revision,locale:"en",changes:{},reviewed:true});
+  assert.equal(doc.statuses.en.needsUpdate,false);assert.equal(doc.statuses.en.sourceKnown,true);
+  assert.equal(m.read().currentAmount,initial.currentAmount);
+});
+test("stale Arabic approvals are rejected and failed saves roll back their content history",async()=>{
+  const initial={id,title:"مشروع",description:"وصف",goalType:"OPEN",translations:[],updates:[]};const m=memory("campaigns",initial);
+  await assert.rejects(approveArabicSource(m.store,{kind:"campaigns",id,revision:"old"}),{status:409});
+  m.fail("update");await assert.rejects(saveWorkspace(m.store,{kind:"campaigns",id,revision:fingerprint(initial),locale:"ar",changes:{title:"عنوان"}}));
+  assert.deepEqual(m.history(),[]);assert.deepEqual(m.read(),initial);
+});
 test("optimized SEO completion preserves content and totals, rejects stale revisions and rolls back failed translation writes", async () => {
   const initial = {id, title:"مشروع", description:"وصف", currentAmount:864.603, baselineAmount:300, slug:"fixed", translations:[{locale:"en",title:"Project",description:"Details",seoTitle:"Manual"}],updates:[]};
   const m = memory("campaigns",initial);
@@ -346,6 +373,7 @@ const rich = (value: string) =>
     content: [{ type: "paragraph", content: [{ type: "text", text: value }] }],
   });
 function memory(kind: ContentKind, initial: ContentRecord) {
+  let revisions:ContentRecord[]=[];
   let state = structuredClone(initial),
     fail = "",
     collision = false;
@@ -398,7 +426,8 @@ function memory(kind: ContentKind, initial: ContentRecord) {
           if (fail === "readback") state.translations = [];
           return {};
         },
-        async create() {
+        async create(args?:{data:ContentRecord}) {
+          if(name === "contentEditorRevision" && args)revisions.push(structuredClone(args.data));
           return {};
         },
       };
@@ -406,10 +435,12 @@ function memory(kind: ContentKind, initial: ContentRecord) {
     },
     async transaction(fn) {
       const previous = structuredClone(state);
+      const previousRevisions=structuredClone(revisions);
       try {
         return await fn(store);
       } catch (error) {
         state = previous;
+        revisions=previousRevisions;
         throw error;
       }
     },
@@ -417,6 +448,7 @@ function memory(kind: ContentKind, initial: ContentRecord) {
   return {
     store,
     read: () => structuredClone(state),
+    history:()=>structuredClone(revisions),
     fail: (value: string) => {
       fail = value;
     },

@@ -10,11 +10,13 @@ import {
   readContent,
   saveWorkspace,
   fillMissingSeo,
+  approveArabicSource,
 } from "@/lib/content-editor/service";
 import { contentStore } from "@/lib/content-editor/store";
 import { isValidLocale } from "@/lib/locales";
 import { queueAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 import { revalidatePath } from "next/cache";
+import { EDITORIAL_ACTIONS } from "@/lib/content-localization/editorial-policy";
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ kind: string; id: string }> };
 async function access(ctx: Context) {
@@ -72,6 +74,11 @@ export async function PUT(request: NextRequest, ctx: Context) {
     if (typeof body.revision !== "string")
       throw new ContentError("أعد تحميل المحتوى قبل الحفظ");
     let result;
+    if (body.action === "approve-arabic") {
+      result = await approveArabicSource(contentStore,{kind,id,revision:body.revision});
+      queueAuditLog({...auditActorFromDashboardSession(session!),action:"CONTENT_EDITOR_SAVE",entityType:CONFIG[kind].model,entityId:id,messageAr:"اعتماد العربية مصدرًا للترجمة",metadata:{sourceRevision:result.workflow.sourceRevision}});
+      return NextResponse.json(result,{headers:{"Cache-Control":"no-store"}});
+    }
     if (body.action === "fill-missing-seo") {
       result = await fillMissingSeo(contentStore, {kind, id, revision:body.revision});
       if (result.filledFields) {
@@ -107,6 +114,7 @@ export async function PUT(request: NextRequest, ctx: Context) {
         reviewed: body.reviewed === true,
         settings: body.settings,
         localeChanges: body.localeChanges,
+        editorialAction: [...EDITORIAL_ACTIONS,"translate","seo","restore"].includes(body.editorialAction) ? body.editorialAction : undefined,
       });
     }
     const actor = auditActorFromDashboardSession(session!);

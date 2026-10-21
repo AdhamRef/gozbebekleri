@@ -5,6 +5,7 @@ import { SUPPORTED_LOCALES } from "../locales";
 import { pickLocaleSlug } from "../slug";
 import { HAS_IMPACT_BACKING_CAMPAIGNS } from "./site-capabilities";
 import { missingSeoChanges } from "./seo-fill";
+import { arabicSourceFingerprint, workflowFor } from "./workflow";
 import {
   CONFIG,
   fieldsFor,
@@ -64,26 +65,26 @@ export function includeFor(kind: ContentKind) {
       : {}),
     ...(kind === "campaigns"
       ? {
-          updates: {
-            include: { translations: true },
-            orderBy: { createdAt: "desc" },
-          },
-        }
+        updates: {
+          include: { translations: true },
+          orderBy: { createdAt: "desc" },
+        },
+      }
       : {}),
     ...(kind === "categories"
       ? {
-          values: { include: { translations: true } },
-          infoCards: { include: { translations: true } },
-        }
+        values: { include: { translations: true } },
+        infoCards: { include: { translations: true } },
+      }
       : {}),
     ...(kind === "super-categories"
       ? {
-          blocks: {
-            include: { translations: true },
-            orderBy: { order: "asc" },
-          },
-          items: { orderBy: { order: "asc" } },
-        }
+        blocks: {
+          include: { translations: true },
+          orderBy: { order: "asc" },
+        },
+        items: { orderBy: { order: "asc" } },
+      }
       : {}),
   };
 }
@@ -99,6 +100,8 @@ export async function readContent(db: Store, kind: ContentKind, id: string) {
 export function documentFor(kind: ContentKind, row: ContentRecord) {
   const base = valuesFor(kind, row, "ar");
   const locales = statuses(kind, row);
+  const workflow = workflowFor(row), sourceRevision = arabicSourceFingerprint(kind, row);
+  const sourceFields = fieldsFor(kind, row).filter(f => f.group === "content" && !f.locked && !f.optional && (f.required || hasText(base[f.key]))).map(f => f.key);
   const reviews =
     row.editorReviews && typeof row.editorReviews === "object"
       ? (row.editorReviews as Record<string, string>)
@@ -121,6 +124,7 @@ export function documentFor(kind: ContentKind, row: ContentRecord) {
     revision: fingerprint(row),
     fields: fieldsFor(kind, row),
     source: base,
+    workflow: { sourceRevision, arabicApproved: workflow.approvedArabic === sourceRevision && locales.ar.complete, lastActions: workflow.lastActions },
     values: Object.fromEntries(
       Object.keys(locales).map((locale) => [
         locale,
@@ -132,6 +136,8 @@ export function documentFor(kind: ContentKind, row: ContentRecord) {
         locale,
         {
           ...status,
+          sourceKnown: locale === "ar" || (sourceFields.length > 0 && sourceFields.every(key => workflow.sources[locale]?.[key] === sourceRevision)),
+          needsUpdate: locale !== "ar" && Object.values(workflow.sources[locale] || {}).some(revision => revision !== sourceRevision),
           reviewed:
             reviews[locale] ===
             fingerprint([base, valuesFor(kind, row, locale)]),
@@ -142,42 +148,57 @@ export function documentFor(kind: ContentKind, row: ContentRecord) {
     settings: row,
   };
 }
+export async function approveArabicSource(db: Store, input: { kind: ContentKind; id: string; revision: string }) {
+  return db.transaction(async tx => {
+const row = await readContent(tx, input.kind, input.id); if (fingerprint(row) !== input.revision) throw new ContentError("تغير المحتوى؛ أعد تحميله قبل اعتماد العربية", 409);
+    if (!statuses(input.kind, row).ar.complete) throw new ContentError("أكمل الحقول العربية المطلوبة قبل اعتماد المصدر");
+    const workflow = workflowFor(row); workflow.approvedArabic = arabicSourceFingerprint(input.kind, row);
+    await tx.model(CONFIG[input.kind].model).update({ where: { id: input.id }, data: { editorVersion: randomUUID(), editorWorkflow: JSON.parse(JSON.stringify(workflow)) } });
+    return documentFor(input.kind, await readContent(tx, input.kind, input.id));
+  });
+}
+async function captureContentRevision(tx: Store, kind: ContentKind, row: ContentRecord, deltas: Record<string, unknown>) {
+  const changed = Object.entries(deltas).some(([locale, value]) => value && typeof value === "object" && !Array.isArray(value) && Object.entries(value).some(([key, text]) => valuesFor(kind, row, locale)[key] !== text));
+  if (!changed) return;
+  await tx.model("contentEditorRevision").create({ data: { kind, entityId: row.id, revision: fingerprint(row), values: Object.fromEntries(SUPPORTED_LOCALES.map(locale => [locale, valuesFor(kind, row, locale)])) } });
+}
 function dataFor(changes: TextValues) {
   return Object.fromEntries(
     Object.entries(changes).map(([key, value]) => [
       key,
       key === "amountLabels"
         ? value
-            .split("\n")
-            .map((v) => v.trim())
-            .filter(Boolean)
+          .split("\n")
+          .map((v) => v.trim())
+          .filter(Boolean)
         : value,
     ]),
   );
 }
 /** One atomic metadata-only save, with a single parent touch/readback for all locales. */
-export async function fillMissingSeo(db: Store, input: {kind: ContentKind; id: string; revision: string}) {
+export async function fillMissingSeo(db: Store, input: { kind: ContentKind; id: string; revision: string }) {
   return db.transaction(async tx => {
-    const {kind, id} = input, cfg = CONFIG[kind], row = await readContent(tx, kind, id);
+    const { kind, id } = input, cfg = CONFIG[kind], row = await readContent(tx, kind, id);
     if (fingerprint(row) !== input.revision) throw new ContentError("تغير المحتوى. أعد تحميله قبل الاستكمال.", 409);
     const changes = missingSeoChanges(kind, row);
     const filledFields = Object.values(changes).reduce((sum, values) => sum + Object.keys(values).length, 0);
-    if (!filledFields) return {...documentFor(kind, row), filledFields:0};
+    if (!filledFields) return { ...documentFor(kind, row), filledFields: 0 };
     const fields = fieldsFor(kind, row).filter(f => f.group === "seo");
-    const reviews = {...(row.editorReviews && typeof row.editorReviews === "object" ? row.editorReviews as Record<string,string> : {})};
+    await captureContentRevision(tx, kind, row, changes);
+    const reviews = { ...(row.editorReviews && typeof row.editorReviews === "object" ? row.editorReviews as Record<string, string> : {}) };
     for (const [locale, delta] of Object.entries(changes)) { validateChanges(fields, delta); delete reviews[locale]; }
-    await tx.model(cfg.model).update({where:{id}, data:{editorVersion:randomUUID(), editorReviews:reviews, ...(changes.ar || {})}});
+    await tx.model(cfg.model).update({ where: { id }, data: { editorVersion: randomUUID(), editorReviews: reviews, ...(changes.ar || {}) } });
     for (const [locale, delta] of Object.entries(changes)) {
       if (locale === "ar") continue;
       const own = valuesFor(kind, row, locale), titleKey = kind === "categories" ? "name" : "title";
-      await tx.model(cfg.translationModel).upsert({where:{[`${cfg.parentKey}_locale`]:{[cfg.parentKey]:id,locale}}, create:{[cfg.parentKey]:id,locale,[titleKey]:own[titleKey],...(kind === "campaigns" ? {description:own.description || ""} : {}),...delta}, update:delta});
+      await tx.model(cfg.translationModel).upsert({ where: { [`${cfg.parentKey}_locale`]: { [cfg.parentKey]: id, locale } }, create: { [cfg.parentKey]: id, locale, [titleKey]: own[titleKey], ...(kind === "campaigns" ? { description: own.description || "" } : {}), ...delta }, update: delta });
     }
     const saved = await readContent(tx, kind, id);
     for (const [locale, delta] of Object.entries(changes)) {
       const values = valuesFor(kind, saved, locale);
       if (Object.entries(delta).some(([key, value]) => values[key] !== value)) throw new ContentError("تعذر التحقق من حفظ SEO", 500);
     }
-    return {...documentFor(kind, saved), filledFields};
+    return { ...documentFor(kind, saved), filledFields };
   });
 }
 export async function saveContent(
@@ -190,6 +211,8 @@ export async function saveContent(
     changes: unknown;
     reviewed?: boolean;
     settings?: unknown;
+    skipHistory?: boolean;
+    editorialAction?: string;
   },
 ) {
   return db.transaction(async (tx) => {
@@ -263,6 +286,7 @@ export async function saveContent(
     const titleKey = kind === "categories" ? "name" : "title";
     if (!hasText(next[titleKey]))
       throw new ContentError("العنوان مطلوب قبل الحفظ");
+    if (!input.skipHistory) await captureContentRevision(tx, kind, row, { [locale]: changes });
     // Touch the parent in the same transaction as every translation/child write.
     // A concurrent legacy form therefore conflicts with this save too.
     const reviews =
@@ -346,7 +370,17 @@ export async function saveContent(
       }
     }
     await saveWorkspaceRelations(tx, kind, id, row, input.settings);
-    const saved = await readContent(tx, kind, id),
+    let saved = await readContent(tx, kind, id);
+    const workflow = workflowFor(saved);
+    if (locale !== "ar" && (Object.keys(changes).length || input.reviewed) && workflow.approvedArabic === arabicSourceFingerprint(kind, saved)) {
+      const source = valuesFor(kind, saved, "ar"), ownValues = valuesFor(kind, saved, locale);
+      const linked = { ...workflow.sources[locale] };
+      for (const field of fieldsFor(kind, saved).filter(f => f.group === "content" && !f.locked)) if ((field.key in changes || input.reviewed) && hasText(ownValues[field.key]) && hasText(source[field.key])) linked[field.key] = workflow.approvedArabic;
+      workflow.sources[locale] = linked;
+    }
+    if (input.editorialAction && Object.keys(changes).length) workflow.lastActions[locale] = input.editorialAction;
+    if (JSON.stringify(workflow) !== JSON.stringify(workflowFor(saved))) { await tx.model(cfg.model).update({ where: { id }, data: { editorWorkflow: JSON.parse(JSON.stringify(workflow)) } }); saved = await readContent(tx, kind, id); }
+    const
       actual = valuesFor(kind, saved, locale);
     for (const [key, value] of Object.entries(settings)) {
       if (key === "categories") continue;
@@ -378,25 +412,28 @@ export async function saveWorkspace(
     reviewed?: boolean;
     settings?: unknown;
     localeChanges?: Record<string, unknown>;
+    editorialAction?: string;
   },
 ) {
   return db.transaction(async (tx) => {
     const original = await readContent(tx, input.kind, input.id);
     let revision = input.revision;
     const locales = { ...input.localeChanges, [input.locale]: input.changes };
+    if (fingerprint(original) !== input.revision) throw new ContentError("تغير المحتوى؛ أعد تحميله قبل الحفظ", 409);
+    await captureContentRevision(tx, input.kind, original, locales);
     const scalarSettings =
       input.settings &&
-      typeof input.settings === "object" &&
-      !Array.isArray(input.settings)
+        typeof input.settings === "object" &&
+        !Array.isArray(input.settings)
         ? Object.fromEntries(
-            Object.entries(input.settings).filter(
-              ([key]) => !(
-                (["super-categories", "urgent-banners"].includes(input.kind) && key === "slugAdjustment") ||
-                (input.kind === "super-categories" && ["blocks", "items", "religiousTextAdjustment"].includes(key)) ||
-                (input.kind === "campaigns" && ["campaignUpdates", "financialAdjustment"].includes(key))
-              ),
+          Object.entries(input.settings).filter(
+            ([key]) => !(
+              (["super-categories", "urgent-banners"].includes(input.kind) && key === "slugAdjustment") ||
+              (input.kind === "super-categories" && ["blocks", "items", "religiousTextAdjustment"].includes(key)) ||
+              (input.kind === "campaigns" && ["campaignUpdates", "financialAdjustment"].includes(key))
             ),
-          )
+          ),
+        )
         : input.settings;
     let saved: ReturnType<typeof documentFor> | undefined;
     for (const [locale, changes] of Object.entries(locales).sort(([a], [b]) =>
@@ -404,6 +441,7 @@ export async function saveWorkspace(
     )) {
       saved = await saveContent(tx, {
         ...input,
+        skipHistory: true,
         locale,
         changes,
         revision,

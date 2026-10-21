@@ -11,6 +11,8 @@ import { SeoWorkspace } from "./SeoWorkspace";
 import { CampaignAdvancedSettings } from "./CampaignAdvancedSettings";
 import { CampaignAchievements } from "./CampaignAchievements";
 import { ProtectedSettings } from "./ProtectedSettings";
+import { EditorialWorkflow } from "./EditorialWorkflow";
+import { EDITORIAL_LABELS, type EditorialAction } from "@/lib/content-localization/editorial-policy";
 import { ImageUploadField } from "@/app/(dashboard)/dashboard/_components/ImageUploadField";
 import { EDITOR_SECTIONS, settingsFor } from "@/lib/content-editor/workspace";
 import type { ContentRecord } from "@/lib/content-editor/contracts";
@@ -79,10 +81,10 @@ function previewText(value: string): string {
         typeof node.text === "string"
           ? node.text
           : (node.content || [])
-              .map((child) =>
-                read(child as { text?: string; content?: unknown[] }),
-              )
-              .join(" ");
+            .map((child) =>
+              read(child as { text?: string; content?: unknown[] }),
+            )
+            .join(" ");
       return read(parsed);
     }
   } catch {
@@ -109,6 +111,8 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
   const [proposal, setProposal] = useState<Proposal | null>(null);
+  const [draftAction, setDraftAction] = useState("");
+  const [history, setHistory] = useState<{ id: string; createdAt: string; revision: string }[] | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [reviewed, setReviewed] = useState(false);
   const [slug, setSlug] = useState("");
@@ -136,6 +140,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
       if (number !== requestRef.current) return;
       setDocument(data);
       setValues(data.values);
+      setDraftAction("");
       setSettingsDraft(settingsFor(kind, data.settings));
       setSelected(data.fields.filter((f) => !f.locked).map((f) => f.key));
       setMessage("");
@@ -153,9 +158,9 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
   }, [initialLoad, invalidateRequests]);
   const dirty = document
     ? JSON.stringify(values) !== JSON.stringify(document.values) ||
-      JSON.stringify(settingsDraft) !==
-        JSON.stringify(settingsFor(kind, document.settings)) ||
-      uploads > 0
+    JSON.stringify(settingsDraft) !==
+    JSON.stringify(settingsFor(kind, document.settings)) ||
+    uploads > 0
     : false;
   useEffect(() => {
     if (!dirty) return;
@@ -177,7 +182,9 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
     };
   }, [dirty]);
   const edit = (key: string, value: string) => {
-    if (busy === "save" || busy === "slug") return;
+    if (valuesRef.current[locale]?.[key] === value) return;
+    if (busy === "save" || busy === "slug" || busy === "approve" || busy === "history") return;
+    setDraftAction("");
     setValues((prev) => ({
       ...prev,
       [locale]: { ...prev[locale], [key]: value },
@@ -212,6 +219,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
           locale: target,
           changes: captured,
           reviewed,
+          editorialAction: draftAction || undefined,
           localeChanges,
           settings: Object.fromEntries(
             Object.entries(settingsDraft).filter(
@@ -231,6 +239,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
       setValues(read.values);
       setSettingsDraft(settingsFor(kind, read.settings));
       setProposal(null);
+      setDraftAction("");
       setReviewed(false);
       setMessage("تم الحفظ والتحقق من النسخة المحفوظة");
     } catch (error) {
@@ -243,7 +252,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
       setBusy("");
     }
   };
-  const suggest = async (action: "seo" | "translate", all = false) => {
+  const suggest = async (action: "seo" | "translate" | EditorialAction, all = false) => {
     if (!document || dirty) {
       setMessage("احفظ التعديلات أولًا لطلب اقتراح مرتبط بالنسخة الحالية");
       return;
@@ -256,8 +265,8 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
     try {
       const targets = all
         ? SUPPORTED_LOCALES.filter(
-            (l) => l !== "ar" && !document.statuses[l].complete,
-          )
+          (l) => l !== "ar" && (!document.statuses[l].complete || document.statuses[l].needsUpdate || !document.statuses[l].sourceKnown),
+        )
         : [locale];
       if (action === "translate" && (targets.includes("ar") || !targets.length))
         throw new Error("اختر لغة أخرى أو لغة تحتاج ترجمة");
@@ -301,6 +310,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
       [target]: { ...prev[target], [key]: value },
     }));
     setReviewed(false);
+    setDraftAction(proposal?.action || "");
     setProposal((prev) => {
       if (!prev) return null;
       const pending = { ...prev.proposals[target].values };
@@ -344,6 +354,20 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
       setBusy("");
     }
   };
+  const approveSource = async () => {
+    if (!document || dirty || busy) return;
+    if (!window.confirm("أؤكد أنني راجعت العربية والحقائق والمصطلحات، وأعتمد هذه النسخة مصدرًا للترجمة؟")) return;
+    setBusy("approve"); setMessage("");
+    try { const saved = await api<Document>(url, { method: "PUT", body: JSON.stringify({ action: "approve-arabic", revision: document.revision }) }); setDocument(saved); setValues(saved.values); setProposal(null); setMessage("اعتمدت النسخة العربية. أي تغيير لاحق فيها يتطلب اعتمادًا جديدًا ويظهر الترجمات المرتبطة التي تحتاج تحديثًا."); } catch (error) { setMessage(error instanceof Error ? error.message : "تعذر اعتماد المصدر"); } finally { setBusy(""); }
+  };
+  const loadHistory = async () => {
+    if (dirty || busy) return; setBusy("history");
+    try { const data = await api<{ items: NonNullable<typeof history> }>(url + "/history"); setHistory(data.items); } catch (error) { setMessage(error instanceof Error ? error.message : "تعذر تحميل النسخ"); } finally { setBusy(""); }
+  };
+  const previewHistory = async (revisionId: string) => {
+    if (!document || dirty || busy) return; setBusy("history");
+    try { const previous = await api<{ values: Record<string, TextValues> }>(url + "/history?revisionId=" + revisionId); setProposal({ id, kind, revision: document.revision, action: "restore", proposals: Object.fromEntries(Object.entries(previous.values).map(([code, fields]) => [code, { values: Object.fromEntries(Object.entries(fields).filter(([key, value]) => value !== document.values[code]?.[key])), warnings: ["معاينة نصوص نسخة سابقة فقط. الإعدادات المالية والروابط التقنية والنصوص المقفلة لا تُسترجع من هنا."] }])), errors: {} }); setHistory(null); } catch (error) { setMessage(error instanceof Error ? error.message : "تعذر معاينة النسخة"); } finally { setBusy(""); }
+  };
   if (!document)
     return (
       <div dir="rtl" className="rounded-xl border p-6" role="status">
@@ -365,14 +389,14 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
     ...settingsDraft,
     blocks: Array.isArray(settingsDraft.blocks)
       ? settingsDraft.blocks.map((item: ContentRecord) => {
-          const key = `blocks.${item.id}.`;
-          return {
-            ...item,
-            title:
-              current[key + "title"] || source[key + "title"] || item.title,
-            body: current[key + "body"] || source[key + "body"],
-          };
-        })
+        const key = `blocks.${item.id}.`;
+        return {
+          ...item,
+          title:
+            current[key + "title"] || source[key + "title"] || item.title,
+          body: current[key + "body"] || source[key + "body"],
+        };
+      })
       : document.settings.blocks,
   };
   const sectionIcons = {
@@ -388,14 +412,18 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
     settings: Settings,
   };
   const setSetting = (key: string, value: unknown) => {
+    if (busy === "save" || busy === "slug" || busy === "approve" || busy === "history") return;
+    setDraftAction("");
     setSettingsDraft((prev) => ({ ...prev, [key]: value }));
     setProposal(null);
   };
   const resetDraft = () => {
+    if (busy) return;
     if (!dirty || window.confirm("التراجع عن كل التعديلات غير المحفوظة؟")) {
       setValues(document.values);
       setSettingsDraft(settingsFor(kind, document.settings));
       setProposal(null);
+      setDraftAction("");
       setReviewed(false);
     }
   };
@@ -409,7 +437,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
           type="button"
           key={code}
           aria-label={LOCALES[code].nativeLabel}
-          title={LOCALES[code].nativeLabel}
+          title={`${LOCALES[code].nativeLabel}${document.statuses[code].needsUpdate ? " — تحتاج تحديثًا من المصدر العربي" : ""}`}
           disabled={Boolean(busy) || uploads > 0}
           onClick={() => {
             setLocale(code);
@@ -419,7 +447,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
           className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${locale === code ? "border-brand bg-brand/5 font-bold text-brand" : "text-slate-500"}`}
         >
           <span
-            className={`h-1.5 w-1.5 rounded-full ${document.statuses[code].reviewed ? "bg-emerald-600" : document.statuses[code].complete ? "bg-amber-500" : "bg-slate-300"}`}
+            className={`h-1.5 w-1.5 rounded-full ${document.statuses[code].needsUpdate ? "bg-orange-600" : document.statuses[code].reviewed ? "bg-emerald-600" : document.statuses[code].complete ? "bg-amber-500" : "bg-slate-300"}`}
           />
           {code.toUpperCase()}
         </button>
@@ -592,6 +620,8 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
         </div>
       </header>
       {languageButtons}
+      <div data-content-editor="unified"><EditorialWorkflow locale={locale} approved={document.workflow.arabicApproved} needsUpdate={document.statuses[locale].needsUpdate} sourceKnown={document.statuses[locale].sourceKnown} busy={Boolean(busy)} dirty={dirty} lastAction={document.workflow.lastActions[locale]} onAction={suggest} onApprove={approveSource} onArabic={() => { if (!dirty) setLocale("ar"); else setMessage("احفظ مسودتك أولًا قبل تغيير اللغة"); }} onHistory={loadHistory} /></div>
+      {history ? <EditorModal title="النسخ السابقة والاسترجاع" onClose={() => setHistory(null)}><div className="space-y-3"><p className="text-sm">تُحفظ نسخة قبل تغيير النصوص. اختر نسخة لمقارنة النصوص قبل استرجاعها وحفظها.</p>{history.length ? history.map(entry => <button type="button" disabled={Boolean(busy)} key={entry.id} onClick={() => previewHistory(entry.id)} className="block w-full rounded border p-3 text-right">معاينة نسخة {new Date(entry.createdAt).toLocaleString("ar", { timeZone: "Europe/Istanbul" })}</button>) : <p>لا توجد نسخ سابقة بعد. يبدأ السجل مع أول حفظ للنص بعد هذا التحديث.</p>}</div></EditorModal> : null}
       <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-white p-3">
         <button
           type="button"
@@ -610,7 +640,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
         <button
           type="button"
           className={button}
-          disabled={Boolean(busy) || locale === "ar" || dirty}
+          disabled={Boolean(busy) || locale === "ar" || dirty || !document.workflow.arabicApproved}
           onClick={() => suggest("translate")}
         >
           ترجمة الحقول المحددة
@@ -618,15 +648,15 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
         <button
           type="button"
           className={button}
-          disabled={Boolean(busy) || dirty}
+          disabled={Boolean(busy) || dirty || !document.workflow.arabicApproved}
           onClick={() => suggest("translate", true)}
         >
-          ترجمة اللغات الناقصة
+          ترجمة اللغات الناقصة أو التي تحتاج تحديثًا
         </button>
         <button
           type="button"
           className={button}
-          disabled={Boolean(busy) || dirty}
+          disabled={Boolean(busy) || dirty || (locale !== "ar" && !document.workflow.arabicApproved)}
           onClick={() => suggest("seo")}
         >
           {isBanner ? "اقتراح وصف الصورة" : "اقتراح SEO"}
@@ -646,7 +676,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
               ? "الاقتراح"
               : busy === "slug"
                 ? "الرابط"
-                : "الترجمة"}
+                : busy === "approve" ? "اعتماد المصدر" : busy === "history" ? "النسخ السابقة" : EDITORIAL_LABELS[busy as EditorialAction] || "الترجمة"}
             …
           </span>
         ) : null}
@@ -744,7 +774,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
         </section>
       ) : null}
       <div
-        inert={busy === "save" || busy === "slug"}
+        inert={busy === "save" || busy === "slug" || busy === "approve" || busy === "history"}
         className="grid items-start gap-5 xl:grid-cols-[190px_minmax(0,1fr)_280px]"
       >
         <nav
@@ -822,8 +852,8 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
                 .map(renderField)}
               {kind === "urgent-banners" && section === "media"
                 ? document.fields
-                    .filter((f) => f.key === "amountLabels")
-                    .map(renderField)
+                  .filter((f) => f.key === "amountLabels")
+                  .map(renderField)
                 : null}
             </>
           ) : null}
