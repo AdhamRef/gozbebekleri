@@ -21,7 +21,7 @@ export function ImageUploadField({
   onUploadingChange,
   required,
   /** Tailwind size classes for the preview, e.g. "w-40 h-24". */
-  previewClass = "w-40 h-40",
+  previewClass = "w-full aspect-[16/9] max-h-72",
 }: {
   label: string;
   value: string;
@@ -70,34 +70,36 @@ export function ImageUploadField({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={value}
-            alt=""
-            className={`${previewClass} object-cover rounded-lg border`}
+            alt={label}
+            className={`${previewClass} object-contain rounded-xl border bg-slate-50`}
           />
           <button
             type="button"
+            disabled={uploading}
+            aria-label={`إزالة ${label} من المسودة`}
             onClick={() => onChange("")}
-            className="absolute top-1 start-1 p-1 bg-red-500 text-white rounded"
+            className="absolute top-2 start-2 grid min-h-11 min-w-11 place-items-center rounded-lg bg-white/95 text-red-600 shadow-sm ring-1 ring-slate-200 disabled:opacity-40"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
-      ) : (
-        <label className="flex items-center gap-2 w-fit px-3 py-2 border rounded-lg cursor-pointer hover:bg-slate-50">
+      ) : null}
+      <label className="flex items-center gap-2 w-fit px-3 py-2 border rounded-lg cursor-pointer hover:bg-slate-50">
           {uploading ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
             <Upload className="w-4 h-4" />
           )}
-          <span className="text-sm">{dt("رفع صورة")}</span>
+          <span className="text-sm">{uploading ? dt("جار رفع الصورة…") : value ? dt("تغيير الصورة") : dt("رفع صورة")}</span>
           <input
             type="file"
             accept="image/*"
+            aria-label={`${value ? "تغيير" : "رفع"} ${label}`}
             className="hidden"
             disabled={uploading}
             onChange={upload}
           />
         </label>
-      )}
     </div>
   );
 }

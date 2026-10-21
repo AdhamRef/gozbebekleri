@@ -9,19 +9,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
 import { useLocale } from "next-intl";
 
 export interface BlogRow {
@@ -45,7 +34,6 @@ function BlogRowActions({
   row: BlogRow;
   onDelete: (id: string) => void | Promise<void>;
 }) {
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const locale = useLocale()
   const { id } = row;
 
@@ -53,7 +41,7 @@ function BlogRowActions({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0">
+          <Button variant="ghost" className="h-11 w-11 p-0">
             <span className="sr-only">فتح القائمة</span>
             <MoreHorizontal className="h-4 w-4" />
           </Button>
@@ -90,38 +78,14 @@ function BlogRowActions({
           </DropdownMenuItem>
           <DropdownMenuItem
             className="flex w-full justify-end items-center text-red-600 focus:text-red-600"
-            onSelect={(e) => {
-              e.preventDefault();
-              setShowDeleteDialog(true);
-            }}
+            onSelect={() => { void onDelete(id); }}
           >
             حذف
             <Trash2 className="h-4 w-4 ml-2" />
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>حذف المقال</AlertDialogTitle>
-            <AlertDialogDescription>
-              هل أنت متأكد من حذف هذا المقال؟ لا يمكن التراجع عن هذا الإجراء.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex gap-2">
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-700 hover:bg-red-800"
-              onClick={async () => {
-                await onDelete(id);
-                setShowDeleteDialog(false);
-              }}
-            >
-              حذف
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+
     </>
   );
 }

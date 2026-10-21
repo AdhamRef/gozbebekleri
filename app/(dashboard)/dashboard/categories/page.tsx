@@ -1,6 +1,7 @@
 "use client";
+import { DeleteContentDialog } from "@/components/dashboard/content-editor/DeleteContentDialog";
 
-import { TranslationOverview } from "@/components/dashboard/content-editor/TranslationOverview";
+import { ContentToolsDialog } from "@/components/dashboard/content-editor/ContentToolsDialog";
 import { useEffect, useState } from "react";
 import { useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
@@ -62,7 +63,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { ReorderDialog } from "./_components/ReorderDialog";
 import { CategoryCampaignPriorityDialog } from "./_components/CategoryCampaignPriorityDialog";
-import { ContentLocalizationAuditCard } from "../_components/ContentLocalizationAuditCard";
+
 
 interface Category {
   id: string;
@@ -83,7 +84,6 @@ export default function CategoriesPage() {
   const [loading, setLoading] = useState(true);
   const [sortField, setSortField] = useState<keyof Category>("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [deleteLoading, setDeleteLoading] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(
     null,
   );
@@ -91,7 +91,6 @@ export default function CategoriesPage() {
   const [campaignsFilter, setCampaignsFilter] = useState<
     "all" | "with" | "without"
   >("all");
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [itemsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [priorityDialog, setPriorityDialog] = useState<{
@@ -239,63 +238,6 @@ export default function CategoriesPage() {
     setCategoryToDelete(category);
   };
 
-  const handleBulkDelete = async () => {
-    if (
-      !window.confirm(`هل أنت متأكد من حذف ${selectedCategories.length} تصنيف؟`)
-    )
-      return;
-
-    setDeleteLoading(true);
-    try {
-      await Promise.all(
-        selectedCategories.map((id) => axios.delete(`/api/categories/${id}`)),
-      );
-      toast.success("تم حذف التصنيفات المحددة بنجاح");
-      fetchCategories();
-      setSelectedCategories([]);
-    } catch (error) {
-      console.error("Error deleting categories:", error);
-      toast.error("فشل في حذف التصنيفات");
-    } finally {
-      setDeleteLoading(false);
-    }
-  };
-
-  const confirmDelete = async () => {
-    if (!categoryToDelete) return;
-
-    setDeleteLoading(true);
-    try {
-      await axios.delete(`/api/categories/${categoryToDelete.id}`);
-      toast.success("تم حذف التصنيف بنجاح");
-      fetchCategories();
-    } catch (error) {
-      console.error("Error deleting category:", error);
-      toast.error("فشل في حذف التصنيف");
-    } finally {
-      setDeleteLoading(false);
-      setCategoryToDelete(null);
-    }
-  };
-
-  const handleSelectCategory = (categoryId: string) => {
-    setSelectedCategories((prev) => {
-      if (prev.includes(categoryId)) {
-        return prev.filter((id) => id !== categoryId);
-      } else {
-        return [...prev, categoryId];
-      }
-    });
-  };
-
-  const handleSelectAllCategories = () => {
-    if (selectedCategories.length === filteredCategories.length) {
-      setSelectedCategories([]);
-    } else {
-      setSelectedCategories(filteredCategories.map((category) => category.id));
-    }
-  };
-
   // Main table shows active only; archived live in the archive dialog (matches
   // the campaigns page convention).
   const activeCategories = categories.filter((c) => c.isActive);
@@ -349,30 +291,13 @@ export default function CategoriesPage() {
 
   return (
     <div>
-      <div className="mb-4">
-        <ContentLocalizationAuditCard section="categories" />
-      </div>
-      <TranslationOverview
-        kind="categories"
-        scopeIds={filteredCategories.map((c) => c.id)}
-      />
+      <ContentToolsDialog kind="categories" scopeIds={filteredCategories.map(c=>c.id)} />
       <PageHeader
         title="التصنيفات"
         description="إدارة التصنيفات ومشاريعها"
         icon={Globe}
         actions={
           <>
-            {selectedCategories.length > 0 && (
-              <Button
-                variant="destructive"
-                onClick={handleBulkDelete}
-                disabled={deleteLoading}
-                className="gap-2"
-              >
-                {deleteLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                حذف ({selectedCategories.length})
-              </Button>
-            )}
             <ReorderDialog
               categories={categories}
               onReorder={fetchCategories}
@@ -427,17 +352,6 @@ export default function CategoriesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12">
-                <input
-                  type="checkbox"
-                  checked={
-                    filteredCategories.length > 0 &&
-                    selectedCategories.length === filteredCategories.length
-                  }
-                  onChange={handleSelectAllCategories}
-                  className="rounded border-input accent-primary"
-                />
-              </TableHead>
               <TableHead
                 className="cursor-pointer"
                 onClick={() => handleSort("name")}
@@ -456,14 +370,6 @@ export default function CategoriesPage() {
           <TableBody>
             {paginatedCategories.map((category) => (
               <TableRow key={category.id}>
-                <TableCell>
-                  <input
-                    type="checkbox"
-                    checked={selectedCategories.includes(category.id)}
-                    onChange={() => handleSelectCategory(category.id)}
-                    className="rounded border-input accent-primary"
-                  />
-                </TableCell>
                 <TableCell className="font-medium">{category.name}</TableCell>
                 <TableCell className="max-w-[300px] truncate pl-12">
                   {category.description || "لا يوجد وصف"}
@@ -541,7 +447,7 @@ export default function CategoriesPage() {
 
             {paginatedCategories.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="p-0">
+                <TableCell colSpan={5} className="p-0">
                   <EmptyState
                     variant="inline"
                     icon={Globe}
@@ -718,32 +624,7 @@ export default function CategoriesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog
-        open={!!categoryToDelete}
-        onOpenChange={() => setCategoryToDelete(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              هل أنت متأكد من حذف هذه التصنيف؟
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              سيتم حذف التصنيف نهائياً ولا يمكن التراجع عن هذا الإجراء.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700 gap-2"
-              disabled={deleteLoading}
-            >
-              {deleteLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-              حذف
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {categoryToDelete ? <DeleteContentDialog kind="categories" id={categoryToDelete.id} onClose={()=>setCategoryToDelete(null)} onDeleted={()=>{void fetchCategories();}} /> : null}
     </div>
   );
 }

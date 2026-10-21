@@ -1,6 +1,7 @@
 "use client"
+import { DeleteContentDialog } from "@/components/dashboard/content-editor/DeleteContentDialog";
 
-import { TranslationOverview } from "@/components/dashboard/content-editor/TranslationOverview";
+import { ContentToolsDialog } from "@/components/dashboard/content-editor/ContentToolsDialog";
 import { useState, useEffect, useMemo, useCallback } from "react"
 import axios from "axios"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,10 +11,11 @@ import { getBlogColumns, type BlogRow } from "../_components/blogColumns"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useLocale } from "next-intl"
 import { Globe } from "lucide-react"
-import { ContentLocalizationAuditCard } from "../_components/ContentLocalizationAuditCard"
+
 
 export default function BooksManagement() {
   const locale = useLocale() as string
+  const [deleteId,setDeleteId]=useState<string | null>(null)
   const [blogs, setBlogs] = useState<BlogRow[]>([])
   const [activeLocale, setActiveLocale] = useState<string>(locale || "ar")
 
@@ -38,24 +40,7 @@ export default function BooksManagement() {
     fetchPosts(activeLocale)
   }, [activeLocale])
 
-  const handleDeletePost = useCallback(async (id: string) => {
-    try {
-      await axios.delete(`/api/posts/${id}`)
-      toast({
-        title: "تم الحذف",
-        description: "تم حذف المقال بنجاح.",
-      })
-      setBlogs((prev) => prev.filter((b) => b.id !== id))
-    } catch (error) {
-      console.error("Error deleting post:", error)
-      toast({
-        title: "خطأ",
-        description: "فشل حذف المقال. تأكد أنك مسجل كمسؤول.",
-        variant: "destructive",
-      })
-      throw error
-    }
-  }, [])
+  const handleDeletePost = useCallback(async (id:string) => { setDeleteId(id) }, [])
 
   const columns = useMemo(
     () => getBlogColumns(handleDeletePost),
@@ -64,8 +49,8 @@ export default function BooksManagement() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <ContentLocalizationAuditCard section="blog" />
-      <TranslationOverview kind="blog" />
+      {deleteId ? <DeleteContentDialog kind="blog" id={deleteId} onClose={()=>setDeleteId(null)} onDeleted={()=>setBlogs(prev=>prev.filter(row=>row.id!==deleteId))} /> : null}
+      <ContentToolsDialog kind="blog" scopeIds={blogs.map(row=>row.id)} />
 
       <Card className="p-8">
         <CardHeader>

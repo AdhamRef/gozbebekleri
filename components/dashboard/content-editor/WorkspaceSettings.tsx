@@ -76,6 +76,8 @@ export function WorkspaceSettings({
   catalog: EditorCatalog;
   onUploadingChange?: (uploading: boolean) => void;
 }) {
+  const [uploadCount,setUploadCount]=useState(0);
+  const notifyUploading=(uploading:boolean)=>{setUploadCount(n=>Math.max(0,n+(uploading?1:-1)));onUploadingChange?.(uploading);};
   return (
     <div className="space-y-5">
       {settingsFields(kind, settings)
@@ -127,7 +129,7 @@ export function WorkspaceSettings({
             return (
               <section key={f.key} className="rounded-xl border bg-white p-5">
                 <ImageUploadField
-                  onUploadingChange={onUploadingChange}
+                  onUploadingChange={notifyUploading}
                   label={f.label}
                   value={String(value || "")}
                   onChange={(url) => onChange(f.key, url)}
@@ -157,10 +159,11 @@ export function WorkspaceSettings({
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {list.map((url, i) => (
-                    <div key={url + i} className="space-y-2 rounded border p-3">
+                    <div key={url + i} className={`space-y-3 rounded-xl border p-3 ${i === 0 ? "sm:col-span-2 border-brand/30 bg-brand/5" : "bg-white"}`}>
                       <ImageUploadField
-                        onUploadingChange={onUploadingChange}
-                        label={i === 0 ? "الصورة الرئيسية" : `الصورة ${i + 1}`}
+                        onUploadingChange={notifyUploading}
+                        label={i === 0 ? "الصورة الرئيسية · تظهر أولًا في صفحة المشروع" : `الصورة ${i + 1}`}
+                        previewClass={i === 0 ? "w-full aspect-[16/9] max-h-96" : "w-full aspect-[16/9] max-h-56"}
                         value={url}
                         onChange={(next) =>
                           onChange(
@@ -171,11 +174,12 @@ export function WorkspaceSettings({
                           )
                         }
                       />
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        {i>0?<button type="button" disabled={uploadCount>0} className="min-h-11 rounded-lg border bg-white px-4 py-2 text-sm text-brand disabled:opacity-40" onClick={()=>onChange(f.key,[url,...list.filter((_,n)=>n!==i)])}>تعيين صورة رئيسية</button>:null}
                         <button
                           type="button"
-                          disabled={!i}
-                          className="rounded border px-3 py-1 text-xs disabled:opacity-40"
+                          disabled={!i || uploadCount>0}
+                          className="min-h-11 rounded-lg border bg-white px-4 py-2 text-sm disabled:opacity-40"
                           onClick={() => {
                             const next = [...list];
                             [next[i - 1], next[i]] = [next[i], next[i - 1]];
@@ -186,8 +190,8 @@ export function WorkspaceSettings({
                         </button>
                         <button
                           type="button"
-                          disabled={i === list.length - 1}
-                          className="rounded border px-3 py-1 text-xs disabled:opacity-40"
+                          disabled={i === list.length - 1 || uploadCount>0}
+                          className="min-h-11 rounded-lg border bg-white px-4 py-2 text-sm disabled:opacity-40"
                           onClick={() => {
                             const next = [...list];
                             [next[i + 1], next[i]] = [next[i], next[i + 1]];
@@ -201,7 +205,7 @@ export function WorkspaceSettings({
                   ))}
                 </div>
                 <ImageUploadField
-                  onUploadingChange={onUploadingChange}
+                  onUploadingChange={notifyUploading}
                   label="إضافة صورة"
                   value=""
                   onChange={(url) => {

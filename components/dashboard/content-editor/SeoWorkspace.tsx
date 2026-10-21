@@ -1,7 +1,8 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { ContentField, TextValues } from "@/lib/content-editor/contracts";
 import { ImageUploadField } from "@/app/(dashboard)/dashboard/_components/ImageUploadField";
+import { analyzeSeo } from "@/lib/content-editor/seo-analysis";
 type Faq = { q: string; a: string };
 export function SeoWorkspace({
   values,
@@ -10,6 +11,7 @@ export function SeoWorkspace({
   onChange,
   locale,
   onUploadingChange,
+  onNavigateField,
 }: {
   values: TextValues;
   fields: ContentField[];
@@ -17,11 +19,13 @@ export function SeoWorkspace({
   onChange: (key: string, value: string) => void;
   locale: string;
   onUploadingChange?: (uploading: boolean) => void;
+  onNavigateField?: (key:string)=>void;
 }) {
   const [tab, setTab] = useState("search");
   let faq: Faq[] = [];
   try {
-    faq = JSON.parse(values.faqContent || "[]");
+    const parsed: unknown = JSON.parse(values.faqContent || "[]");
+    if (Array.isArray(parsed)) faq = parsed.filter((item): item is Faq => !!item && typeof item.q === "string" && typeof item.a === "string");
   } catch {
     /* show a recoverable empty draft */
   }
@@ -30,18 +34,10 @@ export function SeoWorkspace({
     description = values.seoDescription || values.metaDescription || "";
   const writeFaq = (next: Faq[]) =>
     onChange("faqContent", JSON.stringify(next));
-  const checks = [
-    ["عنوان البحث", Boolean(values.seoTitle || values.metaTitle)],
-    ["وصف البحث", Boolean(description)],
-    ["وصف الصورة", Boolean(values.imageAlt)],
-    [
-      "العبارة المستهدفة",
-      Boolean(
-        values.seoKeyword &&
-          [title, description].join(" ").includes(values.seoKeyword),
-      ),
-    ],
-  ] as const;
+  const audit=useMemo(()=>analyzeSeo(values,locale),[values,locale]);
+  const attention=audit.findings.filter(f=>f.status!=="pass");
+  const passed=audit.findings.filter(f=>f.status==="pass");
+  const goToField=(key:string)=>{const field=fields.find(f=>f.key===key);if(field?.group==="seo"){setTab(["ogTitle","ogDescription","ogImage"].includes(key)?"share":"search");requestAnimationFrame(()=>{const target=window.document.getElementById(`content-${locale}-${key}`);target?.scrollIntoView({block:"center",behavior:"smooth"});target?.focus();});}else onNavigateField?.(key);};
   return (
     <div className="space-y-5">
       <nav
@@ -69,6 +65,7 @@ export function SeoWorkspace({
           <label className="block space-y-2 rounded-xl border bg-white p-5">
             <span className="font-semibold">العبارة الرئيسية المستهدفة</span>
             <input
+              id={`content-${locale}-seoKeyword`}
               className="w-full rounded-lg border p-3"
               value={values.seoKeyword || ""}
               onChange={(e) => onChange("seoKeyword", e.target.value)}
@@ -93,6 +90,7 @@ export function SeoWorkspace({
           <label className="flex items-center justify-between gap-3 rounded-xl border bg-white p-5">
             <span>السماح لمحركات البحث بفهرسة هذه اللغة</span>
             <input
+              id={`content-${locale}-seoNoIndex`}
               type="checkbox"
               role="switch"
               checked={values.seoNoIndex !== "true"}
@@ -101,7 +99,7 @@ export function SeoWorkspace({
               }
             />
           </label>
-          <section className="space-y-4 rounded-xl border bg-white p-5">
+          <section id={`content-${locale}-faqContent`} tabIndex={-1} className="space-y-4 rounded-xl border bg-white p-5">
             <div className="flex justify-between">
               <h3 className="font-semibold">الأسئلة الشائعة</h3>
               <button
@@ -167,7 +165,7 @@ export function SeoWorkspace({
           {fields
             .filter((f) => ["ogTitle", "ogDescription"].includes(f.key))
             .map(renderField)}
-          <section className="rounded-xl border bg-white p-5">
+          <section id={`content-${locale}-ogImage`} tabIndex={-1} className="rounded-xl border bg-white p-5">
             <ImageUploadField
               onUploadingChange={onUploadingChange}
               label="صورة المشاركة لهذه اللغة"
@@ -203,18 +201,11 @@ export function SeoWorkspace({
           <p className="text-sm text-slate-500">
             اكتمال الحقول لا يضمن ترتيبًا في محركات البحث. راجع النص والمصادر.
           </p>
-          {checks.map(([label, ok]) => (
-            <div key={label} className="flex justify-between border-b py-3">
-              <span>{label}</span>
-              <span className={ok ? "text-emerald-700" : "text-amber-700"}>
-                {ok ? "متاح" : "يحتاج مراجعة"}
-              </span>
-            </div>
-          ))}
-          <p className="text-sm">
-            عنوان البحث: {[...title].length} حرفًا · الوصف:{" "}
-            {[...description].length} حرفًا
-          </p>
+          <div className="grid grid-cols-3 gap-3 rounded-xl bg-slate-50 p-4 text-center text-sm"><div><strong className="block text-xl">{audit.words}</strong>كلمة</div><div><strong className="block text-xl">{audit.headingCount}</strong>عنوان فرعي</div><div><strong className="block text-xl">{audit.internalLinks}</strong>رابط داخلي</div></div>
+          <p role="status" className="text-sm">{attention.length ? `${attention.filter(f=>f.status==="error").length} ملاحظة أساسية · ${attention.filter(f=>f.status==="warning").length} توصية للمراجعة` : "لم يرصد الفحص المحلي ملاحظات في المسودة الحالية."}</p>
+          {attention.sort((a,b)=>a.status===b.status?0:a.status==="error"?-1:1).map(f=><article key={f.id} className={`rounded-xl border p-4 ${f.status==="error"?"border-red-200 bg-red-50":"border-amber-200 bg-amber-50/50"}`}><div className="flex flex-wrap items-center justify-between gap-2"><h4 className="text-sm font-semibold">{f.label}</h4><button type="button" onClick={()=>goToField(f.field)} className="min-h-11 rounded-lg border bg-white px-3 py-2 text-xs">مراجعة الحقل</button></div><p className="mt-2 text-sm leading-7 text-slate-600">{f.detail}</p></article>)}
+          <details className="rounded-xl border p-4"><summary className="cursor-pointer py-2 text-sm font-semibold">فحوص اجتازت المراجعة المحلية ({passed.length})</summary><div className="divide-y">{passed.map(f=><div key={f.id} className="py-3"><p className="text-sm font-semibold text-emerald-700">{f.label}</p><p className="mt-1 text-xs leading-6 text-slate-500">{f.detail}</p></div>)}</div></details>
+          <p className="text-xs leading-6 text-slate-500">الفحص يعتمد على المسودة الحالية وبنية محتواها. لا يجلب بيانات Search Console أو حجم البحث، ولا يؤكد استجابة الروابط أو ترتيب الصفحة.</p>
         </section>
       ) : null}
     </div>

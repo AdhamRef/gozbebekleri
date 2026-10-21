@@ -44,3 +44,12 @@ test("proofreading other languages is rejected and a provider failure is never p
   globalThis.fetch = async () => new Response("failure", { status: 503 });
   try { const result = await suggestEditorial({ action: "improve", locale: "ar", fields: [{ key: "title", label: "العنوان", group: "content" }], values: { title: "مشروع" }, arabic: { title: "مشروع" } }); assert.deepEqual(result.values, {}); assert.match(result.warnings[0], /503/); } finally { globalThis.fetch = fetch; if (key === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = key; }
 });
+
+test("comprehensive preparation validates revised text before structural formatting and preserves media",async()=>{
+  const raw=JSON.stringify({type:"doc",content:[{type:"paragraph",content:[{type:"text",text:"دعم 15 عائلة"}]},{type:"image",attrs:{src:"/original.jpg",alt:"الصورة"}}]});
+  let phases=0;
+  await provider(input=>{phases++;return input.currentTexts?{texts:input.currentTexts}:{layouts:[{index:0,type:"heading",level:2}]};},async()=>{
+    const result=await suggestEditorial({action:"prepare",locale:"ar",fields:[{key:"description",label:"المحتوى",group:"content",rich:true}],values:{description:raw},arabic:{description:raw}});
+    const document=JSON.parse(result.values.description);assert.equal(phases,2);assert.equal(document.content[0].type,"heading");assert.equal(document.content[0].content[0].text,"دعم 15 عائلة");assert.deepEqual(document.content[1],JSON.parse(raw).content[1]);
+  });
+});

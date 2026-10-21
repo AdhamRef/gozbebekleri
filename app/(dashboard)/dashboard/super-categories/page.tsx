@@ -1,6 +1,6 @@
 "use client";
 
-import { TranslationOverview } from "@/components/dashboard/content-editor/TranslationOverview";
+import { ContentToolsDialog } from "@/components/dashboard/content-editor/ContentToolsDialog";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
@@ -119,7 +119,7 @@ export default function SuperCategoriesPage() {
 
   return (
     <div className="space-y-4">
-      <TranslationOverview kind="super-categories" />
+      <ContentToolsDialog kind="super-categories" />
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-bold">{dt("الأقسام الكبرى")}</h1>

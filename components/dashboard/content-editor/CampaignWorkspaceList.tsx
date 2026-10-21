@@ -1,4 +1,5 @@
 "use client";
+import { DeleteContentDialog } from "./DeleteContentDialog";
 import Link from "next/link";
 import { FillMissingSeo } from "./FillMissingSeo";
 import { CONTENT_KINDS } from "@/lib/content-editor/contracts";
@@ -14,7 +15,7 @@ import {
   Languages,
 } from "lucide-react";
 import { SUPPORTED_LOCALES } from "@/lib/locales";
-import { ContentLocalizationAuditCard } from "@/app/(dashboard)/dashboard/_components/ContentLocalizationAuditCard";
+import { ContentToolsDialog } from "./ContentToolsDialog";
 type State = { complete: boolean; seoComplete: boolean; reviewed: boolean; needsUpdate?:boolean };
 type Row = {
   id: string;
@@ -44,6 +45,7 @@ const input = "rounded-lg border bg-white px-3 py-2 text-sm";
 const storageKey = "campaign-workspace-views-v1";
 const endpoint = "/api/admin/content-editor/campaigns/workspace-list";
 export function CampaignWorkspaceList() {
+  const [deleteId,setDeleteId]=useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>([]),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
@@ -289,7 +291,8 @@ export function CampaignWorkspaceList() {
   };
   return (
     <div dir="rtl" className="mx-auto max-w-[1500px] space-y-5 text-slate-800">
-      <ContentLocalizationAuditCard section="campaigns" />
+      {deleteId ? <DeleteContentDialog kind="campaigns" id={deleteId} onClose={()=>setDeleteId(null)} onDeleted={()=>void load()} /> : null}
+      <ContentToolsDialog kind="campaigns" />
       <FillMissingSeo kinds={CONTENT_KINDS} onDone={() => { void load(); }} />
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -706,6 +709,7 @@ export function CampaignWorkspaceList() {
                         >
                           تحرير
                         </Link>
+                        <button type="button" aria-label={`حذف ${row.title}`} disabled={busy || row.currentAmount > 0 || orderCount > 0} title={row.currentAmount > 0 ? "المشاريع المدعومة محمية من الحذف" : "حذف المشروع بعد تأكيد الاسم"} className={btn+" mt-2 text-red-600 disabled:opacity-40"} onClick={()=>setDeleteId(row.id)}>حذف</button>
                       </td>
                     </tr>
                   );
