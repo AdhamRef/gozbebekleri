@@ -42,6 +42,7 @@ export default function WysiwygEditor({
     onDebouncedUpdate(editor);
   }, debounceDuration);
 
+  const hydratedKeyRef = useRef<string | null>(null);
   const editor = useEditor({
     editable: isEditable,
     content: defaultValue,
@@ -51,6 +52,10 @@ export default function WysiwygEditor({
       ...editorProps,
     },
     onUpdate: (e) => {
+      // Transaction subscribers can render before the parent's onUpdate state
+      // reaches us. Record this synchronously so undo/redo isn't overwritten by
+      // the previous controlled value during that intermediate render.
+      hydratedKeyRef.current = JSON.stringify(e.editor.getJSON());
       onUpdate(e.editor);
       debouncedUpdates(e);
     },
@@ -60,8 +65,6 @@ export default function WysiwygEditor({
   // cursor every render. The parent re-creates the `defaultValue` object on
   // every keystroke (parseEditorContent(state)), so a naïve `setContent` would
   // reset selection to the end after every edit.
-  const hydratedKeyRef = useRef<string | null>(null);
-
   useEffect(() => {
     editor?.setEditable(isEditable, false);
   }, [editor, isEditable]);

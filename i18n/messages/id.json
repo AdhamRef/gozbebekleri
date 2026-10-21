@@ -46,117 +46,117 @@
   "DonationFailed": {
     "badge": "Donasi tidak dapat diproses",
     "title": "Maaf, donasi Anda belum berhasil diselesaikan",
-    "description": "Kami tidak dapat menyelesaikan pembayaran Anda. Hal ini dapat terjadi karena kartu ditolak, masalah jaringan, atau gangguan pada penyedia pembayaran. Tidak ada nominal yang ditagihkan.",
+    "description": "Pembayaran tidak dapat diselesaikan. Penyebabnya mungkin penolakan kartu, kendala koneksi, atau gangguan sementara penyedia pembayaran. Periksa status transaksi sebelum mencoba lagi.",
     "tryAgain": "Coba donasi lagi",
     "manualFallback": "Jika Anda tidak ingin mencoba lagi dengan kartu, Anda tetap dapat menyelesaikan donasi melalui transfer bank ke salah satu rekening di bawah ini.",
-    "reassurance": "You haven't been charged for the attempt. Let's get this fixed.",
-    "loading": "Looking up your donation…",
-    "severitySoft": "Card issue",
-    "severityHard": "Bank declined",
-    "howToFixTitle": "How to fix it",
-    "rawMessageToggle": "Technical details from the bank",
-    "rawCodeLabel": "Code",
+    "reassurance": "Sebelum mencoba lagi, periksa status transaksi di akun Anda atau melalui bank, terutama jika ada dana yang masih tertahan.",
+    "loading": "Memeriksa donasi Anda…",
+    "severitySoft": "Terjadi kendala pembayaran",
+    "severityHard": "Transaksi ditolak oleh bank",
+    "howToFixTitle": "Langkah selanjutnya",
+    "rawMessageToggle": "Detail teknis dari bank",
+    "rawCodeLabel": "Kode",
     "retry": {
-      "title": "Try this donation again",
-      "description": "One tap retries the exact same donation through our secure checkout — no need to re-enter the details.",
-      "cta": "Retry donation now",
-      "ctaMonthly": "Continue to monthly checkout",
-      "amountLabel": "Amount",
-      "perMonth": "/ month",
-      "moreItems": "+{count} more project(s)",
-      "monthly": "Monthly",
-      "oneTime": "One-time",
-      "securedBy": "Secure checkout powered by Stripe.",
-      "failed": "We couldn't restart your donation. Please try again or use the bank transfer below.",
-      "payforHint": "Please re-enter your card on the campaign page to complete the donation."
+      "title": "Coba kembali donasi ini",
+      "description": "Anda dapat mencoba kembali donasi yang sama melalui halaman pembayaran aman. Anda mungkin perlu memasukkan data kartu atau menyelesaikan verifikasi bank.",
+      "cta": "Coba donasi lagi",
+      "ctaMonthly": "Lanjutkan ke donasi bulanan",
+      "amountLabel": "Jumlah",
+      "perMonth": "/ bulan",
+      "moreItems": "+{count} proyek lainnya",
+      "monthly": "Donasi bulanan",
+      "oneTime": "Donasi satu kali",
+      "securedBy": "Halaman pembayaran aman.",
+      "failed": "Donasi tidak dapat dimulai ulang. Coba lagi atau gunakan transfer bank di bawah ini.",
+      "payforHint": "Masukkan kembali data kartu di halaman proyek untuk menyelesaikan donasi."
     },
     "noDonation": {
-      "title": "Pick a project to support",
-      "description": "We couldn't find the failed donation. You can start a new donation from any of our projects.",
-      "cta": "Browse projects"
+      "title": "Pilih proyek yang ingin Anda dukung",
+      "description": "Donasi tidak ditemukan. Anda dapat memulai donasi baru melalui salah satu proyek kami.",
+      "cta": "Lihat proyek"
     },
     "errors": {
       "commonTips": {
-        "tipRetry": "Try the same card again — temporary errors usually clear within a few minutes.",
-        "tipCheckBalance": "Make sure your card has enough balance for the donation amount.",
-        "tipUseAnotherCard": "Try a different card or payment method.",
-        "tipContactBank": "Call your bank to ask why the payment was blocked.",
-        "tipUseTransfer": "Use the bank transfer option below — it always works."
+        "tipRetry": "Coba kembali dengan kartu yang sama; kendala sementara dapat teratasi dalam beberapa menit.",
+        "tipCheckBalance": "Pastikan saldo kartu mencukupi untuk jumlah donasi.",
+        "tipUseAnotherCard": "Coba kartu atau metode pembayaran lain.",
+        "tipContactBank": "Hubungi bank untuk mengetahui alasan penolakan transaksi.",
+        "tipUseTransfer": "Anda dapat menggunakan transfer bank di bawah ini sebagai alternatif pembayaran kartu."
       },
       "insufficientFunds": {
-        "title": "Insufficient funds",
-        "reason": "Your bank reported that the card doesn't have enough balance to complete this donation.",
-        "fix": "Top up your card, lower the donation amount, or try a different card."
+        "title": "Saldo tidak mencukupi",
+        "reason": "Bank menyatakan bahwa saldo kartu tidak cukup untuk donasi ini.",
+        "fix": "Tambahkan saldo, kurangi jumlah donasi, atau gunakan kartu lain."
       },
       "cardDeclined": {
-        "title": "Your bank declined the card",
-        "reason": "Your card issuer refused this transaction. This is the bank's call, not ours — they don't always share the exact reason.",
-        "fix": "Try another card, or contact your bank to find out why it was blocked."
+        "title": "Kartu ditolak oleh bank",
+        "reason": "Bank menolak transaksi ini dan tidak selalu menyampaikan alasan terperinci.",
+        "fix": "Coba kartu lain atau hubungi bank untuk mengetahui alasan penolakan."
       },
       "expiredCard": {
-        "title": "The card has expired",
-        "reason": "The card you used is past its expiry date. Banks won't process payments on expired cards.",
-        "fix": "Switch to a valid card. Your bank can issue a replacement if needed."
+        "title": "Masa berlaku kartu habis",
+        "reason": "Kartu telah melewati masa berlaku sehingga tidak dapat digunakan untuk pembayaran.",
+        "fix": "Gunakan kartu yang masih berlaku. Jika perlu, minta kartu pengganti kepada bank."
       },
       "invalidCvc": {
-        "title": "The security code (CVV) was wrong",
-        "reason": "The 3- or 4-digit CVV/CVC didn't match what your bank has on file.",
-        "fix": "Double-check the security code on the back of your card and try again."
+        "title": "Kode keamanan (CVV) salah",
+        "reason": "Kode keamanan 3 atau 4 digit tidak sesuai dengan data bank.",
+        "fix": "Periksa kode keamanan pada kartu, lalu coba lagi."
       },
       "incorrectNumber": {
-        "title": "The card number looks wrong",
-        "reason": "The card number we sent didn't match a valid card at your bank.",
-        "fix": "Re-enter the 16-digit card number carefully and try again."
+        "title": "Nomor kartu tampaknya salah",
+        "reason": "Nomor yang dimasukkan tidak sesuai dengan kartu yang valid di bank.",
+        "fix": "Periksa nomor kartu, masukkan kembali dengan teliti, lalu coba lagi."
       },
       "lostOrStolen": {
-        "title": "Card reported lost or stolen",
-        "reason": "Your bank flagged this card as lost or stolen and won't allow new payments on it.",
-        "fix": "Contact your bank for a replacement, then try a different card here."
+        "title": "Kartu dilaporkan hilang atau dicuri",
+        "reason": "Bank menandai kartu ini sebagai hilang atau dicuri dan memblokir transaksi baru.",
+        "fix": "Hubungi bank untuk mendapatkan kartu pengganti dan gunakan kartu lain di sini."
       },
       "doNotHonor": {
-        "title": "Generic decline by your bank",
-        "reason": "Your bank refused the transaction without telling us exactly why. This is often a fraud-prevention block on cross-border donations.",
-        "fix": "Call the number on the back of your card and ask them to approve this charity donation, then retry."
+        "title": "Transaksi ditolak oleh bank",
+        "reason": "Bank menolak transaksi tanpa alasan terperinci. Hal ini dapat terkait dengan perlindungan pembayaran internasional.",
+        "fix": "Hubungi nomor di belakang kartu, minta persetujuan untuk donasi ini, lalu coba lagi."
       },
       "limitExceeded": {
-        "title": "Daily or monthly limit reached",
-        "reason": "Your card's daily spend limit or transaction count for the month has been exceeded.",
-        "fix": "Lower the donation amount, wait until tomorrow, or try a different card."
+        "title": "Batas harian atau bulanan tercapai",
+        "reason": "Batas pengeluaran atau jumlah transaksi kartu untuk periode ini telah terlampaui.",
+        "fix": "Kurangi jumlah donasi, tunggu hingga besok, atau gunakan kartu lain."
       },
       "currencyNotSupported": {
-        "title": "Currency not supported by your card",
-        "reason": "Your card can't process payments in the donation currency.",
-        "fix": "Switch the currency from the top-right of the site, or use a card that supports international payments."
+        "title": "Mata uang tidak didukung kartu Anda",
+        "reason": "Kartu Anda tidak dapat memproses pembayaran dalam mata uang donasi.",
+        "fix": "Ubah mata uang di bagian atas halaman atau gunakan kartu yang mendukung pembayaran internasional."
       },
       "authenticationFailed": {
-        "title": "3-D Secure check failed",
-        "reason": "Your bank's 3-D Secure verification didn't go through. This usually means the SMS/app code was wrong or timed out.",
-        "fix": "Make sure your phone is reachable, then retry. Have the bank's 3DS app ready before you tap retry."
+        "title": "Verifikasi 3-D Secure gagal",
+        "reason": "Verifikasi tambahan bank belum selesai. Kode SMS mungkin salah atau kedaluwarsa.",
+        "fix": "Siapkan ponsel Anda, coba lagi, dan segera masukkan kode verifikasi saat diminta."
       },
       "processingError": {
-        "title": "Temporary processing error",
-        "reason": "The payment didn't go through, but it's not a problem with your card — something on the bank's side glitched.",
-        "fix": "Wait a minute and retry. Most processing errors clear by themselves."
+        "title": "Kesalahan pemrosesan sementara",
+        "reason": "Terjadi kesalahan saat memproses pembayaran sehingga transaksi belum selesai.",
+        "fix": "Tunggu sebentar, lalu coba lagi. Gangguan sementara dapat teratasi dengan sendirinya."
       },
       "networkError": {
-        "title": "Connection problem",
-        "reason": "We couldn't reach the bank to process the payment. This is almost always a transient network issue.",
-        "fix": "Check your internet connection, then retry. The exact same card will most likely succeed."
+        "title": "Masalah koneksi",
+        "reason": "Bank tidak dapat dihubungi untuk memproses pembayaran. Hal ini mungkin disebabkan kendala koneksi sementara.",
+        "fix": "Periksa koneksi internet Anda, lalu coba lagi."
       },
       "issuerUnavailable": {
-        "title": "Your bank's system is unavailable",
-        "reason": "Your card issuer's payment system is temporarily down or unreachable.",
-        "fix": "Wait a few minutes and try again, or use a different card from another bank."
+        "title": "Sistem bank sedang tidak tersedia",
+        "reason": "Sistem pembayaran bank penerbit kartu sementara tidak dapat diakses.",
+        "fix": "Tunggu beberapa menit, lalu coba lagi atau gunakan kartu dari bank lain."
       },
       "fraudSuspected": {
-        "title": "Blocked as suspected fraud",
-        "reason": "Your bank's fraud system flagged the donation. Charity donations from a new merchant can trigger this — it's a false positive most of the time.",
-        "fix": "Call the number on the back of your card, confirm it's really you, and ask them to whitelist this merchant."
+        "title": "Diblokir karena dugaan penipuan",
+        "reason": "Sistem keamanan bank menandai transaksi ini sebagai mencurigakan.",
+        "fix": "Hubungi nomor di belakang kartu, konfirmasikan identitas Anda, dan minta persetujuan transaksi ini."
       },
       "generic": {
-        "title": "Payment didn't go through",
-        "reason": "Something stopped the payment from completing. We weren't given a specific reason.",
-        "fix": "Try again, switch to a different card, or use the bank transfer option below."
+        "title": "Pembayaran belum berhasil",
+        "reason": "Terjadi kendala yang menghambat pembayaran. Alasan terperinci belum tersedia.",
+        "fix": "Coba lagi, gunakan kartu lain, atau pilih transfer bank di bawah ini."
       }
     }
   },
@@ -368,6 +368,9 @@
     "news": "Berita"
   },
   "CampaignsPage": {
+    "errorTitle": "Proyek tidak dapat dimuat",
+    "clearFilters": "Hapus filter",
+    "clearSearch": "Hapus pencarian",
     "browse": "Jelajahi",
     "campaigns": "Proyek",
     "pageDescription": "Temukan proyek amal dan bantu mendukung orang-orang yang membutuhkan.",
@@ -413,7 +416,7 @@
     "story": "Deskripsi",
     "updates": "Pembaruan",
     "comments": "Komentar",
-    "info": "Info",
+    "info": "Informasi",
     "commentPlaceholder": "Bagikan pendapat atau kata-kata dukungan...",
     "send": "Kirim",
     "campaignStats": "Statistik Proyek",
@@ -446,7 +449,7 @@
     "signIn": "Masuk",
     "noUpdates": "Belum ada pembaruan.",
     "noComments": "Belum ada komentar. Jadilah yang pertama berkomentar!",
-    "edit": "Edit",
+    "edit": "Sunting",
     "delete": "Hapus",
     "save": "Simpan",
     "cancel": "Batal",
@@ -529,6 +532,7 @@
     "shareText": "Dukung proyek \"{title}\" dan bantu kami membuat perbedaan! 🤲\n{description}"
   },
   "DonationDialog": {
+    "free": "Gratis",
     "chooseDonationType": "Pilih Jenis Donasi",
     "chooseDonationTypeDesc": "Anda dapat memilih donasi satu kali atau donasi bulanan.",
     "oneTimeDonation": "Donasi Satu Kali",
@@ -630,6 +634,9 @@
     "certificateNoteBody": "Masukkan email asli Anda agar kami dapat mengirimkan sertifikat donasi resmi dan kuitansi kepada Anda."
   },
   "DonationSuccess": {
+    "unconfirmedTitle": "Pembayaran belum dikonfirmasi",
+    "unconfirmedDescription": "Konfirmasi dan kuitansi hanya ditampilkan setelah transaksi dikonfirmasi. Status mungkin perlu waktu untuk diperbarui setelah kembali dari bank. Periksa status sebelum mencoba membayar lagi.",
+    "checkStatus": "Periksa status pembayaran",
     "thankYou": "Terima kasih banyak",
     "thankYouName": "Terima kasih {name}",
     "youAreAmazing": "Anda luar biasa! Anda telah membantu mengubah kehidupan seseorang menjadi lebih baik.",
@@ -701,7 +708,7 @@
       "support": "Dukungan",
       "supportDesc": "Dapatkan bantuan dan dukungan",
       "logout": "Keluar",
-      "settingsDesc": "Security, password and notification preferences"
+      "settingsDesc": "Keamanan, kata sandi, dan preferensi notifikasi"
     },
     "toast": {
       "accountDeleted": "Akun dihapus",
@@ -716,7 +723,7 @@
       "allReceiptsDownloadSuccess": "Semua kuitansi berhasil diunduh",
       "allReceiptsDownloadFailed": "Beberapa kuitansi gagal diunduh",
       "subscriptionCancelled": "Langganan dibatalkan",
-      "notificationsUpdated": "Notification preferences saved"
+      "notificationsUpdated": "Preferensi notifikasi disimpan"
     },
     "account": {
       "name": "Nama",
@@ -733,8 +740,8 @@
       "personalInfo": "Informasi Pribadi",
       "security": "Keamanan & Preferensi",
       "gender": "Jenis Kelamin",
-      "namePlaceholder": "Your name",
-      "addressTitle": "Address"
+      "namePlaceholder": "Nama Anda",
+      "addressTitle": "Alamat"
     },
     "editDialog": {
       "notSpecified": "Tidak ditentukan",
@@ -752,7 +759,7 @@
       "deleteAccount": "Hapus Akun",
       "deleteAccountWarning": "Menghapus akun Anda akan menghapus semua data secara permanen. Tindakan ini tidak dapat dibatalkan.",
       "deleteAccountButton": "Hapus Akun",
-      "securityTitle": "Security & password"
+      "securityTitle": "Keamanan dan kata sandi"
     },
     "deleteDialog": {
       "title": "Apakah Anda yakin ingin menghapus akun?",
@@ -790,7 +797,7 @@
       "baseAmount": "Jumlah Dasar",
       "teamSupport": "Dukungan Tim",
       "transactionFees": "Biaya Transaksi",
-      "total": "Total",
+      "total": "Jumlah",
       "monthlyDonationLabel": "Donasi bulanan",
       "date": "Tanggal",
       "actions": "Tindakan",
@@ -888,26 +895,26 @@
       "requestLabel": "Permintaan #{id}",
       "closed": "Ditutup",
       "requestDetailsPreview": "Detail permintaan akan muncul di sini...",
-      "newTitle": "Open a support request",
-      "newSubtitle": "Our team will get back to you by email.",
-      "subjectLabel": "Topic",
-      "bodyLabel": "Your message",
-      "bodyPlaceholder": "Tell us what's going on…",
-      "bodyHint": "{remaining} characters remaining",
-      "submit": "Send request",
-      "sent": "Your message was sent",
-      "failed": "Could not send your message",
-      "errorMin": "Message must be at least 3 characters",
-      "historyTitle": "Your previous requests",
-      "historySubtitle": "The last 50 messages you've sent through this form.",
-      "historyEmpty": "You haven't sent any support messages yet.",
+      "newTitle": "Buat permintaan bantuan",
+      "newSubtitle": "Tim kami akan menghubungi Anda melalui email.",
+      "subjectLabel": "Topik",
+      "bodyLabel": "Pesan Anda",
+      "bodyPlaceholder": "Tuliskan detail permintaan Anda di sini…",
+      "bodyHint": "Tersisa {remaining} karakter",
+      "submit": "Kirim permintaan",
+      "sent": "Pesan Anda telah dikirim",
+      "failed": "Pesan tidak dapat dikirim",
+      "errorMin": "Pesan harus terdiri dari minimal 3 karakter",
+      "historyTitle": "Permintaan Anda sebelumnya",
+      "historySubtitle": "50 pesan terakhir yang Anda kirim melalui formulir ini.",
+      "historyEmpty": "Anda belum mengirim permintaan bantuan.",
       "subjects": {
-        "COMPLAINT": "Complaint",
-        "DONATION_ISSUE": "Donation issue",
-        "CAMPAIGN_SUPPORT": "Project / campaign question",
-        "PARTNERSHIP": "Partnership",
-        "VOLUNTEERING": "Volunteering",
-        "GENERAL": "General"
+        "COMPLAINT": "Keluhan",
+        "DONATION_ISSUE": "Masalah donasi",
+        "CAMPAIGN_SUPPORT": "Pertanyaan tentang proyek",
+        "PARTNERSHIP": "Kemitraan",
+        "VOLUNTEERING": "Kerelawanan",
+        "GENERAL": "Umum"
       }
     },
     "misc": {
@@ -918,55 +925,55 @@
       "closeMenu": "Tutup menu"
     },
     "avatar": {
-      "change": "Change photo",
-      "remove": "Remove photo",
-      "updated": "Profile photo updated",
-      "removed": "Profile photo removed",
-      "failed": "Could not update your photo",
-      "notImage": "Please pick an image file",
-      "tooLarge": "Image must be smaller than 2 MB"
+      "change": "Ubah foto",
+      "remove": "Hapus foto",
+      "updated": "Foto profil diperbarui",
+      "removed": "Foto profil dihapus",
+      "failed": "Foto tidak dapat diperbarui",
+      "notImage": "Pilih berkas gambar",
+      "tooLarge": "Ukuran gambar harus kurang dari 2 MB"
     },
     "countryPicker": {
-      "title": "Choose your country",
-      "search": "Search countries…",
-      "noResults": "No countries match your search",
-      "none": "Not specified"
+      "title": "Pilih negara Anda",
+      "search": "Cari negara…",
+      "noResults": "Tidak ada negara yang sesuai dengan pencarian",
+      "none": "Belum ditentukan"
     },
     "password": {
-      "label": "Password",
-      "descSet": "Your account is protected with a password. You can change it any time.",
-      "descUnset": "You signed in with a social provider. Set a password to also sign in with email.",
-      "change": "Change password",
-      "set": "Set a password",
-      "currentLabel": "Current password",
-      "newLabel": "New password",
-      "confirmLabel": "Confirm new password",
-      "hint": "At least 8 characters. Mix letters, numbers and a symbol for a strong password.",
-      "show": "Show password",
-      "hide": "Hide password",
-      "save": "Save password",
-      "cancel": "Cancel",
-      "success": "Password updated",
-      "failed": "Could not update your password",
-      "errorMinLength": "Password must be at least 8 characters",
-      "errorMismatch": "New passwords do not match",
-      "strengthWeak": "Weak",
-      "strengthOk": "OK",
-      "strengthStrong": "Strong"
+      "label": "Kata sandi",
+      "descSet": "Akun Anda dilindungi kata sandi yang dapat diubah kapan saja.",
+      "descUnset": "Anda masuk melalui akun sosial. Buat kata sandi agar dapat masuk juga dengan email.",
+      "change": "Ubah kata sandi",
+      "set": "Buat kata sandi",
+      "currentLabel": "Kata sandi saat ini",
+      "newLabel": "Kata sandi baru",
+      "confirmLabel": "Konfirmasi kata sandi baru",
+      "hint": "Gunakan minimal 8 karakter. Gabungkan huruf, angka, dan simbol untuk kata sandi yang kuat.",
+      "show": "Tampilkan kata sandi",
+      "hide": "Sembunyikan kata sandi",
+      "save": "Simpan kata sandi",
+      "cancel": "Batal",
+      "success": "Kata sandi diperbarui",
+      "failed": "Kata sandi tidak dapat diperbarui",
+      "errorMinLength": "Kata sandi harus terdiri dari minimal 8 karakter",
+      "errorMismatch": "Kata sandi baru tidak cocok",
+      "strengthWeak": "Lemah",
+      "strengthOk": "Sedang",
+      "strengthStrong": "Kuat"
     },
     "impact": {
-      "totalGiven": "Total given",
-      "monthlyMrr": "Monthly giving",
-      "supportedCampaigns": "Supported projects",
-      "streak": "Streak",
-      "acrossDonations": "across {count} donation(s)",
-      "acrossSubs": "across {count} subscription(s)",
-      "distinctCampaigns": "Distinct projects you've supported",
-      "monthsStreak": "{count} month(s) in a row",
-      "noStreak": "Start a streak",
-      "lastDonation": "Last donation",
-      "badgesEarned": "{count} badge(s) earned",
-      "badgesHint": "View your badges on the homepage donor board"
+      "totalGiven": "Total donasi Anda",
+      "monthlyMrr": "Donasi bulanan Anda",
+      "supportedCampaigns": "Proyek yang Anda dukung",
+      "streak": "Rangkaian donasi Anda",
+      "acrossDonations": "melalui {count} donasi",
+      "acrossSubs": "melalui {count} langganan",
+      "distinctCampaigns": "Jumlah proyek berbeda yang Anda dukung",
+      "monthsStreak": "{count} bulan berturut-turut",
+      "noStreak": "Mulai rangkaian donasi Anda",
+      "lastDonation": "Donasi terakhir",
+      "badgesEarned": "Anda memperoleh {count} lencana",
+      "badgesHint": "Lihat lencana Anda di papan donatur pada beranda"
     }
   },
   "MessageSubjects": {
