@@ -4,14 +4,15 @@ import MainPage from "./_components/MainPage";
 
 
 interface CategoryProps {
-  params: {
+  params: Promise<{
     locale: string;
     categoryId: string;
-  };
+  }>;
 }
 
 // Generate metadata for the category page
-export async function generateMetadata({ params }: CategoryProps): Promise<Metadata> {
+export async function generateMetadata(args: CategoryProps): Promise<Metadata> {
+  const params = await args.params;
   const fetchCategoryData = async (): Promise<Category> => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "";
@@ -58,6 +59,7 @@ export async function generateMetadata({ params }: CategoryProps): Promise<Metad
   };
 }
 
-export default function PostCategoryPage({ params }: CategoryProps) {
+export default async function PostCategoryPage(args: CategoryProps) {
+  const params = await args.params;
   return <MainPage id={params.categoryId} />;
 }
