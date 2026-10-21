@@ -9,12 +9,12 @@ import {
   documentFor,
   readContent,
   saveWorkspace,
+  fillMissingSeo,
 } from "@/lib/content-editor/service";
 import { contentStore } from "@/lib/content-editor/store";
 import { isValidLocale } from "@/lib/locales";
 import { queueAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
 import { revalidatePath } from "next/cache";
-import { missingSeoChanges } from "@/lib/content-editor/seo-fill";
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ kind: string; id: string }> };
 async function access(ctx: Context) {
@@ -73,17 +73,12 @@ export async function PUT(request: NextRequest, ctx: Context) {
       throw new ContentError("أعد تحميل المحتوى قبل الحفظ");
     let result;
     if (body.action === "fill-missing-seo") {
-      const row = await readContent(contentStore, kind, id);
-      const current = documentFor(kind, row);
-      if (current.revision !== body.revision) throw new ContentError("تغير المحتوى. أعد تحميله قبل الاستكمال.", 409);
-      const localeChanges = missingSeoChanges(kind, row);
-      const locale = Object.keys(localeChanges)[0];
-      if (!locale) return NextResponse.json({ ...current, filledFields: 0 }, {headers:{"Cache-Control":"no-store"}});
-      const filledFields = Object.values(localeChanges).reduce((sum, values) => sum + Object.keys(values).length, 0);
-      result = await saveWorkspace(contentStore, { kind, id, revision:body.revision, locale, changes:localeChanges[locale], localeChanges });
-      queueAuditLog({...auditActorFromDashboardSession(session!), action:"CONTENT_EDITOR_SAVE", entityType:CONFIG[kind].model, entityId:id, messageAr:"استكمال SEO الناقص من النص المحفوظ", metadata:{filledFields, locales:Object.keys(localeChanges)}});
-      revalidatePath("/", "layout");
-      return NextResponse.json({...result, filledFields}, {headers:{"Cache-Control":"no-store"}});
+      result = await fillMissingSeo(contentStore, {kind, id, revision:body.revision});
+      if (result.filledFields) {
+        queueAuditLog({...auditActorFromDashboardSession(session!), action:"CONTENT_EDITOR_SAVE", entityType:CONFIG[kind].model, entityId:id, messageAr:"استكمال SEO الناقص من النص المحفوظ", metadata:{filledFields:result.filledFields}});
+        revalidatePath("/", "layout");
+      }
+      return NextResponse.json(result, {headers:{"Cache-Control":"no-store"}});
     }
     if (body.action === "slug" && kind === "categories")
       result = await changeCategorySlug(contentStore, {

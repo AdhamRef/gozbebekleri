@@ -16,6 +16,7 @@ import {
   fingerprint,
   saveContent,
   saveWorkspace,
+  fillMissingSeo,
   type Delegate,
   type Store,
 } from "../../lib/content-editor/service";
@@ -34,6 +35,26 @@ import {
   safeEditorUrl,
 } from "../../lib/content-editor/workspace-settings";
 const id = "111111111111111111111111";
+test("optimized SEO completion preserves content and totals, rejects stale revisions and rolls back failed translation writes", async () => {
+  const initial = {id, title:"مشروع", description:"وصف", currentAmount:864.603, baselineAmount:300, slug:"fixed", translations:[{locale:"en",title:"Project",description:"Details",seoTitle:"Manual"}],updates:[]};
+  const m = memory("campaigns",initial);
+  m.fail("upsert");
+  await assert.rejects(fillMissingSeo(m.store,{kind:"campaigns",id,revision:fingerprint(initial)}));
+  assert.deepEqual(m.read(),initial);
+  m.fail("");
+  const saved = await fillMissingSeo(m.store,{kind:"campaigns",id,revision:fingerprint(initial)});
+  assert.equal(saved.filledFields,9);
+  assert.equal(saved.values.en.seoTitle,"Manual");
+  assert.equal(saved.values.en.seoDescription,"Details");
+  assert.equal(m.read().currentAmount,initial.currentAmount);
+  assert.equal(m.read().baselineAmount,initial.baselineAmount);
+  assert.equal(m.read().description,initial.description);
+  assert.equal(m.read().slug,initial.slug);
+  await assert.rejects(fillMissingSeo(m.store,{kind:"campaigns",id,revision:fingerprint(initial)}),{status:409});
+  const again = await fillMissingSeo(m.store,{kind:"campaigns",id,revision:saved.revision});
+  assert.equal(again.filledFields,0);
+  assert.equal(again.revision,saved.revision);
+});
 test("missing SEO saves atomically across languages and a second pass has no writes", async () => {
   const initial = {id, title:"مشروع", description:"وصف", goalType:"OPEN", currentAmount:100, slug:"unchanged", translations:[{locale:"en", title:"Project", description:"Description", seoTitle:"Manual SEO"}], updates:[]};
   const m = memory("campaigns", initial);
