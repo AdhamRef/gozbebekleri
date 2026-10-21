@@ -7,8 +7,9 @@ import type {
   TextValues,
 } from "@/lib/content-editor/contracts";
 import { BannerPreview } from "./BannerPreview";
-import { parseSuggestedDonations } from "@/lib/campaign/suggested-donations";
+import { parseSuggestedDonations, resolveSuggestedAmountsForCurrency } from "@/lib/campaign/suggested-donations";
 import { parseSuggestedShareCounts } from "@/lib/campaign/campaign-modes";
+import { parseShareLabels, resolveShareUnit } from "@/lib/campaign/share-labels";
 function plain(value: string): string {
   try {
     const doc = JSON.parse(value);
@@ -45,7 +46,7 @@ export function WorkspacePreview({
       "",
   );
   const image = String(
-    (Array.isArray(settings.images)
+    values.image || (Array.isArray(settings.images)
       ? settings.images[0]
       : settings.heroImage || settings.image) || "",
   );
@@ -145,14 +146,9 @@ export function WorkspacePreview({
               ) : null}
               <div className="grid grid-cols-3 gap-2">
                 {(settings.fundraisingMode === "SHARES"
-                  ? Array.isArray(settings.defaultShareCounts)
-                    ? settings.defaultShareCounts
-                    : parseSuggestedShareCounts(settings.suggestedShareCounts)
+                  ? parseSuggestedShareCounts(settings.suggestedShareCounts)
                         .counts
-                  : Array.isArray(settings.defaultDonationAmounts)
-                    ? settings.defaultDonationAmounts
-                    : parseSuggestedDonations(settings.suggestedDonations)
-                        .amounts
+                  : resolveSuggestedAmountsForCurrency(parseSuggestedDonations(settings.suggestedDonations),"USD")
                 )
                   .slice(0, 6)
                   .map((v, i) => (
@@ -161,7 +157,7 @@ export function WorkspacePreview({
                       className="flex-1 rounded border px-2 py-2 text-center text-xs"
                     >
                       {String(v)}{" "}
-                      {settings.fundraisingMode === "SHARES" ? "سهم" : "USD"}
+                      {settings.fundraisingMode === "SHARES" ? resolveShareUnit(parseShareLabels(settings.shareLabels),locale,Number(v)) || "سهم" : "USD"}
                     </span>
                   ))}
               </div>

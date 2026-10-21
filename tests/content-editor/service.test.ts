@@ -33,6 +33,18 @@ import {
   safeEditorUrl,
 } from "../../lib/content-editor/workspace-settings";
 const id = "111111111111111111111111";
+test("invalid advanced relations roll back content and every campaign configuration", async () => {
+  const initial={id,title:"مشروع",description:"وصف",goalType:"OPEN",translations:[],updates:[],currentAmount:100,suggestedDonations:{amounts:[10],byCurrency:{EUR:[20]}}};
+  const m=memory("campaigns",initial);
+  await assert.rejects(saveWorkspace(m.store,{kind:"campaigns",id,revision:fingerprint(initial),locale:"ar",changes:{title:"عنوان جديد"},settings:{suggestedDonations:{amounts:[30],byCurrency:{EUR:[40]}},campaignUpdates:[{id:"foreign",title:"x",description:"y",translations:[]}]}}));
+  assert.deepEqual(m.read(),initial);
+});
+test("forged Arabic campaign image cannot overwrite the native gallery", async () => {
+  const initial={id,title:"مشروع",description:"وصف",goalType:"OPEN",translations:[],updates:[],images:["/original.jpg"]};
+  const m=memory("campaigns",initial);
+  await assert.rejects(saveWorkspace(m.store,{kind:"campaigns",id,revision:fingerprint(initial),locale:"ar",changes:{image:"/forged.jpg"}}));
+  assert.deepEqual(m.read(),initial);
+});
 test("legacy category publication matches public readers without overriding explicit false", () => {
   for (const isActive of [undefined, null, true]) {
     assert.equal(settingsFor("categories", { isActive }).isActive, true);

@@ -209,6 +209,7 @@ export function fieldsFor(
   row: ContentRecord,
 ): ContentField[] {
   const fields = [...CONFIG[kind].fields];
+  if (kind === "campaigns" || kind === "blog") fields.push({key:"image",label:"صورة هذه اللغة (فارغ = الصورة الافتراضية)",group:"content",locked:true,optional:true});
   if (kind !== "urgent-banners")
     fields.push(
       {
@@ -341,7 +342,7 @@ export function validateChanges(
           ? 200
           : key === "seoKeyword"
             ? 200
-            : ["ogImage", "videoUrl"].includes(key)
+            : ["ogImage", "videoUrl", "image"].includes(key)
               ? 2048
               : 200000;
   const entries = Object.entries(value);
@@ -356,7 +357,7 @@ export function validateChanges(
     if (key === "seoNoIndex" && val !== "" && val !== "true" && val !== "false")
       throw new Error("حالة الفهرسة غير صالحة");
     if (
-      key === "ogImage" &&
+      ["ogImage", "image"].includes(key) &&
       typeof val === "string" &&
       val &&
       (!/^(https?:\/\/|\/[^/])/.test(val) || !safeEditorUrl(val))

@@ -4,6 +4,7 @@ import { parseIstanbulSchedule, validateSchedule, safeEditorUrl } from "./urls";
 export { safeEditorUrl } from "./urls";
 import type { ContentKind, ContentRecord } from "./contracts";
 import { BANNER_PAGES } from "../minbar/banner-placements";
+import { CAMPAIGN_CONFIG_KEYS, validateCampaignConfig, validateFinancialAdjustment, validateReligiousAdjustment, validateSlugAdjustment } from "./advanced-settings";
 export function validateWorkspaceSettings(
   kind: ContentKind,
   row: ContentRecord,
@@ -14,6 +15,14 @@ export function validateWorkspaceSettings(
     throw new Error("إعدادات غير صالحة");
   const result: ContentRecord = {};
   for (const [key, value] of Object.entries(input)) {
+    if (["super-categories", "urgent-banners"].includes(kind) && key === "slugAdjustment") { validateSlugAdjustment(value); continue; }
+    if (kind === "campaigns" && CAMPAIGN_CONFIG_KEYS.includes(key)) {
+      result[key] = validateCampaignConfig(key, value);
+      continue;
+    }
+    if (kind === "campaigns" && key === "campaignUpdates") continue;
+    if (kind === "campaigns" && key === "financialAdjustment") { validateFinancialAdjustment(value); continue; }
+    if (kind === "super-categories" && key === "religiousTextAdjustment") { validateReligiousAdjustment(value); continue; }
     const spec = settingsFields(kind, row).find((f) => f.key === key);
     if (kind === "super-categories" && ["blocks", "items"].includes(key))
       continue;

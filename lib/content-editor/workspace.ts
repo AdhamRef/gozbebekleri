@@ -1,6 +1,8 @@
 import type { ContentKind, ContentRecord } from "./contracts";
 import { parseSuggestedDonations } from "../campaign/suggested-donations";
 import { parseSuggestedShareCounts } from "../campaign/campaign-modes";
+import { parseSuggestedTeamSupport } from "../campaign/suggested-team-support";
+import { parseShareLabels } from "../campaign/share-labels";
 export type EditorSection = { id: string; label: string; icon: string };
 export const EDITOR_SECTIONS: Record<ContentKind, EditorSection[]> = {
   campaigns: [
@@ -150,7 +152,7 @@ export function settingsFor(
   kind: ContentKind,
   row: ContentRecord,
 ): ContentRecord {
-  const result = Object.fromEntries(
+  const result: ContentRecord = Object.fromEntries(
     settingsFields(kind, row).map((f) => [
       f.key,
       row[f.key] ??
@@ -173,6 +175,15 @@ export function settingsFor(
     ]),
   );
   if (kind === "campaigns") {
+    result.suggestedDonations = parseSuggestedDonations(row.suggestedDonations);
+    result.suggestedShareCounts = parseSuggestedShareCounts(row.suggestedShareCounts);
+    result.suggestedTeamSupport = row.suggestedTeamSupport ? parseSuggestedTeamSupport(row.suggestedTeamSupport) : null;
+    result.shareLabels = parseShareLabels(row.shareLabels);
+    result.campaignUpdates = (Array.isArray(row.updates) ? row.updates : []).map((update: ContentRecord) => ({
+      id: update.id, title: update.title || "", description: update.description || "",
+      image: update.image || "", videoUrl: update.videoUrl || "",
+      translations: (Array.isArray(update.translations) ? update.translations : []).map((t: ContentRecord) => ({locale:t.locale,title:t.title || "",description:t.description || ""})),
+    }));
     result.defaultDonationAmounts = parseSuggestedDonations(
       row.suggestedDonations,
     ).amounts;

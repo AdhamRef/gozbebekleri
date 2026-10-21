@@ -3,6 +3,7 @@ import type { ContentKind, ContentRecord } from "./contracts";
 import { safeEditorUrl } from "./workspace-settings";
 import { validateSectionLinks } from "./urls";
 import { HAS_IMPACT_BACKING_CAMPAIGNS } from "./site-capabilities";
+import { saveCampaignAdvanced, saveReligiousAdjustment, saveSlugAdjustment } from "./advanced-relations";
 const validId = (v: unknown) =>
   typeof v === "string" && /^[a-f0-9]{24}$/i.test(v);
 const kinds = [
@@ -24,9 +25,12 @@ export async function saveWorkspaceRelations(
   row: ContentRecord,
   input: unknown,
 ) {
-  if (kind !== "super-categories" || !input || typeof input !== "object")
-    return;
+  if (!input || typeof input !== "object" || Array.isArray(input)) return;
   const settings = input as ContentRecord;
+  if (["super-categories", "urgent-banners"].includes(kind)) await saveSlugAdjustment(db, kind === "super-categories" ? "superCategory" : "urgentBanner", id, settings);
+  if (kind === "campaigns") return saveCampaignAdvanced(db, id, row, settings);
+  if (kind !== "super-categories") return;
+  await saveReligiousAdjustment(db, id, settings);
   if (
     Object.keys(settings).some(
       (key) =>
