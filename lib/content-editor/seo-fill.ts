@@ -31,7 +31,11 @@ export function missingSeoChanges(kind: ContentKind, row: ContentRecord): Record
     const values = valuesFor(kind, row, locale);
     const title = seoPlainText(values[kind === "categories" ? "name" : "title"] || "");
     if (!title || (locale !== "ar" && /[\u0600-\u06ff]/.test(title) && title === seoPlainText(source[kind === "categories" ? "name" : "title"] || ""))) continue;
-    const body = ["description", "heroLead", "intro", "subtitle", "content"].map(key => seoPlainText(values[key] || "")).find(Boolean) || title;
+    const body = ["description", "heroLead", "intro", "subtitle", "content"].map(key => {
+      const text = seoPlainText(values[key] || "");
+      // A copied source body is not localized copy, even when the title was translated.
+      return locale !== "ar" && /[\u0600-\u06ff]/.test(text) && text === seoPlainText(source[key] || "") ? "" : text;
+    }).find(Boolean) || title;
     const candidates: TextValues = {
       [kind === "campaigns" ? "seoTitle" : "metaTitle"]: excerpt(title, 70),
       [kind === "campaigns" ? "seoDescription" : "metaDescription"]: excerpt(body, 170),

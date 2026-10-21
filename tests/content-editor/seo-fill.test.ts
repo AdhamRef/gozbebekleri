@@ -30,6 +30,8 @@ test("SEO extracts text and is idempotent, bounded and does not invent a descrip
   assert.ok(long.ar.metaTitle.length <= 70); assert.ok(long.ar.metaDescription.length <= 170);
   const banner = missingSeoChanges("urgent-banners",{title:"Banner",description:"Details"});
   assert.deepEqual(banner.ar,{imageAlt:"Banner"});
+  const copied = missingSeoChanges("campaigns", {title:"مشروع",description:"وصف عربي",translations:[{locale:"en",title:"Project",description:"وصف عربي"}]});
+  assert.equal(copied.en.seoDescription,"Project");
 });
 test("Morocco defaults to USD while old MAD amounts, links and payment currency validation remain supported", () => {
   assert.equal(currencyForCountry("MA"),"USD");
