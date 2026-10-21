@@ -112,7 +112,7 @@ export async function POST(
       for(let offset=0;offset<translatedLocales.length;offset+=2){
         await Promise.all(translatedLocales.slice(offset,offset+2).map(async locale=>{
           const t=result.translations[locale];
-          try{const remaining=requestDeadline-Date.now();if(remaining<3000)throw new Error("review budget exhausted");const issues=await reviewTranslationNotes({locale,arabic:source,current:{...t.fields,...t.richFields},fields:selected},AbortSignal.timeout(Math.min(25000,remaining)));t.warnings.push(...issues.map(issue=>`مراجعة دلالية: ${issue}`));}
+          try{const remaining=requestDeadline-Date.now();if(remaining<3000)throw new Error("review budget exhausted");const issues=await reviewTranslationNotes({locale,arabic:source,current:{...t.fields,...t.richFields},fields:selected},AbortSignal.timeout(Math.min(25000,remaining)));t.warnings.push(...issues.map(issue=>`ملاحظة آلية للمراجعة: ${issue}`));}
           catch{t.warnings.push("لم تكتمل المراجعة الدلالية الآلية؛ راجع المعنى والمصطلحات مقابل العربية قبل الحفظ.");}
         }));
       }

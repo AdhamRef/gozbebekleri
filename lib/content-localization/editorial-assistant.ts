@@ -37,10 +37,18 @@ const layout = layouts.get(index); if (!layout) { formatted.push(node); return; 
   return JSON.stringify({ ...doc, content: formatted });
 }
 export async function reviewTranslationNotes(input: { locale: string; arabic: TextValues; current: TextValues; fields: ContentField[] }, signal=AbortSignal.timeout(90000)): Promise<string[]> {
-  const context = input.fields.filter(f => !f.locked && f.group === "content" && hasText(input.arabic[f.key])).map(f => ({ field: f.label, arabic: seoPlainText(input.arabic[f.key]), current: seoPlainText(input.current[f.key] || "") }));
-  const result = await model({ locale: input.locale, fields: context }, editorialLanguagePolicy(input.locale) + '\nCompare the existing target translation against Arabic. Identify mistranslations, missing/added facts, wrong numbers, terminology inconsistencies and unnatural literal grammar. Return {"issues":["short specific explanations in Arabic"]}. An empty array means no correction was identified. These are editorial observations, not external fact verification.', signal);
-  if (!Array.isArray(result.issues) || result.issues.some(v => typeof v !== "string")) throw new Error("تعذر استكمال مراجعة الترجمة");
-  return (result.issues as string[]).slice(0, 20).map(v => v.slice(0, 1000));
+  const context = input.fields.filter(f => !f.locked && f.group === "content" && hasText(input.arabic[f.key])).map(f => ({ key: f.key, field: f.label, arabic: seoPlainText(input.arabic[f.key]), current: seoPlainText(input.current[f.key] || "") }));
+  const result = await model({ locale: input.locale, fields: context }, editorialLanguagePolicy(input.locale) + '\nCompare the target translation against Arabic. Report only concrete mistranslations, omitted/added facts, wrong numbers, inconsistent terminology or demonstrably ungrammatical language. Accept accurate paraphrases, translated project titles and geographic demonyms. Do not require Arabic words inside the target language unless an explicitly protected legal identifier or quotation requires them. Gözbebekleri, Qurrat Al-Ayoun, Qurrat Al-Ouyun and قرة العيون identify the same organization here. Do not flag those equivalent renderings as invented entities. A stylistic preference is not an error. Return {"issues":[{"key":"field key","category":"meaning|omission|addition|grammar|terminology","sourceQuote":"exact short excerpt from Arabic","targetQuote":"exact short excerpt from target","reason":"short specific explanation in Arabic"}]}. Use an empty sourceQuote only for an addition or target grammar issue, and an empty targetQuote only for an omission. Every issue must cite actual supplied text; never invent excerpts. Do not say a phrase is correct and then require a change. Return an empty array when there is no demonstrable problem. These are editorial observations for human review, not external fact verification.', signal);
+  if (!Array.isArray(result.issues)) throw new Error("تعذر استكمال مراجعة الترجمة");
+  const normalize=(text:string)=>text.replace(/\s+/g," ").trim();
+  return result.issues.slice(0, 20).map(value=>{
+    if(!value || typeof value!=="object" || Array.isArray(value)) throw new Error("ملاحظة مراجعة بلا دليل نصي صالح");
+    const issue=value as Record<string,unknown>, field=context.find(f=>f.key===issue.key);
+    if(!field || !["meaning","omission","addition","grammar","terminology"].includes(String(issue.category)) || typeof issue.sourceQuote!=="string" || typeof issue.targetQuote!=="string" || typeof issue.reason!=="string" || !issue.reason.trim()) throw new Error("ملاحظة مراجعة بلا دليل نصي صالح");
+    const source=normalize(issue.sourceQuote),target=normalize(issue.targetQuote);
+    if((!source&&!target) || (source&&!normalize(field.arabic).includes(source)) || (target&&!normalize(field.current).includes(target)) || (!source&&!["addition","grammar"].includes(String(issue.category))) || (!target&&issue.category!=="omission")) throw new Error("ملاحظة المراجعة لا تطابق النص المعروض");
+    return `${field.field}: ${issue.reason.trim().slice(0,500)} · العربي: «${source.slice(0,180)||"—"}» · الترجمة: «${target.slice(0,180)||"—"}»`;
+  });
 }
 export async function suggestEditorial(input: { action: EditorialAction; locale: string; fields: ContentField[]; values: TextValues; arabic: TextValues; keyword?: string }) {
   const { action, locale, fields, values, arabic } = input;
