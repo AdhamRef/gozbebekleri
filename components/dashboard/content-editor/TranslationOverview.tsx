@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { LOCALES, SUPPORTED_LOCALES } from "@/lib/locales";
 import { CONFIG, type ContentKind } from "@/lib/content-editor/contracts";
+import { FillMissingSeo } from "./FillMissingSeo";
 type Status = {
   complete: boolean;
   missing: string[];
@@ -80,6 +81,7 @@ export function TranslationOverview({
   ).length;
   return (
     <section dir="rtl" className="space-y-4 rounded-xl border bg-white p-5">
+      <FillMissingSeo kinds={[kind]} onDone={load} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold">
           اللغات والمراجعة · {CONFIG[kind].label}

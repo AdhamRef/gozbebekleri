@@ -28,11 +28,34 @@ import {
 import { sessionHasDashboardPermission } from "../../lib/dashboard/permissions";
 import type { Session } from "next-auth";
 import { settingsFor } from "../../lib/content-editor/workspace";
+import { missingSeoChanges } from "../../lib/content-editor/seo-fill";
 import {
   validateWorkspaceSettings,
   safeEditorUrl,
 } from "../../lib/content-editor/workspace-settings";
 const id = "111111111111111111111111";
+test("missing SEO saves atomically across languages and a second pass has no writes", async () => {
+  const initial = {id, title:"مشروع", description:"وصف", goalType:"OPEN", currentAmount:100, slug:"unchanged", translations:[{locale:"en", title:"Project", description:"Description", seoTitle:"Manual SEO"}], updates:[]};
+  const m = memory("campaigns", initial);
+  const localeChanges = missingSeoChanges("campaigns", initial);
+  const saved = await saveWorkspace(m.store, {kind:"campaigns", id, revision:fingerprint(initial), locale:"ar", changes:localeChanges.ar, localeChanges});
+  assert.equal(saved.values.ar.seoDescription,"وصف");
+  assert.equal(saved.values.en.seoTitle,"Manual SEO");
+  assert.equal(saved.values.en.seoDescription,"Description");
+  assert.equal(m.read().currentAmount,100);
+  assert.equal(m.read().slug,"unchanged");
+  assert.deepEqual(missingSeoChanges("campaigns",m.read()),{});
+});
+test("settings-only workspace saves accept an empty text delta without changing amounts or translations", async () => {
+  const initial = {id, title:"مشروع", description:"وصف", goalType:"OPEN", currentAmount:864.6, translations:[], updates:[]};
+  const m = memory("campaigns", initial);
+  const saved = await saveWorkspace(m.store, {kind:"campaigns", id, revision:fingerprint(initial), locale:"ar", changes:{}, settings:{suggestedDonations:{amounts:[10,25],byCurrency:{EUR:[20]}}}});
+  assert.equal(saved.values.ar.title, initial.title);
+  assert.equal(m.read().currentAmount, initial.currentAmount);
+  assert.deepEqual(m.read().translations, []);
+  assert.deepEqual(m.read().suggestedDonations, {amounts:[10,25],byCurrency:{EUR:[20]}});
+  for (const changes of [null, undefined, [], "", {title: 4}, {forged:"x"}]) assert.throws(() => validateChanges(fieldsFor("campaigns", initial), changes));
+});
 test("invalid advanced relations roll back content and every campaign configuration", async () => {
   const initial={id,title:"مشروع",description:"وصف",goalType:"OPEN",translations:[],updates:[],currentAmount:100,suggestedDonations:{amounts:[10],byCurrency:{EUR:[20]}}};
   const m=memory("campaigns",initial);

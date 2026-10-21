@@ -25,6 +25,9 @@ export const SUPPORTED_CURRENCY_OPTIONS = [
   { code: "MAD", symbol: "د.م.", name: "Moroccan Dirham" },
 ] as const satisfies readonly SupportedCurrencyOption[];
 
+/** Available for new selections. Legacy MAD remains supported for saved amounts and payment records. */
+export const PUBLIC_CURRENCY_OPTIONS = SUPPORTED_CURRENCY_OPTIONS.filter((option) => option.code !== "MAD");
+
 /** For admin selects (campaign suggested amounts / share prices, etc.) */
 export const SUPPORTED_CURRENCY_CODES: readonly string[] = SUPPORTED_CURRENCY_OPTIONS.map(
   (o) => o.code
