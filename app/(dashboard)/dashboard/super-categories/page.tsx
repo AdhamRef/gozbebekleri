@@ -226,6 +226,7 @@ export default function SuperCategoriesPage() {
               header: dt("منشور"),
               cell: (r) => (
                 <Switch
+                  aria-label={`نشر القسم ${r.title}`}
                   checked={r.isActive}
                   disabled={togglingId === r.id || isDirty || isSaving}
                   onCheckedChange={(v) => toggleActive(r, v)}
@@ -233,27 +234,31 @@ export default function SuperCategoriesPage() {
               ),
             },
             {
-              header: "",
-              className: "w-24",
+              header: dt("الإجراءات"),
+              className: "w-44",
               cell: (r) => (
                 <div className="flex gap-1">
                   <Button
                     disabled={isDirty || isSaving}
                     variant="ghost"
-                    size="icon"
+                    size="sm"
+                    className="min-h-11 gap-2"
+                    aria-label={`تحرير القسم ${r.title}`}
                     onClick={() =>
                       router.push(`/dashboard/content/super-categories/${r.id}`)
                     }
                   >
-                    <Pencil className="h-4 w-4" />
+                    <Pencil className="h-4 w-4" />{dt("تحرير")}
                   </Button>
                   <Button
                     disabled={isDirty || isSaving}
                     variant="ghost"
-                    size="icon"
+                    size="sm"
+                    className="min-h-11 gap-2"
+                    aria-label={`حذف القسم ${r.title}`}
                     onClick={() => setDeleteTarget(r)}
                   >
-                    <Trash2 className="h-4 w-4 text-red-600" />
+                    <Trash2 className="h-4 w-4 text-red-600" />{dt("حذف")}
                   </Button>
                 </div>
               ),

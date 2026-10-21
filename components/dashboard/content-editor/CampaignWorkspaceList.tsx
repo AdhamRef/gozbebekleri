@@ -644,12 +644,7 @@ export function CampaignWorkspaceList() {
                         >
                           {row.title}
                         </Link>
-                        <small
-                          className="mt-1 block text-[10px] text-slate-400"
-                          dir="ltr"
-                        >
-                          {row.id}
-                        </small>
+
                       </td>
                       <td className="p-4">
                         <div className="flex flex-wrap gap-1">
