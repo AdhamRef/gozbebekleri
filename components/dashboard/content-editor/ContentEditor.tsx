@@ -170,7 +170,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
     uploads > 0
     : false;
   useEffect(() => {
-    if (!dirty) return;
+    if (!dirty && busy !== "save") return;
     const unload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
     };
@@ -187,7 +187,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
       window.removeEventListener("beforeunload", unload);
       window.document.removeEventListener("click", navigation, true);
     };
-  }, [dirty]);
+  }, [dirty, busy]);
   const edit = (key: string, value: string) => {
     if (valuesRef.current[locale]?.[key] === value) return;
     if (busy === "save" || busy === "slug" || busy === "approve" || busy === "history") return;
@@ -625,6 +625,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
             <button
               type="button"
               className={button}
+              disabled={Boolean(busy)}
               onClick={() => setProposal(null)}
             >
               إغلاق
