@@ -155,7 +155,8 @@ export function settingsFor(
       f.key,
       row[f.key] ??
         (f.type === "boolean"
-          ? f.key === "navigationVisible"
+          ? f.key === "navigationVisible" ||
+            (kind === "categories" && f.key === "isActive")
           : ["images", "numbers"].includes(f.type) ||
               [
                 "categoryIds",

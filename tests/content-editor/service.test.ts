@@ -27,11 +27,20 @@ import {
 } from "../../lib/content-editor/urls";
 import { sessionHasDashboardPermission } from "../../lib/dashboard/permissions";
 import type { Session } from "next-auth";
+import { settingsFor } from "../../lib/content-editor/workspace";
 import {
   validateWorkspaceSettings,
   safeEditorUrl,
 } from "../../lib/content-editor/workspace-settings";
 const id = "111111111111111111111111";
+test("legacy category publication matches public readers without overriding explicit false", () => {
+  for (const isActive of [undefined, null, true]) {
+    assert.equal(settingsFor("categories", { isActive }).isActive, true);
+  }
+  assert.equal(settingsFor("categories", { isActive: false }).isActive, false);
+  assert.equal(settingsFor("categories", {}).navigationVisible, true);
+  assert.equal(settingsFor("categories", { navigationVisible: false }).navigationVisible, false);
+});
 test("editor settings never accept financial totals or baseline amounts", () => {
   for (const key of [
     "currentAmount",
