@@ -561,7 +561,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
       dir="rtl"
       className="mx-auto max-w-[1500px] space-y-6 pb-12 text-slate-800"
     >
-      <div className="sticky top-0 z-20 -mx-1 rounded-2xl border border-slate-200 bg-white/95 px-4 shadow-sm backdrop-blur sm:px-6">
+      <div className="sticky top-16 z-10 -mx-1 rounded-2xl border border-slate-200 bg-white/95 px-4 shadow-sm backdrop-blur sm:px-6">
         <header className="flex flex-col gap-3 border-b border-slate-100 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 w-full flex-1">
             <Link className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-brand" href={`/dashboard/${kind}`}>
@@ -712,7 +712,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
       >
         <nav
           aria-label="أقسام المحرر"
-          className="flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 lg:sticky lg:top-44 lg:flex-col lg:overflow-visible"
+          className="flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 lg:sticky lg:top-64 lg:flex-col lg:overflow-visible"
         >
           {EDITOR_SECTIONS[kind].map((item) => {
             const Icon = sectionIcons[item.icon as keyof typeof sectionIcons];
