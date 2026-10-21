@@ -36,7 +36,7 @@ test("improvement processes all long-document batches and keeps rich structure w
   });
 });
 test("translation review sends both Arabic and existing target text for semantic comparison", async () => {
-  await provider(input => { const entries = input.fields as { arabic: string; current: string }[]; assert.equal(entries[0].arabic, "دعم 15 عائلة"); assert.equal(entries[0].current, "Help 99 families"); return { issues: ["المبلغ أو عدد المستفيدين لا يطابق العربية"] }; }, async () => { const result = await reviewTranslationNotes({ locale: "en", fields: [{ key: "title", label: "العنوان", group: "content" }], arabic: { title: "دعم 15 عائلة" }, current: { title: "Help 99 families" } }); assert.equal(result.length, 1); });
+  await provider(input => { const entries = input.fields as { arabic: string; current: string }[]; assert.equal(entries[0].arabic, "دعم 15 عائلة"); assert.equal(entries[0].current, "Help 99 families"); return { issues: [{key:"title",category:"meaning",sourceQuote:"15 عائلة",targetQuote:"99 families",reason:"عدد المستفيدين لا يطابق العربية"}] }; }, async () => { const result = await reviewTranslationNotes({ locale: "en", fields: [{ key: "title", label: "العنوان", group: "content" }], arabic: { title: "دعم 15 عائلة" }, current: { title: "Help 99 families" } }); assert.equal(result.length, 1); });
 });
 test("proofreading other languages is rejected and a provider failure is never presented as generated fallback copy", async () => {
   await assert.rejects(suggestEditorial({ action: "proofread", locale: "tr", fields: [], values: {}, arabic: {} }), /العربية/);
@@ -52,4 +52,20 @@ test("comprehensive preparation validates revised text before structural formatt
     const result=await suggestEditorial({action:"prepare",locale:"ar",fields:[{key:"description",label:"المحتوى",group:"content",rich:true}],values:{description:raw},arabic:{description:raw}});
     const document=JSON.parse(result.values.description);assert.equal(phases,2);assert.equal(document.content[0].type,"heading");assert.equal(document.content[0].content[0].text,"دعم 15 عائلة");assert.deepEqual(document.content[1],JSON.parse(raw).content[1]);
   });
+});
+
+
+test("translation review rejects fabricated evidence and unsupported fields instead of claiming a completed review",async()=>{
+ const input={locale:"en",fields:[{key:"title",label:"العنوان",group:"content" as const}],arabic:{title:"دعم الأسر"},current:{title:"Support families"}};
+ for(const issue of [
+   {key:"title",category:"meaning",sourceQuote:"القدس",targetQuote:"families",reason:"ملاحظة"},
+   {key:"other",category:"meaning",sourceQuote:"الأسر",targetQuote:"families",reason:"ملاحظة"},
+   {key:"title",category:"meaning",sourceQuote:"الأسر",targetQuote:"children",reason:"ملاحظة"},
+   "تفضيل تحريري دون تحديد النص",
+ ])await provider(()=>({issues:[issue]}),async()=>{await assert.rejects(reviewTranslationNotes(input),/ملاحظة/);});
+});
+test("translation review accepts supported omission/addition notes and an empty result for equivalent native copy",async()=>{
+ const input={locale:"en",fields:[{key:"title",label:"العنوان",group:"content" as const}],arabic:{title:"دعم 15 عائلة"},current:{title:"Support families now"}};
+ await provider(()=>({issues:[{key:"title",category:"omission",sourceQuote:"15",targetQuote:"",reason:"حُذف عدد الأسر"},{key:"title",category:"addition",sourceQuote:"",targetQuote:"now",reason:"راجع الإلحاح المضاف"}]}),async()=>{const notes=await reviewTranslationNotes(input);assert.equal(notes.length,2);assert.match(notes[0],/«15»/);assert.match(notes[1],/«now»/);});
+ await provider(()=>({issues:[]}),async()=>{assert.deepEqual(await reviewTranslationNotes(input),[]);});
 });
