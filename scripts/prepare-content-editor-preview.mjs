@@ -9,6 +9,7 @@ const require = createRequire(import.meta.url);
 const { documentFor } = require("../lib/content-editor/service.ts");
 const { SUPPORTED_LOCALES } = require("../lib/locales.ts");
 const output = process.argv[2];
+const realRich = process.env.QA_REAL_RICH === "1";
 if (
   !output ||
   !path.isAbsolute(output) ||
@@ -146,6 +147,7 @@ const bundle = await build({
   platform: "browser",
   format: "iife",
   write: false,
+  outfile: "bundle.js",
   jsx: "automatic",
   tsconfig: path.join(process.cwd(), "tsconfig.json"),
   define: { "process.env.NODE_ENV": '"development"' },
@@ -153,7 +155,7 @@ const bundle = await build({
     {
       name: "qa-next",
       setup(b) {
-        b.onResolve({ filter: /wysiwyg-editor$/ }, () => ({
+        if (!realRich) b.onResolve({ filter: /wysiwyg-editor$/ }, () => ({
           path: "empty-rich",
           namespace: "qa-rich",
         }));
@@ -170,7 +172,7 @@ const bundle = await build({
           resolveDir: process.cwd(),
           contents:
             a.path === "next/dynamic"
-              ? `import React from'react';export default function(){return function Rich({defaultValue,onUpdate,isEditable}){const incoming=JSON.stringify(defaultValue);const[value,setValue]=React.useState(incoming);React.useEffect(()=>setValue(incoming),[incoming]);return <textarea aria-label="محتوى غني (بديل المعاينة المعزولة)" className="min-h-48 w-full rounded border p-3" disabled={!isEditable} value={value} onChange={e=>{setValue(e.target.value);try{const json=JSON.parse(e.target.value);onUpdate({getJSON:()=>json});}catch{}}}/>;};}`
+              ? realRich ? `import React from'react';export default function dynamic(loader){const Component=React.lazy(()=>Promise.resolve(loader()).then(m=>({default:m.default||m})));return function Wrapped(props){return <React.Suspense fallback={<p>تحميل المحرر…</p>}><Component {...props}/></React.Suspense>}}` : `import React from'react';export default function(){return function Rich({defaultValue,onUpdate,isEditable}){const incoming=JSON.stringify(defaultValue);const[value,setValue]=React.useState(incoming);React.useEffect(()=>setValue(incoming),[incoming]);return <textarea aria-label="محتوى غني (بديل المعاينة المعزولة)" className="min-h-48 w-full rounded border p-3" disabled={!isEditable} value={value} onChange={e=>{setValue(e.target.value);try{const json=JSON.parse(e.target.value);onUpdate({getJSON:()=>json});}catch{}}}/>;};}`
               : a.path === "next/image"
                 ? `import React from'react';export default function Image({unoptimized,...props}){return <img {...props}/>;}`
                 : `import React from'react';export default function Link(props){return <a {...props}/>;}`,
@@ -189,10 +191,10 @@ await writeFile(
   path.join(output, "dist/index.html"),
   '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>اختبار محررات المحتوى</title><link rel="stylesheet" href="/style.css"></head><body><div id="root"></div><script src="/bundle.js"></script></body></html>',
 );
-await writeFile(path.join(output, "dist/style.css"), css);
+await writeFile(path.join(output, "dist/style.css"), css + "\n" + (bundle.outputFiles.find(file => file.path.endsWith(".css"))?.text || ""));
 await writeFile(
   path.join(output, "dist/bundle.js"),
-  bundle.outputFiles[0].text,
+  bundle.outputFiles.find(file => file.path.endsWith(".js")).text,
 );
 console.log(
   "Static UI QA prepared at " + output + " (mock data, no live writes).",

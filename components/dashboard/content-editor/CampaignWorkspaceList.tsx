@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import { FillMissingSeo } from "./FillMissingSeo";
+import { CONTENT_KINDS } from "@/lib/content-editor/contracts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Plus,
@@ -288,6 +290,7 @@ export function CampaignWorkspaceList() {
   return (
     <div dir="rtl" className="mx-auto max-w-[1500px] space-y-5 text-slate-800">
       <ContentLocalizationAuditCard section="campaigns" />
+      <FillMissingSeo kinds={CONTENT_KINDS} />
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="mb-2 text-xs text-slate-400">

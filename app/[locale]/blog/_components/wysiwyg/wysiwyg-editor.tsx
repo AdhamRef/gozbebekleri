@@ -62,6 +62,10 @@ export default function WysiwygEditor({
   const hydratedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
+    editor?.setEditable(isEditable, false);
+  }, [editor, isEditable]);
+
+  useEffect(() => {
     if (!editor) return;
 
     // Serialize incoming value for a stable equality check against what we last
@@ -96,9 +100,10 @@ export default function WysiwygEditor({
 
   return (
     <div className={isEditable ? className : ""}>
-      {isEditable && editor && <EditorToolbar editor={editor} />}
-      {editor && <EditorBubbleMenu editor={editor} />}
-      {editor?.isActive("image") && <ImageResizer editor={editor} />}
+      <div hidden={!isEditable}>{editor && <EditorToolbar editor={editor} />}</div>
+      {/* Tippy moves the menu node. Keep its React parent stable when saving. */}
+      <div>{editor && <EditorBubbleMenu editor={editor} />}</div>
+      <div>{editor?.isActive("image") && <ImageResizer editor={editor} />}</div>
       <EditorContent editor={editor} />
     </div>
   );

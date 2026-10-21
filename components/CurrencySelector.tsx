@@ -8,14 +8,14 @@ import {
   isValidCurrencyParam,
   normalizeCurrencyParamToCookie,
 } from "@/lib/currency-link";
-import { SUPPORTED_CURRENCY_OPTIONS } from "@/lib/supported-currencies";
+import { PUBLIC_CURRENCY_OPTIONS, SUPPORTED_CURRENCY_OPTIONS } from "@/lib/supported-currencies";
 import { CURRENCY_COOKIE_UPDATED_EVENT } from "@/components/CurrencyFromUrlSync";
 
 export const DEFAULT_CURRENCY_CODE = "DEFAULT";
 
 const currencies = [
   { code: DEFAULT_CURRENCY_CODE, symbol: "•", name: "Default" },
-  ...SUPPORTED_CURRENCY_OPTIONS,
+  ...PUBLIC_CURRENCY_OPTIONS,
 ];
 
 const CACHE_KEY = "cachedExchangeRates";
@@ -142,7 +142,7 @@ function CurrencySelectorInner({
   };
 
   const current =
-    visibleCurrencies.find((c) => c.code === selectedCurrency) ??
+    SUPPORTED_CURRENCY_OPTIONS.find((c) => c.code === selectedCurrency) ??
     visibleCurrencies.find((c) => c.code === "USD");
 
   return (

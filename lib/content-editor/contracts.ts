@@ -386,7 +386,6 @@ export function validateChanges(
     }
   }
   if (
-    !entries.length ||
     entries.some(
       ([key, val]) =>
         !allowed.has(key) || typeof val !== "string" || val.length > limit(key),
