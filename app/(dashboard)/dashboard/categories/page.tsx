@@ -349,6 +349,9 @@ export default function CategoriesPage() {
 
   return (
     <div>
+      <div className="mb-4">
+        <ContentLocalizationAuditCard section="categories" />
+      </div>
       <TranslationOverview
         kind="categories"
         scopeIds={filteredCategories.map((c) => c.id)}
@@ -397,10 +400,6 @@ export default function CategoriesPage() {
           </>
         }
       />
-
-      <div className="mb-4">
-        <ContentLocalizationAuditCard section="categories" />
-      </div>
 
       <FilterBar
         searchValue={searchQuery}

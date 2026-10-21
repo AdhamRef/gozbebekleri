@@ -1,20 +1,26 @@
-'use client';
+"use client";
 
 import { TranslationOverview } from "@/components/dashboard/content-editor/TranslationOverview";
-import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import axios from 'axios';
-import { Plus, Pencil, Trash2, Loader2, Layers } from 'lucide-react';
-import { toast } from 'react-hot-toast';
-import { EmptyState } from '@/components/dashboard/EmptyState';
-import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import axios from "axios";
+import { Plus, Pencil, Trash2, Loader2, Layers } from "lucide-react";
+import { toast } from "react-hot-toast";
+import { EmptyState } from "@/components/dashboard/EmptyState";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { errorMessage } from '@/lib/dashboard/client-error-message';
-import { SortableTable, useReorder } from '../_components/SortableTable';
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { errorMessage } from "@/lib/dashboard/client-error-message";
+import { SortableTable, useReorder } from "../_components/SortableTable";
 import { dt, dtx } from "@/lib/dashboard/i18n";
 
 interface SuperCategoryRow {
@@ -35,13 +41,15 @@ export default function SuperCategoriesPage() {
   const router = useRouter();
   const [rows, setRows] = useState<SuperCategoryRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deleteTarget, setDeleteTarget] = useState<SuperCategoryRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SuperCategoryRow | null>(
+    null,
+  );
   const [deleting, setDeleting] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const fetchRows = useCallback(async () => {
     try {
-      const res = await axios.get('/api/super-categories/admin');
+      const res = await axios.get("/api/super-categories/admin");
       const items = res.data?.items ?? [];
       setRows(Array.isArray(items) ? items : []);
     } catch (e) {
@@ -52,13 +60,22 @@ export default function SuperCategoriesPage() {
     }
   }, []);
 
-  useEffect(() => { fetchRows(); }, [fetchRows]);
+  useEffect(() => {
+    fetchRows();
+  }, [fetchRows]);
 
-  const { onMove, onCommit } = useReorder(
+  const { onMove, onCommit, isDirty, isSaving, cancelOrder } = useReorder(
     rows,
     setRows,
-    useCallback(async (payload) => { await axios.post('/api/super-categories/reorder', { superCategories: payload }); }, []),
-    useCallback((e: unknown) => { toast.error(errorMessage(e, dt("تعذّر حفظ الترتيب"))); fetchRows(); }, [fetchRows]),
+    useCallback(async (payload) => {
+      await axios.post("/api/super-categories/reorder", {
+        superCategories: payload,
+      });
+    }, []),
+    useCallback((e: unknown) => {
+      toast.error(errorMessage(e, dt("تعذّر حفظ الترتيب")));
+    }, []),
+    true,
   );
 
   const toggleActive = async (row: SuperCategoryRow, next: boolean) => {
@@ -67,7 +84,9 @@ export default function SuperCategoriesPage() {
        to leave the whole page exactly as it is. */
     try {
       await axios.put(`/api/super-categories/${row.id}`, { isActive: next });
-      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, isActive: next } : r)));
+      setRows((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, isActive: next } : r)),
+      );
     } catch (e) {
       toast.error(errorMessage(e, dt("تعذّر تغيير الحالة")));
     } finally {
@@ -105,11 +124,31 @@ export default function SuperCategoriesPage() {
         <div>
           <h1 className="text-lg font-bold">{dt("الأقسام الكبرى")}</h1>
           <p className="text-xs text-slate-500">
-            {dt("صفحات برامج تجمع المشاريع والمقالات، مع أقسام نصية وفيديوهات قابلة للترتيب.")}</p>
+            {dt(
+              "صفحات برامج تجمع المشاريع والمقالات، مع أقسام نصية وفيديوهات قابلة للترتيب.",
+            )}
+          </p>
         </div>
-        <Button onClick={() => router.push('/dashboard/super-categories/new')}>
-          <Plus className="me-1 h-4 w-4" />
-          {dt("قسم جديد")}</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={!isDirty || isSaving}
+            onClick={() => void onCommit()}
+          >
+            {isSaving ? "جار الحفظ…" : "حفظ الترتيب"}
+          </Button>
+          {isDirty ? (
+            <Button variant="outline" disabled={isSaving} onClick={cancelOrder}>
+              إلغاء تغييرات الترتيب
+            </Button>
+          ) : null}
+          <Button
+            disabled={isDirty || isSaving}
+            onClick={() => router.push("/dashboard/super-categories/new")}
+          >
+            <Plus className="me-1 h-4 w-4" />
+            {dt("قسم جديد")}
+          </Button>
+        </div>
       </div>
 
       {rows.length === 0 ? (
@@ -118,9 +157,12 @@ export default function SuperCategoriesPage() {
           title={dt("لا توجد أقسام كبرى")}
           description={dt("أنشئ أول قسم: صفحة برنامج بواجهتها ومحتواها.")}
           action={
-            <Button onClick={() => router.push('/dashboard/super-categories/new')}>
+            <Button
+              onClick={() => router.push("/dashboard/super-categories/new")}
+            >
               <Plus className="me-1 h-4 w-4" />
-              {dt("قسم جديد")}</Button>
+              {dt("قسم جديد")}
+            </Button>
           }
         />
       ) : (
@@ -129,7 +171,7 @@ export default function SuperCategoriesPage() {
           getId={(r) => r.id}
           dragType="SUPER_CATEGORY_ROW"
           onMove={onMove}
-          onCommit={onCommit}
+          onCommit={() => {}}
           isDimmed={(r) => !r.isActive}
           columns={[
             {
@@ -138,40 +180,79 @@ export default function SuperCategoriesPage() {
                 <div className="flex items-center gap-2">
                   {r.heroImage ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={r.heroImage} alt="" className="h-10 w-16 rounded border object-cover" />
+                    <img
+                      src={r.heroImage}
+                      alt=""
+                      className="h-10 w-16 rounded border object-cover"
+                    />
                   ) : (
                     <div
                       className="grid h-10 w-16 place-items-center rounded border"
-                      style={{ background: r.accentColor || '#7C2318' }}
+                      style={{ background: r.accentColor || "#7C2318" }}
                     >
                       <Layers className="h-4 w-4 text-white/80" />
                     </div>
                   )}
                   <div>
                     <div className="font-semibold">{r.title}</div>
-                    <div className="text-xs text-slate-500" dir="ltr">/programs/{r.slug}</div>
+                    <div className="text-xs text-slate-500" dir="ltr">
+                      /programs/{r.slug}
+                    </div>
                   </div>
                 </div>
               ),
             },
-            { header: dt("المحتوى"), cell: (r) => <span className="text-xs text-slate-600">{r.itemCount}</span> },
-            { header: dt("أقسام الصفحة"), cell: (r) => <span className="text-xs text-slate-600">{r.blockCount}</span> },
-            { header: dt("الترجمات"), cell: (r) => <span className="text-xs text-slate-600">{r.translationCount}</span> },
             {
-              header: dt("منشور"),
+              header: dt("المحتوى"),
               cell: (r) => (
-                <Switch checked={r.isActive} disabled={togglingId === r.id} onCheckedChange={(v) => toggleActive(r, v)} />
+                <span className="text-xs text-slate-600">{r.itemCount}</span>
               ),
             },
             {
-              header: '',
-              className: 'w-24',
+              header: dt("أقسام الصفحة"),
+              cell: (r) => (
+                <span className="text-xs text-slate-600">{r.blockCount}</span>
+              ),
+            },
+            {
+              header: dt("الترجمات"),
+              cell: (r) => (
+                <span className="text-xs text-slate-600">
+                  {r.translationCount}
+                </span>
+              ),
+            },
+            {
+              header: dt("منشور"),
+              cell: (r) => (
+                <Switch
+                  checked={r.isActive}
+                  disabled={togglingId === r.id || isDirty || isSaving}
+                  onCheckedChange={(v) => toggleActive(r, v)}
+                />
+              ),
+            },
+            {
+              header: "",
+              className: "w-24",
               cell: (r) => (
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => router.push(`/dashboard/content/super-categories/${r.id}`)}>
+                  <Button
+                    disabled={isDirty || isSaving}
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      router.push(`/dashboard/content/super-categories/${r.id}`)
+                    }
+                  >
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(r)}>
+                  <Button
+                    disabled={isDirty || isSaving}
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setDeleteTarget(r)}
+                  >
                     <Trash2 className="h-4 w-4 text-red-600" />
                   </Button>
                 </div>
@@ -181,18 +262,28 @@ export default function SuperCategoriesPage() {
         />
       )}
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{dt("حذف القسم الكبير")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {dtx("سيتم حذف صفحة «{0}» بأقسامها وترجماتها نهائيًا. المشاريع والمقالات وبقية المحتوى المرتبط لا تُحذف  يُحذف ارتباطها بهذه الصفحة فقط.", [deleteTarget?.title])}</AlertDialogDescription>
+              {dtx(
+                "سيتم حذف صفحة «{0}» بأقسامها وترجماتها نهائيًا. المشاريع والمقالات وبقية المحتوى المرتبط لا تُحذف  يُحذف ارتباطها بهذه الصفحة فقط.",
+                [deleteTarget?.title],
+              )}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>{dt("إلغاء")}</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>
+              {dt("إلغاء")}
+            </AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} disabled={deleting}>
               {deleting && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
-              {dt("حذف")}</AlertDialogAction>
+              {dt("حذف")}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

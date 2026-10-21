@@ -1,23 +1,43 @@
-'use client';
+"use client";
 
 import { TranslationOverview } from "@/components/dashboard/content-editor/TranslationOverview";
-import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import axios from 'axios';
-import { Plus, Pencil, Trash2, Loader2, AlertTriangle, MapPin } from 'lucide-react';
-import { toast } from 'react-hot-toast';
-import { EmptyState } from '@/components/dashboard/EmptyState';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import axios from "axios";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { errorMessage } from '@/lib/dashboard/client-error-message';
-import { LOCALES } from '@/lib/locales';
-import { describePlacement, type BannerTone } from '@/lib/minbar/banner-placements';
-import { SortableTable, useReorder, type SortableColumn } from '../_components/SortableTable';
+  Plus,
+  Pencil,
+  Trash2,
+  Loader2,
+  AlertTriangle,
+  MapPin,
+} from "lucide-react";
+import { toast } from "react-hot-toast";
+import { EmptyState } from "@/components/dashboard/EmptyState";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { errorMessage } from "@/lib/dashboard/client-error-message";
+import { LOCALES } from "@/lib/locales";
+import {
+  describePlacement,
+  type BannerTone,
+} from "@/lib/minbar/banner-placements";
+import {
+  SortableTable,
+  useReorder,
+  type SortableColumn,
+} from "../_components/SortableTable";
 import { dashIntl, dt, dtx } from "@/lib/dashboard/i18n";
 
 interface BannerRow {
@@ -45,20 +65,30 @@ function StatusBadge({ row }: { row: BannerRow }) {
   if (!row.isActive) return <Badge variant="secondary">{dt("معطّل")}</Badge>;
   if (row.expired) return <Badge variant="destructive">{dt("منتهٍ")}</Badge>;
   if (row.pending) return <Badge variant="outline">{dt("مجدول")}</Badge>;
-  if (!row.placements.length) return <Badge variant="outline" className="text-amber-700 border-amber-300">{dt("بلا موضع")}</Badge>;
-  return <Badge className="bg-emerald-600 hover:bg-emerald-600">{dt("ظاهر")}</Badge>;
+  if (!row.placements.length)
+    return (
+      <Badge variant="outline" className="text-amber-700 border-amber-300">
+        {dt("بلا موضع")}
+      </Badge>
+    );
+  return (
+    <Badge className="bg-emerald-600 hover:bg-emerald-600">{dt("ظاهر")}</Badge>
+  );
 }
 
 function formatWindow(row: BannerRow): string {
   if (!row.endsAt) return dt("حتى الإيقاف");
-  return new Date(row.endsAt).toLocaleString(dashIntl("ar"), { dateStyle: 'short', timeStyle: 'short' });
+  return new Date(row.endsAt).toLocaleString(dashIntl("ar"), {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
 }
 
 const TONE_SWATCH: Record<BannerTone, string> = {
-  red: '#A93428',
-  navy: '#132C38',
-  gold: '#D39A27',
-  green: '#1F7A4D',
+  red: "#A93428",
+  navy: "#132C38",
+  gold: "#D39A27",
+  green: "#1F7A4D",
 };
 
 /**
@@ -76,7 +106,7 @@ export default function UrgentBannersPage() {
 
   const fetchRows = useCallback(async () => {
     try {
-      const res = await axios.get('/api/urgent-banners/admin');
+      const res = await axios.get("/api/urgent-banners/admin");
       const items = res.data?.items ?? [];
       setRows(Array.isArray(items) ? items : []);
     } catch (e) {
@@ -87,20 +117,29 @@ export default function UrgentBannersPage() {
     }
   }, []);
 
-  useEffect(() => { fetchRows(); }, [fetchRows]);
+  useEffect(() => {
+    fetchRows();
+  }, [fetchRows]);
 
-  const { onMove, onCommit } = useReorder(
+  const { onMove, onCommit, isDirty, isSaving, cancelOrder } = useReorder(
     rows,
     setRows,
-    useCallback(async (payload) => { await axios.post('/api/urgent-banners/reorder', { banners: payload }); }, []),
-    useCallback((e: unknown) => { toast.error(errorMessage(e, dt("تعذّر حفظ الترتيب"))); fetchRows(); }, [fetchRows]),
+    useCallback(async (payload) => {
+      await axios.post("/api/urgent-banners/reorder", { banners: payload });
+    }, []),
+    useCallback((e: unknown) => {
+      toast.error(errorMessage(e, dt("تعذّر حفظ الترتيب")));
+    }, []),
+    true,
   );
 
   const toggleActive = async (row: BannerRow, next: boolean) => {
     setTogglingId(row.id);
     try {
       await axios.put(`/api/urgent-banners/${row.id}`, { isActive: next });
-      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, isActive: next } : r)));
+      setRows((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, isActive: next } : r)),
+      );
     } catch (e) {
       toast.error(errorMessage(e, dt("تعذّر تغيير الحالة")));
     } finally {
@@ -130,15 +169,27 @@ export default function UrgentBannersPage() {
         <div className="flex items-center gap-2">
           {r.image ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={r.image} alt="" className="w-16 h-10 rounded object-cover border grayscale" style={{ borderColor: TONE_SWATCH[r.tone] }} />
+            <img
+              src={r.image}
+              alt=""
+              className="w-16 h-10 rounded object-cover border grayscale"
+              style={{ borderColor: TONE_SWATCH[r.tone] }}
+            />
           ) : (
-            <div className="w-16 h-10 rounded border grid place-items-center" style={{ background: TONE_SWATCH[r.tone] }}>
+            <div
+              className="w-16 h-10 rounded border grid place-items-center"
+              style={{ background: TONE_SWATCH[r.tone] }}
+            >
               <AlertTriangle className="w-4 h-4 text-white/80" />
             </div>
           )}
           <div className="min-w-0">
-            <div className="font-semibold truncate max-w-[16rem]">{r.title}</div>
-            <div className="text-xs text-slate-500" dir="ltr">{r.slug}</div>
+            <div className="font-semibold truncate max-w-[16rem]">
+              {r.title}
+            </div>
+            <div className="text-xs text-slate-500" dir="ltr">
+              {r.slug}
+            </div>
           </div>
         </div>
       ),
@@ -149,23 +200,34 @@ export default function UrgentBannersPage() {
         r.placements.length ? (
           <div className="flex flex-wrap gap-1 max-w-[18rem]">
             {r.placements.map((p) => (
-              <Badge key={p} variant="outline" className="text-[10px] px-1.5 py-0 font-normal gap-1">
+              <Badge
+                key={p}
+                variant="outline"
+                className="text-[10px] px-1.5 py-0 font-normal gap-1"
+              >
                 <MapPin className="w-2.5 h-2.5" />
                 {describePlacement(p)}
               </Badge>
             ))}
           </div>
         ) : (
-          <span className="text-xs text-amber-700">{dt("لم يُحدَّد  لن يظهر")}</span>
+          <span className="text-xs text-amber-700">
+            {dt("لم يُحدَّد  لن يظهر")}
+          </span>
         ),
     },
     {
       header: dt("الوجهة"),
-      className: 'text-xs text-slate-600 max-w-[12rem] truncate',
-      cell: (r) => r.campaignTitle ?? (r.ctaUrl ? <span dir="ltr">{r.ctaUrl}</span> : '—'),
+      className: "text-xs text-slate-600 max-w-[12rem] truncate",
+      cell: (r) =>
+        r.campaignTitle ?? (r.ctaUrl ? <span dir="ltr">{r.ctaUrl}</span> : "—"),
     },
     { header: dt("الحالة"), cell: (r) => <StatusBadge row={r} /> },
-    { header: dt("ينتهي"), className: 'text-xs text-slate-600', cell: (r) => formatWindow(r) },
+    {
+      header: dt("ينتهي"),
+      className: "text-xs text-slate-600",
+      cell: (r) => formatWindow(r),
+    },
     {
       header: dt("اللغات"),
       cell: (r) =>
@@ -174,7 +236,11 @@ export default function UrgentBannersPage() {
         ) : (
           <div className="flex flex-wrap gap-1">
             {r.locales.map((l) => (
-              <Badge key={l} variant="outline" className="text-[10px] px-1.5 py-0">
+              <Badge
+                key={l}
+                variant="outline"
+                className="text-[10px] px-1.5 py-0"
+              >
                 {LOCALES[l as keyof typeof LOCALES]?.nativeLabel ?? l}
               </Badge>
             ))}
@@ -183,17 +249,35 @@ export default function UrgentBannersPage() {
     },
     {
       header: dt("مفعّل"),
-      cell: (r) => <Switch checked={r.isActive} disabled={togglingId === r.id} onCheckedChange={(v) => toggleActive(r, v)} />,
+      cell: (r) => (
+        <Switch
+          checked={r.isActive}
+          disabled={togglingId === r.id || isDirty || isSaving}
+          onCheckedChange={(v) => toggleActive(r, v)}
+        />
+      ),
     },
     {
-      header: '',
-      className: 'w-24',
+      header: "",
+      className: "w-24",
       cell: (r) => (
         <div className="flex gap-1">
-          <Button variant="ghost" size="icon" onClick={() => router.push(`/dashboard/content/urgent-banners/${r.id}`)}>
+          <Button
+            disabled={isDirty || isSaving}
+            variant="ghost"
+            size="icon"
+            onClick={() =>
+              router.push(`/dashboard/content/urgent-banners/${r.id}`)
+            }
+          >
             <Pencil className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(r)}>
+          <Button
+            disabled={isDirty || isSaving}
+            variant="ghost"
+            size="icon"
+            onClick={() => setDeleteTarget(r)}
+          >
             <Trash2 className="w-4 h-4 text-red-600" />
           </Button>
         </div>
@@ -216,11 +300,31 @@ export default function UrgentBannersPage() {
         <div>
           <h1 className="text-lg font-bold">{dt("البانرات")}</h1>
           <p className="text-xs text-slate-500">
-            {dt("بانرات مثل «شدّ الرحال» تضعها على أي صفحة وموضع. اسحب الصفوف لترتيبها  الأعلى هنا يظهر أولًا حيثما اجتمع بانران في موضع واحد.")}</p>
+            {dt(
+              "بانرات مثل «شدّ الرحال» تضعها على أي صفحة وموضع. اسحب الصفوف لترتيبها  الأعلى هنا يظهر أولًا حيثما اجتمع بانران في موضع واحد.",
+            )}
+          </p>
         </div>
-        <Button onClick={() => router.push('/dashboard/urgent-banners/new')}>
-          <Plus className="w-4 h-4 me-1" />
-          {dt("بانر جديد")}</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={!isDirty || isSaving}
+            onClick={() => void onCommit()}
+          >
+            {isSaving ? "جار الحفظ…" : "حفظ الترتيب"}
+          </Button>
+          {isDirty ? (
+            <Button variant="outline" disabled={isSaving} onClick={cancelOrder}>
+              إلغاء تغييرات الترتيب
+            </Button>
+          ) : null}
+          <Button
+            disabled={isDirty || isSaving}
+            onClick={() => router.push("/dashboard/urgent-banners/new")}
+          >
+            <Plus className="w-4 h-4 me-1" />
+            {dt("بانر جديد")}
+          </Button>
+        </div>
       </div>
 
       {rows.length === 0 ? (
@@ -229,9 +333,12 @@ export default function UrgentBannersPage() {
           title={dt("لا توجد بانرات")}
           description={dt("أنشئ بانرًا واختر الصفحات التي يظهر فيها.")}
           action={
-            <Button onClick={() => router.push('/dashboard/urgent-banners/new')}>
+            <Button
+              onClick={() => router.push("/dashboard/urgent-banners/new")}
+            >
               <Plus className="w-4 h-4 me-1" />
-              {dt("بانر جديد")}</Button>
+              {dt("بانر جديد")}
+            </Button>
           }
         />
       ) : (
@@ -240,24 +347,33 @@ export default function UrgentBannersPage() {
           getId={(r) => r.id}
           columns={columns}
           onMove={onMove}
-          onCommit={onCommit}
+          onCommit={() => {}}
           isDimmed={(r) => !r.isActive || r.expired}
           dragType="urgent-banner"
         />
       )}
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{dt("حذف البانر")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {dtx("سيتم حذف «{0}» وكل ترجماته نهائيًا.", [deleteTarget?.title])}</AlertDialogDescription>
+              {dtx("سيتم حذف «{0}» وكل ترجماته نهائيًا.", [
+                deleteTarget?.title,
+              ])}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>{dt("إلغاء")}</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>
+              {dt("إلغاء")}
+            </AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} disabled={deleting}>
               {deleting && <Loader2 className="w-4 h-4 animate-spin me-2" />}
-              {dt("حذف")}</AlertDialogAction>
+              {dt("حذف")}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

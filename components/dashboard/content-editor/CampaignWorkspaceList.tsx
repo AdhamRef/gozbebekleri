@@ -54,6 +54,34 @@ export function CampaignWorkspaceList() {
     [selected, setSelected] = useState<string[]>([]),
     [sort, setSort] = useState("priority"),
     [views, setViews] = useState<View[]>([]);
+  const [orderDraft, setOrderDraft] = useState<Record<string, string>>({});
+  const orderCount = Object.keys(orderDraft).length;
+  useEffect(() => {
+    if (!orderCount) return;
+    const leave = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", leave);
+    const navigate = (event: MouseEvent) => {
+      if (!(event.target instanceof Element) || event.ctrlKey || event.metaKey)
+        return;
+      const link = event.target.closest("a[href]");
+      if (
+        link &&
+        link.getAttribute("target") !== "_blank" &&
+        !window.confirm("لديك ترتيب غير محفوظ. مغادرة الصفحة وإلغاء التغييرات؟")
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    document.addEventListener("click", navigate, true);
+    return () => {
+      window.removeEventListener("beforeunload", leave);
+      document.removeEventListener("click", navigate, true);
+    };
+  }, [orderCount]);
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) || "[]");
@@ -64,7 +92,9 @@ export function CampaignWorkspaceList() {
               (v) =>
                 v &&
                 typeof v.name === "string" &&
-                typeof v.query==='string'&&typeof v.category==='string'&&['all','ongoing','complete'].includes(v.progress)&&
+                typeof v.query === "string" &&
+                typeof v.category === "string" &&
+                ["all", "ongoing", "complete"].includes(v.progress) &&
                 ["active", "inactive", "archive"].includes(v.tab),
             )
             .slice(0, 12),
@@ -101,8 +131,10 @@ export function CampaignWorkspaceList() {
       } while (cursor);
       setRows(all);
       setSelected([]);
+      return true;
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "تعذر التحميل");
+      return false;
     } finally {
       setLoading(false);
     }
@@ -176,10 +208,10 @@ export function CampaignWorkspaceList() {
     action: string,
     items: { id: string; revision: string; order?: number }[],
   ) => {
-    if (busy || !items.length) return;
+    if (busy || !items.length) return false;
     if (items.length > 50) {
       setMessage("اختر 50 مشروعًا على الأكثر للعملية الواحدة.");
-      return;
+      return false;
     }
     if (
       action !== "order" &&
@@ -187,7 +219,7 @@ export function CampaignWorkspaceList() {
         `تأكيد ${action === "archive" ? "أرشفة" : action === "disable" ? "تعطيل" : action === "restore" ? "استعادة ونشر" : "تفعيل"} ${items.length} مشروع؟ لن تتغير التبرعات أو إيصالاتها.`,
       )
     )
-      return;
+      return false;
     setBusy(true);
     try {
       const res = await fetch(endpoint, {
@@ -197,13 +229,40 @@ export function CampaignWorkspaceList() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      await load();
-      setMessage("تم الحفظ وإعادة قراءة القائمة.");
+      if (action === "order") setOrderDraft({});
+      const loaded = await load();
+      setMessage(
+        loaded
+          ? "تم الحفظ وإعادة قراءة القائمة."
+          : "تم الحفظ، لكن تعذر تحديث القائمة. اضغط تحديث قبل إجراء تعديل آخر.",
+      );
+      return true;
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "تعذر الحفظ");
+      return false;
     } finally {
       setBusy(false);
     }
+  };
+  const saveOrder = () => {
+    const items = Object.entries(orderDraft).map(([id, text]) => ({
+      id,
+      revision: rows.find((r) => r.id === id)?.revision || "",
+      order: Number(text),
+    }));
+    if (
+      items.some(
+        (item) =>
+          !orderDraft[item.id].trim() ||
+          !Number.isInteger(item.order) ||
+          item.order < 0 ||
+          item.order > 1000000,
+      )
+    ) {
+      setMessage("اكتب ترتيبًا صحيحًا من 0 إلى 1000000 لكل مشروع معدّل.");
+      return;
+    }
+    void update("order", items);
   };
   const bulk = (action: string) =>
     void update(
@@ -228,6 +287,7 @@ export function CampaignWorkspaceList() {
   };
   return (
     <div dir="rtl" className="mx-auto max-w-[1500px] space-y-5 text-slate-800">
+      <ContentLocalizationAuditCard section="campaigns" />
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="mb-2 text-xs text-slate-400">
@@ -238,11 +298,32 @@ export function CampaignWorkspaceList() {
             تحرير المحتوى واللغات، ترتيب الظهور ومراجعة جاهزية المشاريع.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={btn + " !bg-brand text-white"}
+            disabled={loading || busy || !orderCount}
+            onClick={saveOrder}
+          >
+            حفظ الترتيب{orderCount ? ` (${orderCount})` : ""}
+          </button>
+          {orderCount ? (
+            <button
+              type="button"
+              className={btn}
+              disabled={busy}
+              onClick={() => {
+                setOrderDraft({});
+                setMessage("");
+              }}
+            >
+              إلغاء تغييرات الترتيب
+            </button>
+          ) : null}
           <button
             className={btn}
             type="button"
-            disabled={loading || busy}
+            disabled={loading || busy || orderCount > 0}
             onClick={() => void load()}
           >
             <RefreshCw size={16} />
@@ -257,6 +338,18 @@ export function CampaignWorkspaceList() {
           </Link>
         </div>
       </header>
+      {orderCount ? (
+        <p
+          role="status"
+          className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm"
+        >
+          {orderCount} مشروع بترتيب غير محفوظ. تبقى الصفوف في أماكنها حتى تضغط
+          حفظ الترتيب.
+          {orderCount > 50
+            ? " احفظ 50 مشروعًا على الأكثر في المرة الواحدة."
+            : ""}
+        </p>
+      ) : null}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
           ["المشاريع المعروضة", filtered.length, rows.length + " في القائمة"],
@@ -418,7 +511,7 @@ export function CampaignWorkspaceList() {
               <button
                 type="button"
                 className={btn}
-                disabled={busy}
+                disabled={busy || orderCount > 0}
                 onClick={() => bulk("restore")}
               >
                 استعادة ونشر
@@ -428,7 +521,7 @@ export function CampaignWorkspaceList() {
                 <button
                   type="button"
                   className={btn}
-                  disabled={busy}
+                  disabled={busy || orderCount > 0}
                   onClick={() => bulk(tab === "active" ? "disable" : "enable")}
                 >
                   {tab === "active" ? "تعطيل المحدد" : "تفعيل المحدد"}
@@ -436,7 +529,7 @@ export function CampaignWorkspaceList() {
                 <button
                   type="button"
                   className={btn}
-                  disabled={busy}
+                  disabled={busy || orderCount > 0}
                   onClick={() => bulk("archive")}
                 >
                   أرشفة المحدد
@@ -524,15 +617,17 @@ export function CampaignWorkspaceList() {
                           max="1000000"
                           aria-label={"ترتيب " + row.title}
                           className="w-16 rounded border p-2 text-center"
-                          defaultValue={row.priority}
-                          key={row.revision}
+                          value={orderDraft[row.id] ?? String(row.priority)}
                           disabled={busy}
-                          onBlur={(e) => {
-                            const order = Number(e.target.value);
-                            if (order !== row.priority)
-                              void update("order", [
-                                { id: row.id, revision: row.revision, order },
-                              ]);
+                          onChange={(e) => {
+                            const text = e.target.value;
+                            setOrderDraft((previous) => {
+                              const next = { ...previous };
+                              if (text.trim() && Number(text) === row.priority)
+                                delete next[row.id];
+                              else next[row.id] = text;
+                              return next;
+                            });
                           }}
                         />
                       </td>
@@ -647,7 +742,6 @@ export function CampaignWorkspaceList() {
           </div>
         </footer>
       </section>
-      <ContentLocalizationAuditCard section="campaigns" />
     </div>
   );
 }
