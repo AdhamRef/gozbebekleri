@@ -224,7 +224,7 @@ export async function translateItem(input: TranslateInput, targetLocale: string)
   for (const k of Object.keys(plain)) {
     const v = gotFields[k];
     if (typeof v === "string" && v.trim()) {
-      const missing = missingProtectedTokens(plain[k], v);
+      const missing = missingProtectedTokens(plain[k], v, { sourceLocale: input.sourceLocale ?? "ar", targetLocale });
       if (!missing.length) out.fields[k] = v.trim();
       else out.warnings.push(protectedTokenWarning(targetLocale, k, missing));
     }
@@ -232,7 +232,7 @@ export async function translateItem(input: TranslateInput, targetLocale: string)
   for (const k of Object.keys(richAsPlain)) {
     const v = gotFields[k];
     if (typeof v === "string" && v.trim()) {
-      const missing = missingProtectedTokens(richAsPlain[k], v);
+      const missing = missingProtectedTokens(richAsPlain[k], v, { sourceLocale: input.sourceLocale ?? "ar", targetLocale });
       if (!missing.length) out.richFields[k] = v.trim();
       else out.warnings.push(protectedTokenWarning(targetLocale, k, missing));
     }
@@ -250,7 +250,7 @@ export async function translateItem(input: TranslateInput, targetLocale: string)
     /* Checked across the whole document, not fragment by fragment: fragments are cut at
        formatting boundaries, and a translation's word order legitimately moves a number or a
        link into the neighbouring fragment. Joined by newlines so digits never merge across a cut. */
-    const missing = missingProtectedTokens(lifted.texts.join("\n"), translatedTexts.join("\n"));
+    const missing = missingProtectedTokens(lifted.texts.join("\n"), translatedTexts.join("\n"), { sourceLocale: input.sourceLocale ?? "ar", targetLocale });
     if (missing.length) {
       out.warnings.push(protectedTokenWarning(targetLocale, k, missing));
       continue;

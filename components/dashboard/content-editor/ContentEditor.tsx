@@ -34,6 +34,7 @@ import {
 import { LOCALES, SUPPORTED_LOCALES } from "@/lib/locales";
 import {
   CONFIG,
+  hasText,
   localeStatus,
   type ContentField,
   type ContentKind,
@@ -686,7 +687,7 @@ export function ContentEditor({ kind, id }: { kind: ContentKind; id: string }) {
                   className={button}
                   onClick={() => {
                     for (const [key, value] of Object.entries(item.values))
-                      if (!(values[code]?.[key] || "").trim())
+                      if (!hasText(values[code]?.[key]))
                         apply(code, key, value);
                   }}
                 >

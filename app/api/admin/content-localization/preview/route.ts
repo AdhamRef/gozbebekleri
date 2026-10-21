@@ -9,6 +9,7 @@ import {
 } from "@/lib/content-localization/access";
 import { prisma } from "@/lib/prisma";
 import { NOT_IMPACT_BACKING } from "@/lib/campaign/soft-delete-filter";
+import { missingProtectedTokens } from "@/lib/content-localization/protected-tokens";
 
 const TRANSLATION_LOCALES = ["en", "fr", "tr", "id", "pt", "es", "de"] as const;
 const SUPPORTED_LOCALES = ["ar", ...TRANSLATION_LOCALES] as const;
@@ -287,6 +288,7 @@ async function generateProfessionalTranslation(
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
+    signal: AbortSignal.timeout(90000),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
@@ -331,6 +333,7 @@ async function generateProfessionalTranslation(
     : {};
   const suggestedTranslation = { ...row.suggestedTranslation };
   const truncatedFields: string[] = [];
+  const rejectedFields: string[] = [];
   for (const field of fields) {
     const value = generated[field];
     if (typeof value !== "string") continue;
@@ -338,6 +341,10 @@ async function generateProfessionalTranslation(
     // model's answer covers part of it. Keeping it would silently truncate the content.
     if (isTooLongForOnePass(row.sourceArabic[field])) {
       truncatedFields.push(field);
+      continue;
+    }
+    if ((row.sourceArabic[field]?.trim() && !value.trim()) || missingProtectedTokens(row.sourceArabic[field] || "", value, {sourceLocale:"ar",targetLocale:locale}).length) {
+      rejectedFields.push(field);
       continue;
     }
     suggestedTranslation[field] = value.trim();
@@ -351,6 +358,7 @@ async function generateProfessionalTranslation(
       `الحقل "${field}" أطول من أن يُترجم في مرة واحدة، لذلك تُرك كما هو ولم يُقترح له نص جديد.`,
     );
   }
+  for (const field of rejectedFields) qualityNotes.unshift(`رُفض اقتراح الحقل "${field}" لتغييره قيمة محمية أو حذف محتوى المصدر. بقي النص الحالي كما هو.`);
 
   return { ...row, suggestedTranslation, qualityNotes };
 }

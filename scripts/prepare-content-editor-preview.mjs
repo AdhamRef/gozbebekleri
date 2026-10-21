@@ -41,6 +41,11 @@ const fixtures = {
     priority: 1,
     translations: [
       {
+        locale: "pt",
+        title: "Título manual preservado",
+        description: JSON.stringify({ type: "doc", content: [{ type: "paragraph" }] }),
+      },
+      {
         locale: "en",
         title: "Clean water for families",
         description: rich("Help provide clean water to families in need."),
@@ -131,6 +136,7 @@ window.fetch=async(url,options={})=>{const parts=String(url).split('/'),kind=par
  if(String(url).endsWith('/content-options'))body={CAMPAIGN:[{id,title:fixtures.campaigns.title,live:true}],POST:[{id,title:fixtures.blog.title,live:false}]};
  else if(String(url).endsWith('/catalog'))body={categories:[{id,title:fixtures.categories.name}],campaigns:[{id,title:fixtures.campaigns.title,categoryIds:[id],priority:1}],postCategories:[],linked:{}};
  else if(String(url).includes('/workspace-list')){if(options.method==='POST'){document.getElementById('qa-writes').textContent=String(++orderWrites);if(failOrder){failOrder=false;return new Response(JSON.stringify({error:'تعارض اختباري؛ المسودة لم تحفظ'}),{status:409,headers:{'Content-Type':'application/json'}});}for(const item of JSON.parse(options.body).items){const row=listRows.find(r=>r.id===item.id);row.priority=item.order;row.revision='list-'+(++version);}}body={items:listRows,nextCursor:null};}
+ else if(String(url).endsWith('/suggest')){const input=JSON.parse(options.body);body={id,kind,revision:docs[kind].revision,action:'translate',proposals:{[input.locale]:{values:{title:'Novo título sugerido',description:JSON.stringify({type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'Água limpa para as famílias.'}]}]})},warnings:[]}},errors:{}};}
  else if(options.method==='PUT'){const input=JSON.parse(options.body);for(const [code,delta] of Object.entries(input.localeChanges||{}))docs[kind].values[code]={...docs[kind].values[code],...delta};docs[kind].values[input.locale]={...docs[kind].values[input.locale],...input.changes};Object.assign(docs[kind].settings,input.settings||{});if(input.settings?.campaignUpdates)docs[kind].settings.updates=input.settings.campaignUpdates.map((row,i)=>({...row,id:row.id||String(i+1).padStart(24,'0')}));if(input.settings?.slugAdjustment){docs[kind].slug=input.settings.slugAdjustment.slug;delete docs[kind].settings.slugAdjustment;}if(input.settings?.religiousTextAdjustment){docs[kind].settings.verseArabic=input.settings.religiousTextAdjustment.text;delete docs[kind].settings.religiousTextAdjustment;}docs[kind].revision='qa-'+(++version);body=docs[kind];}
  else body=docs[kind]||{items:[]};return new Response(JSON.stringify(body),{status:200,headers:{'Content-Type':'application/json'}});};
 function App(){const[kind,setKind]=useState('campaigns'),[listing,setListing]=useState(false);return <><div dir="rtl" className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b bg-white p-3 text-sm"><strong className="me-4">معاينة اختبارية · بيانات محلية فقط</strong>{[['campaigns','المشاريع'],['categories','التصنيفات'],['blog','المدونة'],['super-categories','البرامج'],['urgent-banners','البانرات']].map(([key,label])=><button className="rounded border px-3 py-2" key={key} onClick={()=>{setKind(key);setListing(false);}}>{label}</button>)}<button className="rounded border px-3 py-2" onClick={()=>setListing(true)}>قائمة المشاريع</button><span>طلبات حفظ الترتيب: <b id="qa-writes">0</b></span><button onClick={()=>{failOrder=true;}}>محاكاة تعارض الحفظ التالي</button></div><div className="p-4 lg:p-8">{listing?<CampaignWorkspaceList/>:<ContentEditor key={kind} kind={kind} id={id}/>}</div></>;}createRoot(document.getElementById('root')).render(<App/>);`;
@@ -164,7 +170,7 @@ const bundle = await build({
           resolveDir: process.cwd(),
           contents:
             a.path === "next/dynamic"
-              ? `import React from'react';export default function(){return function Rich({defaultValue,onUpdate,isEditable}){const[value,setValue]=React.useState(JSON.stringify(defaultValue));return <textarea aria-label="محتوى غني (بديل المعاينة المعزولة)" className="min-h-48 w-full rounded border p-3" disabled={!isEditable} value={value} onChange={e=>{setValue(e.target.value);try{const json=JSON.parse(e.target.value);onUpdate({getJSON:()=>json});}catch{}}}/>;};}`
+              ? `import React from'react';export default function(){return function Rich({defaultValue,onUpdate,isEditable}){const incoming=JSON.stringify(defaultValue);const[value,setValue]=React.useState(incoming);React.useEffect(()=>setValue(incoming),[incoming]);return <textarea aria-label="محتوى غني (بديل المعاينة المعزولة)" className="min-h-48 w-full rounded border p-3" disabled={!isEditable} value={value} onChange={e=>{setValue(e.target.value);try{const json=JSON.parse(e.target.value);onUpdate({getJSON:()=>json});}catch{}}}/>;};}`
               : a.path === "next/image"
                 ? `import React from'react';export default function Image({unoptimized,...props}){return <img {...props}/>;}`
                 : `import React from'react';export default function Link(props){return <a {...props}/>;}`,
