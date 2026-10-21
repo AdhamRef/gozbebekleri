@@ -320,7 +320,7 @@ export default function CategoriesPage() {
               className="bg-brand hover:bg-brand-dark gap-2"
             >
               <Plus className="w-4 h-4" />
-              تصنيف جديدة
+              تصنيف جديد
             </Button>
           </>
         }
@@ -342,8 +342,8 @@ export default function CategoriesPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">جميع التصنيفات</SelectItem>
-            <SelectItem value="with">حملات بها مشاريع</SelectItem>
-            <SelectItem value="without">حملات بدون مشاريع</SelectItem>
+            <SelectItem value="with">تصنيفات تحتوي على مشاريع</SelectItem>
+            <SelectItem value="without">تصنيفات بلا مشاريع</SelectItem>
           </SelectContent>
         </Select>
       </FilterBar>
@@ -397,10 +397,10 @@ export default function CategoriesPage() {
                           name: category.name,
                         })
                       }
-                      className="text-amber-600 hover:bg-amber-50"
+                      className="min-h-11 w-auto gap-2 px-3 text-amber-600 hover:bg-amber-50"
                       title="أولويات المشاريع داخل التصنيف"
                     >
-                      <Crown className="w-4 h-4" />
+                      <Crown className="w-4 h-4" />ترتيب المشاريع
                     </Button>
                     <Button
                       variant="ghost"
@@ -410,35 +410,38 @@ export default function CategoriesPage() {
                           `/dashboard/content/categories/${category.id}`,
                         )
                       }
-                      className="text-primary hover:bg-primary/10"
+                      className="min-h-11 w-auto gap-2 px-3 text-primary hover:bg-primary/10"
+                      aria-label={`تحرير التصنيف ${category.name}`}
                     >
-                      <Pencil className="w-4 h-4" />
+                      <Pencil className="w-4 h-4" />تحرير
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => handleDeactivate(category)}
-                      className="text-amber-600 hover:bg-amber-50"
+                      className="min-h-11 w-auto gap-2 px-3 text-amber-600 hover:bg-amber-50"
                       disabled={actionLoading === category.id}
-                      title="تعطيل التصنيف وأرشفتها"
+                      title="تعطيل التصنيف وأرشفته"
                     >
                       {actionLoading === category.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <PowerOff className="w-4 h-4" />
-                      )}
+                      )}أرشفة
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => handleDelete(category)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="min-h-11 w-auto gap-2 px-3 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      aria-label={`حذف التصنيف ${category.name}`}
+                      title={((category as any).campaignCount ?? category.campaigns.length)>0 ? "انقل المشاريع المرتبطة قبل حذف التصنيف" : "حذف بتأكيد الاسم"}
                       disabled={
                         ((category as any).campaignCount ??
                           category.campaigns.length) > 0
                       }
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-4 h-4" />حذف
                     </Button>
                   </div>
                 </TableCell>
@@ -463,7 +466,7 @@ export default function CategoriesPage() {
                         className="bg-brand hover:bg-brand-dark gap-2"
                       >
                         <Plus className="w-4 h-4" />
-                        إضافة تصنيف جديدة
+                        إضافة تصنيف جديد
                       </Button>
                     }
                   />
