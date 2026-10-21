@@ -178,7 +178,10 @@ export async function saveContent(
     let changes: TextValues, settings: ContentRecord;
     try {
       changes = validateChanges(fieldsFor(kind, row), input.changes);
-      if (kind === "campaigns" && locale === "ar" && "image" in changes) throw new ContentError("الصورة العربية تُدار من معرض صور المشروع");
+      if (kind === "campaigns" && locale === "ar" && "image" in changes) {
+        if (changes.image !== text(row.image)) throw new ContentError("الصورة العربية تُدار من معرض صور المشروع");
+        delete changes.image;
+      }
       settings = validateWorkspaceSettings(kind, row, input.settings);
     } catch (error) {
       throw new ContentError(
