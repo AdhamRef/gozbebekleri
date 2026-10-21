@@ -10,6 +10,7 @@ import MainPage from "./_components/MainPage";
 import { prisma } from "@/lib/prisma";
 import {
   isObjectId,
+  decodeRouteKey,
   pickLocaleSlug,
   whereByIdOrAnyLocaleSlug,
 } from "@/lib/slug";
@@ -54,7 +55,8 @@ async function fetchCategoryForSeo(idOrSlug: string) {
 }
 
 async function generateBaseMetadata({ params }: Props): Promise<Metadata> {
-  const { id, locale } = await params;
+  const { id: routeId, locale } = await params;
+  const id = decodeRouteKey(routeId);
   const seo = LOCALE_SEO[locale as Locale] ?? LOCALE_SEO.en;
   // Always anchor canonical to the requested URL so the parent layout's
   // `/{locale}` canonical can never leak through if the DB lookup fails.
@@ -138,9 +140,10 @@ async function generateBaseMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function CategoryPage({ params }: Props) {
-  const { id, locale } = await params;
+  const { id: routeId, locale } = await params;
+  const id = decodeRouteKey(routeId);
   const oldLink = await prisma.category.findFirst({
-    where: { previousSlugs: { has: decodeURIComponent(id) } },
+    where: { previousSlugs: { has: id } },
     select: {
       id: true,
       slug: true,
@@ -150,7 +153,7 @@ export default async function CategoryPage({ params }: Props) {
   if (oldLink) {
     const canonical =
       pickLocaleSlug(oldLink.slug, oldLink.translations, locale) || oldLink.id;
-    if (canonical !== decodeURIComponent(id))
+    if (canonical !== id)
       permanentRedirect(`/${locale}/category/${encodeURIComponent(canonical)}`);
   }
 
@@ -184,7 +187,7 @@ export default async function CategoryPage({ params }: Props) {
       <MainPage id={id} locale={locale} />
       <EditorialFaq
         kind="categories"
-        contentKey={decodeURIComponent(id)}
+        contentKey={id}
         locale={locale}
       />
     </>
@@ -195,7 +198,7 @@ export async function generateMetadata(args: Props): Promise<Metadata> {
   const { id, locale } = await args.params;
   const [base, extra] = await Promise.all([
     generateBaseMetadata(args),
-    readPublicEditorialSeo("categories", decodeURIComponent(id), locale),
+    readPublicEditorialSeo("categories", decodeRouteKey(id), locale),
   ]);
   return applyEditorialSeo(base, extra);
 }

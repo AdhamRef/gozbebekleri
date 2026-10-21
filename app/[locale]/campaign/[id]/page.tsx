@@ -10,6 +10,7 @@ import MainPageDummy from "../_components/MainPageDummy";
 import { prisma } from "@/lib/prisma";
 import {
   isObjectId,
+  decodeRouteKey,
   pickLocaleSlug,
   whereByIdOrAnyLocaleSlug,
 } from "@/lib/slug";
@@ -113,7 +114,8 @@ const URGENCY_PREFIX: Record<string, string> = {
 };
 
 async function generateBaseMetadata({ params }: Props): Promise<Metadata> {
-  const { id, locale } = await params;
+  const { id: routeId, locale } = await params;
+  const id = decodeRouteKey(routeId);
   const seo = LOCALE_SEO[locale as Locale] ?? LOCALE_SEO.en;
   const requestedCanonical = `${SITE_URL}/${locale}/campaign/${encodeURIComponent(id)}`;
 
@@ -239,7 +241,8 @@ async function generateBaseMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function CampaignPage({ params }: Props) {
-  const { id, locale } = await params;
+  const { id: routeId, locale } = await params;
+  const id = decodeRouteKey(routeId);
 
   try {
     const campaign = await prisma.campaign.findFirst({
@@ -273,7 +276,7 @@ export default async function CampaignPage({ params }: Props) {
       <MainPageDummy id={id} locale={locale} />
       <EditorialFaq
         kind="campaigns"
-        contentKey={decodeURIComponent(id)}
+        contentKey={id}
         locale={locale}
       />
     </>
@@ -284,7 +287,7 @@ export async function generateMetadata(args: Props): Promise<Metadata> {
   const { id, locale } = await args.params;
   const [base, extra] = await Promise.all([
     generateBaseMetadata(args),
-    readPublicEditorialSeo("campaigns", decodeURIComponent(id), locale),
+    readPublicEditorialSeo("campaigns", decodeRouteKey(id), locale),
   ]);
   return applyEditorialSeo(base, extra);
 }
