@@ -36,3 +36,8 @@ test("URLs, variables and Quran text remain protected alongside localized amount
   assert.ok(missingProtectedTokens(source,target.replace("example.org","example.net"),{targetLocale:"pt"}).length);
   assert.ok(missingProtectedTokens(source,target.replace("إِنَّ مَعَ الْعُسْرِ يُسْرًا","translated verse"),{targetLocale:"pt"}).length);
 });
+test("normalizing digits cannot disguise changes inside URLs, variables or protected verses", () => {
+  assert.ok(missingProtectedTokens("https://example.org/١٢", "https://example.org/12").length);
+  assert.ok(missingProtectedTokens("{{item١}}", "{{item1}}").length);
+  assert.ok(missingProtectedTokens("﴿ نص ١ ﴾", "﴿ نص 1 ﴾").length);
+});

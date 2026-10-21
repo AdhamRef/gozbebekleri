@@ -66,7 +66,7 @@ function numberKey(raw: string, locale: string): string {
 }
 
 function tokensFor(value: string, locale: string): Token[] {
-  let text = normalizeDigits(value);
+  let text = value;
   const tokens: Token[] = [];
   const take = (re: RegExp, canonical: (m: RegExpMatchArray) => string) => {
     text = text.replace(re, (...args) => {
@@ -82,6 +82,8 @@ function tokensFor(value: string, locale: string): Token[] {
   take(MUSTACHE_RE, (m) => `var:{{${m[1]}}}`);
   take(ICU_VARIABLE_RE, (m) => `var:{${m[1]}}`);
   take(HTML_TAG_RE, (m) => `tag:<${m[1]}${m[2].toLowerCase()}>`);
+  // Number formatting may change; URLs, variables and Quran text must not.
+  text = normalizeDigits(text);
   take(CURRENCY_RE, (m) => `cur:${m[0].toUpperCase()}`);
   take(SYMBOL_RE, (m) => `symbol:${m[0]}`);
   text.replace(NUMBER_RE, raw => {
