@@ -144,8 +144,14 @@ export function WhatsappTemplateList() {
       );
       await fetchAll();
     } catch (error) {
-      const data = (error as { response?: { data?: { error?: string; detail?: string } } }).response?.data;
-      toast.error([data?.error, data?.detail].filter(Boolean).join(" — ") || dt("فشل تحديث حالات Meta"));
+      const requestError = error as { response?: { data?: { error?: string; detail?: string } } };
+      const data = requestError.response?.data;
+      toast.error(
+        [data?.error, data?.detail].filter(Boolean).join(" — ") ||
+          (requestError.response
+            ? dt("فشل تحديث حالات Meta")
+            : dt("تعذّر الاتصال بالخادم أثناء تحديث القوالب من Meta. تحقّق من الاتصال ثم أعد المحاولة.")),
+      );
     } finally {
       setSyncingMeta(false);
     }
@@ -230,7 +236,7 @@ export function WhatsappTemplateList() {
             title={dt("جلب أحدث حالات اعتماد القوالب من Meta")}
           >
             {syncingMeta ? <Loader2 className="w-4 h-4 animate-spin" /> : <DownloadCloud className="w-4 h-4" />}
-            {dt("تحديث من Meta")}</Button>
+            {syncingMeta ? dt("جارٍ التحديث من Meta…") : dt("تحديث من Meta")}</Button>
           <Button
             size="sm"
             variant="outline"
