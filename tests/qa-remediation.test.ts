@@ -263,3 +263,18 @@ test("BUG-11 release regression: Next 16 resolves the same request config in bot
   assert.equal(webpackConfig.resolve.alias["next-intl/config"], `${process.cwd()}/i18n/request.ts`);
   assert.equal(webpackConfig.resolve.alias.existing, "preserved");
 });
+
+
+test("Release font regression: bundled fonts contain the expected families, weights and multilingual glyphs", () => {
+  const { create } = require("fontkit");
+  for (const [name, weight] of [["Regular",400],["Medium",500],["SemiBold",600],["Bold",700]]) {
+    const font = create(readFileSync(`app/fonts/Poppins-${name}.woff2`));
+    assert.match(font.familyName, /^Poppins(?: |$)/);
+    assert.equal(font["OS/2"].usWeightClass, weight);
+    for (const char of "éèçĞİşßñãõáöü") assert.ok(font.hasGlyphForCodePoint(char.codePointAt(0)), char);
+  }
+  const arabic = create(readFileSync("app/fonts/NotoKufiArabic-Variable.woff2"));
+  assert.equal(arabic.familyName, "Noto Kufi Arabic");
+  assert.ok(arabic.variationAxes.wght.min <= 400 && arabic.variationAxes.wght.max >= 700);
+  for (const char of "قرةالعيونشكراً") assert.ok(arabic.hasGlyphForCodePoint(char.codePointAt(0)), char);
+});

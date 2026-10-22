@@ -1,22 +1,25 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Poppins, Noto_Kufi_Arabic } from "next/font/google";
+import localFont from "next/font/local";
 import DeferredGTM from "@/components/DeferredGTM";
 import MicrosoftClarity from "@/components/MicrosoftClarity";
 import EngagementInstrumentation from "@/components/EngagementInstrumentation";
 import { Analytics } from "@vercel/analytics/next";
 import "./[locale]/globals.css";
 
-const poppins = Poppins({
-  weight: ["400", "500", "600", "700"],
-  subsets: ["latin"],
+const poppins = localFont({
+  src: [
+    { path: "./fonts/Poppins-Regular.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/Poppins-Medium.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/Poppins-SemiBold.woff2", weight: "600", style: "normal" },
+    { path: "./fonts/Poppins-Bold.woff2", weight: "700", style: "normal" },
+  ],
   variable: "--font-poppins",
   display: "swap",
 });
 
-const notoKufiArabic = Noto_Kufi_Arabic({
-  weight: ["400", "500", "600", "700"],
-  subsets: ["arabic"],
+const notoKufiArabic = localFont({
+  src: [{ path: "./fonts/NotoKufiArabic-Variable.woff2", weight: "100 900", style: "normal" }],
   variable: "--font-arabic",
   display: "swap",
 });
