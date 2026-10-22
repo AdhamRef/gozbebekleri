@@ -24,6 +24,7 @@ const EmailEditor = dynamic(
 );
 
 interface Props {
+  initialKind?: "SYSTEM" | "CAMPAIGN";
   id: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -42,7 +43,7 @@ interface ApiTemplate {
   purpose?: "MARKETING" | "UTILITY" | "TRANSACTIONAL" | "AUTHENTICATION" | null;
 }
 
-export function EmailTemplateEditorDialog({ id, open, onOpenChange }: Props) {
+export function EmailTemplateEditorDialog({ id, open, initialKind = "CAMPAIGN", onOpenChange }: Props) {
   const [name, setName] = React.useState("");
   const [kind, setKind] = React.useState<"SYSTEM" | "CAMPAIGN">("CAMPAIGN");
   const [variants, setVariants] = React.useState<VariantsState>({});
@@ -54,7 +55,7 @@ export function EmailTemplateEditorDialog({ id, open, onOpenChange }: Props) {
     if (!open) return;
     if (!id) {
       setName("");
-      setKind("CAMPAIGN");
+      setKind(initialKind);
       setVariants({ [DEFAULT_LOCALE]: { subject: "", document: defaultDocument() } });
       setActiveLocale(DEFAULT_LOCALE);
       return;
@@ -89,7 +90,7 @@ export function EmailTemplateEditorDialog({ id, open, onOpenChange }: Props) {
       })
       .catch(() => toast.error(dt("فشل تحميل القالب")))
       .finally(() => setLoading(false));
-  }, [id, open]);
+  }, [id, open, initialKind]);
 
   const current = variants[activeLocale];
 

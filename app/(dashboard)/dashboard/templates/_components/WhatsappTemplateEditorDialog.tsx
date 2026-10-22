@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils";
 import { dt, dtx } from "@/lib/dashboard/i18n";
 
 interface Props {
+  initialKind?: "SYSTEM" | "CAMPAIGN";
   id: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -234,7 +235,7 @@ function mediaAccept(type: HeaderType): string | undefined {
   return undefined;
 }
 
-export function WhatsappTemplateEditorDialog({ id, open, onOpenChange }: Props) {
+export function WhatsappTemplateEditorDialog({ id, open, initialKind = "CAMPAIGN", onOpenChange }: Props) {
   const [name, setName] = React.useState("");
   const [workingId, setWorkingId] = React.useState<string | null>(id);
   const [category, setCategory] = React.useState<Category>("UTILITY");
@@ -272,7 +273,7 @@ export function WhatsappTemplateEditorDialog({ id, open, onOpenChange }: Props) 
     setMediaInfo(null);
     if (!id) {
       setName("");
-      setCategory("UTILITY");
+      setCategory(initialKind === "CAMPAIGN" ? "MARKETING" : "UTILITY");
       setRootHeader({ type: "NONE" });
       setLocales({
         [DEFAULT_LOCALE]: {
@@ -335,7 +336,7 @@ export function WhatsappTemplateEditorDialog({ id, open, onOpenChange }: Props) 
       })
       .catch(() => toast.error(dt("فشل تحميل القالب")))
       .finally(() => setLoading(false));
-  }, [id, open]);
+  }, [id, open, initialKind]);
 
 
 

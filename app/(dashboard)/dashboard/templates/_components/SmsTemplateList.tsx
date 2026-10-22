@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { resolveTemplateKind } from "@/lib/communication/template-kind";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
@@ -75,8 +76,7 @@ export function SmsTemplateList() {
   };
 
   const visibleTemplates = templates.filter((template) => {
-    const isSystem = template.kind === "SYSTEM" || (template.purpose != null && template.purpose !== "MARKETING");
-    const bucket = isSystem ? "SYSTEM" : "CAMPAIGN";
+    const bucket = resolveTemplateKind(template);
     return bucket === section;
   });
 
@@ -90,8 +90,8 @@ export function SmsTemplateList() {
   return (
     <div className="space-y-4">
       <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
-        <button type="button" onClick={() => setSection("CAMPAIGN")} className={`rounded-md px-3 py-1.5 text-xs font-medium ${section === "CAMPAIGN" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{dt("الحملات التسويقية")}</button>
-        <button type="button" onClick={() => setSection("SYSTEM")} className={`rounded-md px-3 py-1.5 text-xs font-medium ${section === "SYSTEM" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{dt("التلقائية والتوثيق")}</button>
+        <button type="button" aria-pressed={section === "CAMPAIGN"} onClick={() => setSection("CAMPAIGN")} className={`rounded-md px-3 py-1.5 text-xs font-medium ${section === "CAMPAIGN" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{dt("الحملات التسويقية")} ({templates.filter((template) => resolveTemplateKind(template) === "CAMPAIGN").length})</button>
+        <button type="button" aria-pressed={section === "SYSTEM"} onClick={() => setSection("SYSTEM")} className={`rounded-md px-3 py-1.5 text-xs font-medium ${section === "SYSTEM" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{dt("التلقائية والتوثيق")} ({templates.filter((template) => resolveTemplateKind(template) === "SYSTEM").length})</button>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -231,6 +231,7 @@ export function SmsTemplateList() {
       </div>
 
       <SmsTemplateEditorDialog
+          initialKind={section}
         id={editor.id}
         open={editor.open}
         onOpenChange={(open) => setEditor((prev) => ({ ...prev, open }))}

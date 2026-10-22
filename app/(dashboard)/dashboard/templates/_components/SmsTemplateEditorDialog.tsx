@@ -16,6 +16,7 @@ import { VariablePicker } from "./VariablePicker";
 import { dt, dtx } from "@/lib/dashboard/i18n";
 
 interface Props {
+  initialKind?: "SYSTEM" | "CAMPAIGN";
   id: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -105,7 +106,7 @@ function SegmentMeter({ text }: { text: string }) {
   );
 }
 
-export function SmsTemplateEditorDialog({ id, open, onOpenChange, onSaved }: Props) {
+export function SmsTemplateEditorDialog({ id, open, initialKind = "CAMPAIGN", onOpenChange, onSaved }: Props) {
   const [name, setName] = React.useState("");
   const [kind, setKind] = React.useState<"SYSTEM" | "CAMPAIGN">("CAMPAIGN");
   const [bodies, setBodies] = React.useState<BodiesState>({});
@@ -118,7 +119,7 @@ export function SmsTemplateEditorDialog({ id, open, onOpenChange, onSaved }: Pro
     if (!open) return;
     if (!id) {
       setName("");
-      setKind("CAMPAIGN");
+      setKind(initialKind);
       setBodies({ [DEFAULT_LOCALE]: dt("شكرًا {{user.name}}! تم استلام تبرعك بمبلغ {{amount}} {{currency}}.") });
       setActiveLocale(DEFAULT_LOCALE);
       return;
@@ -144,7 +145,7 @@ export function SmsTemplateEditorDialog({ id, open, onOpenChange, onSaved }: Pro
       })
       .catch(() => toast.error(dt("فشل تحميل القالب")))
       .finally(() => setLoading(false));
-  }, [id, open]);
+  }, [id, open, initialKind]);
 
   const currentBody = bodies[activeLocale] ?? "";
   const updateCurrentBody = (v: string) => setBodies((prev) => ({ ...prev, [activeLocale]: v }));

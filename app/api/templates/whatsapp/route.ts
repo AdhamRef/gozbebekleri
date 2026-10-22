@@ -1,3 +1,4 @@
+import { classifyEventTemplates } from "@/lib/communication/template-event-classification";
 import { headerSchema, templateButtonsSchema, authSchema, translationSchema } from "@/lib/communication/whatsapp-template-schema";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -103,7 +104,7 @@ export async function GET() {
     };
   });
   return NextResponse.json({
-    templates,
+    templates: await classifyEventTemplates("WHATSAPP", templates),
     directSendEnabled: process.env.META_WHATSAPP_DIRECT_SEND_ENABLED === "true",
   });
 }
