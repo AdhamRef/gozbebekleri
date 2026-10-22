@@ -96,7 +96,7 @@ export default async function Rootlayout({
             <SessionProvider>
               <PreferredLangSync />
               <Navbar />
-              <main className="pt-16 lg:pt-[104px]">
+              <main className="pt-16 2xl:pt-[104px]">
                 <ManagedBannerSlots locale={locale} slot="top" />
                 {children}
                 <ManagedBannerSlots locale={locale} slot="bottom" />

@@ -71,6 +71,12 @@ const marketingRedirects = [
 ] as const;
 
 const nextConfig: NextConfig = {
+  // Isolate local QA compilation from an already-running developer server.
+  distDir: process.env.QA_NEXT_DIST_DIR || ".next",
+  // next-intl 3 configures the legacy experimental.turbo key; Next 16 reads this key.
+  turbopack: {
+    resolveAlias: { "next-intl/config": "./i18n/request.ts" },
+  },
   experimental: {
     optimizePackageImports: ["lucide-react", "framer-motion", "motion", "@radix-ui/react-icons", "date-fns", "react-use"],
     optimizeCss: true,

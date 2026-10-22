@@ -50,7 +50,7 @@ import {
 import useConvetToUSD from "@/hooks/useConvetToUSD";
 import { useReferralCode } from "@/hooks/useReferralCode";
 import { useCurrency } from "@/context/CurrencyContext";
-import { formatNumber } from "@/hooks/formatNumber";
+import { formatCheckoutAmount } from "@/lib/checkout-display";
 import { useCart } from "@/hooks/useCart";
 import { resolveShareUnit, resolveSharePlural, type ShareLabelsConfig } from "@/lib/campaign/share-labels";
 import { useTracking } from "@/components/TrackingPixels";
@@ -837,11 +837,11 @@ const DonationDialog = ({
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">
                     {t("collected")}{" "}
-                    <span dir="ltr">{formatNumber(convertToCurrency(amountRaised).convertedValue ?? 0)} {getCurrency()}</span>
+                    <span dir="ltr">{formatCheckoutAmount(convertToCurrency(amountRaised).convertedValue ?? 0)} {getCurrency()}</span>
                   </span>
                   <span className="text-gray-600">
                     {t("goal")}{" "}
-                    <span dir="ltr">{formatNumber(convertToCurrency(targetAmount).convertedValue ?? 0)} {getCurrency()}</span>
+                    <span dir="ltr">{formatCheckoutAmount(convertToCurrency(targetAmount).convertedValue ?? 0)} {getCurrency()}</span>
                   </span>
                 </div>
                 <div className="w-full bg-gray-100 rounded-full h-2">
@@ -863,7 +863,7 @@ const DonationDialog = ({
                 <>
                   <p className="text-sm text-center text-gray-600">
                     {t("sharePriceLabel")}{" "}
-                    <span dir="ltr">{formatNumber(sharePriceInCurrency)} {getCurrency()}</span>
+                    <span dir="ltr">{formatCheckoutAmount(sharePriceInCurrency)} {getCurrency()}</span>
                   </p>
                   <p className="text-xs text-center text-gray-500">
                     {customPlural
@@ -906,7 +906,7 @@ const DonationDialog = ({
                         }
                       >
                         {c * sharePriceInCurrency > 0 ? (
-                          <span dir="ltr">{formatNumber(c * sharePriceInCurrency)} {getCurrency()}</span>
+                          <span dir="ltr">{formatCheckoutAmount(c * sharePriceInCurrency)} {getCurrency()}</span>
                         ) : (
                           t("free")
                         )}
@@ -914,7 +914,7 @@ const DonationDialog = ({
                     ))}
                   </div>
                   <p className="text-center text-base font-semibold text-[#025EB8]">
-                    {t("donationTotal")}: <span dir="ltr">{formatNumber(donationAmount)} {getCurrency()}</span>
+                    {t("donationTotal")}: <span dir="ltr">{formatCheckoutAmount(donationAmount)} {getCurrency()}</span>
                   </p>
                 </>
                   );
@@ -1163,12 +1163,12 @@ const DonationDialog = ({
             <div dir={locale === "ar" ? "rtl" : "ltr"} className="bg-gray-50 p-4 rounded-lg space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">{t("amount")}</span>
-                <span className="font-medium" dir="ltr">{formatNumber(donationAmount)} {getCurrency()}</span>
+                <span className="font-medium" dir="ltr">{formatCheckoutAmount(donationAmount)} {getCurrency()}</span>
               </div>
               {teamSupport != null && teamSupport > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">{t("teamSupport")}</span>
-                  <span className="font-medium" dir="ltr">{formatNumber(teamSupport)} {getCurrency()}</span>
+                  <span className="font-medium" dir="ltr">{formatCheckoutAmount(teamSupport)} {getCurrency()}</span>
                 </div>
               )}
               <div className="flex justify-between text-sm">
@@ -1243,12 +1243,12 @@ const DonationDialog = ({
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">{t("amount")}</span>
-                <span className="font-medium text-gray-900" dir="ltr">{formatNumber(donationAmount)} {getCurrency()}</span>
+                <span className="font-medium text-gray-900" dir="ltr">{formatCheckoutAmount(donationAmount)} {getCurrency()}</span>
               </div>
               {teamSupport != null && teamSupport > 0 && (
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">{t("teamSupport")}</span>
-                  <span className="font-medium text-gray-900" dir="ltr">{formatNumber(teamSupport)} {getCurrency()}</span>
+                  <span className="font-medium text-gray-900" dir="ltr">{formatCheckoutAmount(teamSupport)} {getCurrency()}</span>
                 </div>
               )}
               {coverFees && (
@@ -1285,11 +1285,11 @@ const DonationDialog = ({
             {/* Footer Note */}
             <p className="text-xs text-center text-gray-500 mt-4">
               {t("byContinuing")}{" "}
-              <a href="#" className="text-[#025EB8] hover:underline">
+              <a href={`/${locale}/terms`} target="_blank" rel="noopener noreferrer" className="text-[#025EB8] hover:underline">
                 {t("termsOfUseLink")}
               </a>{" "}
               {t("and")}{" "}
-              <a href="#" className="text-[#025EB8] hover:underline">
+              <a href={`/${locale}/privacy`} target="_blank" rel="noopener noreferrer" className="text-[#025EB8] hover:underline">
                 {t("privacyPolicyLink")}
               </a>
             </p>

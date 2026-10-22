@@ -38,7 +38,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { formatDistanceToNow } from "date-fns";
-import { ar as dateAr } from "date-fns/locale";
+import { publicDateLocale } from "@/lib/public-date-locale";
 import Link from "next/link";
 import ShareButton from "./_components/ShareButton";
 import BlogPostContent from "./_components/BlogPostContent";
@@ -277,7 +277,7 @@ export default async function BlogPost({
                       {post.createdAt
                         ? formatDistanceToNow(new Date(post.createdAt), {
                             addSuffix: true,
-                            locale: locale === "ar" ? dateAr : undefined,
+                            locale: publicDateLocale(locale),
                           })
                         : ""}
                     </span>

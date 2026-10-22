@@ -864,9 +864,9 @@ const CartPaymentDialog = ({
         </div>
         <p className="text-xs text-center text-gray-500 leading-relaxed px-2 break-words">
           {t("byContinuing")}{" "}
-          <a href="#" className="text-[#025EB8] hover:underline font-medium">{t("termsOfUseLink")}</a>{" "}
+          <a href={`/${locale}/terms`} target="_blank" rel="noopener noreferrer" className="text-[#025EB8] hover:underline font-medium">{t("termsOfUseLink")}</a>{" "}
           {t("and")}{" "}
-          <a href="#" className="text-[#025EB8] hover:underline font-medium">{t("privacyPolicyLink")}</a>
+          <a href={`/${locale}/privacy`} target="_blank" rel="noopener noreferrer" className="text-[#025EB8] hover:underline font-medium">{t("privacyPolicyLink")}</a>
         </p>
       </div>
     );

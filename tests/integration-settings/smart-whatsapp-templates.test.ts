@@ -11,7 +11,7 @@ const variant = (changes: Partial<VariantRow & { businessAccountId: string }> = 
 const routes = { UTILITY: "waba-a", MARKETING: "waba-a" };
 
 test("approved exact WABA is available even when another account has no approval", () => {
-  const templates = [{ id: "receipt", name: "Receipt", wabaVariants: [
+  const templates = [{ id: "receipt", name: "Receipt", kind: "SYSTEM", wabaVariants: [
     variant(), variant({ businessAccountId: "waba-b", approvalStatus: "PENDING" }),
   ] }];
   assert.deepEqual(smartWhatsappTemplateChoices(templates, "ar", routes).utilityTemplates,
@@ -20,19 +20,19 @@ test("approved exact WABA is available even when another account has no approval
 });
 
 test("an approval on a different WABA cannot make a template sendable", () => {
-  const templates = [{ id: "receipt", name: "Receipt", wabaVariants: [variant({ businessAccountId: "waba-b" })] }];
+  const templates = [{ id: "receipt", name: "Receipt", kind: "SYSTEM", wabaVariants: [variant({ businessAccountId: "waba-b" })] }];
   assert.deepEqual(smartWhatsappTemplateChoices(templates, "ar", routes), { utilityTemplates: [], marketingTemplates: [] });
 });
 
-test("Meta recategorization determines the tab instead of stale local taxonomy", () => {
+test("Meta recategorization never moves an automatic template into marketing", () => {
   const templates = [{ id: "receipt", name: "Receipt", category: "UTILITY", purpose: "TRANSACTIONAL", wabaVariants: [variant({ category: "MARKETING" })] }];
   const result = smartWhatsappTemplateChoices(templates, "ar", routes);
   assert.deepEqual(result.utilityTemplates, []);
-  assert.deepEqual(result.marketingTemplates, [{ id: "receipt", name: "Receipt", category: "MARKETING" }]);
+  assert.deepEqual(result.marketingTemplates, []);
 });
 
 test("Utility and Marketing use their independently routed business accounts", () => {
-  const templates = [{ id: "shared", name: "Shared", wabaVariants: [variant(), variant({ businessAccountId: "waba-b", category: "MARKETING" })] }];
+  const templates = [{ id: "utility", name: "Service", kind: "SYSTEM", wabaVariants: [variant()] }, { id: "marketing", name: "Campaign", kind: "CAMPAIGN", wabaVariants: [variant({ businessAccountId: "waba-b", category: "MARKETING" })] }];
   const result = smartWhatsappTemplateChoices(templates, "ar", { UTILITY: "waba-a", MARKETING: "waba-b" });
   assert.equal(result.utilityTemplates[0]?.category, "UTILITY");
   assert.equal(result.marketingTemplates[0]?.category, "MARKETING");
@@ -48,19 +48,20 @@ test("unapproved and unknown-category templates never appear in send choices", (
 
 test("listing and sending share exact-language and Arabic-fallback selection", () => {
   const variants = [variant(), variant({ languageCode: "en_US", locale: "en", category: "MARKETING" })];
-  const templates = [{ id: "receipt", name: "Receipt", wabaVariants: variants }];
+  const templates = [{ id: "receipt", name: "Receipt", kind: "SYSTEM", wabaVariants: variants }];
   assert.equal(resolveVariantForLocale(variants, "en").languageCode, "en_US");
-  assert.equal(smartWhatsappTemplateChoices(templates, "en", routes).marketingTemplates.length, 1);
+  assert.equal(smartWhatsappTemplateChoices(templates, "en", routes).marketingTemplates.length, 0);
+  assert.equal(smartWhatsappTemplateChoices(templates, "en", routes).utilityTemplates.length, 0);
   assert.equal(resolveVariantForLocale(variants, "tr").languageCode, "ar");
   assert.equal(smartWhatsappTemplateChoices(templates, "tr", routes).utilityTemplates.length, 1);
 });
 
 test("unrelated approved languages without a supported fallback remain unavailable", () => {
-  const templates = [{ id: "receipt", name: "Receipt", wabaVariants: [variant({ locale: "en", languageCode: "en_US" })] }];
+  const templates = [{ id: "receipt", name: "Receipt", kind: "SYSTEM", wabaVariants: [variant({ locale: "en", languageCode: "en_US" })] }];
   assert.deepEqual(smartWhatsappTemplateChoices(templates, "tr", routes).utilityTemplates, []);
 });
 
 test("a missing routed WABA does not fall back to another account", () => {
-  const templates = [{ id: "receipt", name: "Receipt", wabaVariants: [variant()] }];
+  const templates = [{ id: "receipt", name: "Receipt", kind: "SYSTEM", wabaVariants: [variant()] }];
   assert.deepEqual(smartWhatsappTemplateChoices(templates, "ar", { UTILITY: null, MARKETING: null }), { utilityTemplates: [], marketingTemplates: [] });
 });

@@ -1,3 +1,4 @@
+import { localizedCampaignTitle } from "@/lib/campaign/localized-title";
 import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -221,7 +222,7 @@ export async function GET(
         // Drives /campaign/[slug] links from this list.
         slug: (tC as { slug?: string | null } | undefined)?.slug || c.slug || null,
         baseSlug: c.slug ?? null,
-        title: tC?.title || c.title,
+        ...localizedCampaignTitle(c.title, c.translations, locale),
         description: tC?.description || c.description,
         images: c.images,
         videoUrl: c.videoUrl,

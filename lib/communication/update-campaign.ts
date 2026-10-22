@@ -1,3 +1,4 @@
+import { findClassifiedTemplate } from "./template-usage";
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
@@ -274,8 +275,9 @@ export async function createUpdateEmailCampaign(
   const source = await loadUpdateSource(input.updateId);
   if (!source) return { ok: false, status: 404, error: "التحديث غير موجود." };
   if (!/^[0-9a-fA-F]{24}$/.test(input.templateId)) return { ok: false, status: 400, error: "اختر قالب بريد." };
-  const template = await prisma.emailTemplate.findUnique({ where: { id: input.templateId }, select: { id: true } });
+  const template = await findClassifiedTemplate("EMAIL", input.templateId);
   if (!template) return { ok: false, status: 404, error: "القالب غير موجود." };
+  if (template.kind !== "CAMPAIGN" || template.status === "ARCHIVED") return { ok: false, status: 409, error: "اختر قالب بريد تسويقيًا متاحًا." };
   const name = input.name.trim();
   if (!name) return { ok: false, status: 400, error: "اسم الحملة مطلوب." };
 

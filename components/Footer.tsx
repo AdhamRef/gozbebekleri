@@ -26,7 +26,7 @@ import {
 import { getSocialLinks } from "@/lib/social-links";
 import { track } from "@vercel/analytics";
 
-const LOGO_URL = "logo-white.png";
+const LOGO_URL = "/logo-white.png";
 
 const Footer = () => {
   const t = useTranslations("Footer");

@@ -16,6 +16,7 @@ import { VariablePicker } from "./VariablePicker";
 import { dt, dtx } from "@/lib/dashboard/i18n";
 
 interface Props {
+  initialKind?: "SYSTEM" | "CAMPAIGN";
   id: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -29,6 +30,7 @@ interface ApiTemplate {
   name: string;
   body: string;
   translations?: Partial<Record<string, { body?: string }>> | null;
+  linkedToEvent?: boolean;
   kind?: "SYSTEM" | "CAMPAIGN" | null;
   purpose?: "MARKETING" | "UTILITY" | "TRANSACTIONAL" | "AUTHENTICATION" | null;
 }
@@ -105,8 +107,10 @@ function SegmentMeter({ text }: { text: string }) {
   );
 }
 
-export function SmsTemplateEditorDialog({ id, open, onOpenChange, onSaved }: Props) {
+export function SmsTemplateEditorDialog({ id, open, initialKind = "CAMPAIGN", onOpenChange, onSaved }: Props) {
   const [name, setName] = React.useState("");
+  const [linkedToEvent, setLinkedToEvent] = React.useState(false);
+  const [originalPurpose, setOriginalPurpose] = React.useState<ApiTemplate["purpose"]>(null);
   const [kind, setKind] = React.useState<"SYSTEM" | "CAMPAIGN">("CAMPAIGN");
   const [bodies, setBodies] = React.useState<BodiesState>({});
   const [activeLocale, setActiveLocale] = React.useState<SupportedLocale>(DEFAULT_LOCALE);
@@ -118,7 +122,9 @@ export function SmsTemplateEditorDialog({ id, open, onOpenChange, onSaved }: Pro
     if (!open) return;
     if (!id) {
       setName("");
-      setKind("CAMPAIGN");
+      setKind(initialKind);
+      setLinkedToEvent(false);
+      setOriginalPurpose(null);
       setBodies({ [DEFAULT_LOCALE]: dt("شكرًا {{user.name}}! تم استلام تبرعك بمبلغ {{amount}} {{currency}}.") });
       setActiveLocale(DEFAULT_LOCALE);
       return;
@@ -129,6 +135,8 @@ export function SmsTemplateEditorDialog({ id, open, onOpenChange, onSaved }: Pro
       .then((res) => {
         const t = res.data?.template as ApiTemplate;
         setName(t?.name ?? "");
+        setLinkedToEvent(Boolean(t?.linkedToEvent));
+        setOriginalPurpose(t?.purpose);
         setKind(t?.kind === "SYSTEM" || (t?.purpose && t.purpose !== "MARKETING") ? "SYSTEM" : "CAMPAIGN");
         const next: BodiesState = { [DEFAULT_LOCALE]: t?.body ?? "" };
         if (t?.translations) {
@@ -144,7 +152,7 @@ export function SmsTemplateEditorDialog({ id, open, onOpenChange, onSaved }: Pro
       })
       .catch(() => toast.error(dt("فشل تحميل القالب")))
       .finally(() => setLoading(false));
-  }, [id, open]);
+  }, [id, open, initialKind]);
 
   const currentBody = bodies[activeLocale] ?? "";
   const updateCurrentBody = (v: string) => setBodies((prev) => ({ ...prev, [activeLocale]: v }));
@@ -205,7 +213,7 @@ export function SmsTemplateEditorDialog({ id, open, onOpenChange, onSaved }: Pro
         body: arBody,
         translations: Object.keys(translations).length > 0 ? translations : null,
         kind,
-        purpose: kind === "CAMPAIGN" ? "MARKETING" : "TRANSACTIONAL",
+        purpose: linkedToEvent && originalPurpose ? originalPurpose : kind === "CAMPAIGN" ? "MARKETING" : originalPurpose && originalPurpose !== "MARKETING" ? originalPurpose : "TRANSACTIONAL",
         status: "READY",
       };
       if (id) await axios.patch(`/api/templates/sms/${id}`, payload);
@@ -257,12 +265,14 @@ export function SmsTemplateEditorDialog({ id, open, onOpenChange, onSaved }: Pro
             <FieldLabel>{dt("نوع الاستخدام")}</FieldLabel>
             <select
               value={kind}
+                disabled={linkedToEvent}
               onChange={(e) => setKind(e.target.value as "SYSTEM" | "CAMPAIGN")}
               className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             >
               <option value="SYSTEM">{dt("تلقائي / خدمي / توثيق")}</option>
               <option value="CAMPAIGN">{dt("حملة تسويقية")}</option>
             </select>
+              {linkedToEvent && <p className="text-xs text-muted-foreground">{dt("مرتبط بحدث تلقائي؛ أزل الارتباط لتغيير النوع.")}</p>}
           </div>
         </div>
 

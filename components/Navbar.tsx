@@ -54,7 +54,7 @@ interface CartItem {
   };
 }
 
-const LOGO_URL = "logo.png";
+const LOGO_URL = "/logo.png";
 const LOGO_MOBILE_URL = "/logo.png";
 
 const Navbar = () => {
@@ -215,8 +215,8 @@ const Navbar = () => {
         }`}
       >
         {/* ── Top Info Bar (desktop only) ── */}
-        <div className="bg-[#025EB8] text-white text-xs hidden lg:block">
-          <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-9">
+        <div className="bg-[#025EB8] text-white text-xs hidden 2xl:block">
+          <div className="max-w-[1600px] mx-auto px-4 flex items-center justify-between h-9">
             {/* Left: social icons + phone */}
             <div className="flex items-center gap-3">
               <a href={social.instagram} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="hover:text-blue-200 transition-colors">
@@ -250,18 +250,18 @@ const Navbar = () => {
 
         {/* ── Main Navbar ── */}
         <nav className="bg-white border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 flex items-center h-16 lg:h-[68px] gap-2">
+          <div className="max-w-[1600px] mx-auto px-4 flex items-center h-16 2xl:h-[68px] gap-2">
 
             {/* Logo — always visible */}
             <Link href="/" className="flex-shrink-0 flex items-center gap-2">
               {/* Mobile: narrow square logo */}
-              <Image src={LOGO_MOBILE_URL} alt="Logo" width={48} height={48} className="lg:hidden h-9 w-auto object-contain" />
+              <Image src={LOGO_MOBILE_URL} alt="Logo" width={48} height={48} className="2xl:hidden h-9 w-auto object-contain" />
               {/* Desktop: wide logo — width must match aspect ratio to prevent blur */}
-              <Image src={LOGO_URL} alt="Logo" width={240} height={48} className="hidden lg:block h-12 w-auto object-contain" />
+              <Image src={LOGO_URL} alt="Logo" width={240} height={48} className="hidden 2xl:block h-12 w-auto object-contain" />
             </Link>
 
             {/* Desktop Nav Links */}
-            <div className="hidden lg:flex items-center gap-1 flex-1 justify-center">
+            <div className="hidden 2xl:flex items-center gap-1 flex-1 justify-center">
               {navLinks.map((link) => (
                 <Link
                   key={link.href + link.label}
@@ -282,7 +282,7 @@ const Navbar = () => {
             {/* Desktop: Search */}
             {/* <form
               onSubmit={handleSearch}
-              className="hidden lg:flex items-center border border-gray-300 rounded-lg overflow-hidden flex-shrink-0"
+              className="hidden 2xl:flex items-center border border-gray-300 rounded-lg overflow-hidden flex-shrink-0"
             >
               <input
                 type="text"
@@ -302,17 +302,17 @@ const Navbar = () => {
             {/* Desktop: Donate button */}
             <Link
               href="/campaigns"
-              className="hidden lg:flex items-center gap-1.5 bg-[#FA5D17] hover:bg-[#e04d0f] text-white font-bold text-sm px-4 py-2.5 rounded-lg transition-colors flex-shrink-0"
+              className="hidden 2xl:flex items-center gap-1.5 bg-[#FA5D17] hover:bg-[#e04d0f] text-white font-bold text-sm px-4 py-2.5 rounded-lg transition-colors flex-shrink-0"
             >
               <Heart className="w-4 h-4" />
               {t("donate") || "BAĞIŞ YAP"}
             </Link>
 
             {/* Spacer — pushes right-side items to the edge on mobile */}
-            <div className="flex-1 lg:hidden" />
+            <div className="flex-1 2xl:hidden" />
 
             {/* Mobile: Language + Currency */}
-            <div className="flex lg:hidden items-center gap-0.5">
+            <div className="flex 2xl:hidden items-center gap-0.5">
               <LanguageSwitcher onDark={false} />
               <CurrencySelector onDark={false} />
             </div>
@@ -346,7 +346,7 @@ const Navbar = () => {
                       {session.user.name?.[0]?.toUpperCase() ?? "U"}
                     </AvatarFallback>
                   </Avatar>
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-500 hidden lg:block" />
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-500 hidden 2xl:block" />
                 </button>
                 {isUserMenuOpen && (
                   <div
@@ -397,7 +397,7 @@ const Navbar = () => {
       );
                   setIsSignInOpen(true);
                 }}
-                className="hidden lg:flex items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-[#025EB8] transition-colors flex-shrink-0"
+                className="hidden 2xl:flex items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-[#025EB8] transition-colors flex-shrink-0"
               >
                 {t("signIn") || "Giriş Yap"}
               </button>
@@ -406,7 +406,7 @@ const Navbar = () => {
             {/* Mobile: Hamburger */}
             <button
               type="button"
-              className="lg:hidden p-2 text-gray-700 flex-shrink-0"
+              className="2xl:hidden p-2 text-gray-700 flex-shrink-0"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               aria-label="Menu"
             >
@@ -416,7 +416,7 @@ const Navbar = () => {
 
           {/* ── Mobile Menu ── */}
           {isMobileMenuOpen && (
-            <div className="lg:hidden overflow-hidden border-t border-gray-200 bg-white animate-fade-in">
+            <div className="2xl:hidden overflow-hidden border-t border-gray-200 bg-white animate-fade-in">
                 {/* Search */}
                 {/* <form
                   onSubmit={handleSearch}

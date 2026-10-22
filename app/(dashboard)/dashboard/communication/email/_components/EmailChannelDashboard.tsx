@@ -48,7 +48,7 @@ type Payload = {
   summary: {
     total: number; allTimeTotal: number; attempted: number; delivered: number; opened: number;
     clicked: number; failed: number; skipped: number;
-    deliveredRate: number; openRate: number; clickRate: number; failedRate: number;
+    accepted: number; deliveryTrackingAvailable: boolean; deliveredRate: number | null; openRate: number; clickRate: number; failedRate: number;
   };
   trackingLive: boolean;
   /** Failed/skipped messages in range that have not been re-sent yet. */
@@ -206,10 +206,10 @@ export function EmailChannelDashboard() {
             icon={Mail}
             eyebrow={dt("رسائل البريد المرسلة")}
             badge={dt("آخر {0} يومًا", [days])}
-            value={summary.attempted.toLocaleString("en-US")}
+            value={summary.accepted.toLocaleString("en-US")}
             note={dt("عدد الرسائل التي قبلها مزوّد البريد خلال الفترة. الرسائل المتخطّاة (بدون بريد أو غير مشتركة) غير محسوبة هنا.")}
             stats={[
-              { label: dt("وصلت"), icon: MailCheck, value: trackingLive ? summary.delivered.toLocaleString("en-US") : "—" },
+              { label: dt("وصلت"), icon: MailCheck, value: summary.deliveryTrackingAvailable ? summary.delivered.toLocaleString("en-US") : "—" },
               { label: dt("فُتحت"), icon: MailOpen, value: trackingLive ? summary.opened.toLocaleString("en-US") : "—", hint: trackingLive ? `${summary.openRate}%` : undefined },
               { label: dt("نُقرت"), icon: MousePointerClick, value: trackingLive ? summary.clicked.toLocaleString("en-US") : "—", hint: trackingLive ? `${summary.clickRate}%` : undefined },
               { label: dt("فشلت"), icon: TriangleAlert, value: summary.failed.toLocaleString("en-US"), hint: `${summary.failedRate}%` },
@@ -259,8 +259,8 @@ export function EmailChannelDashboard() {
             <FunnelCard
               trackingLive={trackingLive}
               steps={[
-                { label: dt("مقبول لدى المزود"), value: summary.attempted, pct: 100, tone: CHART_THEME.primary, always: true },
-                { label: dt("وصل"), value: summary.delivered, pct: summary.deliveredRate, tone: CHART_STATUS.info },
+                { label: dt("مقبول لدى المزود"), value: summary.accepted, pct: 100, tone: CHART_THEME.primary, always: true },
+                ...(summary.deliveryTrackingAvailable ? [{ label: dt("وصل"), value: summary.delivered, pct: summary.deliveredRate ?? 0, tone: CHART_STATUS.info }] : []),
                 { label: dt("فُتح"), value: summary.opened, pct: summary.openRate, tone: CHART_STATUS.success },
                 { label: dt("نُقر"), value: summary.clicked, pct: summary.clickRate, tone: CHART_THEME.secondary },
               ]}

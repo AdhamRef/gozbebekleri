@@ -26,6 +26,7 @@
     "cleanup:orphan-donation-items": "tsx scripts/cleanup-orphan-donation-items.ts",
     "migrate:integration-settings": "prisma generate --schema prisma/integration-settings.schema.prisma && tsx prisma/mongodb-migrations/20260714-integration-settings.ts",
     "test:site-qa": "node --import tsx --test tests/*.test.ts",
+    "test:qa-public-routes": "node scripts/qa-public-routes.mjs",
     "i18n:usage:strict": "node scripts/audit-ui-translation-usage.mjs --strict",
     "test:content-editors": "node --import tsx --test tests/content-editor/*.test.ts",
     "test:content-editors:browser": "node --import tsx scripts/content-editor-browser-test.mjs",
