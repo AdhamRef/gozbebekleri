@@ -1,0 +1,326 @@
+{
+  "fr": {
+    "title": "Politique de confidentialité",
+    "subtitle": "Comment nous recueillons, utilisons et protégeons vos données.",
+    "lastUpdated": "Dernière mise à jour : 2026-04-20",
+    "sections": [
+      {
+        "heading": "1. Données recueillies",
+        "body": [
+          "Nous recueillons les données que vous fournissez volontairement lors d’un don ou d’une inscription : nom, adresse e-mail, téléphone et pays.",
+          "Nous recueillons aussi des données techniques limitées (adresse IP, type de navigateur et pages consultées) pour améliorer le site et prévenir la fraude.",
+          "Nous ne conservons pas les numéros complets de carte sur nos serveurs. Les paiements sont traités par des prestataires certifiés (Stripe / PayFor)."
+        ]
+      },
+      {
+        "heading": "2. Utilisation de vos données",
+        "body": [
+          "Pour traiter les dons et envoyer les reçus.",
+          "Pour communiquer sur les campagnes que vous soutenez et leurs résultats.",
+          "Pour améliorer le site et prévenir les abus.",
+          "Nous ne vendons pas vos données à des tiers."
+        ]
+      },
+      {
+        "heading": "3. Partage des données",
+        "body": [
+          "Nous partageons les données uniquement avec les prestataires indispensables : services de paiement, de messagerie et d’hébergement.",
+          "Nous pouvons divulguer des données si la loi l’exige."
+        ]
+      },
+      {
+        "heading": "4. Vos droits",
+        "body": [
+          "Vous pouvez nous contacter à tout moment pour demander l’accès, la correction ou la suppression de vos données.",
+          "Vous pouvez vous désabonner depuis tout e-mail que nous envoyons."
+        ]
+      },
+      {
+        "heading": "5. Cookies",
+        "body": [
+          "Nous utilisons des cookies essentiels au fonctionnement du site et des cookies analytiques pour comprendre le comportement des visiteurs. Vous pouvez les contrôler dans les paramètres de votre navigateur."
+        ]
+      },
+      {
+        "heading": "6. Modifications de la politique",
+        "body": [
+          "Nous pouvons mettre à jour cette politique. La date en haut indique la dernière modification. La poursuite de l’utilisation du site vaut acceptation."
+        ]
+      }
+    ],
+    "contact": {
+      "heading": "Contact",
+      "body": "Pour toute question sur cette politique, contactez-nous via la page Contact."
+    }
+  },
+  "de": {
+    "title": "Datenschutzerklärung",
+    "subtitle": "Wie wir Ihre Daten erfassen, nutzen und schützen.",
+    "lastUpdated": "Zuletzt aktualisiert: 2026-04-20",
+    "sections": [
+      {
+        "heading": "1. Erfasste Daten",
+        "body": [
+          "Wir erfassen Daten, die Sie bei einer Spende oder Registrierung freiwillig angeben, darunter Name, E-Mail-Adresse, Telefonnummer und Land.",
+          "Außerdem erfassen wir begrenzte technische Daten (IP-Adresse, Browsertyp und besuchte Seiten), um die Website zu verbessern und Betrug zu verhindern.",
+          "Wir speichern keine vollständigen Kartennummern auf unseren Servern. Zahlungen werden von zertifizierten Anbietern (Stripe / PayFor) verarbeitet."
+        ]
+      },
+      {
+        "heading": "2. Nutzung Ihrer Daten",
+        "body": [
+          "Zur Verarbeitung von Spenden und zum Versand von Belegen.",
+          "Zur Kommunikation über unterstützte Kampagnen und deren Wirkung.",
+          "Zur Verbesserung der Website und zur Verhinderung von Missbrauch.",
+          "Wir verkaufen Ihre Daten nicht an Dritte."
+        ]
+      },
+      {
+        "heading": "3. Weitergabe von Daten",
+        "body": [
+          "Wir geben Daten nur an notwendige Dienstleister weiter: Zahlungs-, E-Mail- und Hostinganbieter.",
+          "Wir können Daten offenlegen, wenn dies gesetzlich vorgeschrieben ist."
+        ]
+      },
+      {
+        "heading": "4. Ihre Rechte",
+        "body": [
+          "Sie können uns jederzeit kontaktieren, um Auskunft, Berichtigung oder Löschung Ihrer Daten zu verlangen.",
+          "Sie können sich über jede von uns gesendete E-Mail abmelden."
+        ]
+      },
+      {
+        "heading": "5. Cookies",
+        "body": [
+          "Wir verwenden notwendige Cookies für die Funktion der Website und analytische Cookies zum Verständnis des Besucherverhaltens. Sie können diese über Ihre Browsereinstellungen steuern."
+        ]
+      },
+      {
+        "heading": "6. Änderungen",
+        "body": [
+          "Wir können diese Erklärung gelegentlich aktualisieren. Das Datum oben zeigt die letzte Änderung. Die weitere Nutzung der Website gilt als Zustimmung."
+        ]
+      }
+    ],
+    "contact": {
+      "heading": "Kontakt",
+      "body": "Bei Fragen zu dieser Erklärung erreichen Sie uns über die Kontaktseite."
+    }
+  },
+  "es": {
+    "title": "Política de privacidad",
+    "subtitle": "Cómo recopilamos, utilizamos y protegemos tus datos.",
+    "lastUpdated": "Última actualización: 2026-04-20",
+    "sections": [
+      {
+        "heading": "1. Datos que recopilamos",
+        "body": [
+          "Recopilamos los datos que facilitas voluntariamente al donar o registrarte, como nombre, correo electrónico, teléfono y país.",
+          "También recopilamos datos técnicos limitados (dirección IP, tipo de navegador y páginas visitadas) para mejorar el sitio y prevenir fraudes.",
+          "No almacenamos números completos de tarjetas en nuestros servidores. Los pagos se procesan mediante proveedores certificados (Stripe / PayFor)."
+        ]
+      },
+      {
+        "heading": "2. Uso de tus datos",
+        "body": [
+          "Para procesar donaciones y enviar recibos.",
+          "Para informar sobre las campañas que apoyas y sus resultados.",
+          "Para mejorar el sitio y prevenir abusos.",
+          "No vendemos tus datos a terceros."
+        ]
+      },
+      {
+        "heading": "3. Intercambio de datos",
+        "body": [
+          "Compartimos datos únicamente con proveedores esenciales: pasarelas de pago, servicios de correo y alojamiento.",
+          "Podemos divulgar datos cuando lo exija la ley."
+        ]
+      },
+      {
+        "heading": "4. Tus derechos",
+        "body": [
+          "Puedes contactarnos en cualquier momento para solicitar acceso, corrección o eliminación de tus datos.",
+          "Puedes cancelar la suscripción desde cualquier correo que te enviemos."
+        ]
+      },
+      {
+        "heading": "5. Cookies",
+        "body": [
+          "Utilizamos cookies esenciales para el funcionamiento del sitio y cookies analíticas para comprender el comportamiento de los visitantes. Puedes controlarlas en la configuración del navegador."
+        ]
+      },
+      {
+        "heading": "6. Cambios en la política",
+        "body": [
+          "Podemos actualizar esta política periódicamente. La fecha superior indica la última modificación. El uso continuado del sitio implica aceptación."
+        ]
+      }
+    ],
+    "contact": {
+      "heading": "Contacto",
+      "body": "Si tienes preguntas sobre esta política, contáctanos mediante la página de contacto."
+    }
+  },
+  "pt": {
+    "title": "Política de privacidade",
+    "subtitle": "Como recolhemos, utilizamos e protegemos os seus dados.",
+    "lastUpdated": "Última atualização: 2026-04-20",
+    "sections": [
+      {
+        "heading": "1. Dados que recolhemos",
+        "body": [
+          "Recolhemos os dados que fornece voluntariamente ao doar ou registar-se, incluindo nome, e-mail, telefone e país.",
+          "Também recolhemos dados técnicos limitados (endereço IP, tipo de navegador e páginas visitadas) para melhorar o site e prevenir fraudes.",
+          "Não guardamos números completos de cartões nos nossos servidores. Os pagamentos são processados por fornecedores certificados (Stripe / PayFor)."
+        ]
+      },
+      {
+        "heading": "2. Utilização dos dados",
+        "body": [
+          "Para processar doações e enviar recibos.",
+          "Para comunicar sobre as campanhas que apoia e os seus resultados.",
+          "Para melhorar o site e prevenir abusos.",
+          "Não vendemos os seus dados a terceiros."
+        ]
+      },
+      {
+        "heading": "3. Partilha de dados",
+        "body": [
+          "Partilhamos dados apenas com prestadores essenciais: serviços de pagamento, e-mail e alojamento.",
+          "Podemos divulgar dados quando exigido por lei."
+        ]
+      },
+      {
+        "heading": "4. Os seus direitos",
+        "body": [
+          "Pode contactar-nos a qualquer momento para pedir acesso, correção ou eliminação dos seus dados.",
+          "Pode cancelar a subscrição através de qualquer e-mail que enviamos."
+        ]
+      },
+      {
+        "heading": "5. Cookies",
+        "body": [
+          "Utilizamos cookies essenciais ao funcionamento do site e cookies analíticos para compreender o comportamento dos visitantes. Pode controlá-los nas definições do navegador."
+        ]
+      },
+      {
+        "heading": "6. Alterações à política",
+        "body": [
+          "Podemos atualizar esta política periodicamente. A data no topo indica a última alteração. A utilização continuada do site constitui aceitação."
+        ]
+      }
+    ],
+    "contact": {
+      "heading": "Contacto",
+      "body": "Para esclarecer dúvidas sobre esta política, contacte-nos através da página de contacto."
+    }
+  },
+  "id": {
+    "title": "Kebijakan Privasi",
+    "subtitle": "Cara kami mengumpulkan, menggunakan, dan melindungi data Anda.",
+    "lastUpdated": "Terakhir diperbarui: 2026-04-20",
+    "sections": [
+      {
+        "heading": "1. Data yang kami kumpulkan",
+        "body": [
+          "Kami mengumpulkan data yang Anda berikan secara sukarela saat berdonasi atau mendaftar, termasuk nama, email, nomor telepon, dan negara.",
+          "Kami juga mengumpulkan data teknis terbatas (alamat IP, jenis peramban, dan halaman yang dikunjungi) untuk meningkatkan situs dan mencegah penipuan.",
+          "Kami tidak menyimpan nomor kartu lengkap di server kami. Pembayaran diproses melalui penyedia bersertifikasi (Stripe / PayFor)."
+        ]
+      },
+      {
+        "heading": "2. Penggunaan data Anda",
+        "body": [
+          "Untuk memproses donasi dan mengirim tanda terima.",
+          "Untuk berkomunikasi tentang kampanye yang Anda dukung dan melaporkan dampaknya.",
+          "Untuk meningkatkan situs dan mencegah penyalahgunaan.",
+          "Kami tidak menjual data Anda kepada pihak ketiga."
+        ]
+      },
+      {
+        "heading": "3. Berbagi data",
+        "body": [
+          "Kami hanya membagikan data kepada penyedia layanan penting: layanan pembayaran, email, dan hosting.",
+          "Kami dapat mengungkapkan data jika diwajibkan oleh hukum."
+        ]
+      },
+      {
+        "heading": "4. Hak Anda",
+        "body": [
+          "Anda dapat menghubungi kami kapan saja untuk meminta akses, koreksi, atau penghapusan data Anda.",
+          "Anda dapat berhenti berlangganan melalui setiap email yang kami kirim."
+        ]
+      },
+      {
+        "heading": "5. Cookie",
+        "body": [
+          "Kami menggunakan cookie penting untuk fungsi situs dan cookie analitik untuk memahami perilaku pengunjung. Anda dapat mengaturnya melalui pengaturan peramban."
+        ]
+      },
+      {
+        "heading": "6. Perubahan kebijakan",
+        "body": [
+          "Kami dapat memperbarui kebijakan ini dari waktu ke waktu. Tanggal di bagian atas menunjukkan perubahan terakhir. Penggunaan situs selanjutnya berarti persetujuan."
+        ]
+      }
+    ],
+    "contact": {
+      "heading": "Kontak",
+      "body": "Untuk pertanyaan tentang kebijakan ini, hubungi kami melalui halaman kontak."
+    }
+  },
+  "tr": {
+    "title": "Gizlilik Politikası",
+    "subtitle": "Verilerinizi nasıl topladığımız, kullandığımız ve koruduğumuz.",
+    "lastUpdated": "Son güncelleme: 2026-04-20",
+    "sections": [
+      {
+        "heading": "1. Topladığımız veriler",
+        "body": [
+          "Bağış yaparken veya kaydolurken gönüllü olarak verdiğiniz ad, e-posta, telefon numarası ve ülke gibi verileri toplarız.",
+          "Siteyi geliştirmek ve dolandırıcılığı önlemek için sınırlı teknik veriler de toplarız (IP adresi, tarayıcı türü ve ziyaret edilen sayfalar).",
+          "Tam kart numaralarını sunucularımızda saklamayız. Ödemeler sertifikalı sağlayıcılar (Stripe / PayFor) üzerinden işlenir."
+        ]
+      },
+      {
+        "heading": "2. Verilerinizi kullanma amaçlarımız",
+        "body": [
+          "Bağışları işlemek ve makbuz göndermek.",
+          "Desteklediğiniz kampanyalar ve sonuçları hakkında iletişim kurmak.",
+          "Siteyi geliştirmek ve kötüye kullanımı önlemek.",
+          "Verilerinizi üçüncü taraflara satmayız."
+        ]
+      },
+      {
+        "heading": "3. Veri paylaşımı",
+        "body": [
+          "Verileri yalnızca gerekli hizmet sağlayıcılarla paylaşırız: ödeme, e-posta ve barındırma hizmetleri.",
+          "Yasaların gerektirdiği durumlarda verileri açıklayabiliriz."
+        ]
+      },
+      {
+        "heading": "4. Haklarınız",
+        "body": [
+          "Verilerinize erişim, düzeltme veya silme talebi için istediğiniz zaman bizimle iletişime geçebilirsiniz.",
+          "Gönderdiğimiz her e-posta üzerinden abonelikten çıkabilirsiniz."
+        ]
+      },
+      {
+        "heading": "5. Çerezler",
+        "body": [
+          "Sitenin çalışması için gerekli çerezler ve ziyaretçi davranışını anlamak için analiz çerezleri kullanırız. Bunları tarayıcı ayarlarınızdan yönetebilirsiniz."
+        ]
+      },
+      {
+        "heading": "6. Politika değişiklikleri",
+        "body": [
+          "Bu politikayı zaman zaman güncelleyebiliriz. Üstteki tarih son değişikliği gösterir. Siteyi kullanmaya devam etmeniz kabul anlamına gelir."
+        ]
+      }
+    ],
+    "contact": {
+      "heading": "İletişim",
+      "body": "Bu politika hakkındaki sorularınız için iletişim sayfasından bize ulaşabilirsiniz."
+    }
+  }
+}

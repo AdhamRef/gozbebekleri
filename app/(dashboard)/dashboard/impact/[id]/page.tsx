@@ -1,10 +1,10 @@
 'use client';
+import { dt } from '@/lib/dashboard/i18n';
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import axios from 'axios';
 import { ArrowLeft, Loader2, Pencil } from 'lucide-react';
-import { toast } from 'react-hot-toast';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,15 +38,32 @@ export default function ImpactCampaignReportPage() {
   const [config, setConfig] = useState<ImpactConfig | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
+
   useEffect(() => {
+    let active = true;
+    setLoadError(null);
+    setStats(null);
+    setConfig(null);
+    if (!/^[a-f0-9]{24}$/i.test(id)) { setLoadError(dt('العنصر غير موجود')); return; }
+
     Promise.all([axios.get(`/api/impact/${id}`), axios.get<Stats>(`/api/impact/${id}/stats`)])
       .then(([c, s]) => {
+        if (!active) return;
         setTitle(pickText(c.data.title as LocalizedText, 'ar'));
         setConfig(readImpactConfig(c.data));
         setStats(s.data);
       })
-      .catch((e) => toast.error(errorMessage(e, 'تعذّر تحميل التقرير')));
-  }, [id]);
+      .catch((e) => { if (active) setLoadError(errorMessage(e, dt('تعذّر تحميل التقرير'))); });
+    return () => { active = false; };
+  }, [id, reload]);
+
+  if (loadError) return <div role="alert" className="space-y-4 p-6">
+    <p>{loadError}</p>
+    <button className="rounded border px-4 py-2" onClick={() => setReload((n) => n + 1)}>{dt("إعادة المحاولة")}</button>{' '}
+    <a className="underline" href="/dashboard/impact">{dt("العودة إلى الحملات")}</a>
+  </div>;
 
   if (!stats || !config) {
     return (

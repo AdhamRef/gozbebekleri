@@ -1,3 +1,4 @@
+import { emailMetrics } from "@/lib/communication/email-metrics";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { Prisma } from "@prisma/client";
@@ -146,21 +147,14 @@ export async function GET(request: NextRequest) {
     const statusCounts: Record<string, number> = {};
     for (const row of byStatus) statusCounts[row.status] = row._count._all;
 
-    // "Accepted by the provider"  the denominator every engagement rate is measured against.
-    // Counting against `total` would let SKIPPED rows (no email address, unsubscribed) drag the
-    // open rate down for messages that were never sent to anyone.
-    const sentCount =
-      (statusCounts.SENT ?? 0) + (statusCounts.SENT_TO_PROVIDER ?? 0) + (statusCounts.DELIVERED ?? 0) +
-      (statusCounts.OPENED ?? 0) + (statusCounts.CLICKED ?? 0) + failedCount;
-    const attempted = Math.max(sentCount, 0);
-
     // Daily buckets for the trend chart, built in JS: MongoDB has no date_trunc through Prisma
     // and the row counts here are small enough that one scan beats N queries.
     const bucketRows = await prisma.communicationDelivery.findMany({
       where: rangeWhere,
-      select: { createdAt: true, status: true, deliveredAt: true, openedAt: true },
+      select: { createdAt: true, status: true, sentAt: true, deliveredAt: true, openedAt: true },
       orderBy: { createdAt: "asc" },
     });
+    const metrics = emailMetrics(bucketRows, deliveredCount, openedCount, clickedCount);
     const buckets = new Map<string, Bucket>();
     for (const row of bucketRows) {
       const key = row.createdAt.toISOString().slice(0, 10);
@@ -172,7 +166,7 @@ export async function GET(request: NextRequest) {
       buckets.set(key, bucket);
     }
 
-    const rate = (part: number) => (attempted > 0 ? Math.round((part / attempted) * 1000) / 10 : 0);
+
 
     return NextResponse.json({
       ok: true,
@@ -180,16 +174,13 @@ export async function GET(request: NextRequest) {
       summary: {
         total,
         allTimeTotal,
-        attempted,
+        ...metrics,
         delivered: deliveredCount,
         opened: openedCount,
         clicked: clickedCount,
         failed: failedCount,
         skipped: statusCounts.SKIPPED ?? 0,
-        deliveredRate: rate(deliveredCount),
-        openRate: rate(openedCount),
-        clickRate: rate(clickedCount),
-        failedRate: rate(failedCount),
+
       },
       /**
        * False until the provider has ever posted an event. The page uses this to say "tracking

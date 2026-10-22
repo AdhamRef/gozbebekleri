@@ -553,7 +553,8 @@ export function WhatsappTemplateEditorDialog({ id, open, initialKind = "CAMPAIGN
         name,
         body: submittedLocales.has(DEFAULT_LOCALE) && loadedTemplate ? loadedTemplate.body : category === "AUTHENTICATION" ? "Authentication code" : arabic.body.trim(),
         translations: Object.keys(translations).length ? translations : null,
-        metaCategory: category,
+        // Locale-only saves must not recategorize a legacy template.
+        ...(!workingId || category !== (loadedTemplate?.category === "MARKETING" || loadedTemplate?.category === "AUTHENTICATION" ? loadedTemplate.category : "UTILITY") ? { metaCategory: category } : {}),
         header: submittedLocales.has(DEFAULT_LOCALE) && loadedTemplate ? loadedTemplate.header : {
           ...rootHeader,
           text: rootHeader.type === "TEXT" ? arabic.headerText.trim() : null,

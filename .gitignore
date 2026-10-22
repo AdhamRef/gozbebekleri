@@ -46,3 +46,9 @@ next-env.d.ts
 
 # Rebuilt by test:integration-settings
 /.integration-test-build/
+
+# Isolated local QA compilation
+/.next-qa*/
+
+# Native engine produced by prisma generate
+/generated/integration-settings-client/*.so.node

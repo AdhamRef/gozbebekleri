@@ -71,6 +71,8 @@ const marketingRedirects = [
 ] as const;
 
 const nextConfig: NextConfig = {
+  // Isolate local QA compilation from an already-running developer server.
+  distDir: process.env.QA_NEXT_DIST_DIR || ".next",
   experimental: {
     optimizePackageImports: ["lucide-react", "framer-motion", "motion", "@radix-ui/react-icons", "date-fns", "react-use"],
     optimizeCss: true,

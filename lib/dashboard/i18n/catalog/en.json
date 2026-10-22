@@ -3056,7 +3056,7 @@
  "تعذّر التحقق من المستلم؛ لم يُطلب الإرسال": "Couldn't verify the recipient; sending was not requested",
  "تعذّر التحقق من وسيلة الدفع (3D Secure)": "Could not verify the payment method (3D Secure)",
  "تعذّر التحقق: {0}": "Verification failed: {0}",
- "تعذّر التحميل": "Couldn't load",
+ "تعذّر التحميل": "Could not load",
  "تعذّر التخفيض": "Could not reduce the amount",
  "تعذّر التسجيل": "Couldn't record",
  "تعذّر التعرّف على صف العناوين. تأكد من وجود أعمدة مثل EPOSTA و TOPLAM.": "Couldn't detect the header row. Make sure columns such as EPOSTA and TOPLAM exist.",
@@ -6664,5 +6664,12 @@
  "تعذر فك تشفير قيم محفوظة. تحقق من مفتاح تشفير الإعدادات.": "Could not decrypt saved values. Check the settings encryption key.",
  "{0} متر وقف": "{0} waqf metre(s)",
  "{0} سهم وقف": "{0} waqf share(s)",
- "أسطر الوقف جزء من قيمة التبرع ولا تُعدَّل من هنا.": "Waqf lines are part of the donation amount and cannot be edited here."
+ "أسطر الوقف جزء من قيمة التبرع ولا تُعدَّل من هنا.": "Waqf lines are part of the donation amount and cannot be edited here.",
+ "البحث في القوالب": "Search templates",
+ "القالب قيد الاستخدام ولا يمكن حذفه.": "This template is in use and cannot be deleted.",
+ "العنصر غير موجود": "Item not found",
+ "تعذّر تحميل التقرير": "Could not load the report",
+ "العودة إلى الحملات": "Back to campaigns",
+ "نوع القالب لا يطابق هذا الاستخدام.": "The template type does not match this use.",
+ "مرتبط بحدث تلقائي؛ أزل الارتباط لتغيير النوع.": "Linked to an automatic event. Remove the binding before changing the type."
 }

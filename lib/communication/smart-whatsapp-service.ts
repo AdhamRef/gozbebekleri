@@ -1,4 +1,5 @@
 import "server-only";
+import { classifyEventTemplates } from "./template-event-classification";
 
 import { prisma } from "@/lib/prisma";
 import { createDeliveryRecord, markDeliveryStatus } from "./delivery-log-service";
@@ -127,6 +128,9 @@ export async function getSmartWhatsappContext(userId: string): Promise<SmartWhat
     select: {
       id: true,
       name: true,
+      kind: true,
+      purpose: true,
+      category: true,
       wabaVariants: {
         where: { provider: "META_WHATSAPP", businessAccountId: { in: businessAccountIds } },
         select: {
@@ -138,7 +142,7 @@ export async function getSmartWhatsappContext(userId: string): Promise<SmartWhat
     },
     orderBy: { updatedAt: "desc" },
   }) : [];
-  const { marketingTemplates, utilityTemplates } = smartWhatsappTemplateChoices(templates, locale, wabas);
+  const { marketingTemplates, utilityTemplates } = smartWhatsappTemplateChoices(await classifyEventTemplates("WHATSAPP", templates), locale, wabas);
 
   return {
     userId,
@@ -174,6 +178,8 @@ async function sendApprovedTemplateForDonor(args: {
     select: { id: true, provider: true, name: true, variables: true, header: true, translations: true, category: true, purpose: true, kind: true, status: true },
   });
   if (!template) return { ok: false, reason: "TEMPLATE_NOT_FOUND" };
+  const classified = (await classifyEventTemplates("WHATSAPP", [template]))[0];
+  if (classified.kind !== (args.expected === "MARKETING" ? "CAMPAIGN" : "SYSTEM")) return { ok: false, reason: "TEMPLATE_USAGE_MISMATCH" };
   if (template.status === "ARCHIVED") return { ok: false, reason: "TEMPLATE_ARCHIVED" };
   const mapping = await resolveMetaTemplateMapping(template, args.locale, args.sender.businessAccountId);
   if (!mapping) return { ok: false, reason: "META_TEMPLATE_NOT_APPROVED_FOR_SENDER_LANGUAGE" };
@@ -221,7 +227,7 @@ async function sendApprovedTemplateForDonor(args: {
     }
   }
 
-  const rendered = await renderChannelTemplate("WHATSAPP", template.id, args.locale, renderCtx);
+  const rendered = await renderChannelTemplate("WHATSAPP", template.id, args.locale, renderCtx, "ar", args.expected === "MARKETING" ? "CAMPAIGN" : "SYSTEM");
   if (!rendered) return { ok: false, reason: "TEMPLATE_RENDER_FAILED" };
 
   const built = buildMetaComponents({

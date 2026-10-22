@@ -91,6 +91,7 @@ const APPROVAL_LABEL: Record<string, string> = {
 };
 
 export function WhatsappTemplateList() {
+  const [search, setSearch] = React.useState("");
   const [templates, setTemplates] = React.useState<WhatsappTemplateRow[]>([]);
   const [directSendEnabled, setDirectSendEnabled] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
@@ -126,7 +127,7 @@ export function WhatsappTemplateList() {
   const visibleTemplates = templates.filter((template) => {
     const bucket = resolveTemplateKind(template);
     const archived = String(template.status ?? "").toUpperCase() === "ARCHIVED";
-    return bucket === section && (archiveView === "ARCHIVED" ? archived : !archived);
+    return bucket === section && template.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()) && (archiveView === "ARCHIVED" ? archived : !archived);
   });
 
   const archivedCount = templates.filter((template) => String(template.status ?? "").toUpperCase() === "ARCHIVED").length;
@@ -174,13 +175,14 @@ export function WhatsappTemplateList() {
       await axios.delete(`/api/templates/whatsapp/${id}`);
       toast.success(dt("تم الحذف"));
       fetchAll();
-    } catch {
-      toast.error(dt("فشل الحذف"));
+    } catch (error) {
+      toast.error(dt(axios.isAxiosError(error) && error.response?.status === 409 ? "القالب قيد الاستخدام ولا يمكن حذفه." : "فشل الحذف"));
     }
   };
 
   return (
     <div className="space-y-4">
+      <input aria-label={dt("البحث في القوالب")} placeholder={dt("البحث في القوالب")} value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 w-full rounded-md border px-3 text-sm" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
           <button type="button" aria-pressed={section === "CAMPAIGN"} onClick={() => setSection("CAMPAIGN")} className={`rounded-md px-3 py-1.5 text-xs font-medium ${section === "CAMPAIGN" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{dt("الحملات التسويقية")} ({templates.filter((template) => resolveTemplateKind(template) === "CAMPAIGN").length})</button>
@@ -248,7 +250,7 @@ export function WhatsappTemplateList() {
       </div>
 
 
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="rounded-lg border border-border overflow-x-auto">
         <table className="w-full text-sm text-start">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50/80">

@@ -33,6 +33,7 @@ function remainingLabel(window: ReplyWindow): string {
 }
 
 const ERROR_LABELS: Record<string, string> = {
+  get TEMPLATE_USAGE_MISMATCH() { return dt("نوع القالب لا يطابق هذا الاستخدام."); },
   get REPLY_WINDOW_CLOSED() { return dt("انتهت نافذة الرد الحر. اختر رسالة خدمة أو قالبًا تسويقيًا."); },
   get META_DIRECT_SEND_DISABLED() { return dt("Direct Send غير مفعّل حاليًا. اختر قالب Utility معتمد كمسار احتياطي."); },
   get UTILITY_TEMPLATE_REQUIRED() { return dt("اختر قالب Utility معتمد كمسار احتياطي."); },

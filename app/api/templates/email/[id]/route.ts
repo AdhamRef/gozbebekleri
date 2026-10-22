@@ -1,3 +1,6 @@
+import { classifyEventTemplates } from "@/lib/communication/template-event-classification";
+import { templateInUse, templateKindChangeBlocked } from "@/lib/communication/template-usage";
+import { resolveTemplateKind } from "@/lib/communication/template-kind";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getServerSession } from "next-auth";
@@ -31,7 +34,7 @@ export async function GET(
 
   const template = await prisma.emailTemplate.findUnique({ where: { id } });
   if (!template) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json({ template });
+  return NextResponse.json({ template: (await classifyEventTemplates("EMAIL", [template]))[0] });
 }
 
 export async function PATCH(
@@ -55,6 +58,15 @@ export async function PATCH(
       { error: "Invalid payload", issues: parsed.error.flatten() },
       { status: 400 }
     );
+  }
+
+  if (parsed.data.kind || parsed.data.purpose) {
+    const current = await prisma.emailTemplate.findUnique({ where: { id } });
+    if (!current) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const nextKind = resolveTemplateKind({ ...current, ...parsed.data });
+    if (await templateKindChangeBlocked("EMAIL", id, nextKind)) {
+      return NextResponse.json({ error: "TEMPLATE_IN_USE", message: "القالب مرتبط باستخدام آخر. أزل الارتباط قبل تغيير نوعه." }, { status: 409 });
+    }
   }
 
   const data: Prisma.EmailTemplateUpdateInput = {};
@@ -83,7 +95,7 @@ export async function PATCH(
     entityId: updated.id,
     stream: "TEAM",
   });
-  return NextResponse.json({ template: updated });
+  return NextResponse.json({ template: (await classifyEventTemplates("EMAIL", [updated]))[0] });
 }
 
 export async function DELETE(
@@ -95,6 +107,9 @@ export async function DELETE(
   if (denied) return denied;
   const { id } = await params;
 
+  if (await templateInUse("EMAIL", id)) {
+    return NextResponse.json({ error: "TEMPLATE_IN_USE", message: "القالب قيد الاستخدام ولا يمكن حذفه." }, { status: 409 });
+  }
   const deleted = await prisma.emailTemplate.delete({ where: { id } });
   const actor = auditActorFromDashboardSession(session!);
   await writeAuditLog({

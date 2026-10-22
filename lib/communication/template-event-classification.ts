@@ -13,5 +13,6 @@ export async function classifyEventTemplates<T extends { id: string; kind?: stri
   return templates.map((template) => ({
     ...template,
     kind: resolveTemplateKind(template, linkedIds.has(template.id)),
+    linkedToEvent: linkedIds.has(template.id),
   }));
 }

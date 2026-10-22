@@ -39,12 +39,15 @@ interface ApiTemplate {
   subject: string;
   document: EmailDocument;
   translations?: Partial<Record<string, { subject?: string; document?: EmailDocument }>> | null;
+  linkedToEvent?: boolean;
   kind?: "SYSTEM" | "CAMPAIGN" | null;
   purpose?: "MARKETING" | "UTILITY" | "TRANSACTIONAL" | "AUTHENTICATION" | null;
 }
 
 export function EmailTemplateEditorDialog({ id, open, initialKind = "CAMPAIGN", onOpenChange }: Props) {
   const [name, setName] = React.useState("");
+  const [linkedToEvent, setLinkedToEvent] = React.useState(false);
+  const [originalPurpose, setOriginalPurpose] = React.useState<ApiTemplate["purpose"]>(null);
   const [kind, setKind] = React.useState<"SYSTEM" | "CAMPAIGN">("CAMPAIGN");
   const [variants, setVariants] = React.useState<VariantsState>({});
   const [activeLocale, setActiveLocale] = React.useState<SupportedLocale>(DEFAULT_LOCALE);
@@ -56,6 +59,8 @@ export function EmailTemplateEditorDialog({ id, open, initialKind = "CAMPAIGN", 
     if (!id) {
       setName("");
       setKind(initialKind);
+      setLinkedToEvent(false);
+      setOriginalPurpose(null);
       setVariants({ [DEFAULT_LOCALE]: { subject: "", document: defaultDocument() } });
       setActiveLocale(DEFAULT_LOCALE);
       return;
@@ -66,6 +71,8 @@ export function EmailTemplateEditorDialog({ id, open, initialKind = "CAMPAIGN", 
       .then((res) => {
         const t = res.data?.template as ApiTemplate;
         setName(t?.name ?? "");
+        setLinkedToEvent(Boolean(t?.linkedToEvent));
+        setOriginalPurpose(t?.purpose);
         setKind(t?.kind === "SYSTEM" || (t?.purpose && t.purpose !== "MARKETING") ? "SYSTEM" : "CAMPAIGN");
         const next: VariantsState = {
           [DEFAULT_LOCALE]: {
@@ -145,7 +152,7 @@ export function EmailTemplateEditorDialog({ id, open, initialKind = "CAMPAIGN", 
         document: arVariant.document,
         translations: Object.keys(translations).length > 0 ? translations : null,
         kind,
-        purpose: kind === "CAMPAIGN" ? "MARKETING" : "TRANSACTIONAL",
+        purpose: linkedToEvent && originalPurpose ? originalPurpose : kind === "CAMPAIGN" ? "MARKETING" : originalPurpose && originalPurpose !== "MARKETING" ? originalPurpose : "TRANSACTIONAL",
         status: "READY",
       };
       if (id) {
@@ -196,12 +203,14 @@ export function EmailTemplateEditorDialog({ id, open, initialKind = "CAMPAIGN", 
               <FieldLabel>{dt("نوع الاستخدام")}</FieldLabel>
               <select
                 value={kind}
+                disabled={linkedToEvent}
                 onChange={(e) => setKind(e.target.value as "SYSTEM" | "CAMPAIGN")}
                 className="h-8 w-full rounded-md border border-input bg-background px-2.5 text-sm"
               >
                 <option value="SYSTEM">{dt("تلقائي / خدمي / توثيق")}</option>
                 <option value="CAMPAIGN">{dt("حملة تسويقية")}</option>
               </select>
+              {linkedToEvent && <p className="text-xs text-muted-foreground">{dt("مرتبط بحدث تلقائي؛ أزل الارتباط لتغيير النوع.")}</p>}
             </div>
             <div className="min-w-0 space-y-1">
               <FieldLabel hint={LOCALE_LABELS[activeLocale]}>{dt("موضوع البريد")}</FieldLabel>

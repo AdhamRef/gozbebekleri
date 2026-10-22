@@ -1,3 +1,4 @@
+import { completeImpactText } from "./localized-defaults";
 /**
  * "Make an impact for a child" (ImpactCampaign) — shared config types, defaults,
  * parsing and pricing. Client-safe: no prisma / server imports here.
@@ -74,25 +75,25 @@ function defaultRegion(key: string, ar: string, tr: string, en: string): ImpactR
   const dir = `${ASSET_ROOT}/characters/${key}/`;
   const images: ImpactRegion["images"] = { base: `${dir}base.webp` };
   for (const s of IMPACT_STATE_KEYS) images[s] = `${dir}${s}.webp`;
-  return { key, name: { ar, tr, en }, active: true, images };
+  return { key, name: completeImpactText({ ar, tr, en }), active: true, images };
 }
 
 function defaultNeed(n: Omit<ImpactNeed, "icon" | "maxQuantity" | "active"> & { iconKey?: string }): ImpactNeed {
   const { iconKey, ...rest } = n;
-  return { ...rest, icon: `${ASSET_ROOT}/items/item-${iconKey ?? n.key}.png`, maxQuantity: 10, active: true };
+  return { ...rest, name: completeImpactText(rest.name), icon: `${ASSET_ROOT}/items/item-${iconKey ?? n.key}.png`, maxQuantity: 10, active: true };
 }
 
-export const DEFAULT_IMPACT_TITLE: LocalizedText = {
+export const DEFAULT_IMPACT_TITLE: LocalizedText = completeImpactText({
   ar: "اصنع أثرًا لطفل",
   tr: "Bir çocuk için iz bırak",
   en: "Make an impact for a child",
-};
+});
 
-export const DEFAULT_IMPACT_INTRO: LocalizedText = {
+export const DEFAULT_IMPACT_INTRO: LocalizedText = completeImpactText({
   ar: "اختر الاحتياجات التي تريد تغطيتها، وسيتكوّن أثرك أمام عينيك.",
   tr: "Karşılamak istediğin ihtiyaçları seç; etkin gözünün önünde oluşsun.",
   en: "Choose the needs you want to cover and watch your impact take shape.",
-};
+});
 
 export const DEFAULT_IMPACT_CONFIG: ImpactConfig = {
   regions: [
@@ -116,7 +117,7 @@ export const DEFAULT_IMPACT_CONFIG: ImpactConfig = {
 
 export function pickText(text: unknown, locale: string): string {
   if (!text || typeof text !== "object") return typeof text === "string" ? text : "";
-  const t = text as LocalizedText;
+  const t = completeImpactText(text as LocalizedText);
   return t[locale] || t.en || t.ar || Object.values(t).find(Boolean) || "";
 }
 

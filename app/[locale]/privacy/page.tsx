@@ -11,6 +11,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   const seo = LOCALE_SEO[locale as Locale] ?? LOCALE_SEO.en;
   const titles: Record<string, string> = {
+    de: "Datenschutzerklärung",
     ar: "سياسة الخصوصية",
     en: "Privacy Policy",
     fr: "Politique de Confidentialité",

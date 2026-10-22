@@ -1,3 +1,5 @@
+import { classifyEventTemplates } from "@/lib/communication/template-event-classification";
+import { templateInUse } from "@/lib/communication/template-usage";
 import { headerSchema, templateButtonsSchema, authSchema, translationSchema } from "@/lib/communication/whatsapp-template-schema";
 import { unsubmittedTemplateLocales } from "@/lib/communication/template-locale-media";
 import { NextRequest, NextResponse } from "next/server";
@@ -54,7 +56,7 @@ export async function GET(
     providerCategoriesByLocale[locale] = [...new Set([...(providerCategoriesByLocale[locale] ?? []), category])];
   }
   const templateData = { ...template, variants: undefined, wabaVariants: undefined };
-  return NextResponse.json({ template: { ...templateData, submittedLocales, providerCategoriesByLocale } });
+  return NextResponse.json({ template: { ...(await classifyEventTemplates("WHATSAPP", [templateData]))[0], submittedLocales, providerCategoriesByLocale } });
 }
 
 export async function PATCH(
@@ -88,17 +90,22 @@ export async function PATCH(
 
   // Languages are separate Meta variants under the same provider template name. For an existing
   // template, publish only newly-added locales; do not resubmit already-approved/in-review variants.
-  const currentTemplate = await prisma.whatsappTemplate.findUnique({where:{id},select:{translations:true}});
+  const currentTemplate = await prisma.whatsappTemplate.findUnique({where:{id},select:{translations:true,category:true,kind:true,purpose:true}});
   const newlyAddedLocales = unsubmittedTemplateLocales(
     editable.translations === undefined ? currentTemplate?.translations : editable.translations,
     submittedBefore,
   );
 
   const data: Prisma.WhatsappTemplateUpdateInput = {};
-  if (metaCategory) {
+  if (metaCategory && metaCategory !== currentTemplate?.category) {
     data.category = metaCategory;
     data.purpose = metaCategory;
-    data.kind = metaCategory === "MARKETING" ? "CAMPAIGN" : "SYSTEM";
+    const linked = await prisma.messageTrigger.count({ where: { channel: "WHATSAPP", templateId: id } }) > 0;
+    const nextKind = linked || metaCategory !== "MARKETING" ? "SYSTEM" : "CAMPAIGN";
+    if (nextKind === "SYSTEM" && await prisma.communicationCampaign.count({ where: { channel: "WHATSAPP", templateGroupId: id } }) > 0) {
+      return NextResponse.json({ error: "TEMPLATE_IN_USE" }, { status: 409 });
+    }
+    data.kind = nextKind;
   }
   if (editable.name != null) data.name = editable.name;
   if (editable.body != null) data.body = editable.body;
@@ -165,7 +172,7 @@ export async function PATCH(
   }
   const fresh = await prisma.whatsappTemplate.findUnique({ where: { id: updated.id } });
   const submittedLocales = Array.from(await submittedMetaLocales(updated.id)).sort();
-  return NextResponse.json({ template: { ...(fresh ?? updated), submittedLocales }, publish });
+  return NextResponse.json({ template: { ...(await classifyEventTemplates("WHATSAPP", [fresh ?? updated]))[0], submittedLocales }, publish });
 }
 
 export async function DELETE(
@@ -179,6 +186,7 @@ export async function DELETE(
 
   /* A template a trigger, campaign or delivery still points at is archived, not destroyed: deleting
      it left the trigger resolving to nothing and firing silently forever. */
+  if (await templateInUse("WHATSAPP", id)) return NextResponse.json({ error: "TEMPLATE_IN_USE" }, { status: 409 });
   const outcome = await deleteOrArchiveWhatsappTemplate(id);
   if (!outcome) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const actor = auditActorFromDashboardSession(session!);

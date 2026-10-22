@@ -21,6 +21,7 @@ interface EmailTemplateRow {
 }
 
 export function EmailTemplateList() {
+  const [search, setSearch] = React.useState("");
   const [templates, setTemplates] = React.useState<EmailTemplateRow[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [section, setSection] = React.useState<"SYSTEM" | "CAMPAIGN">("CAMPAIGN");
@@ -47,7 +48,7 @@ export function EmailTemplateList() {
 
   const visibleTemplates = templates.filter((template) => {
     const bucket = resolveTemplateKind(template);
-    return bucket === section;
+    return bucket === section && template.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase());
   });
 
   const handleDelete = async (id: string) => {
@@ -56,13 +57,14 @@ export function EmailTemplateList() {
       await axios.delete(`/api/templates/email/${id}`);
       toast.success(dt("تم الحذف"));
       fetchAll();
-    } catch {
-      toast.error(dt("فشل الحذف"));
+    } catch (error) {
+      toast.error(dt(axios.isAxiosError(error) && error.response?.status === 409 ? "القالب قيد الاستخدام ولا يمكن حذفه." : "فشل الحذف"));
     }
   };
 
   return (
     <div className="space-y-4">
+      <input aria-label={dt("البحث في القوالب")} placeholder={dt("البحث في القوالب")} value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 w-full rounded-md border px-3 text-sm" />
       <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
         <button type="button" aria-pressed={section === "CAMPAIGN"} onClick={() => setSection("CAMPAIGN")} className={`rounded-md px-3 py-1.5 text-xs font-medium ${section === "CAMPAIGN" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{dt("الحملات التسويقية")} ({templates.filter((template) => resolveTemplateKind(template) === "CAMPAIGN").length})</button>
         <button type="button" aria-pressed={section === "SYSTEM"} onClick={() => setSection("SYSTEM")} className={`rounded-md px-3 py-1.5 text-xs font-medium ${section === "SYSTEM" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{dt("التلقائية والتوثيق")} ({templates.filter((template) => resolveTemplateKind(template) === "SYSTEM").length})</button>
@@ -79,7 +81,7 @@ export function EmailTemplateList() {
           <Plus className="w-4 h-4" /> {dt(" قالب جديد")}</Button>
       </div>
 
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="rounded-lg border border-border overflow-x-auto">
         <table className="w-full text-sm text-start">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50/80">

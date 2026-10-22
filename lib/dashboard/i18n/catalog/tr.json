@@ -6664,5 +6664,12 @@
  "تعذر فك تشفير قيم محفوظة. تحقق من مفتاح تشفير الإعدادات.": "Kayıtlı değerlerin şifresi çözülemedi. Ayarların şifreleme anahtarını kontrol edin.",
  "{0} متر وقف": "{0} metre vakıf",
  "{0} سهم وقف": "{0} vakıf hissesi",
- "أسطر الوقف جزء من قيمة التبرع ولا تُعدَّل من هنا.": "Vakıf satırları bağış tutarının parçasıdır ve buradan düzenlenemez."
+ "أسطر الوقف جزء من قيمة التبرع ولا تُعدَّل من هنا.": "Vakıf satırları bağış tutarının parçasıdır ve buradan düzenlenemez.",
+ "البحث في القوالب": "Şablonlarda ara",
+ "القالب قيد الاستخدام ولا يمكن حذفه.": "Bu şablon kullanımda olduğu için silinemez.",
+ "العنصر غير موجود": "Öğe bulunamadı",
+ "تعذّر تحميل التقرير": "Rapor yüklenemedi",
+ "العودة إلى الحملات": "Kampanyalara dön",
+ "نوع القالب لا يطابق هذا الاستخدام.": "Şablon türü bu kullanıma uygun değil.",
+ "مرتبط بحدث تلقائي؛ أزل الارتباط لتغيير النوع.": "Otomatik bir olaya bağlı. Türü değiştirmeden önce bağlantıyı kaldırın."
 }

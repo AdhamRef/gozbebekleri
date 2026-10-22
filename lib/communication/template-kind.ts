@@ -1,4 +1,4 @@
-/** Display classification; never changes stored templates or provider categories. */
+/** Canonical usage classification, independent of locale; never mutates provider categories. */
 export type TemplateKind = "SYSTEM" | "CAMPAIGN";
 export function resolveTemplateKind(template: {
   kind?: string | null;
