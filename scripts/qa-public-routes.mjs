@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process';
 import { get } from 'node:http';
 import { writeFile, mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import { NOT_FOUND_COPY } from '../lib/not-found-copy.ts';
 const port = 3137;
 const bundler = process.env.QA_BUNDLER === 'turbopack' ? '--turbopack' : '--webpack';
 const env = {...process.env, DATABASE_URL:'', INTEGRATION_DATABASE_URL:'', NEXT_TELEMETRY_DISABLED:'1', VERCEL_ENV:'development', QA_NEXT_DIST_DIR:'.next-qa-http', GOOGLE_CLIENT_ID:'qa-client.invalid', GOOGLE_CLIENT_SECRET:'qa-placeholder', NEXTAUTH_SECRET:'local-qa-placeholder-not-a-production-secret', NEXTAUTH_URL:`http://localhost:${port}`};
@@ -19,6 +20,7 @@ try {
     const privacy=await request(`/${locale}/privacy`);assert.equal(privacy.status,200,`${locale} privacy`);
     assert.ok(!privacy.body.includes('NEXT_HTTP_ERROR_FALLBACK;500'),`${locale} privacy error`);
     const missing=await request(`/${locale}/qa-remediation-missing`);await writeFile(`/tmp/gozbebekleri-qa-missing-${locale}.html`,missing.body);assert.ok(missing.status === 404 || (missing.status === 200 && missing.body.includes('content="noindex"')), `${locale} missing status or streamed noindex`);
+    assert.ok(missing.body.includes(NOT_FOUND_COPY[locale].title), `${locale} localized recovery heading`);
     assert.ok(missing.body.includes(`href="/${locale}/campaigns"`) || missing.body.replaceAll(String.fromCharCode(92), "").includes(`"href":"/${locale}/campaigns"`), `${locale} recovery link in HTML or RSC payload`);
     const terms=await request(`/${locale}/terms`);assert.equal(terms.status,200,`${locale} terms link destination`);
     const contact=await request(`/${locale}/contact-us`);assert.equal(contact.status,200,`${locale} contact`);
