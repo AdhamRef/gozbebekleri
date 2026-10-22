@@ -254,3 +254,12 @@ test("NEW-02: article and listing dates support all eight public locales", async
   assert.equal(publicDateLocale("fr-FR").code, "fr");
   assert.equal(publicDateLocale("unknown").code, "en-US");
 });
+
+
+test("BUG-11 release regression: Next 16 resolves the same request config in both bundlers", () => {
+  const config = load("next.config.ts", { "next-intl/plugin": { default: require("next-intl/plugin") } });
+  assert.equal(config.turbopack.resolveAlias["next-intl/config"], "./i18n/request.ts");
+  const webpackConfig = config.webpack({context:process.cwd(),resolve:{alias:{existing:"preserved"}}}, {});
+  assert.equal(webpackConfig.resolve.alias["next-intl/config"], `${process.cwd()}/i18n/request.ts`);
+  assert.equal(webpackConfig.resolve.alias.existing, "preserved");
+});

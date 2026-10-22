@@ -7,8 +7,9 @@ import { get } from 'node:http';
 import { writeFile, mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 const port = 3137;
+const bundler = process.env.QA_BUNDLER === 'turbopack' ? '--turbopack' : '--webpack';
 const env = {...process.env, DATABASE_URL:'', INTEGRATION_DATABASE_URL:'', NEXT_TELEMETRY_DISABLED:'1', VERCEL_ENV:'development', QA_NEXT_DIST_DIR:'.next-qa-http', GOOGLE_CLIENT_ID:'qa-client.invalid', GOOGLE_CLIENT_SECRET:'qa-placeholder', NEXTAUTH_SECRET:'local-qa-placeholder-not-a-production-secret', NEXTAUTH_URL:`http://localhost:${port}`};
-const child=spawn(process.execPath,['node_modules/next/dist/bin/next','dev','--webpack','--hostname','localhost','--port',String(port)],{env,stdio:['ignore','pipe','pipe']});
+const child=spawn(process.execPath,['node_modules/next/dist/bin/next','dev',bundler,'--hostname','localhost','--port',String(port)],{env,stdio:['ignore','pipe','pipe']});
 let logs=''; child.stdout.on('data',d=>logs+=d);child.stderr.on('data',d=>logs+=d);
 const request=path=>new Promise((resolve,reject)=>get(`http://localhost:${port}${path}`,res=>{let body='';res.on('data',d=>body+=d);res.on('end',()=>resolve({status:res.statusCode,body}));}).on('error',reject));
 try {
@@ -27,7 +28,7 @@ try {
     }
     results.push({locale,privacy:privacy.status,missing:missing.status,contact:contact.status,terms:terms.status});
   }
-  console.log(JSON.stringify({passed:true,results},null,2));
+  console.log(JSON.stringify({passed:true,bundler,results},null,2));
 } finally {
   child.kill('SIGTERM');
   await mkdir('/tmp/gozbebekleri-qa',{recursive:true});
