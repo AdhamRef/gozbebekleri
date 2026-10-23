@@ -15,6 +15,7 @@ import { pickLocale, resolveEmailVariant } from "@/lib/templates/locale-resolver
 import { logSentMessage } from "@/lib/messaging/log-sent";
 import { getActiveElasticEmailRuntimeConfig } from "@/lib/communication/runtime-config";
 import { sendArchivedEmail } from "@/lib/communication/system-email";
+import { classifyEventTemplates } from "@/lib/communication/template-event-classification";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -47,6 +48,13 @@ export async function POST(request: NextRequest) {
   const { templateId, target } = parsed.data;
   const template = await prisma.emailTemplate.findUnique({ where: { id: templateId } });
   if (!template) return NextResponse.json({ error: "Template not found" }, { status: 404 });
+  const [classifiedTemplate] = await classifyEventTemplates("EMAIL", [template]);
+  if (classifiedTemplate?.kind !== "CAMPAIGN") {
+    return NextResponse.json({
+      error: "TEMPLATE_KIND_MISMATCH",
+      messageAr: "هذا قالب تلقائي أو خدمي؛ اختر قالبًا تسويقيًا لهذا الإرسال.",
+    }, { status: 409 });
+  }
   const userIds = target.kind === "user" ? [target.userId] : await resolveDonorIds(target.filters);
   if (!userIds.length) return NextResponse.json({ sent: 0, failed: [], skipped: 0, total: 0 });
   const contexts = await loadContextsForUserIds(userIds);

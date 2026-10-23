@@ -1723,6 +1723,8 @@
  "التكوين العامل لـSMS الدولي دون إرسال.": "Uluslararası SMS için etkin yapılandırma, gönderim yapılmadan.",
  "التكوين العامل للحساب ونطاق بريد المرسل دون إرسال.": "Hesabın ve gönderen e-posta alan adının etkin yapılandırması, gönderim yapılmadan.",
  "التلقائية والتوثيق": "Otomasyon ve belgeleme",
+ "النوع يحدد استخدام القالب؛ تغيير اللغة يغيّر المحتوى فقط ولا ينشئ قالبًا جديدًا.": "Şablon türü kullanımını belirler. Dili değiştirmek yalnızca içeriği değiştirir; yeni bir şablon oluşturmaz.",
+ "هذا قالب تلقائي أو خدمي؛ اختر قالبًا تسويقيًا لهذا الإرسال.": "Bu otomatik veya hizmet şablonudur. Bu gönderim için bir pazarlama şablonu seçin.",
  "التنزيلات": "İndirmeler",
  "التنقل الرئيسي": "Ana gezinme",
  "التنقل داخل القسم": "Bölüm içi gezinme",

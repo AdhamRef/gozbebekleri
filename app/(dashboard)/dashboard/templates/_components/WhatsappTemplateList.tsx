@@ -201,6 +201,9 @@ export function WhatsappTemplateList() {
           </button>
         </div>
       </div>
+      <p className="text-xs leading-5 text-muted-foreground">
+        {dt("النوع يحدد استخدام القالب؛ تغيير اللغة يغيّر المحتوى فقط ولا ينشئ قالبًا جديدًا.")}
+      </p>
       {section === "SYSTEM" && (
         <div className={cn(
           "rounded-xl border px-3 py-2.5 text-xs leading-5",
@@ -301,6 +304,9 @@ export function WhatsappTemplateList() {
                     <td className="py-3 px-4">
                       <div className="flex flex-col items-start gap-0.5">
                         <span className="font-medium text-slate-900">{t.name}</span>
+                        <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] ${resolveTemplateKind(t) === "SYSTEM" ? "border-violet-200 bg-violet-50 text-violet-700" : "border-sky-200 bg-sky-50 text-sky-700"}`}>
+                          {dt(resolveTemplateKind(t) === "SYSTEM" ? "تلقائي / خدمي / توثيق" : "حملة تسويقية")}
+                        </span>
                         {t.externalTemplateId ? (
                           <span className="font-mono text-[10px] text-slate-500">
                             {t.externalTemplateId}

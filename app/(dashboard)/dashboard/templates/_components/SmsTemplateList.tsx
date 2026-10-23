@@ -95,6 +95,9 @@ export function SmsTemplateList() {
         <button type="button" aria-pressed={section === "CAMPAIGN"} onClick={() => setSection("CAMPAIGN")} className={`rounded-md px-3 py-1.5 text-xs font-medium ${section === "CAMPAIGN" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{dt("الحملات التسويقية")} ({templates.filter((template) => resolveTemplateKind(template) === "CAMPAIGN").length})</button>
         <button type="button" aria-pressed={section === "SYSTEM"} onClick={() => setSection("SYSTEM")} className={`rounded-md px-3 py-1.5 text-xs font-medium ${section === "SYSTEM" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{dt("التلقائية والتوثيق")} ({templates.filter((template) => resolveTemplateKind(template) === "SYSTEM").length})</button>
       </div>
+      <p className="text-xs leading-5 text-muted-foreground">
+        {dt("النوع يحدد استخدام القالب؛ تغيير اللغة يغيّر المحتوى فقط ولا ينشئ قالبًا جديدًا.")}
+      </p>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-xs text-muted-foreground">
@@ -157,10 +160,9 @@ export function SmsTemplateList() {
                   <tr key={t.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
                     <td className="whitespace-nowrap px-4 py-3 align-middle">
                       <span className="font-medium text-slate-900">{t.name}</span>
-                      {t.kind === "SYSTEM" && (
-                        <span className="ms-1.5 inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-700">
-                          {dt("نظامي")}</span>
-                      )}
+                      <span className={`ms-1.5 inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] ${resolveTemplateKind(t) === "SYSTEM" ? "border-violet-200 bg-violet-50 text-violet-700" : "border-sky-200 bg-sky-50 text-sky-700"}`}>
+                        {dt(resolveTemplateKind(t) === "SYSTEM" ? "تلقائي / خدمي / توثيق" : "حملة تسويقية")}
+                      </span>
                     </td>
                     <td className="max-w-0 px-4 py-3 align-middle">
                       <span className="block truncate text-xs text-slate-600" title={rendered}>

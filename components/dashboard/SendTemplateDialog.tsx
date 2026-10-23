@@ -15,6 +15,7 @@ import {
 import { Loader2, Mail, MessageCircle, Send } from "lucide-react";
 import { LOCALE_OPTIONS, isValidLocale, type SupportedLocale } from "@/lib/locales";
 import { dashDir, dt, dtx } from "@/lib/dashboard/i18n";
+import { campaignTemplates, resolveTemplateKind } from "@/lib/communication/template-kind";
 
 const LOCALE_AUTO = "__auto__";
 
@@ -42,6 +43,9 @@ interface Props {
 interface TemplateRow {
   id: string;
   name: string;
+  kind?: string | null;
+  purpose?: string | null;
+  category?: string | null;
 }
 
 export function SendTemplateDialog({ open, onOpenChange, channel, target }: Props) {
@@ -71,7 +75,10 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
     setTemplatesLoading(true);
     axios
       .get(apiBase)
-      .then((res) => setTemplates(res.data?.templates ?? []))
+      .then((res) => {
+        const rows = res.data?.templates ?? [];
+        setTemplates(channel === "email" ? campaignTemplates(rows) : rows);
+      })
       .catch(() => toast.error(dt("فشل تحميل القوالب")))
       .finally(() => setTemplatesLoading(false));
   }, [open, apiBase]);
@@ -150,6 +157,8 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
       // Defensive: a legacy/disabled route returns 410 with an Arabic message + redirect target.
       if (axios.isAxiosError(err) && err.response?.status === 410) {
         toast.error(err.response.data?.messageAr || dt("تم نقل الإرسال إلى مركز التواصل."));
+      } else if (axios.isAxiosError(err) && err.response?.status === 409 && err.response.data?.error === "TEMPLATE_KIND_MISMATCH") {
+        toast.error(dt("هذا قالب تلقائي أو خدمي؛ اختر قالبًا تسويقيًا لهذا الإرسال."));
       } else {
         toast.error(dt("فشل الإرسال"));
       }
@@ -209,7 +218,7 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
               <SelectContent>
                 {templates.map((t) => (
                   <SelectItem key={t.id} value={t.id}>
-                    {t.name}
+                    {t.name} · {dt(resolveTemplateKind(t) === "SYSTEM" ? "تلقائي / خدمي / توثيق" : "حملة تسويقية")}
                   </SelectItem>
                 ))}
               </SelectContent>
