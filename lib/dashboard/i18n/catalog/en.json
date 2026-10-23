@@ -1723,6 +1723,8 @@
  "التكوين العامل لـSMS الدولي دون إرسال.": "Active configuration for international SMS, without sending.",
  "التكوين العامل للحساب ونطاق بريد المرسل دون إرسال.": "Active configuration of the account and sender email domain, without sending.",
  "التلقائية والتوثيق": "Automation and documentation",
+ "النوع يحدد استخدام القالب؛ تغيير اللغة يغيّر المحتوى فقط ولا ينشئ قالبًا جديدًا.": "Template type determines how it can be used. Changing language changes the content only and does not create another template.",
+ "هذا قالب تلقائي أو خدمي؛ اختر قالبًا تسويقيًا لهذا الإرسال.": "This is an automated or service template. Choose a marketing template for this send.",
  "التنزيلات": "Downloads",
  "التنقل الرئيسي": "Main navigation",
  "التنقل داخل القسم": "Section navigation",

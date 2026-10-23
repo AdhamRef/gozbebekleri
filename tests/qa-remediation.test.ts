@@ -12,6 +12,7 @@ import { buildBreadcrumbs } from "../lib/dashboard/breadcrumbs";
 import { NOT_FOUND_COPY } from "../lib/not-found-copy";
 import privacy from "../lib/privacy-translations.json";
 import { defaultEditorContent } from "../app/[locale]/blog/_components/wysiwyg/default-content";
+import { dt, setDashLocale } from "../lib/dashboard/i18n";
 
 const require = createRequire(import.meta.url);
 function load(path: string, dependencies: Record<string, unknown>): any {
@@ -29,6 +30,30 @@ test("BUG-02: checkout preserves fractional amounts, including three-decimal cur
   for (const [amount, expected] of [[3.57,"3.57"],[0.125,"0.125"],[1234.5,"1,234.5"],[4,"4"],[0,"0"]] as const) {
     assert.equal(formatCheckoutAmount(amount), expected);
     assert.equal(Number(formatCheckoutAmount(amount).replaceAll(",", "")), amount);
+  }
+});
+
+test("BUG-01: template type guidance and rejection messages are localized in every dashboard language", () => {
+  const guidance = "النوع يحدد استخدام القالب؛ تغيير اللغة يغيّر المحتوى فقط ولا ينشئ قالبًا جديدًا.";
+  const rejection = "هذا قالب تلقائي أو خدمي؛ اختر قالبًا تسويقيًا لهذا الإرسال.";
+  const expected = {
+    ar: [guidance, rejection],
+    en: [
+      "Template type determines how it can be used. Changing language changes the content only and does not create another template.",
+      "This is an automated or service template. Choose a marketing template for this send.",
+    ],
+    tr: [
+      "Şablon türü kullanımını belirler. Dili değiştirmek yalnızca içeriği değiştirir; yeni bir şablon oluşturmaz.",
+      "Bu otomatik veya hizmet şablonudur. Bu gönderim için bir pazarlama şablonu seçin.",
+    ],
+  } as const;
+  try {
+    for (const locale of ["ar", "en", "tr"] as const) {
+      setDashLocale(locale);
+      assert.deepEqual([dt(guidance), dt(rejection)], expected[locale]);
+    }
+  } finally {
+    setDashLocale("ar");
   }
 });
 

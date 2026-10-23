@@ -24,6 +24,7 @@
     "app/api/templates/**/*.ts",
     "app/(dashboard)/dashboard/templates/**/*.tsx",
     "components/dashboard/SmartWhatsappDialog.tsx",
+    "components/dashboard/SendTemplateDialog.tsx",
     "app/(dashboard)/dashboard/_shell/DashboardTopbar.tsx"
   ],
   "exclude": [

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { resolveTemplateKind } from "../../lib/communication/template-kind";
+import { campaignTemplates, resolveTemplateKind } from "../../lib/communication/template-kind";
 
 test("legacy templates bound to automatic events leave the marketing list", () => {
   assert.equal(resolveTemplateKind({ kind: null, purpose: null }, true), "SYSTEM");
@@ -25,4 +25,16 @@ test("classification does not alter Meta's marketing category", () => {
   assert.equal(resolveTemplateKind(template, true), "SYSTEM");
   assert.equal(template.category, "MARKETING");
   assert.equal(template.kind, "CAMPAIGN");
+});
+
+test("manual email send choices contain marketing templates only and ignore localized content", () => {
+  const marketing = { id: "campaign", kind: "CAMPAIGN", purpose: "MARKETING", translations: { fr: { subject: "Bonjour" } } };
+  const automatic = { id: "receipt", kind: "SYSTEM", purpose: "TRANSACTIONAL", translations: { fr: { subject: "Reçu" } } };
+  const legacyEventTemplate = { id: "legacy-receipt", kind: "CAMPAIGN", purpose: "MARKETING", linkedToEvent: true };
+
+  // API rows are classified before reaching the dialog, including legacy event bindings.
+  const rows = [marketing, automatic, { ...legacyEventTemplate, kind: resolveTemplateKind(legacyEventTemplate, true) }];
+  assert.deepEqual(campaignTemplates(rows).map((template) => template.id), ["campaign"]);
+  assert.equal(resolveTemplateKind(marketing), "CAMPAIGN");
+  assert.equal(resolveTemplateKind({ ...marketing, translations: { tr: { subject: "Merhaba" } } } as Parameters<typeof resolveTemplateKind>[0]), "CAMPAIGN");
 });
