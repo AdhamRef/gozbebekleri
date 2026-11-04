@@ -1,3 +1,10 @@
+import { campaignTrackingValues, trackCampaignMetaButtons } from "./campaign-message-tracking";
+import { donationTemplateValues } from "./template-donation-links";
+import { localizeDonationFailureLinks } from "@/lib/templates/localize-donation-failure-link";
+import { donationNotificationParameters, isDonationMoneyNotificationEvent } from "@/lib/templates/donation-money";
+import { retryPayloadBlockReason } from "./retry-readiness";
+import { RETRY_BATCH_CAP } from "./retry-batches";
+import type { CommunicationPurposeGroup } from "./purpose-group";
 import { prisma } from "@/lib/prisma";
 import { createDeliveryRecord, markDeliveryStatus } from "./delivery-log-service";
 import { sendPreparedDelivery } from "./provider-router";
@@ -6,6 +13,11 @@ import { resolveMetaTemplateMapping } from "./automatic-message-dispatcher";
 import { buildMetaComponents } from "./providers/meta-whatsapp/parameters";
 import { resolveSmsProvider } from "./providers/sms/client";
 import { checkRetryRecipient, retryDefinitelyNotSent, type RetryRecipientCode } from "./retry-recipient-guard";
+import {
+  reserveWhatsappMarketingSend,
+  releaseWhatsappMarketingReservation,
+  type WhatsAppMarketingReservation,
+} from "./whatsapp-marketing-frequency";
 import {
   RETRYABLE_STATUSES, NON_RETRYABLE_TERMINAL, isCommunicationChannel,
   type CommunicationChannelId, type CommunicationProviderId,
@@ -18,13 +30,19 @@ export type RetryOutcomeCode = RetryRecipientCode
   | "ALREADY_RETRIED" | "NO_RENDERED_BODY" | "META_TEMPLATE_REQUIRED"
   | "NO_SENDER_IDENTITY" | "TEMPLATE_PARAMETER_MISSING" | "TEMPLATE_HEADER_MEDIA_MISSING"
   | "ARCHIVE_FAILED" | "PROVIDER_REJECTED" | "RETRY_ORIGINAL_REQUIRED"
-  | "DELIVERY_OUTCOME_UNCERTAIN" | "ACCEPTED_UNRECORDED";
+  | "DELIVERY_OUTCOME_UNCERTAIN" | "ACCEPTED_UNRECORDED"
+  | "EXACT_TEMPLATE_LANGUAGE_REQUIRED" | "RECURRING_TEMPLATE_CADENCE_MISMATCH"
+  | "WHATSAPP_MARKETING_COOLDOWN" | "WHATSAPP_FREQUENCY_CHECK_UNAVAILABLE"
+  | "DONATION_WAQF_LINK_REQUIRES_CERTIFICATE_ID" | "DONATION_DOCUMENT_CONTEXT_MISSING"
+  | "DONATION_DOCUMENT_RECIPIENT_MISMATCH" | "DONATION_DOCUMENT_ACCESS_TOKEN_UNAVAILABLE";
 export type RetryResult = {
   deliveryId: string; code: RetryOutcomeCode; ok: boolean; message: string;
   detail?: string | null; recipient?: string | null;
   recipientName?: string | null; newDeliveryId?: string | null;
 };
 const MESSAGES: Record<RetryOutcomeCode, string> = {
+  RECURRING_TEMPLATE_CADENCE_MISMATCH: "القالب المحفوظ لا يطابق دورية التبرع؛ استخدم القالب الصحيح في رسالة جديدة",
+  EXACT_TEMPLATE_LANGUAGE_REQUIRED: "النسخة المحفوظة ليست بلغة المستلم؛ أكمل ترجمة القالب وأنشئ رسالة جديدة قبل الإرسال",
   SENT: "قبل المزوّد الرسالة؛ تُتابَع حالة التسليم في السجل",
   NOT_FOUND: "لم يُعثر على الرسالة",
   NOT_RETRYABLE_STATUS: "الرسالة ليست في حالة تسمح بإعادة الإرسال",
@@ -37,6 +55,10 @@ const MESSAGES: Record<RetryOutcomeCode, string> = {
   NO_SENDER_IDENTITY: "لا توجد هوية مُرسِل مُفعّلة",
   TEMPLATE_PARAMETER_MISSING: "القالب يطلب متغيّرًا لا توجد له قيمة محفوظة",
   TEMPLATE_HEADER_MEDIA_MISSING: "القالب يطلب صورة أو ملفًا في الترويسة ولا يوجد",
+  DONATION_WAQF_LINK_REQUIRES_CERTIFICATE_ID: "زر شهادة الوقف يحتاج رقم الشهادة المرتبط بالتبرع؛ لم تُطلب إعادة الإرسال",
+  DONATION_DOCUMENT_CONTEXT_MISSING: "تعذّر تحديد التبرع المرتبط بزر المستند؛ لم تُطلب إعادة الإرسال",
+  DONATION_DOCUMENT_RECIPIENT_MISMATCH: "المستند لا يخص مستلم الرسالة؛ لم تُطلب إعادة الإرسال",
+  DONATION_DOCUMENT_ACCESS_TOKEN_UNAVAILABLE: "رابط المستند الآمن غير متاح؛ لم تُطلب إعادة الإرسال",
   ARCHIVE_FAILED: "تعذّر تسجيل المحاولة؛ لم يُطلب الإرسال",
   PROVIDER_REJECTED: "لم تُرسل الرسالة؛ راجع سبب الرفض",
   RECIPIENT_NOT_FOUND: "المستلم لم يعد موجودًا؛ لم تُستخدم بياناته القديمة",
@@ -46,6 +68,8 @@ const MESSAGES: Record<RetryOutcomeCode, string> = {
   RETRY_ORIGINAL_REQUIRED: "أعد المحاولة من الرسالة الأصلية، وليس من سجل محاولة فرعية",
   DELIVERY_OUTCOME_UNCERTAIN: "نتيجة المزوّد غير مؤكدة؛ راجعها قبل السماح بمحاولة جديدة",
   ACCEPTED_UNRECORDED: "قبل المزوّد الرسالة لكن تعذّر تحديث سجلها؛ لا تُعد إرسالها",
+  WHATSAPP_MARKETING_COOLDOWN: "لم تُرسل الرسالة؛ لم يمرّ الفاصل المحدد منذ آخر رسالة تسويقية لهذا المتبرع",
+  WHATSAPP_FREQUENCY_CHECK_UNAVAILABLE: "تعذّر التحقق من الفاصل بين الرسائل؛ لم يُطلب الإرسال",
 };
 function result(deliveryId: string, code: RetryOutcomeCode, extra: Partial<RetryResult> = {}): RetryResult {
   return { deliveryId, code, ok: code === "SENT", message: MESSAGES[code], ...extra };
@@ -57,23 +81,25 @@ type DeliveryRow = {
   recipientPhone: string | null; recipientName: string | null;
   renderedSubject: string | null; renderedBody: string | null; variables: unknown;
   campaignId: string | null; retriedAt: Date | null; retryOfDeliveryId: string | null;
+  errorMessage?: string | null;
 };
 const SELECT = {
   id: true, channel: true, status: true, origin: true, purpose: true, locale: true,
   templateId: true, templateName: true, recipientUserId: true, recipientEmail: true,
   recipientPhone: true, recipientName: true, renderedSubject: true, renderedBody: true,
   variables: true, campaignId: true, retriedAt: true, retryOfDeliveryId: true,
+  errorMessage: true,
 } as const;
 
 /** Preserve the existing manual/transactional policy; campaign retries also pass their shared guard. */
-async function consentBlockReason(userId: string | null, channel: CommunicationChannelId, purpose: string): Promise<string | null> {
+async function consentBlockReason(userId: string | null, channel: CommunicationChannelId, purpose: string, campaignId: string | null): Promise<string | null> {
   if (!userId) return null;
   const profile = await prisma.donorCommunicationProfile.findUnique({
-    where: { userId }, select: { doNotContact: true, emailOptIn: true, whatsappOptIn: true, smsOptIn: true },
+    where: { userId }, select: { doNotContact: true, emailOptIn: true, smsOptIn: true },
   });
-  if (!profile) return channel === "WHATSAPP" ? null : (purpose === "MARKETING" ? "لا توجد موافقة مسجلة لهذا المستلم" : null);
+  if (!profile) return channel === "WHATSAPP" || (channel === "EMAIL" && campaignId) ? null : (purpose === "MARKETING" ? "لا توجد موافقة مسجلة لهذا المستلم" : null);
   if (profile.doNotContact) return "المستلم مفعّل عليه عدم التواصل";
-  if (purpose !== "MARKETING" || channel === "WHATSAPP") return null;
+  if (purpose !== "MARKETING" || channel === "WHATSAPP" || (channel === "EMAIL" && campaignId)) return null;
   const optedIn = channel === "EMAIL" ? profile.emailOptIn : profile.smsOptIn;
   return optedIn ? null : "رسالة تسويقية بدون موافقة على هذه القناة";
 }
@@ -112,7 +138,7 @@ async function resolveMetaTemplate(row: DeliveryRow, businessAccountId: string |
   const tpl = await prisma.whatsappTemplate.findUnique({
     where: { id: row.templateId }, select: { id: true, provider: true, name: true, variables: true, header: true, translations: true },
   });
-  return tpl ? resolveMetaTemplateMapping(tpl, row.locale || "ar", businessAccountId) : null;
+  return tpl ? resolveMetaTemplateMapping(tpl, row.locale || "ar", businessAccountId, { exactLanguage: true }) : null;
 }
 
 export async function retryDelivery(deliveryId: string, opts: { actorId?: string | null; config?: TriggerSendConfig } = {}): Promise<RetryResult> {
@@ -128,11 +154,39 @@ export async function retryDelivery(deliveryId: string, opts: { actorId?: string
   if ((NON_RETRYABLE_TERMINAL as readonly string[]).includes(row.status)) return result(deliveryId, "NOT_RETRYABLE_BOUNCED", { recipientName: row.recipientName });
   if (!(RETRYABLE_STATUSES as readonly string[]).includes(row.status)) return result(deliveryId, "NOT_RETRYABLE_STATUS", { detail: row.status });
   if (row.retriedAt) return result(deliveryId, "ALREADY_RETRIED", { recipientName: row.recipientName });
+  if (row.errorMessage === "RECURRING_TEMPLATE_CADENCE_MISMATCH") return result(deliveryId, "RECURRING_TEMPLATE_CADENCE_MISMATCH", { recipientName: row.recipientName });
+  if (row.errorMessage === "EXACT_TEMPLATE_LANGUAGE_REQUIRED") return result(deliveryId, "EXACT_TEMPLATE_LANGUAGE_REQUIRED", { recipientName: row.recipientName });
+  const issuedDocumentId = row.variables && typeof row.variables === "object" ? (row.variables as { issuedDocumentId?: unknown }).issuedDocumentId : null;
+  if ((row.channel === "EMAIL" || row.channel === "WHATSAPP") && typeof issuedDocumentId === "string" && /^[a-f0-9]{24}$/i.test(issuedDocumentId)) {
+    const { deliverIssuedCertificate } = await import("@/lib/certificates/manual-delivery");
+    const delivered = await deliverIssuedCertificate(issuedDocumentId, row.channel);
+    if (delivered.ok) { await prisma.communicationDelivery.update({ where: { id: deliveryId }, data: { retriedAt: new Date() } }); return result(deliveryId, "SENT"); }
+    return result(deliveryId, delivered.reason === "DELIVERY_OUTCOME_UNCERTAIN" ? "DELIVERY_OUTCOME_UNCERTAIN" : "PROVIDER_REJECTED", { detail: delivered.reason });
+  }
+  // Gift retries must update their per-channel state under the item lease.
+  // Replaying only the archive payload would bypass gift idempotency.
+  const giftItemId = row.variables && typeof row.variables === "object" ? (row.variables as { giftItemId?: unknown }).giftItemId : null;
+  if ((row.channel === "EMAIL" || row.channel === "WHATSAPP") && typeof giftItemId === "string" && /^[a-f0-9]{24}$/i.test(giftItemId)) {
+    if (row.retriedAt) return result(deliveryId, "ALREADY_RETRIED");
+    const gift = await prisma.donationItem.findUnique({ where: { id: giftItemId }, select: { donationId: true, giftDeliveryState: true } });
+    if (!gift) return result(deliveryId, "NOT_FOUND");
+    const { deliverDonationGifts } = await import("@/lib/donations/gift-delivery");
+    await deliverDonationGifts(gift.donationId);
+    const refreshed = await prisma.donationItem.findUnique({ where: { id: giftItemId }, select: { giftDeliveryState: true } });
+    const { readGiftDeliveryState } = await import("@/lib/donations/gift-delivery-state");
+    const state = readGiftDeliveryState(refreshed?.giftDeliveryState);
+    const channelState = row.channel === "EMAIL" ? state.EMAIL : state.WHATSAPP;
+    if (channelState?.status === "SENT") {
+      await prisma.communicationDelivery.update({ where: { id: deliveryId }, data: { retriedAt: new Date() } });
+      return result(deliveryId, "SENT");
+    }
+    return result(deliveryId, channelState?.status === "SENDING" ? "DELIVERY_OUTCOME_UNCERTAIN" : "PROVIDER_REJECTED", { detail: channelState?.reason || "GIFT_DELIVERY_PENDING" });
+  }
   const channel = row.channel;
   let recipient: string | null;
   try {
     recipient = await resolveRecipient(row);
-    const blocked = await consentBlockReason(row.recipientUserId, channel, row.purpose);
+    const blocked = await consentBlockReason(row.recipientUserId, channel, row.purpose, row.campaignId);
     if (blocked) return result(deliveryId, "CONSENT_BLOCKED", { detail: blocked, recipientName: row.recipientName });
   } catch {
     return result(deliveryId, "RECIPIENT_CHECK_UNAVAILABLE", { recipientName: row.recipientName });
@@ -142,37 +196,54 @@ export async function retryDelivery(deliveryId: string, opts: { actorId?: string
   if (!precheck.ok) return result(deliveryId, precheck.code, { recipientName: row.recipientName });
   recipient = precheck.contact;
   const base = { recipient, recipientName: row.recipientName };
+  const renderedBody = row.renderedBody
+    ? localizeDonationFailureLinks(row.renderedBody, row.locale || "ar")
+    : null;
   const config = opts.config ?? await resolveTriggerSendConfig();
   let payload: Parameters<typeof sendPreparedDelivery>[0];
   let provider: CommunicationProviderId;
   let senderId: string | null = null;
   if (channel === "EMAIL") {
-    if (!row.renderedBody) return result(deliveryId, "NO_RENDERED_BODY", base);
+    if (!renderedBody) return result(deliveryId, "NO_RENDERED_BODY", base);
     const routed = resolveTriggerSender(config, "EMAIL", { locale: row.locale, purpose: row.purpose as never });
     if (!routed.ok) return result(deliveryId, "NO_SENDER_IDENTITY", { ...base, detail: routed.reason });
     provider = "ELASTIC_EMAIL";
     senderId = routed.sender.id;
-    payload = { channel, sender: { senderEmail: routed.sender.senderEmail }, to: recipient, subject: row.renderedSubject ?? "", html: row.renderedBody };
+    payload = { channel, sender: { senderEmail: routed.sender.senderEmail }, to: recipient, subject: row.renderedSubject ?? "", html: renderedBody };
   } else if (channel === "WHATSAPP") {
+    // Preflight skips can have no archived variable snapshot. A retry must not claim it can
+    // replay the original message when the original template payload was never rendered.
+    const archivedPayloadBlock = retryPayloadBlockReason(row);
+    if (archivedPayloadBlock) return result(deliveryId, archivedPayloadBlock, base);
     const routed = resolveTriggerSender(config, "WHATSAPP", { locale: row.locale, purpose: row.purpose as never });
     if (!routed.ok) return result(deliveryId, "NO_SENDER_IDENTITY", { ...base, detail: routed.reason });
     if (!routed.sender.phoneNumberId || !routed.sender.businessAccountId) return result(deliveryId, "NO_SENDER_IDENTITY", base);
     const meta = await resolveMetaTemplate(row, routed.sender.businessAccountId);
     if (!meta) return result(deliveryId, "META_TEMPLATE_REQUIRED", base);
+    const archived=row.variables && typeof row.variables === "object" ? row.variables as {trigger?:{donationId?:string;event?:string};snapshot?:{donation?:{id?:string;notificationAmount?:string}}} : {};
+    const values = donationNotificationParameters({
+      values: storedTemplateValues(row.variables, meta.positionalNames),
+      scopedNames: meta.scopedNames, positionalNames: meta.positionalNames,
+      componentsSchema: meta.componentsSchema,
+      notificationAmount: row.origin === "TRIGGER" && archived.trigger?.donationId && isDonationMoneyNotificationEvent(archived.trigger.event ?? "")
+        ? archived.snapshot?.donation?.notificationAmount : undefined,
+    });
+    const prepared=await donationTemplateValues({componentsSchema:meta.componentsSchema,scopedNames:meta.scopedNames,values,donationId:archived.trigger?.donationId || archived.snapshot?.donation?.id,recipientUserId:row.recipientUserId});
+    if(!prepared.ok)return result(deliveryId,prepared.reason as RetryOutcomeCode,base);
     const built = buildMetaComponents({
-      componentsSchema: meta.componentsSchema, values: storedTemplateValues(row.variables, meta.positionalNames),
+      componentsSchema: meta.componentsSchema, values: row.campaignId ? campaignTrackingValues(meta.componentsSchema, prepared.values, { id: row.campaignId, channel }) : prepared.values,
       positionalNames: meta.positionalNames, scopedNames: meta.scopedNames,
       headerMediaUrl: meta.headerMediaUrl, headerMediaFilename: meta.headerMediaFilename, headerLocation: meta.headerLocation,
     });
     if (!built.ok) return result(deliveryId, built.reason as RetryOutcomeCode, { ...base, detail: built.detail });
     provider = "META_WHATSAPP";
     senderId = routed.sender.id;
-    payload = { channel, sender: { provider, phoneNumberId: routed.sender.phoneNumberId }, to: recipient, templateName: meta.name, languageCode: meta.language, components: built.components };
+    payload = { channel, sender: { provider, phoneNumberId: routed.sender.phoneNumberId }, to: recipient, templateName: meta.name, languageCode: meta.language, components: row.campaignId ? trackCampaignMetaButtons({ campaign: { id: row.campaignId, channel }, componentsSchema: meta.componentsSchema, components: built.components }) : built.components };
   } else {
-    if (!row.renderedBody) return result(deliveryId, "NO_RENDERED_BODY", base);
+    if (!renderedBody) return result(deliveryId, "NO_RENDERED_BODY", base);
     const route = await resolveSmsProvider(null, recipient);
     provider = route.provider;
-    payload = { channel, to: recipient, html: row.renderedBody };
+    payload = { channel, to: recipient, html: renderedBody };
   }
   // Omitting these fields made marketing retries use transactional transport.
   payload.purpose = row.purpose as CommunicationPurposeId;
@@ -193,7 +264,7 @@ export async function retryDelivery(deliveryId: string, opts: { actorId?: string
     templateName: row.templateName, recipientUserId: row.recipientUserId,
     recipientEmail: channel === "EMAIL" ? recipient : null, recipientPhone: channel === "EMAIL" ? null : recipient,
     recipientName: row.recipientName, locale: row.locale, purpose: row.purpose as CommunicationPurposeId,
-    origin: row.origin as DeliveryOriginId, renderedSubject: row.renderedSubject, renderedBody: row.renderedBody,
+    origin: row.origin as DeliveryOriginId, renderedSubject: row.renderedSubject, renderedBody,
     variables: (row.variables ?? undefined) as Record<string, unknown> | undefined,
     createdBy: opts.actorId ?? null, status: "RENDERED",
   });
@@ -211,8 +282,24 @@ export async function retryDelivery(deliveryId: string, opts: { actorId?: string
     await releaseClaim();
     return result(deliveryId, "ARCHIVE_FAILED", { ...base, newDeliveryId: newId });
   }
+  let frequencyReservation: WhatsAppMarketingReservation | null = null;
+  if (row.channel === "WHATSAPP" && row.purpose === "MARKETING") {
+    const frequency = await reserveWhatsappMarketingSend(row.recipientUserId, new Date(), row.recipientPhone);
+    if (!frequency.ok) {
+      await markDeliveryStatus(
+        newId,
+        frequency.reason === "WHATSAPP_MARKETING_COOLDOWN" ? "SKIPPED" : "FAILED",
+        { errorMessage: frequency.reason },
+      );
+      await releaseClaim();
+      return result(deliveryId, frequency.reason, { ...base, newDeliveryId: newId });
+    }
+    frequencyReservation = frequency.reservation;
+  }
+  // Recipient status, consent, and contact are rechecked after reserving the slot.
   const live = await checkRetryRecipient(row, recipient);
   if (!live.ok) {
+    if (frequencyReservation) await releaseWhatsappMarketingReservation(frequencyReservation);
     await markDeliveryStatus(newId, live.code === "CONSENT_BLOCKED" ? "SKIPPED" : "FAILED", { errorMessage: live.code });
     await releaseClaim();
     return result(deliveryId, live.code, { ...base, newDeliveryId: newId });
@@ -230,6 +317,9 @@ export async function retryDelivery(deliveryId: string, opts: { actorId?: string
   if (!response.ok) {
     const detail = response.detail ? `${response.reason}  ${response.detail}` : response.reason;
     const knownUnsent = retryDefinitelyNotSent(response.reason);
+    if (knownUnsent && frequencyReservation) {
+      await releaseWhatsappMarketingReservation(frequencyReservation);
+    }
     await markDeliveryStatus(newId, "FAILED", { errorMessage: knownUnsent ? detail : `DELIVERY_OUTCOME_UNCERTAIN: ${detail}` });
     if (knownUnsent) await releaseClaim();
     return result(deliveryId, knownUnsent ? "PROVIDER_REJECTED" : "DELIVERY_OUTCOME_UNCERTAIN", { ...base, detail, newDeliveryId: newId });
@@ -239,12 +329,31 @@ export async function retryDelivery(deliveryId: string, opts: { actorId?: string
   return result(deliveryId, "SENT", { ...base, newDeliveryId: newId });
 }
 
-export const RETRY_BATCH_CAP = 25;
-export type RetryCandidateFilter = { channel: CommunicationChannelId; from?: Date; to?: Date; ids?: string[] };
+export { RETRY_BATCH_CAP } from "./retry-batches";
+export type RetryCandidateFilter = {
+  channel: CommunicationChannelId;
+  from?: Date;
+  to?: Date;
+  ids?: string[];
+  /** Keep retries launched from a campaign report inside that campaign. */
+  campaignId?: string;
+  /** Keep a retry batch inside the currently selected automatic/marketing view. */
+  purposeGroup?: CommunicationPurposeGroup;
+};
+type RetryPayloadFields = { channel: string; templateId: string | null; renderedBody: string | null; variables: unknown };
+function hasArchivedRetryPayload(row: RetryPayloadFields): boolean {
+  return retryPayloadBlockReason(row) === null;
+}
 const rootDelivery = { OR: [{ retryOfDeliveryId: null }, { retryOfDeliveryId: { isSet: false } }] };
 function retryScope(filter: RetryCandidateFilter) {
   return {
     channel: filter.channel,
+    ...(filter.purposeGroup === "MARKETING"
+      ? { purpose: "MARKETING" }
+      : filter.purposeGroup === "AUTOMATIC"
+        ? { purpose: { not: "MARKETING" } }
+        : {}),
+    ...(filter.campaignId ? { campaignId: filter.campaignId } : {}),
     ...(filter.ids !== undefined ? { id: { in: [...new Set(filter.ids)] } } : {}),
     ...(filter.from || filter.to ? { createdAt: { ...(filter.from ? { gte: filter.from } : {}), ...(filter.to ? { lte: filter.to } : {}) } } : {}),
     AND: [rootDelivery],
@@ -277,25 +386,49 @@ export async function listRetryCandidatePage(
   take = RETRY_BATCH_CAP,
 ): Promise<RetryCandidateCursor[]> {
   const limit = Number.isFinite(take) ? Math.max(1, Math.min(RETRY_BATCH_CAP, Math.floor(take))) : RETRY_BATCH_CAP;
-  const rows = await prisma.communicationDelivery.findMany({
-    where: retryCandidatePageWhere(filter, after),
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-    take: limit,
-    select: { id: true, createdAt: true },
-  });
-  return rows.map((record) => ({ id: record.id, createdAt: record.createdAt }));
+  const selected: RetryCandidateCursor[] = [];
+  let cursor = after;
+  while (selected.length < limit) {
+    const rows = await prisma.communicationDelivery.findMany({
+      where: retryCandidatePageWhere(filter, cursor),
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: limit,
+      select: { id: true, createdAt: true, channel: true, templateId: true, renderedBody: true, variables: true },
+    });
+    if (!rows.length) break;
+    for (const row of rows) {
+      if (hasArchivedRetryPayload(row)) selected.push({ id: row.id, createdAt: row.createdAt });
+      if (selected.length === limit) break;
+    }
+    const last = rows.at(-1)!;
+    cursor = { id: last.id, createdAt: last.createdAt };
+    if (rows.length < limit) break;
+  }
+  return selected;
 }
 
 export async function listRetryCandidates(filter: RetryCandidateFilter, take = RETRY_BATCH_CAP): Promise<string[]> {
   const limit = Number.isFinite(take) ? Math.max(1, Math.min(RETRY_BATCH_CAP, Math.floor(take))) : RETRY_BATCH_CAP;
-  const rows = await prisma.communicationDelivery.findMany({
-    where: { ...retryScope(filter), status: { in: [...RETRYABLE_STATUSES] }, OR: [{ retriedAt: null }, { retriedAt: { isSet: false } }] },
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: limit, select: { id: true },
-  });
-  return rows.map((record) => record.id);
+  const where = { ...retryScope(filter), status: { in: [...RETRYABLE_STATUSES] }, OR: [{ retriedAt: null }, { retriedAt: { isSet: false } }] };
+  const selected: string[] = [];
+  const pageSize = Math.max(100, limit * 4);
+  for (let skip = 0; selected.length < limit; skip += pageSize) {
+    const rows = await prisma.communicationDelivery.findMany({
+      where,
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }], skip, take: pageSize,
+      select: { id: true, channel: true, templateId: true, renderedBody: true, variables: true },
+    });
+    if (!rows.length) break;
+    for (const row of rows) {
+      if (hasArchivedRetryPayload(row)) selected.push(row.id);
+      if (selected.length >= limit) break;
+    }
+    if (rows.length < pageSize) break;
+  }
+  return selected;
 }
 export type RetryPreflight = {
-  eligible: number; alreadyRetried: number; bounced: number; cap: number;
+  eligible: number; candidateIds: string[]; missingContent: number; alreadyRetried: number; bounced: number; cap: number;
   oldestDays: number | null; byReason: Array<{ reason: string; count: number }>;
 };
 export async function retryPreflight(filter: RetryCandidateFilter): Promise<RetryPreflight> {
@@ -303,19 +436,20 @@ export async function retryPreflight(filter: RetryCandidateFilter): Promise<Retr
   const [eligibleRows, alreadyRetried, bounced] = await Promise.all([
     prisma.communicationDelivery.findMany({
       where: { ...scope, status: { in: [...RETRYABLE_STATUSES] }, OR: [{ retriedAt: null }, { retriedAt: { isSet: false } }] },
-      select: { errorMessage: true, createdAt: true }, orderBy: { createdAt: "asc" },
+      select: { id: true, errorMessage: true, createdAt: true, channel: true, templateId: true, renderedBody: true, variables: true }, orderBy: { createdAt: "asc" },
     }),
     prisma.communicationDelivery.count({ where: { ...scope, status: { in: [...RETRYABLE_STATUSES] }, retriedAt: { not: null } } }),
     prisma.communicationDelivery.count({ where: { ...scope, status: { in: [...NON_RETRYABLE_TERMINAL] } } }),
   ]);
+  const readyRows = eligibleRows.filter(hasArchivedRetryPayload);
   const counts = new Map<string, number>();
-  for (const record of eligibleRows) {
+  for (const record of readyRows) {
     const reason = (record.errorMessage || "غير محدّد").split("  ")[0];
     counts.set(reason, (counts.get(reason) ?? 0) + 1);
   }
-  const oldest = eligibleRows[0]?.createdAt ?? null;
+  const oldest = readyRows[0]?.createdAt ?? null;
   return {
-    eligible: eligibleRows.length, alreadyRetried, bounced, cap: RETRY_BATCH_CAP,
+    eligible: readyRows.length, candidateIds: readyRows.map((row) => row.id), missingContent: eligibleRows.length - readyRows.length, alreadyRetried, bounced, cap: RETRY_BATCH_CAP,
     oldestDays: oldest ? Math.max(0, Math.floor((Date.now() - oldest.getTime()) / 86_400_000)) : null,
     byReason: [...counts.entries()].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count),
   };

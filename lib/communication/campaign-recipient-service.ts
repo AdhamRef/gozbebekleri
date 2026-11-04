@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { SUPPORTED_LOCALES, LOCALES, DEFAULT_LOCALE, isValidLocale, type SupportedLocale } from "@/lib/locales";
+import { SUPPORTED_LOCALES, LOCALES, DEFAULT_LOCALE, isValidLocale, type AnyLocale as SupportedLocale } from "@/lib/ported-systems/locales";
 import type { CommunicationChannelId } from "./communication-runtime-types";
 import { parseListKey } from "./audience-list-service";
 import { countSmartAudience, getSmartAudienceDefinitionForList, loadSmartAudiencePage, previewSmartAudience, type SmartAudiencePreview } from "./smart-audience";
@@ -17,6 +17,22 @@ export type CampaignRecipientBreakdown = {
   totals: Omit<LocaleRecipientBreakdown, "locale" | "label">;
   recipientLocaleCounts: Record<string, number>;
 };
+
+/** Coverage needs counts, not a full contact preview or profile-bootstrap writes. */
+export async function countCampaignRecipientLocales(channel: CommunicationChannelId, audienceSegmentKey: string | null): Promise<Record<string, number>> {
+  const listId = parseListKey(audienceSegmentKey);
+  if (listId) {
+    const list = await readCampaignAudienceList(listId);
+    const smart = await getSmartAudienceDefinitionForList(listId);
+    if (!smart && list.type !== "SMART") {
+      const { countSavedListLanguages } = await import("./campaign-language-counts");
+      return countSavedListLanguages(listId, channel);
+    }
+    if (!smart) throw new Error("SMART_AUDIENCE_DEFINITION_UNAVAILABLE");
+    return (await previewSmartAudience({ ...smart, channel }, 0)).eligibleLanguages;
+  }
+  return (await getRecipientBreakdown(channel, { locale: audienceSegmentKey })).recipientLocaleCounts;
+}
 
 function combineBreakdown(channel: CommunicationChannelId, locales: LocaleRecipientBreakdown[]): CampaignRecipientBreakdown {
   const totals = locales.reduce((acc, row) => ({
@@ -40,7 +56,7 @@ function breakdownFromPreview(channel: CommunicationChannelId, preview: SmartAud
 async function profilesFor(ids: string[]) {
   return ids.length ? prisma.donorCommunicationProfile.findMany({
     where: { userId: { in: [...new Set(ids)] } },
-    select: { userId: true, whatsappOptIn: true, emailOptIn: true, smsOptIn: true, doNotContact: true },
+    select: { userId: true, emailOptIn: true, smsOptIn: true, doNotContact: true, consentSource: true },
   }) : [];
 }
 
@@ -60,7 +76,7 @@ export async function getRecipientBreakdown(
     while (true) {
       const page: Awaited<ReturnType<typeof readCampaignListPage>> = await readCampaignListPage(listId, { limit: 1000, cursorId: cursor });
       const ids = page.members.filter((member) => !member.missingDonor).map((member) => member.userId);
-      // Preserve the existing email/SMS bootstrap. Never infer WhatsApp consent.
+      // Preview stays read-only for WhatsApp; no opt-in is inferred or profile written.
       if (channel !== "WHATSAPP" && ids.length) await ensureProfilesForUsers(ids);
       const byUser = new Map((await profilesFor(ids)).map((profile) => [profile.userId, profile]));
       for (const member of page.members) {
@@ -94,7 +110,7 @@ export type CampaignRecipient = {
 };
 export type RecipientLoadResult = {
   recipients: CampaignRecipient[];
-  skipped: { cursorId: string; userId: string; locale: string; reason: string }[];
+  skipped: { cursorId: string; userId: string; name: string | null; email: string | null; phone: string | null; locale: string; reason: string }[];
   truncated: boolean; nextCursor: string | null; exhausted: boolean;
 };
 
@@ -158,7 +174,7 @@ export async function loadCampaignRecipients(
     nextCursor = users.length ? users[users.length - 1].id : cursor;
   }
   const ids = members.filter((member) => !member.missingDonor).map((member) => member.userId);
-  if (bootstrapLegacy && channel !== "WHATSAPP" && ids.length) await ensureProfilesForUsers(ids);
+  if (bootstrapLegacy && ids.length) await ensureProfilesForUsers(ids);
   const byUser = new Map((await profilesFor(ids)).map((profile) => [profile.userId, profile]));
   const recipients: CampaignRecipient[] = [];
   const skipped: RecipientLoadResult["skipped"] = [];
@@ -166,7 +182,7 @@ export async function loadCampaignRecipients(
     const reason = member.missingDonor ? "RECIPIENT_NOT_FOUND" : recipientExclusionReason(member, channel, byUser.get(member.userId));
     if (reason === null) {
       recipients.push({ cursorId: member.cursorId, userId: member.userId, name: member.name, email: member.email, phone: member.phone, locale: member.locale, country: member.country });
-    } else skipped.push({ cursorId: member.cursorId, userId: member.userId, locale: member.locale, reason });
+    } else skipped.push({ cursorId: member.cursorId, userId: member.userId, name: member.name, email: member.email, phone: member.phone, locale: member.locale, reason });
   }
   return { recipients, skipped, truncated: !exhausted, nextCursor, exhausted };
 }

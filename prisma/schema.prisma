@@ -117,6 +117,11 @@ model User {
   messages     Message[]
   creditCards  CreditCard[]
   communicationProfile DonorCommunicationProfile?
+
+  // Fields required by the transferred systems; existing fields are retained.
+  verifiedAt            DateTime?
+  registeredAt          DateTime?
+
 }
 
 /* ===================== CREDIT CARDS ===================== */
@@ -139,6 +144,10 @@ model CreditCard {
   updatedAt      DateTime @updatedAt
 
   @@index([userId])
+
+  // Fields required by the transferred systems; existing fields are retained.
+  subscriptions Subscription[]
+
 }
 
 /* ===================== AUDIT LOG (dashboard activity) ===================== */
@@ -157,6 +166,11 @@ model AuditLog {
   metadata   Json?
   /// TEAM: actions by ADMIN/STAFF — DONOR: actions by donors (e.g. donations, profile)
   stream     String
+
+  // Fields required by the transferred systems; existing fields are retained.
+
+  @@index([action, entityType, createdAt(sort: Desc)], map: "content_editor_action_entityType_createdAt")
+  @@index([action, entityType, entityId], map: "content_editor_action_entityType_entityId")
 }
 
 /* ===================== CONTACT MESSAGES ===================== */
@@ -188,6 +202,11 @@ model Message {
   repliedByName String?
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  // Fields required by the transferred systems; existing fields are retained.
+  source       String?
+  donationId   String?         @db.ObjectId
+
 }
 
 enum MessageReplyChannel {
@@ -298,6 +317,19 @@ model Category {
   seoNoIndex String?
   faqContent String?
   navigationVisible Boolean? @default(true)
+
+  // Fields required by the transferred systems; existing fields are retained.
+  pageTemplate String?
+  heroImage    String?
+  heroVideoUrl String?
+  statDoneValue Int?
+  statGoalValue Int?
+  donateToCategory    Boolean @default(false)
+  donateCampaignId    String? @db.ObjectId
+  suggestedAmounts    Int[]   @default([])
+  suggestedByCurrency Json?
+  achievementVideoIds String[] @db.ObjectId
+
 }
 
 
@@ -454,6 +486,12 @@ model Campaign {
   ogImage String?
   seoNoIndex String?
   faqContent String?
+
+  // Fields required by the transferred systems; existing fields are retained.
+  recommendedFrequency String?
+  previousSlugs String[] @default([])
+  slugChanges Json?
+  @@index([previousSlugs])
 }
 
 /// "Make an impact for a child" — interactive builder campaign type.
@@ -648,6 +686,27 @@ model Donation {
   categoryItems DonationCategoryItem[]
   impactLines   ImpactDonationLine[]
   comments      Comment[]
+
+  // Fields required by the transferred systems; existing fields are retained.
+  accessToken String?
+  bankOperations Json?
+  bankOperationLock String?
+  bankOperationsRevision Int?
+  bankLastInquiry Json?
+  reconciliationCheckedAt DateTime?
+  reconciliationNextAt DateTime?
+  reconciliationLeaseToken String?
+  reconciliationLeaseUntil DateTime?
+  paypalOrderId    String?
+  paypalCaptureId  String?
+  paidAmount       Float?
+  paidCurrency     String?
+  bankTransferClaim BankTransferClaim?
+  waqfItems         DonationWaqfItem[]
+  certificates      Certificate[]
+  receipt           DonationReceipt?
+  @@index([donorId, status, paidAt])
+  @@index([status, paidAt, donorId])
 }
 
 model Subscription {
@@ -681,6 +740,25 @@ model Subscription {
   categoryItems SubscriptionCategoryItem[]
   impactLines   ImpactDonationLine[]
   donations     Donation[]
+
+  // Fields required by the transferred systems; existing fields are retained.
+  frequency            RecurringFrequency? @default(MONTHLY)
+  timezone             String?
+  scheduleRule         Json?
+  consentSnapshot      Json?
+  stripeSubscriptionId String?
+  provider              String?
+  paymentCardId         String?     @db.ObjectId
+  paymentCard           CreditCard? @relation(fields: [paymentCardId], references: [id])
+  chargeAttempts        Int         @default(0)
+  lastChargeError       String?
+  billingLeaseToken     String?
+  billingLeaseUntil     DateTime?
+  amountChangeLock      String?
+  amountChangeStartedAt DateTime?
+  paypalVaultId         String?
+  paypalCustomerId      String?
+  @@index([donorId, status])
 }
 
 model SubscriptionItem {
@@ -733,6 +811,21 @@ model DonationItem {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Fields required by the transferred systems; existing fields are retained.
+  giftRecipientName  String?
+  giftRecipientEmail String?
+  giftRecipientPhone String?
+  giftMessage        String?
+  giftChannels       String[]  @default([])
+  giftShowAmount     Boolean   @default(true)
+  giftDeliveredAt    DateTime?
+  giftDeliveryState Json?
+  giftDeliveryLock String?
+  giftDeliveryLockUntil DateTime?
+  giftDeliveryError String?
+  @@index([donationId, campaignId])
+  @@index([campaignId, donationId])
 }
 
 model DonationCategoryItem {
@@ -754,6 +847,10 @@ enum SubscriptionStatus {
   ACTIVE
   PAUSED
   CANCELLED
+
+  // Fields required by the transferred systems; existing fields are retained.
+  PAYMENT_FAILED
+
 }
 
 enum DonationStatus {
@@ -764,6 +861,10 @@ enum DonationStatus {
 enum PaymentMethod {
   CARD
   PAYPAL
+
+  // Fields required by the transferred systems; existing fields are retained.
+  BANK_TRANSFER
+
 }
 //asd
 type CardDetails {
@@ -1082,6 +1183,10 @@ model WhatsappTemplate {
   @@index([externalTemplateId])
   @@index([provider])
   @@index([kind])
+
+  // Fields required by the transferred systems; existing fields are retained.
+  notificationUpgrade Json?
+
 }
 
 /// Plain-text templates for the SMS channel.
@@ -1248,6 +1353,10 @@ model GlobalSettings {
   payforEnabled        Boolean  @default(true)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+
+  // Fields required by the transferred systems; existing fields are retained.
+  certificateCopy      Json?
+
 }
 
 /* ===================== MARKETING PLATFORM CONNECTIONS ===================== */
@@ -1690,6 +1799,10 @@ model DonorCommunicationProfile {
 
   @@index([preferredLocale])
   @@index([countryCode])
+
+  // Fields required by the transferred systems; existing fields are retained.
+  lastWhatsappMarketingAt DateTime?
+
 }
 
 model CommunicationCampaign {
@@ -1767,6 +1880,10 @@ model CommunicationDelivery {
   @@index([channel, status])
   @@index([recipientUserId])
   @@index([providerMessageId])
+
+  // Fields required by the transferred systems; existing fields are retained.
+
+  @@index([channel, senderId, recipientPhone, createdAt(sort: Desc), status], map: "content_editor_channel_senderId_recipientPhone_createdAt_status")
 }
 
 model CommunicationProviderEvent {
@@ -1788,6 +1905,10 @@ model CommunicationProviderEvent {
 
   @@index([deliveryId])
   @@index([providerMessageId])
+
+  // Fields required by the transferred systems; existing fields are retained.
+
+  @@index([channel, eventType, receivedAt(sort: Desc)], map: "content_editor_channel_eventType_receivedAt")
 }
 
 /// A reusable audience list — a custom manual list or a TEST list used to try
@@ -1953,6 +2074,11 @@ model CommunicationGlobalControl {
   updatedBy     String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  // Fields required by the transferred systems; existing fields are retained.
+  whatsappMarketingCooldownDays       Int?     @default(0)
+  whatsappMarketingCooldownConfigured Boolean  @default(false)
+
 }
 
 
@@ -2262,4 +2388,224 @@ enum SuperCategoryItemKind {
   COURSE
   REPORT
   BOOKLET
+}
+
+
+// Models supporting the transferred systems. No records are imported.
+model DonorContactListEntry {
+  id              String           @id @default(auto()) @map("_id") @db.ObjectId
+  listId          String           @db.ObjectId
+  name            String
+  email           String?
+  phone           String?
+  normalizedEmail String?
+  normalizedPhone String?
+  createdAt       DateTime         @default(now())
+  list            DonorContactList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  @@index([listId, createdAt])
+  @@index([listId, normalizedEmail])
+  @@index([listId, normalizedPhone])
+}
+
+model DonorContactList {
+  id          String                  @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  contacts    DonorContactListEntry[]
+
+  @@index([updatedAt])
+}
+
+model CommunicationContactFrequency {
+  id String @id @map("_id") @db.ObjectId
+  lastSentAt DateTime?
+  reservationToken String?
+}
+
+model IssuedCertificate {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  requestKey String @unique
+  inputHash String
+  kind String
+  locale String
+  donorName String
+  recipientName String
+  recipientEmail String?
+  recipientPhone String?
+  serial String
+  issuedAt DateTime
+  document Json
+  deliveryState Json?
+  deliveryLock String?
+  deliveryLockUntil DateTime?
+  createdById String @db.ObjectId
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+}
+
+model DonationReceipt {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  receiptNo  String   @unique
+  number     Int
+  donationId String   @unique @db.ObjectId
+  /// Short code printed on the receipt that ties the paper copy to this row.
+  verifyCode String   @unique
+  issuedAt   DateTime @default(now())
+  locale     String
+
+  donation Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
+}
+
+model Certificate {
+  id          String          @id @default(auto()) @map("_id") @db.ObjectId
+  /// Unique serial, e.g. `MIA-THX-2026-000123` or `MIA-WQF-S-076544`.
+  serial      String          @unique
+  /// The number printed on the face: the waqf certificates carry the bare
+  /// per-unit sequence (metres from 9876, shares from 76543), the thank-you
+  /// certificate its yearly counter.
+  number      Int
+  type        CertificateType
+  donationId  String          @db.ObjectId
+  donorId     String          @db.ObjectId
+  /// Set on a waqf certificate: the line it was issued for. One certificate
+  /// per line, enforced by the unique index.
+  waqfItemId  String?         @unique @db.ObjectId
+  count       Int
+  amount      Float
+  currency    String
+  /// The name printed on the certificate. The donor may edit it on the success
+  /// page; the edit is stored here so every later download and the emailed
+  /// copy say the same thing.
+  donorName   String
+  /// Waqf: whom the endowment is made on behalf of. Thanks: unused.
+  dedicatedTo String?
+  issuedAt    DateTime        @default(now())
+  /// The locale the donation was made in  the document renders in it.
+  locale      String
+
+  donation Donation          @relation(fields: [donationId], references: [id], onDelete: Cascade)
+  waqfItem DonationWaqfItem? @relation(fields: [waqfItemId], references: [id])
+
+  /// One thank-you certificate per donation; waqf certificates are keyed by
+  /// their line through `waqfItemId` above.
+  @@unique([donationId, type, waqfItemId])
+  @@index([donorId])
+}
+
+model DocumentSequence {
+  id    String @id @map("_id")
+  value Int
+}
+
+model BankTransferClaim {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  donationId String   @unique @db.ObjectId
+  donation   Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
+
+  status BankTransferClaimStatus @default(AWAITING_RECEIPT)
+
+  /// Random secret that lets a guest  who has no session to prove the order
+  /// is theirs  reach the upload page from the redirect and from the emails.
+  /// A signed-in donor who owns the donation needs no token.
+  accessToken String @unique
+
+  /// Which published account the donor said they used, snapshotted so the
+  /// review still reads correctly if the account is later edited or removed.
+  bankSlug     String?
+  bankName     String?
+  /// ISO 4217 of the IBAN they picked on that account.
+  bankCurrency String?
+
+  /// What the donor typed beside the receipt. All optional  the file is the
+  /// evidence; these help the reviewer find the line on the statement.
+  senderName        String?
+  transferDate      DateTime?
+  transferReference String?
+  donorNote         String?
+
+  receipts           BankTransferReceiptFile[]
+  /// How many times a receipt has been submitted (first upload = 1).
+  submissionCount    Int                       @default(0)
+  receiptSubmittedAt DateTime?
+
+  /// The review. `reviewedBy*` are plain scalars, not a relation, for the same
+  /// reason `Message.repliedBy*` are: only ever displayed.
+  reviewedAt      DateTime?
+  reviewedById    String?   @db.ObjectId
+  reviewedByName  String?
+  /// Shown to the donor on rejection (and in the rejection email).
+  rejectionReason String?
+  /// Internal only  never shown to the donor.
+  adminNote       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+}
+
+model DonationWaqfItem {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  donationId String   @db.ObjectId
+  unit       WaqfUnit
+  count      Int
+  /// Unit price in USD at the time of the order ($100 share / $1,500 metre).
+  unitPrice  Float
+  /// Line total in the donation's currency, and in USD.
+  amount     Float
+  amountUSD  Float?
+  /// The endower's name as it goes on the certificate.
+  donorName  String
+  /// Whom the waqf is made on behalf of ("وقد أوقفها عن").
+  onBehalf   String
+
+  donation    Donation     @relation(fields: [donationId], references: [id], onDelete: Cascade)
+  certificate Certificate?
+
+  createdAt DateTime @default(now())
+}
+
+enum RecurringFrequency {
+  DAILY
+  FRIDAY
+  MONTHLY
+}
+
+enum CertificateType {
+  THANKS
+  SHARE
+  METER
+}
+
+enum BankTransferClaimStatus {
+  /// The order exists; the donor has not sent a receipt yet.
+  AWAITING_RECEIPT
+  /// A receipt is in; the finance team has to match it against the account.
+  UNDER_REVIEW
+  /// Money matched. The donation's `paidAt` is stamped at the same moment.
+  CONFIRMED
+  /// Not matched. The donor is told why and may upload again (see
+  /// `BANK_TRANSFER_MAX_SUBMISSIONS`); the donation is FAILED meanwhile.
+  REJECTED
+}
+
+type BankTransferReceiptFile {
+  url          String
+  publicId     String
+  /// Cloudinary resource type the file was stored under  "image" or "raw".
+  resourceType String
+  mimeType     String
+  bytes        Int
+  fileName     String
+  uploadedAt   DateTime
+  /// 1-based: which submission this file belongs to.
+  submission   Int
+}
+
+enum WaqfUnit {
+  SHARE
+  METER
 }

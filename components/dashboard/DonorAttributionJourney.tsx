@@ -36,6 +36,7 @@ interface JourneyResponse {
 }
 
 const STATUS_PILL: Record<DonationSourceStatus, string> = {
+  unknown: "bg-slate-50 text-slate-600 border-slate-200",
   verified: "bg-emerald-50 text-emerald-700 border-emerald-200",
   "utm-only": "bg-amber-50 text-amber-700 border-amber-200",
   "tracking-error": "bg-rose-50 text-rose-700 border-rose-200",
@@ -43,6 +44,7 @@ const STATUS_PILL: Record<DonationSourceStatus, string> = {
 };
 
 const STATUS_DOT: Record<DonationSourceStatus, string> = {
+  unknown: "bg-slate-300",
   verified: "bg-emerald-500",
   "utm-only": "bg-amber-400",
   "tracking-error": "bg-rose-500",

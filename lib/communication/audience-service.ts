@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { SUPPORTED_LOCALES, LOCALES, type SupportedLocale } from "@/lib/locales";
+import { SUPPORTED_LOCALES, LOCALES, type AnyLocale as SupportedLocale } from "@/lib/ported-systems/locales";
 import type { CommunicationChannel } from "./communication-types";
 import { safeCountValue } from "@/lib/dashboard/safe-count";
 import { recipientExclusionReason } from "./campaign-audience-accounting";
@@ -7,8 +7,8 @@ import { previewSmartAudience } from "./smart-audience";
 
 /**
  * Dynamic audiences computed from donors, not manually maintained channel lists.
- * Membership and permission to send are separate. The communication profile is
- * authoritative; no missing preference is turned into an opt-in by this module.
+ * Email and SMS preferences are checked from the communication profile. WhatsApp
+ * candidates are checked for contact details and explicit STOP requests.
  * Read-only: no writes, no sends, no provider calls.
  */
 export type ChannelEligibility = "ELIGIBLE" | "NEEDS_REVIEW" | "UNAVAILABLE";
@@ -47,15 +47,15 @@ const DONOR_BASE = { role: "DONOR" as const };
 
 async function localeCounts(locale: SupportedLocale) {
   const base = { ...DONOR_BASE, preferredLang: locale };
-  const [total, withEmail, withPhone, emailEligible, smsEligible, whatsapp] = await Promise.all([
+  const [total, withEmail, withPhone, email, smsEligible, whatsapp] = await Promise.all([
     prisma.user.count({ where: base }),
     prisma.user.count({ where: { ...base, email: { not: null } } }),
     prisma.user.count({ where: { ...base, phone: { not: null } } }),
-    safeCountValue("audience.emailReachable", () => prisma.donorCommunicationProfile.count({ where: { preferredLocale: locale, email: { not: null }, emailOptIn: true, doNotContact: false } })),
+    previewSmartAudience({ version: 1, kind: "SMART", channel: "EMAIL", filters: { locales: [locale], hasContact: false } }, 0),
     safeCountValue("audience.smsReachable", () => prisma.donorCommunicationProfile.count({ where: { preferredLocale: locale, phone: { not: null }, smsOptIn: true, doNotContact: false } })),
     previewSmartAudience({ version: 1, kind: "SMART", channel: "WHATSAPP", filters: { locales: [locale], hasContact: false } }, 0),
   ]);
-  return { total, withEmail, withPhone, emailEligible, smsEligible, whatsappEligible: whatsapp.eligible, whatsappNeedsReview: whatsapp.needsReview };
+  return { total, withEmail, withPhone, emailEligible: email.eligible, smsEligible, whatsappEligible: whatsapp.eligible, whatsappNeedsReview: whatsapp.needsReview };
 }
 
 export async function getAudienceOverview(): Promise<AudienceOverview> {
@@ -90,7 +90,7 @@ export async function getAudienceOverview(): Promise<AudienceOverview> {
     generatedAt: new Date().toISOString(),
     totals,
     languages,
-    consentNote: "واتساب لا يشترط موافقة مسبقة داخل النظام. تُحترم طلبات إيقاف التواصل وموافقات البريد وSMS، وتُراجع بيانات الاتصال عند التنفيذ. حجم الجمهور لا يضمن التسليم.",
+    consentNote: "حجم الجمهور لا يضمن التسليم. تُحترم موافقة القناة وطلبات إيقاف التواصل، وتُراجع بيانات الاتصال عند التنفيذ.",
   };
 }
 
@@ -103,6 +103,7 @@ export function donorChannelEligibility(
     emailOptIn?: boolean;
     smsOptIn?: boolean;
     whatsappOptIn?: boolean;
+    consentSource?: string | null;
   } | null
 ): ChannelEligibility {
   const reason = recipientExclusionReason(donor, channel, profile);

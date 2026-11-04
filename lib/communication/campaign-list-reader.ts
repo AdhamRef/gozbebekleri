@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_LOCALE, isValidLocale, type SupportedLocale } from "@/lib/locales";
+import { DEFAULT_LOCALE, isValidLocale, type AnyLocale as SupportedLocale } from "@/lib/ported-systems/locales";
 
 /** Campaign reads must never mistake a database failure for an empty audience. */
 export async function readCampaignAudienceList(listId: string) {

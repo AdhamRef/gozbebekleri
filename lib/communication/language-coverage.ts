@@ -1,4 +1,4 @@
-import { LOCALES, isKnownLocale, type AnyLocale } from "@/lib/locales";
+import { LOCALES, isKnownLocale, type AnyLocale } from "@/lib/ported-systems/locales";
 
 /**
  * Language coverage for a campaign: given the locales present among recipients and the
@@ -46,14 +46,10 @@ export function computeLanguageCoverage(
     if (!isKnownLocale(code)) continue;
     const meta = LOCALES[code];
     let status: CoverageStatus = "MISSING";
-    let fallbackLocale: AnyLocale | undefined;
     if (available.has(code)) {
       status = "EXISTS";
-    } else if (available.has(meta.fallbackLocale)) {
-      status = "FALLBACK";
-      fallbackLocale = meta.fallbackLocale;
     }
-    locales.push({ locale: code, label: meta.label, status, fallbackLocale, recipientCount: count });
+    locales.push({ locale: code, label: meta.label, status, recipientCount: count });
   }
   locales.sort((a, b) => b.recipientCount - a.recipientCount);
 

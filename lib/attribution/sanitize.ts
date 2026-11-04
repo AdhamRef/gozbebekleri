@@ -1,6 +1,8 @@
 import type { Prisma } from "@prisma/client";
 
 export const DONATION_ATTRIBUTION_KEYS = [
+  "source_capture",
+  "source_captured_at",
   "utm_source",
   "utm_medium",
   "utm_campaign",

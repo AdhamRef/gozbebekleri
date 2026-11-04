@@ -1,8 +1,11 @@
+import { dt } from "./i18n";
 import type { DashboardPermissionKey } from "./permissions";
 import type { NavIconName } from "./nav-icons";
 
 export type DashboardNavItem = {
   key: DashboardPermissionKey;
+  anyPermissions?: DashboardPermissionKey[];
+  adminOnly?: boolean;
   title: string;
   href: string;
   /** Rendered in the sidebar and the command palette. */
@@ -75,16 +78,16 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
       // DONATION_LAPSED reminder.
       // Per-channel pages: each answers "what did we send on this channel, and what happened to
       // it afterwards" — the delivery/open/click detail the flat send log cannot show.
-      { key: "messages", title: "الحملات التسويقية", href: "/dashboard/communication/campaigns", icon: "megaphone", keywords: ["campaigns", "marketing", "حملات", "تسويق", "broadcast", "bulk"] },
-      { key: "messages", title: "البريد الإلكتروني", href: "/dashboard/communication/email", icon: "mail", keywords: ["email", "بريد", "elastic"] },
-      { key: "messages", title: "واتساب", href: "/dashboard/communication/whatsapp", icon: "messageCircle", keywords: ["whatsapp", "واتساب", "meta"] },
+      { key: "messages", get title() { return dt("الحملات التسويقية"); }, href: "/dashboard/communication/campaigns", icon: "megaphone", keywords: ["campaigns", "marketing", "حملات", "تسويق", "broadcast", "bulk"] },
+      { key: "messages", get title() { return dt("البريد الإلكتروني"); }, href: "/dashboard/communication/email", icon: "mail", keywords: ["email", "بريد", "elastic"] },
+      { key: "messages", get title() { return dt("واتساب"); }, href: "/dashboard/communication/whatsapp", icon: "messageCircle", keywords: ["whatsapp", "واتساب", "meta"] },
       { key: "messages", title: "محادثات واتساب", href: "/dashboard/communication/inbox", icon: "messageCircle", keywords: ["whatsapp", "conversations", "محادثات", "واتساب"] },
-      { key: "messages", title: "الرسائل النصية", href: "/dashboard/communication/sms", icon: "messageSquare", keywords: ["sms", "نصية", "netgsm", "brevo"] },
-      { key: "templates", title: "قوالب البريد والمحفّزات", href: "/dashboard/templates", icon: "mail", keywords: ["email", "triggers", "محفزات"] },
+      { key: "messages", get title() { return dt("الرسائل النصية"); }, href: "/dashboard/communication/sms", icon: "messageSquare", keywords: ["sms", "نصية", "netgsm", "brevo"] },
+      { key: "templates", get title() { return dt("القوالب والمحفّزات"); }, href: "/dashboard/templates", icon: "mail", keywords: ["email", "whatsapp", "sms", "templates", "triggers", "قوالب", "محفزات"] },
       // Was the second tab of /dashboard/messages, behind a page that defaults to the outbound
       // log — so visitor mail had no sidebar entry and no command-palette hit. It is inbound
       // human correspondence, not send telemetry, and belongs beside the channels, not inside them.
-      { key: "badges", title: "الشارات", href: "/dashboard/badges", icon: "award", keywords: ["badges"] },
+      { key: "badges", get title() { return dt("تصنيفات المتبرعين"); }, href: "/dashboard/badges", icon: "award", keywords: ["donor categories", "donor lists", "badges", "قوائم المتبرعين"] },
       // The flat outbound send log (/dashboard/messages) is gone. Per-channel delivery detail lives
       // in البريد الإلكتروني / واتساب / الرسائل النصية above.
       { key: "messages", title: "الرسائل الواردة", href: "/dashboard/inbox", icon: "inbox", keywords: ["inbox", "inbound", "contact", "واردة", "زوار", "تواصل"], badge: "inboxUnread" },
@@ -104,8 +107,8 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
     items: [
       // The overview, الحسابات الإعلانية, Webhooks and سجلات المنصات pages were removed. The three
       // pages left are the ones that configure something: pixels, providers, and the health check.
-      { key: "platformConnections", title: "بكسلات التتبع", href: "/dashboard/platform-connections/tracking", icon: "radar", keywords: ["pixels", "meta", "tiktok", "snap"] },
-      { key: "platformConnections", title: "مزودو التواصل والإرسال", href: "/dashboard/platform-connections/communication", icon: "server", keywords: ["providers", "twilio", "smtp", "whatsapp"] },
+      { key: "platformConnections", get title() { return dt("بكسلات التتبع"); }, href: "/dashboard/platform-connections/tracking", icon: "radar", keywords: ["pixels", "meta", "tiktok", "snap"] },
+      { key: "platformConnections", get title() { return dt("مزودو التواصل والإرسال"); }, href: "/dashboard/platform-connections/communication", icon: "server", keywords: ["providers", "meta", "elastic email", "brevo", "netgsm", "whatsapp", "sms", "email"] },
       { key: "platformConnections", title: "فحص الاتصال", href: "/dashboard/platform-connections/health", icon: "heartPulse", keywords: ["health", "status", "diagnostics"] },
       // No dedicated "telegram" permission key exists, and inventing one would need a matching
       // grant UI. It is an outbound integration, so it sits under platformConnections with the
@@ -116,7 +119,8 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
   {
     group: "الإدارة",
     items: [
-      { key: "team", title: "الفريق", href: "/dashboard/users/team", icon: "userCog", keywords: ["team", "staff", "permissions", "صلاحيات"] },
+      { key: "team", get title() { return dt("الفريق"); }, href: "/dashboard/users/team", icon: "userCog", keywords: ["team", "staff", "permissions", "صلاحيات"] },
+      { key: "logs", get title() { return dt("الأمان وسجل الوصول"); }, href: "/dashboard/security", icon: "shield", adminOnly: true, keywords: ["security", "ip", "country", "block", "حظر", "أمان"] },
       { key: "generalSettings", title: "الإعدادات", href: "/dashboard/general/payment-gateways", icon: "settings", keywords: ["settings", "payment", "gateways", "stripe"] },
       { key: "logs", title: "سجلات النظام", href: "/dashboard/logs", icon: "scrollText", keywords: ["logs", "audit", "system"] },
     ],

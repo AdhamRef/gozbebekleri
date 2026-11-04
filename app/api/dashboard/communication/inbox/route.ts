@@ -23,13 +23,17 @@ export async function GET(request: NextRequest) {
   const senderId = sp.get("senderId") || null;
   const filter = sp.get("filter"); // needsReply | unresolved | all
   const search = (sp.get("q") || "").trim().toLowerCase();
-  const limit = Math.min(Math.max(Number(sp.get("limit") ?? 50), 1), 200);
-  const offset = Math.max(Number(sp.get("offset") ?? 0), 0);
+  const limit = Math.min(Math.max(Number.parseInt(sp.get("limit") || "50") || 50, 1), 200);
+  const offset = Math.min(100000, Math.max(Number.parseInt(sp.get("offset") || "0") || 0, 0));
 
-  const [all, senders] = await Promise.all([listConversations({ senderId }), listInboxSenders()]);
+  const senderRows = listInboxSenders();
+  const loaded = await Promise.all([listConversations({ senderId, senderRows, enrichLimit: !search && (!filter || filter === "all") ? offset + limit : undefined }), senderRows]).catch(() => null);
+  if (!loaded) return NextResponse.json({ error: "INBOX_UNAVAILABLE" }, { status: 503 });
+  const [all, senders] = loaded;
 
   let rows = all;
   if (filter === "needsReply") rows = rows.filter((c) => c.needsReply);
+  else if (filter === "unread") rows = rows.filter(c => c.unread);
   else if (filter === "unresolved") rows = rows.filter((c) => c.unresolved);
   if (search) {
     rows = rows.filter((c) =>
@@ -42,6 +46,7 @@ export async function GET(request: NextRequest) {
     ok: true,
     conversations: rows.slice(offset, offset + limit),
     total: rows.length,
+    unread: all.filter(c => c.unread).length,
     needsReply: all.filter((c) => c.needsReply).length,
     senders,
   });

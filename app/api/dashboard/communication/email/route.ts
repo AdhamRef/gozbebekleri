@@ -1,12 +1,13 @@
-import { emailMetrics } from "@/lib/communication/email-metrics";
+import { emailDeliveryProgress } from "@/lib/communication/email-delivery-progress";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { Prisma } from "@prisma/client";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
-import { RETRYABLE_STATUSES } from "@/lib/communication/communication-runtime-types";
+import { retryPreflight } from "@/lib/communication/delivery-retry-service";
 import { getActiveElasticEmailRuntimeConfig } from "@/lib/communication/runtime-config";
+import { communicationPurposeWhere, parseCommunicationPurposeGroup } from "@/lib/communication/purpose-group";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
     const { from, to } = parseRange(sp);
     const status = sp.get("status") || "all";
     const origin = sp.get("origin") || "all";
+    const purposeGroup = parseCommunicationPurposeGroup(sp.get("purposeGroup"));
     const search = sp.get("search")?.trim() || "";
     const page = Math.max(1, parseInt(sp.get("page") || "1"));
     const limit = Math.min(100, Math.max(1, parseInt(sp.get("limit") || "25")));
@@ -59,15 +61,20 @@ export async function GET(request: NextRequest) {
     // and drops the date window while doing it. The campaign IS the range; keeping the default
     // 30 days would report zeros for any campaign sent earlier than that.
     const campaignId = sp.get("campaign")?.trim() || "";
+    const purposeWhere = communicationPurposeWhere(purposeGroup);
     const rangeWhere: Prisma.CommunicationDeliveryWhereInput = campaignId
-      ? { channel: CHANNEL, campaignId }
-      : { channel: CHANNEL, createdAt: { gte: from, lte: to } };
+      ? { channel: CHANNEL, campaignId, ...purposeWhere }
+      : { channel: CHANNEL, createdAt: { gte: from, lte: to }, ...purposeWhere };
 
     const listWhere: Prisma.CommunicationDeliveryWhereInput = { ...rangeWhere };
     if (status !== "all") {
       if (status === "failed") listWhere.status = { in: [...FAILED_STATUSES] };
-      else if (status === "opened") listWhere.openedAt = { not: null };
-      else if (status === "clicked") listWhere.clickedAt = { not: null };
+      else if (status === "opened") listWhere.AND = [{ OR: [
+        { openedAt: { not: null } }, { clickedAt: { not: null } }, { status: { in: ["OPENED", "CLICKED"] } },
+      ] }];
+      else if (status === "clicked") listWhere.AND = [{ OR: [
+        { clickedAt: { not: null } }, { status: "CLICKED" },
+      ] }];
       else listWhere.status = status;
     }
     if (origin !== "all") listWhere.origin = origin;
@@ -83,29 +90,23 @@ export async function GET(request: NextRequest) {
     const [
       total,
       byStatus,
-      deliveredCount,
-      openedCount,
-      clickedCount,
       failedCount,
       providerEventCount,
       allTimeTotal,
       rows,
       listTotal,
       byTemplate,
-      retryableCount,
+      retryPreflightResult,
       emailRuntime,
       activeEmailSenderCount,
     ] = await Promise.all([
       prisma.communicationDelivery.count({ where: rangeWhere }),
       prisma.communicationDelivery.groupBy({ by: ["status"], where: rangeWhere, _count: { _all: true } }),
-      prisma.communicationDelivery.count({ where: { ...rangeWhere, deliveredAt: { not: null } } }),
-      prisma.communicationDelivery.count({ where: { ...rangeWhere, openedAt: { not: null } } }),
-      prisma.communicationDelivery.count({ where: { ...rangeWhere, clickedAt: { not: null } } }),
       prisma.communicationDelivery.count({ where: { ...rangeWhere, status: { in: [...FAILED_STATUSES] } } }),
       // Email tracking is live only when an EMAIL provider event has actually arrived.
       // WhatsApp events must never make the email dashboard claim its webhooks are working.
       prisma.communicationProviderEvent.count({ where: { channel: CHANNEL } }),
-      prisma.communicationDelivery.count({ where: { channel: CHANNEL } }),
+      prisma.communicationDelivery.count({ where: { channel: CHANNEL, ...purposeWhere } }),
       prisma.communicationDelivery.findMany({
         where: listWhere,
         orderBy: { createdAt: "desc" },
@@ -119,20 +120,11 @@ export async function GET(request: NextRequest) {
         },
       }),
       prisma.communicationDelivery.count({ where: listWhere }),
-      // No `orderBy: { _count: … }` here: on MongoDB it comes back in the wrong order (verified
+      // No `orderBy: { _count: … }` here: on MongoDB it comes back in the wrong order (verified 
       // it returned ascending), which combined with `take` would silently return the *least* used
       // templates. Sorted in JS below instead; the distinct-template count is tiny.
       prisma.communicationDelivery.groupBy({ by: ["templateName"], where: rangeWhere, _count: { _all: true } }),
-      // Re-sendable backlog. BOUNCED is excluded (a bounce is not fixed by sending again), and rows
-      // already retried are excluded  on MongoDB `null` matches only an explicit null, so documents
-      // written before the field existed need the `isSet: false` arm or none of them would count.
-      prisma.communicationDelivery.count({
-        where: {
-          ...rangeWhere,
-          status: { in: [...RETRYABLE_STATUSES] },
-          OR: [{ retriedAt: null }, { retriedAt: { isSet: false } }],
-        },
-      }),
+      retryPreflight({ channel: "EMAIL", purposeGroup, campaignId: campaignId || undefined, ...(campaignId ? {} : { from, to }) }),
       getActiveElasticEmailRuntimeConfig(),
       prisma.communicationSender.count({
         where: {
@@ -147,26 +139,32 @@ export async function GET(request: NextRequest) {
     const statusCounts: Record<string, number> = {};
     for (const row of byStatus) statusCounts[row.status] = row._count._all;
 
+    // Engagement stages are cumulative even when provider webhooks arrive out of order.
+    // A local send failure without provider evidence is an attempt, not an accepted email.
+    let attempted = 0, observedAttempts = 0, deliveredCount = 0, openedCount = 0, clickedCount = 0;
+
     // Daily buckets for the trend chart, built in JS: MongoDB has no date_trunc through Prisma
     // and the row counts here are small enough that one scan beats N queries.
     const bucketRows = await prisma.communicationDelivery.findMany({
       where: rangeWhere,
-      select: { createdAt: true, status: true, sentAt: true, deliveredAt: true, openedAt: true },
+      select: { createdAt: true, status: true, providerMessageId: true, sentAt: true, deliveredAt: true, openedAt: true, clickedAt: true },
       orderBy: { createdAt: "asc" },
     });
-    const metrics = emailMetrics(bucketRows, deliveredCount, openedCount, clickedCount);
     const buckets = new Map<string, Bucket>();
     for (const row of bucketRows) {
       const key = row.createdAt.toISOString().slice(0, 10);
       const bucket = buckets.get(key) ?? { date: key, sent: 0, delivered: 0, opened: 0, failed: 0 };
-      if ((FAILED_STATUSES as readonly string[]).includes(row.status)) bucket.failed++;
-      else if (row.status !== "SKIPPED" && row.status !== "RENDERED" && row.status !== "DRAFT") bucket.sent++;
-      if (row.deliveredAt) bucket.delivered++;
-      if (row.openedAt) bucket.opened++;
+      const progress = emailDeliveryProgress(row);
+      if (progress.accepted) { attempted++; bucket.sent++; }
+      if (progress.attempted) observedAttempts++;
+      if (progress.failed) bucket.failed++;
+      if (progress.delivered) { deliveredCount++; bucket.delivered++; }
+      if (progress.opened) { openedCount++; bucket.opened++; }
+      if (progress.clicked) clickedCount++;
       buckets.set(key, bucket);
     }
 
-
+    const rate = (part: number) => (attempted > 0 ? Math.round((part / attempted) * 1000) / 10 : 0);
 
     return NextResponse.json({
       ok: true,
@@ -174,20 +172,23 @@ export async function GET(request: NextRequest) {
       summary: {
         total,
         allTimeTotal,
-        ...metrics,
+        attempted,
         delivered: deliveredCount,
         opened: openedCount,
         clicked: clickedCount,
         failed: failedCount,
         skipped: statusCounts.SKIPPED ?? 0,
-
+        deliveredRate: rate(deliveredCount),
+        openRate: rate(openedCount),
+        clickRate: rate(clickedCount),
+        failedRate: observedAttempts > 0 ? Math.round((failedCount / observedAttempts) * 1000) / 10 : 0,
       },
       /**
        * False until the provider has ever posted an event. The page uses this to say "tracking
        * not receiving events" instead of presenting an authoritative-looking 0% open rate.
        */
       trackingLive: providerEventCount > 0,
-      retryableCount,
+      retryableCount: retryPreflightResult.eligible,
       provider: {
         configured: emailRuntime.configured,
         reason: emailRuntime.configured ? null : emailRuntime.reason,

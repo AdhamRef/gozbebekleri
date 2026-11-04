@@ -1,5 +1,6 @@
 import { templateLocaleHeader, META_TEMPLATE_LANGUAGES } from "./template-locale-media";
 import "server-only";
+import { localizeDonationFailureDraft } from "@/lib/templates/localize-donation-failure-link";
 
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
@@ -50,7 +51,7 @@ export type MetaPublishSummary = {
 export async function publishWhatsappTemplateToMeta(
   templateId: string,
   actor?: Actor,
-  opts: { category?: "UTILITY" | "MARKETING" | "AUTHENTICATION"; locales?: string[] } = {},
+  opts: { category?: "UTILITY" | "MARKETING" | "AUTHENTICATION"; locales?: string[]; defaultOnly?: boolean } = {},
 ): Promise<MetaPublishSummary> {
   const summary: MetaPublishSummary = {
     ok: false, templateId, targets: 0, created: 0, existing: 0, failed: 0,
@@ -171,7 +172,11 @@ export async function publishWhatsappTemplateToMeta(
     orderBy: [{ isDefault: "desc" }, { priority: "asc" }],
   });
   const wabas: string[] = [];
-  for (const sender of senders) {
+  if (senders.filter(sender => sender.isDefault).length !== 1) {
+    summary.errors.push({ businessAccountId: "", language: "", reason: "ONE_ACTIVE_DEFAULT_WHATSAPP_SENDER_REQUIRED" });
+    return summary;
+  }
+  for (const sender of senders.filter(sender => sender.isDefault)) {
     const waba = sender.businessAccountId?.trim();
     if (waba && !wabas.includes(waba)) wabas.push(waba);
   }
@@ -187,7 +192,7 @@ export async function publishWhatsappTemplateToMeta(
   // provider template name. The local editorial name may have changed, but using that changed name
   // here would create a second Meta template family instead of a new language variant.
   const existingProviderVariants = await prisma.whatsappTemplateWabaVariant.findMany({
-    where: { templateId, provider: "META_WHATSAPP" },
+    where: { templateId, provider: "META_WHATSAPP", businessAccountId: { in: wabas } },
     select: { providerTemplateName: true, componentsSchema: true },
     orderBy: { createdAt: "asc" },
   }).catch(() => []);
@@ -222,12 +227,16 @@ export async function publishWhatsappTemplateToMeta(
             ];
           }
         } else {
-          const built = buildStandardMetaComponents({
+          const localized = localizeDonationFailureDraft({
             body: variant.body ?? "",
+            buttons: variant.buttons ?? rootButtons,
+          }, locale);
+          const built = buildStandardMetaComponents({
+            body: localized.body,
             header: templateLocaleHeader(template, locale) as HeaderDraft,
             headerText: variant.headerText ?? String(header.text ?? ""),
             footerText: variant.footerText ?? template.footerText ?? "",
-            buttons: variant.buttons ?? rootButtons,
+            buttons: localized.buttons ?? rootButtons,
           });
           components = built.components;
           parameterFormat = built.parameterFormat;

@@ -9,7 +9,7 @@ import { dt } from "@/lib/dashboard/i18n";
 /**
  * Campaign scoping for the three channel pages.
  *
- * Opening a campaign from الحملات التسويقية lands here with `?campaign=<id>`, and the whole page
+ * Opening a campaign from الحملات التسويقية lands here with `?campaign=<id>`, and the whole page 
  * summary, chart, delivery list  narrows to that campaign's sends. This is where a campaign's
  * performance is read: rather than building a fourth analytics surface inside the campaign screen,
  * the channel page it already belongs to does the job, so the funnel a campaign is judged by is the

@@ -9,7 +9,7 @@ import { getActiveCommunicationRuntimeBundle } from "./runtime-config";
  * Can this trigger actually send? Answered before it is switched on, not at the donor's expense.
  *
  * Enabling a WhatsApp trigger used to be a single boolean write. Nothing checked that the template
- * was a Meta template, that Meta had approved any language of it, or that a WhatsApp sender existed
+ * was a Meta template, that Meta had approved any language of it, or that a WhatsApp sender existed 
  * so a trigger could sit enabled for weeks, firing on every donation and skipping every one with
  * `META_TEMPLATE_REQUIRED_FOR_AUTOMATIC_WHATSAPP` buried in the delivery log. Donors simply never
  * received their receipts, and the dashboard showed a healthy, enabled trigger.
@@ -112,7 +112,7 @@ async function preflightWhatsappTrigger(templateId: string, purpose: "TRANSACTIO
 
   const provider = (tpl.provider ?? "").toUpperCase();
   if (provider !== "META" && provider !== "META_WHATSAPP") {
-    /* A Twilio import or a MANUAL free-text template can never go out automatically: Meta refuses
+    /* A retired-provider import or a MANUAL free-text template can never go out automatically: Meta refuses
        business-initiated free text, so there is no payload this trigger could ever send. */
     problems.push({
       code: "TEMPLATE_NOT_META",

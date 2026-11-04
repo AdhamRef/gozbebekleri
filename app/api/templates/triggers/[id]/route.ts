@@ -1,4 +1,3 @@
-import { findClassifiedTemplate, retainAutomaticTemplateKind } from "@/lib/communication/template-usage";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getServerSession } from "next-auth";
@@ -40,10 +39,14 @@ export async function PATCH(
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   if (parsed.data.templateId) {
-    const template = await findClassifiedTemplate(existing.channel, parsed.data.templateId);
-    if (!template) return NextResponse.json({ error: "Template not found for channel" }, { status: 400 });
-    if (template.kind !== "SYSTEM" || template.status === "ARCHIVED") {
-      return NextResponse.json({ error: "SYSTEM_TEMPLATE_REQUIRED" }, { status: 409 });
+    const exists =
+      existing.channel === "EMAIL"
+        ? await prisma.emailTemplate.findUnique({ where: { id: parsed.data.templateId }, select: { id: true } })
+        : existing.channel === "WHATSAPP"
+          ? await prisma.whatsappTemplate.findUnique({ where: { id: parsed.data.templateId }, select: { id: true } })
+          : await prisma.smsTemplate.findUnique({ where: { id: parsed.data.templateId }, select: { id: true } });
+    if (!exists) {
+      return NextResponse.json({ error: "Template not found for channel" }, { status: 400 });
     }
   }
 
@@ -62,10 +65,6 @@ export async function PATCH(
   // Timing only applies to scheduled events; silently ignore it on event-driven triggers.
   const scheduled = existing.event === "DONATION_LAPSED";
 
-  if (templateChanged) {
-    await retainAutomaticTemplateKind(existing.channel, existing.templateId);
-    await retainAutomaticTemplateKind(existing.channel, parsed.data.templateId!);
-  }
   const updated = await prisma.messageTrigger.update({
     where: { id },
     data: {
@@ -97,9 +96,6 @@ export async function DELETE(
   if (denied) return denied;
   const { id } = await params;
 
-  const existing = await prisma.messageTrigger.findUnique({ where: { id } });
-  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  await retainAutomaticTemplateKind(existing.channel, existing.templateId);
   const deleted = await prisma.messageTrigger.delete({ where: { id } });
   const actor = auditActorFromDashboardSession(session!);
   await writeAuditLog({

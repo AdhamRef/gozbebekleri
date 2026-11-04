@@ -15,7 +15,6 @@ import { pickLocale, resolveEmailVariant } from "@/lib/templates/locale-resolver
 import { logSentMessage } from "@/lib/messaging/log-sent";
 import { getActiveElasticEmailRuntimeConfig } from "@/lib/communication/runtime-config";
 import { sendArchivedEmail } from "@/lib/communication/system-email";
-import { classifyEventTemplates } from "@/lib/communication/template-event-classification";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -48,13 +47,6 @@ export async function POST(request: NextRequest) {
   const { templateId, target } = parsed.data;
   const template = await prisma.emailTemplate.findUnique({ where: { id: templateId } });
   if (!template) return NextResponse.json({ error: "Template not found" }, { status: 404 });
-  const [classifiedTemplate] = await classifyEventTemplates("EMAIL", [template]);
-  if (classifiedTemplate?.kind !== "CAMPAIGN") {
-    return NextResponse.json({
-      error: "TEMPLATE_KIND_MISMATCH",
-      messageAr: "هذا قالب تلقائي أو خدمي؛ اختر قالبًا تسويقيًا لهذا الإرسال.",
-    }, { status: 409 });
-  }
   const userIds = target.kind === "user" ? [target.userId] : await resolveDonorIds(target.filters);
   if (!userIds.length) return NextResponse.json({ sent: 0, failed: [], skipped: 0, total: 0 });
   const contexts = await loadContextsForUserIds(userIds);
@@ -79,8 +71,13 @@ export async function POST(request: NextRequest) {
     }
     const locale = pickLocale({ override: parsed.data.locale, recipientLang: ctx.user.preferredLang });
     const variant = resolveEmailVariant(template, locale);
+    if (variant.resolvedLocale !== locale) {
+      skipped += 1;
+      await logSentMessage({ channel: "EMAIL", origin: "MANUAL", status: "SKIPPED", templateId: template.id, templateName: template.name, locale, recipientUserId: ctx.user.id, recipientEmail: ctx.user.email, recipientName: ctx.user.name || null, renderedSubject: "", renderedBody: "", variables: ctx as unknown as Prisma.InputJsonValue, errorMessage: "EXACT_TEMPLATE_LANGUAGE_REQUIRED", actorId: actor.actorId ?? null, actorName: actor.actorName ?? null });
+      continue;
+    }
     const subject = renderEmailSubject(variant.subject, ctx);
-    const html = await renderEmailHtml(variant.document as TReaderDocument, ctx);
+    const html = await renderEmailHtml(variant.document as TReaderDocument, ctx, variant.resolvedLocale);
     const result = await sendArchivedEmail({ to: ctx.user.email, subject, html, recipientUserId: ctx.user.id, recipientName: ctx.user.name || null, locale, origin: "MANUAL", purpose: "MARKETING", templateId: template.id, templateName: template.name, createdBy: actor.actorId ?? null }, runtimeConfig);
     const status = result.ok ? "SENT" : result.reason.endsWith("_NOT_CONFIGURED") || result.reason === "PROVIDER_DISABLED" ? "SKIPPED" : "FAILED";
     if (result.ok) sent += 1;

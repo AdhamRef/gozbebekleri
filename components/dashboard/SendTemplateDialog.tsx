@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
+import { SmartWhatsappDialog } from "@/components/dashboard/SmartWhatsappDialog";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { Dialog, DialogOverlay, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -13,9 +15,8 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Loader2, Mail, MessageCircle, Send } from "lucide-react";
-import { LOCALE_OPTIONS, isValidLocale, type SupportedLocale } from "@/lib/locales";
+import { LOCALE_OPTIONS, isValidLocale, type AnyLocale as SupportedLocale } from "@/lib/ported-systems/locales";
 import { dashDir, dt, dtx } from "@/lib/dashboard/i18n";
-import { campaignTemplates, resolveTemplateKind } from "@/lib/communication/template-kind";
 
 const LOCALE_AUTO = "__auto__";
 
@@ -43,12 +44,21 @@ interface Props {
 interface TemplateRow {
   id: string;
   name: string;
-  kind?: string | null;
-  purpose?: string | null;
-  category?: string | null;
 }
 
-export function SendTemplateDialog({ open, onOpenChange, channel, target }: Props) {
+export function SendTemplateDialog(props: Props) {
+  if (props.channel === "whatsapp") {
+    if (props.target.kind === "user") return <SmartWhatsappDialog open={props.open} onOpenChange={props.onOpenChange} userId={props.target.userId} initialMode="UTILITY" />;
+    return <Dialog open={props.open} onOpenChange={props.onOpenChange}><DialogContent dir={dashDir()}>
+      <DialogTitle>{dt("إرسال حملة واتساب")}</DialogTitle>
+      <p>{dt("اختر الجمهور والقالب المعتمد من محرر الحملات لمراجعة الإرسال الجماعي.")}</p>
+      <Button asChild><Link href="/dashboard/communication/campaigns/new">{dt("فتح محرر الحملات")}</Link></Button>
+    </DialogContent></Dialog>;
+  }
+  return <EmailTemplateDialog {...props} />;
+}
+
+function EmailTemplateDialog({ open, onOpenChange, channel, target }: Props) {
   const [templates, setTemplates] = React.useState<TemplateRow[]>([]);
   const [templatesLoading, setTemplatesLoading] = React.useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = React.useState<string>("");
@@ -75,10 +85,7 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
     setTemplatesLoading(true);
     axios
       .get(apiBase)
-      .then((res) => {
-        const rows = res.data?.templates ?? [];
-        setTemplates(channel === "email" ? campaignTemplates(rows) : rows);
-      })
+      .then((res) => setTemplates(res.data?.templates ?? []))
       .catch(() => toast.error(dt("فشل تحميل القوالب")))
       .finally(() => setTemplatesLoading(false));
   }, [open, apiBase]);
@@ -157,8 +164,6 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
       // Defensive: a legacy/disabled route returns 410 with an Arabic message + redirect target.
       if (axios.isAxiosError(err) && err.response?.status === 410) {
         toast.error(err.response.data?.messageAr || dt("تم نقل الإرسال إلى مركز التواصل."));
-      } else if (axios.isAxiosError(err) && err.response?.status === 409 && err.response.data?.error === "TEMPLATE_KIND_MISMATCH") {
-        toast.error(dt("هذا قالب تلقائي أو خدمي؛ اختر قالبًا تسويقيًا لهذا الإرسال."));
       } else {
         toast.error(dt("فشل الإرسال"));
       }
@@ -218,7 +223,7 @@ export function SendTemplateDialog({ open, onOpenChange, channel, target }: Prop
               <SelectContent>
                 {templates.map((t) => (
                   <SelectItem key={t.id} value={t.id}>
-                    {t.name} · {dt(resolveTemplateKind(t) === "SYSTEM" ? "تلقائي / خدمي / توثيق" : "حملة تسويقية")}
+                    {t.name}
                   </SelectItem>
                 ))}
               </SelectContent>

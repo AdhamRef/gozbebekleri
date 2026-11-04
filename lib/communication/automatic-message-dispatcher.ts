@@ -1,3 +1,4 @@
+import { donationTemplateValues } from "./template-donation-links";
 import { templateLocaleHeader } from "./template-locale-media";
 import type { Prisma, MessageTriggerEvent } from "@prisma/client";
 import { createDeliveryRecord, markDeliveryStatus } from "./delivery-log-service";
@@ -8,6 +9,12 @@ import type { CommunicationPurposeId } from "./communication-runtime-types";
 import { getActiveMetaWhatsappRuntimeConfig } from "./runtime-config";
 import { prisma } from "@/lib/prisma";
 import { ensureProfilesForUsers } from "./donor-communication-profile-service";
+import { retryDefinitelyNotSent } from "./retry-recipient-guard";
+import {
+  reserveWhatsappMarketingSend,
+  releaseWhatsappMarketingReservation,
+  type WhatsAppMarketingReservation,
+} from "./whatsapp-marketing-frequency";
 
 /**
  * Automatic (trigger-fired) message dispatcher for the Communication Center.
@@ -15,7 +22,7 @@ import { ensureProfilesForUsers } from "./donor-communication-profile-service";
  * Every automatic donation/subscription message now flows through the FINAL provider architecture:
  *   - EMAIL    → Elastic Email (via ProviderRouter). Never SendGrid, never Brevo.
  *   - WHATSAPP → Meta Cloud API. Utility/Auth prefers Direct Send when the beta is enabled, then
- *                falls back to an approved Meta template. Marketing stays template-only. Never Twilio.
+ *                falls back to an approved Meta template. Marketing stays template-only.
  *   - SMS      → TR (+90) → Netgsm, international → Brevo SMS. Automatic SMS triggers use the
  *                same delivery archive, consent gates and provider router as SMS campaigns.
  *
@@ -29,6 +36,8 @@ export type AutomaticOutcome = "SENT" | "SKIPPED" | "FAILED";
 export type AutomaticResult = { outcome: AutomaticOutcome; reason?: string; providerMessageId?: string | null };
 
 type CommonInput = {
+  /** Archived refusal, so missing translations cannot silently become Arabic sends. */
+  renderingError?: string;
   triggerEvent: MessageTriggerEvent;
   templateId: string;
   templateName: string;
@@ -53,8 +62,7 @@ function isTerminalConfigReason(reason: string): boolean {
     reason.endsWith("_NOT_IMPLEMENTED") ||
     reason === "EMAIL_SUPPRESSED" ||
     reason.includes("SENDER_MISSING") ||
-    reason.includes("REQUIRED_FOR_AUTOMATIC") ||
-    reason === "TWILIO_LEGACY_DISABLED"
+    reason.includes("REQUIRED_FOR_AUTOMATIC")
   );
 }
 
@@ -65,16 +73,27 @@ function deliveryVariables(input: CommonInput): Record<string, unknown> {
 
 async function automaticConsentBlock(
   userId: string,
-  channel: "EMAIL" | "SMS",
+  channel: "EMAIL" | "SMS" | "WHATSAPP",
   purpose: CommunicationPurposeId | undefined,
 ): Promise<string | null> {
-  await ensureProfilesForUsers([userId]);
-  const profile = await prisma.donorCommunicationProfile.findUnique({
-    where: { userId },
-    select: { doNotContact: true, emailOptIn: true, smsOptIn: true },
-  }).catch(() => null);
+  let profile: {
+    doNotContact: boolean;
+    emailOptIn: boolean;
+    smsOptIn: boolean;
+    consentSource: string | null;
+  } | null;
+  try {
+    await ensureProfilesForUsers([userId]);
+    profile = await prisma.donorCommunicationProfile.findUnique({
+      where: { userId },
+      select: { doNotContact: true, emailOptIn: true, smsOptIn: true, consentSource: true },
+    });
+  } catch {
+    return "CONSENT_CHECK_UNAVAILABLE";
+  }
 
   if (profile?.doNotContact) return "DO_NOT_CONTACT";
+  if (channel === "WHATSAPP" && profile?.consentSource === "meta-whatsapp-inbound-opt-out") return "DO_NOT_CONTACT";
   if (channel === "SMS" && profile?.smsOptIn !== true) return "SMS_OPT_IN_REQUIRED";
   if (channel === "EMAIL" && purpose === "MARKETING" && profile?.emailOptIn !== true) return "EMAIL_MARKETING_OPT_IN_REQUIRED";
   return null;
@@ -142,6 +161,13 @@ export async function sendAutomaticEmailMessage(
     renderedBody: input.renderedBody,
     variables: deliveryVariables(input),
   };
+
+  if (input.renderingError) {
+    const created = await createDeliveryRecord({ ...base, recipientEmail: input.recipientEmail, status: "RENDERED" });
+    if (created.ok) await markDeliveryStatus(created.data.id, "SKIPPED", { errorMessage: input.renderingError });
+    await mirrorSentMessage("EMAIL", input, "SKIPPED", { recipientEmail: input.recipientEmail, renderedSubject: input.renderedSubject, renderedBody: input.renderedBody, errorMessage: input.renderingError });
+    return { outcome: created.ok ? "SKIPPED" : "FAILED", reason: created.ok ? input.renderingError : "ARCHIVE_FAILED" };
+  }
 
   const consentBlock = await automaticConsentBlock(input.recipientUserId, "EMAIL", input.purpose);
   if (consentBlock) {
@@ -229,11 +255,30 @@ export async function sendAutomaticWhatsappMessage(
     senderId: input.sender?.id ?? null,
   };
 
+  if (input.renderingError) {
+    const created = await createDeliveryRecord({ ...base, recipientPhone: input.recipientPhone, status: "RENDERED" });
+    if (created.ok) await markDeliveryStatus(created.data.id, "SKIPPED", { errorMessage: input.renderingError });
+    await mirrorSentMessage("WHATSAPP", input, "SKIPPED", { recipientPhone: input.recipientPhone, renderedBody: input.renderedBody, errorMessage: input.renderingError });
+    return { outcome: created.ok ? "SKIPPED" : "FAILED", reason: created.ok ? input.renderingError : "ARCHIVE_FAILED" };
+  }
+
   if (!input.recipientPhone) {
     const created = await createDeliveryRecord({ ...base, recipientPhone: null, status: "RENDERED" });
     if (created.ok) await markDeliveryStatus(created.data.id, "SKIPPED", { errorMessage: "NO_RECIPIENT_PHONE" });
     await mirrorSentMessage("WHATSAPP", input, "SKIPPED", { recipientPhone: null, renderedBody: input.renderedBody, errorMessage: "Recipient has no phone number" });
     return { outcome: "SKIPPED", reason: "NO_RECIPIENT_PHONE" };
+  }
+
+  const consentBlock = await automaticConsentBlock(input.recipientUserId, "WHATSAPP", input.purpose);
+  if (consentBlock) {
+    const skipped = await createDeliveryRecord({ ...base, recipientPhone: input.recipientPhone, status: "RENDERED" });
+    if (skipped.ok) await markDeliveryStatus(skipped.data.id, "SKIPPED", { errorMessage: consentBlock });
+    await mirrorSentMessage("WHATSAPP", input, "SKIPPED", {
+      recipientPhone: input.recipientPhone,
+      renderedBody: input.renderedBody,
+      errorMessage: consentBlock,
+    });
+    return { outcome: "SKIPPED", reason: consentBlock };
   }
 
   const created = await createDeliveryRecord({ ...base, recipientPhone: input.recipientPhone, status: "RENDERED" });
@@ -242,6 +287,15 @@ export async function sendAutomaticWhatsappMessage(
     return { outcome: "FAILED", reason: "ARCHIVE_FAILED" };
   }
   const id = created.data.id;
+  const skipForRecipientPreference = async (reason: string): Promise<AutomaticResult> => {
+    await markDeliveryStatus(id, "SKIPPED", { errorMessage: reason });
+    await mirrorSentMessage("WHATSAPP", input, "SKIPPED", {
+      recipientPhone: input.recipientPhone,
+      renderedBody: input.renderedBody,
+      errorMessage: reason,
+    });
+    return { outcome: "SKIPPED", reason };
+  };
 
   if (!input.sender?.phoneNumberId) {
     await markDeliveryStatus(id, "SKIPPED", { errorMessage: "META_SENDER_MISSING_PHONE_NUMBER_ID" });
@@ -265,6 +319,8 @@ export async function sendAutomaticWhatsappMessage(
         ? "utility"
         : null;
   if (directCategory && process.env.META_WHATSAPP_DIRECT_SEND_ENABLED === "true") {
+    const liveBlock = await automaticConsentBlock(input.recipientUserId, "WHATSAPP", input.purpose);
+    if (liveBlock) return skipForRecipientPreference(liveBlock);
     const runtime = await getActiveMetaWhatsappRuntimeConfig();
     const { sendDirectTextMessage } = await import("./providers/meta-whatsapp/messages");
     const direct = await sendDirectTextMessage(
@@ -317,9 +373,11 @@ export async function sendAutomaticWhatsappMessage(
      schema rather than from the local body text. A template asking for a value we cannot supply is
      skipped here instead of being sent and rejected with `#132000`. */
   const { buildMetaComponents } = await import("./providers/meta-whatsapp/parameters");
+  const prepared=await donationTemplateValues({componentsSchema:input.metaTemplate.componentsSchema,scopedNames:input.metaTemplate.scopedNames,values:input.templateValues ?? {},donationId:input.donationId,recipientUserId:input.recipientUserId});
+  if(!prepared.ok){await markDeliveryStatus(id,"SKIPPED",{errorMessage:prepared.reason});return{outcome:"SKIPPED",reason:prepared.reason};}
   const built = buildMetaComponents({
     componentsSchema: input.metaTemplate.componentsSchema,
-    values: input.templateValues ?? {},
+    values: prepared.values,
     positionalNames: input.metaTemplate.positionalNames,
     scopedNames: input.metaTemplate.scopedNames,
     headerMediaUrl: input.headerMediaUrl ?? input.metaTemplate.headerMediaUrl ?? null,
@@ -330,6 +388,27 @@ export async function sendAutomaticWhatsappMessage(
     await markDeliveryStatus(id, "SKIPPED", { errorMessage: `${built.reason}: ${built.detail}` });
     await mirrorSentMessage("WHATSAPP", input, "SKIPPED", { recipientPhone: input.recipientPhone, renderedBody: input.renderedBody, errorMessage: `${built.reason}: ${built.detail}` });
     return { outcome: "SKIPPED", reason: built.reason };
+  }
+
+  let frequencyReservation: WhatsAppMarketingReservation | null = null;
+  if (input.purpose === "MARKETING") {
+    const liveBlock = await automaticConsentBlock(input.recipientUserId, "WHATSAPP", input.purpose);
+    if (liveBlock) return skipForRecipientPreference(liveBlock);
+    const frequency = await reserveWhatsappMarketingSend(input.recipientUserId, new Date(), input.recipientPhone);
+    if (!frequency.ok) {
+      const failed = frequency.reason === "WHATSAPP_FREQUENCY_CHECK_UNAVAILABLE";
+      await markDeliveryStatus(id, failed ? "FAILED" : "SKIPPED", { errorMessage: frequency.reason });
+      await mirrorSentMessage("WHATSAPP", input, failed ? "FAILED" : "SKIPPED", {
+        recipientPhone: input.recipientPhone,
+        renderedBody: input.renderedBody,
+        errorMessage: frequency.reason,
+      });
+      return { outcome: failed ? "FAILED" : "SKIPPED", reason: frequency.reason };
+    }
+    frequencyReservation = frequency.reservation;
+  } else {
+    const liveBlock = await automaticConsentBlock(input.recipientUserId, "WHATSAPP", input.purpose);
+    if (liveBlock) return skipForRecipientPreference(liveBlock);
   }
 
   const res = await sendPreparedDelivery({
@@ -345,6 +424,9 @@ export async function sendAutomaticWhatsappMessage(
   if (!res.ok) {
     const terminal = isTerminalConfigReason(res.reason);
     const errorMessage = res.detail ? `${res.reason}  ${res.detail}` : res.reason;
+    if (frequencyReservation && retryDefinitelyNotSent(res.reason)) {
+      await releaseWhatsappMarketingReservation(frequencyReservation);
+    }
     await markDeliveryStatus(id, terminal ? "SKIPPED" : "FAILED", { errorMessage });
     await mirrorSentMessage("WHATSAPP", input, terminal ? "SKIPPED" : "FAILED", {
       recipientPhone: input.recipientPhone,
@@ -394,6 +476,12 @@ export async function sendAutomaticSmsMessage(
     renderedBody: input.renderedBody,
     variables: deliveryVariables(input),
   };
+
+  if (input.renderingError) {
+    const created = await createDeliveryRecord({ ...base, recipientPhone: input.recipientPhone, status: "RENDERED" });
+    if (created.ok) await markDeliveryStatus(created.data.id, "SKIPPED", { errorMessage: input.renderingError });
+    return { outcome: created.ok ? "SKIPPED" : "FAILED", reason: created.ok ? input.renderingError : "ARCHIVE_FAILED" };
+  }
 
   const consentBlock = await automaticConsentBlock(input.recipientUserId, "SMS", input.purpose);
   if (consentBlock) {
@@ -462,7 +550,7 @@ export type MetaTemplateMapping = {
  * perfectly good Arabic variant existed. The language now comes from the variant that was chosen,
  * which is the only language that variant can be sent in.
  *
- * Returns null when nothing is sendable  a free-text MANUAL template, a Twilio import, a template
+ * Returns null when nothing is sendable  a free-text MANUAL template, a retired-provider import, a template
  * whose variants Meta has not approved, or one the sync has never seen. Automatic WhatsApp is then
  * SKIPPED, which is the honest outcome: Meta refuses business-initiated free text, so there is no
  * legal payload to fall back to.
@@ -471,12 +559,13 @@ export async function resolveMetaTemplateMapping(
   tpl: { id?: string | null; provider?: string | null; name?: string | null; variables?: unknown; header?: unknown; translations?: unknown },
   locale: string,
   businessAccountId?: string | null,
+  options?: { exactLanguage?: boolean },
 ): Promise<MetaTemplateMapping | null> {
   const provider = (tpl.provider ?? "").toUpperCase();
   if (provider !== "META" && provider !== "META_WHATSAPP") return null;
   if (!tpl.id) return null;
   const { getTemplateReadiness } = await import("./whatsapp-template-sync");
-  const readiness = await getTemplateReadiness(tpl.id, locale, businessAccountId);
+  const readiness = await getTemplateReadiness(tpl.id, locale, businessAccountId, options?.exactLanguage ?? false);
   if (!readiness.ready || !readiness.providerTemplateName || !readiness.languageCode) return null;
   const binding = variableBindingInfo(tpl.variables);
   const header = templateLocaleHeader(tpl, readiness.locale ?? readiness.languageCode);

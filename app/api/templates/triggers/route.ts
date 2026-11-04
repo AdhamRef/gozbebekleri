@@ -1,4 +1,3 @@
-import { findClassifiedTemplate, retainAutomaticTemplateKind } from "@/lib/communication/template-usage";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getServerSession } from "next-auth";
@@ -110,10 +109,14 @@ export async function POST(request: NextRequest) {
   const scheduled = event === "DONATION_LAPSED";
 
   // Validate the templateId actually exists in the matching channel's table.
-  const template = await findClassifiedTemplate(channel, templateId);
-  if (!template) return NextResponse.json({ error: "Template not found for channel" }, { status: 400 });
-  if (template.kind !== "SYSTEM" || template.status === "ARCHIVED") {
-    return NextResponse.json({ error: "SYSTEM_TEMPLATE_REQUIRED" }, { status: 409 });
+  const exists =
+    channel === "EMAIL"
+      ? await prisma.emailTemplate.findUnique({ where: { id: templateId }, select: { id: true } })
+      : channel === "WHATSAPP"
+        ? await prisma.whatsappTemplate.findUnique({ where: { id: templateId }, select: { id: true } })
+        : await prisma.smsTemplate.findUnique({ where: { id: templateId }, select: { id: true } });
+  if (!exists) {
+    return NextResponse.json({ error: "Template not found for channel" }, { status: 400 });
   }
 
   /* Enabled means it will fire on the next donation. A trigger that cannot send must not be switched
@@ -127,7 +130,6 @@ export async function POST(request: NextRequest) {
   }
 
   const actor = auditActorFromDashboardSession(session!);
-  await retainAutomaticTemplateKind(channel, templateId);
   const created = await prisma.messageTrigger.create({
     data: {
       event,

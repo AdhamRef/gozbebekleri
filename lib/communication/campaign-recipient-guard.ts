@@ -7,11 +7,10 @@ export type CampaignRecipientGuardResult =
   | { ok: false; reason: RecipientExclusionReason | "RECIPIENT_NOT_FOUND" | "RECIPIENT_CONTACT_CHANGED" | "INVALID_EMAIL_FORMAT" | "INVALID_PHONE_FORMAT" | "CONSENT_CHECK_UNAVAILABLE"; unavailable?: boolean };
 
 /**
- * Re-read current contact and channel policy immediately before the provider call.
+ * Re-read current contact and consent immediately before the provider call.
  * This also protects recipients released from the quiet-hours queue, whose
  * contact/consent may have changed since they were originally selected.
- * WhatsApp does not require opt-in; DNC, changed contacts and read failures still
- * block sending. Email and SMS retain their existing consent requirements.
+ * Missing consent never becomes approval, and a read failure never allows send.
  */
 export async function checkCampaignRecipientBeforeSend(
   channel: AudienceChannel,
@@ -23,7 +22,7 @@ export async function checkCampaignRecipientBeforeSend(
       where: { id: userId },
       select: {
         email: true, phone: true,
-        communicationProfile: { select: { doNotContact: true, emailOptIn: true, smsOptIn: true, whatsappOptIn: true } },
+        communicationProfile: { select: { doNotContact: true, emailOptIn: true, smsOptIn: true, consentSource: true } },
       },
     });
     if (!donor) return { ok: false, reason: "RECIPIENT_NOT_FOUND" };

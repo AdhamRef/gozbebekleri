@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { markDeliveryStatus } from "./delivery-log-service";
+import { isWhatsappUnsubscribeQuickReply } from "./whatsapp-template-unsubscribe";
 import { shouldApplyDeliveryStatus } from "./delivery-status-progress";
 import { normalizePhoneE164, phoneMatchVariants } from "./phone";
 import type { NormalizedWebhookEvent } from "./providers/meta-whatsapp/types";
@@ -45,6 +46,59 @@ export type WebhookProcessSummary = {
 
 type RecordOutcome = "INSERTED" | "DUPLICATE" | "ERROR";
 
+const WHATSAPP_OPTOUT_TERMS = new Set([
+  "stop", "unsubscribe", "cancel", "end", "quit", "opt out", "optout",
+  "dur", "iptal", "ايقاف", "وقف", "توقف", "الغاء", "انهاء",
+  "لا ترسل", "لا ترسلوا", "لا تراسلني", "لا تتواصل معي",
+]);
+
+function normalizeOptOutText(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .normalize("NFKC")
+    .replace(/[إأآٱ]/g, "ا")
+    .toLowerCase()
+    .replace(/^[\p{P}\p{S}\s]+|[\p{P}\p{S}\s]+$/gu, "")
+    .replace(/\s+/g, " ");
+}
+
+function isWhatsappOptOut(event: NormalizedWebhookEvent): event is Extract<NormalizedWebhookEvent, { kind: "inbound" }> {
+  if (event.kind !== "inbound") return false;
+  return [event.text, event.buttonReply?.title, event.buttonReply?.id]
+    .filter((value): value is string => Boolean(value))
+    .some((value) => WHATSAPP_OPTOUT_TERMS.has(normalizeOptOutText(value)) || isWhatsappUnsubscribeQuickReply(value));
+}
+
+/** Apply a donor's clear STOP request before acknowledging the inbound webhook event. */
+async function applyWhatsappOptOut(from: string | null): Promise<boolean> {
+  if (!from) return true;
+  const variants = phoneMatchVariants(from);
+  if (!variants.length) return true;
+  try {
+    const profiles = await prisma.donorCommunicationProfile.findMany({
+      where: { phone: { in: variants } },
+      select: { userId: true },
+    });
+    const userIds = [...new Set(profiles.map((profile) => profile.userId).filter(Boolean))];
+    if (!userIds.length) return true;
+    await prisma.donorCommunicationProfile.updateMany({
+      where: { userId: { in: userIds } },
+      data: {
+        whatsappOptIn: false,
+        consentSource: "meta-whatsapp-inbound-opt-out",
+        lastConsentAt: new Date(),
+      },
+    });
+    return true;
+  } catch (error) {
+    console.error("WhatsApp inbound opt-out update failed", {
+      errorName: error instanceof Error ? error.name : "UNKNOWN",
+    });
+    return false;
+  }
+}
+
 async function senderIdForPhoneNumber(
   phoneNumberId: string | null,
 ): Promise<{ ok: true; senderId: string | null } | { ok: false }> {
@@ -75,6 +129,7 @@ async function recordEvent(data: {
   errorMessage: string | null;
   idempotencyKey: string;
   payloadSanitized: Prisma.InputJsonValue;
+  receivedAt?: Date;
 }): Promise<RecordOutcome> {
   try {
     await prisma.communicationProviderEvent.create({
@@ -88,6 +143,7 @@ async function recordEvent(data: {
         recipient: data.recipient,
         payloadSanitized: data.payloadSanitized,
         processedAt: new Date(),
+        ...(data.receivedAt ? { receivedAt: data.receivedAt } : {}),
         status: data.status,
         errorMessage: data.errorMessage,
         idempotencyKey: data.idempotencyKey,
@@ -101,6 +157,12 @@ async function recordEvent(data: {
     console.error("recordEvent failed", { eventType: data.eventType, idempotencyKey: data.idempotencyKey, error });
     return "ERROR";
   }
+}
+
+function messageEventTime(timestamp: number | null): Date {
+  const now = Date.now();
+  const milliseconds = timestamp === null ? NaN : timestamp * 1000;
+  return new Date(Number.isFinite(milliseconds) && milliseconds > 0 && milliseconds <= now + 300_000 ? milliseconds : now);
 }
 
 export async function processWhatsappEvents(events: NormalizedWebhookEvent[]): Promise<WebhookProcessSummary> {
@@ -121,6 +183,12 @@ export async function processWhatsappEvents(events: NormalizedWebhookEvent[]): P
       continue;
     }
     const senderId = senderLookup.senderId;
+
+    // Run before event idempotency recording so a retry can complete the opt-out if the profile write failed.
+    if (isWhatsappOptOut(event) && !(await applyWhatsappOptOut(event.from))) {
+      summary.persistenceErrors += 1;
+      continue;
+    }
 
     if (event.kind === "status") {
       let delivery: { id: string; status: string } | null = null;
@@ -164,6 +232,17 @@ export async function processWhatsappEvents(events: NormalizedWebhookEvent[]): P
         summary.processed += 1;
       }
 
+      if (!delivery) {
+        // App-originated messages live in the event archive. Persist their latest provider state
+        // too, so loading an older history page does not lose a newer delivery/read receipt.
+        const previous = ["SENT", "DELIVERED", "READ"].filter(status => shouldApplyDeliveryStatus(status, event.status));
+        try {
+          await prisma.communicationProviderEvent.updateMany({
+            where: { channel: "WHATSAPP", eventType: "outbound_echo", providerMessageId: event.providerMessageId, senderId, status: { in: previous } },
+            data: { status: event.status },
+          });
+        } catch { summary.persistenceErrors += 1; }
+      }
       if (delivery) {
         /* Out-of-order callbacks are normal; a late `sent` must not undo a `read`. The event itself
            is kept either way  it is evidence  but the delivery's status does not move backwards. */
@@ -181,10 +260,52 @@ export async function processWhatsappEvents(events: NormalizedWebhookEvent[]): P
       continue;
     }
 
+    if (event.kind === "echo") {
+      // One unique provider-event write makes webhook redelivery safe even after a process crash.
+      // An app echo is evidence of sending, but never evidence of delivery/read or a donor reply.
+      let delivery: { id: string } | null;
+      try {
+        delivery = await prisma.communicationDelivery.findFirst({
+          where: { channel: "WHATSAPP", providerMessageId: event.providerMessageId, senderId }, select: { id: true },
+        });
+      } catch { summary.persistenceErrors += 1; continue; }
+      const outcome = await recordEvent({
+        deliveryId: delivery?.id ?? null, eventType: "outbound_echo", providerMessageId: event.providerMessageId,
+        senderId, recipient: normalizePhoneE164(event.recipient) ?? event.recipient,
+        status: "SENT", errorMessage: null, idempotencyKey: event.idempotencyKey,
+        receivedAt: messageEventTime(event.timestamp),
+        payloadSanitized: { kind: "echo", text: event.text, messageType: event.messageType,
+          timestamp: event.timestamp, media: event.media ?? null, replyToMessageId: event.replyToMessageId ?? null,
+          source: "WHATSAPP_BUSINESS_APP" },
+      });
+      if (outcome === "ERROR") summary.persistenceErrors += 1;
+      else if (outcome === "DUPLICATE") summary.duplicates += 1;
+      else summary.processed += 1;
+      if (outcome !== "ERROR") {
+        try {
+          // Read receipts AFTER insertion: a receipt arriving concurrently before the echo was
+          // archived must still be applied. A receipt arriving afterward can update it directly.
+          const receipts = await prisma.communicationProviderEvent.findMany({
+            where: { channel: "WHATSAPP", providerMessageId: event.providerMessageId, senderId, eventType: { in: ["status_read", "status_delivered", "status_failed"] } },
+            select: { status: true }, take: 10,
+          });
+          const status = receipts.some(row => row.status === "FAILED") ? "FAILED" : receipts.some(row => row.status === "READ") ? "READ"
+            : receipts.some(row => row.status === "DELIVERED") ? "DELIVERED" : null;
+          if (status) await prisma.communicationProviderEvent.updateMany({
+            where: { channel: "WHATSAPP", eventType: "outbound_echo", providerMessageId: event.providerMessageId, senderId,
+              status: { in: ["SENT", "DELIVERED", "READ"].filter(previous => shouldApplyDeliveryStatus(previous, status)) } },
+            data: { status },
+          });
+        } catch { summary.persistenceErrors += 1; }
+      }
+      continue;
+    }
+
     // Inbound user message
     const outcome = await recordEvent({
       deliveryId: null,
       eventType: "inbound_message",
+      receivedAt: messageEventTime(event.timestamp),
       providerMessageId: event.providerMessageId,
       senderId,
       /* Stored in E.164 so the inbox groups a contact under one identity regardless of whether the

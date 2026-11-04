@@ -1,6 +1,3 @@
-import { classifyEventTemplates } from "@/lib/communication/template-event-classification";
-import { templateInUse, templateKindChangeBlocked } from "@/lib/communication/template-usage";
-import { resolveTemplateKind } from "@/lib/communication/template-kind";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getServerSession } from "next-auth";
@@ -27,7 +24,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 
   const template = await prisma.smsTemplate.findUnique({ where: { id } });
   if (!template) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json({ template: (await classifyEventTemplates("SMS", [template]))[0] });
+  return NextResponse.json({ template });
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -45,15 +42,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid payload", issues: parsed.error.flatten() }, { status: 400 });
-  }
-
-  if (parsed.data.kind || parsed.data.purpose) {
-    const current = await prisma.smsTemplate.findUnique({ where: { id } });
-    if (!current) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    const nextKind = resolveTemplateKind({ ...current, ...parsed.data });
-    if (await templateKindChangeBlocked("SMS", id, nextKind)) {
-      return NextResponse.json({ error: "TEMPLATE_IN_USE", message: "القالب مرتبط باستخدام آخر. أزل الارتباط قبل تغيير نوعه." }, { status: 409 });
-    }
   }
 
   const data: Prisma.SmsTemplateUpdateInput = {};
@@ -81,7 +69,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     entityId: updated.id,
     stream: "TEAM",
   });
-  return NextResponse.json({ template: (await classifyEventTemplates("SMS", [updated]))[0] });
+  return NextResponse.json({ template: updated });
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -90,9 +78,6 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
   if (denied) return denied;
   const { id } = await params;
 
-  if (await templateInUse("SMS", id)) {
-    return NextResponse.json({ error: "TEMPLATE_IN_USE", message: "القالب قيد الاستخدام ولا يمكن حذفه." }, { status: 409 });
-  }
   const deleted = await prisma.smsTemplate.delete({ where: { id } });
   const actor = auditActorFromDashboardSession(session!);
   await writeAuditLog({

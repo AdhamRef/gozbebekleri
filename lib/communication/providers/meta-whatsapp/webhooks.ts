@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { getActiveMetaWebhookConfig, type ActiveRuntimeConfig, type MetaWhatsappRuntimeValues } from "../../runtime-config";
 import type { InboundMediaDescriptor, NormalizedWebhookEvent } from "./types";
+import { scrubSecrets } from "./errors";
 
 export type MetaWebhookRuntimeConfig = ActiveRuntimeConfig<Pick<MetaWhatsappRuntimeValues, "appSecret" | "verifyToken">>;
 
@@ -46,9 +47,12 @@ function mapStatus(status: string): "SENT" | "DELIVERED" | "READ" | "FAILED" | n
 
 function firstErrorMessage(errors: unknown): string | null {
   if (Array.isArray(errors) && errors[0] && typeof errors[0] === "object") {
-    const e = errors[0] as { title?: unknown; message?: unknown };
+    const e = errors[0] as { title?: unknown; message?: unknown; code?: unknown; error_data?: { details?: unknown } };
     const text = (typeof e.message === "string" && e.message) || (typeof e.title === "string" && e.title) || "";
-    return text ? text.slice(0, 300) : null;
+    const details = typeof e.error_data?.details === "string" ? e.error_data.details : "";
+    const code = typeof e.code === "number" ? `Meta ${e.code}` : "";
+    const message = [code, text, details && details !== text ? details : ""].filter(Boolean).join(" · ");
+    return message ? scrubSecrets(message).slice(0, 500) : null;
   }
   return null;
 }
@@ -142,6 +146,25 @@ export function parseWebhookPayload(payload: unknown): NormalizedWebhookEvent[] 
           errorMessage: mapped === "FAILED" ? firstErrorMessage(status.errors) : null,
           idempotencyKey: `wa:status:${wamid}:${mapped}`,
         });
+      }
+      // Coexistence echoes are outbound. Only accept the documented field and destination.
+      if ((change as { field?: unknown }).field === "smb_message_echoes") {
+        const echoes = Array.isArray(value.message_echoes) ? value.message_echoes as Record<string, unknown>[] : [];
+        for (const message of echoes) {
+          const wamid = str(message.id);
+          const recipient = str(message.to);
+          if (!wamid || !recipient || !phoneNumberId) continue;
+          const type = str(message.type);
+          // Edits/revocations require a separate mutation model; never mislabel them as a sent reply.
+          if (type === "edit" || type === "revoke") continue;
+          const media = mediaDescriptor(type, message);
+          const button = buttonReply(message);
+          const text = inboundText(type, message, media, button);
+          out.push({ kind: "echo", providerMessageId: wamid, recipient, phoneNumberId,
+            text: text ? text.slice(0, 4000) : null, messageType: type,
+            timestamp: toNumber(message.timestamp), idempotencyKey: `wa:echo:${wamid}`,
+            media, replyToMessageId: contextMessageId(message), buttonReply: button });
+        }
       }
       const messages = Array.isArray(value.messages) ? value.messages as Record<string, unknown>[] : [];
       for (const message of messages) {

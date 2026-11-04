@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react';
 
-import { localeDirection } from "@/lib/locales";
+import { localeDirection } from "@/lib/ported-systems/locales";
 import SessionProvider from '@/components/providers/SessionProvider';
 import { NextIntlClientProvider } from "next-intl";
 import { Toaster } from "react-hot-toast";
@@ -99,7 +99,7 @@ function DashboardContent({
     return DASHBOARD_NAV_GROUPS
       .map((section) => ({
         group: section.group,
-        items: section.items.filter((item) => userHasDashboardPermission(u, item.key)),
+        items: section.items.filter((item) => (!item.adminOnly || u.role === "ADMIN") && userHasDashboardPermission(u, item.key)),
       }))
       .filter((s) => s.items.length > 0);
   }, [session?.user]);
@@ -179,15 +179,13 @@ function DashboardContent({
     let cancelled = false;
     const run = async () => {
       try {
-        const res = await fetch('/api/dashboard/communication/inbox?filter=needsReply&limit=1', { cache: 'no-store' });
-        if (!res.ok) { if (!cancelled) setWhatsappInboxCount(0); return; }
+        const res = await fetch("/api/dashboard/communication/inbox/summary", { cache: "no-store" });
+        if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled) setWhatsappInboxCount(Math.max(0, Number(data?.needsReply ?? 0)));
-      } catch {
-        if (!cancelled) setWhatsappInboxCount(0);
-      }
+        if (!cancelled && data.ok !== false && Number.isFinite(data.unread)) setWhatsappInboxCount(Math.max(0, data.unread));
+      } catch { /* Retain the last successful count. */ }
     };
-    run();
+    void run();
     const timer = setInterval(run, 30000);
     return () => { cancelled = true; clearInterval(timer); };
   }, [canUseWhatsappInbox]);
