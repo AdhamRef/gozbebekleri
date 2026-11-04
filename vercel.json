@@ -32,5 +32,6 @@
       "path": "/api/cron/resume-dispatches",
       "schedule": "*/5 * * * *"
     }
-  ]
+  ],
+  "installCommand": "npm ci --include=dev --legacy-peer-deps --no-audit --no-fund"
 }

@@ -9,3 +9,8 @@ export function resolveTemplateKind(template: {
   const purpose = String(template.purpose ?? template.category ?? "").toUpperCase();
   return ["UTILITY", "TRANSACTIONAL", "AUTHENTICATION"].includes(purpose) ? "SYSTEM" : "CAMPAIGN";
 }
+
+/** Keep legacy manual senders on marketing templates after classification. */
+export function campaignTemplates<T extends { kind?: string | null; purpose?: string | null; category?: string | null }>(templates: readonly T[]): T[] {
+  return templates.filter(template => resolveTemplateKind(template) === "CAMPAIGN");
+}

@@ -1,3 +1,11 @@
+// Offline regression fixtures for the transferred runtime.
+import * as fixtureBrand from "../../lib/ported-systems/brand";
+import * as fixtureLocales from "../../lib/ported-systems/locales";
+import { buildMetaComponents } from "../../lib/communication/providers/meta-whatsapp/parameters";
+import { buildWhatsappRenderedPreview } from "../../lib/communication/whatsapp-rendered-preview";
+import * as readiness from "../../lib/communication/whatsapp-template-readiness";
+import * as campaignTracking from "../../lib/communication/campaign-message-tracking";
+import { recentMarketingDeliveryWhere } from "../../lib/communication/recent-marketing-filter";
 import { templateLocaleHeader } from "../../lib/communication/template-locale-media";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -14,7 +22,10 @@ function isolated<T>(file: string, dependencies: Dict, append = ""): T {
   const loaded = { exports: {} };
   new vm.Script(output + append, { filename: file }).runInNewContext({ module: loaded, exports: loaded.exports, Date, Error,
     process: { env: { DATABASE_URL: "mongodb://127.0.0.1/isolated", COMMUNICATION_EMAIL_CONCURRENCY: "2" } },
-    require: (id: string) => { if (!(id in dependencies)) throw new Error(`Unexpected dependency: ${id}`); return dependencies[id]; },
+    require: (id: string) => {
+ if(id==="@/lib/ported-systems/brand")return fixtureBrand;
+ if(id==="@/lib/ported-systems/locales")return fixtureLocales;
+ if (!(id in dependencies)) throw new Error(`Unexpected dependency: ${id}`); return dependencies[id]; },
   });
   return loaded.exports as T;
 }
@@ -23,9 +34,10 @@ type Progress = { cursor: string | null; total: number; sent: number; skipped: n
 type State = { id: string; name: string; status: string; channel: string; purpose: string; templateGroupId: string; audienceSegmentKey: null; scheduledAt: Date; metadata: Dict };
 type Recipient = { cursorId: string; userId: string; name: string; email: string; phone: string; locale: string; country: string };
 type Delivery = Dict & { id: string; status: string; recipientUserId: string; recipientEmail?: string; recipientPhone?: string; providerMessageId?: string; errorMessage?: string };
-type Options = { size?: number; resumeAtEnd?: boolean; allSkipped?: boolean; failSkip?: boolean; failCreate?: boolean; failSentArchive?: boolean; failContext?: boolean; failQueueCount?: boolean; failQueueDelete?: boolean; failFinal?: boolean; cancelAtFinal?: boolean; pauseAtWorker?: boolean; guardBlocks?: boolean; sendThrows?: boolean; quiet?: boolean; duplicateContact?: boolean; failCounter?: boolean };
+type Options = { renderedLocale?: string; trackingBody?: string; denyRouting?: boolean; channel?: string; recentMarketing?: boolean; size?: number; resumeAtEnd?: boolean; allSkipped?: boolean; failSkip?: boolean; failCreate?: boolean; failSentArchive?: boolean; failContext?: boolean; failQueueCount?: boolean; failQueueDelete?: boolean; failFinal?: boolean; cancelAtFinal?: boolean; pauseAtWorker?: boolean; guardBlocks?: boolean; sendThrows?: boolean; quiet?: boolean; duplicateContact?: boolean; failCounter?: boolean };
 type Result = { ok: boolean; status: string; sent: number; skipped: number; failed: number; total: number; hasMore?: boolean; blocked?: string };
 type Engine = {
+  runDueCampaigns: () => Promise<Result[]>;
   executeCampaignSend: (id: string, opts?: { mode?: string; maxBatches?: number; batchSize?: number; timeBudgetMs?: number }) => Promise<Result>;
   __test: { mapWithConcurrency: <T,R>(items: T[], limit: number, work: (item: T) => Promise<R>) => Promise<R[]> };
 };
@@ -35,10 +47,11 @@ function engineHarness(options: Options = {}) {
   }));
   const now = new Date().toISOString();
   const previous: Progress = { cursor: recipients.at(-1)?.cursorId ?? null, total: recipients.length, sent: recipients.length, skipped: 0, failed: 0, done: false, batches: 1, blockedRuns: 0, reasons: {}, startedAt: now, updatedAt: now };
-  const campaign: State = { id: "campaign", name: "Test", status: options.resumeAtEnd ? "SENDING" : "APPROVED", channel: "EMAIL", purpose: "MARKETING", templateGroupId: "template", audienceSegmentKey: null, scheduledAt: new Date(0), metadata: options.resumeAtEnd ? { sendProgress: previous } : {} };
+  const campaign: State = { id: "campaign", name: "Test", status: options.resumeAtEnd ? "SENDING" : "APPROVED", channel: options.channel ?? "EMAIL", purpose: "MARKETING", templateGroupId: "template", audienceSegmentKey: null, scheduledAt: new Date(0), metadata: options.resumeAtEnd ? { sendProgress: previous } : {} };
   const deliveries: Delivery[] = options.resumeAtEnd ? recipients.map((r, i) => ({ id: `d${i}`, status: "SENT", recipientUserId: r.userId, recipientEmail: r.email, providerMessageId: `p${i}` })) : [];
   let queue: Array<Recipient & { id: string; nextAttemptAt: Date }> = [];
   let calls = 0, gates = 0, creates = 0;
+  const payloads: Dict[] = [];
   const checkpoints: Array<{ status: string; metadata: Dict; options: Dict }> = [];
   const events: string[] = [];
   function mutate(_id: string, fn: (current: Dict) => Dict | null, config: { status?: string; expectedStatus?: string } = {}) {
@@ -56,8 +69,14 @@ function engineHarness(options: Options = {}) {
     quietHours: { enabled: !!options.quiet, timezoneMode: "RECIPIENT", timezone: "Europe/Istanbul" } });
   const counter = isolated<{ computeFinalStatus: (total: number, sent: number, skipped: number, failed: number) => string }>("lib/communication/campaign-counter-service.ts", { "@/lib/prisma": { prisma: {} } });
   const engine = isolated<Engine>("lib/communication/campaign-send-executor.ts", {
+    "./campaign-message-tracking": campaignTracking,
     "./template-locale-media": { templateLocaleHeader },
+    "./smart-audience": { getSmartAudienceDefinitionForSegmentKey: async () => options.recentMarketing ? { filters: { excludeMarketedWithinDays: 7 } } : null },
+    "./recent-marketing-filter": { recentMarketingDeliveryWhere },
     "@/lib/prisma": { prisma: {
+      whatsappTemplateWabaVariant: { findMany: async () => [{ businessAccountId: "waba", languageCode: "en", locale: "en", approvalStatus: "APPROVED", category: "MARKETING", providerTemplateName: "fixture", componentsSchema: [{ type: "BODY", text: "Fixture donation" }], lastSyncedAt: new Date() }] },
+      whatsappTemplate: { findUnique: async () => ({ variables: [], header: {}, translations: {} }) },
+      communicationCampaign: { findMany: async ({ where }: { where: { status: string; scheduledAt?: { lte: Date } } }) => campaign.status === where.status && (!where.scheduledAt || campaign.scheduledAt <= where.scheduledAt.lte) ? [clone(campaign)] : [] },
       communicationCampaignDeferredRecipient: {
         count: async () => { if (options.failQueueCount) throw new Error("QUEUE_READ_FAILED"); return queue.length; },
         findMany: async () => clone(queue.filter((row) => row.nextAttemptAt <= new Date())),
@@ -65,10 +84,11 @@ function engineHarness(options: Options = {}) {
         updateMany: async () => ({ count: 0 }),
         deleteMany: async () => { if (options.failQueueDelete) throw new Error("QUEUE_DELETE_FAILED"); const count = queue.length; queue = []; return { count }; },
       },
-      communicationDelivery: { findMany: async () => clone([...deliveries].reverse()) },
+      communicationDelivery: { findMany: async () => clone([...deliveries].reverse()), findFirst: async () => options.recentMarketing ? { id: "another-campaign-send" } : null },
     } },
     "@/lib/audit-log": { writeAuditLog: async () => {} },
     "./campaign-service": { getCampaign: async () => clone(campaign) },
+    "./campaign-approval-service": { evaluateCoverageGate: async () => ({ ok: !(options as Options & { missingLanguage?: boolean }).missingLanguage }) },
     "./campaign-send-planner": { planCampaignSend: async (_id: string, opts: { cursor?: string | null; batchSize: number }) => {
       const page = recipients.filter((row) => !opts.cursor || row.cursorId > opts.cursor).slice(0, opts.batchSize);
       const skippedList = options.allSkipped ? page.map((r) => ({ cursorId: r.cursorId, userId: r.userId, locale: r.locale, reason: "DO_NOT_CONTACT" })) : [];
@@ -78,7 +98,7 @@ function engineHarness(options: Options = {}) {
         nextCursor: page.at(-1)?.cursorId ?? opts.cursor ?? null, exhausted: page.length < opts.batchSize, truncated: page.length >= opts.batchSize,
         ...(page.length ? {} : { blocked: "AUDIENCE_EXHAUSTED" }) };
     } },
-    "./template-compat": { renderChannelTemplate: async () => ({ templateName: "template", subject: "Subject", body: "Body", usedFallback: false }) },
+    "./template-compat": { renderChannelTemplate: async () => ({ templateName: "template", subject: "Subject", body: options.trackingBody ?? "Body", resolvedLocale: options.renderedLocale ?? "en", usedFallback: options.renderedLocale ? options.renderedLocale !== "en" : false }) },
     "@/lib/templates/variables": { loadContextsForUserIds: async (ids: string[]) => { if (options.failContext) throw new Error("CONTEXT_READ_FAILED"); return new Map(ids.map((id) => [id, { user: { name: id } }])); } },
     "./update-campaign": { sourceUpdateOf: () => null, loadUpdateSource: async () => null, updateContextFor: () => ({}) },
     "./delivery-log-service": {
@@ -88,11 +108,11 @@ function engineHarness(options: Options = {}) {
       updateDeliveryVariables: async () => ({ ok: true }),
     },
     "./provider-router": { resolveProviderForSendWithRuntime: () => ({ canSend: true, providerId: "ELASTIC_EMAIL" }),
-      sendPreparedDelivery: async () => { calls++; events.push("send"); if (options.sendThrows) throw new Error("socket error"); return { ok: true, providerMessageId: `p-${calls}`, internalAccepted: false }; } },
+      sendPreparedDelivery: async (payload: Dict) => { payloads.push(payload); calls++; events.push("send"); if (options.sendThrows) throw new Error("socket error"); return { ok: true, providerMessageId: `p-${calls}`, internalAccepted: false }; } },
     "./providers/email/client": { EMAIL_PROVIDER_ID: "ELASTIC_EMAIL" },
     "./runtime-config": { getActiveCommunicationRuntimeBundle: async () => ({}) },
-    "./sender-resolution": { loadSenderRoutingSnapshot: async () => ({}), resolveSenderFromSnapshot: () => ({ ok: true, sender: { id: "sender", senderEmail: "sender@example.test" } }) },
-    "./whatsapp-template-sync": {}, "./providers/meta-whatsapp/parameters": {}, "./whatsapp-rendered-preview": {},
+    "./sender-resolution": { loadSenderRoutingSnapshot: async () => ({}), resolveSenderFromSnapshot: () => options.denyRouting ? ({ ok: false, reason: "NO_SENDER_AVAILABLE" }) : ({ ok: true, sender: { id: "sender", senderEmail: "sender@example.test", businessAccountId: "waba" } }) },
+    "./whatsapp-template-readiness": readiness, "./whatsapp-template-sync": { META_PROVIDER: "META_WHATSAPP", NOT_READY: readiness.NOT_READY }, "./providers/meta-whatsapp/parameters": { buildMetaComponents }, "./whatsapp-rendered-preview": { buildWhatsappRenderedPreview },
     "./audience-list-service": { resolveAudienceOrigin: async () => "CAMPAIGN" },
     "./campaign-counter-service": { ...counter, recomputeCampaignCounters: async () => ({ ok: !options.failCounter, status: campaign.status }) },
     "./campaign-send-controls": { autoSpeedMode: () => "BALANCED", campaignPriorityRank: () => 1, campaignSendControls: controls,
@@ -103,14 +123,25 @@ function engineHarness(options: Options = {}) {
     "./phone": { phoneMatchVariants: (phone: string) => [phone] },
     "./campaign-contact-validation": { normalizeCampaignContact },
     "./campaign-recipient-guard": { checkCampaignRecipientBeforeSend: async (_channel: string, _id: string, contact: string) => { events.push("guard"); return options.guardBlocks ? { ok: false, reason: "DO_NOT_CONTACT" } : { ok: true, contact }; } },
-    "@/lib/locales": { DEFAULT_LOCALE: "ar", isValidLocale: (value: string) => ["ar", "en"].includes(value) },
+    "./retry-recipient-guard": { retryDefinitelyNotSent: () => false },
+    "./whatsapp-marketing-frequency": {
+      reserveWhatsappMarketingSend: async () => ({ ok: true, reservation: { userId: "donor", reservedAt: new Date(), previousAt: null, reserved: true } }),
+      releaseWhatsappMarketingReservation: async () => undefined,
+    },
+    "@/lib/ported-systems/locales": { DEFAULT_LOCALE: "ar", isValidLocale: (value: string) => ["ar", "en"].includes(value) },
     "./recipient-timezone": { recipientTimeZone: () => "Europe/Istanbul" },
   }, "\nexports.__test = { mapWithConcurrency };\n");
   function expireLease() { const lease = campaign.metadata.sendLease as { expiresAt: string } | undefined; if (lease) lease.expiresAt = new Date(0).toISOString(); }
-  return { engine, campaign, deliveries, checkpoints, options, events, state: () => ({ calls, creates, queue: clone(queue) }), expireLease,
+  return { engine, campaign, deliveries, payloads, checkpoints, options, events, state: () => ({ calls, creates, queue: clone(queue) }), expireLease,
     releaseQuiet: () => { options.quiet = false; for (const row of queue) row.nextAttemptAt = new Date(0); } };
 }
 
+test("a full-audience language missing beyond the first page prevents any provider call", async () => {
+  const h = engineHarness({ ...({ missingLanguage: true } as Options), size: 2 });
+  const result = await h.engine.executeCampaignSend("campaign");
+  assert.equal(result.blocked, "LANGUAGE_COVERAGE_INCOMPLETE");
+  assert.equal(h.campaign.status, "APPROVED"); assert.equal(h.state().calls, 0); assert.equal(h.state().creates, 0);
+});
 test("executor sends each recipient once and checkpoints done only with final status", async () => {
   const h = engineHarness(); const result = await h.engine.executeCampaignSend("campaign");
   assert.equal(result.ok, true); assert.equal(result.status, "SENT"); assert.equal(result.total, 2); assert.equal(result.sent, 2);
@@ -242,8 +273,52 @@ for (const code of ["DELIVERY_OUTCOME_UNCERTAIN", "SEND_THREW  socket", "NETWORK
     const guard = isolated<{ checkRetryRecipient: (input: Dict) => Promise<{ ok: boolean; code?: string }> }>("lib/communication/retry-recipient-guard.ts", {
       "@/lib/prisma": { prisma: { communicationDelivery: { findUnique: async () => ({ errorMessage: code }) }, user: { findUnique: async () => { throw new Error("must not read donor after uncertain evidence"); } } } },
       "./campaign-audience-accounting": { recipientExclusionReason }, "./campaign-contact-validation": { normalizeCampaignContact },
+      "./phone": { phoneMatchVariants: (phone: string) => [phone] },
     });
     const result = await guard.checkRetryRecipient({ id: "delivery", channel: "EMAIL", purpose: "MARKETING", campaignId: "campaign", recipientUserId: "user", recipientEmail: "u@example.test", recipientPhone: null });
     assert.equal(result.code, "DELIVERY_OUTCOME_UNCERTAIN");
   });
 }
+
+test("live marketing exclusion skips contacted recipients before any provider send and retains an audit row", async () => {
+  const h = engineHarness({ recentMarketing: true }); const result = await h.engine.executeCampaignSend("campaign");
+  assert.equal(h.state().calls, 0); assert.equal(result.skipped, 2);
+  assert.ok(h.deliveries.every(row => row.status === "SKIPPED" && row.errorMessage === "RECENT_MARKETING_CONTACT"));
+});
+
+for (const channel of ["EMAIL", "SMS"]) test(`${channel} executor never bypasses a final routing refusal`, async () => {
+  const h = engineHarness({ channel, denyRouting: true });
+  const result = await h.engine.executeCampaignSend("campaign");
+  assert.equal(h.state().calls, 0); assert.equal(result.sent, 0); assert.equal(result.skipped, 2);
+  assert.ok(h.deliveries.every(row => row.status === "SKIPPED" && row.errorMessage === "NO_SENDER_AVAILABLE"));
+});
+
+ test("the campaign executor archives and sends the same uniquely tracked donation link", async () => {
+  const h = engineHarness({ trackingBody: '<a href="/en/campaigns?ref=fixture">Donate</a>' });
+  const result = await h.engine.executeCampaignSend("campaign");
+  assert.equal(result.ok, true);
+  for (const payload of h.payloads) {
+    assert.ok(String(payload.html).includes("utm_id=campaign"));
+    assert.equal(payload.html, h.deliveries.find(row => row.recipientEmail === payload.to)?.renderedBody);
+  }
+});
+
+ test("legacy campaign fallback decisions never send another donor language", async () => {
+  const h = engineHarness({ renderedLocale: "ar" });
+  h.campaign.metadata.coverageDecisions = { en: "FALLBACK" };
+  const result = await h.engine.executeCampaignSend("campaign");
+  assert.equal(h.state().calls, 0); assert.equal(result.skipped, 2);
+  assert.ok(h.deliveries.every(row => row.errorMessage === "EXACT_TEMPLATE_LANGUAGE_REQUIRED"));
+ });
+
+for (const channel of ["EMAIL", "WHATSAPP"]) test(`${channel}: future schedules wait; concurrent due ticks send each recipient once and cancelled schedules never send`, async () => {
+ const h = engineHarness({ channel }); h.campaign.status = "SCHEDULED"; h.campaign.scheduledAt = new Date(Date.now() + 3600_000);
+ assert.equal((await h.engine.runDueCampaigns()).length, 0); assert.equal(h.state().calls, 0);
+ h.campaign.scheduledAt = new Date(Date.now() - 1000);
+ await Promise.all([h.engine.runDueCampaigns(), h.engine.runDueCampaigns()]);
+ assert.equal(h.state().calls, 2); assert.equal(h.campaign.status, "SENT");
+ await h.engine.runDueCampaigns(); assert.equal(h.state().calls, 2);
+ const cancelled = engineHarness({ channel }); cancelled.campaign.status = "CANCELLED";
+ assert.equal((await cancelled.engine.runDueCampaigns()).length, 0); assert.equal(cancelled.state().calls, 0);
+});
+

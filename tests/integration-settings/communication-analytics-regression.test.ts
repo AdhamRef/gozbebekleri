@@ -1,3 +1,4 @@
+// Offline regression fixtures for the transferred runtime.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -11,7 +12,7 @@ test("campaign analytics surfaces delivery engagement and attributed outcomes", 
   const table = read("app/(dashboard)/dashboard/communication/campaigns/_components/CampaignsTable.tsx");
   const list = read("app/(dashboard)/dashboard/communication/campaigns/_components/CampaignsListClient.tsx");
 
-  assert.match(api, /getCampaignOutcomeMetrics/);
+  assert.match(api, /getCampaignOutcomeSummary/);
   assert.match(api, /failedDonationCount/);
   assert.match(counters, /openedAt/);
   assert.match(counters, /clickedAt/);
@@ -24,12 +25,14 @@ test("campaign analytics surfaces delivery engagement and attributed outcomes", 
   assert.match(list, /إيراد منسوب/);
 });
 
-test("campaign outcome attribution is exact and never channel-fallback in comparison view", () => {
+test("campaign outcomes resolve exact IDs or unique registered UTMs without channel fallback", () => {
   const source = read("lib/communication/campaign-attribution-service.ts");
   assert.match(source, /getCampaignOutcomeMetrics/);
   assert.match(source, /utm_campaign/);
-  assert.match(source, /ids\.has\(campaignId\)/);
-  assert.match(source, /donation\.status === "PAID"/);
+  assert.match(source, /buildUniqueCampaignUtmAliases/);
+  assert.match(source, /resolveCommunicationCampaignId/);
+  assert.doesNotMatch(source, /donations\.filter\(\(d\) => source &&/);
+  assert.match(source, /d\.status === "PAID" && !!d\.paidAt/);
 });
 
 test("WhatsApp templates can be archived and restored without losing history", () => {
@@ -48,3 +51,4 @@ test("WhatsApp templates can be archived and restored without losing history", (
   assert.match(compat, /status: \{ not: "ARCHIVED" \}/);
   assert.match(smart, /status: \{ not: "ARCHIVED" \}/);
 });
+

@@ -1,9 +1,17 @@
+// Offline regression fixtures for the transferred runtime.
+import * as fixtureBrand from "../../lib/ported-systems/brand";
+import * as fixtureLocales from "../../lib/ported-systems/locales";
+import * as phoneNumberValidation from "libphonenumber-js/core";
+import * as phoneMetadata from "libphonenumber-js/metadata.min.json";
+import * as campaignTracking from "../../lib/communication/campaign-message-tracking";
 import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import ts from "typescript";
+import * as donationMoney from "../../lib/templates/donation-money";
+import { buildMetaComponents } from "../../lib/communication/providers/meta-whatsapp/parameters";
 
 function isolated<T>(file: string, dependencies: Record<string, unknown>): T {
   const source = fs.readFileSync(path.join(process.cwd(), file), "utf8");
@@ -12,6 +20,9 @@ function isolated<T>(file: string, dependencies: Record<string, unknown>): T {
   new vm.Script(output, { filename: file }).runInNewContext({
     module: loaded, exports: loaded.exports, process: { env: { DATABASE_URL: "mongodb://127.0.0.1:27017/isolated_test" } },
     require: (id: string) => {
+ if(id==="@/lib/ported-systems/brand")return fixtureBrand;
+ if(id==="@/lib/ported-systems/locales")return fixtureLocales;
+
       if (!(id in dependencies)) throw new Error(`Unexpected import: ${id}`);
       return dependencies[id];
     },
@@ -25,9 +36,9 @@ const locales = {
   isValidLocale: (value: string) => ["ar", "en"].includes(value),
 };
 const policy = isolated<Record<string, unknown>>("lib/communication/campaign-audience-accounting.ts", {});
-const validation = isolated<Record<string, unknown>>("lib/communication/campaign-contact-validation.ts", {});
+const validation = isolated<Record<string, unknown>>("lib/communication/campaign-contact-validation.ts", { "libphonenumber-js/core": phoneNumberValidation, "libphonenumber-js/metadata.min.json": phoneMetadata });
 const approved = { doNotContact: false, whatsappOptIn: true, emailOptIn: true, smsOptIn: true };
-type Donor = { email: string | null; phone: string | null; communicationProfile: typeof approved | null };
+type Donor = { email: string | null; phone: string | null; communicationProfile: (typeof approved & { consentSource?: string | null }) | null };
 type RetryRow = { channel: string; purpose: string; campaignId: string | null; recipientUserId: string | null; recipientEmail: string | null; recipientPhone: string | null };
 type Guard = {
   checkRetryRecipient: (row: RetryRow, planned?: string) => Promise<{ ok: boolean; contact?: string; code?: string }>;
@@ -36,12 +47,16 @@ type Guard = {
 const row: RetryRow = { channel: "WHATSAPP", purpose: "MARKETING", campaignId: "campaign", recipientUserId: "user", recipientEmail: "donor@example.test", recipientPhone: "+905551112233" };
 function retryHarness(donor: Donor | null, failure = false): Guard {
   return isolated<Guard>("lib/communication/retry-recipient-guard.ts", {
-    "@/lib/prisma": { prisma: { user: { findUnique: async () => {
-      if (failure) throw new Error("database unavailable");
-      return donor;
-    } } } },
+    "@/lib/prisma": { prisma: {
+      user: { findUnique: async () => {
+        if (failure) throw new Error("database unavailable");
+        return donor;
+      } },
+      donorCommunicationProfile: { findMany: async () => [] },
+    } },
     "./campaign-audience-accounting": policy,
     "./campaign-contact-validation": validation,
+    "./phone": { phoneMatchVariants: (phone: string) => [phone] },
   });
 }
 const donor: Donor = { email: "donor@example.test", phone: "+905551112233", communicationProfile: approved };
@@ -51,15 +66,23 @@ test("retry guard accepts unchanged recipient and canonical international format
   assert.equal(result.ok, true);
   assert.equal(result.contact, donor.phone);
 });
-test("campaign retry accepts WhatsApp without opt-in under the shared policy", async () => {
+test("campaign retry ignores internal opt-in values", async () => {
   const result = await retryHarness({ ...donor, communicationProfile: { ...approved, whatsappOptIn: false } }).checkRetryRecipient(row);
   assert.equal(result.ok, true);
 });
-test("campaign retry accepts WhatsApp without a profile and does not create consent", async () => {
+test("campaign retry allows an absent profile but still blocks explicit STOP", async () => {
   assert.equal((await retryHarness({ ...donor, communicationProfile: null }).checkRetryRecipient(row)).ok, true);
+  assert.equal((await retryHarness({ ...donor, communicationProfile: { ...approved, doNotContact: false, consentSource: "meta-whatsapp-inbound-opt-out" } }).checkRetryRecipient(row)).code, "CONSENT_BLOCKED");
 });
-test("manual WhatsApp retains its separate existing policy", async () => {
-  assert.equal((await retryHarness({ ...donor, communicationProfile: null }).checkRetryRecipient({ ...row, campaignId: null })).ok, true);
+test("manual WhatsApp retry does not require internal opt-in for transactional or marketing sends", async () => {
+  const noProfile = await retryHarness({ ...donor, communicationProfile: null }).checkRetryRecipient({ ...row, purpose: "TRANSACTIONAL", campaignId: null });
+  const optedOut = await retryHarness({ ...donor, communicationProfile: { ...approved, whatsappOptIn: false } }).checkRetryRecipient({ ...row, purpose: "TRANSACTIONAL", campaignId: null });
+  assert.equal(noProfile.ok, true);
+  assert.equal(optedOut.ok, true);
+});
+test("unlinked manual WhatsApp retry can use its saved phone unless that number explicitly opted out", async () => {
+  const result = await retryHarness(donor).checkRetryRecipient({ ...row, campaignId: null, recipientUserId: null });
+  assert.equal(result.ok, true);
 });
 test("transactional email remains independent of marketing opt-in", async () => {
   assert.equal((await retryHarness({ ...donor, communicationProfile: null }).checkRetryRecipient({ ...row, channel: "EMAIL", purpose: "TRANSACTIONAL", campaignId: null })).ok, true);
@@ -135,13 +158,13 @@ function audienceHarness(size: number, options: ReaderOptions = {}) {
       return args.where.userId.in.map((userId) => ({ userId, ...approved }));
     } },
   };
-  const reader = isolated<Reader>("lib/communication/campaign-list-reader.ts", { "@/lib/prisma": { prisma }, "@/lib/locales": locales });
+  const reader = isolated<Reader>("lib/communication/campaign-list-reader.ts", { "@/lib/prisma": { prisma }, "@/lib/ported-systems/locales": locales });
   const service = isolated<{
     countCampaignAudience: (key: string) => Promise<number>;
     loadCampaignRecipients: (channel: string, key: string, opts?: { limit: number; cursor?: string | null }) => Promise<{ recipients: Member[]; skipped: Array<{ reason: string }>; nextCursor: string | null; exhausted: boolean }>;
     getRecipientBreakdown: (channel: string, opts: { locale: string }) => Promise<{ totals: { total: number; eligible: number; needsReview: number }; locales: Array<{ total: number }> }>;
   }>("lib/communication/campaign-recipient-service.ts", {
-    "@/lib/prisma": { prisma }, "@/lib/locales": locales,
+    "@/lib/prisma": { prisma }, "@/lib/ported-systems/locales": locales,
     "./audience-list-service": { parseListKey: (key: string) => key.startsWith("list:") ? key.slice(5) : null },
     "./smart-audience": { getSmartAudienceDefinitionForList: async () => null },
     "./donor-communication-profile-service": { ensureProfilesForUsers: async () => { writeCalls += 1; } },
@@ -205,7 +228,7 @@ test("saved list reader bounds untrusted page sizes", async () => {
 });
 
 type RetryEngineResult = { code: string; ok: boolean };
-type EngineOptions = { outcome?: "accept" | "throw" | "unknown" | "unconfigured"; failLink?: boolean; failArchive?: boolean; revokeBeforeSend?: boolean; child?: boolean; status?: string };
+type EngineOptions = { outcome?: "accept" | "throw" | "unknown" | "unconfigured"; failLink?: boolean; failArchive?: boolean; revokeBeforeSend?: boolean; child?: boolean; status?: string; whatsappTrigger?: boolean; variables?: unknown };
 function engineHarness(options: EngineOptions = {}) {
   let held = false;
   let sends = 0;
@@ -214,13 +237,18 @@ function engineHarness(options: EngineOptions = {}) {
   let payload: Record<string, unknown> | null = null;
   let lastQuery: Record<string, unknown> | null = null;
   const events: string[] = [];
-  const stored = { id: "original", channel: "EMAIL", status: options.status ?? "FAILED", origin: "CAMPAIGN", purpose: "MARKETING", locale: "en", templateId: "template", templateName: "template", recipientUserId: "user", recipientEmail: "donor@example.test", recipientPhone: null, recipientName: "Donor", renderedSubject: "Subject", renderedBody: "Body", variables: {}, campaignId: "campaign", retriedAt: null, retryOfDeliveryId: options.child ? "parent" : null };
+  const stored = { id: "original", channel: options.whatsappTrigger ? "WHATSAPP" : "EMAIL", status: options.status ?? "FAILED", origin: options.whatsappTrigger ? "TRIGGER" : "CAMPAIGN", purpose: options.whatsappTrigger ? "TRANSACTIONAL" : "MARKETING", locale: "en", templateId: "template", templateName: "template", recipientUserId: "user", recipientEmail: "donor@example.test", recipientPhone: options.whatsappTrigger ? "+15555555555" : null, recipientName: "Donor", renderedSubject: "Subject", renderedBody: "Body", variables: options.variables ?? {}, campaignId: "campaign", retriedAt: null, retryOfDeliveryId: options.child ? "parent" : null };
   const engine = isolated<{
     retryDelivery: (id: string, opts?: { config: Record<string, unknown> }) => Promise<RetryEngineResult>;
     listRetryCandidates: (filter: { channel: string; ids?: string[] }) => Promise<string[]>;
     retryPreflight: (filter: { channel: string; ids?: string[] }) => Promise<unknown>;
   }>("lib/communication/delivery-retry-service.ts", {
+    "./campaign-message-tracking": campaignTracking,
+    "@/lib/templates/donation-money": donationMoney,
+    "./retry-batches": { RETRY_BATCH_CAP: 25 },
+    "./retry-readiness": { retryPayloadBlockReason: () => null },
     "@/lib/prisma": { prisma: {
+      whatsappTemplate: { findUnique: async () => ({ id: "template" }) },
       communicationDelivery: {
         findUnique: async () => ({ ...stored, retriedAt: held ? new Date() : null }),
         updateMany: async (args: { where: { status?: string }; data: { retriedAt: Date | null } }) => {
@@ -251,10 +279,16 @@ function engineHarness(options: EngineOptions = {}) {
       if (options.outcome === "unconfigured") return { ok: false, reason: "EMAIL_NOT_CONFIGURED" };
       return { ok: true, providerMessageId: "provider-id", internalAccepted: false };
     } },
-    "@/lib/events/dispatch": { resolveTriggerSendConfig: async () => ({}), resolveTriggerSender: () => ({ ok: true, sender: { id: "sender", senderEmail: "sender@example.test" } }) },
-    "./automatic-message-dispatcher": {},
-    "./providers/meta-whatsapp/parameters": {},
+    "@/lib/events/dispatch": { resolveTriggerSendConfig: async () => ({}), resolveTriggerSender: () => ({ ok: true, sender: { id: "sender", senderEmail: "sender@example.test", phoneNumberId: "number", businessAccountId: "waba" } }) },
+    "./template-donation-links": {donationTemplateValues:async(input:{values:unknown})=>({ok:true,values:input.values})},
+    "@/lib/templates/localize-donation-failure-link": { localizeDonationFailureLinks: (body: string) => body },
+    "./automatic-message-dispatcher": { resolveMetaTemplateMapping: async () => ({ name: "receipt", language: "en", positionalNames: ["donation.amount"], scopedNames: { "body.1": "donation.amount" }, componentsSchema: [{ type: "BODY", text: "Amount {{1}} USD" }] }) },
+    "./providers/meta-whatsapp/parameters": { buildMetaComponents },
     "./providers/sms/client": {},
+    "./whatsapp-marketing-frequency": {
+      reserveWhatsappMarketingSend: async () => ({ ok: true, reservation: { userId: "donor", reservedAt: new Date(), previousAt: null, reserved: true } }),
+      releaseWhatsappMarketingReservation: async () => undefined,
+    },
     "./retry-recipient-guard": {
       checkRetryRecipient: async () => {
         guardCalls += 1; events.push("guard");
@@ -275,6 +309,19 @@ test("retry executor preserves marketing purpose and locale through the actual p
   assert.equal(state.payload?.locale, "en");
   assert.ok(state.events.indexOf("link") < state.events.indexOf("send"));
   assert.ok(state.events.lastIndexOf("guard") < state.events.indexOf("send"));
+});
+test("automatic WhatsApp retries keep the archived corrected total without rewriting historical amounts", async () => {
+  const notificationAmount = "Attempted total — collection not confirmed: 300 (Projects: 250; Team support: 50)";
+  const variables = { trigger: { event: "DONATION_FAILED", donationId: "donation" }, snapshot: { donation: { id: "donation", amount: "250", totalAmount: "300", notificationAmount } } };
+  const harness = engineHarness({ whatsappTrigger: true, variables });
+  assert.equal((await harness.engine.retryDelivery("original")).code, "SENT");
+  const components = harness.state().payload?.components as Array<{ parameters: Array<{ text: string }> }>;
+  assert.equal(components[0].parameters[0].text, notificationAmount);
+  assert.equal(variables.snapshot.donation.amount, "250");
+  const legacy = engineHarness({ whatsappTrigger: true, variables: { snapshot: { donation: { amount: "250" } } } });
+  assert.equal((await legacy.engine.retryDelivery("original")).code, "SENT");
+  const oldComponents = legacy.state().payload?.components as typeof components;
+  assert.equal(oldComponents[0].parameters[0].text, "250");
 });
 test("retry executor rechecks withdrawal immediately before sending", async () => {
   const harness = engineHarness({ revokeBeforeSend: true });
@@ -331,3 +378,4 @@ test("retry candidates and preflight respect the explicit empty selection and ch
   assert.equal(where.id.in.length, 0);
   assert.equal(where.channel, "SMS");
 });
+

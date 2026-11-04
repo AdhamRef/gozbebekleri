@@ -47,6 +47,7 @@ export function subjectLabel(subject: MessageSubject, locale?: string): string {
   const isId = l.startsWith("id");
   const isPt = l.startsWith("pt");
   const isTr = l.startsWith("tr");
+  const isDe = l.startsWith("de");
 
   if (subject === "COMPLAINT") {
     if (isAr) return "شكوى";
@@ -55,6 +56,7 @@ export function subjectLabel(subject: MessageSubject, locale?: string): string {
     if (isId) return "Keluhan";
     if (isPt) return "Reclamacao";
     if (isTr) return "Sikayet";
+    if (isDe) return "Beschwerde";
     return "Complaint";
   }
   if (subject === "DONATION_ISSUE") {
@@ -64,6 +66,7 @@ export function subjectLabel(subject: MessageSubject, locale?: string): string {
     if (isId) return "Masalah donasi";
     if (isPt) return "Problema na doacao";
     if (isTr) return "Bagis sorunu";
+    if (isDe) return "Problem mit einer Spende";
     return "Donation Issue";
   }
   if (subject === "CAMPAIGN_SUPPORT") {
@@ -73,6 +76,7 @@ export function subjectLabel(subject: MessageSubject, locale?: string): string {
     if (isId) return "Dukungan kampanye";
     if (isPt) return "Suporte de campanha";
     if (isTr) return "Kampanya destegi";
+    if (isDe) return "Unterstützung einer Kampagne";
     return "Campaign Support";
   }
   if (subject === "PARTNERSHIP") {
@@ -82,6 +86,7 @@ export function subjectLabel(subject: MessageSubject, locale?: string): string {
     if (isId) return "Kemitraan";
     if (isPt) return "Parceria";
     if (isTr) return "Ortaklik";
+    if (isDe) return "Partnerschaft";
     return "Partnership";
   }
   if (subject === "VOLUNTEERING") {
@@ -91,6 +96,7 @@ export function subjectLabel(subject: MessageSubject, locale?: string): string {
     if (isId) return "Kerelawanan";
     if (isPt) return "Voluntariado";
     if (isTr) return "Gonulluluk";
+    if (isDe) return "Freiwilligenarbeit";
     return "Volunteering";
   }
   if (isAr) return "استفسار عام";
@@ -99,5 +105,6 @@ export function subjectLabel(subject: MessageSubject, locale?: string): string {
   if (isId) return "Pertanyaan umum";
   if (isPt) return "Consulta geral";
   if (isTr) return "Genel talep";
+  if (isDe) return "Allgemeine Anfrage";
   return "General Inquiry";
 }
