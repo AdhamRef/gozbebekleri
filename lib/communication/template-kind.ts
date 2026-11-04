@@ -10,11 +10,7 @@ export function resolveTemplateKind(template: {
   return ["UTILITY", "TRANSACTIONAL", "AUTHENTICATION"].includes(purpose) ? "SYSTEM" : "CAMPAIGN";
 }
 
-/** Templates offered by the legacy manual email sender are always marketing sends. */
-export function campaignTemplates<T extends {
-  kind?: string | null;
-  purpose?: string | null;
-  category?: string | null;
-}>(templates: readonly T[]): T[] {
-  return templates.filter((template) => resolveTemplateKind(template) === "CAMPAIGN");
+/** Keep legacy manual senders on marketing templates after classification. */
+export function campaignTemplates<T extends { kind?: string | null; purpose?: string | null; category?: string | null }>(templates: readonly T[]): T[] {
+  return templates.filter(template => resolveTemplateKind(template) === "CAMPAIGN");
 }

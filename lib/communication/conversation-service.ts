@@ -1,7 +1,9 @@
+import { donorAccountStatus, type DonorAccountStatus } from "@/lib/dashboard/donor-account";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
 import { normalizePhoneE164, phoneDigits, phoneMatchVariants } from "./phone";
 import type { WhatsappRenderedPreview } from "./whatsapp-rendered-preview";
+import { INBOX_ACCEPTED_STATUSES } from "./inbox-timeline";
 
 type Actor = { actorId?: string | null; actorName?: string | null; actorRole?: string | null } | null;
 
@@ -26,6 +28,7 @@ type Actor = { actorId?: string | null; actorName?: string | null; actorRole?: s
  */
 
 export type ConversationDonor = {
+  accountStatus?: DonorAccountStatus;
   userId: string | null;
   name: string | null;
   email: string | null;
@@ -50,11 +53,13 @@ export type ConversationSummary = {
   lastMessageAt: string | null;
   lastInboundText: string | null;
   needsReply: boolean;
+  unread: boolean;
   inboundCount: number;
   outboundCount: number;
   sender: ConversationSender | null;
 };
 
+const READ_ACTION = "communication.conversation.read";
 const HANDLED_ACTION = "communication.conversation.handled";
 
 /** No sender row claims this number  kept as its own bucket rather than merged into a real one. */
@@ -78,6 +83,7 @@ type Bucket = {
   phone: string;
   lastInboundAt: number;
   lastOutboundAt: number;
+  lastReplyAt: number;
   lastInboundText: string | null;
   inboundCount: number;
   outboundCount: number;
@@ -88,7 +94,7 @@ type Bucket = {
  * phoneNumberId. Uses CommunicationSender data (no fake/demo numbers).
  */
 export async function listInboxSenders(): Promise<ConversationSender[]> {
-  if (!process.env.DATABASE_URL) return [];
+  if (!process.env.DATABASE_URL) throw new Error("INBOX_SENDERS_UNAVAILABLE");
   try {
     const rows = await prisma.communicationSender.findMany({
       where: { channel: "WHATSAPP" },
@@ -96,14 +102,13 @@ export async function listInboxSenders(): Promise<ConversationSender[]> {
       orderBy: [{ isDefault: "desc" }, { name: "asc" }],
     });
     return rows.map((s) => ({ id: s.id, name: s.displayName || s.name, phone: s.displayPhoneNumber ?? null }));
-  } catch (error) {
-    console.error("listInboxSenders failed", error);
-    return [];
+  } catch {
+    throw new Error("INBOX_SENDERS_UNAVAILABLE");
   }
 }
 
-async function senderMap(): Promise<Map<string, ConversationSender>> {
-  const senders = await listInboxSenders();
+async function senderMap(known?: Promise<ConversationSender[]>): Promise<Map<string, ConversationSender>> {
+  const senders = await (known || listInboxSenders());
   return new Map(senders.map((s) => [s.id, s]));
 }
 
@@ -119,12 +124,14 @@ async function matchDonors(phoneDigitsList: string[]): Promise<Map<string, Conve
     });
     // Names live on the User row, not the profile  join them in.
     const userIds = Array.from(new Set(profiles.map((p) => p.userId).filter(Boolean) as string[]));
-    const users = userIds.length ? await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } }).catch(() => []) : [];
+    const users = userIds.length ? await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true, password: true, verifiedAt: true, registeredAt: true, emailVerified: true, _count: { select: { accounts: true } } } }).catch(() => []) : [];
     const nameById = new Map(users.map((u) => [u.id, u.name]));
+    const statusById = new Map(users.map(u => [u.id, donorAccountStatus(u)]));
     for (const p of profiles) {
       const key = phoneDigits(p.phone);
       const donor: ConversationDonor = {
         userId: p.userId,
+        accountStatus: p.userId ? statusById.get(p.userId) ?? "UNKNOWN" : "UNKNOWN",
         name: p.userId ? nameById.get(p.userId) ?? null : null,
         email: p.email,
         locale: p.preferredLocale,
@@ -152,7 +159,7 @@ async function matchDonors(phoneDigitsList: string[]): Promise<Map<string, Conve
    key is the stored string and the spellings are folded together here, where E.164 normalisation
    already lives. Nothing is dropped either way: every spelling comes back as its own row. */
 
-type RawGroup = { _id: { senderId?: unknown; phone?: unknown }; count?: unknown; lastAt?: unknown; lastPayload?: unknown };
+type RawGroup = { _id: { senderId?: unknown; phone?: unknown }; count?: unknown; lastAt?: unknown; lastReplyAt?: unknown; lastPayload?: unknown };
 
 function rawDate(value: unknown): number {
   if (value && typeof value === "object" && "$date" in (value as Record<string, unknown>)) {
@@ -166,14 +173,12 @@ function rawDate(value: unknown): number {
 }
 
 function groups(result: unknown): RawGroup[] {
-  const batch = (result as { cursor?: { firstBatch?: unknown } } | null)?.cursor?.firstBatch;
-  return Array.isArray(batch) ? (batch as RawGroup[]) : [];
+  if (!Array.isArray(result)) throw new Error("INBOX_AGGREGATION_INVALID");
+  return result as RawGroup[];
 }
 
 async function aggregateInbound(): Promise<RawGroup[]> {
-  const result = await prisma
-    .$runCommandRaw({
-      aggregate: "CommunicationProviderEvent",
+  const result = await prisma.communicationProviderEvent.aggregateRaw({
       pipeline: [
         { $match: { channel: "WHATSAPP", eventType: "inbound_message" } },
         { $sort: { receivedAt: -1 } },
@@ -182,35 +187,42 @@ async function aggregateInbound(): Promise<RawGroup[]> {
             _id: { senderId: "$senderId", phone: "$recipient" },
             count: { $sum: 1 },
             lastAt: { $first: "$receivedAt" },
-            lastPayload: { $first: "$payloadSanitized" },
+            lastPayload: { $first: { text: "$payloadSanitized.text" } },
           },
         },
       ],
-      allowDiskUse: true,
-      cursor: {},
-    })
-    .catch((error: unknown) => { console.error("aggregateInbound failed", error); return null; });
+      options: { allowDiskUse: true, maxTimeMS: 15000 },
+    });
   return groups(result);
 }
 
 async function aggregateOutbound(): Promise<RawGroup[]> {
-  const result = await prisma
-    .$runCommandRaw({
-      aggregate: "CommunicationDelivery",
+  const result = await prisma.communicationDelivery.aggregateRaw({
       pipeline: [
         { $match: { channel: "WHATSAPP", recipientPhone: { $ne: null } } },
+        { $project: { _id: 0, senderId: 1, recipientPhone: 1, createdAt: 1, status: 1 } },
         {
           $group: {
             _id: { senderId: "$senderId", phone: "$recipientPhone" },
             count: { $sum: 1 },
             lastAt: { $max: "$createdAt" },
+            lastReplyAt: { $max: { $cond: [{ $in: ["$status", INBOX_ACCEPTED_STATUSES] }, "$createdAt", null] } },
           },
         },
       ],
-      allowDiskUse: true,
-      cursor: {},
-    })
-    .catch((error: unknown) => { console.error("aggregateOutbound failed", error); return null; });
+      options: { allowDiskUse: true, maxTimeMS: 15000 },
+    });
+  return groups(result);
+}
+
+async function aggregateAppEchoes(): Promise<RawGroup[]> {
+  const result = await prisma.communicationProviderEvent.aggregateRaw({
+    pipeline: [
+      { $match: { channel: "WHATSAPP", eventType: "outbound_echo", deliveryId: null } },
+      { $group: { _id: { senderId: "$senderId", phone: "$recipient" }, count: { $sum: 1 },
+        lastAt: { $max: "$receivedAt" }, lastReplyAt: { $max: { $cond: [{ $in: ["$status", INBOX_ACCEPTED_STATUSES] }, "$receivedAt", null] } } } },
+    ], options: { allowDiskUse: true, maxTimeMS: 15000 },
+  });
   return groups(result);
 }
 
@@ -223,9 +235,21 @@ function objectIdString(value: unknown): string | null {
   return null;
 }
 
-export async function listConversations(opts: { senderId?: string | null } = {}): Promise<ConversationSummary[]> {
-  if (!process.env.DATABASE_URL) return [];
-  const [inbound, outbound] = await Promise.all([aggregateInbound(), aggregateOutbound()]);
+// A badge refresh and an inbox load can arrive together. Share only pending reads;
+// never cache read/handled markers or reuse a completed snapshot for a later event.
+let pendingGroups: Promise<[RawGroup[], RawGroup[], RawGroup[]]> | null = null;
+async function conversationGroups() {
+  if (pendingGroups) return pendingGroups;
+  const pending = Promise.all([aggregateInbound(), aggregateOutbound(), aggregateAppEchoes()]);
+  pendingGroups = pending;
+  try { return await pending; }
+  finally { if (pendingGroups === pending) pendingGroups = null; }
+}
+
+export async function listConversations(opts: { senderId?: string | null; summaryOnly?: boolean; enrichLimit?: number; senderRows?: Promise<ConversationSender[]> } = {}): Promise<ConversationSummary[]> {
+  if (!process.env.DATABASE_URL) throw new Error("INBOX_UNAVAILABLE");
+  const [inbound, deliveries, appEchoes] = await conversationGroups();
+  const outbound = [...deliveries, ...appEchoes];
 
   const buckets = new Map<string, Bucket>();
   const ensure = (senderId: string | null, phone: string): Bucket => {
@@ -234,7 +258,7 @@ export async function listConversations(opts: { senderId?: string | null } = {})
     if (!bucket) {
       bucket = {
         id, senderId, phone: normalizePhoneE164(phone) ?? phone,
-        lastInboundAt: 0, lastOutboundAt: 0, lastInboundText: null, inboundCount: 0, outboundCount: 0,
+        lastInboundAt: 0, lastOutboundAt: 0, lastReplyAt: 0, lastInboundText: null, inboundCount: 0, outboundCount: 0,
       };
       buckets.set(id, bucket);
     }
@@ -260,12 +284,14 @@ export async function listConversations(opts: { senderId?: string | null } = {})
     const bucket = ensure(objectIdString(row._id?.senderId), phone);
     bucket.outboundCount += Number(row.count ?? 0);
     bucket.lastOutboundAt = Math.max(bucket.lastOutboundAt, rawDate(row.lastAt));
+    bucket.lastReplyAt = Math.max(bucket.lastReplyAt, rawDate(row.lastReplyAt));
   }
 
-  const [donorMap, handledMap, senders] = await Promise.all([
-    matchDonors([...new Set([...buckets.values()].map((b) => phoneDigits(b.phone)))]),
+  const [donorMap, handledMap, senders, readMap] = await Promise.all([
+    opts.summaryOnly ? Promise.resolve(new Map<string, ConversationDonor[]>()) : matchDonors([...new Set([...buckets.values()].filter(bucket => !opts.senderId || bucket.senderId === opts.senderId).sort((a, b) => Math.max(b.lastInboundAt, b.lastOutboundAt) - Math.max(a.lastInboundAt, a.lastOutboundAt)).slice(0, opts.enrichLimit).map((b) => phoneDigits(b.phone)))]),
     loadHandledMarkers(),
-    senderMap(),
+    opts.summaryOnly ? Promise.resolve(new Map<string, ConversationSender>()) : senderMap(opts.senderRows),
+    loadReadMarkers([...buckets.keys()]),
   ]);
 
   let summaries: ConversationSummary[] = [...buckets.values()].map((bucket) => {
@@ -284,7 +310,8 @@ export async function listConversations(opts: { senderId?: string | null } = {})
       handled,
       lastMessageAt: lastAt ? new Date(lastAt).toISOString() : null,
       lastInboundText: bucket.lastInboundText,
-      needsReply: bucket.lastInboundAt > bucket.lastOutboundAt && !handled,
+      needsReply: bucket.lastInboundAt > bucket.lastReplyAt && !handled,
+      unread: bucket.lastInboundAt > Math.max(bucket.lastReplyAt, readMap.get(bucket.id) ?? 0) && !handled,
       inboundCount: bucket.inboundCount,
       outboundCount: bucket.outboundCount,
       sender: bucket.senderId ? senders.get(bucket.senderId) ?? null : null,
@@ -299,6 +326,7 @@ export async function listConversations(opts: { senderId?: string | null } = {})
 }
 
 export type TimelineItem = {
+  id: string;
   kind: "inbound" | "outbound" | "status";
   at: string | null;
   text: string | null;
@@ -340,7 +368,7 @@ export async function getConversation(
   if (!variants.length) return null;
   const limit = Math.min(Math.max(opts.limit ?? TIMELINE_PAGE, 1), 200);
   const before = opts.before ? new Date(opts.before) : null;
-  const senderScope = senderId ? { senderId } : {};
+  const senderScope = senderId ? { senderId } : { OR: [{senderId:null}, {senderId:{isSet:false}}] };
 
   const [events, deliveries, donorMap, senders] = await Promise.all([
     prisma.communicationProviderEvent
@@ -348,17 +376,15 @@ export async function getConversation(
         where: { channel: "WHATSAPP", recipient: { in: variants }, ...senderScope, ...(before ? { receivedAt: { lt: before } } : {}) },
         orderBy: { receivedAt: "desc" },
         take: limit + 1,
-        select: { eventType: true, receivedAt: true, status: true, payloadSanitized: true, senderId: true },
-      })
-      .catch(() => []),
+        select: { id: true, eventType: true, receivedAt: true, status: true, payloadSanitized: true, senderId: true, deliveryId: true, providerMessageId: true },
+      }),
     prisma.communicationDelivery
       .findMany({
         where: { channel: "WHATSAPP", recipientPhone: { in: variants }, ...senderScope, ...(before ? { createdAt: { lt: before } } : {}) },
         orderBy: { createdAt: "desc" },
         take: limit + 1,
-        select: { createdAt: true, renderedBody: true, variables: true, status: true, senderId: true },
-      })
-      .catch(() => []),
+        select: { id: true, createdAt: true, renderedBody: true, variables: true, status: true, senderId: true },
+      }),
     matchDonors([phoneDigits(phone)]),
     senderMap(),
   ]);
@@ -376,11 +402,13 @@ export async function getConversation(
       ? (vars.whatsappPreview as WhatsappRenderedPreview)
       : null;
     timeline.push({
+      id: `delivery:${delivery.id}`,
       kind: "outbound",
       at: delivery.createdAt?.toISOString() ?? null,
       text: preview?.body ?? delivery.renderedBody ?? null,
       status: delivery.status,
       whatsappPreview: preview,
+      media: vars?.media as TimelineItem["media"] || null,
     });
   }
   let resolvedSenderId: string | null = senderId;
@@ -388,14 +416,26 @@ export async function getConversation(
     if (event.eventType === "inbound_message") {
       const payload = event.payloadSanitized as { text?: unknown; media?: unknown } | null;
       timeline.push({
+        id: `event:${event.id}`,
         kind: "inbound",
         at: event.receivedAt?.toISOString() ?? null,
         text: payload && typeof payload.text === "string" ? payload.text : null,
         status: null,
         media: (payload?.media ?? null) as TimelineItem["media"],
       });
+    } else if (event.eventType === "outbound_echo") {
+      if (!event.deliveryId) {
+        const payload = event.payloadSanitized as { text?: unknown; media?: unknown } | null;
+        const receipts = events.filter(row => row.providerMessageId === event.providerMessageId && row.eventType.startsWith("status_"));
+        const states = [event.status, ...receipts.map(row => row.status)];
+        const status = states.includes("FAILED") ? "FAILED" : states.includes("READ") ? "READ"
+          : states.includes("DELIVERED") ? "DELIVERED" : "SENT";
+        timeline.push({ id: `event:${event.id}`, kind: "outbound", at: event.receivedAt.toISOString(),
+          text: typeof payload?.text === "string" ? payload.text : null, status,
+          media: (payload?.media ?? null) as TimelineItem["media"] });
+      }
     } else {
-      timeline.push({ kind: "status", at: event.receivedAt?.toISOString() ?? null, text: null, status: event.status ?? event.eventType });
+      timeline.push({ id: `event:${event.id}`, kind: "status", at: event.receivedAt?.toISOString() ?? null, text: null, status: event.status ?? event.eventType });
     }
     if (!resolvedSenderId && event.senderId) resolvedSenderId = event.senderId;
   }
@@ -478,4 +518,27 @@ export async function logConversationAction(idOrPhone: string, action: "followup
     stream: "TEAM",
   });
   return { ok: true };
+}
+
+
+/** Read acknowledgement covers an actual displayed inbound event, never a future arrival. */
+export async function markConversationRead(idOrPhone: string, eventId: string, actor?: Actor): Promise<boolean> {
+  const { senderId, phone } = parseConversationId(idOrPhone);
+  const id = eventId.replace(/^event:/, "");
+  if (!/^[a-f0-9]{24}$/i.test(id)) return false;
+  const event = await prisma.communicationProviderEvent.findFirst({ where: { id, channel: "WHATSAPP", eventType: "inbound_message", recipient: { in: phoneMatchVariants(phone) }, ...(senderId ? {senderId} : { OR: [{senderId:null}, {senderId:{isSet:false}}] }) }, select: { receivedAt: true } });
+  if (!event) return false;
+  await prisma.auditLog.create({data:{ actorId: actor?.actorId ?? undefined, actorName: actor?.actorName ?? undefined, actorRole: actor?.actorRole ?? "ADMIN", action: READ_ACTION, entityType: "CommunicationConversation", entityId: conversationId(senderId, phone), messageAr: "تم فتح محادثة واتساب", metadata: { seenThrough: event.receivedAt.toISOString(), externalCall: false }, stream: "TEAM" }});
+  return true;
+}
+async function loadReadMarkers(ids: string[]): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+  if (!ids.length) return result;
+  const rows = await prisma.auditLog.findMany({ where: { entityType: "CommunicationConversation", action: READ_ACTION, entityId: { in: ids } }, select: { entityId: true, metadata: true } });
+  for (const row of rows) {
+    const metadata = row.metadata as { seenThrough?: unknown } | null;
+    const at = typeof metadata?.seenThrough === "string" ? Date.parse(metadata.seenThrough) : NaN;
+    if (row.entityId && Number.isFinite(at)) result.set(row.entityId, Math.max(result.get(row.entityId) ?? 0, at));
+  }
+  return result;
 }

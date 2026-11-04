@@ -20,6 +20,12 @@ function load(path: string, dependencies: Record<string, unknown>): any {
   const js = ts.transpileModule(readFileSync(path, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   runInNewContext(js, { module, exports: module.exports, console, process, require: (name: string) => {
     if (name in dependencies) return dependencies[name];
+    if (name === "@/lib/ported-systems/locales") return require("../lib/ported-systems/locales.ts");
+    if (name === "@/lib/ported-systems/brand") return require("../lib/ported-systems/brand.ts");
+    if (name === "@/lib/communication/whatsapp-template-unsubscribe") return require("../lib/communication/whatsapp-template-unsubscribe.ts");
+    if (name === "@/lib/templates/localize-donation-failure-link") return require("../lib/templates/localize-donation-failure-link.ts");
+    if (name === "./campaign-lifecycle") return require("../lib/communication/campaign-lifecycle.ts");
+    if (name === "./template-locale-media") return require("../lib/communication/template-locale-media.ts");
     if (!name.startsWith("@/") && !name.startsWith(".")) return require(name);
     throw new Error(`Unexpected import ${name} in ${path}`);
   } });

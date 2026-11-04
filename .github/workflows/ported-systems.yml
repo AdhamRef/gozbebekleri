@@ -1,0 +1,57 @@
+name: Transferred systems verification
+on:
+  push:
+    branches: [port/minber-systems-20261104]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ported-systems-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    permissions:
+      contents: write
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+      DATABASE_URL: mongodb://127.0.0.1:27018/ported_systems_fixture?serverSelectionTimeoutMS=500&connectTimeoutMS=500
+      NEXTAUTH_URL: http://127.0.0.1:3106
+      APP_URL: https://fixture.example
+      NEXT_PUBLIC_SITE_URL: https://fixture.example
+      NEXTAUTH_SECRET: isolated-build-fixture-not-a-deployment-secret
+      GOOGLE_CLIENT_ID: fixture-client
+      GOOGLE_CLIENT_SECRET: fixture-secret
+      STRIPE_SECRET_KEY: sk_test_fixture_no_network
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Resolve the transferred dependencies
+        run: npm install --package-lock-only --ignore-scripts --legacy-peer-deps --no-audit --no-fund
+      - name: Keep the dependency lockfile synchronized
+        if: github.event_name == 'push'
+        run: |
+          if ! git diff --quiet -- package-lock.json; then
+            git config user.name "GitHub Actions"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "Synchronize dependencies for transferred systems"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
+      - run: npm ci --ignore-scripts --legacy-peer-deps --no-audit --no-fund
+      - name: Validate schemas and generate clients
+        run: |
+          npx --no-install prisma validate
+          npx --no-install prisma generate
+          npx --no-install prisma generate --schema prisma/integration-settings.schema.prisma
+      - name: Check transferred pages and dependencies
+        run: npm run typecheck:ported-systems
+      - name: Run isolated system regressions
+        run: npm run test:ported-systems
+      - name: Compile production routes without production index writes
+        run: npx --no-install next build

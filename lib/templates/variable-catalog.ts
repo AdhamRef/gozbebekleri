@@ -1,3 +1,4 @@
+import { SYSTEM_ORIGIN } from "@/lib/ported-systems/brand";
 export interface VariableEntry {
   token: string;
   label: string;
@@ -10,6 +11,13 @@ export interface VariableGroup {
 }
 
 export const VARIABLE_CATALOG: VariableGroup[] = [
+  { group:"الاشتراك الدوري",entries:[
+    {token:"{{subscription.frequencyLabel}}",label:"دورية الاشتراك بلغة المتبرع",exampleValue:"كل جمعة"},
+    {token:"{{subscription.frequency}}",label:"رمز الدورية",exampleValue:"FRIDAY"},
+    {token:"{{subscription.amount}}",label:"مبلغ دفعة الاشتراك",exampleValue:"25"},
+    {token:"{{subscription.currency}}",label:"عملة الاشتراك",exampleValue:"USD"},
+    {token:"{{subscription.nextBillingDate}}",label:"الموعد القادم للاشتراك",exampleValue:"2026-12-01"},
+  ]},
   {
     group: "المتبرع",
     entries: [
@@ -45,10 +53,16 @@ export const VARIABLE_CATALOG: VariableGroup[] = [
     group: "التبرّعة الحالية (للأحداث التلقائية فقط)",
     entries: [
       { token: "{{donation.id}}", label: "معرّف التبرّعة", exampleValue: "65f12abc..." },
-      { token: "{{donation.amount}}", label: "المبلغ", exampleValue: "50" },
+      { token: "{{donation.amount}}", label: "مبلغ المشاريع (قديم)", exampleValue: "50" },
+      { token: "{{donation.projectsAmount}}", label: "مبلغ المشاريع", exampleValue: "50" },
+      { token: "{{donation.teamSupport}}", label: "دعم الفريق", exampleValue: "5" },
+      { token: "{{donation.fees}}", label: "الرسوم المغطاة", exampleValue: "0" },
+      { token: "{{donation.amountBreakdown}}", label: "الإجمالي مع تفصيل المشاريع والدعم والرسوم وحالة التحصيل", exampleValue: "الإجمالي: 55 USD (المشاريع: 50 USD; دعم الفريق: 5 USD)" },
       { token: "{{donation.amountUSD}}", label: "المبلغ (USD)", exampleValue: "50" },
       { token: "{{donation.currency}}", label: "العملة", exampleValue: "USD" },
       { token: "{{donation.totalAmount}}", label: "الإجمالي", exampleValue: "55" },
+      { token: "{{donation.receiptSummary}}", label: "إجمالي بعملة المتبرع والمقابل البنكي المؤكد بلغة الرسالة", exampleValue: "الإجمالي: 55 دولار أمريكي. المقابل البنكي لنفس التبرع: 2,000 ليرة تركية." },
+      { token: "{{donation.displayDate}}", label: "تاريخ ووقت التبرع بلغة الرسالة (توقيت إسطنبول)", exampleValue: "29 أكتوبر 2026، 12:00" },
       { token: "{{donation.itemCount}}", label: "عدد البنود", exampleValue: "2" },
       { token: "{{donation.createdAt}}", label: "تاريخ التبرّعة", exampleValue: "2026-04-12" },
       { token: "{{donation.campaignTitle}}", label: "أسماء الحملات (مفصولة)", exampleValue: "حملة العيون، حملة الشتاء" },
@@ -65,8 +79,8 @@ export const VARIABLE_CATALOG: VariableGroup[] = [
       { token: "{{update.videoThumbnail}}", label: "لقطة الفيديو (رابط صورة)", exampleValue: "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg" },
       { token: "{{update.date}}", label: "تاريخ التحديث", exampleValue: "2026-09-29" },
       { token: "{{update.campaignTitle}}", label: "اسم المشروع", exampleValue: "سلال غذائية لغزة" },
-      { token: "{{update.url}}", label: "رابط التحديثات في صفحة المشروع", exampleValue: "https://www.gozbebekleri.org/ar/campaign/example#updates" },
-      { token: "{{update.donateUrl}}", label: "رابط التبرع للمشروع", exampleValue: "https://www.gozbebekleri.org/ar/campaign/example" },
+      { token: "{{update.url}}", label: "رابط التحديثات في صفحة المشروع", exampleValue: SYSTEM_ORIGIN + "/ar/campaign/example-project#updates" },
+      { token: "{{update.donateUrl}}", label: "رابط التبرع للمشروع", exampleValue: SYSTEM_ORIGIN + "/ar/campaign/example-project" },
     ],
   },
   {

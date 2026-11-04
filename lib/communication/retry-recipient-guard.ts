@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { recipientExclusionReason, type AudienceChannel } from "./campaign-audience-accounting";
+import { isWhatsappExplicitlyUnsubscribed, recipientExclusionReason, type AudienceChannel } from "./campaign-audience-accounting";
 import { normalizeCampaignContact } from "./campaign-contact-validation";
+import { phoneMatchVariants } from "./phone";
 
 export type RetryRecipientInput = {
   id?: string;
@@ -28,16 +29,26 @@ export async function checkRetryRecipient(row: RetryRecipientInput, plannedConta
       if (row.campaignId) return { ok: false, code: "RECIPIENT_CHECK_UNAVAILABLE" };
       const contact = normalizeCampaignContact(channel, stored);
       if (!contact) return { ok: false, code: stored ? "INVALID_CONTACT" : "NO_RECIPIENT" };
+      if (channel === "WHATSAPP") {
+        const variants = phoneMatchVariants(contact);
+        const profiles = variants.length ? await prisma.donorCommunicationProfile.findMany({
+          where: { phone: { in: variants } },
+          select: { doNotContact: true, consentSource: true },
+        }) : [];
+        if (profiles.some((profile) => profile.doNotContact || isWhatsappExplicitlyUnsubscribed(profile))) {
+          return { ok: false, code: "CONSENT_BLOCKED" };
+        }
+      }
       if (plannedContact !== undefined && normalizeCampaignContact(channel, plannedContact) !== contact) return { ok: false, code: "RECIPIENT_CONTACT_CHANGED" };
       return { ok: true, contact };
     }
     const donor = await prisma.user.findUnique({
       where: { id: row.recipientUserId },
-      select: { email: true, phone: true, communicationProfile: { select: { doNotContact: true, emailOptIn: true, smsOptIn: true, whatsappOptIn: true } } },
+      select: { email: true, phone: true, communicationProfile: { select: { doNotContact: true, emailOptIn: true, smsOptIn: true, consentSource: true } } },
     });
     if (!donor) return { ok: false, code: "RECIPIENT_NOT_FOUND" };
     const profile = donor.communicationProfile;
-    if (profile?.doNotContact === true) return { ok: false, code: "CONSENT_BLOCKED" };
+    if (profile?.doNotContact === true || (channel === "WHATSAPP" && isWhatsappExplicitlyUnsubscribed(profile))) return { ok: false, code: "CONSENT_BLOCKED" };
     if (row.campaignId) {
       const reason = recipientExclusionReason(donor, channel, profile);
       if (reason) return { ok: false, code: reason === "MISSING_CONTACT" ? "NO_RECIPIENT" : "CONSENT_BLOCKED" };
@@ -65,5 +76,5 @@ export function retryDefinitelyNotSent(reason: string): boolean {
   return reason.endsWith("_NOT_CONFIGURED") || reason.endsWith("_NOT_IMPLEMENTED") ||
     reason.startsWith("SENDER_MISSING_") || reason.includes("_SENDER_MISSING_") ||
     reason.startsWith("TEMPLATE_") || reason === "META_TEMPLATE_REQUIRED" ||
-    ["PROVIDER_DISABLED", "EMAIL_SUPPRESSED", "INTEGRATION_DECRYPTION_FAILED", "INTEGRATION_DATABASE_UNAVAILABLE"].includes(reason);
+    ["INVALID_CONTACT", "ELASTIC_EMAIL_REJECTED", "ELASTIC_EMAIL_UNAUTHORIZED", "ELASTIC_EMAIL_RATE_LIMITED", "PROVIDER_DISABLED", "EMAIL_SUPPRESSED", "INTEGRATION_DECRYPTION_FAILED", "INTEGRATION_DATABASE_UNAVAILABLE"].includes(reason);
 }

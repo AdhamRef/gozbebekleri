@@ -1,20 +1,27 @@
+// Offline regression fixtures for the transferred runtime.
+import * as fixtureBrand from "../../lib/ported-systems/brand";
+import * as fixtureLocales from "../../lib/ported-systems/locales";
+import * as campaignTracking from "../../lib/communication/campaign-message-tracking";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
 import ts from "typescript";
+import * as donationMoney from "../../lib/templates/donation-money";
 
 type Cursor = { id: string; createdAt: Date };
 type Service = {
+  retryDelivery: (id:string)=>Promise<{code:string}>;
   listRetryCandidatePage: (filter: { channel: "WHATSAPP" }, after?: Cursor | null, take?: number) => Promise<Cursor[]>;
 };
 
-function loadService() {
+function loadService(includeMissingPayload = false) {
   const calls: Array<Record<string, unknown>> = [];
-  const firstPage = Array.from({ length: 25 }, (_, index) => ({ id: `delivery-${index + 1}`, createdAt: new Date("2026-10-01T00:00:00.000Z") }));
-  const secondPage = [{ id: "delivery-26", createdAt: new Date("2026-10-01T00:00:00.000Z") }];
+  const firstPage = Array.from({ length: 25 }, (_, index) => ({ id: `delivery-${index + 1}`, createdAt: new Date("2026-10-01T00:00:00.000Z"), channel: "WHATSAPP", templateId: "tpl", renderedBody: null, variables: includeMissingPayload ? null : { snapshot: {} } }));
+  const secondPage = [{ id: "delivery-26", createdAt: new Date("2026-10-01T00:00:00.000Z"), channel: "WHATSAPP", templateId: "tpl", renderedBody: null, variables: { snapshot: {} } }];
   const prisma = {
     communicationDelivery: {
+      findUnique: async () => ({id:"blocked",channel:"WHATSAPP",status:"SKIPPED",errorMessage:"RECURRING_TEMPLATE_CADENCE_MISMATCH"}),
       findMany: async (args: Record<string, unknown>) => {
         calls.push(args);
         return calls.length === 1 ? firstPage : secondPage;
@@ -22,7 +29,12 @@ function loadService() {
     },
   };
   const dependencies: Record<string, unknown> = {
+    "./campaign-message-tracking": campaignTracking,
+    "@/lib/templates/donation-money": donationMoney,
     "./template-donation-links": { donationTemplateValues: async () => ({ ok: true, values: {} }) },
+    "@/lib/templates/localize-donation-failure-link": { localizeDonationFailureLinks: (body: string) => body },
+    "./retry-batches": { RETRY_BATCH_CAP: 25 },
+    "./retry-readiness": { retryPayloadBlockReason: (row: { variables?: unknown }) => row.variables ? null : "NO_RENDERED_BODY" },
     "@/lib/prisma": { prisma },
     "./delivery-log-service": { createDeliveryRecord: async () => ({ ok: true }), markDeliveryStatus: async () => ({ ok: true }) },
     "./provider-router": { sendPreparedDelivery: async () => ({ ok: true }) },
@@ -32,7 +44,7 @@ function loadService() {
     "./providers/sms/client": { resolveSmsProvider: async () => ({ provider: "SMS" }) },
     "./retry-recipient-guard": { checkRetryRecipient: async () => ({ ok: true }), retryDefinitelyNotSent: () => true },
     "./whatsapp-marketing-frequency": { reserveWhatsappMarketingSend: async () => ({ ok: true }), releaseWhatsappMarketingReservation: async () => {} },
-    "./communication-runtime-types": { RETRYABLE_STATUSES: ["FAILED"], NON_RETRYABLE_TERMINAL: ["BOUNCED"], isCommunicationChannel: () => true },
+    "./communication-runtime-types": { RETRYABLE_STATUSES: ["FAILED", "SKIPPED"], NON_RETRYABLE_TERMINAL: ["BOUNCED"], isCommunicationChannel: () => true },
   };
   const source = fs.readFileSync("lib/communication/delivery-retry-service.ts", "utf8");
   const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -42,6 +54,9 @@ function loadService() {
     exports: loaded.exports,
     process: { env: { DATABASE_URL: "test" } },
     require: (id: string) => {
+ if(id==="@/lib/ported-systems/brand")return fixtureBrand;
+ if(id==="@/lib/ported-systems/locales")return fixtureLocales;
+
       if (!(id in dependencies)) throw new Error(`Unexpected import: ${id}`);
       return dependencies[id];
     },
@@ -57,7 +72,7 @@ test("retry candidate pages advance by (createdAt, id) while retaining the 25-ro
 
   const cursor = first.at(-1)!;
   const second = await service.listRetryCandidatePage({ channel: "WHATSAPP" }, cursor, 10_000);
-  assert.deepEqual(second.map((row) => row.id), ["delivery-26"]);
+  assert.deepEqual(Array.from(second, (row) => row.id), ["delivery-26"]);
   assert.equal(calls[1].take, 25);
 
   const where = calls[1].where as { AND: Array<{ OR?: Array<Record<string, unknown>> }> };
@@ -71,6 +86,14 @@ test("retry candidate pages advance by (createdAt, id) while retaining the 25-ro
   assert.equal((sameDateLaterId?.id as { gt?: string } | undefined)?.gt, cursor.id);
 });
 
+test("retry pagination advances past a full page without archived content and retains later ready recipients", async () => {
+  const { service, calls } = loadService(true);
+  const ready = await service.listRetryCandidatePage({ channel: "WHATSAPP" });
+  assert.deepEqual(Array.from(ready, (row) => row.id), ["delivery-26"]);
+  assert.equal(calls.length, 2);
+  assert.ok(JSON.stringify(calls[1].where).includes('"gt":"delivery-25"'));
+});
+
 type RetryRoute = {
   GET: (request: { nextUrl: { searchParams: URLSearchParams } }) => Promise<Response>;
   POST: (request: { json: () => Promise<unknown> }) => Promise<Response>;
@@ -81,6 +104,7 @@ function loadRetryRoute() {
   const createdAt = new Date("2026-10-01T00:00:00.000Z");
   const firstPage = Array.from({ length: 25 }, (_, index) => ({ id: `delivery-${index + 1}`, createdAt }));
   const dependencies: Record<string, unknown> = {
+    "./campaign-message-tracking": campaignTracking,
     "next/server": { NextResponse: { json: (body: Record<string, unknown>, init?: { status?: number }) => new Response(JSON.stringify(body), { status: init?.status ?? 200, headers: { "content-type": "application/json" } }) } },
     "next-auth": { getServerSession: async () => ({ user: { id: "admin" } }) },
     "@/app/api/auth/[...nextauth]/options": { authOptions: {} },
@@ -97,6 +121,7 @@ function loadRetryRoute() {
       RETRY_BATCH_CAP: 25,
     },
     "@/lib/communication/communication-runtime-types": { isCommunicationChannel: (channel: string) => channel === "WHATSAPP" },
+    "@/lib/communication/purpose-group": { parseCommunicationPurposeGroup: (value: unknown) => value === "MARKETING" || value === "AUTOMATIC" ? value : undefined },
   };
   const source = fs.readFileSync("app/api/dashboard/communication/deliveries/retry/route.ts", "utf8");
   const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -109,6 +134,9 @@ function loadRetryRoute() {
     Response,
     console: { error: () => {} },
     require: (id: string) => {
+ if(id==="@/lib/ported-systems/brand")return fixtureBrand;
+ if(id==="@/lib/ported-systems/locales")return fixtureLocales;
+
       if (!(id in dependencies)) throw new Error(`Unexpected import: ${id}`);
       return dependencies[id];
     },
@@ -148,3 +176,23 @@ test("bulk retry carries one frozen preflight range through every bounded page",
     assert.equal((query.filter.to as Date).toISOString(), preflight.range.to);
   }
 });
+
+test("campaign retries keep their campaign and purpose scope without the dashboard's day cutoff", async () => {
+  const { route, candidateQueries } = loadRetryRoute();
+  const response = await route.GET({ nextUrl: { searchParams: new URLSearchParams("channel=WHATSAPP&days=30&campaign=campaign-1&purposeGroup=MARKETING") } });
+  const preflight = await response.json() as { range: { from: string | null; to: string } };
+  assert.equal(response.status, 200);
+  assert.equal(preflight.range.from, null);
+  const sent = await route.POST({ json: async () => ({ channel: "WHATSAPP", campaignId: "campaign-1", purposeGroup: "MARKETING", days: 30, range: preflight.range }) });
+  const events = await ndjson(sent);
+  assert.equal(events.at(-1)?.type, "done");
+  assert.equal(candidateQueries[0].filter.campaignId, "campaign-1");
+  assert.equal(candidateQueries[0].filter.purposeGroup, "MARKETING");
+  assert.equal(candidateQueries[0].filter.from, undefined);
+  assert.equal((candidateQueries[0].filter.to as Date).toISOString(), preflight.range.to);
+});
+
+test("retry cannot bypass a recurring cadence mismatch archived by the automatic renderer",async()=>{
+ const f=loadService();assert.equal((await f.service.retryDelivery("blocked")).code,"RECURRING_TEMPLATE_CADENCE_MISMATCH");assert.equal(f.calls.length,0);
+});
+

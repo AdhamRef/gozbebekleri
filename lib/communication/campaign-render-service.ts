@@ -1,5 +1,5 @@
 import type { CommunicationCampaign } from "@prisma/client";
-import { isValidLocale, type SupportedLocale } from "@/lib/locales";
+import { isValidLocale, type AnyLocale as SupportedLocale } from "@/lib/ported-systems/locales";
 import { renderChannelTemplate, type RenderedTemplate } from "./template-compat";
 import { createDeliveryRecord, recordSkippedDelivery } from "./delivery-log-service";
 import { resolveProviderForSend } from "./provider-router";

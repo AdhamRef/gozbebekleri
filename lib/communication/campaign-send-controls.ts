@@ -11,6 +11,7 @@ export type CampaignSendControls = {
   autoSpeed: boolean;
   priority: CampaignPriority;
   dailyCap: number;
+  dailyCapEnabled: boolean;
   scheduledStopAt: string | null;
   resumeAt: string | null;
   quietHours: {
@@ -63,10 +64,8 @@ export function campaignSendControls(campaign: Pick<CommunicationCampaign, "meta
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
   };
-  const configuredGlobalCap = process.env.COMMUNICATION_WHATSAPP_DAILY_CAP
-    ? positiveInt(process.env.COMMUNICATION_WHATSAPP_DAILY_CAP, 100_000)
-    : null;
-  const requestedCap = positiveInt(raw.dailyCap, configuredGlobalCap ?? 100_000);
+  const dailyCapEnabled = raw.dailyCapEnabled === true;
+  const requestedCap = dailyCapEnabled ? positiveInt(raw.dailyCap, 0) : 0;
 
   return {
     paused: raw.paused === true,
@@ -75,9 +74,8 @@ export function campaignSendControls(campaign: Pick<CommunicationCampaign, "meta
     priority: ["LOW", "NORMAL", "HIGH", "URGENT"].includes(priority) ? priority : "NORMAL",
     scheduledStopAt: isoOrNull(raw.scheduledStopAt),
     resumeAt: isoOrNull(raw.resumeAt),
-    // An explicitly configured environment ceiling remains a hard safety cap. When there is no
-    // environment override, the campaign value can come directly from Meta's current account tier.
-    dailyCap: configuredGlobalCap ? Math.min(requestedCap, configuredGlobalCap) : requestedCap,
+    dailyCapEnabled,
+    dailyCap: requestedCap,
     quietHours: {
       enabled: quiet.enabled === true,
       start: hhmm(quiet.start, "00:00"),
@@ -125,6 +123,79 @@ export function autoSpeedMode(input: {
 }
 
 const GLOBAL_CONTROL_ID = "000000000000000000000001";
+export const DEFAULT_WHATSAPP_MARKETING_COOLDOWN_DAYS = 0;
+export const MIN_WHATSAPP_MARKETING_COOLDOWN_DAYS = 0;
+export const MAX_WHATSAPP_MARKETING_COOLDOWN_DAYS = 365;
+
+export type CampaignGlobalControls = {
+  emergencyStop: boolean;
+  whatsappMarketingCooldownDays: number;
+};
+
+export async function readCampaignGlobalControls():
+  Promise<{ ok: true; controls: CampaignGlobalControls } | { ok: false }> {
+  try {
+    const row = await prisma.communicationGlobalControl.findUnique({
+      where: { id: GLOBAL_CONTROL_ID },
+      select: { emergencyStop: true, whatsappMarketingCooldownDays: true, whatsappMarketingCooldownConfigured: true },
+    });
+    const days = row?.whatsappMarketingCooldownConfigured === true
+      ? row.whatsappMarketingCooldownDays ?? DEFAULT_WHATSAPP_MARKETING_COOLDOWN_DAYS
+      : DEFAULT_WHATSAPP_MARKETING_COOLDOWN_DAYS;
+    if (!Number.isInteger(days) || days < MIN_WHATSAPP_MARKETING_COOLDOWN_DAYS || days > MAX_WHATSAPP_MARKETING_COOLDOWN_DAYS) {
+      return { ok: false };
+    }
+    return {
+      ok: true,
+      controls: {
+        emergencyStop:
+          String(process.env.COMMUNICATION_CAMPAIGN_EMERGENCY_STOP ?? "").toLowerCase() === "true" ||
+          row?.emergencyStop === true,
+        whatsappMarketingCooldownDays: days,
+      },
+    };
+  } catch {
+    return { ok: false };
+  }
+}
+
+export async function setCampaignGlobalControls(
+  patch: Partial<CampaignGlobalControls>,
+  updatedBy?: string | null,
+): Promise<CampaignGlobalControls | null> {
+  if (patch.whatsappMarketingCooldownDays !== undefined &&
+      (!Number.isInteger(patch.whatsappMarketingCooldownDays) ||
+       patch.whatsappMarketingCooldownDays < MIN_WHATSAPP_MARKETING_COOLDOWN_DAYS ||
+       patch.whatsappMarketingCooldownDays > MAX_WHATSAPP_MARKETING_COOLDOWN_DAYS)) return null;
+  try {
+    const row = await prisma.communicationGlobalControl.upsert({
+      where: { id: GLOBAL_CONTROL_ID },
+      create: {
+        id: GLOBAL_CONTROL_ID,
+        emergencyStop: patch.emergencyStop ?? false,
+        whatsappMarketingCooldownDays: patch.whatsappMarketingCooldownDays ?? DEFAULT_WHATSAPP_MARKETING_COOLDOWN_DAYS,
+        whatsappMarketingCooldownConfigured: patch.whatsappMarketingCooldownDays !== undefined,
+        updatedBy: updatedBy ?? null,
+      },
+      update: {
+        ...patch,
+        ...(patch.whatsappMarketingCooldownDays !== undefined ? { whatsappMarketingCooldownConfigured: true } : {}),
+        updatedBy: updatedBy ?? null,
+      },
+      select: { emergencyStop: true, whatsappMarketingCooldownDays: true, whatsappMarketingCooldownConfigured: true },
+    });
+    return {
+      emergencyStop:
+        String(process.env.COMMUNICATION_CAMPAIGN_EMERGENCY_STOP ?? "").toLowerCase() === "true" ||
+        row.emergencyStop,
+      whatsappMarketingCooldownDays: row.whatsappMarketingCooldownConfigured === true
+        ? row.whatsappMarketingCooldownDays ?? DEFAULT_WHATSAPP_MARKETING_COOLDOWN_DAYS
+        : DEFAULT_WHATSAPP_MARKETING_COOLDOWN_DAYS,
+    };
+  } catch {
+    return null;
+  }
+}
 
 export async function campaignEmergencyStopEnabled(): Promise<boolean> {
   if (String(process.env.COMMUNICATION_CAMPAIGN_EMERGENCY_STOP ?? "").toLowerCase() === "true") return true;
@@ -136,12 +207,7 @@ export async function campaignEmergencyStopEnabled(): Promise<boolean> {
 }
 
 export async function setCampaignEmergencyStop(enabled: boolean, updatedBy?: string | null): Promise<boolean> {
-  const row = await prisma.communicationGlobalControl.upsert({
-    where: { id: GLOBAL_CONTROL_ID },
-    create: { id: GLOBAL_CONTROL_ID, emergencyStop: enabled, updatedBy: updatedBy ?? null },
-    update: { emergencyStop: enabled, updatedBy: updatedBy ?? null },
-    select: { emergencyStop: true },
-  }).catch(() => null);
+  const row = await setCampaignGlobalControls({ emergencyStop: enabled }, updatedBy);
   return row?.emergencyStop === enabled;
 }
 
@@ -211,7 +277,7 @@ export async function evaluateCampaignSendControls(
     return { ok: false, controls, reason: "QUIET_HOURS", remainingDaily: null };
   }
 
-  if (campaign.channel === "WHATSAPP") {
+  if (campaign.channel === "WHATSAPP" && controls.dailyCap > 0) {
     const used = await whatsappSentLast24Hours();
     const remaining = Math.max(controls.dailyCap - used, 0);
     if (remaining <= 0) return { ok: false, controls, reason: "DAILY_CAP_REACHED", remainingDaily: 0 };

@@ -27,7 +27,7 @@ import {
  *   2. Donors with an active recurring subscription are never reminded (they are already giving).
  *   3. Marketing consent is enforced with the same `donorChannelEligibility` rules campaigns use
  *      (doNotContact / emailOptIn / emailNotifications / whatsappOptIn).
- *   4. A donor is reminded at most once per `cooldownDays`, and never twice for the same lapse
+ *   4. A donor is reminded at most once per `cooldownDays`, and never twice for the same lapse 
  *      idempotency is read from CommunicationDelivery (the archive source of truth), so a re-run of
  *      the cron on the same day cannot double-send.
  *   5. Each run is bounded by `maxPerRun` so a first run over a large donor base cannot time out or
@@ -219,7 +219,7 @@ export async function runDonationLapsedReminders(
     const donorById = new Map(donors.map((d) => [d.id, d]));
 
     const profiles = await prisma.donorCommunicationProfile
-      .findMany({ where: { userId: { in: batchIds } }, select: { userId: true, whatsappOptIn: true, emailOptIn: true, smsOptIn: true, doNotContact: true } })
+      .findMany({ where: { userId: { in: batchIds } }, select: { userId: true, emailOptIn: true, smsOptIn: true, doNotContact: true, consentSource: true } })
       .catch(() => []);
     const profileById = new Map(profiles.map((p) => [p.userId, p]));
 
@@ -230,7 +230,8 @@ export async function runDonationLapsedReminders(
       const donor = donorById.get(donorId);
       if (!donor) { row.skipped += 1; summary.skipped += 1; bump(row.reasons, "DONOR_NOT_FOUND"); continue; }
 
-      // Re-engagement is marketing, not a receipt  consent is mandatory.
+      // Re-engagement is marketing. WhatsApp follows explicit STOP and the shared frequency limit;
+      // email and SMS continue to follow their channel preferences.
       const eligibility = donorChannelEligibility(
         { email: donor.email, phone: donor.phone, emailNotifications: donor.emailNotifications, smsNotifications: donor.smsNotifications },
         channel,
@@ -255,11 +256,11 @@ export async function runDonationLapsedReminders(
       }
 
       try {
-        // Context is loaded from the last donation so the template can use {{donation.*}}
+        // Context is loaded from the last donation so the template can use {{donation.*}} 
         // "your last gift of $X on <date>"  alongside {{user.*}} and {{totals.*}}.
         const ctx = await loadContextForDonation(donationId);
         if (!ctx) { row.skipped += 1; summary.skipped += 1; bump(row.reasons, "NO_CONTEXT"); continue; }
-        const locale = pickLocale({ recipientLang: ctx.user.preferredLang });
+        const locale = pickLocale({ override: ctx.donation?.locale, recipientLang: ctx.user.preferredLang });
         const result = await sendTriggerMessage(trigger, ctx, { event: "DONATION_LAPSED", locale, config, donationId, purpose: "MARKETING" });
         if (!result) { row.skipped += 1; summary.skipped += 1; bump(row.reasons, "TEMPLATE_MISSING"); continue; }
         if (result.outcome === "SENT") { row.sent += 1; summary.sent += 1; bump(row.reasons, "SENT"); }

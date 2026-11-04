@@ -17,11 +17,11 @@ test("category-only donations have their actual destination instead of a missing
 
 test("mixed campaign, category and waqf destinations are preserved with original amounts", () => {
   const result = donationProjectSummary({
-    locale: "en", items: [{ amount: 5, amountUSD: 5, campaign: { title: "Water" } }],
-    categoryItems: [{ amount: 10, amountUSD: 10, category: { name: "Gaza" } }],
+    locale: "en", items: [{ amount: 5, amountUSD: 5, campaign: { title: "Water", translations: [{locale:"en",title:"Water"}] } }],
+    categoryItems: [{ amount: 10, amountUSD: 10, category: { name: "Gaza", translations: [{locale:"en",name:"Gaza"}] } }],
     waqfItems: [{ amount: 100, amountUSD: 100, unit: "SHARE", count: 1 }],
   });
-  assert.equal(result.campaignTitle, "Water، Gaza، Waqf share");
+  assert.equal(result.campaignTitle, "Water, Gaza, Waqf share");
   assert.equal(result.lines.length, 3);
   assert.deepEqual(result.lines.map((x) => x.amount), [5, 10, 100]);
   assert.equal(result.lines[2].shareCount, 1);

@@ -1,15 +1,15 @@
 import { forEachTemplateSyncItem } from "./template-sync-work";
+import { WHATSAPP_CATALOGUE_SYNC_ACTION } from "./template-sync-result";
 import { templateLocaleFromLanguage } from "./template-locale-media";
+import { resolveExactVariantForLocale } from "./whatsapp-template-readiness";
 import { schemaHasInvalidMetaParameterNames } from "./meta-parameter-name";
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
-import { SUPPORTED_LOCALES, type SupportedLocale } from "@/lib/locales";
+import { SUPPORTED_LOCALES, type AnyLocale as SupportedLocale } from "@/lib/ported-systems/locales";
 import { listAllTemplates } from "./providers/meta-whatsapp/templates";
 import { deriveOverallMetaTemplateStatus, normalizeMetaTemplateStatus } from "./whatsapp-template-status";
-import { NOT_READY, resolveVariantForLocale, type VariantReadiness, type VariantRow } from "./whatsapp-template-readiness";
-export { NOT_READY, resolveVariantForLocale, type VariantReadiness, type VariantRow } from "./whatsapp-template-readiness";
 
 export const META_PROVIDER = "META_WHATSAPP";
 
@@ -298,7 +298,9 @@ export async function syncMetaWhatsappTemplates(opts: {
     actorId: opts.actor?.actorId ?? undefined,
     actorName: opts.actor?.actorName ?? undefined,
     actorRole: opts.actor?.actorRole ?? "SYSTEM",
-    action: "communication.whatsapp.templates.sync",
+    action: opts.templateId || opts.businessAccountId?.trim()
+      ? "communication.whatsapp.templates.sync"
+      : WHATSAPP_CATALOGUE_SYNC_ACTION,
     messageAr: `مزامنة قوالب واتساب من Meta عبر ${summary.wabasSynced} WABA — ${summary.variantsUpserted} نسخة WABA/لغة`,
     messageEn: `WhatsApp template sync across ${summary.wabasSynced} WABA(s); ${summary.variantsUpserted} WABA/language variant(s)`,
     entityType: "WhatsappTemplate",
@@ -308,6 +310,75 @@ export async function syncMetaWhatsappTemplates(opts: {
   return summary;
 }
 
+export type VariantReadiness = {
+  ready: boolean;
+  reason: string | null;
+  languageCode: string | null;
+  approvalStatus: string | null;
+  category: string | null;
+  locale: string | null;
+  providerTemplateName: string | null;
+  componentsSchema: unknown;
+  rejectionReason: string | null;
+  lastSyncedAt: Date | null;
+};
+
+export const NOT_READY: VariantReadiness = {
+  ready: false,
+  reason: "NO_VARIANT",
+  languageCode: null,
+  approvalStatus: null,
+  category: null,
+  locale: null,
+  providerTemplateName: null,
+  componentsSchema: null,
+  rejectionReason: null,
+  lastSyncedAt: null,
+};
+
+export type VariantRow = {
+  languageCode: string;
+  locale: string | null;
+  approvalStatus: string;
+  category: string | null;
+  providerTemplateName: string;
+  componentsSchema: unknown;
+  rejectionReason: string | null;
+  lastSyncedAt: Date;
+};
+
+export function resolveVariantForLocale(variants: VariantRow[], locale: string, fallbackLocale = "ar"): VariantReadiness {
+  if (!variants.length) return NOT_READY;
+  const approved = variants.filter((v) => v.approvalStatus === "APPROVED");
+  const pool = approved.length ? approved : variants;
+  const base = templateLocaleFromLanguage(locale);
+  const chosen =
+    pool.find((v) => v.locale === locale) ??
+    pool.find((v) => v.languageCode.toLowerCase() === locale.toLowerCase()) ??
+    pool.find((v) => templateLocaleFromLanguage(v.languageCode) === base) ??
+    pool.find((v) => v.locale === fallbackLocale) ??
+    pool.find((v) => v.languageCode.toLowerCase() === fallbackLocale.toLowerCase()) ??
+    pool.find((v) => v.languageCode.toLowerCase().replace(/[_-].*$/, "") === fallbackLocale.toLowerCase()) ??
+    pool.find((v) => v.locale === "ar") ??
+    pool.find((v) => v.languageCode.toLowerCase().startsWith("ar")) ??
+    null;
+  if (!chosen) return NOT_READY;
+  const isApproved = normalizeApprovalStatus(chosen.approvalStatus) === "APPROVED";
+  const parameterSchemaInvalid = isApproved && schemaHasInvalidMetaParameterNames(chosen.componentsSchema);
+  const ready = isApproved && !parameterSchemaInvalid;
+  return {
+    ready,
+    reason: parameterSchemaInvalid ? "META_TEMPLATE_PARAMETER_NAME_INVALID" : ready ? null : "NOT_APPROVED",
+    languageCode: chosen.languageCode,
+    approvalStatus: chosen.approvalStatus,
+    category: chosen.category ?? null,
+    locale: chosen.locale,
+    providerTemplateName: chosen.providerTemplateName,
+    componentsSchema: chosen.componentsSchema,
+    rejectionReason: chosen.rejectionReason,
+    lastSyncedAt: chosen.lastSyncedAt,
+  };
+}
 
 /**
  * Runtime readiness. When a WABA is known (normal multi-sender send), truth is read only from that
@@ -317,8 +388,10 @@ export async function getTemplateReadiness(
   templateId: string,
   locale: string,
   businessAccountId?: string | null,
+  exactLanguage = false,
 ): Promise<VariantReadiness> {
   if (!process.env.DATABASE_URL) return NOT_READY;
+  const resolve = exactLanguage ? resolveExactVariantForLocale : resolveVariantForLocale;
   if (businessAccountId) {
     const variants = await prisma.whatsappTemplateWabaVariant.findMany({
       where: { templateId, provider: META_PROVIDER, businessAccountId },
@@ -333,7 +406,7 @@ export async function getTemplateReadiness(
         lastSyncedAt: true,
       },
     }).catch(() => []);
-    return resolveVariantForLocale(variants as VariantRow[], locale);
+    return resolve(variants as VariantRow[], locale);
   }
   const variants = await prisma.whatsappTemplateVariant.findMany({
     where: { templateId, provider: META_PROVIDER },
@@ -348,7 +421,7 @@ export async function getTemplateReadiness(
       lastSyncedAt: true,
     },
   }).catch(() => []);
-  return resolveVariantForLocale(variants as VariantRow[], locale);
+  return resolve(variants as VariantRow[], locale);
 }
 
 export async function approvedLocalesFor(templateId: string, businessAccountId?: string | null): Promise<string[]> {

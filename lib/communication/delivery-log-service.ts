@@ -14,7 +14,7 @@ import {
  *
  * Every outgoing message (manual, trigger, campaign, test, reactivation, system) gets a
  * CommunicationDelivery record created at render time, BEFORE any provider call. The record
- * is then advanced as the real provider responds. This package does not call any provider
+ * is then advanced as the real provider responds. This package does not call any provider 
  * it only provides the safe create/update/query foundation.
  *
  * Hard rule: a delivery may only enter a provider-success status (SENT / DELIVERED / …) when

@@ -62,13 +62,13 @@ function patchNetworkSaveEvents() {
   const originalOpen = window.XMLHttpRequest.prototype.open;
   const originalSend = window.XMLHttpRequest.prototype.send;
 
-  window.XMLHttpRequest.prototype.open = function patchedOpen(method: string, url: string | URL, ...rest: any[]) {
+  window.XMLHttpRequest.prototype.open = function patchedOpen(this: XMLHttpRequest, method: string, url: string | URL, ...rest: any[]) {
     (this as any).__dashboardMethod = method;
     (this as any).__dashboardUrl = String(url);
-    return originalOpen.call(this, method, url, ...rest as [boolean?, string?, string?]);
+    return originalOpen.call(this, method, url, rest[0] ?? true, rest[1], rest[2]);
   } as typeof window.XMLHttpRequest.prototype.open;
 
-  window.XMLHttpRequest.prototype.send = function patchedSend(...args: any[]) {
+  window.XMLHttpRequest.prototype.send = function patchedSend(this: XMLHttpRequest, ...args: any[]) {
     const method = (this as any).__dashboardMethod;
     const url = (this as any).__dashboardUrl;
     const shouldTrack = isDashboardSaveRequest(method, url);

@@ -1,3 +1,6 @@
+// Offline regression fixtures for the transferred runtime.
+import * as fixtureBrand from "../../lib/ported-systems/brand";
+import * as fixtureLocales from "../../lib/ported-systems/locales";
 import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
@@ -17,6 +20,9 @@ function loadIsolated<T>(file: string, dependencies: Record<string, unknown>): T
   new vm.Script(output, { filename: file }).runInNewContext({
     module: isolatedModule, exports: isolatedModule.exports,
     require: (id: string) => {
+ if(id==="@/lib/ported-systems/brand")return fixtureBrand;
+ if(id==="@/lib/ported-systems/locales")return fixtureLocales;
+
       if (!(id in dependencies)) throw new Error(`Unexpected dependency: ${id}`);
       return dependencies[id];
     },
@@ -32,11 +38,23 @@ function row(id: number, patch: Partial<AudienceAccountingRow> = {}): AudienceAc
 async function* rows(values: AudienceAccountingRow[]) { yield* values; }
 
 for (const channel of ["WHATSAPP", "EMAIL", "SMS"] as const) {
-  test(`${channel}: channel policy preserves DNC precedence`, () => {
+  test(`${channel}: channel preferences and explicit stop state are applied consistently`, () => {
     assert.equal(recipientExclusionReason(contact, channel, allowed), null);
     assert.equal(recipientExclusionReason(contact, channel, { ...allowed, doNotContact: true }), "DO_NOT_CONTACT");
-    assert.equal(recipientExclusionReason(contact, channel, null), channel === "WHATSAPP" ? null : "NEEDS_CONSENT_REVIEW");
-    assert.equal(recipientExclusionReason(contact, channel, {}), channel === "WHATSAPP" ? null : `${channel}_OPT_IN_REQUIRED`);
+    if (channel === "WHATSAPP") {
+      assert.equal(recipientExclusionReason(contact, channel, null), null);
+      assert.equal(recipientExclusionReason(contact, channel, {}), null);
+      assert.equal(recipientExclusionReason(contact, channel, { ...allowed, whatsappOptIn: false }), null);
+      assert.equal(recipientExclusionReason(contact, channel, { consentSource: "meta-whatsapp-inbound-opt-out" }), "DO_NOT_CONTACT");
+    } else if (channel === "EMAIL") {
+      assert.equal(recipientExclusionReason(contact, channel, null), null);
+      assert.equal(recipientExclusionReason(contact, channel, {}), null);
+      assert.equal(recipientExclusionReason(contact, channel, { emailOptIn: false }), null);
+      assert.equal(recipientExclusionReason(contact, channel, { consentSource: "elastic-email:unsubscribe" }), "DO_NOT_CONTACT");
+    } else {
+      assert.equal(recipientExclusionReason(contact, channel, null), "NEEDS_CONSENT_REVIEW");
+      assert.equal(recipientExclusionReason(contact, channel, {}), `${channel}_OPT_IN_REQUIRED`);
+    }
   });
 }
 
@@ -115,8 +133,9 @@ type GuardModule = { checkCampaignRecipientBeforeSend: (channel: AudienceChannel
 const guardCases: Array<{ name: string; donor: unknown; planned?: string; throws?: boolean; expected: string | null }> = [
   { name: "current consent permits the unchanged destination", donor: { ...contact, communicationProfile: allowed }, expected: null },
   { name: "withdrawal after planning blocks the provider", donor: { ...contact, communicationProfile: { ...allowed, doNotContact: true } }, expected: "DO_NOT_CONTACT" },
-  { name: "missing WhatsApp profile does not require opt-in", donor: { ...contact, communicationProfile: null }, expected: null },
-  { name: "unconfirmed WhatsApp opt-in does not block campaign sending", donor: { ...contact, communicationProfile: { ...allowed, whatsappOptIn: false } }, expected: null },
+  { name: "missing profile does not block WhatsApp", donor: { ...contact, communicationProfile: null }, expected: null },
+  { name: "a false internal WhatsApp opt-in field does not block sending", donor: { ...contact, communicationProfile: { ...allowed, whatsappOptIn: false } }, expected: null },
+  { name: "an explicit WhatsApp STOP still blocks sending", donor: { ...contact, communicationProfile: { doNotContact: false, consentSource: "meta-whatsapp-inbound-opt-out" } }, expected: "DO_NOT_CONTACT" },
   { name: "changed contact is never silently retargeted", donor: { ...contact, phone: "+905559998877", communicationProfile: allowed }, expected: "RECIPIENT_CONTACT_CHANGED" },
   { name: "invalid contact is rejected at execution", donor: { ...contact, phone: "wrong-number", communicationProfile: allowed }, expected: "INVALID_PHONE_FORMAT" },
   { name: "deleted donor is not sent", donor: null, expected: "RECIPIENT_NOT_FOUND" },
@@ -138,14 +157,13 @@ for (const scenario of guardCases) {
   });
 }
 
-test("preview and bootstrap agree for missing legacy email/SMS profiles, never infer WhatsApp consent", () => {
+test("preview keeps WhatsApp opt-out separate from email/SMS preferences", () => {
   const legacy = { email: "legacy@example.test", phone: "+905551112233", emailNotifications: true, smsNotifications: true };
   assert.equal(recipientExclusionReason(legacy, "EMAIL", previewConsentForLegacyDonor(legacy, "EMAIL", null)), null);
   assert.equal(recipientExclusionReason(legacy, "SMS", previewConsentForLegacyDonor(legacy, "SMS", null)), null);
-  assert.equal(previewConsentForLegacyDonor(legacy, "WHATSAPP", null), null);
-  assert.equal(recipientExclusionReason(legacy, "WHATSAPP", null), null);
+  assert.equal(recipientExclusionReason(legacy, "WHATSAPP", previewConsentForLegacyDonor(legacy, "WHATSAPP", null)), null);
   const legacyOptedOut = { ...legacy, emailNotifications: false };
-  assert.equal(recipientExclusionReason(legacyOptedOut, "EMAIL", previewConsentForLegacyDonor(legacyOptedOut, "EMAIL", null)), "EMAIL_OPT_IN_REQUIRED");
+  assert.equal(recipientExclusionReason(legacyOptedOut, "EMAIL", previewConsentForLegacyDonor(legacyOptedOut, "EMAIL", null)), null);
   assert.equal(recipientExclusionReason(legacy, "EMAIL", previewConsentForLegacyDonor(legacy, "EMAIL", { doNotContact: true, emailOptIn: true })), "DO_NOT_CONTACT");
 });
 test("legacy email/SMS previews account for the whole matching audience instead of discarding non-profile donors", async () => {
@@ -155,6 +173,7 @@ test("legacy email/SMS previews account for the whole matching audience instead 
     row(3, { communicationProfile: allowed }),
   ]), "EMAIL");
   assert.equal(outcome.matched, 3);
-  assert.equal(outcome.eligible, 2);
-  assert.equal(outcome.needsReview, 1);
+  assert.equal(outcome.eligible, 3);
+  assert.equal(outcome.needsReview, 0);
 });
+

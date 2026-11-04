@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Mail, MailCheck, MailOpen, MousePointerClick, TriangleAlert, Search, Loader2,
   RefreshCw, Inbox, SlashIcon, ChevronLeft, ChevronRight, Send,
@@ -20,6 +21,8 @@ import {
 } from "../../_shared/channel-ui";
 import { DeliveryPreviewSheet } from "../../_shared/DeliveryPreviewSheet";
 import { RetryDialog } from "../../_shared/RetryDialog";
+import { CommunicationPurposeTabs } from "../../_shared/CommunicationPurposeTabs";
+import { setCommunicationPurposeParams, type CommunicationPurposeGroup } from "@/lib/communication/purpose-group";
 import { useCampaignScope, CampaignScopeBanner } from "../../_shared/CampaignScope";
 import { cn } from "@/lib/utils";
 import { dashDir, dt, dtx } from "@/lib/dashboard/i18n";
@@ -48,7 +51,7 @@ type Payload = {
   summary: {
     total: number; allTimeTotal: number; attempted: number; delivered: number; opened: number;
     clicked: number; failed: number; skipped: number;
-    accepted: number; deliveryTrackingAvailable: boolean; deliveredRate: number | null; openRate: number; clickRate: number; failedRate: number;
+    deliveredRate: number; openRate: number; clickRate: number; failedRate: number;
   };
   trackingLive: boolean;
   /** Failed/skipped messages in range that have not been re-sent yet. */
@@ -89,6 +92,18 @@ export function buildStages(row: StageSource): JourneyStage[] {
 
 export function EmailChannelDashboard() {
   const { openUserProfile } = useViewUserProfile();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const campaignQuery = searchParams.get("campaign");
+  const explicitView = searchParams.get("view");
+  const purposeGroup: CommunicationPurposeGroup = explicitView === "marketing"
+    ? "MARKETING"
+    : explicitView === "automatic"
+      ? "AUTOMATIC"
+      : campaignQuery
+        ? "MARKETING"
+        : "AUTOMATIC";
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -103,11 +118,19 @@ export function EmailChannelDashboard() {
 
   const { campaignId, campaignName } = useCampaignScope();
 
+  const changePurposeGroup = useCallback((group: CommunicationPurposeGroup) => {
+    const params = setCommunicationPurposeParams(searchParams.toString(), group);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    setPage(1);
+  }, [pathname, router, searchParams]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({ days: String(days), status, page: String(page), limit: "25" });
+      params.set("purposeGroup", purposeGroup);
       if (search) params.set("search", search);
       if (campaignId) params.set("campaign", campaignId);
       const res = await fetch(`/api/dashboard/communication/email?${params}`, { cache: "no-store" });
@@ -119,7 +142,7 @@ export function EmailChannelDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [days, status, page, search, campaignId]);
+  }, [days, status, page, search, campaignId, purposeGroup]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -183,6 +206,8 @@ export function EmailChannelDashboard() {
           }
         />
 
+        <CommunicationPurposeTabs value={purposeGroup} onChange={changePurposeGroup} />
+
         <CampaignScopeBanner campaignId={campaignId} campaignName={campaignName} clearHref="/dashboard/communication/email" />
 
         {data && (!data.provider.configured || !data.provider.senderReady) && (
@@ -205,11 +230,13 @@ export function EmailChannelDashboard() {
           <MetricSummaryBand
             icon={Mail}
             eyebrow={dt("رسائل البريد المرسلة")}
-            badge={dt("آخر {0} يومًا", [days])}
-            value={summary.accepted.toLocaleString("en-US")}
-            note={dt("عدد الرسائل التي قبلها مزوّد البريد خلال الفترة. الرسائل المتخطّاة (بدون بريد أو غير مشتركة) غير محسوبة هنا.")}
+            badge={campaignId ? dt("إجمالي الحملة") : dt("آخر {0} يومًا", [days])}
+            value={summary.attempted.toLocaleString("en-US")}
+            note={campaignId
+              ? dt("عدد الرسائل التي قبلها مزوّد البريد في هذه الحملة. الرسائل المتخطّاة غير محسوبة هنا.")
+              : dt("عدد الرسائل التي قبلها مزوّد البريد خلال الفترة. الرسائل المتخطّاة (بدون بريد أو غير مشتركة) غير محسوبة هنا.")}
             stats={[
-              { label: dt("وصلت"), icon: MailCheck, value: summary.deliveryTrackingAvailable ? summary.delivered.toLocaleString("en-US") : "—" },
+              { label: dt("وصلت"), icon: MailCheck, value: trackingLive ? summary.delivered.toLocaleString("en-US") : "—" },
               { label: dt("فُتحت"), icon: MailOpen, value: trackingLive ? summary.opened.toLocaleString("en-US") : "—", hint: trackingLive ? `${summary.openRate}%` : undefined },
               { label: dt("نُقرت"), icon: MousePointerClick, value: trackingLive ? summary.clicked.toLocaleString("en-US") : "—", hint: trackingLive ? `${summary.clickRate}%` : undefined },
               { label: dt("فشلت"), icon: TriangleAlert, value: summary.failed.toLocaleString("en-US"), hint: `${summary.failedRate}%` },
@@ -225,7 +252,9 @@ export function EmailChannelDashboard() {
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-[13px] font-semibold text-slate-900">{dt("حركة الإرسال")}</h2>
-              <SegmentedControl options={PERIODS} value={days} onChange={setDays} />
+              {campaignId
+                ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-medium text-slate-500">{dt("مدة الحملة كاملة")}</span>
+                : <SegmentedControl options={PERIODS} value={days} onChange={setDays} />}
             </div>
 
             {loading && !data ? (
@@ -259,8 +288,8 @@ export function EmailChannelDashboard() {
             <FunnelCard
               trackingLive={trackingLive}
               steps={[
-                { label: dt("مقبول لدى المزود"), value: summary.accepted, pct: 100, tone: CHART_THEME.primary, always: true },
-                ...(summary.deliveryTrackingAvailable ? [{ label: dt("وصل"), value: summary.delivered, pct: summary.deliveredRate ?? 0, tone: CHART_STATUS.info }] : []),
+                { label: dt("مقبول لدى المزود"), value: summary.attempted, pct: 100, tone: CHART_THEME.primary, always: true },
+                { label: dt("وصل"), value: summary.delivered, pct: summary.deliveredRate, tone: CHART_STATUS.info },
                 { label: dt("فُتح"), value: summary.opened, pct: summary.openRate, tone: CHART_STATUS.success },
                 { label: dt("نُقر"), value: summary.clicked, pct: summary.clickRate, tone: CHART_THEME.secondary },
               ]}
@@ -430,7 +459,10 @@ export function EmailChannelDashboard() {
         open={retryIds !== undefined}
         channel="EMAIL"
         ids={retryIds ?? null}
+        purposeGroup={purposeGroup}
         days={days}
+        campaignId={campaignId || null}
+        campaignName={campaignName}
         onOpenChange={(open) => !open && setRetryIds(undefined)}
         onFinished={() => void load()}
       />

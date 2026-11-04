@@ -25,8 +25,6 @@ interface Props {
 interface TemplateRow {
   id: string;
   name: string;
-  kind?: string | null;
-  status?: string | null;
 }
 
 export function TriggerEditorDialog({ open, onOpenChange }: Props) {
@@ -69,8 +67,7 @@ export function TriggerEditorDialog({ open, onOpenChange }: Props) {
   }, [channel]);
 
   const eventDef = event ? EVENT_CATALOG.find((e) => e.event === event) : null;
-  const templates = (channel === "EMAIL" ? emailTemplates : channel === "WHATSAPP" ? whatsappTemplates : smsTemplates)
-    .filter((template) => template.kind === "SYSTEM" && template.status !== "ARCHIVED");
+  const templates = channel === "EMAIL" ? emailTemplates : channel === "WHATSAPP" ? whatsappTemplates : smsTemplates;
   const isScheduled = eventDef?.scheduled === true;
   const lapseValue = Number(lapseDays);
   const cooldownValue = Number(cooldownDays);

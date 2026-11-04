@@ -1,8 +1,12 @@
+import { campaignTrackingValues, trackCampaignBody, trackCampaignMetaButtons } from "./campaign-message-tracking";
 import { templateLocaleHeader } from "./template-locale-media";
+import { getSmartAudienceDefinitionForSegmentKey } from "./smart-audience";
+import { recentMarketingDeliveryWhere } from "./recent-marketing-filter";
 import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit-log";
 import type { CommunicationCampaign } from "@prisma/client";
 import { getCampaign } from "./campaign-service";
+import { evaluateCoverageGate } from "./campaign-approval-service";
 import { planCampaignSend, type SendPlan } from "./campaign-send-planner";
 import { renderChannelTemplate } from "./template-compat";
 import { loadContextsForUserIds } from "@/lib/templates/variables";
@@ -12,8 +16,9 @@ import { resolveProviderForSendWithRuntime, sendPreparedDelivery } from "./provi
 import { EMAIL_PROVIDER_ID } from "./providers/email/client";
 import { getActiveCommunicationRuntimeBundle } from "./runtime-config";
 import { loadSenderRoutingSnapshot, resolveSenderFromSnapshot } from "./sender-resolution";
-import { resolveVariantForLocale, NOT_READY, META_PROVIDER } from "./whatsapp-template-sync";
-import { buildMetaComponents } from "./providers/meta-whatsapp/parameters";
+import { NOT_READY, META_PROVIDER } from "./whatsapp-template-sync";
+import { resolveExactVariantForLocale } from "./whatsapp-template-readiness";
+import { buildMetaComponents, type MetaComponent } from "./providers/meta-whatsapp/parameters";
 import { buildWhatsappRenderedPreview } from "./whatsapp-rendered-preview";
 import { resolveAudienceOrigin } from "./audience-list-service";
 import { computeFinalStatus, recomputeCampaignCounters } from "./campaign-counter-service";
@@ -23,7 +28,13 @@ import { mergeCampaignMetadata, mutateCampaignMetadata } from "./campaign-metada
 import { phoneMatchVariants } from "./phone";
 import { normalizeCampaignContact } from "./campaign-contact-validation";
 import { checkCampaignRecipientBeforeSend } from "./campaign-recipient-guard";
-import { DEFAULT_LOCALE, isValidLocale, type SupportedLocale } from "@/lib/locales";
+import { retryDefinitelyNotSent } from "./retry-recipient-guard";
+import {
+  reserveWhatsappMarketingSend,
+  releaseWhatsappMarketingReservation,
+  type WhatsAppMarketingReservation,
+} from "./whatsapp-marketing-frequency";
+import { DEFAULT_LOCALE, isValidLocale, type AnyLocale as SupportedLocale } from "@/lib/ported-systems/locales";
 import { recipientTimeZone } from "./recipient-timezone";
 
 export { computeFinalStatus };
@@ -97,7 +108,7 @@ async function countDeferredQuietRecipients(campaignId: string): Promise<number>
 }
 
 async function loadWhatsappTemplateTruth(templateId: string): Promise<{
-  byWaba: Map<string, Parameters<typeof resolveVariantForLocale>[0]>;
+  byWaba: Map<string, Parameters<typeof resolveExactVariantForLocale>[0]>;
   templateMedia: { header?: unknown; translations?: unknown };
   positionalNames: string[]; scopedNames: Record<string, string>; headerMediaUrl: string | null; headerMediaFilename: string | null;
   headerLocation: { latitude: number; longitude: number; name?: string; address?: string } | null;
@@ -106,7 +117,7 @@ async function loadWhatsappTemplateTruth(templateId: string): Promise<{
     prisma.whatsappTemplateWabaVariant.findMany({ where: { templateId, provider: META_PROVIDER }, select: { businessAccountId: true, languageCode: true, locale: true, approvalStatus: true, category: true, providerTemplateName: true, componentsSchema: true, rejectionReason: true, lastSyncedAt: true } }),
     prisma.whatsappTemplate.findUnique({ where: { id: templateId }, select: { variables: true, header: true, translations: true } }),
   ]);
-  const byWaba = new Map<string, Parameters<typeof resolveVariantForLocale>[0]>();
+  const byWaba = new Map<string, Parameters<typeof resolveExactVariantForLocale>[0]>();
   for (const row of variants) { const list = byWaba.get(row.businessAccountId) ?? []; list.push(row); byWaba.set(row.businessAccountId, list); }
   const catalog = Array.isArray(tpl?.variables) ? tpl!.variables as unknown[] : [];
   const positionalNames: string[] = [];
@@ -225,6 +236,7 @@ async function executeCampaignRun(campaignId: string, opts: ExecutionOptions): P
   const campaign = await getCampaign(campaignId);
   if (!campaign) return { ...base, blocked: "NOT_FOUND" };
   base.status = campaign.status;
+  const recentMarketingDays = (await getSmartAudienceDefinitionForSegmentKey(campaign.audienceSegmentKey))?.filters.excludeMarketedWithinDays;
   const controlGate = await evaluateCampaignSendControls(campaign);
   if (!controlGate.ok) return { ...base, blocked: controlGate.reason };
   const speed = speedSettings(controlGate.controls.speedMode);
@@ -242,6 +254,13 @@ async function executeCampaignRun(campaignId: string, opts: ExecutionOptions): P
     if (leaseIsFresh(leaseOf(campaign))) return { ...base, blocked: "ALREADY_RUNNING" };
   }
   const resuming = mode === "RESUME";
+  if (!resuming) {
+    const coverage = await evaluateCoverageGate(campaignId);
+    if (!coverage.ok) {
+      await auditBlocked(campaign, "LANGUAGE_COVERAGE_INCOMPLETE", actor, mode);
+      return { ...base, blocked: "LANGUAGE_COVERAGE_INCOMPLETE" };
+    }
+  }
   const observedProgress = JSON.stringify(metaOf(campaign).sendProgress ?? null);
   const progress: SendProgress = progressOf(campaign) ?? { cursor: null, batches: 0, total: 0, sent: 0, skipped: 0, failed: 0, reasons: {}, startedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), done: false, blockedRuns: 0 };
   let firstPlan = await planCampaignSend(campaignId, { batchSize, cursor: resuming ? progress.cursor : null });
@@ -253,7 +272,7 @@ async function executeCampaignRun(campaignId: string, opts: ExecutionOptions): P
   if (firstPlan.blocked) {
     await auditBlocked(campaign, firstPlan.blocked, actor, mode, firstPlan);
     const giveUp = resuming && progress.blockedRuns + 1 >= MAX_BLOCKED_RESUMES;
-    const lastRun = { ranAt: new Date().toISOString(), mode, blocked: firstPlan.blocked, reasons: firstPlan.reasons, truncated: true };
+    const lastRun = { ranAt: new Date().toISOString(), mode, blocked: firstPlan.blocked, undecidedLocales: firstPlan.coverage.undecided, reasons: firstPlan.reasons, truncated: true };
     await mutateCampaignMetadata(campaignId, (current) => {
       if (leaseIsFresh(leaseFromMetadata(current)) || JSON.stringify(current.sendProgress ?? null) !== observedProgress) return null;
       return { ...current, lastRun, ...(resuming ? { sendProgress: { ...progress, done: false, blockedRuns: progress.blockedRuns + 1, updatedAt: new Date().toISOString() }, sendLease: null } : {}) };
@@ -330,7 +349,7 @@ async function executeCampaignRun(campaignId: string, opts: ExecutionOptions): P
     }
     for (const skipped of plan.skippedList) {
       if (alreadyDone.has(skipped.userId)) { recoverOutcome(skipped.userId, tally); continue; }
-      await recordSkippedDelivery({ channel, campaignId, templateId, recipientUserId: skipped.userId, locale: skipped.locale, purpose, origin, createdBy: actor?.actorId ?? null }, skipped.reason);
+      await recordSkippedDelivery({ channel, campaignId, templateId, recipientUserId: skipped.userId, recipientName: skipped.name, recipientEmail: channel === "EMAIL" ? skipped.email : null, recipientPhone: channel !== "EMAIL" ? skipped.phone : null, locale: skipped.locale, purpose, origin, createdBy: actor?.actorId ?? null }, skipped.reason);
       tally.skipped++; bump(tally.reasons, skipped.reason);
     }
     const contexts = await loadContextsForUserIds(plan.recipients.map((recipient) => recipient.userId));
@@ -338,9 +357,15 @@ async function executeCampaignRun(campaignId: string, opts: ExecutionOptions): P
       const outcome: BatchTally = { total: 0, sent: 0, skipped: 0, failed: 0, reasons: {} };
       if (Date.now() + 15_000 >= deadline) throw new Error("RUN_TIME_BUDGET_REACHED");
       if (alreadyDone.has(recipient.userId)) { recoverOutcome(recipient.userId, outcome); return outcome; }
+      if (recentMarketingDays && await prisma.communicationDelivery.findFirst({
+        where: { AND: [recentMarketingDeliveryWhere(recentMarketingDays), { OR: [{ recipientUserId: recipient.userId }, ...(channel === "EMAIL" && recipient.email ? [{ recipientEmail: { equals: recipient.email.trim(), mode: "insensitive" as const } }] : []), ...(channel !== "EMAIL" && recipient.phone ? [{ recipientPhone: { in: phoneMatchVariants(recipient.phone) } }] : [])] }] }, select: { id: true },
+      })) {
+        await recordSkippedDelivery({ channel, campaignId, templateId, recipientUserId: recipient.userId, recipientName: recipient.name, locale: recipient.locale, purpose, origin, createdBy: actor?.actorId ?? null }, "RECENT_MARKETING_CONTACT");
+        outcome.skipped++; bump(outcome.reasons, "RECENT_MARKETING_CONTACT"); return outcome;
+      }
       const contactKey = normalizeRecipientContact(channel, recipient.email, recipient.phone);
       if (contactKey && (alreadyDoneContacts.has(contactKey) || claimedBatchContacts.has(contactKey))) {
-        await recordSkippedDelivery({ channel, campaignId, templateId, recipientUserId: recipient.userId, recipientEmail: channel === "EMAIL" ? recipient.email : null, recipientPhone: channel !== "EMAIL" ? recipient.phone : null, locale: recipient.locale, purpose, origin, createdBy: actor?.actorId ?? null }, "DUPLICATE_RECIPIENT_CONTACT");
+        await recordSkippedDelivery({ channel, campaignId, templateId, recipientUserId: recipient.userId, recipientName: recipient.name, recipientEmail: channel === "EMAIL" ? recipient.email : null, recipientPhone: channel !== "EMAIL" ? recipient.phone : null, locale: recipient.locale, purpose, origin, createdBy: actor?.actorId ?? null }, "DUPLICATE_RECIPIENT_CONTACT");
         outcome.skipped++; bump(outcome.reasons, "DUPLICATE_RECIPIENT_CONTACT"); return outcome;
       }
       // Claim synchronously before the first await, then check live controls
@@ -350,37 +375,40 @@ async function executeCampaignRun(campaignId: string, opts: ExecutionOptions): P
       const loadedCtx = contexts.get(recipient.userId) ?? null;
       const recipientCtx = loadedCtx && updateSource ? { ...loadedCtx, update: updateContextFor(updateSource, recipient.locale, campaignId) } : loadedCtx;
       if (!recipientCtx) {
-        await recordSkippedDelivery({ channel, campaignId, templateId, recipientUserId: recipient.userId, locale: recipient.locale, purpose, origin }, "CONTEXT_LOAD_FAILED");
+        await recordSkippedDelivery({ channel, campaignId, templateId, recipientUserId: recipient.userId, recipientName: recipient.name, recipientEmail: channel === "EMAIL" ? recipient.email : null, recipientPhone: channel !== "EMAIL" ? recipient.phone : null, locale: recipient.locale, purpose, origin }, "CONTEXT_LOAD_FAILED");
         outcome.skipped++; bump(outcome.reasons, "CONTEXT_LOAD_FAILED"); return outcome;
       }
       const rendered = await renderChannelTemplate(channel, templateId, recipient.locale, recipientCtx, fallbackLocale, "CAMPAIGN");
       if (!rendered) {
-        await recordSkippedDelivery({ channel, campaignId, templateId, recipientUserId: recipient.userId, locale: recipient.locale, purpose, origin }, "TEMPLATE_RENDER_FAILED");
+        await recordSkippedDelivery({ channel, campaignId, templateId, recipientUserId: recipient.userId, recipientName: recipient.name, recipientEmail: channel === "EMAIL" ? recipient.email : null, recipientPhone: channel !== "EMAIL" ? recipient.phone : null, locale: recipient.locale, purpose, origin }, "TEMPLATE_RENDER_FAILED");
         outcome.skipped++; bump(outcome.reasons, "TEMPLATE_RENDER_FAILED"); return outcome;
       }
-      if (rendered.usedFallback && decisions[recipient.locale] === "EXCLUDE") {
-        await recordSkippedDelivery({ channel, campaignId, templateId, recipientUserId: recipient.userId, locale: recipient.locale, purpose, origin, templateName: rendered.templateName }, "LANGUAGE_EXCLUDED");
-        outcome.skipped++; bump(outcome.reasons, "LANGUAGE_EXCLUDED"); return outcome;
+      if (rendered.usedFallback || rendered.resolvedLocale !== recipient.locale) {
+        const reason = decisions[recipient.locale] === "EXCLUDE" ? "LANGUAGE_EXCLUDED" : "EXACT_TEMPLATE_LANGUAGE_REQUIRED";
+        await recordSkippedDelivery({ channel, campaignId, templateId, recipientUserId: recipient.userId, recipientName: recipient.name, recipientEmail: channel === "EMAIL" ? recipient.email : null, recipientPhone: channel !== "EMAIL" ? recipient.phone : null, locale: recipient.locale, purpose, origin, templateName: rendered.templateName }, reason);
+        outcome.skipped++; bump(outcome.reasons, reason); return outcome;
       }
-      const routed = resolveSenderFromSnapshot(senderSnapshot, { locale: recipient.locale, country: recipient.country, purpose });
+      rendered.body = trackCampaignBody(rendered.body, { id: campaignId, channel });
+      const routed = resolveSenderFromSnapshot(senderSnapshot, { locale: recipient.locale, country: recipient.country, purpose, template: senderSnapshot.channel === "WHATSAPP" });
       const sender = routed.ok ? routed.sender : null;
       const routingReason = routed.ok ? null : routed.reason;
+      const routing = routed.ok ? { matchedBy: routed.matchedBy, ruleId: routed.ruleId ?? null, fallbackUsed: routed.fallbackUsed ?? false } : { reason: routed.reason };
       let to = channel === "EMAIL" ? recipient.email ?? "" : recipient.phone ?? "";
       const decision = resolveProviderForSendWithRuntime(runtime, channel, sender, { country: recipient.country, phone: to });
       const provider = decision.canSend ? decision.providerId : channel === "WHATSAPP" ? "META_WHATSAPP" : channel === "EMAIL" ? EMAIL_PROVIDER_ID : undefined;
       const snapshot = JSON.parse(JSON.stringify(recipientCtx)) as Record<string, unknown>;
-      const created = await createDeliveryRecord({ channel, provider: provider as never, campaignId, templateId, templateName: rendered.templateName, recipientUserId: recipient.userId, recipientEmail: channel === "EMAIL" ? recipient.email : null, recipientPhone: channel !== "EMAIL" ? recipient.phone : null, recipientName: recipient.name, locale: recipient.locale, purpose, origin, renderedSubject: rendered.subject, renderedBody: rendered.body, variables: { snapshot }, senderId: sender?.id ?? null, createdBy: actor?.actorId ?? null, status: "RENDERED" });
+      const created = await createDeliveryRecord({ channel, provider: provider as never, campaignId, templateId, templateName: rendered.templateName, recipientUserId: recipient.userId, recipientEmail: channel === "EMAIL" ? recipient.email : null, recipientPhone: channel !== "EMAIL" ? recipient.phone : null, recipientName: recipient.name, locale: recipient.locale, purpose, origin, renderedSubject: rendered.subject, renderedBody: rendered.body, variables: { snapshot, routing }, senderId: sender?.id ?? null, createdBy: actor?.actorId ?? null, status: "RENDERED" });
       if (!created.ok) throw new Error("ARCHIVE_WRITE_FAILED");
       const deliveryId = created.data.id;
-      if (!sender && channel !== "SMS") {
+      if (!routed.ok) {
         const reason = routingReason ?? "NO_SENDER_AVAILABLE";
         await markDeliveryStatus(deliveryId, "SKIPPED", { errorMessage: reason });
         outcome.skipped++; bump(outcome.reasons, reason); return outcome;
       }
       let metaName = rendered.templateName, metaLanguage: string = recipient.locale;
-      let metaComponents: unknown[] | undefined;
+      let metaComponents: MetaComponent[] | undefined;
       if (channel === "WHATSAPP") {
-        const readiness = whatsapp && sender?.businessAccountId ? resolveVariantForLocale(whatsapp.byWaba.get(sender.businessAccountId) ?? [], recipient.locale, fallbackLocale) : NOT_READY;
+        const readiness = whatsapp && sender?.businessAccountId ? resolveExactVariantForLocale(whatsapp.byWaba.get(sender.businessAccountId) ?? [], recipient.locale) : NOT_READY;
         if (!readiness.ready || !readiness.providerTemplateName || !readiness.languageCode) {
           const reason = readiness.reason ?? "META_TEMPLATE_REQUIRED";
           await markDeliveryStatus(deliveryId, "SKIPPED", { errorMessage: reason });
@@ -394,16 +422,34 @@ async function executeCampaignRun(campaignId: string, opts: ExecutionOptions): P
           outcome.skipped++; bump(outcome.reasons, reason); return outcome;
         }
         const localizedHeader = templateLocaleHeader(whatsapp?.templateMedia ?? {}, readiness.locale ?? readiness.languageCode);
-        const built = buildMetaComponents({ componentsSchema: readiness.componentsSchema, values: templateValuesFor(whatsapp?.positionalNames ?? [], recipientCtx), positionalNames: whatsapp?.positionalNames ?? [], scopedNames: whatsapp?.scopedNames ?? {}, headerMediaUrl: typeof localizedHeader.mediaUrl === "string" ? localizedHeader.mediaUrl : null, headerMediaFilename: typeof localizedHeader.fileName === "string" ? localizedHeader.fileName : null, headerLocation: whatsapp?.headerLocation ?? null });
+        const built = buildMetaComponents({ componentsSchema: readiness.componentsSchema, values: campaignTrackingValues(readiness.componentsSchema, templateValuesFor(whatsapp?.positionalNames ?? [], recipientCtx), { id: campaignId, channel }), positionalNames: whatsapp?.positionalNames ?? [], scopedNames: whatsapp?.scopedNames ?? {}, headerMediaUrl: typeof localizedHeader.mediaUrl === "string" ? localizedHeader.mediaUrl : null, headerMediaFilename: typeof localizedHeader.fileName === "string" ? localizedHeader.fileName : null, headerLocation: whatsapp?.headerLocation ?? null });
         if (!built.ok) {
           await markDeliveryStatus(deliveryId, "SKIPPED", { errorMessage: `${built.reason}  ${built.detail}` });
           outcome.skipped++; bump(outcome.reasons, built.reason); return outcome;
         }
-        metaName = readiness.providerTemplateName; metaLanguage = readiness.languageCode; metaComponents = built.components;
-        await updateDeliveryVariables(deliveryId, { snapshot, whatsappPreview: buildWhatsappRenderedPreview({ componentsSchema: readiness.componentsSchema, builtComponents: built.components, fallbackBody: rendered.body, providerTemplateName: readiness.providerTemplateName, languageCode: readiness.languageCode }) });
+        metaName = readiness.providerTemplateName; metaLanguage = readiness.languageCode; metaComponents = trackCampaignMetaButtons({ campaign: { id: campaignId, channel }, componentsSchema: readiness.componentsSchema, components: built.components });
+        await updateDeliveryVariables(deliveryId, { snapshot, routing, whatsappPreview: buildWhatsappRenderedPreview({ componentsSchema: readiness.componentsSchema, builtComponents: metaComponents, fallbackBody: rendered.body, providerTemplateName: readiness.providerTemplateName, languageCode: readiness.languageCode }) });
       }
+      let frequencyReservation: WhatsAppMarketingReservation | null = null;
+      if (channel === "WHATSAPP" && purpose === "MARKETING") {
+        const frequency = await reserveWhatsappMarketingSend(recipient.userId, new Date(), to);
+        if (!frequency.ok) {
+          await markDeliveryStatus(
+            deliveryId,
+            frequency.reason === "WHATSAPP_MARKETING_COOLDOWN" ? "SKIPPED" : "FAILED",
+            { errorMessage: frequency.reason },
+          );
+          if (frequency.reason === "WHATSAPP_MARKETING_COOLDOWN") outcome.skipped++;
+          else outcome.failed++;
+          bump(outcome.reasons, frequency.reason);
+          return outcome;
+        }
+        frequencyReservation = frequency.reservation;
+      }
+      // Keep the live consent/contact check immediately adjacent to the provider call.
       const executionCheck = await checkCampaignRecipientBeforeSend(channel, recipient.userId, to);
       if (!executionCheck.ok) {
+        if (frequencyReservation) await releaseWhatsappMarketingReservation(frequencyReservation);
         await markDeliveryStatus(deliveryId, executionCheck.unavailable ? "FAILED" : "SKIPPED", { errorMessage: executionCheck.reason });
         if (executionCheck.unavailable) outcome.failed++; else outcome.skipped++;
         bump(outcome.reasons, executionCheck.reason); return outcome;
@@ -418,6 +464,9 @@ async function executeCampaignRun(campaignId: string, opts: ExecutionOptions): P
         outcome.failed++; bump(outcome.reasons, "DELIVERY_OUTCOME_UNCERTAIN"); return outcome;
       }
       if (!result.ok) {
+        if (frequencyReservation && retryDefinitelyNotSent(result.reason)) {
+          await releaseWhatsappMarketingReservation(frequencyReservation);
+        }
         const terminal = result.reason.endsWith("_NOT_CONFIGURED") || result.reason.endsWith("_NOT_IMPLEMENTED") || result.reason === "EMAIL_SUPPRESSED" || result.reason.includes("SENDER_MISSING") || result.reason === "PROVIDER_DISABLED" || result.reason === "INTEGRATION_DECRYPTION_FAILED" || result.reason === "INTEGRATION_DATABASE_UNAVAILABLE";
         await markDeliveryStatus(deliveryId, terminal ? "SKIPPED" : "FAILED", { errorMessage: result.detail ? `${result.reason}  ${result.detail}` : result.reason });
         if (terminal) outcome.skipped++; else outcome.failed++;

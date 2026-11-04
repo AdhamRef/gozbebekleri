@@ -1,3 +1,5 @@
+import { checkSiteAccess } from "./lib/site-security/request";
+import type { NextFetchEvent } from "next/server";
 import createIntlMiddleware from 'next-intl/middleware';
 import { NextResponse, type NextRequest } from 'next/server';
 import {
@@ -6,7 +8,7 @@ import {
 } from '@/lib/currency-link';
 import { currencyForCountry } from '@/lib/geo/country-to-currency';
 import { localeForCountry } from '@/lib/geo/country-to-locale';
-import { SUPPORTED_LOCALES, DEFAULT_LOCALE } from '@/lib/locales';
+import { SUPPORTED_LOCALES, DEFAULT_LOCALE } from '@/lib/ported-systems/locales';
 
 // Single source of truth (enabled/public locales) — see `lib/locales.ts`.
 const LOCALES = SUPPORTED_LOCALES;
@@ -32,7 +34,7 @@ function countryFromHeaders(req: NextRequest): string | null {
 // Runs before SSR so the page renders with `currency` already in cookies —
 // otherwise scripts/pixels would fire with the default (USD) before the
 // client-side `?currency=` sync catches up.
-export default function middleware(req: NextRequest) {
+function localizedResponse(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
 
   // Locale-less URL (e.g. a share link generated with auto-locale): pick a
@@ -85,10 +87,17 @@ export default function middleware(req: NextRequest) {
   return response;
 }
 
+export default async function proxy(req: NextRequest, event: NextFetchEvent) {
+  const denied = await checkSiteAccess(req, event);
+  if (denied) return denied;
+  if (/^\/(?:api|dashboard|auth)(?:\/|$)/.test(req.nextUrl.pathname)) return NextResponse.next();
+  return localizedResponse(req);
+}
+
 export const config = {
   // Catch every public path so locale-less share links also reach the middleware
   // and can be redirected. Excludes: API/Next internals/Vercel internals,
   // the standalone dashboard + auth routes (not localized), and any file with
   // an extension (favicon, images, sitemap.xml, etc.).
-  matcher: ['/((?!api|_next|_vercel|dashboard|auth|.*\\..*).*)'],
+  matcher: ['/((?!_next|_vercel|.*\\..*).*)'],
 };

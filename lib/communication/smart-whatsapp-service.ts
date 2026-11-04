@@ -1,5 +1,4 @@
 import "server-only";
-import { classifyEventTemplates } from "./template-event-classification";
 
 import { prisma } from "@/lib/prisma";
 import { createDeliveryRecord, markDeliveryStatus } from "./delivery-log-service";
@@ -13,10 +12,19 @@ import { renderChannelTemplate } from "./template-compat";
 import { resolveMetaTemplateMapping } from "./automatic-message-dispatcher";
 import { buildMetaComponents } from "./providers/meta-whatsapp/parameters";
 import { buildWhatsappRenderedPreview } from "./whatsapp-rendered-preview";
-import { isValidLocale, type SupportedLocale } from "@/lib/locales";
+import { isValidLocale, type AnyLocale as SupportedLocale } from "@/lib/ported-systems/locales";
 import { writeAuditLog } from "@/lib/audit-log";
 import { touchProfileCommunication } from "./donor-communication-profile-service";
 import { smartWhatsappTemplateChoices } from "./smart-whatsapp-templates";
+import { classifyEventTemplates } from "./template-event-classification";
+import { isWhatsappExplicitlyUnsubscribed } from "./campaign-audience-accounting";
+import { retryDefinitelyNotSent } from "./retry-recipient-guard";
+import { templateLocaleFromLanguage } from "./template-locale-media";
+import {
+  reserveWhatsappMarketingSend,
+  releaseWhatsappMarketingReservation,
+  type WhatsAppMarketingReservation,
+} from "./whatsapp-marketing-frequency";
 
 type Actor = { actorId?: string | null; actorName?: string | null; actorRole?: string | null } | null;
 export type SmartWhatsappMode = "AUTO" | "FREEFORM" | "UTILITY" | "MARKETING";
@@ -28,7 +36,8 @@ export type SmartWhatsappContext = {
   locale: string;
   country: string | null;
   doNotContact: boolean;
-  whatsappOptIn: boolean;
+  whatsappUnsubscribed: boolean;
+  consentCheckUnavailable: boolean;
   directSendEnabled: boolean;
   conversationId: string | null;
   replyWindow: Awaited<ReturnType<typeof replyWindowFor>>;
@@ -57,26 +66,45 @@ function valuesFor(names: string[], ctx: unknown): Record<string, string> {
   return values;
 }
 
+/** Recheck platform-wide blocks and an explicit WhatsApp STOP just before sending. */
+async function checkWhatsappRecipientStop(userId: string): Promise<"DO_NOT_CONTACT" | "CONSENT_CHECK_UNAVAILABLE" | null> {
+  try {
+    const profile = await prisma.donorCommunicationProfile.findUnique({
+      where: { userId },
+      select: { doNotContact: true, consentSource: true },
+    });
+    if (!profile) return "CONSENT_CHECK_UNAVAILABLE";
+    return profile.doNotContact || isWhatsappExplicitlyUnsubscribed(profile) ? "DO_NOT_CONTACT" : null;
+  } catch {
+    return "CONSENT_CHECK_UNAVAILABLE";
+  }
+}
+
 async function donor(userId: string) {
-  const [user, profile] = await Promise.all([
+  const [user, profileResult] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, name: true, phone: true, preferredLang: true, countryCode: true },
     }),
     prisma.donorCommunicationProfile.findUnique({
       where: { userId },
-      select: { phone: true, preferredLocale: true, countryCode: true, doNotContact: true, whatsappOptIn: true },
-    }).catch(() => null),
+      select: { phone: true, preferredLocale: true, countryCode: true, doNotContact: true, consentSource: true },
+    }).then((value) => ({ value, unavailable: false })).catch(() => ({ value: null, unavailable: true })),
   ]);
   if (!user) return null;
+  const profile = profileResult.value;
+  const locale = [profile?.preferredLocale, user.preferredLang]
+    .map((value) => templateLocaleFromLanguage(value ?? ""))
+    .find(isValidLocale) ?? "ar";
   return {
     id: user.id,
     name: user.name,
     phone: normalizePhoneE164(profile?.phone ?? user.phone),
-    locale: profile?.preferredLocale ?? user.preferredLang ?? "ar",
+    locale,
     country: profile?.countryCode ?? user.countryCode ?? null,
     doNotContact: profile?.doNotContact ?? false,
-    whatsappOptIn: profile?.whatsappOptIn ?? false,
+    whatsappUnsubscribed: isWhatsappExplicitlyUnsubscribed(profile),
+    consentCheckUnavailable: profileResult.unavailable,
   };
 }
 
@@ -108,50 +136,30 @@ export async function getSmartWhatsappContext(userId: string): Promise<SmartWhat
       }).catch(() => null)
     : null;
 
-  const locale = isValidLocale(d.locale) ? d.locale : "ar";
-  const snapshot = await loadSenderRoutingSnapshot("WHATSAPP");
-  const utilityRoute = resolveSenderFromSnapshot(snapshot, { locale, country: d.country, purpose: "UTILITY" });
-  const marketingRoute = resolveSenderFromSnapshot(snapshot, { locale, country: d.country, purpose: "MARKETING" });
-  const wabas = {
-    UTILITY: utilityRoute.ok ? utilityRoute.sender.businessAccountId : null,
-    MARKETING: marketingRoute.ok ? marketingRoute.sender.businessAccountId : null,
+  const [templates, routing] = await Promise.all([
+    prisma.whatsappTemplate.findMany({
+      where: { OR: [{ status: { not: "ARCHIVED" } }, { status: null }, { status: { isSet: false } }], wabaVariants: { some: { provider: "META_WHATSAPP", approvalStatus: "APPROVED" } } },
+      select: { id: true, name: true, category: true, purpose: true, kind: true, wabaVariants: {where: {provider: "META_WHATSAPP"}} },
+      orderBy: { updatedAt: "desc" }, take: 100,
+    }),
+    loadSenderRoutingSnapshot("WHATSAPP"),
+  ]);
+  const classified = await classifyEventTemplates("WHATSAPP", templates);
+  const routedWaba = (purpose: "UTILITY" | "MARKETING") => {
+    const result = resolveSenderFromSnapshot(routing, {locale: d.locale, country: d.country, purpose, template: true});
+    return result.ok ? result.sender.businessAccountId : null;
   };
-  const businessAccountIds = [...new Set(Object.values(wabas).filter((id): id is string => Boolean(id)))];
-  // The aggregate can be unapproved because a different WABA is missing this language.
-  // Read exact rows once; do not let that unrelated account hide an available template.
-  const templates = businessAccountIds.length ? await prisma.whatsappTemplate.findMany({
-    where: {
-      provider: { in: ["META", "META_WHATSAPP"] },
-      status: { not: "ARCHIVED" },
-      wabaVariants: { some: { provider: "META_WHATSAPP", businessAccountId: { in: businessAccountIds } } },
-    },
-    select: {
-      id: true,
-      name: true,
-      kind: true,
-      purpose: true,
-      category: true,
-      wabaVariants: {
-        where: { provider: "META_WHATSAPP", businessAccountId: { in: businessAccountIds } },
-        select: {
-          businessAccountId: true, languageCode: true, locale: true, approvalStatus: true,
-          category: true, providerTemplateName: true, componentsSchema: true,
-          rejectionReason: true, lastSyncedAt: true,
-        },
-      },
-    },
-    orderBy: { updatedAt: "desc" },
-  }) : [];
-  const { marketingTemplates, utilityTemplates } = smartWhatsappTemplateChoices(await classifyEventTemplates("WHATSAPP", templates), locale, wabas);
+  const {marketingTemplates, utilityTemplates} = smartWhatsappTemplateChoices(classified, d.locale, {UTILITY: routedWaba("UTILITY"), MARKETING: routedWaba("MARKETING")});
 
   return {
     userId,
     phone: d.phone,
     name: d.name,
-    locale,
+    locale: d.locale,
     country: d.country,
     doNotContact: d.doNotContact,
-    whatsappOptIn: d.whatsappOptIn,
+    whatsappUnsubscribed: d.whatsappUnsubscribed,
+    consentCheckUnavailable: d.consentCheckUnavailable,
     directSendEnabled: process.env.META_WHATSAPP_DIRECT_SEND_ENABLED === "true",
     conversationId: convId,
     replyWindow,
@@ -179,16 +187,18 @@ async function sendApprovedTemplateForDonor(args: {
   });
   if (!template) return { ok: false, reason: "TEMPLATE_NOT_FOUND" };
   const classified = (await classifyEventTemplates("WHATSAPP", [template]))[0];
-  if (classified.kind !== (args.expected === "MARKETING" ? "CAMPAIGN" : "SYSTEM")) return { ok: false, reason: "TEMPLATE_USAGE_MISMATCH" };
+  const expectedKind = args.expected === "MARKETING" ? "CAMPAIGN" : "SYSTEM";
+  if (classified.kind !== expectedKind) return { ok: false, reason: "TEMPLATE_USAGE_MISMATCH" };
   if (template.status === "ARCHIVED") return { ok: false, reason: "TEMPLATE_ARCHIVED" };
-  const mapping = await resolveMetaTemplateMapping(template, args.locale, args.sender.businessAccountId);
-  if (!mapping) return { ok: false, reason: "META_TEMPLATE_NOT_APPROVED_FOR_SENDER_LANGUAGE" };
-  const providerCategory = String(mapping.category ?? "").toUpperCase();
-  if (providerCategory !== args.expected) {
-    return { ok: false, reason: "META_TEMPLATE_CATEGORY_MISMATCH", detail: `Meta: ${providerCategory || "UNKNOWN"} · Expected: ${args.expected}` };
+
+  const category = String(template.category ?? template.purpose ?? "").toUpperCase();
+  if (args.expected === "MARKETING") {
+    if (category !== "MARKETING" && template.kind !== "CAMPAIGN") return { ok: false, reason: "MARKETING_TEMPLATE_REQUIRED" };
+  } else if (!["UTILITY", "TRANSACTIONAL"].includes(category)) {
+    return { ok: false, reason: "UTILITY_TEMPLATE_REQUIRED" };
   }
 
-  const contexts = await loadContextsForUserIds([args.ctx.userId]);
+  const contexts = await loadContextsForUserIds([args.ctx.userId], args.locale);
   let renderCtx: TemplateContext | undefined = contexts.get(args.ctx.userId);
   if (!renderCtx) return { ok: false, reason: "CONTEXT_LOAD_FAILED" };
 
@@ -222,14 +232,22 @@ async function sendApprovedTemplateForDonor(args: {
       select: { id: true },
     }).catch(() => null);
     if (focus?.id) {
-      const focused = await loadContextForDonation(focus.id);
+      const focused = await loadContextForDonation(focus.id, args.locale);
       if (focused) renderCtx = focused;
     }
   }
 
-  const rendered = await renderChannelTemplate("WHATSAPP", template.id, args.locale, renderCtx, "ar", args.expected === "MARKETING" ? "CAMPAIGN" : "SYSTEM");
+  const rendered = await renderChannelTemplate("WHATSAPP", template.id, args.locale, renderCtx, "ar", expectedKind);
   if (!rendered) return { ok: false, reason: "TEMPLATE_RENDER_FAILED" };
 
+  const mapping = await resolveMetaTemplateMapping(template, args.locale, args.sender.businessAccountId, { exactLanguage: true });
+  if (!mapping || templateLocaleFromLanguage(mapping.language) !== args.locale) {
+    return { ok: false, reason: "META_TEMPLATE_NOT_APPROVED_FOR_SENDER_LANGUAGE" };
+  }
+  const providerCategory = String(mapping.category ?? "").toUpperCase();
+  if (providerCategory && providerCategory !== args.expected) {
+    return { ok: false, reason: "META_TEMPLATE_CATEGORY_MISMATCH", detail: `Meta: ${providerCategory} · Expected: ${args.expected}` };
+  }
   const built = buildMetaComponents({
     componentsSchema: mapping.componentsSchema,
     values: valuesFor(mapping.positionalNames, renderCtx),
@@ -240,6 +258,14 @@ async function sendApprovedTemplateForDonor(args: {
     headerLocation: mapping.headerLocation,
   });
   if (!built.ok) return { ok: false, reason: built.reason, detail: built.detail };
+  const whatsappPreview = buildWhatsappRenderedPreview({
+    componentsSchema: mapping.componentsSchema,
+    builtComponents: built.components,
+    fallbackBody: rendered.resolvedLocale === args.locale ? rendered.body : "",
+    providerTemplateName: mapping.name,
+    languageCode: mapping.language,
+  });
+  if (!whatsappPreview.body.trim()) return { ok: false, reason: "TEMPLATE_RENDER_FAILED" };
 
   const created = await createDeliveryRecord({
     channel: "WHATSAPP",
@@ -252,16 +278,10 @@ async function sendApprovedTemplateForDonor(args: {
     recipientName: args.ctx.name,
     recipientPhone: args.ctx.phone,
     locale: args.locale,
-    renderedBody: rendered.body,
+    renderedBody: whatsappPreview.body,
     variables: {
       snapshot: renderCtx,
-      whatsappPreview: buildWhatsappRenderedPreview({
-        componentsSchema: mapping.componentsSchema,
-        builtComponents: built.components,
-        fallbackBody: rendered.body,
-        providerTemplateName: mapping.name,
-        languageCode: mapping.language,
-      }),
+      whatsappPreview,
     } as never,
     senderId: args.sender.id,
     createdBy: args.actor?.actorId ?? null,
@@ -269,17 +289,46 @@ async function sendApprovedTemplateForDonor(args: {
   });
   if (!created.ok) return { ok: false, reason: "ARCHIVE_FAILED" };
 
+  let frequencyReservation: WhatsAppMarketingReservation | null = null;
+  if (args.expected === "MARKETING") {
+    const frequency = await reserveWhatsappMarketingSend(args.ctx.userId, new Date(), args.ctx.phone);
+    if (!frequency.ok) {
+      await markDeliveryStatus(
+        created.data.id,
+        frequency.reason === "WHATSAPP_MARKETING_COOLDOWN" ? "SKIPPED" : "FAILED",
+        { errorMessage: frequency.reason },
+      );
+      return { ok: false, reason: frequency.reason };
+    }
+    frequencyReservation = frequency.reservation;
+  }
+  const stopCheck = await checkWhatsappRecipientStop(args.ctx.userId);
+  if (stopCheck) {
+    if (frequencyReservation) await releaseWhatsappMarketingReservation(frequencyReservation);
+    await markDeliveryStatus(created.data.id, stopCheck === "CONSENT_CHECK_UNAVAILABLE" ? "FAILED" : "SKIPPED", { errorMessage: stopCheck });
+    return { ok: false, reason: stopCheck };
+  }
+
   const { sendTemplateMessage } = await import("./providers/meta-whatsapp/messages");
   const runtime = await getActiveMetaWhatsappRuntimeConfig();
-  const sent = await sendTemplateMessage({
-    phoneNumberId: args.sender.phoneNumberId!,
-    to: args.ctx.phone!,
-    templateName: mapping.name,
-    languageCode: mapping.language,
-    components: built.components,
-  }, runtime);
+  let sent: Awaited<ReturnType<typeof sendTemplateMessage>>;
+  try {
+    sent = await sendTemplateMessage({
+      phoneNumberId: args.sender.phoneNumberId!,
+      to: args.ctx.phone!,
+      templateName: mapping.name,
+      languageCode: mapping.language,
+      components: built.components,
+    }, runtime);
+  } catch {
+    await markDeliveryStatus(created.data.id, "FAILED", { errorMessage: "DELIVERY_OUTCOME_UNCERTAIN" });
+    return { ok: false, reason: "DELIVERY_OUTCOME_UNCERTAIN" };
+  }
 
   if (!sent.ok) {
+    if (frequencyReservation && retryDefinitelyNotSent(sent.reason)) {
+      await releaseWhatsappMarketingReservation(frequencyReservation);
+    }
     await markDeliveryStatus(created.data.id, "FAILED", { errorMessage: sent.detail ? `${sent.reason}  ${sent.detail}` : sent.reason });
     return { ok: false, reason: sent.reason, detail: sent.detail ?? null };
   }
@@ -320,6 +369,18 @@ export async function sendSmartWhatsapp(input: {
   templateId?: string | null;
   actor?: Actor;
 }): Promise<SmartWhatsappSendResult> {
+  try {
+    // Create only the profile row needed to persist future STOP requests and frequency state.
+    // Preference fields retain their schema defaults; no WhatsApp opt-in is written.
+    await prisma.donorCommunicationProfile.upsert({
+      where: { userId: input.userId },
+      create: { userId: input.userId },
+      update: {},
+      select: { userId: true },
+    });
+  } catch {
+    return { ok: false, reason: "CONSENT_CHECK_UNAVAILABLE" };
+  }
   const ctx = await getSmartWhatsappContext(input.userId);
   if (!ctx) return { ok: false, reason: "DONOR_NOT_FOUND" };
   if (!ctx.phone) return { ok: false, reason: "NO_RECIPIENT_PHONE" };
@@ -333,10 +394,14 @@ export async function sendSmartWhatsapp(input: {
   // A platform-level do-not-contact block applies to every outbound path,
   // including free-form replies inside Meta's 24-hour window.
   if (ctx.doNotContact) return { ok: false, reason: "DO_NOT_CONTACT" };
+  if (ctx.whatsappUnsubscribed) return { ok: false, reason: "DO_NOT_CONTACT" };
+  if (ctx.consentCheckUnavailable) return { ok: false, reason: "CONSENT_CHECK_UNAVAILABLE" };
 
   if (mode === "FREEFORM") {
     if (!ctx.conversationId || !ctx.replyWindow.open) return { ok: false, reason: "REPLY_WINDOW_CLOSED" };
     if (!body) return { ok: false, reason: "EMPTY_BODY" };
+    const stopCheck = await checkWhatsappRecipientStop(ctx.userId);
+    if (stopCheck) return { ok: false, reason: stopCheck };
     const sent = await sendConversationReply(ctx.conversationId, body, input.actor);
     return sent.ok
       ? { ok: true, transport: "FREEFORM", deliveryId: sent.deliveryId, providerMessageId: sent.providerMessageId }
@@ -348,6 +413,7 @@ export async function sendSmartWhatsapp(input: {
     locale,
     country: ctx.country,
     purpose: mode === "MARKETING" ? "MARKETING" : "UTILITY",
+    template: true,
   });
   if (!routed.ok) return { ok: false, reason: routed.reason };
   const sender = routed.sender;
@@ -356,8 +422,9 @@ export async function sendSmartWhatsapp(input: {
   if (mode === "UTILITY") {
     let directFailure: { reason: string; detail?: string | null } | null = null;
 
-    if (ctx.directSendEnabled) {
-      if (!body) return { ok: false, reason: "EMPTY_BODY" };
+    // A selected approved template is independently sendable. Direct Send only
+    // applies when the operator actually entered service text.
+    if (ctx.directSendEnabled && body) {
 
       const created = await createDeliveryRecord({
         channel: "WHATSAPP",
@@ -374,6 +441,12 @@ export async function sendSmartWhatsapp(input: {
         status: "RENDERED",
       });
       if (!created.ok) return { ok: false, reason: "ARCHIVE_FAILED" };
+
+      const stopCheck = await checkWhatsappRecipientStop(ctx.userId);
+      if (stopCheck) {
+        await markDeliveryStatus(created.data.id, stopCheck === "CONSENT_CHECK_UNAVAILABLE" ? "FAILED" : "SKIPPED", { errorMessage: stopCheck });
+        return { ok: false, reason: stopCheck };
+      }
 
       const runtime = await getActiveMetaWhatsappRuntimeConfig();
       const { sendDirectTextMessage } = await import("./providers/meta-whatsapp/messages");

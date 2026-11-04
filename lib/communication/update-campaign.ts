@@ -1,11 +1,10 @@
-import { findClassifiedTemplate } from "./template-usage";
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { pickTranslation } from "@/lib/i18n/translation-fallback";
 import { pickLocaleSlug } from "@/lib/slug";
-
+import { miaPath } from "@/lib/minbar/routes";
 import { SITE_URL } from "@/lib/seo";
 import type { TemplateUpdate } from "@/lib/templates/variables";
 import { AUDIENCE_SELECTION_MAX } from "./audience-limits";
@@ -126,7 +125,7 @@ export function updateContextFor(source: UpdateSource, locale: string, communica
   const t = pickTranslation(source.translations, locale);
   const campaignT = pickTranslation(source.campaign.translations, locale);
   const slug = pickLocaleSlug(source.campaign.slug, source.campaign.translations, locale) ?? source.campaign.id;
-  const page = `${SITE_URL}${`/${locale}/campaign/${encodeURIComponent(slug)}`}`;
+  const page = `${SITE_URL}${miaPath("projectDetail", locale, encodeURIComponent(slug))}`;
   /* UTM tags: the campaign-attribution service credits donations whose
      utm_campaign is this communication campaign's id. */
   const utm = communicationCampaignId
@@ -175,14 +174,14 @@ function starterDocument(copy: { greeting: string; watch: string; thanks: string
     root: {
       type: "EmailLayout",
       data: {
-        backdropColor: "#f4f8fb",
+        backdropColor: "#F4F1EA",
         canvasColor: "#FFFFFF",
         textColor: "#10212B",
         fontFamily: "MODERN_SANS",
         childrenIds: ["upd-campaign", "upd-greeting", "upd-title", "upd-cover", "upd-body", "upd-video", "upd-thanks", "upd-follow", "upd-donate"],
       },
     },
-    "upd-campaign": block("Text", { text: "{{update.campaignTitle}} · {{update.date}}" }, { textAlign: align, color: "#0068a8", fontSize: 13, fontWeight: "bold", padding: { top: 24, bottom: 0, right: 24, left: 24 } }),
+    "upd-campaign": block("Text", { text: "{{update.campaignTitle}} · {{update.date}}" }, { textAlign: align, color: "#8A5D16", fontSize: 13, fontWeight: "bold", padding: { top: 24, bottom: 0, right: 24, left: 24 } }),
     "upd-greeting": block("Text", { text: copy.greeting }, { textAlign: align, color: "#374151", fontSize: 15 }),
     "upd-title": block("Heading", { text: "{{update.title}}", level: "h2" }, { textAlign: align, padding: { top: 4, bottom: 8, right: 24, left: 24 } }),
     "upd-cover": block("Image", { url: "{{update.cover}}", alt: "{{update.title}}", linkHref: "{{update.url}}", contentAlignment: "middle" }),
@@ -195,7 +194,7 @@ function starterDocument(copy: { greeting: string; watch: string; thanks: string
     "upd-thanks": block("Text", { text: copy.thanks }, { textAlign: align, color: "#10212B", fontSize: 15, fontWeight: "bold" }),
     "upd-follow": block(
       "Button",
-      { text: copy.follow, url: "{{update.url}}", buttonStyle: "rounded", size: "medium", fullWidth: true, buttonBackgroundColor: "#be1e2d", buttonTextColor: "#FFFFFF" },
+      { text: copy.follow, url: "{{update.url}}", buttonStyle: "rounded", size: "medium", fullWidth: true, buttonBackgroundColor: "#A93428", buttonTextColor: "#FFFFFF" },
       { textAlign: "center" }
     ),
     "upd-donate": block("Text", { text: `[${copy.donate}]({{update.donateUrl}})`, markdown: true }, { textAlign: "center", fontSize: 13, color: "#6B7280", padding: { top: 0, bottom: 28, right: 24, left: 24 } }),
@@ -203,7 +202,7 @@ function starterDocument(copy: { greeting: string; watch: string; thanks: string
 }
 
 /**
- * Create the ready-made update template (all eight enabled site languages).
+ * Create the ready-made update template (Arabic, with an English version).
  * An ordinary email template afterwards: the team edits it in the template
  * editor like any other, moving the {{update.*}} variables where they want.
  */
@@ -228,24 +227,17 @@ export function starterUpdateDocuments() {
     },
     false
   );
-  const fr = starterDocument({"greeting": "Bonjour {{user.name}},", "watch": "▶ Voir la vidéo", "thanks": "Voici ce que votre don a rendu possible. Merci.", "follow": "Suivre le projet", "donate": "Soutenir à nouveau ce projet"}, false);
-  const tr = starterDocument({"greeting": "Selamünaleyküm {{user.name}},", "watch": "▶ Videoyu izle", "thanks": "Bağışınız bunu mümkün kıldı. Teşekkür ederiz.", "follow": "Projeyi takip edin", "donate": "Bu projeye tekrar bağış yapın"}, false);
-  const de = starterDocument({"greeting": "Hallo {{user.name}},", "watch": "▶ Video ansehen", "thanks": "Das hat Ihre Spende möglich gemacht. Vielen Dank.", "follow": "Das Projekt verfolgen", "donate": "Dieses Projekt erneut unterstützen"}, false);
-  const es = starterDocument({"greeting": "Hola {{user.name}},", "watch": "▶ Ver el vídeo", "thanks": "Su donación ha hecho esto posible. Gracias.", "follow": "Seguir el proyecto", "donate": "Volver a apoyar este proyecto"}, false);
-  const pt = starterDocument({"greeting": "Olá {{user.name}},", "watch": "▶ Ver o vídeo", "thanks": "O seu donativo tornou isto possível. Obrigado.", "follow": "Acompanhar o projeto", "donate": "Apoiar este projeto novamente"}, false);
-  const id = starterDocument({"greeting": "Assalamu alaikum {{user.name}},", "watch": "▶ Tonton video", "thanks": "Donasi Anda telah mewujudkan ini. Terima kasih.", "follow": "Ikuti proyek", "donate": "Dukung proyek ini lagi"}, false);
-  return { ar, en, fr, tr, de, es, pt, id };
+  return { ar, en };
 }
 
 export async function createStarterUpdateTemplate(actor: Actor): Promise<{ id: string; name: string }> {
-  const documents = starterUpdateDocuments();
-  const { ar } = documents;
+  const { ar, en } = starterUpdateDocuments();
   const row = await prisma.emailTemplate.create({
     data: {
       name: "تحديث مشروع  للمتبرعين",
       subject: "{{update.title}}  {{update.campaignTitle}}",
       document: ar as unknown as Prisma.InputJsonValue,
-      translations: Object.fromEntries(Object.entries(documents).filter(([locale]) => locale !== "ar").map(([locale, document]) => [locale, { subject: "{{update.title}}  {{update.campaignTitle}}", document }])) as unknown as Prisma.InputJsonValue,
+      translations: { en: { subject: "{{update.title}}  {{update.campaignTitle}}", document: en } } as unknown as Prisma.InputJsonValue,
       createdById: actor.actorId && /^[0-9a-fA-F]{24}$/.test(actor.actorId) ? actor.actorId : null,
       kind: "CAMPAIGN",
       status: "READY",
@@ -275,9 +267,8 @@ export async function createUpdateEmailCampaign(
   const source = await loadUpdateSource(input.updateId);
   if (!source) return { ok: false, status: 404, error: "التحديث غير موجود." };
   if (!/^[0-9a-fA-F]{24}$/.test(input.templateId)) return { ok: false, status: 400, error: "اختر قالب بريد." };
-  const template = await findClassifiedTemplate("EMAIL", input.templateId);
+  const template = await prisma.emailTemplate.findUnique({ where: { id: input.templateId }, select: { id: true } });
   if (!template) return { ok: false, status: 404, error: "القالب غير موجود." };
-  if (template.kind !== "CAMPAIGN" || template.status === "ARCHIVED") return { ok: false, status: 409, error: "اختر قالب بريد تسويقيًا متاحًا." };
   const name = input.name.trim();
   if (!name) return { ok: false, status: 400, error: "اسم الحملة مطلوب." };
 

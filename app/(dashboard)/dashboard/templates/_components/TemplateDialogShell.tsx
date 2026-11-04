@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X, Trash2, Loader2 } from "lucide-react";
-import { SUPPORTED_LOCALES, LOCALE_LABELS, DEFAULT_LOCALE, type SupportedLocale } from "@/lib/locales";
+import { SUPPORTED_LOCALES, LOCALE_LABELS, DEFAULT_LOCALE, type AnyLocale as SupportedLocale } from "@/lib/ported-systems/locales";
 import { cn } from "@/lib/utils";
 import { dashDir, dt } from "@/lib/dashboard/i18n";
 

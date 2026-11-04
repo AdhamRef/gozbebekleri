@@ -1,3 +1,6 @@
+// Offline regression fixtures for the transferred runtime.
+import * as fixtureBrand from "../../lib/ported-systems/brand";
+import * as fixtureLocales from "../../lib/ported-systems/locales";
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -27,13 +30,13 @@ const contacts = [undefined, null, "", " ", "+905551112233"];
 const profiles = [null, {}, { doNotContact: true }, { whatsappOptIn: true, emailOptIn: true, smsOptIn: true },
   { doNotContact: false, whatsappOptIn: true, emailOptIn: true, smsOptIn: true },
   { doNotContact: false, whatsappOptIn: false, emailOptIn: false, smsOptIn: false },
+  { doNotContact: false, whatsappOptIn: false, emailOptIn: false, smsOptIn: false, consentSource: "meta-whatsapp-inbound-opt-out" },
   { doNotContact: true, whatsappOptIn: true, emailOptIn: true, smsOptIn: true }];
 for (const channel of ["EMAIL", "WHATSAPP", "SMS"] as AudienceChannel[]) {
   test(`${channel}: candidate predicates reconcile contacts with resolved profile defaults`, () => {
     for (const contact of contacts) for (const profile of profiles) {
       const donor = { id: "user", ...(contact === undefined ? {} : { email: contact, phone: contact }), role: "DONOR" };
-      const reason = recipientExclusionReason({ email: "present", phone: "present" }, channel, profile);
-      const ids = (channel === "WHATSAPP" ? reason === "DO_NOT_CONTACT" : reason === null) ? ["user"] : [];
+      const ids = recipientExclusionReason({ email: "present", phone: "present" }, channel, profile) === null ? ["user"] : [];
       const expected = recipientExclusionReason(donor, channel, profile) === null;
       assert.equal(matches(donor, campaignCandidateWhere({ role: "DONOR" }, channel, "eligible", ids) as RecordValue), expected);
       assert.equal(matches(donor, campaignCandidateWhere({ role: "DONOR" }, channel, "ineligible", ids) as RecordValue), !expected);
@@ -46,6 +49,22 @@ test("all candidates adds no hidden gate; an unresolved explicit gate throws ins
   assert.equal(campaignCandidateWhere(base, "WHATSAPP", "all"), base);
   assert.throws(() => campaignCandidateWhere(base, "WHATSAPP", "eligible"), /NOT_RESOLVED/);
 });
+test("WhatsApp readiness includes donors without a profile and excludes an explicit STOP", async () => {
+  const reader = isolated<{ readCampaignConsentUserIds: (channel: AudienceChannel) => Promise<string[]> }>("lib/communication/campaign-consent-reader.ts", {
+    "@/lib/prisma": { prisma: {
+      donorCommunicationProfile: {
+        findFirst: async () => ({ id: "p2" }),
+        findMany: async () => [
+          { id: "p1", userId: "profiled", doNotContact: false, emailOptIn: false, smsOptIn: false, consentSource: null },
+          { id: "p2", userId: "stopped", doNotContact: false, emailOptIn: false, smsOptIn: false, consentSource: "meta-whatsapp-inbound-opt-out" },
+        ],
+      },
+      user: { findMany: async (args: { where: { id?: { gt?: string } } }) => args.where.id?.gt ? [] : [{ id: "legacy" }] },
+    } },
+    "./campaign-audience-accounting": { recipientExclusionReason },
+  });
+  assert.deepEqual(Array.from(await reader.readCampaignConsentUserIds("WHATSAPP")), ["profiled", "legacy"]);
+});
 test("pagination rejects malformed numeric inputs before reaching the database", () => {
   assert.deepEqual(candidatePagination(null, null), { page: 1, limit: 25 });
   assert.deepEqual(candidatePagination("2", "1000"), { page: 2, limit: 100 });
@@ -57,7 +76,10 @@ function isolated<T>(file: string, dependencies: Record<string, unknown>): T {
   const output = ts.transpileModule(fs.readFileSync(file, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const loaded = { exports: {} };
   new vm.Script(output, { filename: file }).runInNewContext({ module: loaded, exports: loaded.exports,
-    require: (id: string) => { if (!(id in dependencies)) throw new Error(`Unexpected dependency: ${id}`); return dependencies[id]; },
+    require: (id: string) => {
+ if(id==="@/lib/ported-systems/brand")return fixtureBrand;
+ if(id==="@/lib/ported-systems/locales")return fixtureLocales;
+ if (!(id in dependencies)) throw new Error(`Unexpected dependency: ${id}`); return dependencies[id]; },
   });
   return loaded.exports as T;
 }
@@ -80,19 +102,21 @@ function harness(opts: { denied?: boolean; failedRead?: boolean; failedConsent?:
           reads += 1; queries.push(args);
           if (opts.failedRead) throw new Error("read failed");
           if ((args.select as RecordValue).communicationProfile) return [{ id: "user", name: "Donor", email: "donor@example.test", phone: "+905551112233", image: null, preferredLang: "ar", countryCode: "TR", communicationProfile: profile }];
-          return Array.from({ length: Math.min(opts.size ?? 1, args.take as number) }, (_, i) => ({ id: String(i) }));
+          const cursor = args.cursor as { id: string } | undefined;
+          const offset = cursor ? Number(cursor.id) + 1 : 0;
+          return Array.from({ length: Math.max(0, Math.min((opts.size ?? 1) - offset, args.take as number)) }, (_, i) => ({ id: String(offset + i) }));
         }, groupBy: async () => [],
       }, badge: { findMany: async () => [], findUnique: async () => null },
     } },
     "@/lib/communication/audience-service": { donorChannelEligibility: (donor: { phone: string }, channel: AudienceChannel, preference: typeof profile) => recipientExclusionReason(donor, channel, preference) === null ? "ELIGIBLE" : "UNAVAILABLE" },
     "@/lib/communication/campaign-audience-accounting": { recipientExclusionReason, RECIPIENT_REASON_LABELS },
     "@/lib/communication/campaign-candidate-policy": { campaignCandidateWhere, candidatePagination },
-    "@/lib/communication/campaign-consent-reader": { readCampaignProfileGateUserIds: async () => { consentReads++; if (opts.failedConsent) throw new Error("consent unavailable"); return ["user"]; } },
+    "@/lib/communication/campaign-consent-reader": { readCampaignConsentUserIds: async () => { consentReads++; if (opts.failedConsent) throw new Error("consent unavailable"); return ["user"]; } },
     "@/lib/communication/communication-runtime-types": { isCommunicationChannel: (value: string) => ["WHATSAPP", "EMAIL", "SMS"].includes(value) },
     "@/lib/badge-criteria": { getBadgeIdsByUser: async () => new Map(), getUserIdsMatchingBadge: async () => [] },
     "@/lib/dashboard/resolve-user-country": { resolveUserCountry: () => ({ code: "TR", name: "Turkey" }) },
     "@/lib/dashboard/country-display-name": { getCountryDisplayNameFromCode: () => "Turkey" },
-    "@/lib/locales": { DEFAULT_LOCALE: "ar", isValidLocale: (value: string) => ["ar", "en"].includes(value) },
+    "@/lib/ported-systems/locales": { DEFAULT_LOCALE: "ar", isValidLocale: (value: string) => ["ar", "en"].includes(value) },
     "@/lib/dashboard/user-demographics": {
       birthdateRangeForAges: () => null, genderQueryValues: (value: string) => [value],
       parseGenderParam: (value: string) => ["male", "female", "undisclosed"].includes(value) ? value : null,
@@ -110,7 +134,7 @@ test("candidate GET and POST authorize before any protected read", async () => {
   assert.equal((await h.route.POST(request())).status, 403);
   assert.equal(h.state().reads + h.state().consentReads, 0);
 });
-test("candidate GET permits WhatsApp without recorded opt-in and performs no consent writes", async () => {
+test("candidate GET treats account holders as WhatsApp-eligible unless they opted out", async () => {
   const h = harness();
   const res = await h.route.GET(request());
   assert.equal(res.status, 200);
@@ -139,11 +163,16 @@ test("bad filters and malformed pagination fail without querying donors", async 
   for (const body of [null, [], "bad", { channel: "WHATSAPP", search: {} }, { channel: "INVALID" }]) assert.equal((await h.route.POST(request("", body))).status, 400);
   assert.equal(h.state().reads, 0);
 });
-test("select-all truncation is true only when more than the ceiling exists", async () => {
-  assert.equal((await harness({ size: 5 }).route.POST(request())).body.truncated, false);
-  const large = await harness({ size: 6 }).route.POST(request());
-  assert.equal(large.body.truncated, true); assert.equal((large.body.ids as string[]).length, 5);
+test("select-all includes all 14,842 matching donors in bounded pages", async () => {
+  const h = harness({ size: 14842 });
+  const result = await h.route.POST(request());
+  assert.equal(result.body.truncated, false);
+  assert.equal((result.body.ids as string[]).length, 14842);
+  assert.equal(new Set(result.body.ids as string[]).size, 14842);
+  assert.equal(h.state().queries.length, 15);
+  assert.ok(h.state().queries.every(query => query.take === 1000));
 });
+
 test("explicit eligibility precedes GET count/pagination and matches POST select-all", async () => {
   const h = harness();
   await h.route.GET(request("channel=WHATSAPP&eligibility=eligible"));
@@ -154,36 +183,34 @@ test("explicit eligibility precedes GET count/pagination and matches POST select
   assert.equal(JSON.stringify(queries[1].orderBy), JSON.stringify(queries[2].orderBy));
 });
 
-type Reader = { readCampaignProfileGateUserIds: (channel: AudienceChannel, signal?: AbortSignal) => Promise<string[]> };
+type Reader = { readCampaignConsentUserIds: (channel: AudienceChannel, signal?: AbortSignal) => Promise<string[]> };
 function consentReader(failPage = 0, repeat = false): Reader {
   let calls = 0;
   const rows = Array.from({ length: 2001 }, (_, i) => ({ id: String(i + 1).padStart(6, "0"), userId: `user-${i}`, doNotContact: i % 5 === 0, whatsappOptIn: i % 2 === 0, emailOptIn: false, smsOptIn: true }));
   return isolated<Reader>("lib/communication/campaign-consent-reader.ts", {
-    "@/lib/prisma": { prisma: { donorCommunicationProfile: {
-      findFirst: async () => ({ id: "002001" }),
-      findMany: async (args: { where: { id: { gt?: string; lte: string } }; take: number }) => {
-        calls++; if (calls === failPage) throw new Error("source page failed");
-        assert.equal(args.take, 1000);
-        return rows.filter((row) => repeat || !args.where.id.gt || row.id > args.where.id.gt).slice(0, args.take);
+    "@/lib/prisma": { prisma: {
+      donorCommunicationProfile: {
+        findFirst: async () => ({ id: "002001" }),
+        findMany: async (args: { where: { id: { gt?: string; lte: string } }; take: number }) => {
+          calls++; if (calls === failPage) throw new Error("source page failed");
+          assert.equal(args.take, 1000);
+          return rows.filter((row) => repeat || !args.where.id.gt || row.id > args.where.id.gt).slice(0, args.take);
+        },
       },
-    } } }, "./campaign-audience-accounting": { recipientExclusionReason },
+      user: { findMany: async () => [] },
+    } }, "./campaign-audience-accounting": { recipientExclusionReason },
   });
 }
-test("WhatsApp profile gate walks bounded pages and returns only DNC exclusions", async () => {
-  const ids = await consentReader().readCampaignProfileGateUserIds("WHATSAPP");
-  assert.equal(ids.length, 401); assert.equal(new Set(ids).size, ids.length);
-  assert.equal(ids.includes("user-0"), true);
-  assert.equal(ids.includes("user-1"), false);
-});
-test("email and SMS profile gates retain their channel opt-in rules", async () => {
-  assert.equal((await consentReader().readCampaignProfileGateUserIds("EMAIL")).length, 0);
-  assert.equal((await consentReader().readCampaignProfileGateUserIds("SMS")).length, 1600);
+test("consent reader walks bounded pages, applies DNC and never truncates at the first page", async () => {
+  const ids = await consentReader().readCampaignConsentUserIds("WHATSAPP");
+  assert.equal(ids.length, 1600); assert.equal(new Set(ids).size, ids.length);
 });
 test("consent reader rejects failed pages and repeated cursors rather than returning partial IDs", async () => {
-  await assert.rejects(consentReader(2).readCampaignProfileGateUserIds("WHATSAPP"), /source page failed/);
-  await assert.rejects(consentReader(0, true).readCampaignProfileGateUserIds("WHATSAPP"), /CURSOR_NOT_ADVANCING/);
+  await assert.rejects(consentReader(2).readCampaignConsentUserIds("WHATSAPP"), /source page failed/);
+  await assert.rejects(consentReader(0, true).readCampaignConsentUserIds("WHATSAPP"), /CURSOR_NOT_ADVANCING/);
 });
 test("cancelled consent reads do not return an empty successful filter", async () => {
   const controller = new AbortController(); controller.abort();
-  await assert.rejects(consentReader().readCampaignProfileGateUserIds("WHATSAPP", controller.signal));
+  await assert.rejects(consentReader().readCampaignConsentUserIds("WHATSAPP", controller.signal));
 });
+

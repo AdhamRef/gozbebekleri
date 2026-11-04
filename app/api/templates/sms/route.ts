@@ -1,4 +1,3 @@
-import { classifyEventTemplates } from "@/lib/communication/template-event-classification";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getServerSession } from "next-auth";
@@ -39,7 +38,7 @@ export async function GET() {
       createdAt: true, updatedAt: true,
     },
   });
-  return NextResponse.json({ templates: await classifyEventTemplates("SMS", templates) });
+  return NextResponse.json({ templates });
 }
 
 export async function POST(request: NextRequest) {

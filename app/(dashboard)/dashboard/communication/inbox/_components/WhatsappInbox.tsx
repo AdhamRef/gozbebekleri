@@ -4,15 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  MessageCircle, Search, Loader2, RefreshCw, Send, Check, CircleAlert, Clock,
+  ChevronLeft, MessageCircle, Search, Loader2, RefreshCw, Send, Check, CircleAlert, Clock,
   UserRound, UserX, Image as ImageIcon, Mic, FileText, MapPin, Video, Link2, Flag,
 } from "lucide-react";
+import { useDashboardUnsavedChanges } from "@/hooks/useDashboardUnsavedChanges";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { SegmentedControl, fmtDateTime, fmtFull } from "../../_shared/channel-ui";
 import { cn } from "@/lib/utils";
 import { SmartWhatsappDialog } from "@/components/dashboard/SmartWhatsappDialog";
 import { dashDir, dt, dtx } from "@/lib/dashboard/i18n";
+import { mergeInboxTimeline } from "@/lib/communication/inbox-timeline";
 
 /**
  * The WhatsApp inbox.
@@ -29,7 +31,12 @@ import { dashDir, dt, dtx } from "@/lib/dashboard/i18n";
  * message the donor never receives, recorded as sent.
  */
 
+import { InboxAttachments, type InboxAttachment } from "./InboxAttachments";
+import { InboxMedia } from "./InboxMedia";
+import { DonorAccountBadge } from "@/components/dashboard/DonorAccountBadge";
+
 type Donor = {
+  accountStatus?: import("@/lib/dashboard/donor-account").DonorAccountStatus;
   userId: string | null;
   name: string | null;
   email: string | null;
@@ -52,6 +59,7 @@ type Conversation = {
   lastMessageAt: string | null;
   lastInboundText: string | null;
   needsReply: boolean;
+  unread?: boolean;
   inboundCount: number;
   outboundCount: number;
   sender: Sender | null;
@@ -85,6 +93,7 @@ type WhatsappPreview = {
 };
 
 type TimelineItem = {
+  id: string;
   kind: "inbound" | "outbound" | "status";
   at: string | null;
   text: string | null;
@@ -107,6 +116,7 @@ type Detail = {
 type ReplyWindow = { open: boolean; lastInboundAt: string | null; remainingMs: number; lastInboundMessageId: string | null };
 
 const FILTERS = [
+  { value: "unread", get label() { return dt("غير المقروءة"); } },
   { value: "needsReply", get label() { return dt("بانتظار ردّ"); } },
   { value: "unresolved", get label() { return dt("غير مرتبطة"); } },
   { value: "all", get label() { return dt("الكل"); } },
@@ -133,15 +143,37 @@ function windowText(window: ReplyWindow): string {
   return hours > 0 ? dt("يمكن الردّ بنص حر خلال {0} ساعة و{1} دقيقة.", [hours, minutes]) : dt("يمكن الردّ بنص حر خلال {0} دقيقة.", [minutes]);
 }
 
+function messageStatus(status: string | null): string {
+  switch (status) {
+    case "SENT": return dt("أُرسلت");
+    case "DELIVERED": return dt("وصلت");
+    case "READ": return dt("قُرئت");
+    case "FAILED": return dt("فشلت");
+    case "RENDERED": return dt("جاهزة");
+    default: return status ?? "";
+  }
+}
+
+function invalidateRequest(request: { current: number }) {
+  request.current++;
+}
+
 export function WhatsappInbox() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get("q") ?? "";
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [senders, setSenders] = useState<Sender[]>([]);
-  const [needsReply, setNeedsReply] = useState(0);
+  const [needsReply, setNeedsReply] = useState<number | null>(null);
+  const [loadingSenders, setLoadingSenders] = useState(true);
+  const [sendersReady, setSendersReady] = useState(false);
+  const [senderError, setSenderError] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
   const [senderId, setSenderId] = useState<string>("");
   const [query, setQuery] = useState(initialQuery);
+  const [totalConversations, setTotalConversations] = useState(0);
+  const [loadingMoreConversations, setLoadingMoreConversations] = useState(false);
+  const conversationRows = useRef<Conversation[]>([]);
+  conversationRows.current = conversations;
   const [loadingList, setLoadingList] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
 
@@ -151,108 +183,199 @@ export function WhatsappInbox() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
 
-  const [draft, setDraft] = useState("");
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const draft = activeId ? drafts[activeId] ?? "" : "";
   const [sending, setSending] = useState(false);
+  const [recordingVoice, setRecordingVoice] = useState(false);
+  const recordingRef = useRef(false);
+  recordingRef.current = recordingVoice;
+  const [attachments, setAttachments] = useState<Record<string, InboxAttachment | undefined>>({});
+  const attachment = activeId ? attachments[activeId] : undefined;
+  useDashboardUnsavedChanges(recordingVoice || Object.values(drafts).some(value => Boolean(value.trim())) || Object.values(attachments).some(Boolean));
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [smartOpen, setSmartOpen] = useState(false);
   const [smartInitialMode, setSmartInitialMode] = useState<"FREEFORM" | "UTILITY" | "MARKETING" | undefined>(undefined);
-  const senderSelectionReady = useRef(Boolean(initialQuery.trim()));
-  const listRequest = useRef(0);
-  const timelineRef = useRef<HTMLDivElement | null>(null);
-
-  // A donor-history link must not inherit a remembered business-number filter.
-  // Also handle links opened while this inbox is already mounted.
+  const senderSelectionReady = useRef(false);
+  const threadRef = useRef<HTMLDivElement | null>(null);
+  const conversationButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   useEffect(() => {
-    setQuery(initialQuery);
-    if (initialQuery.trim()) {
-      senderSelectionReady.current = true;
-      setSenderId("");
-      setFilter("all");
-    }
-  }, [initialQuery]);
+    const update = () => setViewportHeight(window.visualViewport?.height || window.innerHeight);
+    update(); window.visualViewport?.addEventListener("resize", update); window.addEventListener("resize", update);
+    return () => { window.visualViewport?.removeEventListener("resize", update); window.removeEventListener("resize", update); };
+  }, []);
+  useEffect(() => {
+    if (window.matchMedia("(min-width: 768px)").matches) return;
+    const frame = requestAnimationFrame(() => {
+      if (activeId) { threadRef.current?.scrollIntoView({ block: "start" }); threadRef.current?.querySelector<HTMLButtonElement>("[data-inbox-back]")?.focus({ preventScroll: true }); }
+      else if (conversationButtonRef.current?.isConnected) conversationButtonRef.current.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeId]);
+  const timelineRef = useRef<HTMLDivElement | null>(null);
+  const activeRef = useRef<string | null>(null);
+  const listRequest = useRef(0);
+  const listController = useRef<AbortController | null>(null);
+  const senderController = useRef<AbortController | null>(null);
+  const detailRequest = useRef(0);
+  const replyInFlight = useRef(false);
+  const readAcknowledgements = useRef(new Map<string, string>());
+  const followBottom = useRef(true);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const selectConversation = useCallback((id: string | null) => {
+    if (activeRef.current === id || recordingRef.current) return;
+    activeRef.current = id;
+    detailRequest.current++;
+    followBottom.current = true;
+    setActiveId(id);
+    setLoadingDetail(Boolean(id));
+    setDetail(null);
+    setReplyWindow(null);
+    setNotice(null);
+    setDetailError(null);
+    setLoadingOlder(false);
+    setSmartOpen(false);
+  }, []);
 
-  const loadList = useCallback(async (silent = false) => {
+  // Business numbers must remain available even when the archive is slow or unavailable.
+  const loadSenders = useCallback(async () => {
+    senderController.current?.abort();
+    const controller = new AbortController();
+    senderController.current = controller;
+    setLoadingSenders(true);
+    setSenderError(null);
+    try {
+      const response = await fetch("/api/dashboard/communication/inbox/senders", {
+        cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]),
+      });
+      const data = await response.json();
+      if (controller.signal.aborted) return;
+      if (!response.ok || !data.ok || !Array.isArray(data.senders)) throw new Error("INBOX_SENDERS_UNAVAILABLE");
+      const nextSenders: Sender[] = data.senders;
+      setSenders(nextSenders);
+      if (!senderSelectionReady.current) {
+        senderSelectionReady.current = true;
+        let remembered: string | null = null;
+        try { remembered = window.localStorage.getItem("communication:whatsapp:senderId"); } catch { /* Storage is optional. */ }
+        setSenderId(remembered && nextSenders.some(sender => sender.id === remembered)
+          ? remembered : nextSenders.length === 1 ? nextSenders[0].id : "");
+      }
+    } catch {
+      if (!controller.signal.aborted) setSenderError(dt("تعذّر تحميل أرقام واتساب. أعد المحاولة؛ الأرقام المحفوظة لم تُحذف."));
+    } finally {
+      if (senderController.current === controller && !controller.signal.aborted) {
+        senderController.current = null;
+        setLoadingSenders(false);
+        setSendersReady(true);
+      }
+    }
+  }, []);
+  useEffect(() => { void loadSenders(); return () => senderController.current?.abort(); }, [loadSenders]);
+
+  const loadList = useCallback(async (silent = false, reset = false) => {
+    if (silent && listController.current) return;
+    listController.current?.abort();
+    const controller = new AbortController();
+    listController.current = controller;
     const request = ++listRequest.current;
-    if (!silent) setLoadingList(true);
+    if (!silent) { setLoadingList(true); setNeedsReply(null); }
     setListError(null);
     try {
-      const params = new URLSearchParams({ filter });
+      const refreshLimit = reset ? 50 : Math.min(200, Math.max(50, conversationRows.current.length));
+      const params = new URLSearchParams({ filter, limit: String(refreshLimit) });
       if (senderId) params.set("senderId", senderId);
       if (query.trim()) params.set("q", query.trim());
-      const res = await fetch(`/api/dashboard/communication/inbox?${params}`, { cache: "no-store" });
+      const res = await fetch(`/api/dashboard/communication/inbox?${params}`, { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)]) });
       const data = await res.json();
       if (request !== listRequest.current) return;
-      if (!res.ok || !data.ok) throw new Error(data.error ?? "load failed");
+      if (!res.ok || !data.ok) throw new Error(data.error === "INBOX_UNAVAILABLE" ? dt("تعذّر تحميل صندوق واتساب") : data.error ?? "load failed");
       const nextConversations = data.conversations ?? [];
-      const nextSenders = data.senders ?? [];
-      setConversations(nextConversations);
-      setSenders(nextSenders);
+      setTotalConversations(Number(data.total || 0));
+      setConversations(previous => reset ? nextConversations : [...new Map([
+        ...nextConversations,
+        ...previous.slice(refreshLimit).filter(row => !nextConversations.some((item: Conversation) => item.id === row.id)),
+      ].map(row => [row.id, row])).values()].filter(row => filter === "unread" ? row.unread : filter === "needsReply" ? row.needsReply : filter === "unresolved" ? row.unresolved : true));
       setNeedsReply(data.needsReply ?? 0);
+      window.dispatchEvent(new CustomEvent("whatsapp-inbox-updated"));
 
-      if (!senderSelectionReady.current && nextSenders.length > 0) {
-        senderSelectionReady.current = true;
-        const remembered = typeof window !== "undefined" ? window.localStorage.getItem("communication:whatsapp:senderId") : null;
-        const preferred = remembered && nextSenders.some((sender: Sender) => sender.id === remembered)
-          ? remembered
-          : (nextSenders.length === 1 ? nextSenders[0].id : "");
-        if (preferred !== senderId) {
-          setSenderId(preferred);
-          return;
-        }
-      }
-
-      if (nextConversations.length === 0) {
-        setActiveId(null);
-        setDetail(null);
-        setReplyWindow(null);
-      } else {
-        setActiveId((current) =>
-          current && nextConversations.some((conversation: Conversation) => conversation.id === current)
-            ? current
-            : nextConversations[0].id,
-        );
-      }
+      // Opening the inbox is not opening its first conversation. In particular,
+      // a hidden mobile thread must never acknowledge a message as read.
+      // A read acknowledgement can remove the selected row from the unread
+      // filter. Silent refreshes must not close the thread while it is being read.
+      if (reset && !nextConversations.some((conversation: Conversation) => conversation.id === activeRef.current)) selectConversation(null);
     } catch (error) {
-      if (request !== listRequest.current) return;
+      if (request !== listRequest.current || controller.signal.aborted) return;
       setListError((error as Error).message || dt("تعذّر تحميل صندوق واتساب"));
     } finally {
-      if (request === listRequest.current) setLoadingList(false);
+      if (request === listRequest.current) { listController.current = null; setLoadingList(false); }
     }
-  }, [filter, senderId, query]);
+  }, [filter, senderId, query, selectConversation]);
 
   useEffect(() => {
-    void loadList();
-    return () => { listRequest.current += 1; };
-  }, [loadList]);
+    if (!sendersReady) return;
+    void loadList(false, true);
+    return () => { invalidateRequest(listRequest); listController.current?.abort(); listController.current = null; };
+  }, [loadList, sendersReady]);
 
   // Keep an operational inbox fresh without forcing the team to click «تحديث».
   // Silent polling preserves the current list on transient errors instead of
   // turning a backend/network failure into a false empty state.
   useEffect(() => {
     const id = window.setInterval(() => {
-      if (document.visibilityState === "visible") void loadList(true);
+      if (sendersReady && document.visibilityState === "visible") void loadList(true);
     }, 30_000);
     return () => window.clearInterval(id);
-  }, [loadList]);
+  }, [loadList, sendersReady]);
 
+  const loadMoreConversations = async () => {
+    if (loadingMoreConversations) return;
+    const request = listRequest.current, params = new URLSearchParams({ filter, offset: String(conversationRows.current.length), limit: "50" });
+    if (senderId) params.set("senderId", senderId); if (query.trim()) params.set("q", query.trim());
+    setLoadingMoreConversations(true);
+    try {
+      const response = await fetch(`/api/dashboard/communication/inbox?${params}`, { cache: "no-store", signal: AbortSignal.timeout(20000) });
+      const data = await response.json(); if (!response.ok || !data.ok) throw new Error(dt("تعذر تحميل المزيد من المحادثات"));
+      if (request !== listRequest.current) return;
+      setConversations(previous => [...new Map([...previous, ...data.conversations].map(row => [row.id, row])).values()]); setTotalConversations(Number(data.total || 0));
+    } catch (failure) { if (request === listRequest.current) setListError((failure as Error).message); }
+    finally { setLoadingMoreConversations(false); }
+  };
+  const detailController = useRef<AbortController | null>(null);
   const loadDetail = useCallback(async (id: string, silent = false) => {
+    if (activeRef.current !== id || silent && detailController.current) return;
+    detailController.current?.abort();
+    const controller = new AbortController(); detailController.current = controller;
+    const request = ++detailRequest.current;
     if (!silent) setLoadingDetail(true);
     if (!silent) setNotice(null);
     setDetailError(null);
     try {
-      const res = await fetch(`/api/dashboard/communication/inbox/${encodeURIComponent(id)}`, { cache: "no-store" });
+      const res = await fetch(`/api/dashboard/communication/inbox/${encodeURIComponent(id)}`, { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)]) });
       const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error ?? "load failed");
-      setDetail(data.conversation);
+      if (request !== detailRequest.current || activeRef.current !== id) return;
+      if (!res.ok || !data.ok) throw new Error(data.error === "INBOX_UNAVAILABLE" ? dt("تعذّر تحميل المحادثة") : data.error ?? "load failed");
+      setDetail(previous => previous && silent ? {
+        ...data.conversation,
+        timeline: mergeInboxTimeline(previous.timeline, data.conversation.timeline),
+        hasMore: previous.hasMore,
+        oldestAt: previous.oldestAt,
+      } : data.conversation);
       setReplyWindow(data.replyWindow);
+      const latest = [...(data.conversation.timeline as TimelineItem[])].reverse().find(item => item.kind === "inbound");
+      if (latest && document.visibilityState === "visible" && readAcknowledgements.current.get(id) !== latest.id) {
+        readAcknowledgements.current.set(id, latest.id);
+        void fetch(`/api/dashboard/communication/inbox/${encodeURIComponent(id)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "read", eventId: latest.id }), signal: AbortSignal.timeout(12000) }).then(response => { if (!response.ok) throw new Error("Read acknowledgement failed"); setConversations(previous => previous.map(conversation => conversation.id === id ? {...conversation,unread:false} : conversation)); window.dispatchEvent(new CustomEvent("whatsapp-inbox-updated")); }).catch(() => { if (readAcknowledgements.current.get(id) === latest.id) readAcknowledgements.current.delete(id); });
+      }
     } catch (error) {
+      if (controller.signal.aborted || request !== detailRequest.current || activeRef.current !== id) return;
       setDetailError((error as Error).message || dt("تعذّر تحميل المحادثة"));
     } finally {
-      if (!silent) setLoadingDetail(false);
+      if (detailController.current === controller) detailController.current = null;
+      if (request === detailRequest.current) setLoadingDetail(false);
     }
   }, []);
 
-  useEffect(() => { if (activeId) void loadDetail(activeId); }, [activeId, loadDetail]);
+  useEffect(() => { if (activeId) void loadDetail(activeId); return () => { invalidateRequest(detailRequest); detailController.current?.abort(); detailController.current = null; }; }, [activeId, loadDetail]);
 
   useEffect(() => {
     if (!activeId) return;
@@ -265,54 +388,81 @@ export function WhatsappInbox() {
   /* Newest message in view when a conversation opens  the reason anyone opened it. */
   useEffect(() => {
     const node = timelineRef.current;
-    if (node) node.scrollTop = node.scrollHeight;
+    if (node && followBottom.current) node.scrollTop = node.scrollHeight;
   }, [detail]);
 
   const act = useCallback(async (action: "handled" | "followup" | "link") => {
     if (!activeId) return;
+    const requestedId = activeId;
+    try {
     const res = await fetch(`/api/dashboard/communication/inbox/${encodeURIComponent(activeId)}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ action }),
     });
+    if (activeRef.current !== requestedId) return;
     if (res.ok) {
       setNotice({ tone: "ok", text: action === "handled" ? dt("تم وسمها كمُعالَجة.") : action === "followup" ? dt("سُجّل طلب المتابعة.") : dt("سُجّل طلب الربط بمتبرع.") });
       void loadList();
     } else {
       setNotice({ tone: "error", text: dt("تعذّر تنفيذ الإجراء.") });
     }
+    } catch {
+      if (activeRef.current === requestedId) setNotice({ tone: "error", text: dt("تعذّر تنفيذ الإجراء.") });
+    }
   }, [activeId, loadList]);
 
   const sendReply = useCallback(async () => {
-    if (!activeId || !draft.trim()) return;
+    if (!activeId || recordingVoice || (!draft.trim() && !attachment) || replyInFlight.current) return;
+    const conversationId = activeId;
+    const submittedDraft = draft;
+    const submittedAttachment = attachment;
+    const audioOnly = Boolean(attachment && (attachment.voice || attachment.file.type.startsWith("audio/")));
+    replyInFlight.current = true;
     setSending(true);
     setNotice(null);
     try {
-      const res = await fetch(`/api/dashboard/communication/inbox/${encodeURIComponent(activeId)}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "reply", body: draft.trim() }),
+      let form: FormData | null = null;
+      if (attachment) { form = new FormData(); form.set("file", attachment.file); form.set("voice", String(attachment.voice)); form.set("body", audioOnly ? "" : draft.trim()); }
+      const res = await fetch(`/api/dashboard/communication/inbox/${encodeURIComponent(activeId)}${attachment ? "/media" : ""}`, {
+        method: "POST", ...(attachment ? {} : { headers: { "content-type": "application/json" } }),
+        body: form || JSON.stringify({ action: "reply", body: draft.trim() }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
+      if (res.ok && data.ok !== true) throw new Error("Unconfirmed send response");
+      if (res.ok && data.ok && !audioOnly) setDrafts(previous => previous[conversationId] === submittedDraft ? { ...previous, [conversationId]: "" } : previous);
+      if (res.ok && data.ok && submittedAttachment) setAttachments(previous => previous[conversationId] === submittedAttachment ? { ...previous, [conversationId]: undefined } : previous);
+      if (activeRef.current !== conversationId) return;
+      if (!res.ok || !data.ok) {
         /* The window closing between load and send is the one failure an operator will actually
            hit, so it is named rather than reported as a generic error. */
         setNotice({
           tone: "error",
           text: data.error === "REPLY_WINDOW_CLOSED"
             ? dt("انتهت نافذة الردّ الحر قبل الإرسال  استخدم قالبًا معتمدًا.")
+            : data.error === "MEDIA_TYPE_OR_SIZE_INVALID" ? dt("نوع الملف أو حجمه غير مدعوم. راجع المرفق وأعد المحاولة.")
+            : typeof data.error === "string" && data.error.startsWith("VOICE_CONVERSION") ? dt("معالجة التسجيل غير متاحة حاليًا. يمكنك إرفاق ملف صوتي محفوظ بدلًا منه.")
+            : data.error === "CONVERSATION_SENDER_UNAVAILABLE" ? dt("رقم واتساب لهذه المحادثة غير متاح للإرسال. راجع حالة المُرسل.")
+            : data.error === "CONTACT_POLICY_UNAVAILABLE" ? dt("تعذر التحقق من سياسة التواصل. لم تُرسل الرسالة؛ أعد المحاولة بعد استعادة الاتصال.")
+            : data.error === "MEDIA_SEND_UNCONFIRMED" ? dt("نتيجة إرسال المرفق غير مؤكدة؛ راجع سجل المحادثة وMeta قبل إعادة الإرسال.")
+            : data.error === "ACCEPTED_UNRECORDED"
+              ? dt("قبل المزوّد الرسالة لكن تعذّر تحديث سجلها؛ لا تُعد إرسالها")
             : dt("تعذّر الإرسال: {0}", [data.error ?? dt("خطأ غير معروف")]),
         });
         return;
       }
-      setDraft("");
+      followBottom.current = true;
       setNotice({ tone: "ok", text: dt("أُرسل الردّ.") });
-      await loadDetail(activeId);
-      void loadList();
+      await loadDetail(conversationId, true);
+      void loadList(true);
+    } catch {
+      if (activeRef.current === conversationId) setNotice({ tone: "error", text: dt("نتيجة المزوّد غير مؤكدة؛ راجعها قبل السماح بمحاولة جديدة") });
+      await loadDetail(conversationId, true);
     } finally {
+      replyInFlight.current = false;
       setSending(false);
     }
-  }, [activeId, draft, loadDetail, loadList]);
+  }, [activeId, draft, attachment, recordingVoice, loadDetail, loadList]);
 
   const senderOptions = useMemo(
     () => [{ value: "", label: dt("كل الأرقام") }, ...senders.map((s) => ({ value: s.id, label: s.phone ? `${s.name} · ${s.phone}` : s.name }))],
@@ -320,7 +470,8 @@ export function WhatsappInbox() {
   );
 
   return (
-    <div dir={dashDir()}>
+    <div dir={dashDir()} className="min-w-0" data-whatsapp-inbox="true" style={viewportHeight ? { "--inbox-viewport-height": `${viewportHeight}px` } as React.CSSProperties : undefined}>
+      <div className={activeId ? "hidden md:block" : "block"}>
       <PageHeader
         eyebrow={dt("التواصل")}
         title={dt("صندوق واتساب")}
@@ -329,7 +480,8 @@ export function WhatsappInbox() {
         actions={
           <button
             type="button"
-            onClick={() => void loadList()}
+            disabled={recordingVoice}
+            onClick={() => { void loadSenders(); void loadList(); if (activeRef.current) void loadDetail(activeRef.current, true); }}
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
             <RefreshCw className={cn("w-4 h-4", loadingList && "animate-spin")} />
@@ -338,47 +490,55 @@ export function WhatsappInbox() {
       />
 
       <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3">
-        <SegmentedControl
+        <fieldset disabled={recordingVoice} aria-label={dt("تصفية المحادثات")} className="grid min-w-0 gap-3 sm:flex sm:flex-wrap sm:items-center">
+        <div className="min-w-0 overflow-x-auto"><SegmentedControl
           value={filter}
           onChange={(v) => setFilter(String(v))}
           options={FILTERS}
-        />
+        /></div>
         <select
+          aria-label={dt("رقم واتساب")}
+          disabled={loadingSenders && senders.length === 0}
           value={senderId}
           onChange={(e) => {
             const value = e.target.value;
             setSenderId(value);
-            if (typeof window !== "undefined") {
+            try {
               if (value) window.localStorage.setItem("communication:whatsapp:senderId", value);
               else window.localStorage.removeItem("communication:whatsapp:senderId");
-            }
+            } catch { /* Storage is optional. */ }
           }}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700"
+          className="min-h-11 w-full min-w-0 max-w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-base sm:w-auto sm:text-sm"
         >
-          {senderOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          {loadingSenders && senders.length === 0 ? <option value="">{dt("جارٍ تحميل أرقام واتساب…")}</option> : senderOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
-        <div className="relative">
+        <div className="relative min-w-0 sm:flex-1">
           <Search className="pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={dt("رقم، اسم، أو نصّ رسالة")}
-            className="w-64 rounded-lg border border-slate-200 bg-white py-1.5 ps-8 pe-3 text-sm text-slate-700 placeholder:text-slate-400"
+            aria-label={dt("البحث في المحادثات")}
+            className="min-h-11 w-full min-w-0 rounded-lg border border-slate-200 bg-white py-2 ps-8 pe-3 text-base text-slate-700 placeholder:text-slate-400 sm:min-w-48 sm:text-sm"
           />
         </div>
         <span className={cn(
           "rounded-full border px-2.5 py-1 text-xs font-medium",
-          needsReply > 0 ? "border-amber-200 bg-amber-50 text-amber-700" : "border-emerald-200 bg-emerald-50 text-emerald-700",
+          needsReply === null || listError ? "border-slate-200 bg-slate-50 text-slate-600" : needsReply > 0 ? "border-amber-200 bg-amber-50 text-amber-700" : "border-emerald-200 bg-emerald-50 text-emerald-700",
         )}>
-          {needsReply > 0 ? dt("{0} محادثة بانتظار ردّ", [needsReply]) : dt("لا شيء بانتظار ردّ")}
+          {listError ? dt("تعذّر تحديث العدد") : needsReply === null ? dt("جارٍ تحميل العدد…") : needsReply > 0 ? dt("{0} محادثة بانتظار ردّ", [needsReply]) : dt("لا شيء بانتظار ردّ")}
         </span>
-        </div>
+        </fieldset>
+        {senderError && <div role="alert" className="mt-3 flex items-center gap-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">
+          <span>{senderError}</span><button type="button" onClick={() => void loadSenders()} className="font-semibold underline">{dt("إعادة المحاولة")}</button>
+        </div>}
       </div>
 
-      <div className="grid min-h-[68vh] gap-4 xl:grid-cols-[minmax(20rem,23rem)_minmax(0,1fr)]">
+      </div>
+      <div className="grid min-h-0 min-w-0 gap-4 md:grid-cols-[minmax(15rem,18rem)_minmax(0,1fr)] xl:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
         {/* ── Conversation list ─────────────────────────────────── */}
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div aria-label={dt("قائمة المحادثات")} className={cn("min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:flex", activeId ? "hidden" : "flex")}>
+          <div className="flex items-center justify-between border-b bg-slate-50/70 px-4 py-3 text-sm font-semibold"><h2>{dt("المحادثات")}</h2><span className="text-xs font-normal text-slate-500">{conversations.length} / {totalConversations}</span></div>
           {listError && conversations.length > 0 && (
             <div className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-800">
               {dt("تعذّر تحديث القائمة الآن؛ المعروض هو آخر بيانات ناجحة.")}</div>
@@ -408,58 +568,66 @@ export function WhatsappInbox() {
                 title={dt("لا توجد محادثات")}
                 description={filter === "needsReply" ? dt("لا توجد محادثات بانتظار الرد حاليًا.") : dt("لم تصل أي محادثات مطابقة لهذا الفلتر.")}
               />
-              {filter !== "all" && (
+              {(filter !== "all" || query.trim().length > 0) && (
                 <button
                   type="button"
-                  onClick={() => setFilter("all")}
+                  onClick={() => { setFilter("all"); setQuery(""); }}
                   className="mx-auto mt-3 block rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   {dt("عرض كل المحادثات")}</button>
               )}
             </div>
           ) : (
-            <ul className="max-h-[72vh] divide-y divide-slate-100 overflow-y-auto">
+            <ul className="max-h-[calc(100dvh-23rem)] min-h-40 divide-y divide-slate-100 overflow-y-auto overscroll-contain md:h-[calc(100dvh-20rem)] md:max-h-none md:min-h-[25rem]">
               {conversations.map((c) => {
                 const at = fmtDateTime(c.lastMessageAt);
                 return (
                   <li key={c.id}>
                     <button
                       type="button"
-                      onClick={() => setActiveId(c.id)}
+                      aria-label={dt("فتح محادثة: {0}", [c.donor?.name || c.phone])}
+                      aria-pressed={activeId === c.id}
+                      disabled={recordingVoice}
+                      onClick={event => { conversationButtonRef.current = event.currentTarget; selectConversation(c.id); }}
                       className={cn(
                         "relative w-full px-3 py-3.5 text-start transition-colors hover:bg-slate-50",
                         activeId === c.id && "bg-emerald-50/70",
                       )}
                     >
                       {activeId === c.id && <span className="absolute inset-y-2 start-0 w-1 rounded-e-full bg-emerald-500" />}
+                      <div className="flex items-start gap-3"><span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-sm font-bold text-emerald-700">{c.donor?.name ? c.donor.name.trim().split(/\s+/).slice(0,2).map(part => part[0]).join("") : <UserRound size={18} />}</span><div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-sm font-semibold text-slate-900 truncate">
-                          {c.donor?.name || c.phone}
+                          {c.donor?.name || <bdi dir="ltr">{c.phone}</bdi>}
                         </span>
+                        {c.unread ? <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-600" aria-label={dt("محادثة غير مقروءة")} /> : null}
                         {c.needsReply && (
                           <span className="shrink-0 rounded-full bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
                             {dt("بانتظار ردّ")}</span>
                         )}
                       </div>
                       <p className="mt-0.5 text-xs text-slate-500 truncate">{c.lastInboundText || "—"}</p>
-                      <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-400">
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-slate-400">
                         {at && <span>{at.date} · {at.time}</span>}
-                        {c.sender?.phone && <span className="truncate">{dtx("عبر {0}", [c.sender.phone])}</span>}
+                        {c.sender?.phone && <span className="truncate">{dt("عبر")} <bdi dir="ltr">{c.sender.phone}</bdi></span>}
                         {c.unresolved && (
                           <span className="inline-flex items-center gap-0.5 text-slate-400">
                             <UserX className="w-3 h-3" /> {dt(" غير مرتبطة")}</span>
                         )}
                       </div>
+                      </div></div>
                     </button>
                   </li>
                 );
               })}
+              {conversations.length < totalConversations ? <li className="p-3 text-center"><button type="button" disabled={loadingMoreConversations} onClick={() => void loadMoreConversations()} className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50">{loadingMoreConversations ? dt("جار التحميل…") : dt("عرض المزيد من المحادثات")}</button></li> : null}
             </ul>
           )}
         </div>
 
         {/* ── Thread ─────────────────────────────────────────────── */}
-        <div className="flex min-h-[68vh] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div ref={threadRef} role="region" aria-label={dt("المحادثة الحالية")} className={cn("min-h-0 min-w-0 scroll-mt-20 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm h-[calc(var(--inbox-viewport-height,100dvh)-6rem)] md:flex md:h-[calc(100dvh-17rem)] md:min-h-[28rem]", activeId ? "flex" : "hidden")}>
+          {activeId ? <div className="flex min-h-12 shrink-0 items-center border-b border-slate-100 px-2 md:hidden"><button data-inbox-back type="button" disabled={recordingVoice} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-brand" onClick={() => selectConversation(null)}><ChevronLeft size={20} className="rtl:rotate-180" />{dt("العودة للمحادثات")}</button></div> : null}
           {!activeId ? (
             <EmptyState variant="inline" title={dt("اختر محادثة")} description={dt("ستظهر الرسائل وملف المتبرع هنا.")} />
           ) : loadingDetail && !detail ? (
@@ -484,16 +652,13 @@ export function WhatsappInbox() {
                 <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-[11px] font-medium text-amber-800">
                   {dt("تعذّر تحديث المحادثة الآن؛ المعروض هو آخر بيانات ناجحة.")}</div>
               )}
-              <div className="border-b border-slate-100 px-4 py-3">
+              <div className="shrink-0 border-b border-slate-100 px-3 py-3 sm:px-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-slate-900 truncate">
-                      {detail.donor?.name || detail.phone}
+                      {detail.donor?.name || <bdi dir="ltr">{detail.phone}</bdi>} {detail.donor && <DonorAccountBadge status={detail.donor.accountStatus} />}
                     </p>
-                    <p className="text-xs text-slate-500">
-                      {detail.phone}
-                      {detail.sender?.phone ? dt(" · عبر {0}", [detail.sender.phone]) : ""}
-                    </p>
+                    <p className="flex flex-wrap gap-x-2 text-xs text-slate-500"><bdi dir="ltr">{detail.phone}</bdi>{detail.sender?.phone ? <span>{dt("عبر")} <bdi dir="ltr">{detail.sender.phone}</bdi></span> : null}</p>
                   </div>
                   <div className="flex items-center gap-1.5">
                     {detail.donor?.userId && (
@@ -528,18 +693,32 @@ export function WhatsappInbox() {
                 )}
               </div>
 
-              <div ref={timelineRef} className="flex-1 space-y-3 overflow-y-auto bg-gradient-to-b from-slate-50/80 to-white px-4 py-4">
+              <div ref={timelineRef} onScroll={() => { const node = timelineRef.current; if (node) followBottom.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80; }} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-gradient-to-b from-slate-50/80 to-white px-4 py-4">
                 {detail.hasMore && (
                   <button
                     type="button"
+                    disabled={loadingOlder}
                     onClick={() => {
                       if (!detail.oldestAt || !activeId) return;
+                      const requestedId = activeId;
+                      const node = timelineRef.current;
+                      const oldHeight = node?.scrollHeight ?? 0;
+                      const oldTop = node?.scrollTop ?? 0;
+                      followBottom.current = false;
+                      setLoadingOlder(true);
                       void (async () => {
-                        const res = await fetch(`/api/dashboard/communication/inbox/${encodeURIComponent(activeId)}?before=${encodeURIComponent(detail.oldestAt!)}`, { cache: "no-store" });
+                        try {
+                        const res = await fetch(`/api/dashboard/communication/inbox/${encodeURIComponent(requestedId)}?before=${encodeURIComponent(detail.oldestAt!)}`, { cache: "no-store", signal: AbortSignal.timeout(12_000) });
                         const data = await res.json();
-                        if (res.ok && data.ok) {
+                        if (activeRef.current !== requestedId) return;
+                        if (!res.ok || !data.ok) throw new Error("load failed");
                           /* Older page prepended, so the reader keeps their place in the thread. */
-                          setDetail({ ...data.conversation, timeline: [...data.conversation.timeline, ...detail.timeline], hasMore: data.conversation.hasMore });
+                          setDetail(previous => previous ? { ...previous, timeline: mergeInboxTimeline(data.conversation.timeline, previous.timeline), oldestAt: data.conversation.oldestAt, hasMore: data.conversation.hasMore } : previous);
+                          requestAnimationFrame(() => { if (node && activeRef.current === requestedId) node.scrollTop = oldTop + node.scrollHeight - oldHeight; });
+                        } catch {
+                          if (activeRef.current === requestedId) setDetailError(dt("تعذّر تحميل المحادثة"));
+                        } finally {
+                          if (activeRef.current === requestedId) setLoadingOlder(false);
                         }
                       })();
                     }}
@@ -547,32 +726,26 @@ export function WhatsappInbox() {
                   >
                     {dt("تحميل رسائل أقدم")}</button>
                 )}
-                {detail.timeline.map((item, index) => {
+                {detail.timeline.map((item) => {
                   if (item.kind === "status") {
                     return (
-                      <p key={index} className="text-center text-[11px] text-slate-400">
-                        {item.status} · {fmtFull(item.at)}
+                      <p key={item.id} className="text-center text-[11px] text-slate-400">
+                        {messageStatus(item.status)} · {fmtFull(item.at)}
                       </p>
                     );
                   }
                   const inbound = item.kind === "inbound";
                   const MediaIcon = item.media ? MEDIA_ICONS[item.media.kind] ?? FileText : null;
                   return (
-                    <div key={index} className={cn("flex", inbound ? "justify-start" : "justify-end")}>
+                    <div key={item.id} className={cn("flex", inbound ? "justify-start" : "justify-end")}>
                       <div
                         className={cn(
                           "max-w-[78%] rounded-2xl px-3 py-2.5 text-sm shadow-sm",
                           inbound ? "border border-slate-200 bg-white text-slate-800" : "border border-emerald-200 bg-emerald-50 text-slate-900",
                         )}
                       >
-                        {item.media && MediaIcon && (
-                          /* A voice note or a photo of a receipt is a message. It used to arrive as an
-                             empty bubble because only `text.body` was parsed. */
-                          <p className="mb-1 inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                            <MediaIcon className="w-3.5 h-3.5" />
-                            {mediaLabel(item.media)}
-                          </p>
-                        )}
+                        {item.media && MediaIcon ? item.media.mediaId ? <InboxMedia conversationId={activeId!} itemId={item.id} media={item.media}/> : <p className="text-xs text-slate-500">{mediaLabel(item.media)}</p> : null}
+                        {item.media?.caption && item.media.caption !== item.text ? <p className="whitespace-pre-wrap">{item.media.caption}</p> : null}
 
                         {!inbound && item.whatsappPreview?.header?.type === "image" && item.whatsappPreview.header.mediaUrl && (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -634,7 +807,7 @@ export function WhatsappInbox() {
 
                         <p className="mt-1 text-[10px] text-slate-400">
                           {fmtFull(item.at)}
-                          {!inbound && item.status ? ` · ${item.status}` : ""}
+                          {!inbound && item.status ? ` · ${messageStatus(item.status)}` : ""}
                         </p>
                       </div>
                     </div>
@@ -642,7 +815,7 @@ export function WhatsappInbox() {
                 })}
               </div>
 
-              <div className="border-t border-slate-100 px-4 py-3">
+              <div className="max-h-[50%] shrink-0 overflow-y-auto border-t border-slate-100 bg-white px-3 py-3 sm:px-4" style={{ paddingBottom: "max(.75rem, env(safe-area-inset-bottom))" }}>
                 {replyWindow && (
                   <p className={cn(
                     "mb-2 inline-flex items-center gap-1.5 text-xs",
@@ -653,7 +826,7 @@ export function WhatsappInbox() {
                   </p>
                 )}
                 {notice && (
-                  <p className={cn("mb-2 text-xs font-medium", notice.tone === "ok" ? "text-emerald-700" : "text-rose-700")}>
+                  <p role={notice.tone === "error" ? "alert" : "status"} className={cn("mb-2 text-xs font-medium", notice.tone === "ok" ? "text-emerald-700" : "text-rose-700")}>
                     {notice.text}
                   </p>
                 )}
@@ -661,24 +834,27 @@ export function WhatsappInbox() {
                   <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
                     {dt("المتبرع مفعّل عليه «عدم التواصل». الإرسال متوقف حتى تُعدّل حالة التواصل.")}</div>
                 ) : replyWindow?.open ? (
+                  <div className="space-y-3">
+                    <InboxAttachments key={activeId} onRecordingChange={setRecordingVoice} attachment={attachment} disabled={sending} onChange={value => { const target = activeId!; setAttachments(previous => ({...previous, [target]:value || undefined})); }} onError={text => setNotice({tone:"error",text})}/>
                   <div className="flex items-end gap-2">
                     <textarea
+                      aria-label={dt("نص الرد")}
                       value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
+                      onChange={(e) => { const value = e.target.value; if (activeId) setDrafts(previous => ({ ...previous, [activeId]: value })); }}
                       disabled={sending}
                       rows={2}
                       placeholder={dt("اكتب ردًّا…")}
-                      className="flex-1 resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400"
+                      className="min-w-0 flex-1 resize-none rounded-lg border border-slate-200 px-3 py-2 text-base text-slate-800 placeholder:text-slate-400 sm:text-sm"
                     />
                     <button
                       type="button"
                       onClick={() => void sendReply()}
-                      disabled={sending || !draft.trim()}
+                      disabled={sending || recordingVoice || (!draft.trim() && !attachment)}
                       className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-40"
                     >
                       {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                       {dt("إرسال")}</button>
-                  </div>
+                  </div></div>
                 ) : detail.donor?.userId ? (
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
                     <div>
@@ -695,7 +871,7 @@ export function WhatsappInbox() {
                         className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
                       >
                         <MessageCircle className="h-4 w-4" />
-                        {dt("إرسال قالب تحية")}</button>
+                        {dt("اختيار قالب معتمد")}</button>
                       <button
                         type="button"
                         onClick={() => {

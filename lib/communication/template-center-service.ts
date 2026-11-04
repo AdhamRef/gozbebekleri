@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { SUPPORTED_LOCALES, LOCALES, DEFAULT_LOCALE, isValidLocale, type SupportedLocale } from "@/lib/locales";
+import { SUPPORTED_LOCALES, LOCALES, DEFAULT_LOCALE, isValidLocale, type AnyLocale as SupportedLocale } from "@/lib/ported-systems/locales";
 
 /**
  * Read layer for the Template Center. Presents the existing WhatsappTemplate / EmailTemplate rows

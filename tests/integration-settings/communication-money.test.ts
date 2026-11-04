@@ -1,4 +1,9 @@
+// Offline regression fixtures for the transferred runtime.
+import * as fixtureBrand from "../../lib/ported-systems/brand";
+import * as fixtureLocales from "../../lib/ported-systems/locales";
+import * as cadence from "../../lib/templates/recurring-cadence";
 import * as projects from "../../lib/templates/donation-projects";
+import * as donationMoney from "../../lib/templates/donation-money";
 import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
@@ -23,18 +28,21 @@ test("template money keeps cents and currency precision rather than rounding to 
 
 test("actual context loader supports category-only donations and this site's Prisma relations", async () => {
   const donor = { id: "user", name: "Donor", email: "donor@example.test", phone: null, countryName: "Türkiye", country: "TR", countryCode: "TR", city: "", region: "", preferredLang: "en" };
-  const donation = { id: "donation", donorId: "user", locale: "en", amount: 1234.56, amountUSD: 35.27, totalAmount: 1250.56, currency: "TRY", status: "PAID", createdAt: new Date("2026-10-19"), items: [], categoryItems: [{ amount: 1234.56, amountUSD: 35.27, category: { name: "Medical relief" } }] };
+  const donation = { id: "donation", donorId: "user", locale: "en", amount: 1234.56, amountUSD: 35.27, totalAmount: 1250.56, currency: "TRY", status: "PAID", createdAt: new Date("2026-10-19"), items: [], categoryItems: [{ amount: 1234.56, amountUSD: 35.27, category: { name: "الإغاثة الطبية", translations: [{ locale: "en", name: "Medical relief" }] } }] };
   const prisma = {
     user: { findUnique: async () => donor, findMany: async () => [donor] },
     donation: {
-      findMany: async (args: { select: Record<string, unknown> }) => { assert.ok(!("waqfItems" in args.select)); return [donation]; },
+      findMany: async (args: { select: Record<string, unknown> }) => { assert.ok("waqfItems" in args.select); return [donation]; },
       findUnique: async () => donation,
     },
   };
-  const dependencies: Record<string, unknown> = { "@/lib/prisma": { prisma }, "./donation-projects": projects, "./money": { donationUsdAmount, formatTemplateMoney }, "./variable-catalog": {} };
+  const dependencies: Record<string, unknown> = { "@/lib/prisma": { prisma }, "./donation-projects": projects, "./donation-money": donationMoney, "./money": { donationUsdAmount, formatTemplateMoney }, "./variable-catalog": {} };
   const output = ts.transpileModule(fs.readFileSync("lib/templates/variables.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
   const loaded = { exports: {} };
-  new vm.Script(output).runInNewContext({ module: loaded, exports: loaded.exports, Date, Intl, Map, require: (id: string) => { assert.ok(id in dependencies, id); return dependencies[id]; } });
+  new vm.Script(output).runInNewContext({ module: loaded, exports: loaded.exports, Date, Intl, Map, require: (id: string) => {
+ if(id==="@/lib/ported-systems/brand")return fixtureBrand;
+ if(id==="@/lib/ported-systems/locales")return fixtureLocales;
+ if(id==="./recurring-cadence")return cadence; assert.ok(id in dependencies, id); return dependencies[id]; } });
   const api = loaded.exports as { loadContext: (id: string) => Promise<{ donation?: unknown; donations: Array<{ campaignTitle: string; amount: string; currency: string; amountUSD: string }>; totals: { amountUSD: string } }>; loadContextsForUserIds: (ids: string[]) => Promise<Map<string, unknown>> };
   const context = await api.loadContext("user");
   assert.equal(context.donations[0].campaignTitle, "Medical relief");
@@ -44,3 +52,4 @@ test("actual context loader supports category-only donations and this site's Pri
   assert.equal(context.totals.amountUSD, "35.27");
   assert.ok((await api.loadContextsForUserIds(["user"])).has("user"));
 });
+

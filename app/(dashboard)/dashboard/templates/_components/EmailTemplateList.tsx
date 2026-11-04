@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { resolveTemplateKind } from "@/lib/communication/template-kind";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
@@ -21,7 +20,6 @@ interface EmailTemplateRow {
 }
 
 export function EmailTemplateList() {
-  const [search, setSearch] = React.useState("");
   const [templates, setTemplates] = React.useState<EmailTemplateRow[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [section, setSection] = React.useState<"SYSTEM" | "CAMPAIGN">("CAMPAIGN");
@@ -47,8 +45,9 @@ export function EmailTemplateList() {
   }, [fetchAll]);
 
   const visibleTemplates = templates.filter((template) => {
-    const bucket = resolveTemplateKind(template);
-    return bucket === section && template.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase());
+    const isSystem = template.kind === "SYSTEM" || (template.purpose != null && template.purpose !== "MARKETING");
+    const bucket = isSystem ? "SYSTEM" : "CAMPAIGN";
+    return bucket === section;
   });
 
   const handleDelete = async (id: string) => {
@@ -57,21 +56,17 @@ export function EmailTemplateList() {
       await axios.delete(`/api/templates/email/${id}`);
       toast.success(dt("تم الحذف"));
       fetchAll();
-    } catch (error) {
-      toast.error(dt(axios.isAxiosError(error) && error.response?.status === 409 ? "القالب قيد الاستخدام ولا يمكن حذفه." : "فشل الحذف"));
+    } catch {
+      toast.error(dt("فشل الحذف"));
     }
   };
 
   return (
     <div className="space-y-4">
-      <input aria-label={dt("البحث في القوالب")} placeholder={dt("البحث في القوالب")} value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 w-full rounded-md border px-3 text-sm" />
       <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
-        <button type="button" aria-pressed={section === "CAMPAIGN"} onClick={() => setSection("CAMPAIGN")} className={`rounded-md px-3 py-1.5 text-xs font-medium ${section === "CAMPAIGN" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{dt("الحملات التسويقية")} ({templates.filter((template) => resolveTemplateKind(template) === "CAMPAIGN").length})</button>
-        <button type="button" aria-pressed={section === "SYSTEM"} onClick={() => setSection("SYSTEM")} className={`rounded-md px-3 py-1.5 text-xs font-medium ${section === "SYSTEM" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{dt("التلقائية والتوثيق")} ({templates.filter((template) => resolveTemplateKind(template) === "SYSTEM").length})</button>
+        <button type="button" onClick={() => setSection("CAMPAIGN")} className={`rounded-md px-3 py-1.5 text-xs font-medium ${section === "CAMPAIGN" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{dt("الحملات التسويقية")}</button>
+        <button type="button" onClick={() => setSection("SYSTEM")} className={`rounded-md px-3 py-1.5 text-xs font-medium ${section === "SYSTEM" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{dt("التلقائية والتوثيق")}</button>
       </div>
-      <p className="text-xs leading-5 text-muted-foreground">
-        {dt("النوع يحدد استخدام القالب؛ تغيير اللغة يغيّر المحتوى فقط ولا ينشئ قالبًا جديدًا.")}
-      </p>
       <div className="flex justify-between items-center">
         <p className="text-xs text-muted-foreground">
           {loading ? "…" : dt("{0} قالب بريد", [visibleTemplates.length])}
@@ -84,7 +79,7 @@ export function EmailTemplateList() {
           <Plus className="w-4 h-4" /> {dt(" قالب جديد")}</Button>
       </div>
 
-      <div className="rounded-lg border border-border overflow-x-auto">
+      <div className="rounded-lg border border-border overflow-hidden">
         <table className="w-full text-sm text-start">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50/80">
@@ -109,14 +104,7 @@ export function EmailTemplateList() {
             ) : (
               visibleTemplates.map((t) => (
                 <tr key={t.id} className="border-b border-slate-100 hover:bg-slate-50/60">
-                  <td className="py-3 px-4 font-medium text-slate-900">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span>{t.name}</span>
-                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${resolveTemplateKind(t) === "SYSTEM" ? "border-violet-200 bg-violet-50 text-violet-700" : "border-sky-200 bg-sky-50 text-sky-700"}`}>
-                        {dt(resolveTemplateKind(t) === "SYSTEM" ? "تلقائي / خدمي / توثيق" : "حملة تسويقية")}
-                      </span>
-                    </div>
-                  </td>
+                  <td className="py-3 px-4 font-medium text-slate-900">{t.name}</td>
                   <td className="py-3 px-4 text-slate-600 truncate max-w-[280px]" title={t.subject}>
                     {t.subject}
                   </td>
@@ -149,7 +137,6 @@ export function EmailTemplateList() {
 
       {editor.open && (
         <EmailTemplateEditorDialog
-          initialKind={section}
           id={editor.id}
           open={editor.open}
           onOpenChange={(open) => {

@@ -1,4 +1,5 @@
 "use client";
+import { whatsappFailureGuidance } from "@/lib/communication/whatsapp-failure-guidance";
 
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -9,7 +10,7 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { LOCALE_LABELS } from "@/lib/locales";
+import { LOCALE_LABELS } from "@/lib/ported-systems/locales";
 import { cn } from "@/lib/utils";
 import { fmtFull, type StageBuilder } from "./channel-ui";
 import { dashDir, dt } from "@/lib/dashboard/i18n";
@@ -18,7 +19,7 @@ import { dashDir, dt } from "@/lib/dashboard/i18n";
  * The معاينة sheet  one delivery, opened from a row on either channel page.
  *
  * It answers the two questions a row can only hint at: what did the recipient actually receive, and
- * how far did it get? The rendered content and the lifecycle live in the same panel deliberately
+ * how far did it get? The rendered content and the lifecycle live in the same panel deliberately 
  * they are read together ("it failed… showing what?"), and splitting them across two dialogs would
  * make the row's click target ambiguous.
  *
@@ -164,8 +165,8 @@ export function DeliveryPreviewSheet({ id, stagesFor, trackingLive, onOpenChange
 
   return (
     <Sheet open={!!id} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-full overflow-y-auto p-0 sm:max-w-[760px]" dir={dashDir()}>
-        <SheetHeader className="sticky top-0 z-10 border-b border-slate-200 bg-white p-5">
+      <SheetContent side="left" className="w-full overflow-y-auto p-0 sm:max-w-[760px] [&>button]:z-20" dir={dashDir()}>
+        <SheetHeader className="sticky top-0 z-10 border-b border-slate-200 bg-white px-12 py-5">
           <SheetTitle className="flex items-center justify-between gap-3 text-start">
             <span className="flex min-w-0 items-center gap-2">
               <ChannelIcon className="h-5 w-5 shrink-0 text-brand" />
@@ -229,7 +230,7 @@ export function DeliveryPreviewSheet({ id, stagesFor, trackingLive, onOpenChange
                   </div>
                 )}
                 {!row.recipientName && !row.recipientEmail && !row.recipientPhone && (
-                  <span className="text-slate-400">{dt("لا يوجد عنوان مسجّل  لهذا لم تُرسل.")}</span>
+                  <span className="text-slate-400">{dt("لا توجد بيانات اتصال محفوظة في سجل هذه المحاولة.")}</span>
                 )}
               </div>
             </div>
@@ -248,6 +249,7 @@ export function DeliveryPreviewSheet({ id, stagesFor, trackingLive, onOpenChange
                   {row.status === "SKIPPED" ? dt("سبب عدم الإرسال") : dt("رسالة الخطأ")}
                 </div>
                 <p className="whitespace-pre-wrap break-words text-xs" dir="ltr">{row.errorMessage}</p>
+                {row.channel === "WHATSAPP" && whatsappFailureGuidance(row.errorMessage) ? <p className="mt-3 text-xs leading-7">{dt(whatsappFailureGuidance(row.errorMessage)!)}</p> : null}
               </div>
             )}
 
@@ -268,7 +270,7 @@ export function DeliveryPreviewSheet({ id, stagesFor, trackingLive, onOpenChange
               <div className="flex items-center justify-between gap-3 rounded-xl border border-brand/20 bg-brand-50/50 p-4">
                 <div className="min-w-0 text-xs text-slate-700">
                   <b className="block text-slate-900">{dt("هذه الرسالة لم تصل المستلم")}</b>
-                  {dt("يمكن إعادة إرسالها الآن بنفس المحتوى المحفوظ.")}</div>
+                  {dt("سيتحقق النظام من عنوان المستلم والقالب والمحتوى قبل إنشاء محاولة جديدة.")}</div>
                 <Button
                   size="sm"
                   className="shrink-0 gap-1.5"

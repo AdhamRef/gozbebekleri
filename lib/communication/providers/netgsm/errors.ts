@@ -44,7 +44,7 @@ export function mapNetgsmCode(code: string): { ok: boolean; reason: string } {
 }
 
 /**
- * Netgsm answers a rejected send with a NON-2xx status whose body still carries the real code
+ * Netgsm answers a rejected send with a NON-2xx status whose body still carries the real code 
  * e.g. `HTTP 406 {"code":"30","description":"Check the usercode-password information and API
  * access permission"}`. Reading only `res.ok` therefore turned every credential and header problem
  * into NETGSM_REQUEST_FAILED, which reads like a network outage and sent operators looking in the

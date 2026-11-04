@@ -7,24 +7,23 @@ import { prisma } from "@/lib/prisma";
 import { donorChannelEligibility } from "@/lib/communication/audience-service";
 import { recipientExclusionReason, RECIPIENT_REASON_LABELS } from "@/lib/communication/campaign-audience-accounting";
 import { campaignCandidateWhere, candidatePagination } from "@/lib/communication/campaign-candidate-policy";
-import { readCampaignProfileGateUserIds } from "@/lib/communication/campaign-consent-reader";
+import { readCampaignConsentUserIds } from "@/lib/communication/campaign-consent-reader";
 import { isCommunicationChannel } from "@/lib/communication/communication-runtime-types";
 import { getUserIdsMatchingBadge, getBadgeIdsByUser } from "@/lib/badge-criteria";
 import { resolveUserCountry } from "@/lib/dashboard/resolve-user-country";
 import { getCountryDisplayNameFromCode } from "@/lib/dashboard/country-display-name";
-import { isValidLocale, DEFAULT_LOCALE } from "@/lib/locales";
+import { isValidLocale, DEFAULT_LOCALE } from "@/lib/ported-systems/locales";
 import { birthdateRangeForAges, genderQueryValues, parseAgeParam, parseGenderParam } from "@/lib/dashboard/user-demographics";
-import { AUDIENCE_SELECTION_MAX } from "@/lib/communication/audience-limits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** All matching donors remain selectable; readiness filtering is opt-in and read-only. */
-const SELECT_ALL_CEILING = AUDIENCE_SELECTION_MAX;
+const SELECT_ALL_PAGE_SIZE = 1000;
 const donorSelect = {
   id: true, name: true, email: true, phone: true, image: true, preferredLang: true,
   country: true, countryCode: true, countryName: true,
-  communicationProfile: { select: { doNotContact: true, emailOptIn: true, smsOptIn: true, whatsappOptIn: true } },
+  communicationProfile: { select: { doNotContact: true, emailOptIn: true, smsOptIn: true, consentSource: true } },
 } satisfies Prisma.UserSelect;
 type DonorRow = Prisma.UserGetPayload<{ select: typeof donorSelect }>;
 type FilterInput = {
@@ -89,7 +88,7 @@ async function buildWhere(f: FilterInput): Promise<Prisma.UserWhereInput> {
   return where;
 }
 
-type ConsentProfile = { doNotContact: boolean; emailOptIn: boolean; smsOptIn: boolean; whatsappOptIn: boolean };
+type ConsentProfile = { doNotContact: boolean; emailOptIn: boolean; smsOptIn: boolean; consentSource: string | null };
 function eligibilityReason(
   donor: { email?: string | null; phone?: string | null },
   channel: "EMAIL" | "WHATSAPP" | "SMS",
@@ -104,7 +103,7 @@ async function channelEligibilityWhere(
   eligibility: string,
   signal?: AbortSignal,
 ): Promise<Prisma.UserWhereInput> {
-  const ids = eligibility === "all" ? undefined : await readCampaignProfileGateUserIds(channel, signal);
+  const ids = eligibility === "all" ? undefined : await readCampaignConsentUserIds(channel, signal);
   return campaignCandidateWhere(base, channel, eligibility, ids);
 }
 
@@ -146,7 +145,6 @@ export async function GET(request: NextRequest) {
         countryCode: resolved.code, countryName: resolved.name, badgeIds: badgeIdsByUser.get(user.id) ?? [],
         eligibility: donorChannelEligibility(user, channel, profile),
         eligibilityReason: eligibilityReason(user, channel, profile),
-        canConfirmWhatsappOptIn: false,
       };
     });
     const countryGroups = await prisma.user.groupBy({
@@ -184,10 +182,15 @@ export async function POST(request: NextRequest) {
   try {
     const baseWhere = await buildWhere(filters);
     const where = await channelEligibilityWhere(baseWhere, channel, eligibilityFilter, request.signal);
-    const rows = await prisma.user.findMany({
-      where, select: { id: true }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: SELECT_ALL_CEILING + 1,
-    });
-    return reply({ ok: true, ids: rows.slice(0, SELECT_ALL_CEILING).map((row) => row.id), truncated: rows.length > SELECT_ALL_CEILING });
+    const ids: string[] = []; let cursor: string | null = null;
+    for (;;) {
+      request.signal?.throwIfAborted();
+      const rows: Array<{ id: string }> = await prisma.user.findMany({ where, select: { id: true }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: SELECT_ALL_PAGE_SIZE, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}) });
+      ids.push(...rows.map(row => row.id));
+      if (rows.length < SELECT_ALL_PAGE_SIZE) break;
+      const next = rows.at(-1)?.id; if (!next || next === cursor) throw new Error("AUDIENCE_CURSOR_STALLED"); cursor = next;
+    }
+    return reply({ ok: true, ids, truncated: false });
   } catch {
     return reply({ ok: false, error: "تعذّر تحديد جمهور الحملة. لم يتم اعتماد قائمة بديلة؛ أعد المحاولة." }, 503);
   }

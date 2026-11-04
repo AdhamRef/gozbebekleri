@@ -35,9 +35,8 @@ export async function resumeStaleDispatches(): Promise<{ found: number; resumed:
   for (const claim of claims) {
     if (!claim.donationId || !claim.event) continue;
     try {
-      const result = await dispatchEvent(claim.event as MessageTriggerEvent, { donationId: String(claim.donationId) });
-      if (result.errors > 0) failed++;
-      else resumed++;
+      await dispatchEvent(claim.event as MessageTriggerEvent, { donationId: String(claim.donationId) });
+      resumed++;
     } catch (error) {
       failed++;
       console.error("[resume-stale-dispatches] dispatch failed", {

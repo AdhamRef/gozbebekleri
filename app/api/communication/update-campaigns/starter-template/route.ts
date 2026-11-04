@@ -9,7 +9,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * POST  create the ready-made "project update" email template (all eight enabled site languages): the update's campaign and date, title, photo (or video still),
+ * POST  create the ready-made "project update" email template (Arabic +
+ * English): the update's campaign and date, title, photo (or video still),
  * text, a "watch the video" button, a thank-you line and a link back to the
  * project. An ordinary template afterwards  edited in the templates page,
  * where the {{update.*}} variables can be moved anywhere.

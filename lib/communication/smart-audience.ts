@@ -1,6 +1,8 @@
+import { cleanAudienceFrequencies, recurringAudienceWhere } from "./recurring-audience";
 import { Prisma } from "@prisma/client";
+import { recentMarketingDeliveryWhere } from "./recent-marketing-filter";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_LOCALE, isValidLocale, type SupportedLocale } from "@/lib/locales";
+import { DEFAULT_LOCALE, isValidLocale, type AnyLocale as SupportedLocale } from "@/lib/ported-systems/locales";
 import type { CommunicationChannelId } from "./communication-runtime-types";
 import { getUserIdsMatchingBadge } from "@/lib/badge-criteria";
 import { summarizeCampaignAudience, type AudienceAccountingRow } from "./audience-preview-accounting";
@@ -9,6 +11,7 @@ import type { RecipientExclusionReason } from "./campaign-audience-accounting";
 export const SMART_AUDIENCE_METADATA_KEY = "smartAudience";
 
 export type SmartAudienceFilters = {
+  excludeMarketedWithinDays?: number | null;
   countries?: string[];
   locales?: string[];
   donatedWithinDays?: number | null;
@@ -16,6 +19,9 @@ export type SmartAudienceFilters = {
   projectIds?: string[];
   badgeIds?: string[];
   recurringOnly?: boolean;
+  oneTimeOnly?: boolean;
+  recurringFrequencies?: string[];
+  excludeRecurringFrequencies?: string[];
   minDonationAmountUSD?: number | null;
   hasContact?: boolean;
 };
@@ -77,6 +83,7 @@ export function normalizeSmartAudienceDefinition(input: unknown, channel: Commun
     kind: "SMART",
     channel,
     filters: {
+      excludeMarketedWithinDays: typeof f.excludeMarketedWithinDays === "number" && Number.isFinite(f.excludeMarketedWithinDays) && f.excludeMarketedWithinDays > 0 ? Math.min(3650, Math.max(1, Math.floor(f.excludeMarketedWithinDays))) : null,
       countries: cleanList(f.countries).map((v) => v.toUpperCase()).slice(0, 100),
       locales: cleanList(f.locales).filter(isValidLocale),
       donatedWithinDays,
@@ -84,6 +91,9 @@ export function normalizeSmartAudienceDefinition(input: unknown, channel: Commun
       projectIds: cleanList(f.projectIds).slice(0, 100),
       badgeIds: cleanList(f.badgeIds).slice(0, 20),
       recurringOnly: f.recurringOnly === true,
+      oneTimeOnly: f.oneTimeOnly === true,
+      recurringFrequencies: cleanAudienceFrequencies(f.recurringFrequencies),
+      excludeRecurringFrequencies: cleanAudienceFrequencies(f.excludeRecurringFrequencies),
       minDonationAmountUSD,
       hasContact: f.hasContact === true,
     },
@@ -156,7 +166,8 @@ export function buildSmartAudienceUserWhere(definition: SmartAudienceDefinition)
     ];
   }
 
-  if (f.recurringOnly) where.subscriptions = { some: { status: "ACTIVE" } };
+  const recurring = recurringAudienceWhere(f);
+  if (recurring.length) where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), ...recurring];
 
   // Contact presence is an explicit audience choice, never an implicit default.
   if (f.hasContact === true) {
@@ -172,6 +183,16 @@ export function buildSmartAudienceUserWhere(definition: SmartAudienceDefinition)
 
 async function resolveSmartAudienceUserWhere(definition: SmartAudienceDefinition): Promise<Prisma.UserWhereInput> {
   const where = buildSmartAudienceUserWhere(definition);
+  if (definition.filters.excludeMarketedWithinDays) {
+    const recent = await prisma.communicationDelivery.findMany({
+      where: { ...recentMarketingDeliveryWhere(definition.filters.excludeMarketedWithinDays), recipientUserId: { not: null } },
+      select: { recipientUserId: true }, distinct: ["recipientUserId"], take: 50_001,
+    });
+    // Do not silently omit exclusions if a very large account needs a narrower window.
+    if (recent.length > 50_000) throw new Error("MARKETING_EXCLUSION_WINDOW_TOO_LARGE");
+    const excluded = [...new Set([...(definition.excludeUserIds || []), ...recent.map(row => row.recipientUserId).filter((id): id is string => Boolean(id))])];
+    where.id = { notIn: excluded };
+  }
   const badgeIds = definition.filters.badgeIds ?? [];
   if (!badgeIds.length) return where;
 
@@ -249,7 +270,10 @@ export async function previewSmartAudience(
   signal?.throwIfAborted();
   const where = await resolveSmartAudienceUserWhere(definition);
   const last = await prisma.user.findFirst({
-    where, orderBy: { id: "desc" }, select: { id: true },
+    // The snapshot upper bound may include donors outside this audience.
+    // Membership is still evaluated with the complete filters on every page.
+    // Avoid an extra reverse scan with all donation/subscription joins.
+    where: { role: "DONOR" }, orderBy: { id: "desc" }, select: { id: true },
   });
 
   async function* rows(): AsyncGenerator<AudienceAccountingRow> {
@@ -260,14 +284,14 @@ export async function previewSmartAudience(
       // Explicit result type breaks Prisma's recursive cursor inference (TS7022).
       const page: Array<SmartUserRow & {
         communicationProfile: Prisma.DonorCommunicationProfileGetPayload<{
-          select: { doNotContact: true; emailOptIn: true; smsOptIn: true; whatsappOptIn: true };
+          select: { doNotContact: true; emailOptIn: true; smsOptIn: true; consentSource: true };
         }> | null;
       }> = await prisma.user.findMany({
         where: { AND: [where, { id: { lte: last.id, ...(cursor ? { gt: cursor } : {}) } }] },
         select: {
           id: true, name: true, email: true, phone: true,
           preferredLang: true, countryCode: true, emailNotifications: true, smsNotifications: true,
-          communicationProfile: { select: { doNotContact: true, emailOptIn: true, smsOptIn: true, whatsappOptIn: true } },
+          communicationProfile: { select: { doNotContact: true, emailOptIn: true, smsOptIn: true, consentSource: true } },
         },
         orderBy: { id: "asc" },
         take: 1000,

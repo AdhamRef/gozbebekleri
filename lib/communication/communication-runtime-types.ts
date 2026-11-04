@@ -19,7 +19,6 @@ export type ActiveCommunicationProviderId = (typeof ACTIVE_COMMUNICATION_PROVIDE
 
 export const HISTORICAL_COMMUNICATION_PROVIDERS = [
   "BREVO_EMAIL",
-  "TWILIO",
   "SENDGRID",
   "NETGSM",
   "CUSTOM",
@@ -60,6 +59,27 @@ export const CAMPAIGN_STATUSES = [
   "ARCHIVED",
 ] as const;
 export type CampaignStatusId = (typeof CAMPAIGN_STATUSES)[number];
+
+/** Campaigns in these states have finished their send lifecycle and cannot be paused or resumed. */
+export const CAMPAIGN_CONTROL_TERMINAL_STATUSES = [
+  "SENT",
+  "SENT_WITH_ISSUES",
+  "BLOCKED",
+  "CANCELLED",
+  "FAILED",
+  "ARCHIVED",
+] as const satisfies readonly CampaignStatusId[];
+
+export function isCampaignControlTerminalStatus(status: string): boolean {
+  return (CAMPAIGN_CONTROL_TERMINAL_STATUSES as readonly string[]).includes(status);
+}
+
+/** An unfinished, blocked audience walk can be diagnosed and explicitly requeued. */
+export function isResumableBlockedCampaign(campaign: { status: string; metadata?: unknown }): boolean {
+  if (campaign.status !== "BLOCKED" || !campaign.metadata || typeof campaign.metadata !== "object") return false;
+  const progress = (campaign.metadata as { sendProgress?: unknown }).sendProgress;
+  return !!progress && typeof progress === "object" && (progress as { done?: unknown }).done === false;
+}
 
 export const DELIVERY_ORIGINS = ["MANUAL", "CAMPAIGN", "TRIGGER", "TEST", "REACTIVATION", "SYSTEM"] as const;
 export type DeliveryOriginId = (typeof DELIVERY_ORIGINS)[number];
@@ -102,6 +122,10 @@ export function isCommunicationChannel(value: unknown): value is CommunicationCh
 
 export function isActiveCommunicationProvider(value: unknown): value is ActiveCommunicationProviderId {
   return typeof value === "string" && (ACTIVE_COMMUNICATION_PROVIDERS as readonly string[]).includes(value);
+}
+
+export function isActiveSenderProvider(channel: string, provider: unknown): provider is ActiveCommunicationProviderId {
+  return channel === "WHATSAPP" ? provider === "META_WHATSAPP" : channel === "EMAIL" ? provider === "ELASTIC_EMAIL" : channel === "SMS" && (provider === "NETGSM_SMS" || provider === "BREVO_SMS");
 }
 
 export function isCommunicationProvider(value: unknown): value is CommunicationProviderId {
