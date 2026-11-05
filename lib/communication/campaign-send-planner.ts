@@ -4,7 +4,6 @@ import { evaluateCoverageGate } from "./campaign-approval-service";
 import { listSenders } from "./sender-service";
 import { getActiveCommunicationRuntimeBundle } from "./runtime-config";
 import { isSendEnabled } from "./provider-router";
-import { resolveSmsProviderWithRuntime } from "./providers/sms/client";
 import { isCommunicationChannel, type CommunicationChannelId } from "./communication-runtime-types";
 
 export type SendPlan = {
@@ -71,31 +70,6 @@ export async function planCampaignSend(campaignId: string, opts: { batchSize?: n
   }
 
   const runtime = await getActiveCommunicationRuntimeBundle();
-  if (channel === "SMS") {
-    let trCount = 0;
-    let intlCount = 0;
-    let missingTR = false;
-    let missingIntl = false;
-    for (const recipient of recipients) {
-      const route = resolveSmsProviderWithRuntime(runtime, recipient.country, recipient.phone);
-      if (route.provider === "NETGSM_SMS") {
-        trCount += 1;
-        if (!route.configured) missingTR = true;
-      } else {
-        intlCount += 1;
-        if (!route.configured) missingIntl = true;
-      }
-    }
-    if (missingTR || missingIntl) {
-      const smsReasons = { ...reasons };
-      if (missingTR) smsReasons[runtime.netgsm.reason ?? "NETGSM_NOT_CONFIGURED"] = trCount;
-      if (missingIntl) smsReasons[runtime.brevoSms.reason ?? "BREVO_SMS_NOT_CONFIGURED"] = intlCount;
-      const blocked = missingTR && missingIntl ? "SMS_PROVIDER_NOT_CONFIGURED" : missingTR ? runtime.netgsm.reason ?? "NETGSM_NOT_CONFIGURED" : runtime.brevoSms.reason ?? "BREVO_SMS_NOT_CONFIGURED";
-      return { ...partial, reasons: smsReasons, providerReady: false, senderReady: false, blocked };
-    }
-    return { ...partial, providerReady: true, senderReady: true, willSend: true };
-  }
-
   const providerReady = await isSendEnabled(channel, runtime);
   if (!providerReady) {
     const blocked = channel === "WHATSAPP" ? runtime.meta.reason : runtime.elasticEmail.reason;

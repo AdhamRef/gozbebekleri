@@ -275,69 +275,16 @@ export class ElasticEmailConnectionTester implements IntegrationProviderTester {
 
 /** Brevo  international (non-Turkish) SMS only. Email moved to Elastic Email. */
 export class BrevoConnectionTester implements IntegrationProviderTester {
-  constructor(private readonly fetchImpl: ProviderFetch = fetch) {}
-
-  async test(input: ProviderConnectionTestInput): Promise<ProviderConnectionTestResult> {
-    const key = input.values.API_KEY;
-    const smsSender = input.values.SMS_SENDER;
-    if (!key || !smsSender) return failed("بيانات Brevo المطلوبة غير مكتملة.", "BREVO_CONFIGURATION_INCOMPLETE");
-
-    try {
-      validateIntegrationSettingValue("BREVO", "SMS_SENDER", smsSender);
-    } catch {
-      return failed("اسم مرسل SMS غير صالح محليًا.", "BREVO_SMS_SENDER_INVALID");
-    }
-
-    try {
-      const account = await providerFetch(this.fetchImpl, "https://api.brevo.com/v3/account", {
-        method: "GET",
-        headers: apiKey(key),
-      });
-      if (!account.ok) return failed("تعذر الوصول إلى حساب Brevo.", account.status === 401 ? "BREVO_UNAUTHORIZED" : "BREVO_ACCOUNT_UNAVAILABLE");
-
-      return connected("تم التحقق من حساب Brevo ومن إعداد مرسل SMS الدولي دون إرسال رسالة.");
-    } catch {
-      return failed("تعذر الاتصال بخدمة Brevo حاليًا.", "BREVO_REQUEST_FAILED");
-    }
+  constructor(_fetchImpl: ProviderFetch = fetch) {}
+  async test(_input: ProviderConnectionTestInput): Promise<ProviderConnectionTestResult> {
+    return failed("تم حذف خدمة الرسائل النصية.", "CHANNEL_REMOVED");
   }
 }
 
 export class NetgsmConnectionTester implements IntegrationProviderTester {
-  constructor(private readonly fetchImpl: ProviderFetch = fetch) {}
-
-  async test(input: ProviderConnectionTestInput): Promise<ProviderConnectionTestResult> {
-    const usercode = input.values.USERCODE;
-    const password = input.values.PASSWORD;
-    const header = input.values.HEADER;
-    if (!usercode || !password || !header) return failed("بيانات Netgsm المطلوبة غير مكتملة.", "NETGSM_CONFIGURATION_INCOMPLETE");
-
-    const authorization = `Basic ${Buffer.from(`${usercode}:${password}`).toString("base64")}`;
-    try {
-      const account = await providerFetch(this.fetchImpl, "https://api.netgsm.com.tr/balance/list/get", {
-        method: "GET",
-        headers: { Authorization: authorization, accept: "application/json,text/plain" },
-      });
-      if (!account.ok) return failed("تعذر التحقق من حساب Netgsm.", account.status === 401 ? "NETGSM_UNAUTHORIZED" : "NETGSM_ACCOUNT_UNAVAILABLE");
-      const normalized = account.text.trim();
-      if (/^(30|40|50|60|70)\b/.test(normalized)) return failed("بيانات دخول Netgsm غير مقبولة.", "NETGSM_AUTH_REJECTED");
-
-      const headers = await providerFetch(this.fetchImpl, "https://api.netgsm.com.tr/sms/rest/v2/header", {
-        method: "GET",
-        headers: { Authorization: authorization, accept: "application/json,text/plain" },
-      });
-      if (headers.ok) {
-        const haystack = JSON.stringify(headers.body ?? headers.text).toLocaleUpperCase("tr-TR");
-        if (!haystack.includes(header.toLocaleUpperCase("tr-TR"))) {
-          return failed("اسم المرسل غير موجود ضمن عناوين Netgsm المتاحة.", "NETGSM_HEADER_NOT_AVAILABLE");
-        }
-      } else if (headers.status !== 404 && headers.status !== 405) {
-        return failed("تعذر التحقق من اسم المرسل في Netgsm.", "NETGSM_HEADER_CHECK_FAILED");
-      }
-
-      return connected("تم التحقق من حساب Netgsm واسم المرسل دون إرسال رسالة.");
-    } catch {
-      return failed("تعذر الاتصال بخدمة Netgsm حاليًا.", "NETGSM_REQUEST_FAILED");
-    }
+  constructor(_fetchImpl: ProviderFetch = fetch) {}
+  async test(_input: ProviderConnectionTestInput): Promise<ProviderConnectionTestResult> {
+    return failed("تم حذف خدمة الرسائل النصية.", "CHANNEL_REMOVED");
   }
 }
 

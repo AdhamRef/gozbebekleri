@@ -275,7 +275,7 @@ export function CampaignRowActions({
         </AlertDialogContent>
       </AlertDialog>
 
-      {canReviewFailures && ["WHATSAPP", "EMAIL", "SMS"].includes(campaign.channel) ? <RetryDialog open={retryOpen} channel={campaign.channel as "WHATSAPP" | "EMAIL" | "SMS"} ids={null} days={30} campaignId={campaign.id} campaignName={campaign.name} purposeGroup="MARKETING" onOpenChange={setRetryOpen} onFinished={onChanged} /> : null}
+      {canReviewFailures && ["WHATSAPP", "EMAIL"].includes(campaign.channel) ? <RetryDialog open={retryOpen} channel={campaign.channel as "WHATSAPP" | "EMAIL" | "SMS"} ids={null} days={30} campaignId={campaign.id} campaignName={campaign.name} purposeGroup="MARKETING" onOpenChange={setRetryOpen} onFinished={onChanged} /> : null}
       <CampaignRecoveryDialog open={recoveryOpen} onOpenChange={setRecoveryOpen} campaignId={campaign.id} campaignName={campaign.name} onChanged={onChanged} canControl={canControl} onControls={() => { setRecoveryOpen(false); setControlsOpen(true); }} />
       <CampaignControlsDialog
         open={controlsOpen}

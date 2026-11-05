@@ -1,5 +1,6 @@
-export const INTEGRATION_PROVIDERS = ["META_WHATSAPP", "ELASTIC_EMAIL", "BREVO", "NETGSM", "SYSTEM"] as const;
-export type IntegrationProvider = (typeof INTEGRATION_PROVIDERS)[number];
+export const INTEGRATION_PROVIDERS = ["META_WHATSAPP", "ELASTIC_EMAIL", "SYSTEM"] as const;
+// Retired provider keys remain compatible with archived settings.
+export type IntegrationProvider = (typeof INTEGRATION_PROVIDERS)[number] | "BREVO" | "NETGSM";
 
 export const INTEGRATION_VALUE_SOURCES = ["DATABASE", "ENVIRONMENT", "NONE"] as const;
 export type IntegrationValueSource = (typeof INTEGRATION_VALUE_SOURCES)[number];

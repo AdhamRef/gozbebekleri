@@ -52,11 +52,11 @@ export function DonorCommunicationHistory({ userId }: { userId: string }) {
     </div>
     <div className="flex flex-wrap gap-3">
       <select aria-label={dt("القناة")} className="rounded-md border bg-background p-2" value={channel} onChange={(event) => setChannel(event.target.value)}>
-        <option value="">{dt("جميع القنوات")}</option><option value="WHATSAPP">{dt("واتساب")}</option><option value="EMAIL">{dt("البريد الإلكتروني")}</option><option value="SMS">SMS</option>
+        <option value="">{dt("جميع القنوات")}</option><option value="WHATSAPP">{dt("واتساب")}</option><option value="EMAIL">{dt("البريد الإلكتروني")}</option>
       </select>
       <Button variant="outline" disabled={loading} onClick={() => void load()}>{dt("تحديث")}</Button>
     </div>
-    <p className="text-sm text-muted-foreground">{dt("الرسائل المرسلة لهذا المتبرع عبر واتساب والبريد وSMS، مع أحدث حالة تسليم متاحة. السجلات القديمة التي لا تحمل هوية المتبرع لا تُنسب إليه بالتخمين.")}</p>
+    <p className="text-sm text-muted-foreground">{dt("الرسائل المرسلة لهذا المتبرع عبر واتساب والبريد، مع أحدث حالة تسليم متاحة. السجلات القديمة التي لا تحمل هوية المتبرع لا تُنسب إليه بالتخمين.")}</p>
     {error && <p role="alert" className="rounded border border-red-200 p-3 text-red-700">{error}</p>}
     {!loading && !error && !items.length && <p>{dt("لا توجد رسائل مسجلة لهذا المتبرع.")}</p>}
     <div className="space-y-3">{items.map((item) => {

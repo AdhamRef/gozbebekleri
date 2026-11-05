@@ -33,7 +33,8 @@
     "typecheck:content-editor-service": "tsc -p tsconfig.content-editor.json",
     "test:ported-systems": "node --import tsx --import ./tests/ported-systems/setup.ts --test tests/ported-systems/*.test.ts",
     "typecheck:ported-systems": "tsc -p tsconfig.ported-systems.json",
-    "postinstall": "prisma generate && prisma generate --schema prisma/integration-settings.schema.prisma"
+    "postinstall": "prisma generate && prisma generate --schema prisma/integration-settings.schema.prisma",
+    "test:sms-removal": "node --import tsx --test tests/integration-settings/sms-removal.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

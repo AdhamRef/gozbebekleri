@@ -12,7 +12,7 @@ import type { TReaderDocument } from "@usewaypoint/email-builder";
 import { notifyDonationEvent } from "@/lib/telegram/notify";
 import { sendDonationServerConversions } from "@/lib/tracking/donation-conversion-server";
 import { upsertProfileForUser } from "@/lib/communication/donor-communication-profile-service";
-import { sendAutomaticEmailMessage, sendAutomaticWhatsappMessage, sendAutomaticSmsMessage, resolveMetaTemplateMapping, type AutomaticOutcome } from "@/lib/communication/automatic-message-dispatcher";
+import { sendAutomaticEmailMessage, sendAutomaticWhatsappMessage, resolveMetaTemplateMapping, type AutomaticOutcome } from "@/lib/communication/automatic-message-dispatcher";
 import { loadSenderRoutingSnapshot, resolveSenderFromSnapshot, type SenderResolution, type SenderRoutingSnapshot } from "@/lib/communication/sender-resolution";
 import type { CommunicationPurposeId } from "@/lib/communication/communication-runtime-types";
 import type { AnyLocale as SupportedLocale } from "@/lib/ported-systems/locales";
@@ -102,29 +102,6 @@ export async function sendTriggerMessage(
     if (!routed.ok) return { channel: "EMAIL", outcome: "SKIPPED", reason: routed.reason };
     const response = await sendAutomaticEmailMessage({ triggerEvent: event, templateId: tpl.id, templateName: tpl.name, locale, recipientUserId: ctx.user.id, recipientName: ctx.user.name || null, recipientEmail: ctx.user.email ?? null, renderedSubject: subject, renderedBody: html, senderEmail: routed.sender.senderEmail, variables, donationId, purpose: opts.purpose, attachments: opts.attachments, renderingError });
     return { channel: "EMAIL", outcome: response.outcome, reason: response.reason };
-  }
-
-  if (trigger.channel === "SMS") {
-    const tpl = await prisma.smsTemplate.findUnique({ where: { id: trigger.templateId } });
-    if (!tpl) return null;
-    const variant = resolveWhatsappBody(tpl, locale);
-    const body = localizeDonationFailureLinks(mergeText(recurringNotificationText(donationNotificationText(variant.body, moneyContext, locale),frequency,locale), ctx), locale);
-    const response = await sendAutomaticSmsMessage({
-      triggerEvent: event,
-      templateId: tpl.id,
-      templateName: tpl.name,
-      locale,
-      recipientUserId: ctx.user.id,
-      recipientName: ctx.user.name || null,
-      recipientPhone: ctx.user.phone || null,
-      country: ctx.user.countryCode || null,
-      renderedBody: body,
-      renderingError: event.startsWith("SUBSCRIPTION_") && !frequency && containsMonthlyCadence(variant.body, locale) ? "RECURRING_TEMPLATE_CADENCE_MISMATCH" : variant.resolvedLocale && variant.resolvedLocale !== locale ? "EXACT_TEMPLATE_LANGUAGE_REQUIRED" : undefined,
-      variables,
-      donationId,
-      purpose: opts.purpose,
-    });
-    return { channel: "SMS", outcome: response.outcome, reason: response.reason };
   }
 
   if (trigger.channel === "WHATSAPP") {
@@ -272,7 +249,7 @@ export async function dispatchEvent(event: MessageTriggerEvent, input: EventDisp
   try {
     // Do not consume the once-per-donation claim until we know there is actual work and a
     // renderable recipient. This keeps a temporarily missing trigger/context retryable.
-    let triggers = await prisma.messageTrigger.findMany({ where: { event: input.donationId && isPaymentReceiptEvent(event) ? { in: [...PAYMENT_RECEIPT_EVENTS] } : event, enabled: true }, orderBy: { id: "asc" } });
+    let triggers = await prisma.messageTrigger.findMany({ where: { event: input.donationId && isPaymentReceiptEvent(event) ? { in: [...PAYMENT_RECEIPT_EVENTS] } : event, enabled: true, channel: { in: ["EMAIL", "WHATSAPP"] } }, orderBy: { id: "asc" } });
     result.triggers = triggers.length;
     if (!triggers.length) {
       await writeAuditLog({

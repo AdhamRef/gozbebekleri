@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
   if (denied) return denied;
   const sp = request.nextUrl.searchParams;
   const channel = sp.get("channel");
-  if (!isCommunicationChannel(channel)) return reply({ ok: false, error: "channel must be EMAIL, WHATSAPP or SMS" }, 400);
+  if (!isCommunicationChannel(channel)) return reply({ ok: false, error: "channel must be EMAIL or WHATSAPP" }, 400);
   const eligibilityFilter = sp.get("eligibility") || "all";
   if (!["all", "eligible", "ineligible"].includes(eligibilityFilter)) return reply({ ok: false, error: "Invalid eligibility filter" }, 400);
   const pagination = candidatePagination(sp.get("page"), sp.get("limit"));
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
   if (!filters || !body || typeof body !== "object") return reply({ ok: false, error: "Invalid audience filters" }, 400);
   const input = body as Record<string, unknown>;
   const channel = input.channel;
-  if (!isCommunicationChannel(channel)) return reply({ ok: false, error: "channel must be EMAIL, WHATSAPP or SMS" }, 400);
+  if (!isCommunicationChannel(channel)) return reply({ ok: false, error: "channel must be EMAIL or WHATSAPP" }, 400);
   const eligibilityFilter = input.eligibility ?? "all";
   if (typeof eligibilityFilter !== "string" || !["all", "eligible", "ineligible"].includes(eligibilityFilter)) return reply({ ok: false, error: "Invalid eligibility filter" }, 400);
   try {

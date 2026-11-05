@@ -448,14 +448,7 @@ export async function sendAutomaticWhatsappMessage(
   return { outcome: "SENT", providerMessageId: res.providerMessageId };
 }
 
-/* ─────────────────────────── SMS (Netgsm TR / Brevo) ─────────────────────────── */
-
-/**
- * Automatic SMS. Trigger events route through the same final provider architecture as campaigns:
- * Turkish recipients → Netgsm, international recipients → Brevo SMS. Every attempt is archived in
- * CommunicationDelivery before the provider call. SentMessage remains only a legacy email/WhatsApp
- * mirror, so SMS does not depend on it.
- */
+/** Compatibility entry point for archived SMS triggers; never sends. */
 export async function sendAutomaticSmsMessage(
   input: CommonInput & {
     recipientPhone: string | null;
@@ -464,59 +457,7 @@ export async function sendAutomaticSmsMessage(
     smsSender?: string | null;
   }
 ): Promise<AutomaticResult> {
-  const base = {
-    channel: "SMS" as const,
-    origin: "TRIGGER" as const,
-    purpose: input.purpose ?? ("TRANSACTIONAL" as const),
-    templateId: input.templateId,
-    templateName: input.templateName,
-    recipientUserId: input.recipientUserId,
-    recipientName: input.recipientName,
-    locale: input.locale,
-    renderedBody: input.renderedBody,
-    variables: deliveryVariables(input),
-  };
-
-  if (input.renderingError) {
-    const created = await createDeliveryRecord({ ...base, recipientPhone: input.recipientPhone, status: "RENDERED" });
-    if (created.ok) await markDeliveryStatus(created.data.id, "SKIPPED", { errorMessage: input.renderingError });
-    return { outcome: created.ok ? "SKIPPED" : "FAILED", reason: created.ok ? input.renderingError : "ARCHIVE_FAILED" };
-  }
-
-  const consentBlock = await automaticConsentBlock(input.recipientUserId, "SMS", input.purpose);
-  if (consentBlock) {
-    const created = await createDeliveryRecord({ ...base, recipientPhone: input.recipientPhone, status: "RENDERED" });
-    if (created.ok) await markDeliveryStatus(created.data.id, "SKIPPED", { errorMessage: consentBlock });
-    return { outcome: "SKIPPED", reason: consentBlock };
-  }
-
-  if (!input.recipientPhone) {
-    const created = await createDeliveryRecord({ ...base, recipientPhone: null, status: "RENDERED" });
-    if (created.ok) await markDeliveryStatus(created.data.id, "SKIPPED", { errorMessage: "NO_RECIPIENT_PHONE" });
-    return { outcome: "SKIPPED", reason: "NO_RECIPIENT_PHONE" };
-  }
-
-  const created = await createDeliveryRecord({ ...base, recipientPhone: input.recipientPhone, status: "RENDERED" });
-  if (!created.ok) return { outcome: "FAILED", reason: "ARCHIVE_FAILED" };
-  const id = created.data.id;
-
-  const res = await sendPreparedDelivery({
-    channel: "SMS",
-    sender: input.smsSender ? { smsSender: input.smsSender } : null,
-    country: input.country,
-    to: input.recipientPhone,
-    html: input.renderedBody,
-    purpose: input.purpose ?? "TRANSACTIONAL",
-  });
-
-  if (!res.ok) {
-    const terminal = isTerminalConfigReason(res.reason);
-    await markDeliveryStatus(id, terminal ? "SKIPPED" : "FAILED", { errorMessage: res.reason });
-    return { outcome: terminal ? "SKIPPED" : "FAILED", reason: res.reason };
-  }
-
-  await markDeliveryStatus(id, "SENT", { providerMessageId: res.providerMessageId, internalAccepted: res.internalAccepted });
-  return { outcome: "SENT", providerMessageId: res.providerMessageId };
+  return { outcome: "SKIPPED", reason: "CHANNEL_REMOVED" };
 }
 
 export type MetaTemplateMapping = {

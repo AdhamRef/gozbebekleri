@@ -39,6 +39,8 @@ export async function PATCH(
   const existing = await prisma.messageTrigger.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  if (existing.channel === "SMS") return NextResponse.json({ error: "CHANNEL_REMOVED" }, { status: 410 });
+
   if (parsed.data.templateId) {
     const template = await findClassifiedTemplate(existing.channel, parsed.data.templateId);
     if (!template) return NextResponse.json({ error: "Template not found for channel" }, { status: 400 });

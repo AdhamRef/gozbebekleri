@@ -17,8 +17,6 @@ export type OfficialProvider = {
 export const PROVIDER_REGISTRY: readonly OfficialProvider[] = [
   { key: "META_WHATSAPP", channel: "WHATSAPP", labelAr: "Meta WhatsApp", scope: "ALL" },
   { key: "ELASTIC_EMAIL", channel: "EMAIL", labelAr: "Elastic Email", scope: "ALL" },
-  { key: "BREVO_SMS", channel: "SMS", labelAr: "Brevo SMS", scope: "INTERNATIONAL" },
-  { key: "NETGSM_SMS", channel: "SMS", labelAr: "Netgsm SMS", scope: "TR" },
 ] as const;
 
 export function activeProviders(channel?: CommunicationChannelId): OfficialProvider[] {
@@ -36,8 +34,6 @@ export function isProviderActive(key: string): key is CommunicationProviderKey {
 export const OFFICIAL_PROVIDER_MATRIX = {
   whatsapp: "META_WHATSAPP",
   email: "ELASTIC_EMAIL",
-  smsInternational: "BREVO_SMS",
-  smsTurkey: "NETGSM_SMS",
 } as const satisfies Record<string, CommunicationProviderKey>;
 
 export const communicationProviderRegistry: ProviderConnection[] = PROVIDER_REGISTRY.map((provider) => ({
@@ -48,12 +44,7 @@ export const communicationProviderRegistry: ProviderConnection[] = PROVIDER_REGI
   isPrimary: true,
   supportsTransactional: true,
   supportsMarketing: true,
-  notes:
-    provider.key === "NETGSM_SMS"
-      ? "تركيا (+90)"
-      : provider.key === "BREVO_SMS"
-        ? "الرسائل الدولية خارج تركيا"
-        : null,
+  notes: null,
 }));
 
 export function providerForChannel(channel: CommunicationChannelId) {

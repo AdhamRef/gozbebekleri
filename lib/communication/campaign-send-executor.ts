@@ -190,7 +190,7 @@ function sendConcurrency(channel: CommunicationChannelId, speedMode: CampaignSpe
   const speed = speedSettings(speedMode);
   if (channel === "WHATSAPP") return concurrencyFromEnv("COMMUNICATION_WHATSAPP_CONCURRENCY", speed.concurrency);
   if (channel === "EMAIL") return concurrencyFromEnv("COMMUNICATION_EMAIL_CONCURRENCY", Math.max(speed.concurrency, 20));
-  return concurrencyFromEnv("COMMUNICATION_SMS_CONCURRENCY", speed.concurrency);
+  return speed.concurrency;
 }
 /** Drain already-started workers before propagating failure; stop taking new work. */
 async function mapWithConcurrency<T, R>(items: readonly T[], limit: number, worker: (item: T, index: number) => Promise<R>): Promise<R[]> {
@@ -236,6 +236,7 @@ async function executeCampaignRun(campaignId: string, opts: ExecutionOptions): P
   const campaign = await getCampaign(campaignId);
   if (!campaign) return { ...base, blocked: "NOT_FOUND" };
   base.status = campaign.status;
+  if (campaign.channel === "SMS") return { ...base, blocked: "CHANNEL_REMOVED", reasons: { CHANNEL_REMOVED: 1 } };
   const recentMarketingDays = (await getSmartAudienceDefinitionForSegmentKey(campaign.audienceSegmentKey))?.filters.excludeMarketedWithinDays;
   const controlGate = await evaluateCampaignSendControls(campaign);
   if (!controlGate.ok) return { ...base, blocked: controlGate.reason };
@@ -556,7 +557,7 @@ export async function runDueCampaigns(opts: { actor?: Actor; max?: number; maxBa
   const maxBatchesPerCampaign = Math.max(1, Math.min(opts.maxBatchesPerCampaign ?? 1, DEFAULT_MAX_BATCHES));
   const deadline = Date.now() + RUN_BUDGET_MS;
   const results: ExecutionSummary[] = [];
-  const dueCandidates = await prisma.communicationCampaign.findMany({ where: { status: "SCHEDULED", scheduledAt: { lte: new Date() } }, select: { id: true, metadata: true, scheduledAt: true }, take: Math.min(max * 5, 250) });
+  const dueCandidates = await prisma.communicationCampaign.findMany({ where: { channel: { in: ["EMAIL", "WHATSAPP"] }, status: "SCHEDULED", scheduledAt: { lte: new Date() } }, select: { id: true, metadata: true, scheduledAt: true }, take: Math.min(max * 5, 250) });
   dueCandidates.sort((a, b) => campaignPriorityRank(campaignSendControls(a as Pick<CommunicationCampaign, "metadata">).priority) - campaignPriorityRank(campaignSendControls(b as Pick<CommunicationCampaign, "metadata">).priority) || (a.scheduledAt?.getTime() ?? 0) - (b.scheduledAt?.getTime() ?? 0));
   const due = dueCandidates.slice(0, max);
   for (const campaign of due) {
@@ -565,7 +566,7 @@ export async function runDueCampaigns(opts: { actor?: Actor; max?: number; maxBa
   }
   const budget = max - results.length;
   if (budget > 0 && Date.now() + 15_000 < deadline) {
-    const inFlight = await prisma.communicationCampaign.findMany({ where: { status: "SENDING" }, select: { id: true, metadata: true, updatedAt: true }, take: Math.min(budget * 8, 250) });
+    const inFlight = await prisma.communicationCampaign.findMany({ where: { channel: { in: ["EMAIL", "WHATSAPP"] }, status: "SENDING" }, select: { id: true, metadata: true, updatedAt: true }, take: Math.min(budget * 8, 250) });
     inFlight.sort((a, b) => campaignPriorityRank(campaignSendControls(a as Pick<CommunicationCampaign, "metadata">).priority) - campaignPriorityRank(campaignSendControls(b as Pick<CommunicationCampaign, "metadata">).priority) || a.updatedAt.getTime() - b.updatedAt.getTime());
     for (const row of inFlight) {
       if (results.length >= max || Date.now() + 15_000 >= deadline) break;

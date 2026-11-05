@@ -131,7 +131,7 @@ export async function runDonationLapsedReminders(
 
   if (!process.env.DATABASE_URL) return { ...summary, ok: false };
 
-  const triggers = await prisma.messageTrigger.findMany({ where: { event: "DONATION_LAPSED", enabled: true }, orderBy: { createdAt: "asc" } });
+  const triggers = await prisma.messageTrigger.findMany({ where: { event: "DONATION_LAPSED", enabled: true, channel: { in: ["EMAIL", "WHATSAPP"] } }, orderBy: { createdAt: "asc" } });
   summary.triggers = triggers.length;
   if (!triggers.length) return summary;
 

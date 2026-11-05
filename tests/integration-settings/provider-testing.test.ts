@@ -155,7 +155,7 @@ test("Meta tester requires a locally valid webhook verify token", async () => {
   assert.match(result.messageAr, /محليًا/);
 });
 
-test("Brevo tester validates the SMS account without sending and without touching email endpoints", async () => {
+test("retired Brevo tester refuses configuration without network access", async () => {
   const calls: string[] = [];
   const fakeFetch: ProviderFetch = async (input) => {
     calls.push(String(input));
@@ -166,9 +166,9 @@ test("Brevo tester validates the SMS account without sending and without touchin
     candidateVersion: null,
     values: { API_KEY: "key", SMS_SENDER: "GOZBEBEK" },
   });
-  assert.equal(result.success, true);
-  assert.deepEqual(calls, ["https://api.brevo.com/v3/account"]);
-  assert.equal(calls.some((url) => url.includes("/senders") || url.includes("/smtp")), false);
+  assert.equal(result.success, false);
+  assert.deepEqual(calls, []);
+  assert.equal(result.failureCode, "CHANNEL_REMOVED");
 });
 
 test("Brevo tester records provider authentication failure safely", async () => {
@@ -179,7 +179,7 @@ test("Brevo tester records provider authentication failure safely", async () => 
     values: { API_KEY: "secret-api-key", SMS_SENDER: "GOZBEBEK" },
   });
   assert.equal(result.success, false);
-  assert.equal(result.failureCode, "BREVO_UNAUTHORIZED");
+  assert.equal(result.failureCode, "CHANNEL_REMOVED");
   assert.equal(JSON.stringify(result).includes("secret-api-key"), false);
 });
 
@@ -295,8 +295,9 @@ test("Netgsm tester checks account and header without sending SMS", async () => 
     candidateVersion: null,
     values: { USERCODE: "user", PASSWORD: "password", HEADER: "GOZBEBEK" },
   });
-  assert.equal(result.success, true);
-  assert.equal(calls.some((url) => url.includes("/send")), false);
+  assert.equal(result.success, false);
+  assert.equal(result.failureCode, "CHANNEL_REMOVED");
+  assert.deepEqual(calls, []);
 });
 
 test("System Cron tester validates the decrypted candidate locally", async () => {

@@ -72,7 +72,7 @@ export async function listSenders(strict = false): Promise<CommunicationSender[]
   }
   try {
     const rows = await prisma.communicationSender.findMany({
-      where: { OR: [{ channel: "WHATSAPP", provider: "META_WHATSAPP" }, { channel: "EMAIL", provider: "ELASTIC_EMAIL" }, { channel: "SMS", provider: { in: ["NETGSM_SMS", "BREVO_SMS"] } }] },
+      where: { OR: [{ channel: "WHATSAPP", provider: "META_WHATSAPP" }, { channel: "EMAIL", provider: "ELASTIC_EMAIL" }] },
       orderBy: [{ enabled: "desc" }, { priority: "asc" }, { name: "asc" }],
     });
     return rows.filter(row => isActiveSenderProvider(row.channel, row.provider));
