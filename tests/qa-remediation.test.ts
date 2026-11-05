@@ -99,8 +99,8 @@ test("BUG-09/11/12: complete localized privacy and recovery copy; no sample arti
   assert.deepEqual(defaultEditorContent, { type: "doc", content: [{ type: "paragraph" }] });
 });
 
-test("BUG-01/SRC-01: actual email/SMS routes classify legacy bindings and refuse deletion or reclassification of referenced templates", async () => {
-  for (const channel of ["EMAIL", "SMS"] as const) {
+test("BUG-01/SRC-01: actual email routes classify legacy bindings and refuse deletion or reclassification of referenced templates", async () => {
+  for (const channel of ["EMAIL"] as const) {
     let updates = 0, deletes = 0, triggerCount = 1, campaignCount = 0;
     const row = { id: "111111111111111111111111", kind: "CAMPAIGN", purpose: "MARKETING", name: "Legacy receipt", status: "READY" };
     const delegate = { findUnique: async () => row, update: async ({data}: any) => { updates++; return {...row,...data}; }, delete: async () => { deletes++; return row; } };

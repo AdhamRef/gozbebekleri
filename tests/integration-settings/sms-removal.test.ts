@@ -54,6 +54,8 @@ test("SMS routes and navigation are removed, old campaigns and triggers are bloc
   assert.match(readFileSync("lib/communication/campaign-send-executor.ts", "utf8"), /campaign.channel === "SMS".*CHANNEL_REMOVED/);
   assert.match(readFileSync("lib/communication/provider-router.ts", "utf8"), /input.channel === "SMS".*CHANNEL_REMOVED/);
   assert.equal(readFileSync("lib/events/dispatch.ts", "utf8").includes("sendAutomaticSmsMessage"), false);
+  const executor = readFileSync("lib/communication/campaign-send-executor.ts", "utf8");
+  assert.equal((executor.match(/where: \{ channel: \{ in: \["EMAIL", "WHATSAPP"\] \}, status: "S(?:CHEDULED|ENDING)"/g) ?? []).length, 2);
 });
 
 // Execute the real router with all runtime resolution forbidden: retired sends must exit first.
