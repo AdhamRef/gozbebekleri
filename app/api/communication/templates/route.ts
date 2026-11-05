@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
   const channel = request.nextUrl.searchParams.get("channel");
   if (!isCommunicationChannel(channel)) {
-    return NextResponse.json({ ok: false, error: "channel must be EMAIL, WHATSAPP or SMS" }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "channel must be EMAIL or WHATSAPP" }, { status: 400 });
   }
 
   try {

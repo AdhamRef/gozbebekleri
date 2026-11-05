@@ -286,7 +286,7 @@ test("live marketing exclusion skips contacted recipients before any provider se
   assert.ok(h.deliveries.every(row => row.status === "SKIPPED" && row.errorMessage === "RECENT_MARKETING_CONTACT"));
 });
 
-for (const channel of ["EMAIL", "SMS"]) test(`${channel} executor never bypasses a final routing refusal`, async () => {
+for (const channel of ["EMAIL"]) test(`${channel} executor never bypasses a final routing refusal`, async () => {
   const h = engineHarness({ channel, denyRouting: true });
   const result = await h.engine.executeCampaignSend("campaign");
   assert.equal(h.state().calls, 0); assert.equal(result.sent, 0); assert.equal(result.skipped, 2);
@@ -322,3 +322,10 @@ for (const channel of ["EMAIL", "WHATSAPP"]) test(`${channel}: future schedules 
  assert.equal((await cancelled.engine.runDueCampaigns()).length, 0); assert.equal(cancelled.state().calls, 0);
 });
 
+
+test("legacy SMS campaigns cannot execute or resume", async () => {
+  const h = engineHarness({ channel: "SMS" });
+  const result = await h.engine.executeCampaignSend("campaign", { mode: "RESUME" });
+  assert.equal(result.blocked, "CHANNEL_REMOVED");
+  assert.equal(h.state().calls, 0); assert.equal(h.deliveries.length, 0);
+});

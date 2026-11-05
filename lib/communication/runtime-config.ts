@@ -45,7 +45,7 @@ type RuntimeOptions = {
 };
 
 async function resolve<T extends Record<string, string>>(
-  provider: "META_WHATSAPP" | "ELASTIC_EMAIL" | "BREVO" | "NETGSM",
+  provider: "META_WHATSAPP" | "ELASTIC_EMAIL",
   required: readonly string[],
   select: (values: Record<string, string>) => T,
   options: RuntimeOptions = {}
@@ -138,23 +138,23 @@ export function getActiveElasticEmailWebhookSecret(): Promise<ActiveRuntimeConfi
   );
 }
 
+/** Retired SMS compatibility: never read credentials or access the settings database. */
+function retiredSmsRuntime(): NotReady {
+  return { configured: false, enabled: false, values: null, sources: {}, databaseAvailable: true, reason: RUNTIME_FAILURE.PROVIDER_DISABLED, missingFields: [] };
+}
+
 export type BrevoSmsRuntimeValues = { apiKey: string; sender: string };
 export function getActiveBrevoSmsRuntimeConfig(): Promise<ActiveRuntimeConfig<BrevoSmsRuntimeValues>> {
-  return resolve("BREVO", ["API_KEY", "SMS_SENDER"], (v) => ({ apiKey: v.API_KEY, sender: v.SMS_SENDER }));
+  return Promise.resolve(retiredSmsRuntime());
 }
 
 export type NetgsmRuntimeValues = { usercode: string; password: string; header: string };
 export function getActiveNetgsmRuntimeConfig(): Promise<ActiveRuntimeConfig<NetgsmRuntimeValues>> {
-  return resolve("NETGSM", ["USERCODE", "PASSWORD", "HEADER"], (v) => ({ usercode: v.USERCODE, password: v.PASSWORD, header: v.HEADER }));
+  return Promise.resolve(retiredSmsRuntime());
 }
 
 export function getActiveBrevoWebhookSecret(): Promise<ActiveRuntimeConfig<{ secret: string }>> {
-  return resolve(
-    "BREVO",
-    ["WEBHOOK_SECRET"],
-    (v) => ({ secret: v.WEBHOOK_SECRET }),
-    { allowDisabled: true, allowDatabaseFallback: true }
-  );
+  return Promise.resolve(retiredSmsRuntime());
 }
 
 export type CommunicationRuntimeBundle = {
@@ -165,11 +165,9 @@ export type CommunicationRuntimeBundle = {
 };
 
 export async function getActiveCommunicationRuntimeBundle(): Promise<CommunicationRuntimeBundle> {
-  const [meta, elasticEmail, brevoSms, netgsm] = await Promise.all([
+  const [meta, elasticEmail] = await Promise.all([
     getActiveMetaWhatsappRuntimeConfig(),
     getActiveElasticEmailRuntimeConfig(),
-    getActiveBrevoSmsRuntimeConfig(),
-    getActiveNetgsmRuntimeConfig(),
   ]);
-  return { meta, elasticEmail, brevoSms, netgsm };
+  return { meta, elasticEmail, brevoSms: retiredSmsRuntime(), netgsm: retiredSmsRuntime() };
 }

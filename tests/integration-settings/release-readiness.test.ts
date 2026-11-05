@@ -67,7 +67,6 @@ test("preflight and migration verification are read-only and provider-free", () 
 test("crypto Prisma webhook integration and Cron routes explicitly use Node runtime", () => {
   const routes = [
     "app/api/webhooks/meta/whatsapp/route.ts",
-    "app/api/webhooks/brevo/transactional/route.ts",
     "app/api/cron/communication-run-due/route.ts",
     "app/api/admin/integration-settings/[provider]/route.ts",
     "app/api/admin/integration-settings/[provider]/test-active/route.ts",

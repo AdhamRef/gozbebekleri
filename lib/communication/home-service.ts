@@ -15,7 +15,7 @@ export type CommunicationHome = {
   repliesNeedingAction: number;
   failedDeliveries: number;
   incompleteTemplates: number;
-  providers: { whatsapp: boolean; email: boolean; sms: boolean };
+  providers: { whatsapp: boolean; email: boolean };
   recentCampaigns: { id: string; name: string; channel: string; status: string }[];
 };
 
@@ -23,12 +23,11 @@ export async function getCommunicationHome(): Promise<CommunicationHome> {
   // `isSendEnabled` is async. Unawaited, each value was a Promise  always truthy  so the
   // Communication Center home showed every channel as "جاهز" (ready, green) even with no
   // provider configured at all.
-  const [whatsappEnabled, emailEnabled, smsEnabled] = await Promise.all([
+  const [whatsappEnabled, emailEnabled] = await Promise.all([
     isSendEnabled("WHATSAPP"),
     isSendEnabled("EMAIL"),
-    isSendEnabled("SMS"),
   ]);
-  const providers = { whatsapp: whatsappEnabled, email: emailEnabled, sms: smsEnabled };
+  const providers = { whatsapp: whatsappEnabled, email: emailEnabled };
   if (!process.env.DATABASE_URL) {
     return { campaignsInReview: 0, repliesNeedingAction: 0, failedDeliveries: 0, incompleteTemplates: 0, providers, recentCampaigns: [] };
   }

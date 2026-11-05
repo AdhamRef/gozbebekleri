@@ -28,7 +28,7 @@ const EVENT_VALUES = [
 
 const createSchema = z.object({
   event: z.enum(EVENT_VALUES),
-  channel: z.enum(["EMAIL", "WHATSAPP", "SMS"]),
+  channel: z.enum(["EMAIL", "WHATSAPP"]),
   templateId: z.string().min(1),
   enabled: z.boolean().optional(),
   // DONATION_LAPSED timing  ignored for event-driven triggers.
@@ -77,7 +77,7 @@ export async function GET() {
   const denied = requireAdminOrDashboardPermission(session, "templates");
   if (denied) return denied;
 
-  const rows = await prisma.messageTrigger.findMany({
+  const rows = await prisma.messageTrigger.findMany({ where: { channel: { in: ["EMAIL", "WHATSAPP"] } },
     orderBy: [{ event: "asc" }, { createdAt: "desc" }],
   });
   const triggers = await enrichTriggers(rows);
@@ -112,9 +112,7 @@ export async function POST(request: NextRequest) {
   const exists =
     channel === "EMAIL"
       ? await prisma.emailTemplate.findUnique({ where: { id: templateId }, select: { id: true } })
-      : channel === "WHATSAPP"
-        ? await prisma.whatsappTemplate.findUnique({ where: { id: templateId }, select: { id: true } })
-        : await prisma.smsTemplate.findUnique({ where: { id: templateId }, select: { id: true } });
+      : await prisma.whatsappTemplate.findUnique({ where: { id: templateId }, select: { id: true } });
   if (!exists) {
     return NextResponse.json({ error: "Template not found for channel" }, { status: 400 });
   }

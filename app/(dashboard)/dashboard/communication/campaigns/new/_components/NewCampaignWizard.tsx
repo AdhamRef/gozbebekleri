@@ -53,7 +53,7 @@ const TIMEZONE_OPTIONS = [
   ["UTC", "UTC"],
 ] as const;
 
-const CHANNEL_ORDER = ["EMAIL", "WHATSAPP", "SMS"] as const;
+const CHANNEL_ORDER = ["EMAIL", "WHATSAPP"] as const;
 const BASE_STEPS = dtList(["القناة", "الرسالة", "الجمهور", "اللغة"] as const);
 
 type CampaignSendControlsDraft = {
@@ -243,7 +243,7 @@ export function NewCampaignWizard() {
   const chosenTemplate = templates.find((t) => t.id === templateId) ?? null;
 
   React.useEffect(() => {
-    if (!channel || !["EMAIL", "WHATSAPP", "SMS"].includes(channel)) return;
+    if (!channel || !["EMAIL", "WHATSAPP"].includes(channel)) return;
     setSmartAudience((current) => ({ ...current, channel: channel as SmartAudienceDraft["channel"] }));
     setSavedListId("");
     setBadgeId("");
@@ -432,7 +432,6 @@ export function NewCampaignWizard() {
                 <span className="text-[11px] leading-5 text-slate-500">
                   {id === "EMAIL" && dt("موضوع ومحتوى كامل، ويدعم الفتح والنقر في التقارير.")}
                   {id === "WHATSAPP" && dt("يستخدم قالبًا معتمدًا من Meta على الرقم الافتراضي، حسب لغة المتبرع.")}
-                  {id === "SMS" && dt("نص فقط، ويُحاسب بالمقطع  العربية ٧٠ حرفًا للمقطع.")}
                 </span>
               </button>
             );

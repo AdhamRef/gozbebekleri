@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, Mail, MessageCircle, MessageSquare, Zap } from "lucide-react";
 import { EmailTemplateList } from "./EmailTemplateList";
 import { WhatsappTemplateList } from "./WhatsappTemplateList";
-import { SmsTemplateList } from "./SmsTemplateList";
 import { TriggerList } from "./TriggerList";
 import { dashDir, dt } from "@/lib/dashboard/i18n";
 
@@ -28,13 +27,11 @@ export default function TemplatesPageClient() {
           </CardHeader>
           <CardContent className="pt-0">
             <Tabs defaultValue="email" dir={dashDir()}>
-              <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4">
+              <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-3">
                 <TabsTrigger value="email" className="gap-2 whitespace-normal py-3 text-xs sm:text-sm">
                   <Mail className="w-4 h-4" /> {dt("قوالب البريد")}</TabsTrigger>
                 <TabsTrigger value="whatsapp" className="gap-2 whitespace-normal py-3 text-xs sm:text-sm">
                   <MessageCircle className="w-4 h-4" /> {dt("قوالب واتساب")}</TabsTrigger>
-                <TabsTrigger value="sms" className="gap-2 whitespace-normal py-3 text-xs sm:text-sm">
-                  <MessageSquare className="w-4 h-4" /> {dt("قوالب الرسائل النصية")}</TabsTrigger>
                 <TabsTrigger value="triggers" className="gap-2 whitespace-normal py-3 text-xs sm:text-sm">
                   <Zap className="w-4 h-4" /> {dt(" الأحداث التلقائية")}</TabsTrigger>
               </TabsList>
@@ -43,9 +40,6 @@ export default function TemplatesPageClient() {
               </TabsContent>
               <TabsContent value="whatsapp" className="mt-6">
                 <WhatsappTemplateList />
-              </TabsContent>
-              <TabsContent value="sms" className="mt-6">
-                <SmsTemplateList />
               </TabsContent>
               <TabsContent value="triggers" className="mt-6">
                 <TriggerList />

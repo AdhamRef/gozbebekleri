@@ -22,7 +22,7 @@ import { dashDir, dt, dtList, dtx } from "@/lib/dashboard/i18n";
  * flatter itself  including by reporting a refusal as a refusal.
  */
 
-const CHANNELS = ["WHATSAPP", "EMAIL", "SMS"] as const;
+const CHANNELS = ["WHATSAPP", "EMAIL"] as const;
 const PURPOSES = ["TRANSACTIONAL", "MARKETING", "UTILITY", "AUTHENTICATION"] as const;
 
 const SUPPORTED_LANGUAGES = [
@@ -716,7 +716,7 @@ function SenderForm({
         displayPhoneNumber: channel === "WHATSAPP" ? form.displayPhoneNumber.trim() || null : null,
         businessAccountId: channel === "WHATSAPP" ? form.businessAccountId.trim() || null : null,
         senderEmail: channel === "EMAIL" ? form.senderEmail.trim() || null : null,
-        smsSender: channel === "SMS" ? form.smsSender.trim() || null : null,
+        smsSender: null,
         supportedLocales: locales,
         supportedCountries: list(form.supportedCountries).map((country) => country.toUpperCase()),
         supportedPurposes: purposes,
@@ -727,7 +727,7 @@ function SenderForm({
         : {
             ...editable,
             channel,
-            provider: channel === "WHATSAPP" ? "META_WHATSAPP" : channel === "EMAIL" ? "ELASTIC_EMAIL" : "NETGSM_SMS",
+            provider: channel === "WHATSAPP" ? "META_WHATSAPP" : "ELASTIC_EMAIL",
             status: channel === "WHATSAPP" ? "NOT_CONFIGURED" : "ACTIVE",
             enabled: channel === "WHATSAPP" ? false : true,
           };
@@ -879,11 +879,6 @@ function SenderForm({
         {channel === "EMAIL" && (
           <label className="text-xs font-semibold text-slate-600">
             {dt("بريد المُرسِل")}<input value={form.senderEmail} onChange={set("senderEmail")} className={cn(field, "mt-1")} />
-          </label>
-        )}
-        {channel === "SMS" && (
-          <label className="text-xs font-semibold text-slate-600">
-            {dt("ترويسة الرسائل")}<input value={form.smsSender} onChange={set("smsSender")} className={cn(field, "mt-1")} />
           </label>
         )}
 

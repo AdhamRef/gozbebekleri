@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   const channel = body.channel;
   if (!isCommunicationChannel(channel)) {
     return NextResponse.json(
-      { ok: false, error: "channel must be EMAIL, WHATSAPP or SMS" },
+      { ok: false, error: "channel must be EMAIL or WHATSAPP" },
       { status: 400 },
     );
   }

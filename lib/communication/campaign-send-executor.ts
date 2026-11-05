@@ -190,7 +190,7 @@ function sendConcurrency(channel: CommunicationChannelId, speedMode: CampaignSpe
   const speed = speedSettings(speedMode);
   if (channel === "WHATSAPP") return concurrencyFromEnv("COMMUNICATION_WHATSAPP_CONCURRENCY", speed.concurrency);
   if (channel === "EMAIL") return concurrencyFromEnv("COMMUNICATION_EMAIL_CONCURRENCY", Math.max(speed.concurrency, 20));
-  return concurrencyFromEnv("COMMUNICATION_SMS_CONCURRENCY", speed.concurrency);
+  return speed.concurrency;
 }
 /** Drain already-started workers before propagating failure; stop taking new work. */
 async function mapWithConcurrency<T, R>(items: readonly T[], limit: number, worker: (item: T, index: number) => Promise<R>): Promise<R[]> {
@@ -236,6 +236,7 @@ async function executeCampaignRun(campaignId: string, opts: ExecutionOptions): P
   const campaign = await getCampaign(campaignId);
   if (!campaign) return { ...base, blocked: "NOT_FOUND" };
   base.status = campaign.status;
+  if (campaign.channel === "SMS") return { ...base, blocked: "CHANNEL_REMOVED", reasons: { CHANNEL_REMOVED: 1 } };
   const recentMarketingDays = (await getSmartAudienceDefinitionForSegmentKey(campaign.audienceSegmentKey))?.filters.excludeMarketedWithinDays;
   const controlGate = await evaluateCampaignSendControls(campaign);
   if (!controlGate.ok) return { ...base, blocked: controlGate.reason };
