@@ -204,7 +204,7 @@ export async function getDonorReactivationOverview(): Promise<DonorReactivationO
       },
       summary: {
         candidates: candidates.length,
-        whatsapp: candidates.filter((candidate) => candidate.channel === "WHATSAPP").length,
+        whatsappOrSms: candidates.filter((candidate) => candidate.channel === "WHATSAPP").length,
         email: candidates.filter((candidate) => candidate.channel === "EMAIL").length,
         noChannel,
         recentlyHandled: handledIds.length,
