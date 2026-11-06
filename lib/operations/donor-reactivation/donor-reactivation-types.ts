@@ -1,6 +1,6 @@
 import type { OperationsPersistenceInfo } from "../persistence-types";
 
-export type DonorReactivationChannel = "WHATSAPP_OR_SMS" | "EMAIL" | "NO_CHANNEL";
+export type DonorReactivationChannel = "WHATSAPP" | "EMAIL" | "NO_CHANNEL";
 
 export type DonorReactivationActionType =
   | "MARK_MANUALLY_SENT"
