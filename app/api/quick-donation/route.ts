@@ -42,6 +42,10 @@ export async function PUT(request: NextRequest) {
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "INVALID_QUICK_DONATION" }, { status: 400 });
   }
+  // The public checkout is not integrated yet. Do not allow a direct PUT to enable the widget.
+  if (config.enabled) {
+    return NextResponse.json({ error: "QUICK_DONATION_ACTIVATION_NOT_RELEASED" }, { status: 409 });
+  }
   const ids = [...new Set(config.destinations.filter(d => d.enabled).map(d => d.projectId).filter((id): id is string => Boolean(id)))];
   if (config.enabled && config.destinations.some(d => d.enabled && !d.projectId)) {
     return NextResponse.json({ error: "QUICK_DONATION_UNMAPPED_DESTINATION" }, { status: 400 });
