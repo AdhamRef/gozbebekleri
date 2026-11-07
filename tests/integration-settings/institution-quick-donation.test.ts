@@ -10,8 +10,8 @@ const approved = {
   ...EMPTY_INSTITUTION_QUICK_DONATION,
   enabled: true,
   destinations: [
-    { id: "zakat", type: "intention", label: "زكاة المال", enabled: true, projectId: "goz-test-zakat" },
-    { id: "relief", type: "project", label: "الإغاثة", enabled: false, projectId: "goz-test-relief" },
+    { id: "zakat", type: "intention", label: "زكاة المال", enabled: true, projectId: "507f1f77bcf86cd799439011" },
+    { id: "relief", type: "project", label: "الإغاثة", enabled: false, projectId: "507f1f77bcf86cd799439012" },
   ],
   defaultDestinationId: "zakat",
 };
@@ -22,7 +22,7 @@ test("starts disabled and does not inherit a Minber payment target", () => {
 });
 test("validates institution-owned intent and prevents disabled/unmapped selection", () => {
   const config = validateInstitutionQuickDonation(approved);
-  assert.equal(resolveInstitutionQuickDonationTarget(config, "zakat"), "goz-test-zakat");
+  assert.equal(resolveInstitutionQuickDonationTarget(config, "zakat"), "507f1f77bcf86cd799439011");
   assert.equal(resolveInstitutionQuickDonationTarget(config, "relief"), null);
   assert.equal(resolveInstitutionQuickDonationTarget(config, "unknown"), null);
 });
@@ -34,6 +34,7 @@ test("refuses enabled widget without approved target, duplicate ids, and bad mon
     { ...approved, defaultDestinationId: "relief" },
     { ...approved, amounts: [10, -1] },
     { ...approved, currency: "XX" },
+    { ...approved, destinations: [{ ...approved.destinations[0], projectId: "../invalid" }] },
     { ...approved, cadences: ["once", "once"] },
   ]) assert.throws(() => validateInstitutionQuickDonation(bad));
 });
