@@ -11,9 +11,20 @@ import {
   validateInstitutionQuickDonation,
 } from "@/lib/quick-donation/institution-config";
 
-/** Public read only. Missing settings never activate any destination. */
+/**
+ * Administrative read of saved drafts.
+ * Never disclose unpublished destination labels/project IDs to public callers.
+ * Until the public widget is released, unauthenticated callers receive only
+ * the disabled empty configuration. No donation endpoint is enabled here.
+ */
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions);
+    const denied = requireAdminOrDashboardPermission(session, "siteContent");
+    if (denied) return NextResponse.json(
+      { config: EMPTY_INSTITUTION_QUICK_DONATION },
+      { headers: { "Cache-Control": "no-store" } },
+    );
     const row = await prisma.globalSettings.findFirst({
       orderBy: { createdAt: "asc" },
       select: { quickDonation: true },
