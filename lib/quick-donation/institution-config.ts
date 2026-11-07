@@ -7,6 +7,8 @@
  * This is intentionally not wired into checkout until the existing
  * destination/checkout integration is audited.
  */
+import { SUPPORTED_CURRENCY_CODES } from "../supported-currencies";
+
 export type QuickCadence = "once" | "daily" | "friday" | "monthly";
 export type QuickDestinationType = "project" | "category" | "intention";
 export interface QuickDestination {
@@ -59,7 +61,7 @@ export function validateInstitutionQuickDonation(value: unknown): InstitutionQui
   for (const key of ["desktop", "mobile", "sticky"]) if (typeof display[key] !== "boolean") {
     throw new Error("INVALID_QUICK_DONATION_DISPLAY");
   }
-  if (typeof v.currency !== "string" || !MONEY.test(v.currency)) throw new Error("INVALID_QUICK_DONATION_CURRENCY");
+  if (typeof v.currency !== "string" || (!MONEY.test(v.currency) || !SUPPORTED_CURRENCY_CODES.includes(v.currency))) throw new Error("INVALID_QUICK_DONATION_CURRENCY");
   if (!Array.isArray(v.amounts) || v.amounts.length < 2 || v.amounts.length > 6 ||
       v.amounts.some(a => typeof a !== "number" || !Number.isFinite(a) || a <= 0 || Math.abs(Math.round(a * 100) - a * 100) > 1e-7) ||
       new Set(v.amounts).size !== v.amounts.length) throw new Error("INVALID_QUICK_DONATION_AMOUNTS");
