@@ -1356,6 +1356,8 @@ model GlobalSettings {
 
   // Fields required by the transferred systems; existing fields are retained.
   certificateCopy      Json?
+  /// Institution-owned quick donation configuration; absent means disabled.
+  quickDonation        Json?
 
 }
 
