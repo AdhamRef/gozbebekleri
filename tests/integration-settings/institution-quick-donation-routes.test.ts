@@ -24,6 +24,7 @@ function harness(page: "settings" | "resolve", options: {
   approved?: boolean;
   validCount?: number;
   stored?: unknown;
+  storageError?: boolean;
 } = {}) {
   const queries: unknown[] = [];
   const writes: unknown[] = [];
@@ -34,6 +35,7 @@ function harness(page: "settings" | "resolve", options: {
     globalSettings: {
       findFirst: async (query: unknown) => {
         queries.push(["settings", query]);
+        if (options.storageError) throw new Error("synthetic storage failure");
         return stored === null ? null : { id: "synthetic-settings", quickDonation: stored };
       },
       update: async (query: unknown) => {
@@ -116,6 +118,13 @@ test("settings GET never leaks stored draft project IDs to public or unauthorize
   const allowed = await staff.actions.GET();
   assert.equal(allowed.status, 200);
   assert.equal((allowed.data.config as { destinations: { projectId: string }[] }).destinations[0].projectId, "507f1f77bcf86cd799439011");
+});
+test("authorized staff GET reports storage errors instead of silently replacing drafts with defaults", async () => {
+  const h = harness("settings", { storageError: true });
+  const result = await h.actions.GET();
+  assert.equal(result.status, 503);
+  assert.equal(result.data.error, "QUICK_DONATION_LOAD_UNAVAILABLE");
+  assert.equal(h.writes.length, 0);
 });
 test("settings PUT denies anonymous and unauthorized staff before touching data", async () => {
   for (const option of [{ authenticated: false }, { authorized: false }]) {
