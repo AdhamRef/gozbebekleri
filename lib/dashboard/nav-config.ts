@@ -58,6 +58,7 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
       { key: "categories", title: "التصنيفات", href: "/dashboard/categories", icon: "globe", keywords: ["categories", "countries", "تصنيفات"] },
       { key: "siteContent", title: "الأقسام الكبرى", href: "/dashboard/super-categories", icon: "layers" },
       { key: "siteContent", title: "البانرات", href: "/dashboard/urgent-banners", icon: "alertTriangle" },
+      { key: "siteContent", title: "التبرع السريع", href: "/dashboard/quick-donation", icon: "heartHandshake", keywords: ["quick donation", "تبرع سريع", "واجهة التبرع"] },
       { key: "blog", title: "المدونة", href: "/dashboard/blog", icon: "penLine", keywords: ["blog", "posts", "مقالات"] },
       // Built, API-backed, and previously unreachable. Slides and ticker both control what the
       // PUBLIC site renders, so leaving them unlinked meant no one could edit live UI.
@@ -88,7 +89,7 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
       // human correspondence, not send telemetry, and belongs beside the channels, not inside them.
       { key: "badges", get title() { return dt("تصنيفات المتبرعين"); }, href: "/dashboard/badges", icon: "award", keywords: ["donor categories", "donor lists", "badges", "قوائم المتبرعين"] },
       // The flat outbound send log (/dashboard/messages) is gone. Per-channel delivery detail lives
-      // in البريد الإلكتروني / واتساب / الرسائل النصية above.
+      // in البريد الإلكتروني / واتساب above. SMS is intentionally retired.
       { key: "messages", title: "الرسائل الواردة", href: "/dashboard/inbox", icon: "inbox", keywords: ["inbox", "inbound", "contact", "واردة", "زوار", "تواصل"], badge: "inboxUnread" },
     ],
   },
@@ -107,7 +108,7 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
       // The overview, الحسابات الإعلانية, Webhooks and سجلات المنصات pages were removed. The three
       // pages left are the ones that configure something: pixels, providers, and the health check.
       { key: "platformConnections", get title() { return dt("بكسلات التتبع"); }, href: "/dashboard/platform-connections/tracking", icon: "radar", keywords: ["pixels", "meta", "tiktok", "snap"] },
-      { key: "platformConnections", get title() { return dt("مزودو التواصل والإرسال"); }, href: "/dashboard/platform-connections/communication", icon: "server", keywords: ["providers", "meta", "elastic email", "brevo", "netgsm", "whatsapp", "sms", "email"] },
+      { key: "platformConnections", get title() { return dt("مزودو التواصل والإرسال"); }, href: "/dashboard/platform-connections/communication", icon: "server", keywords: ["providers", "meta", "elastic email", "whatsapp", "email"] },
       { key: "platformConnections", title: "فحص الاتصال", href: "/dashboard/platform-connections/health", icon: "heartPulse", keywords: ["health", "status", "diagnostics"] },
       // No dedicated "telegram" permission key exists, and inventing one would need a matching
       // grant UI. It is an outbound integration, so it sits under platformConnections with the
