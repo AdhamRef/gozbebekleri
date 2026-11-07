@@ -61,7 +61,7 @@ export function validateInstitutionQuickDonation(value: unknown): InstitutionQui
   }
   if (typeof v.currency !== "string" || !MONEY.test(v.currency)) throw new Error("INVALID_QUICK_DONATION_CURRENCY");
   if (!Array.isArray(v.amounts) || v.amounts.length < 2 || v.amounts.length > 6 ||
-      v.amounts.some(a => typeof a !== "number" || !Number.isFinite(a) || a <= 0 || Math.round(a * 100) !== a * 100) ||
+      v.amounts.some(a => typeof a !== "number" || !Number.isFinite(a) || a <= 0 || Math.abs(Math.round(a * 100) - a * 100) > 1e-7) ||
       new Set(v.amounts).size !== v.amounts.length) throw new Error("INVALID_QUICK_DONATION_AMOUNTS");
   if (!Array.isArray(v.cadences) || !v.cadences.length ||
       v.cadences.some(c => !CADENCES.includes(c as QuickCadence)) ||
