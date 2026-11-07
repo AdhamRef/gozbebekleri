@@ -1356,6 +1356,8 @@ model GlobalSettings {
 
   // Fields required by the transferred systems; existing fields are retained.
   certificateCopy      Json?
+  /// Institution-owned quick donation configuration; absent means disabled.
+  quickDonation        Json?
 
 }
 
@@ -2608,4 +2610,27 @@ type BankTransferReceiptFile {
 enum WaqfUnit {
   SHARE
   METER
+}
+
+/// Local-only service requests. Never a payment instruction or a second ledger.
+model SubscriptionServiceRequest {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  subscriptionId  String   @db.ObjectId
+  donorId         String   @db.ObjectId
+  activeKey       String   @unique
+  kind            String // AMOUNT_CHANGE | PAUSE | CANCEL
+  status          String   @default("NEW") // NEW | IN_PROGRESS | COMPLETED | REJECTED | WITHDRAWN
+  requestedAmount Float?
+  currency        String
+  locale          String
+  note            String
+  staffNote       String?
+  resolutionNote  String?
+  history         Json?
+  handledById     String?  @db.ObjectId
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  completedAt     DateTime? // Resolution time; status distinguishes execution, rejection and withdrawal.
+  @@index([status, createdAt])
+  @@index([donorId, subscriptionId, createdAt])
 }

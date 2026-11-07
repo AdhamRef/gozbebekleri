@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma generate --schema prisma/integration-settings.schema.prisma && npm run test:content-editors && npm run test:site-qa && npm run typecheck:content-editor-service && npm run test:integration-settings && npm run typecheck:communication-runtime && npm run typecheck:integration-release && TSC_COMPILE_ON_ERROR=true next build && node --import tsx scripts/ensure-content-editor-indexes.ts --production",
+    "build": "prisma generate && prisma generate --schema prisma/integration-settings.schema.prisma && npm run test:content-editors && npm run test:site-qa && npm run typecheck:content-editor-service && npm run test:integration-settings && npm run typecheck:communication-runtime && npm run typecheck:ported-systems && npm run test:ported-systems && npm run typecheck:integration-release && TSC_COMPILE_ON_ERROR=true next build && node --import tsx scripts/ensure-content-editor-indexes.ts --production",
     "start": "next start",
     "lint": "next lint",
     "test:integration-settings": "tsc -p tsconfig.integration-tests.json --noEmit && node --import tsx --import ./tests/ported-systems/setup.ts --test tests/integration-settings/*.test.ts",
