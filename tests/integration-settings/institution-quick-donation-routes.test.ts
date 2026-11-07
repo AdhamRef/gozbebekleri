@@ -152,15 +152,19 @@ test("settings PUT saves disabled draft config and audits once without charging"
   assert.equal(h.writes.length, 1);
   assert.equal(h.audit.length, 1);
 });
-test("resolve only returns currently approved active project and never writes", async () => {
+test("public resolver is locked regardless of stored activation, and never reads data or writes", async () => {
   const h = harness("resolve");
-  assert.equal((await h.actions.POST(h.request({ destination: "zakat" }))).status, 200);
-  assert.equal((await h.actions.POST(h.request({ destination: "invalid" }))).status, 422);
+  const attempted = await h.actions.POST(h.request({ destination: "zakat" }));
+  assert.equal(attempted.status, 503);
+  assert.equal(attempted.data.error, "QUICK_DONATION_CHECKOUT_NOT_RELEASED");
+  assert.equal(h.queries.length, 0);
   assert.equal(h.writes.length, 0);
   const closed = harness("resolve", { approved: false });
-  assert.equal((await closed.actions.POST(closed.request({ destination: "zakat" }))).status, 422);
+  assert.equal((await closed.actions.POST(closed.request({ destination: "zakat" }))).status, 503);
+  assert.equal(closed.queries.length, 0);
   const missing = harness("resolve", { stored: null });
-  assert.equal((await missing.actions.POST(missing.request({ destination: "zakat" }))).status, 422);
+  assert.equal((await missing.actions.POST(missing.request({ destination: "zakat" }))).status, 503);
+  assert.equal(missing.queries.length, 0);
 });
 
 test("settings PUT rejects activation until checkout is verified", async () => {
