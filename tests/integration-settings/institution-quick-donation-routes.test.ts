@@ -122,9 +122,9 @@ test("settings PUT refuses deleted/unavailable targets without writes", async ()
   const where = (counts[1] as {where: {AND: unknown[]}}).where;
   assert.equal(where.AND.length, 2);
 });
-test("settings PUT saves approved config and audits once without charging", async () => {
+test("settings PUT saves disabled draft config and audits once without charging", async () => {
   const h = harness("settings");
-  const result = await h.actions.PUT(h.request({ config: activeConfig }));
+  const result = await h.actions.PUT(h.request({ config: { ...activeConfig, enabled: false } }));
   assert.equal(result.status, 200);
   assert.equal(h.writes.length, 1);
   assert.equal(h.audit.length, 1);
@@ -138,4 +138,12 @@ test("resolve only returns currently approved active project and never writes", 
   assert.equal((await closed.actions.POST(closed.request({ destination: "zakat" }))).status, 422);
   const missing = harness("resolve", { stored: null });
   assert.equal((await missing.actions.POST(missing.request({ destination: "zakat" }))).status, 422);
+});
+
+test("settings PUT rejects activation until checkout is verified", async () => {
+  const h = harness("settings");
+  const result = await h.actions.PUT(h.request({ config: activeConfig }));
+  assert.equal(result.status, 409);
+  assert.equal(h.writes.length, 0);
+  assert.equal(h.audit.length, 0);
 });
