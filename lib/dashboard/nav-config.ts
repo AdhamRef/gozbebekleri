@@ -58,6 +58,7 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
       { key: "categories", title: "التصنيفات", href: "/dashboard/categories", icon: "globe", keywords: ["categories", "countries", "تصنيفات"] },
       { key: "siteContent", title: "الأقسام الكبرى", href: "/dashboard/super-categories", icon: "layers" },
       { key: "siteContent", title: "البانرات", href: "/dashboard/urgent-banners", icon: "alertTriangle" },
+      { key: "siteContent", title: "التبرع السريع", href: "/dashboard/quick-donation", icon: "heartHandshake", keywords: ["quick donation", "تبرع سريع", "واجهة التبرع"] },
       { key: "blog", title: "المدونة", href: "/dashboard/blog", icon: "penLine", keywords: ["blog", "posts", "مقالات"] },
       // Built, API-backed, and previously unreachable. Slides and ticker both control what the
       // PUBLIC site renders, so leaving them unlinked meant no one could edit live UI.
