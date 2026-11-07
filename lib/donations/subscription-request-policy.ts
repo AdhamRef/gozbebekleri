@@ -23,7 +23,9 @@ export function isReductionRequestForPlan(
 }
 export function requestMatchesPlan(request: { kind: string; requestedAmount: number | null; currency?: string; donorId?: string }, plan: { status: string; amount: number; currency?: string; donorId?: string } | null) {
   if (!plan) return false;
-  if (request.currency && plan.currency && request.currency !== plan.currency || request.donorId && plan.donorId && request.donorId !== plan.donorId) return false;
+  // A missing identity field must fail closed; a matching amount/status alone is insufficient.
+  if (request.currency !== undefined && request.currency !== plan.currency) return false;
+  if (request.donorId !== undefined && request.donorId !== plan.donorId) return false;
   if (request.kind === "CANCEL") return plan.status === "CANCELLED";
   if (request.kind === "PAUSE") return plan.status === "PAUSED";
   return request.kind === "AMOUNT_CHANGE" && ["ACTIVE", "PAUSED"].includes(plan.status) && request.requestedAmount !== null && Math.abs(plan.amount - request.requestedAmount) < 0.00001;
