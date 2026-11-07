@@ -34,8 +34,12 @@ export async function GET() {
       : EMPTY_INSTITUTION_QUICK_DONATION;
     return NextResponse.json({ config }, { headers: { "Cache-Control": "no-store" } });
   } catch {
-    // Fail closed; malformed historical JSON must never enable an unreviewed target.
-    return NextResponse.json({ config: EMPTY_INSTITUTION_QUICK_DONATION }, { headers: { "Cache-Control": "no-store" } });
+    // A staff editor must not mistake a storage/corruption error for a new
+    // configuration and overwrite institution-owned settings with defaults.
+    return NextResponse.json(
+      { error: "QUICK_DONATION_LOAD_UNAVAILABLE" },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
   }
 }
 
