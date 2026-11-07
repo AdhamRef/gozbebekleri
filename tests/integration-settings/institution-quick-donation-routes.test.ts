@@ -103,6 +103,20 @@ test("settings GET has disabled fallback and does not write on a missing row", a
   assert.equal((result.data.config as {enabled: boolean}).enabled, false);
   assert.equal(h.writes.length, 0);
 });
+test("settings GET never leaks stored draft project IDs to public or unauthorized callers", async () => {
+  for (const options of [{ authenticated: false }, { authorized: false }]) {
+    const h = harness("settings", options);
+    const result = await h.actions.GET();
+    assert.equal(result.status, 200);
+    assert.equal((result.data.config as { enabled: boolean }).enabled, false);
+    assert.deepEqual(Array.from((result.data.config as { destinations: unknown[] }).destinations), []);
+    assert.equal(h.queries.length, 0);
+  }
+  const staff = harness("settings");
+  const allowed = await staff.actions.GET();
+  assert.equal(allowed.status, 200);
+  assert.equal((allowed.data.config as { destinations: { projectId: string }[] }).destinations[0].projectId, "507f1f77bcf86cd799439011");
+});
 test("settings PUT denies anonymous and unauthorized staff before touching data", async () => {
   for (const option of [{ authenticated: false }, { authorized: false }]) {
     const h = harness("settings", option);
