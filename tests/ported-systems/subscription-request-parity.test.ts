@@ -37,6 +37,17 @@ test("request completion requires independently verified subscription state", ()
   assert.equal(requestMatchesPlan({kind:"PAUSE",requestedAmount:null},{...plan,status:"PAUSED"}),true);
 });
 
+test("completion policy fails closed when plan ownership or currency evidence is missing", () => {
+  const request = { kind: "AMOUNT_CHANGE", requestedAmount: 10, donorId: "donor1", currency: "USD" };
+  const verified = { status: "ACTIVE", amount: 10, donorId: "donor1", currency: "USD" };
+  assert.equal(requestMatchesPlan(request, verified), true);
+  assert.equal(requestMatchesPlan(request, { ...verified, donorId: undefined }), false);
+  assert.equal(requestMatchesPlan(request, { ...verified, currency: undefined }), false);
+  assert.equal(requestMatchesPlan(request, { ...verified, donorId: "donor2" }), false);
+  assert.equal(requestMatchesPlan(request, { ...verified, currency: "TRY" }), false);
+  assert.equal(requestMatchesPlan({ ...request, kind: "CANCEL", requestedAmount: null }, { ...verified, status: "CANCELLED", donorId: undefined }), false);
+});
+
 test("request timeline ignores invalid values and preserves a bounded history", () => {
   assert.ok(OPEN_REQUEST_STATUSES.includes("NEW"));
   assert.equal(requestHistory([{status:"UNKNOWN",at:"2026-11-07",actorRole:"DONOR"}]).length,0);
