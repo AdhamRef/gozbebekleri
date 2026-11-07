@@ -114,7 +114,7 @@ test("settings PUT denies anonymous and unauthorized staff before touching data"
 });
 test("settings PUT refuses deleted/unavailable targets without writes", async () => {
   const h = harness("settings", { validCount: 0 });
-  const result = await h.actions.PUT(h.request({ config: activeConfig }));
+  const result = await h.actions.PUT(h.request({ config: { ...activeConfig, enabled: false } }));
   assert.equal(result.status, 400);
   assert.equal(h.writes.length, 0);
   const counts = h.queries.find(q => Array.isArray(q) && q[0] === "count") as unknown[];
