@@ -62,6 +62,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/context/CurrencyContext";
+import { activeConfirmedSubscriptionCount, isSettledProfileDonation, profileDonationDate, profileDonationMatchesPeriod } from "@/lib/minbar/profile-donation-stats";
 import EditDialog from "./_components/EditDialog";
 import AvatarUploader from "./_components/AvatarUploader";
 import CountryPicker, { CountryRow } from "./_components/CountryPicker";
@@ -151,8 +152,8 @@ function donationPaymentChargeStatus(d: Pick<DonationForProfile, "paymentStatus"
   return String(d.paymentStatus ?? "").toUpperCase();
 }
 
-function donationReceiptAllowed(d: Pick<DonationForProfile, "paymentStatus">) {
-  return donationPaymentChargeStatus(d) === "PAID";
+function donationReceiptAllowed(d: DonationForProfile) {
+  return isSettledProfileDonation(d);
 }
 
 const ProfilePage = () => {
@@ -567,28 +568,20 @@ const ProfilePage = () => {
   };
 
   const renderDonations = (u: UserProfile) => {
-    const matchesPeriod = (donation: DonationForProfile) => {
-      const date = new Date(donation.createdAt);
-      const now = new Date();
-      switch (selectedPeriod) {
-        case "month":
-          return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-        case "year":
-          return date.getFullYear() === now.getFullYear();
-        default:
-          return true;
-      }
-    };
+    // Successful gifts count on settlement, failed attempts on creation.
+    const now = new Date();
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const matchesPeriod = (donation: DonationForProfile) => profileDonationMatchesPeriod(donation, selectedPeriod, now, timeZone);
 
     const donationsInPeriod = u.donations?.filter(matchesPeriod) ?? [];
-    const isSuccessfulCharge = (d: DonationForProfile) => donationReceiptAllowed(d);
+    const isSuccessfulCharge = (d: DonationForProfile) => isSettledProfileDonation(d);
     const successfulInPeriod = donationsInPeriod.filter(isSuccessfulCharge);
     const forReceiptDownload = successfulInPeriod;
 
     const filteredHistory = donationsInPeriod.filter((d) => {
       if (paymentFilter === "all") return true;
       return donationPaymentChargeStatus(d) === paymentFilter;
-    });
+    }).sort((a, b) => (profileDonationDate(b)?.getTime() ?? 0) - (profileDonationDate(a)?.getTime() ?? 0));
 
     const subscriptionRows: DonationForProfile[] = (() => {
       const monthly = (u.donations ?? []).filter(
@@ -640,8 +633,8 @@ const ProfilePage = () => {
           })
         : "0";
 
-    const monthlyCount =
-      u.donations?.filter((d) => d.type === "MONTHLY" && d.status === "ACTIVE").length || 0;
+    // Distinct plans with at least one confirmed payment, not billing attempts.
+    const monthlyCount = activeConfirmedSubscriptionCount(u.donations ?? []);
     const campaignCount = new Set(
       (u.donations ?? [])
         .filter(isSuccessfulCharge)
