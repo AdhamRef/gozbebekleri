@@ -99,7 +99,6 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "division.iium.edu.my" },
     ],
   },
-  eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
   devIndicators: { position: "bottom-right" },
   reactStrictMode: true,
