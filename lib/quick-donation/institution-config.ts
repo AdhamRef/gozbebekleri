@@ -32,6 +32,7 @@ export interface InstitutionQuickDonation {
 }
 const ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 const MONEY = /^[A-Z]{3}$/;
+const MONGO_OBJECT_ID = /^[a-fA-F0-9]{24}$/;
 const CADENCES: readonly QuickCadence[] = ["once", "daily", "friday", "monthly"];
 const TYPES: readonly QuickDestinationType[] = ["project", "category", "intention"];
 
@@ -75,7 +76,7 @@ export function validateInstitutionQuickDonation(value: unknown): InstitutionQui
     if (!id(d.id) || !TYPES.includes(d.type as QuickDestinationType) ||
         typeof d.label !== "string" || !d.label.trim() || d.label.length > 100 ||
         typeof d.enabled !== "boolean" ||
-        (d.projectId !== null && !id(d.projectId))) throw new Error("INVALID_QUICK_DONATION_DESTINATION");
+        (d.projectId !== null && (typeof d.projectId !== "string" || !MONGO_OBJECT_ID.test(d.projectId)))) throw new Error("INVALID_QUICK_DONATION_DESTINATION");
     return { id: d.id, type: d.type as QuickDestinationType, label: d.label.trim(), enabled: d.enabled, projectId: d.projectId as string | null };
   });
   if (new Set(destinations.map(d => d.id)).size !== destinations.length) throw new Error("DUPLICATE_QUICK_DONATION_DESTINATION");
