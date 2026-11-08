@@ -24,7 +24,7 @@ import { donationProviderWhere } from "@/lib/dashboard/donation-provider-filter"
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { donationStatusWhere } from "@/lib/dashboard/report-donation-filter";
+import { donationStatusWhere, reportDonationPeriodWhere } from "@/lib/dashboard/report-donation-filter";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
@@ -83,7 +83,7 @@ async function localizedGET(request: NextRequest) {
       ...(referralId && referralId !== "all" && { referralId }),
       ...(subscriptionOnly && { subscriptionId: { not: null } }),
       ...(donationType === "MONTHLY" && { subscriptionId: { not: null } }),
-      ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
+      
     };
     if (categoryId && categoryId !== "all") {
       baseWhere.OR = [
@@ -93,6 +93,8 @@ async function localizedGET(request: NextRequest) {
     }
 
     const filters: Prisma.DonationWhereInput[] = [baseWhere];
+    const periodWhere = reportDonationPeriodWhere(dateFilter);
+    if (periodWhere) filters.push(periodWhere);
     const providerFilter = donationProviderWhere(sp.get("provider"));
     if (providerFilter) filters.push(providerFilter);
     // ناجح / قيد التأكيد / فاشل, as the tables show them.
@@ -206,7 +208,7 @@ async function localizedGET(request: NextRequest) {
 
     const subscriptions = await loadReportSubscriptions(exportRows.map(r => r.subscriptionId).filter((id): id is string => Boolean(id)));
     exportFilters.push({ label: dt("نطاق الاشتراكات"), value: dt("الاشتراكات المرتبطة بصفوف التبرعات المصدّرة؛ الحالات حالية والإجماليات طوال المدة") });
-    exportFilters.push({ label: dt("أساس الفترة"), value: dt("تاريخ إنشاء التبرع؛ المبالغ المحصّلة تخص الدفعات المؤكدة ضمن النتائج المصدّرة") });
+    exportFilters.push({ label: dt("أساس الفترة"), value: dt("تاريخ التحصيل للمدفوعات المؤكدة، وتاريخ الإنشاء للمحاولات غير المحصّلة") });
     exportFilters.push({ label: dt("حد صفوف التبرعات"), value: String(limit) });
     const out = await buildDonationExport({
       format,
