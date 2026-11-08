@@ -59,3 +59,17 @@ export function activeConfirmedSubscriptionCount(donations: readonly ProfileDona
   const settled = new Set(donations.filter(d => d.subscriptionId && isSettledProfileDonation(d)).map(d => d.subscriptionId!));
   return new Set(donations.filter(d => d.subscriptionId && d.status === "ACTIVE" && settled.has(d.subscriptionId)).map(d => d.subscriptionId!)).size;
 }
+
+/**
+ * Known settled USD value only. An unavailable FX conversion for EUR/TRY etc.
+ * must not be displayed as an equal numeric number of dollars.
+ * The caller can separately disclose missing FX instead of inventing revenue.
+ */
+export function settledProfileUsdValue(
+  donation: ProfileDonationEvidence & { amountUSD?: number | null; totalAmount?: number | null; currency?: string | null },
+): number {
+  if (!isSettledProfileDonation(donation)) return 0;
+  if (typeof donation.amountUSD === "number" && Number.isFinite(donation.amountUSD) && donation.amountUSD >= 0) return donation.amountUSD;
+  if (donation.currency === "USD" && typeof donation.totalAmount === "number" && Number.isFinite(donation.totalAmount)) return donation.totalAmount;
+  return 0;
+}
