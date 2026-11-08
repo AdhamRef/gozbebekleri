@@ -3,7 +3,7 @@ on:
   push:
     branches: [port/minber-systems-20261104, integration/unified-systems-20261107]
   pull_request:
-    branches: [main]
+    branches: [main, integration/unified-systems-20261107]
   workflow_dispatch:
 permissions:
   contents: read
