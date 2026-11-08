@@ -31,7 +31,7 @@
     "test:content-editors": "node --import tsx --test tests/content-editor/*.test.ts",
     "test:content-editors:browser": "node --import tsx scripts/content-editor-browser-test.mjs",
     "typecheck:content-editor-service": "tsc -p tsconfig.content-editor.json",
-    "test:ported-systems": "node --import tsx --import ./tests/ported-systems/setup.ts --test tests/ported-systems/*.test.ts",
+    "test:ported-systems": "node --import tsx --import ./tests/ported-systems/setup.ts --test tests/ported-systems/*.test.ts tests/ported-systems/*.test.mjs",
     "typecheck:ported-systems": "tsc -p tsconfig.ported-systems.json",
     "postinstall": "prisma generate && prisma generate --schema prisma/integration-settings.schema.prisma",
     "test:sms-removal": "node --import tsx --test tests/integration-settings/sms-removal.test.ts"
