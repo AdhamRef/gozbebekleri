@@ -62,7 +62,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/context/CurrencyContext";
-import { activeConfirmedSubscriptionCount, isSettledProfileDonation, profileDonationDate, profileDonationMatchesPeriod } from "@/lib/minbar/profile-donation-stats";
+import { activeConfirmedSubscriptionCount, isSettledProfileDonation, profileDonationDate, profileDonationMatchesPeriod, settledProfileUsdValue } from "@/lib/minbar/profile-donation-stats";
 import EditDialog from "./_components/EditDialog";
 import AvatarUploader from "./_components/AvatarUploader";
 import CountryPicker, { CountryRow } from "./_components/CountryPicker";
@@ -580,7 +580,7 @@ const ProfilePage = () => {
 
     const filteredHistory = donationsInPeriod.filter((d) => {
       if (paymentFilter === "all") return true;
-      return donationPaymentChargeStatus(d) === paymentFilter;
+      return paymentFilter === "PAID" ? isSuccessfulCharge(d) : donationPaymentChargeStatus(d) === "FAILED";
     }).sort((a, b) => (profileDonationDate(b)?.getTime() ?? 0) - (profileDonationDate(a)?.getTime() ?? 0));
 
     const subscriptionRows: DonationForProfile[] = (() => {
@@ -614,7 +614,7 @@ const ProfilePage = () => {
 
     const totalHistoryUSD =
       successfulInPeriod.reduce(
-        (sum: number, d) => sum + (d.amountUSD ?? d.totalAmount),
+        (sum: number, d) => sum + settledProfileUsdValue(d),
         0
       ) || 0;
     const totalAmountConverted = convertToCurrency(totalHistoryUSD);
