@@ -19,6 +19,7 @@ import { sanitizeDonationAttribution } from "@/lib/attribution/sanitize";
 import { inferLocaleFromRequest } from "@/lib/preferred-lang";
 import { resolveGuestDonor } from "@/lib/users/resolve-guest-donor";
 import { istanbulDateKeysToUtcRange } from "@/lib/admin/istanbul-calendar";
+import { donationStatusWhere, reportDonationPeriodWhere } from "@/lib/dashboard/report-donation-filter";
 import {
   assertImpactAmountMatches,
   impactLinesCreateData,
@@ -79,8 +80,8 @@ export async function GET(request: NextRequest) {
       ...(subscriptionOnly && { subscriptionId: { not: null } }),
       ...(donationTypeFilter === "MONTHLY" && { subscriptionId: { not: null } }),
       ...(!isAdmin && { donorId: session.user.id }),
-      ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
-      ...(statusFilter && ["PAID", "FAILED"].includes(statusFilter) && { status: statusFilter }),
+      
+      
     };
     if (categoryId && isAdmin) {
       baseWhere.OR = [
@@ -127,7 +128,7 @@ export async function GET(request: NextRequest) {
         ? { OR: [{ subscriptionId: null }, { subscriptionId: { isSet: false } }] }
         : null;
 
-    const extraFilters = [searchWhere, localeWhere, countryWhere, donationTypeWhere].filter((w) => w != null);
+    const extraFilters = [searchWhere, localeWhere, countryWhere, donationTypeWhere, reportDonationPeriodWhere(dateFilter), isAdmin ? donationStatusWhere(statusFilter) : null].filter((w) => w != null);
     const where: Record<string, unknown> =
       extraFilters.length > 0 ? { AND: [baseWhere, ...extraFilters] } : baseWhere;
 
