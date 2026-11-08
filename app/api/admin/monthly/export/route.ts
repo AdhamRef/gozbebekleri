@@ -19,7 +19,7 @@ import { dt, withReportLanguage } from "@/lib/dashboard/report-i18n";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { donationStatusWhere } from "@/lib/dashboard/report-donation-filter";
+import { donationStatusWhere, reportDonationPeriodWhere } from "@/lib/dashboard/report-donation-filter";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
@@ -85,7 +85,7 @@ async function localizedGET(request: NextRequest) {
       ...donationFrequencyWhere(frequency),
       ...(campaignId && campaignId !== "all" && { items: { some: { campaignId } } }),
       ...(userId && userId !== "all" && { donorId: userId }),
-      ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
+      
     };
     if (categoryId && categoryId !== "all") {
       donationWhere.OR = [
@@ -95,6 +95,8 @@ async function localizedGET(request: NextRequest) {
     }
 
     const donationFilters: Prisma.DonationWhereInput[] = [donationWhere];
+    const periodWhere = reportDonationPeriodWhere(dateFilter);
+    if (periodWhere) donationFilters.push(periodWhere);
     const providerWhere = donationProviderWhere(provider);
     if (providerWhere) donationFilters.push(providerWhere);
     if (["ACTIVE", "PAUSED", "CANCELLED", "PAYMENT_FAILED"].includes(subStatusRaw)) {
@@ -207,7 +209,7 @@ async function localizedGET(request: NextRequest) {
 
     if (provider && provider !== "all") filters.push({ label: dt("بوابة الدفع"), value: provider });
     filters.push({ label: dt("نطاق الاشتراكات"), value: dt("لقطة حالية للاشتراكات المطابقة؛ الفترة تخص التبرعات، وإجماليات الاشتراكات طوال المدة") });
-    filters.push({ label: dt("أساس الفترة"), value: dt("تاريخ إنشاء التبرع؛ المبالغ المحصّلة تخص الدفعات المؤكدة ضمن النتائج المصدّرة") });
+    filters.push({ label: dt("أساس الفترة"), value: dt("تاريخ التحصيل للمدفوعات المؤكدة، وتاريخ الإنشاء للمحاولات غير المحصّلة") });
     filters.push({ label: dt("حد صفوف التبرعات"), value: String(limit) });
     const out = await buildDonationExport({
       format,
