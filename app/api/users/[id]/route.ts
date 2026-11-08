@@ -44,7 +44,21 @@ export async function GET(
       where: { id },
       include: {
         donations: {
-          omit: { providerRaw: true, cardDetails: true, accessToken: true, bankOperations: true, bankOperationLock: true, bankOperationsRevision: true, bankLastInquiry: true },
+          omit: {
+            // Public donor history needs amounts/status, not gateway credentials,
+            // raw reconciliation signals, ad identifiers or payment transport data.
+            providerRaw: true, cardDetails: true, accessToken: true,
+            providerTxnType: true, providerProcReturnCode: true,
+            providerTxnResult: true, providerAuthCode: true,
+            providerHostRefNum: true, providerErrorMessage: true,
+            providerOrderId: true, paypalOrderId: true, paypalCaptureId: true,
+            bankOperations: true, bankOperationLock: true,
+            bankOperationsRevision: true, bankLastInquiry: true,
+            reconciliationCheckedAt: true, reconciliationNextAt: true,
+            reconciliationLeaseToken: true, reconciliationLeaseUntil: true,
+            attribution: true, conversionEventsSentAt: true,
+            conversionFailedEventsSentAt: true, paidAmount: true, paidCurrency: true,
+          },
           include: {
             subscription: {
               select: {
@@ -181,10 +195,12 @@ export async function GET(
 
     // Don't leak the password hash to the client. The profile UI only needs
     // a boolean to know whether to show the "current password" field.
-    const { password: _omitPwd, ...userWithoutPwd } = user;
+    const { password: _omitPwd, clarityId: _internalClarityId, ...userWithoutPwd } = user;
     void _omitPwd;
     const safeUser = {
       ...userWithoutPwd,
+      // A Clarity identity is an internal operator cross-reference, not donor data.
+      ...(session.user.role === 'ADMIN' ? { clarityId: _internalClarityId } : {}),
       hasPassword: Boolean(user.password),
       donations: donationsForUser,
       ...profileCard,
@@ -194,7 +210,7 @@ export async function GET(
       user: safeUser,
       oneTimeDonations: oneTimeDonations.map((d) => withType(d, 'ONE_TIME')),
       monthlyDonations: monthlyDonations.map((d) => withType(d, 'MONTHLY')),
-    });
+    }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     console.error('Error fetching user:', error);
     return NextResponse.json(
