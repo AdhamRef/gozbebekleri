@@ -62,7 +62,7 @@ test("November donor ledger reconciles actual Excel summary and CSV rows", async
   const csvText = csv.body.toString();
   for (const donation of selected) assert.ok(csvText.includes(donation.id), donation.id);
   assert.ok(!csvText.includes("oct-settled"));
-  const rows = csvText.split(/\\r?\\n/).filter(line => selected.some(r => line.includes(r.id)));
+  const rows = csvText.split(/\r?\n/).filter(line => selected.some(r => line.includes(r.id)));
   assert.equal(rows.length, 7);
   assert.equal(new Set(collected.map(r => r.subscriptionId).filter(Boolean)).size, 3);
 });
