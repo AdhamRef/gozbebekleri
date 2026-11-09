@@ -122,10 +122,37 @@ export async function POST(req: NextRequest) {
         if (!stripeSubscriptionId) break;
 
         // Find our DB subscription by Stripe subscription ID (stored in payforToken)
-        const dbSubscription = await prisma.subscription.findFirst({
+        let dbSubscription = await prisma.subscription.findFirst({
           where: { payforToken: stripeSubscriptionId },
           include: { items: true, categoryItems: true },
         });
+        // Stripe can deliver invoice.payment_succeeded BEFORE the Checkout
+        // session completion event has populated payforToken. Look up only
+        // the Stripe subscription's own signed, server-created metadata.
+        // Never settle an arbitrary database subscription from invoice data.
+        if (!dbSubscription) {
+          const remoteSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+          const dbId = remoteSub.metadata?.subscriptionDbId;
+          const ownerId = remoteSub.metadata?.userId;
+          if (dbId && ownerId) {
+            const candidate = await prisma.subscription.findUnique({
+              where: { id: dbId },
+              include: { items: true, categoryItems: true },
+            });
+            if (
+              candidate?.donorId === ownerId &&
+              (!candidate.payforToken || candidate.payforToken === stripeSubscriptionId)
+            ) {
+              if (!candidate.payforToken) {
+                await prisma.subscription.update({
+                  where: { id: candidate.id },
+                  data: { payforToken: stripeSubscriptionId },
+                });
+              }
+              dbSubscription = candidate;
+            }
+          }
+        }
         if (!dbSubscription) break;
 
         // Idempotency: skip if we've already settled this invoice. The original
