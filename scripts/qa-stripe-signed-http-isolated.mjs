@@ -158,5 +158,44 @@ addRefund("re_wrong_currency",1000,renewalCharge,"succeeded","try");
 const mismatch=await send(evt("refund.updated",{id:"re_wrong_currency",object:"refund"}));
 assert.equal(mismatch.status,500);assert.deepEqual(await balance(),[50,50]);
 pass("provider currency mismatch rejected without ledger mutation");
+
+const fixtureDonation=new ObjectId();
+const projectA=new ObjectId(),projectB=new ObjectId(),categoryA=new ObjectId(),categoryB=new ObjectId();
+for(const [id,value] of [[projectA,60],[projectB,40]]) {
+ await db.collection("Campaign").insertOne({_id:id,title:"Synthetic allocation",description:"Fixture",targetAmount:1000,currentAmount:value,baselineAmount:0,images:[],categoryIds:[],createdAt:created,updatedAt:created});
+}
+for(const [id,value] of [[categoryA,70],[categoryB,30]]) {
+ await db.collection("Category").insertOne({_id:id,name:"Synthetic allocation",campaignIds:[],currentAmount:value,baselineAmount:0});
+}
+const piSplit="pi_multi_split",chSplit="ch_multi_split";
+globalThis.fixture.charges.set(chSplit,{id:chSplit,amount:11000,currency:"usd",paid:true,captured:true,payment_intent:piSplit,metadata:{donationId:fixtureDonation.toHexString()}});
+globalThis.fixture.intents.set(piSplit,{id:piSplit,metadata:{donationId:fixtureDonation.toHexString()}});
+globalThis.fixture.refunds.set("re_before_paid",{id:"re_before_paid",object:"refund",amount:5500,charge:chSplit,payment_intent:piSplit,currency:"usd",status:"succeeded"});
+const early=await send(evt("refund.updated",{id:"re_before_paid",object:"refund"}));
+assert.equal(early.status,500,"refund before known successful donation must retry");
+assert.equal(await db.collection("StripeRefundSettlement").countDocuments({_id:"re_before_paid"}),0);
+pass("refund before local settled donation fails closed, no premature ledger record");
+await db.collection("Donation").insertOne({_id:fixtureDonation,donorId:donor,amount:100,amountUSD:100,teamSupport:5,fees:5,coverFees:true,totalAmount:110,currency:"USD",status:"PAID",paidAt:created,createdAt:created,provider:"STRIPE",providerOrderId:piSplit,providerAuthCode:piSplit,paymentMethod:"CARD"});
+for(const [id,amount] of [[projectA,60],[projectB,40]]) await db.collection("DonationItem").insertOne({_id:new ObjectId(),donationId:fixtureDonation,campaignId:id,amount,amountUSD:amount,createdAt:created,updatedAt:created});
+for(const [id,amount] of [[categoryA,70],[categoryB,30]]) await db.collection("DonationCategoryItem").insertOne({_id:new ObjectId(),donationId:fixtureDonation,categoryId:id,amount,amountUSD:amount,createdAt:created,updatedAt:created});
+const completed=await send(evt("refund.updated",{id:"re_before_paid",object:"refund"}));
+assert.equal(completed.status,200,completed.body);
+const da=await prisma.donation.findUnique({where:{id:fixtureDonation.toHexString()}});
+assert.equal(da.refundedTotalAmount,55);assert.equal(da.refundedAmountUSD,50);
+assert.equal(da.refundedTeamSupport,2.5);assert.equal(da.refundedFees,2.5);
+for(const [id,value] of [[projectA,30],[projectB,20]]) assert.equal((await db.collection("Campaign").findOne({_id:id})).currentAmount,value);
+for(const [id,value] of [[categoryA,35],[categoryB,15]]) assert.equal((await db.collection("Category").findOne({_id:id})).currentAmount,value);
+pass("110 paid with 100 cause +5 support +5 fees: 55 refunded splits cause/support/fees and 2 projects + 2 categories");
+const projection=(await import("../lib/dashboard/donation-refund-finance.ts")).donationGrossRefundNet;
+const view=projection(da);
+assert.equal(view.grossChargedUSD,110);assert.equal(view.refundedChargedUSD,55);assert.equal(view.netChargedUSD,55);assert.equal(view.netCauseUSD,50);
+pass("refund finance projection reports gross=110 refunded=55 net=55; net cause=50");
+const wrongValue=globalThis.fixture.charges.get(chSplit);
+wrongValue.amount=9000;
+const mismatchValue=await send(evt("refund.updated",{id:"re_before_paid",object:"refund"}));
+assert.equal(mismatchValue.status,500);
+assert.equal((await db.collection("Campaign").findOne({_id:projectA})).currentAmount,30);
+pass("changed Stripe original amount rejects refund replay without modifying applied ledger");
+wrongValue.amount=11000;
 console.log(JSON.stringify({summary:"SIGNED_HTTP_REFUNDS_PASS",passed,refund:"PASS",database:"isolated MongoDB",stripeCalls:0}));
 }finally{if(server)await new Promise(ok=>server.close(ok));await prisma.$disconnect();await mongo.close();await repl.stop();rmSync(dir,{recursive:true,force:true})}
