@@ -20,3 +20,11 @@ test("initiation guard uses database atomic updates and explicit rejection", () 
   assert.match(source, /status: 429/);
   assert.match(source, /status: 503/);
 });
+
+test("card donation creation is guarded at both public intake routes", () => {
+  for (const path of ["app/api/cart/payment/route.ts", "app/api/donations/route.ts"]) {
+    const source = readFileSync(path, "utf8");
+    assert.match(source, /enforceDonationIntakeBudget\(request\)/);
+    assert.ok(source.indexOf("enforceDonationIntakeBudget(request)") < source.indexOf("resolveGuestDonor("));
+  }
+});
