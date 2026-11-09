@@ -110,7 +110,7 @@ const firstCharge="ch_signup_synth", firstPi="pi_signup_synth";
 globalThis.fixture.charges.set(firstCharge,{id:firstCharge,amount:10000,currency:"usd",paid:true,captured:true,payment_intent:firstPi,invoice:"in_synthetic_signup",metadata:{}});
 globalThis.fixture.intents.set(firstPi,{id:firstPi,invoice:"in_synthetic_signup",metadata:{}});
 const addRefund=(id,amount,chargeId=firstCharge,status="succeeded",currency="usd")=>{
- globalThis.fixture.refunds.set(id,{id,object:"refund",amount,charge:chargeId,payment_intent:chargeId===firstCharge?firstPi:"pi_renew_synth",currency,status});
+ globalThis.fixture.refunds.set(id,{id,object:"refund",amount,charge:chargeId,payment_intent:globalThis.fixture.charges.get(chargeId)?.payment_intent ?? "pi_missing",currency,status});
 };
 const refunded=async()=>{const x=await prisma.donation.findUnique({where:{id:donation.toHexString()}});return x?.refundedTotalAmount??0};
 const balance=async()=>[(await db.collection("Campaign").findOne({_id:campaign})).currentAmount,(await db.collection("Category").findOne({_id:category})).currentAmount];
