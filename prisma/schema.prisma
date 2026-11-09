@@ -9,6 +9,57 @@ datasource db {
 
 /* ===================== AUTH ===================== */
 
+// Stripe invoice claim ledger. MongoDB _id uniqueness serializes concurrent webhook
+// handlers; the claim and all money-side effects MUST live in one transaction.
+// Provision this collection before accepting invoice webhooks (collection creation
+// inside transactions is not supported in all MongoDB topologies).
+model StripeInvoiceSettlement {
+  id             String   @id @map("_id") // Stripe invoice ID (in_...), not ObjectId
+  subscriptionId String   @db.ObjectId
+  paidAt         DateTime
+  createdAt      DateTime @default(now())
+
+  @@index([subscriptionId, paidAt])
+}
+
+// One immutable provider refund ID, reconciled by its current Stripe status.
+// Keep failed/reversed history; never delete successful payment or paidAt.
+// Pre-provision this collection before accepting refund webhooks.
+// Signed Stripe refund event received before its local payment was settled.
+// Keep the immutable refund ID until verified reconciliation succeeds.
+// No personal donor fields are stored here.
+model StripeDeferredRefund {
+  id               String   @id @map("_id")
+  chargeId         String?
+  status           String   @default("PENDING") // PENDING | RESOLVED | REVIEW_REQUIRED
+  reason           String
+  attempts         Int      @default(0)
+  firstSeenAt      DateTime @default(now())
+  lastSeenAt       DateTime @updatedAt
+  lastAttemptAt    DateTime?
+  nextAttemptAt    DateTime @default(now())
+  resolvedAt       DateTime?
+  @@index([status, nextAttemptAt])
+}
+
+model StripeRefundSettlement {
+  id                String   @id @map("_id") // re_... (Stripe refund ID)
+  donationId        String   @db.ObjectId
+  chargeId          String
+  paymentIntentId   String?
+  invoiceId         String?
+  amountMinor       Int
+  chargeAmountMinor Int
+  currency          String
+  status            String   // APPLIED | REVERSED
+  appliedAt         DateTime?
+  reversedAt        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  @@index([donationId, status])
+  @@index([chargeId])
+}
+
 model ContentEditorRevision {
   id String @id @default(auto()) @map("_id") @db.ObjectId
   kind String
@@ -681,6 +732,14 @@ model Donation {
 
   createdAt DateTime @default(now())
   paidAt    DateTime?
+  // Reconciled, provider-confirmed refunds. Optional for legacy Mongo documents:
+  // missing fields must not break existing Prisma reads.
+  refundedMinor        Int?   @default(0)
+  refundedTotalAmount  Float? @default(0) // local captured currency, including fees/support
+  refundedTotalUSD     Float? @default(0) // historical FX snapshot; gross
+  refundedAmountUSD    Float? @default(0) // cause donation only, excludes support/fees
+  refundedTeamSupport  Float? @default(0) // local currency
+  refundedFees         Float? @default(0) // local currency
 
   items         DonationItem[]
   categoryItems DonationCategoryItem[]
@@ -1356,6 +1415,8 @@ model GlobalSettings {
 
   // Fields required by the transferred systems; existing fields are retained.
   certificateCopy      Json?
+  /// Institution-owned quick donation configuration; absent means disabled.
+  quickDonation        Json?
 
 }
 
@@ -2608,4 +2669,27 @@ type BankTransferReceiptFile {
 enum WaqfUnit {
   SHARE
   METER
+}
+
+/// Local-only service requests. Never a payment instruction or a second ledger.
+model SubscriptionServiceRequest {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  subscriptionId  String   @db.ObjectId
+  donorId         String   @db.ObjectId
+  activeKey       String   @unique
+  kind            String // AMOUNT_CHANGE | PAUSE | CANCEL
+  status          String   @default("NEW") // NEW | IN_PROGRESS | COMPLETED | REJECTED | WITHDRAWN
+  requestedAmount Float?
+  currency        String
+  locale          String
+  note            String
+  staffNote       String?
+  resolutionNote  String?
+  history         Json?
+  handledById     String?  @db.ObjectId
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  completedAt     DateTime? // Resolution time; status distinguishes execution, rejection and withdrawal.
+  @@index([status, createdAt])
+  @@index([donorId, subscriptionId, createdAt])
 }

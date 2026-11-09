@@ -10,6 +10,7 @@ import {
 import { requireAdminSession } from '@/lib/dashboard/api-auth';
 import { writeAuditLog } from '@/lib/audit-log';
 import { getBadgeIdsByUser } from '@/lib/badge-criteria';
+import { chargesPerMonth } from '@/lib/donations/recurring-schedule';
 import { BLOCKED_EMAIL_ERROR, isBlockedEmail } from '@/lib/security/blocked-emails';
 
 function roleLabelAr(r: string) {
@@ -44,6 +45,21 @@ export async function GET(
       where: { id },
       include: {
         donations: {
+          omit: {
+            // Public donor history needs amounts/status, not gateway credentials,
+            // raw reconciliation signals, ad identifiers or payment transport data.
+            providerRaw: true, cardDetails: true, accessToken: true,
+            providerTxnType: true, providerProcReturnCode: true,
+            providerTxnResult: true, providerAuthCode: true,
+            providerHostRefNum: true, providerErrorMessage: true,
+            providerOrderId: true, paypalOrderId: true, paypalCaptureId: true,
+            bankOperations: true, bankOperationLock: true,
+            bankOperationsRevision: true, bankLastInquiry: true,
+            reconciliationCheckedAt: true, reconciliationNextAt: true,
+            reconciliationLeaseToken: true, reconciliationLeaseUntil: true,
+            attribution: true, conversionEventsSentAt: true,
+            conversionFailedEventsSentAt: true, paidAmount: true, paidCurrency: true,
+          },
           include: {
             subscription: {
               select: {
@@ -102,16 +118,11 @@ export async function GET(
         where: {
           donorId: id,
           status: 'PAID',
-          // One-time donations need a settled paidAt to count; subscription
-          // donations count on status=PAID alone since recurring charges fire
-          // without a donor click (no abandonment moment to guard against).
-          OR: [
-            { paidAt: { not: null } },
-            { subscriptionId: { not: null } },
-          ],
+          // Initial and recurring payments require the same settlement evidence.
+          paidAt: { not: null },
         },
-        _sum: { totalAmount: true, amountUSD: true },
-        _max: { createdAt: true },
+        _sum: { totalAmount: true, amountUSD: true, refundedTotalAmount: true, refundedTotalUSD: true, refundedAmountUSD: true },
+        _max: { paidAt: true },
         _count: { id: true },
       }),
       prisma.badge.findMany({
@@ -119,28 +130,29 @@ export async function GET(
         orderBy: { order: 'asc' },
       }),
       prisma.subscription.findMany({
-        where: { donorId: id, status: 'ACTIVE' },
-        select: { id: true, amountUSD: true, amount: true, currency: true },
+        where: { donorId: id, status: 'ACTIVE', donations: { some: { status: 'PAID', paidAt: { not: null } } } },
+        select: { id: true, amountUSD: true, amount: true, currency: true, frequency: true },
       }),
     ]);
     const t = totalsRows[0];
     const badgeIdsByUser =
       allBadges.length > 0 ? await getBadgeIdsByUser([id], allBadges) : new Map<string, string[]>();
 
-    // Currently-active monthly recurring revenue from this donor (USD).
-    // Falls back to local-currency amount only when amountUSD wasn't captured
-    // at subscription create time.
+    // Monthly equivalent of active, first-payment-confirmed plans.
+    // Missing FX must never be silently treated as USD.
     const currentMonthlyMrrUSD = activeSubs.reduce(
-      (sum, s) => sum + (s.amountUSD ?? s.amount ?? 0),
+      (sum, s) => {
+        const usdPerCharge = s.amountUSD ?? (s.currency === 'USD' ? s.amount : null);
+        return sum + (usdPerCharge == null ? 0 : usdPerCharge * chargesPerMonth(s.frequency ?? 'MONTHLY'));
+      },
       0
     );
 
-    // Distinct supported campaigns. Subscription donations count even without
-    // paidAt — they're treated as ناجح across dashboards/UI.
+    // Distinct campaigns supported by confirmed settlements only.
     const supportedCampaignIds = new Set<string>();
     for (const donation of user.donations) {
       if (donation.status !== 'PAID') continue;
-      if (donation.paidAt == null && donation.subscriptionId == null) continue;
+      if (donation.paidAt == null) continue;
       for (const item of donation.items) supportedCampaignIds.add(item.campaignId);
     }
 
@@ -174,7 +186,14 @@ export async function GET(
       totalDonationsCount: t?._count.id ?? 0,
       totalDonatedAmount: t?._sum.totalAmount ?? 0,
       totalDonatedAmountUSD: t?._sum.amountUSD ?? 0,
-      lastDonationAt: t?._max.createdAt ?? null,
+      // Do not rewrite original gross values. Display explicit refunds and
+      // net (USD cause-only). Local sums are meaningful only for same-currency donors.
+      totalRefundedAmount: t?._sum.refundedTotalAmount ?? 0,
+      netDonatedAmount: Math.max(0, (t?._sum.totalAmount ?? 0) - (t?._sum.refundedTotalAmount ?? 0)),
+      totalRefundedAmountUSD: t?._sum.refundedAmountUSD ?? 0,
+      netDonatedAmountUSD: Math.max(0, (t?._sum.amountUSD ?? 0) - (t?._sum.refundedAmountUSD ?? 0)),
+      totalRefundedChargedUSD: t?._sum.refundedTotalUSD ?? 0,
+      lastDonationAt: t?._max.paidAt ?? null,
       badgeIds: badgeIdsByUser.get(id) ?? [],
       currentMonthlyMrrUSD,
       activeSubscriptionsCount: activeSubs.length,
@@ -184,10 +203,12 @@ export async function GET(
 
     // Don't leak the password hash to the client. The profile UI only needs
     // a boolean to know whether to show the "current password" field.
-    const { password: _omitPwd, ...userWithoutPwd } = user;
+    const { password: _omitPwd, clarityId: _internalClarityId, ...userWithoutPwd } = user;
     void _omitPwd;
     const safeUser = {
       ...userWithoutPwd,
+      // A Clarity identity is an internal operator cross-reference, not donor data.
+      ...(session.user.role === 'ADMIN' ? { clarityId: _internalClarityId } : {}),
       hasPassword: Boolean(user.password),
       donations: donationsForUser,
       ...profileCard,
@@ -197,7 +218,7 @@ export async function GET(
       user: safeUser,
       oneTimeDonations: oneTimeDonations.map((d) => withType(d, 'ONE_TIME')),
       monthlyDonations: monthlyDonations.map((d) => withType(d, 'MONTHLY')),
-    });
+    }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     console.error('Error fetching user:', error);
     return NextResponse.json(

@@ -25,6 +25,8 @@ export interface UserProfileCardData {
   totalDonationsCount: number;
   totalDonatedAmount: number;
   totalDonatedAmountUSD: number;
+  totalRefundedAmountUSD?: number;
+  netDonatedAmountUSD?: number;
   lastDonationAt: string | null;
   badgeIds: string[];
   /** Microsoft Clarity user-id assigned by an admin for session replay lookup. */

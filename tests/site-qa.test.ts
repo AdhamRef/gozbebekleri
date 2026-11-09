@@ -6,6 +6,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { IntlMessageFormat } from 'intl-messageformat';
 import { MAX_IMAGE_BYTES, validateImageFile } from '../lib/uploads/image-file-rules';
+import { assertRasterImageUpload } from '../lib/uploads/strict-image-content';
 import { hasConfirmedDonationPayment } from '../lib/donations/receipt-state';
 
 test('a missing or failed donation never becomes a paid receipt because its subscription is active', () => {
@@ -29,6 +30,19 @@ test('image validation accepts supported photos and refuses empty, oversized and
   assert.ok(validateImageFile({type:'image/png',size:MAX_IMAGE_BYTES+1}));
   assert.ok(validateImageFile({type:'image/x-unknown',size:100}));
 });
+test('media signature checks reject spoofed SVG and HTML before upload',()=>{
+  assert.equal(assertRasterImageUpload({type:'image/jpeg',name:'ok.jpg'},Buffer.from([255,216,255,1,2])),null);
+  assert.equal(assertRasterImageUpload({type:'image/png',name:'ok.png'},Buffer.from([137,80,78,71,13,10,26,10,1])),null);
+  assert.ok(assertRasterImageUpload({type:'image/svg+xml',name:'evil.svg'},Buffer.from('<svg onload=alert(1)>')));
+  assert.ok(assertRasterImageUpload({type:'image/png',name:'evil.png'},Buffer.from('<script>')));
+  assert.ok(assertRasterImageUpload({type:'image/jpeg',name:'wrong.html'},Buffer.from([255,216,255])));
+});
+test('shared Cloudinary images cannot be deleted while referenced by content',async()=>{
+  const f=uploadDeleteFixture('ADMIN',true);
+  const response=await f.DELETE(new Request('https://example.org/api/upload?publicId=photo-1'));
+  assert.equal(response.status,409);
+  assert.deepEqual(f.destroyed,[]);
+});
 test('the legacy success URL never fabricates a donation and only forwards validated record IDs', async () => {
   const target={exports:{} as {default:(props:unknown)=>Promise<unknown>}},destinations:string[]=[];
   const code=ts.transpileModule(readFileSync('app/[locale]/success/page.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
@@ -43,14 +57,17 @@ test('the legacy success URL never fabricates a donation and only forwards valid
     assert.equal(destinations.at(-1),expected);
   }
 });
-function uploadDeleteFixture(role:string|null){
+function uploadDeleteFixture(role:string|null,referenced=false){
   const destroyed:string[]=[],session=role?{user:{role}}:null;
   const result={exports:{} as {DELETE:(request:Request)=>Promise<Response>}};
   const response={json:(data:unknown,init?:ResponseInit)=>new Response(JSON.stringify(data),init)};
   const dependencies:Record<string,unknown>={
     'next/server':{NextResponse:response},'next-auth':{getServerSession:async()=>session},'../auth/[...nextauth]/options':{authOptions:{}},
     '@/lib/dashboard/api-auth':{requireAdminSession:(s:typeof session)=>!s?response.json({error:'Unauthorized'},{status:401}):s.user.role!=='ADMIN'?response.json({error:'Forbidden'},{status:403}):null},
-    '@/lib/cloudinary':{uploader:{destroy:async(id:string)=>destroyed.push(id)}},
+    '@/lib/dashboard/permissions':{sessionHasDashboardPermission:(s:typeof session,key:string)=>Boolean(s?.user?.role==='ADMIN'||(s?.user?.role==='STAFF'&&['campaigns','categories','blog','slides','siteContent'].includes(key)))},
+    '@/lib/cloudinary':{api:{resource:async(id:string)=>({secure_url:'https://res.cloudinary.com/goz/image/upload/'+id})},uploader:{destroy:async(id:string)=>destroyed.push(id)}},
+    '@/lib/media/reference-check':{isMediaUrlReferenced:async()=>referenced},
+    '@/lib/uploads/strict-image-content':{assertRasterImageUpload},
     '@/lib/audit-log':{queueAuditLog:()=>{},auditActorFromSiteSession:()=>({}),auditStreamForRole:()=>''},
     '@/lib/uploads/image-file-rules':{MAX_IMAGE_BYTES,formatBytes:()=>'',validateImageFile},
   };

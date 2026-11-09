@@ -163,6 +163,11 @@ interface DashboardStats {
   totalDonations: number;
   totalUsers: number;
   totalAmount: number;
+  grossAmountUSD?: number;
+  refundedAmountUSD?: number;
+  netAmountUSD?: number;
+  refundedAllTimeUSD?: number;
+  netRevenueAllTimeUnfiltered?: number;
   allTimeRevenue?: number;
   /** Sum of all PAID donations (USD) — ignores period / category / campaign filters */
   paidRevenueAllTimeUnfiltered?: number;
@@ -494,6 +499,8 @@ export default function DashboardPage() {
       if (selectedCampaign !== "all") params.append("campaignId", selectedCampaign);
       if (effectiveUserId !== "all") params.append("userId", effectiveUserId);
       if (showFailed) params.set("showFailed", "true");
+      params.set("status", donationsStatusFilter);
+      params.set("donationType", donationsTypeFilter);
       if (donationLocaleFilter !== "all") params.set("locale", donationLocaleFilter);
       if (donationCountryFilter !== "all") params.set("country", donationCountryFilter);
       const response = await axios.get(`/api/admin/donations/chart?${params}`);
@@ -505,7 +512,7 @@ export default function DashboardPage() {
     } finally {
       setChartLoading(false);
     }
-  }, [selectedCategory, selectedCampaign, selectedUserId, searchParams, chartPeriod, dateFrom, dateTo, showFailed, donationLocaleFilter, donationCountryFilter]);
+  }, [selectedCategory, selectedCampaign, selectedUserId, searchParams, chartPeriod, dateFrom, dateTo, showFailed, donationsStatusFilter, donationsTypeFilter, donationLocaleFilter, donationCountryFilter]);
 
   useEffect(() => {
     fetchChartData();
@@ -884,7 +891,7 @@ export default function DashboardPage() {
                 />
                 <StatsMetricCard
                   compact
-                  title={`إيرادات ناجحة (${chartFilterPeriodLabelAr})`}
+                  title={`إيرادات إجمالية قبل الاسترداد (${chartFilterPeriodLabelAr})`}
                   value={stats?.totalAmount ?? 0}
                   icon={DollarSign}
                   accent="emerald"
@@ -893,12 +900,39 @@ export default function DashboardPage() {
                 />
                 <StatsMetricCard
                   compact
-                  title="إيرادات ناجحة (كل الوقت)"
+                  title="إيرادات إجمالية قبل الاسترداد (كل الوقت)"
                   value={stats?.paidRevenueAllTimeUnfiltered ?? 0}
                   icon={DollarSign}
                   accent="emerald"
                   format="money"
                   subtitle="جميع التبرعات الناجحة بشكل عام دون فلتر"
+                />
+                <StatsMetricCard
+                  compact
+                  title={`الاستردادات (${chartFilterPeriodLabelAr})`}
+                  value={stats?.refundedAmountUSD ?? 0}
+                  icon={Receipt}
+                  accent="amber"
+                  format="money"
+                  subtitle="مسترد أصل التبرعات بالـUSD، دون رسوم أو دعم الفريق"
+                />
+                <StatsMetricCard
+                  compact
+                  title={`صافي الإيراد (${chartFilterPeriodLabelAr})`}
+                  value={stats?.netAmountUSD ?? 0}
+                  icon={Wallet}
+                  accent="emerald"
+                  format="money"
+                  subtitle="المحصل المؤكد ناقص أصل المبالغ المستردة"
+                />
+                <StatsMetricCard
+                  compact
+                  title="صافي الإيراد (كل الوقت)"
+                  value={stats?.netRevenueAllTimeUnfiltered ?? 0}
+                  icon={Wallet}
+                  accent="emerald"
+                  format="money"
+                  subtitle="صافي التبرعات بعد الاستردادات — دون فلاتر"
                 />
                 <StatsMetricCard
                   compact

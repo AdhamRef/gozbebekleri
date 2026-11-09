@@ -1,0 +1,335 @@
+{
+  "sourceRepository": "saladin76/minberiaksa",
+  "sourceCommit": "3a6454673bee51ca42a8c04299b667b5376c0c96",
+  "target": "AdhamRef/gozbebekleri",
+  "targetBaseline": "0105005cbfa07b521cbc3975080ccdd7c68fc842",
+  "dataTransfer": false,
+  "smsIncluded": false,
+  "stage": "REPORT_ENGINE_VALIDATED_INTEGRATION_PENDING",
+  "phpBridge": "NOT_APPLICABLE",
+  "systems": [
+    {
+      "system": "overview",
+      "source": 27,
+      "goz": {
+        "same": 5,
+        "different": 15,
+        "missing": 7
+      },
+      "yedi": {
+        "same": 2,
+        "different": 13,
+        "missing": 12
+      },
+      "ummet": {
+        "same": 0,
+        "different": 1,
+        "missing": 26
+      }
+    },
+    {
+      "system": "donors",
+      "source": 20,
+      "goz": {
+        "same": 5,
+        "different": 6,
+        "missing": 9
+      },
+      "yedi": {
+        "same": 3,
+        "different": 6,
+        "missing": 11
+      },
+      "ummet": {
+        "same": 1,
+        "different": 2,
+        "missing": 17
+      }
+    },
+    {
+      "system": "projects",
+      "source": 45,
+      "goz": {
+        "same": 6,
+        "different": 31,
+        "missing": 8
+      },
+      "yedi": {
+        "same": 3,
+        "different": 32,
+        "missing": 10
+      },
+      "ummet": {
+        "same": 0,
+        "different": 0,
+        "missing": 45
+      }
+    },
+    {
+      "system": "categories",
+      "source": 17,
+      "goz": {
+        "same": 3,
+        "different": 11,
+        "missing": 3
+      },
+      "yedi": {
+        "same": 1,
+        "different": 13,
+        "missing": 3
+      },
+      "ummet": {
+        "same": 0,
+        "different": 0,
+        "missing": 17
+      }
+    },
+    {
+      "system": "blog",
+      "source": 29,
+      "goz": {
+        "same": 15,
+        "different": 12,
+        "missing": 2
+      },
+      "yedi": {
+        "same": 14,
+        "different": 11,
+        "missing": 4
+      },
+      "ummet": {
+        "same": 0,
+        "different": 0,
+        "missing": 29
+      }
+    },
+    {
+      "system": "slides",
+      "source": 8,
+      "goz": {
+        "same": 3,
+        "different": 4,
+        "missing": 1
+      },
+      "yedi": {
+        "same": 3,
+        "different": 4,
+        "missing": 1
+      },
+      "ummet": {
+        "same": 0,
+        "different": 0,
+        "missing": 8
+      }
+    },
+    {
+      "system": "seo",
+      "source": 5,
+      "goz": {
+        "same": 1,
+        "different": 1,
+        "missing": 3
+      },
+      "yedi": {
+        "same": 1,
+        "different": 1,
+        "missing": 3
+      },
+      "ummet": {
+        "same": 0,
+        "different": 1,
+        "missing": 4
+      }
+    },
+    {
+      "system": "attribution",
+      "source": 9,
+      "goz": {
+        "same": 1,
+        "different": 5,
+        "missing": 3
+      },
+      "yedi": {
+        "same": 0,
+        "different": 5,
+        "missing": 4
+      },
+      "ummet": {
+        "same": 1,
+        "different": 3,
+        "missing": 5
+      }
+    },
+    {
+      "system": "tracking",
+      "source": 27,
+      "goz": {
+        "same": 25,
+        "different": 2,
+        "missing": 0
+      },
+      "yedi": {
+        "same": 1,
+        "different": 16,
+        "missing": 10
+      },
+      "ummet": {
+        "same": 25,
+        "different": 2,
+        "missing": 0
+      }
+    },
+    {
+      "system": "providers",
+      "source": 34,
+      "goz": {
+        "same": 29,
+        "different": 5,
+        "missing": 0
+      },
+      "yedi": {
+        "same": 12,
+        "different": 21,
+        "missing": 1
+      },
+      "ummet": {
+        "same": 28,
+        "different": 6,
+        "missing": 0
+      }
+    },
+    {
+      "system": "security",
+      "source": 3,
+      "goz": {
+        "same": 2,
+        "different": 0,
+        "missing": 1
+      },
+      "yedi": {
+        "same": 0,
+        "different": 0,
+        "missing": 3
+      },
+      "ummet": {
+        "same": 2,
+        "different": 0,
+        "missing": 1
+      }
+    },
+    {
+      "system": "logs",
+      "source": 2,
+      "goz": {
+        "same": 1,
+        "different": 1,
+        "missing": 0
+      },
+      "yedi": {
+        "same": 0,
+        "different": 2,
+        "missing": 0
+      },
+      "ummet": {
+        "same": 1,
+        "different": 0,
+        "missing": 1
+      }
+    },
+    {
+      "system": "whatsappInbox",
+      "source": 142,
+      "goz": {
+        "same": 105,
+        "different": 37,
+        "missing": 0
+      },
+      "yedi": {
+        "same": 6,
+        "different": 52,
+        "missing": 84
+      },
+      "ummet": {
+        "same": 104,
+        "different": 38,
+        "missing": 0
+      }
+    },
+    {
+      "system": "siteInbox",
+      "source": 6,
+      "goz": {
+        "same": 0,
+        "different": 6,
+        "missing": 0
+      },
+      "yedi": {
+        "same": 0,
+        "different": 6,
+        "missing": 0
+      },
+      "ummet": {
+        "same": 0,
+        "different": 0,
+        "missing": 6
+      }
+    },
+    {
+      "system": "team",
+      "source": 1,
+      "goz": {
+        "same": 1,
+        "different": 0,
+        "missing": 0
+      },
+      "yedi": {
+        "same": 1,
+        "different": 0,
+        "missing": 0
+      },
+      "ummet": {
+        "same": 0,
+        "different": 1,
+        "missing": 0
+      }
+    },
+    {
+      "system": "quickDonation",
+      "source": 7,
+      "goz": {
+        "same": 0,
+        "different": 0,
+        "missing": 7
+      },
+      "yedi": {
+        "same": 0,
+        "different": 0,
+        "missing": 7
+      },
+      "ummet": {
+        "same": 0,
+        "different": 0,
+        "missing": 7
+      }
+    },
+    {
+      "system": "reports",
+      "source": 4,
+      "goz": {
+        "same": 0,
+        "different": 1,
+        "missing": 3
+      },
+      "yedi": {
+        "same": 0,
+        "different": 1,
+        "missing": 3
+      },
+      "ummet": {
+        "same": 0,
+        "different": 0,
+        "missing": 4
+      }
+    }
+  ]
+}

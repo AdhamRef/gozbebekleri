@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma generate --schema prisma/integration-settings.schema.prisma && npm run test:content-editors && npm run test:site-qa && npm run typecheck:content-editor-service && npm run test:integration-settings && npm run typecheck:communication-runtime && npm run typecheck:integration-release && TSC_COMPILE_ON_ERROR=true next build && node --import tsx scripts/ensure-content-editor-indexes.ts --production",
+    "build": "prisma generate && prisma generate --schema prisma/integration-settings.schema.prisma && npm run test:content-editors && npm run test:site-qa && npm run typecheck:content-editor-service && npm run test:integration-settings && npm run typecheck:communication-runtime && npm run typecheck:ported-systems && npm run test:ported-systems && npm run typecheck:integration-release && TSC_COMPILE_ON_ERROR=true next build && node --import tsx scripts/ensure-content-editor-indexes.ts --production",
     "start": "next start",
     "lint": "next lint",
     "test:integration-settings": "tsc -p tsconfig.integration-tests.json --noEmit && node --import tsx --import ./tests/ported-systems/setup.ts --test tests/integration-settings/*.test.ts",
@@ -31,8 +31,8 @@
     "test:content-editors": "node --import tsx --test tests/content-editor/*.test.ts",
     "test:content-editors:browser": "node --import tsx scripts/content-editor-browser-test.mjs",
     "typecheck:content-editor-service": "tsc -p tsconfig.content-editor.json",
-    "test:ported-systems": "node --import tsx --import ./tests/ported-systems/setup.ts --test tests/ported-systems/*.test.ts",
-    "typecheck:ported-systems": "tsc -p tsconfig.ported-systems.json",
+    "test:ported-systems": "node --import tsx --import ./tests/ported-systems/setup.ts --test tests/ported-systems/*.test.ts tests/ported-systems/*.test.mjs",
+    "typecheck:ported-systems": "tsc -p tsconfig.ported-systems.json && tsc -p tsconfig.stripe-webhook.json",
     "postinstall": "prisma generate && prisma generate --schema prisma/integration-settings.schema.prisma",
     "test:sms-removal": "node --import tsx --test tests/integration-settings/sms-removal.test.ts"
   },

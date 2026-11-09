@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "incremental": false,
+    "skipLibCheck": true
+  },
+  "include": [
+    "next-env.d.ts",
+    "types/next-auth.d.ts",
+    "app/api/stripe/webhook/route.ts",
+    "lib/donations/stripe-checkout-settlement.ts",
+    "lib/donations/subscription-dedupe-audit.ts"
+  ],
+  "exclude": ["node_modules"]
+}

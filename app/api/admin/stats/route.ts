@@ -454,6 +454,22 @@ export async function GET(request: NextRequest) {
       ]);
     const monthlyRecurringRevenueUnfiltered = mrrUnfilteredResult._sum?.amountUSD ?? 0;
 
+    // Gross remains unchanged for audit; new refund/net values are explicit.
+    // All figures below refer to cause-only USD amounts at historical FX.
+    const [filteredRefunds, allTimeRefunds] = await Promise.all([
+      prisma.donation.aggregate({
+        where: paidWhere,
+        _sum: { refundedAmountUSD: true, refundedTotalUSD: true },
+      }),
+      prisma.donation.aggregate({
+        where: globalPaidWhere,
+        _sum: { refundedAmountUSD: true, refundedTotalUSD: true },
+      }),
+    ]);
+    const refundedAmountUSD = filteredRefunds._sum.refundedAmountUSD ?? 0;
+    const refundedChargedUSD = filteredRefunds._sum.refundedTotalUSD ?? 0;
+    const refundedAllTimeUSD = allTimeRefunds._sum.refundedAmountUSD ?? 0;
+
     return NextResponse.json({
       totalCampaigns,
       totalCategories,
@@ -461,8 +477,15 @@ export async function GET(request: NextRequest) {
       totalUsers,
       // Revenue (PAID only)
       totalAmount,
+      grossAmountUSD: totalAmount,
+      refundedAmountUSD,
+      refundedChargedUSD,
+      netAmountUSD: Math.max(0, totalAmount - refundedAmountUSD),
       allTimeRevenue,
+      refundedAllTimeUSD,
+      netAllTimeRevenue: Math.max(0, allTimeRevenue - refundedAllTimeUSD),
       paidRevenueAllTimeUnfiltered,
+      netRevenueAllTimeUnfiltered: Math.max(0, paidRevenueAllTimeUnfiltered - refundedAllTimeUSD),
       paidCountAllTimeUnfiltered,
       activeMonthlyCountUnfiltered,
       monthlyRecurringRevenueUnfiltered,

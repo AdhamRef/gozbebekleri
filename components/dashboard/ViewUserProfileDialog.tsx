@@ -452,6 +452,21 @@ export function ViewUserProfileDialog({
                 />
               </div>
 
+              {user.totalRefundedAmountUSD != null && (
+                <div className="grid grid-cols-2 gap-2">
+                  <StatBox
+                    icon={Receipt}
+                    label="المبالغ المستردة (USD)"
+                    value={<span dir="ltr">{formatMoney(user.totalRefundedAmountUSD)}</span>}
+                  />
+                  <StatBox
+                    icon={TrendingUp}
+                    label="صافي التبرعات (USD)"
+                    value={<span dir="ltr">{formatMoney(user.netDonatedAmountUSD ?? Math.max(0, user.totalDonatedAmountUSD - user.totalRefundedAmountUSD))}</span>}
+                  />
+                </div>
+              )}
+
               {/* Two-column info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <SectionCard title="معلومات التواصل" icon={UserCircle}>

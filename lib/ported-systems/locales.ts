@@ -22,8 +22,7 @@ import { SUPPORTED_LOCALES as PUBLIC_LOCALES } from "@/lib/locales";
 
 /**
  * Enabled / public locales. Order is significant (drives dropdowns + routing)
- * and is the order the locked Minbar design ships in `Header.dc.html`
- * → `Component.LANGS`, so the language picker reads as designed.
+ * and MUST follow the local institution routing, not the Minbar language list.
  */
 export const REGISTERED_LOCALES = [
   "ar",
@@ -46,21 +45,23 @@ export const REGISTERED_LOCALES = [
   "zh",
   "hi",
 ] as const;
-export const SUPPORTED_LOCALES: readonly SupportedLocale[] = REGISTERED_LOCALES;
+export const SUPPORTED_LOCALES: readonly SupportedLocale[] = PUBLIC_LOCALES;
 
+// Legacy template payloads may contain known, disabled language codes, but
+// ONLY the runtime supported array controls what users can select.
 export type SupportedLocale = (typeof REGISTERED_LOCALES)[number];
 
 /**
- * Registered but not yet publicly routed. Empty since the Minbar handoff landed
- * complete `i18n/<lang>/` bundles for all 19 languages (Core Website
- * Localization Pass) and every one of them is now routed.
+ * Other historical/registered codes stay disabled. They are not routing,
+ * template, audience, or communication choices for Gözbebekleri.
  */
-export const FUTURE_LOCALES = [] as const;
+export const FUTURE_LOCALES = REGISTERED_LOCALES.filter(
+  (code) => !(PUBLIC_LOCALES as readonly string[]).includes(code),
+);
 
-/** Every locale the platform knows about (enabled + future). */
-export const ALL_LOCALES = [...SUPPORTED_LOCALES, ...FUTURE_LOCALES] as const;
-
-export type AnyLocale = (typeof ALL_LOCALES)[number];
+/** Registered codes remain known for legacy data, but are not selectable. */
+export const ALL_LOCALES = REGISTERED_LOCALES;
+export type AnyLocale = (typeof REGISTERED_LOCALES)[number];
 
 export type LocaleDirection = "rtl" | "ltr";
 
@@ -91,8 +92,7 @@ export const LOCALES: Record<AnyLocale, LocaleMeta> = {
   pt: { code: "pt", label: "Português", nativeLabel: "Português", direction: "ltr", fallbackLocale: "en", enabled: true },
   es: { code: "es", label: "Español", nativeLabel: "Español", direction: "ltr", fallbackLocale: "en", enabled: true },
   de: { code: "de", label: "Deutsch", nativeLabel: "Deutsch", direction: "ltr", fallbackLocale: "en", enabled: true },
-  // Promoted with the Minbar handoff  `Component.BODY_TRANSLATED` lists all 19
-  // as body-translated, and `Minbar/i18n/<lang>/` ships complete bundles.
+  // Legacy known codes retained for stored records, never enable from Minbar.
   ur: { code: "ur", label: "Urdu", nativeLabel: "اردو", direction: "rtl", fallbackLocale: "en", enabled: true },
   sq: { code: "sq", label: "Albanian", nativeLabel: "Shqip", direction: "ltr", fallbackLocale: "en", enabled: true },
   it: { code: "it", label: "Italian", nativeLabel: "Italiano", direction: "ltr", fallbackLocale: "en", enabled: true },
@@ -109,12 +109,12 @@ export const LOCALES: Record<AnyLocale, LocaleMeta> = {
 /** Historical export  label map for the enabled locales. Unchanged values. */
 for (const code of REGISTERED_LOCALES) LOCALES[code].enabled = (PUBLIC_LOCALES as readonly string[]).includes(code);
 
-export const LOCALE_LABELS: Record<SupportedLocale, string> = REGISTERED_LOCALES.reduce(
+export const LOCALE_LABELS: Record<AnyLocale, string> = SUPPORTED_LOCALES.reduce(
   (acc, code) => {
     acc[code] = LOCALES[code].label;
     return acc;
   },
-  {} as Record<SupportedLocale, string>
+  {} as Record<AnyLocale, string>
 );
 
 /** Enabled locales for dropdown/select (code + label). */
@@ -124,7 +124,7 @@ export const LOCALE_OPTIONS = SUPPORTED_LOCALES.map((code) => ({
 }));
 
 /** Every registered locale for admin/messaging pickers (code + label + enabled). */
-export const ALL_LOCALE_OPTIONS = ALL_LOCALES.map((code) => ({
+export const ALL_LOCALE_OPTIONS = SUPPORTED_LOCALES.map((code) => ({
   code,
   label: LOCALES[code].label,
   nativeLabel: LOCALES[code].nativeLabel,

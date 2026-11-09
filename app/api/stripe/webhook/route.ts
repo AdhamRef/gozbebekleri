@@ -10,9 +10,19 @@ import { sendDonationFailedConversions } from "@/lib/tracking/donation-conversio
 import { dispatchDonationPaid, dispatchEvent } from "@/lib/events/dispatch";
 import { donationFieldEmpty } from "@/lib/donations/mongo-null";
 import { normalizeDonationCurrencyCode } from "@/lib/exchange/convert-amount-in-currency-to-usd";
+import { checkoutPaymentCanSettle, stripeInvoiceSettlementDate, stripeSubscriptionOwnershipMatches } from "@/lib/donations/stripe-checkout-settlement";
+import { settleStripeInvoiceOnce } from "@/lib/donations/stripe-invoice-settlement";
+import { verifiedUsdCredit } from "@/lib/donations/verified-usd-credit";
+import { stripeBillingState } from "@/lib/donations/stripe-subscription-billing";
+import { reconcileChargeRefunds } from "@/lib/donations/stripe-refund-settlement";
+import { reconcileOrDeferStripeRefund } from "@/lib/donations/stripe-refund-deferred";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-03-25.dahlia",
+  // Preserve the provider API version already used by this handler. Stripe SDK
+  // only types its latest version; do not silently change runtime API semantics.
+  // SDK v22's type only admits its latest version; preserve the existing
+  // explicit runtime version rather than silently changing Stripe behavior.
+  apiVersion: "2026-03-25.dahlia" as any,
 });
 
 // Stripe removed `invoice.subscription` in API 2024-09-30. The subscription ID
@@ -58,22 +68,35 @@ export async function POST(req: NextRequest) {
 
         const isMonthly = session.mode === "subscription";
 
-        if (session.payment_status === "paid" || isMonthly) {
-          await prisma.$transaction(async (tx) => {
+        // Subscriptions have a separate authoritative invoice.payment_succeeded
+        // event. Settling them here would count the signup invoice twice when
+        // the two webhook event types arrive in either order.
+        if (isMonthly) {
+          if (subscriptionDbId && session.subscription) {
+            await prisma.subscription.update({
+              where: { id: subscriptionDbId },
+              data: { payforToken: session.subscription as string },
+            });
+          }
+          break;
+        }
+
+        if (checkoutPaymentCanSettle(session.mode, session.payment_status)) {
+          const settledNow = await prisma.$transaction(async (tx) => {
             const donation = await tx.donation.findUnique({
               where: { id: donationId },
               include: { items: true, categoryItems: true },
             });
             // Idempotency: the row is created with status=PAID by /api/stripe/intent
             // before Stripe confirms payment, so we key off paidAt (only set here).
-            if (!donation || donation.paidAt != null) return;
+            if (!donation || donation.paidAt != null) return false;
 
             // Mark donation as paid
             await tx.donation.update({
               where: { id: donationId },
               data: {
                 status: "PAID",
-                paidAt: new Date(),
+                paidAt: new Date(event.created * 1000),
                 provider: "STRIPE",
                 providerOrderId: session.id,
                 providerAuthCode: session.payment_intent as string ?? null,
@@ -84,33 +107,31 @@ export async function POST(req: NextRequest) {
 
             // Apply campaign/category amount increments
             for (const item of donation.items) {
+              const credit = verifiedUsdCredit(item.amount, item.amountUSD, donation.currency);
+              if (credit === null) {
+                console.warn("[stripe] skipping non-USD project/category increment without recorded FX", { invoiceOrSession: session.id });
+                continue;
+              }
               await tx.campaign.update({
                 where: { id: item.campaignId },
-                data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
+                data: { currentAmount: { increment: credit } },
               });
             }
             for (const item of donation.categoryItems) {
+              const credit = verifiedUsdCredit(item.amount, item.amountUSD, donation.currency);
+              if (credit === null) {
+                console.warn("[stripe] skipping non-USD project/category increment without recorded FX", { invoiceOrSession: session.id });
+                continue;
+              }
               await tx.category.update({
                 where: { id: item.categoryId },
-                data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
+                data: { currentAmount: { increment: credit } },
               });
             }
 
-            // If monthly subscription, store Stripe subscription ID
-            if (isMonthly && subscriptionDbId && session.subscription) {
-              await tx.subscription.update({
-                where: { id: subscriptionDbId },
-                data: {
-                  // Reuse payforToken field to store Stripe subscription ID
-                  payforToken: session.subscription as string,
-                },
-              });
-            }
+            return true;
           });
-          after(() => dispatchDonationPaid(donationId));
-          if (isMonthly && subscriptionDbId) {
-            after(() => dispatchEvent("SUBSCRIPTION_CREATED", { donationId }));
-          }
+          if (settledNow) after(() => dispatchDonationPaid(donationId));
         }
         break;
       }
@@ -121,10 +142,39 @@ export async function POST(req: NextRequest) {
         if (!stripeSubscriptionId) break;
 
         // Find our DB subscription by Stripe subscription ID (stored in payforToken)
-        const dbSubscription = await prisma.subscription.findFirst({
+        let dbSubscription = await prisma.subscription.findFirst({
           where: { payforToken: stripeSubscriptionId },
           include: { items: true, categoryItems: true },
         });
+        // Stripe can deliver invoice.payment_succeeded BEFORE the Checkout
+        // session completion event has populated payforToken. Look up only
+        // the Stripe subscription's own signed, server-created metadata.
+        // Never settle an arbitrary database subscription from invoice data.
+        if (!dbSubscription) {
+          const remoteSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+          const dbId = remoteSub.metadata?.subscriptionDbId;
+          const ownerId = remoteSub.metadata?.userId;
+          if (dbId && ownerId) {
+            const candidate = await prisma.subscription.findUnique({
+              where: { id: dbId },
+              include: { items: true, categoryItems: true },
+            });
+            if (candidate && stripeSubscriptionOwnershipMatches(
+              candidate,
+              stripeSubscriptionId,
+              { subscriptionDbId: dbId, userId: ownerId },
+              dbId,
+            )) {
+              if (!candidate.payforToken) {
+                await prisma.subscription.update({
+                  where: { id: candidate.id },
+                  data: { payforToken: stripeSubscriptionId },
+                });
+              }
+              dbSubscription = candidate;
+            }
+          }
+        }
         if (!dbSubscription) break;
 
         // Idempotency: skip if we've already settled this invoice. The original
@@ -142,8 +192,10 @@ export async function POST(req: NextRequest) {
         });
         if (existingForInvoice) break;
 
-        // Compute paidAt from invoice timestamp
-        const paidAt = new Date((invoice as any).created * 1000);
+        // The invoice can be created days before it is actually paid.
+        // Stripe status_transitions.paid_at is the collected-money calendar.
+        // Fallback to the signed webhook event time, never invoice.created.
+        const paidAt = stripeInvoiceSettlementDate(invoice.status_transitions?.paid_at, event.created);
 
         // Stripe's own first-vs-renewal marker. "subscription_create" is the signup
         // charge; "subscription_cycle" is an automatic renewal. Anything else
@@ -152,22 +204,11 @@ export async function POST(req: NextRequest) {
         const billingReason = ((invoice as any).billing_reason as string | null) ?? null;
         const isSignupInvoice = billingReason === "subscription_create";
 
-        // nextBillingDate = one month after this invoice was paid. Stripe owns the
-        // actual billing cadence (donors can't pick a day); we just mirror it so
-        // the admin UI and cron filters have a usable value. Clamp to the target
-        // month's last day to handle edge cases like the 31st.
-        const nextBillingDate = new Date(Date.UTC(
-          paidAt.getUTCFullYear(),
-          paidAt.getUTCMonth() + 1,
-          1,
-        ));
-        const lastDay = new Date(Date.UTC(
-          nextBillingDate.getUTCFullYear(),
-          nextBillingDate.getUTCMonth() + 1,
-          0,
-        )).getUTCDate();
-        nextBillingDate.setUTCDate(Math.min(paidAt.getUTCDate(), lastDay));
-        nextBillingDate.setUTCHours(0, 0, 0, 0);
+        // Stripe owns the period anchor. A late-paid invoice must not shift
+        // the next due date; a canceled or failed plan must not be revived.
+        const billingSnapshot = stripeBillingState(
+          await stripe.subscriptions.retrieve(stripeSubscriptionId),
+        );
 
         const fees = (dbSubscription.amount + dbSubscription.teamSupport) * 0.03;
         const finalTotal =
@@ -179,7 +220,10 @@ export async function POST(req: NextRequest) {
           (await getDonorCountryCodeForSnapshot(prisma, dbSubscription.donorId)) ??
           undefined;
 
-        await prisma.$transaction(async (tx) => {
+        const settlementOutcome = await settleStripeInvoiceOnce(
+          prisma,
+          { invoiceId: invoice.id, subscriptionId: dbSubscription.id, paidAt },
+          async (tx) => {
           // Find the original "checkout started" donation for this subscription
           // (status=PAID is the optimistic sentinel; paidAt=null means it never
           // settled). For the FIRST invoice we update that row instead of
@@ -206,6 +250,7 @@ export async function POST(req: NextRequest) {
                   donationFieldEmpty("paidAt"),
                 ],
               },
+              include: { items: true, categoryItems: true },
             })) ??
             (isSignupInvoice
               ? await tx.donation.findFirst({
@@ -216,6 +261,7 @@ export async function POST(req: NextRequest) {
                     ],
                   },
                   orderBy: { createdAt: "asc" },
+                  include: { items: true, categoryItems: true },
                 })
               : null);
 
@@ -231,6 +277,17 @@ export async function POST(req: NextRequest) {
                 providerAuthCode: stripeSubscriptionId,
                 providerTxnResult: "Success",
                 providerRaw: invoice as any,
+                // Signup checkout rows can be created without allocation
+                // snapshots. Persist the EXACT settlement allocation before
+                // refunds rely on it; never infer history from a later plan.
+                ...(existingPending.items.length === 0 && dbSubscription.items.length
+                  ? { items: { create: dbSubscription.items.map(i => ({
+                        campaignId: i.campaignId, amount: i.amount, amountUSD: i.amountUSD,
+                      })) } } : {}),
+                ...(existingPending.categoryItems.length === 0 && dbSubscription.categoryItems.length
+                  ? { categoryItems: { create: dbSubscription.categoryItems.map(i => ({
+                        categoryId: i.categoryId, amount: i.amount, amountUSD: i.amountUSD,
+                      })) } } : {}),
               },
             });
           } else {
@@ -296,15 +353,25 @@ export async function POST(req: NextRequest) {
 
           // Apply campaign/category amount increments for every paid invoice
           for (const item of dbSubscription.items) {
+            const credit = verifiedUsdCredit(item.amount, item.amountUSD, dbSubscription.currency);
+            if (credit === null) {
+              console.warn("[stripe] skipping non-USD project/category increment without recorded FX", { invoiceOrSession: invoice.id });
+              continue;
+            }
             await tx.campaign.update({
               where: { id: item.campaignId },
-              data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
+              data: { currentAmount: { increment: credit } },
             });
           }
           for (const item of dbSubscription.categoryItems) {
+            const credit = verifiedUsdCredit(item.amount, item.amountUSD, dbSubscription.currency);
+            if (credit === null) {
+              console.warn("[stripe] skipping non-USD project/category increment without recorded FX", { invoiceOrSession: invoice.id });
+              continue;
+            }
             await tx.category.update({
               where: { id: item.categoryId },
-              data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
+              data: { currentAmount: { increment: credit } },
             });
           }
 
@@ -313,11 +380,13 @@ export async function POST(req: NextRequest) {
             where: { id: dbSubscription.id },
             data: {
               lastBillingDate: paidAt,
-              nextBillingDate: nextBillingDate,
-              status: "ACTIVE",
+              ...(billingSnapshot.nextBillingDate ? { nextBillingDate: billingSnapshot.nextBillingDate } : {}),
+              ...(billingSnapshot.status ? { status: billingSnapshot.status } : {}),
             },
           });
-        });
+          },
+        );
+        if (settlementOutcome === "duplicate") break;
         const paidForInvoice = await prisma.donation.findFirst({
           where: {
             subscriptionId: dbSubscription.id,
@@ -328,6 +397,9 @@ export async function POST(req: NextRequest) {
         });
         if (paidForInvoice) {
           after(() => dispatchEvent("SUBSCRIPTION_PAYMENT", { donationId: paidForInvoice.id }));
+          if (isSignupInvoice) {
+            after(() => dispatchEvent("SUBSCRIPTION_CREATED", { donationId: paidForInvoice.id }));
+          }
         }
         break;
       }
@@ -338,16 +410,66 @@ export async function POST(req: NextRequest) {
         const stripeSubscriptionId = getStripeSubscriptionIdFromInvoice(invoice);
         if (!stripeSubscriptionId) break;
 
-        const dbSubscription = await prisma.subscription.findFirst({
+        let dbSubscription = await prisma.subscription.findFirst({
           where: { payforToken: stripeSubscriptionId },
         });
+        // Stripe may send the FAILED first invoice before Checkout binds the
+        // provider subscription. Resolve only from trusted provider metadata.
+        if (!dbSubscription) {
+          const remoteSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+          const dbId = remoteSub.metadata?.subscriptionDbId;
+          const ownerId = remoteSub.metadata?.userId;
+          if (dbId && ownerId) {
+            const candidate = await prisma.subscription.findUnique({ where: { id: dbId } });
+            if (candidate && stripeSubscriptionOwnershipMatches(
+              candidate,
+              stripeSubscriptionId,
+              { subscriptionDbId: dbId, userId: ownerId },
+              dbId,
+            )) {
+              if (!candidate.payforToken) {
+                await prisma.subscription.update({
+                  where: { id: candidate.id },
+                  data: { payforToken: stripeSubscriptionId },
+                });
+              }
+              dbSubscription = candidate;
+            }
+          }
+        }
         if (!dbSubscription) break;
 
         // Idempotency: skip if already recorded
         const existingFailed = await prisma.donation.findFirst({
           where: { subscriptionId: dbSubscription.id, providerOrderId: invoice.id },
         });
-        if (existingFailed) break;
+        // The signup creates an unsettled donation before Stripe attempts the
+        // first charge. Never create a second FAILED row for that invoice or
+        // leave an unpaid subscription labeled ACTIVE.
+        if (existingFailed) {
+          if (existingFailed.paidAt != null) break; // A successful charge always wins.
+          const changed = await prisma.donation.updateMany({
+            where: {
+              AND: [{ id: existingFailed.id }, donationFieldEmpty("paidAt")],
+            },
+            data: {
+              status: "FAILED",
+              providerTxnResult: "Failed",
+              providerErrorMessage: "Monthly billing failed via Stripe",
+            },
+          });
+          if (changed.count > 0) {
+            await prisma.subscription.update({
+              where: { id: dbSubscription.id },
+              data: { status: "PAYMENT_FAILED" },
+            });
+            if (existingFailed.status !== "FAILED") {
+              after(() => dispatchEvent("DONATION_FAILED", { donationId: existingFailed.id }));
+              void sendDonationFailedConversions(existingFailed.id);
+            }
+          }
+          break;
+        }
 
         const fees = (dbSubscription.amount + dbSubscription.teamSupport) * 0.03;
         const finalTotal =
@@ -391,6 +513,10 @@ export async function POST(req: NextRequest) {
         // Seed Meta DonateFailed for the failed recurring charge so lookalike
         // audiences still get the "donor who tried" signal on monthly drops.
         void sendDonationFailedConversions(failedRecurring.id);
+        await prisma.subscription.update({
+          where: { id: dbSubscription.id },
+          data: { status: "PAYMENT_FAILED" },
+        });
         break;
       }
 
@@ -404,20 +530,20 @@ export async function POST(req: NextRequest) {
         const donationId = intent.metadata?.donationId;
         if (!donationId) break;
 
-        await prisma.$transaction(async (tx) => {
+        const settledNow = await prisma.$transaction(async (tx) => {
           const donation = await tx.donation.findUnique({
             where: { id: donationId },
             include: { items: true, categoryItems: true },
           });
           // Idempotency: the row is created with status=PAID by /api/stripe/intent
           // before Stripe confirms payment, so we key off paidAt (only set here).
-          if (!donation || donation.paidAt != null) return;
+          if (!donation || donation.paidAt != null) return false;
 
           await tx.donation.update({
             where: { id: donationId },
             data: {
               status: "PAID",
-              paidAt: new Date(),
+              paidAt: new Date(event.created * 1000),
               provider: "STRIPE",
               providerOrderId: intent.id,
               providerAuthCode: intent.id,
@@ -427,19 +553,30 @@ export async function POST(req: NextRequest) {
           });
 
           for (const item of donation.items) {
+            const credit = verifiedUsdCredit(item.amount, item.amountUSD, donation.currency);
+            if (credit === null) {
+              console.warn("[stripe] skipping non-USD campaign increment without recorded FX", { intentId: intent.id });
+              continue;
+            }
             await tx.campaign.update({
               where: { id: item.campaignId },
-              data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
+              data: { currentAmount: { increment: credit } },
             });
           }
           for (const item of donation.categoryItems) {
+            const credit = verifiedUsdCredit(item.amount, item.amountUSD, donation.currency);
+            if (credit === null) {
+              console.warn("[stripe] skipping non-USD category increment without recorded FX", { intentId: intent.id });
+              continue;
+            }
             await tx.category.update({
               where: { id: item.categoryId },
-              data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
+              data: { currentAmount: { increment: credit } },
             });
           }
+          return true;
         });
-        after(() => dispatchDonationPaid(donationId));
+        if (settledNow) after(() => dispatchDonationPaid(donationId));
         break;
       }
 
@@ -511,6 +648,55 @@ export async function POST(req: NextRequest) {
         // Hosted Stripe Checkout expired/failed before payment — seed Meta
         // DonateFailed so the abandoned-checkout cohort feeds lookalikes.
         void sendDonationFailedConversions(donationId);
+        break;
+      }
+
+      case "charge.refunded": {
+        // Charge events are notifications, not settlement evidence. The refund
+        // list is read back from Stripe, and each refund is re-retrieved and
+        // recorded exactly once inside MongoDB.
+        const charge = event.data.object as Stripe.Charge;
+        await reconcileChargeRefunds(prisma, stripe, charge.id,
+          refundId => reconcileOrDeferStripeRefund(prisma, stripe, refundId));
+        break;
+      }
+
+      case "refund.created":
+      case "refund.updated":
+      case "refund.failed": {
+        const refund = event.data.object as Stripe.Refund;
+        await reconcileOrDeferStripeRefund(prisma, stripe, refund.id);
+        break;
+      }
+
+      case "customer.subscription.updated": {
+        // An event may be delivered after a newer status update. Re-read the
+        // provider's current state rather than trusting an out-of-order payload.
+        const updated = event.data.object as Stripe.Subscription;
+        const local = await prisma.subscription.findFirst({
+          where: { payforToken: updated.id },
+          select: { id: true },
+        });
+        if (!local) break;
+        const provider = await stripe.subscriptions.retrieve(updated.id);
+        const state = stripeBillingState(provider);
+        if (!state.status) break;
+        // "ACTIVE" in Stripe does not prove that the first donation settled.
+        const confirmed = state.status === "ACTIVE"
+          ? await prisma.donation.findFirst({
+              where: { subscriptionId: local.id, paidAt: { not: null } },
+              select: { id: true },
+            })
+          : null;
+        await prisma.subscription.update({
+          where: { id: local.id },
+          data: {
+            status: state.status === "ACTIVE" && !confirmed
+              ? "PAYMENT_FAILED"
+              : state.status,
+            ...(state.nextBillingDate ? { nextBillingDate: state.nextBillingDate } : {}),
+          },
+        });
         break;
       }
 

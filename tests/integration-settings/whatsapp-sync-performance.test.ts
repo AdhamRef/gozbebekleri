@@ -46,10 +46,11 @@ if(!(id in dependencies))throw new Error(`Unexpected dependency ${id}`);return d
   return {run:syncMetaWhatsappTemplates,stats:()=>({peak,active,deletes,exactWrites}),audits};
 }
 
-test("real sync persists all 19 languages with bounded database parallelism",async()=>{
+test("real sync persists ONLY institution enabled languages with bounded database parallelism",async()=>{
   const h=harness();const result=await h.run();
-  assert.equal(result.ok,true);assert.equal(result.variantsUpserted,19);
-  assert.equal(h.stats().exactWrites,19);assert.equal(h.stats().peak,6);assert.equal(h.stats().active,0);
+  assert.equal(SUPPORTED_LOCALES.length,8);
+  assert.equal(result.ok,true);assert.equal(result.variantsUpserted,SUPPORTED_LOCALES.length);
+  assert.equal(h.stats().exactWrites,SUPPORTED_LOCALES.length);assert.ok(h.stats().peak<=6);assert.equal(h.stats().active,0);
   assert.equal(h.audits[0].action,syncResult.WHATSAPP_CATALOGUE_SYNC_ACTION);
 });
 

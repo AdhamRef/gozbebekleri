@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
 import { requireAdminOrDashboardPermission } from '@/lib/dashboard/api-auth';
 import { donationRowUsdApprox } from '@/lib/dashboard/donation-usd-revenue';
+import { donationChartStatusWhere, donationChartTypeWhere } from '@/lib/dashboard/donation-chart-filter-scope';
 import {
   eachIstanbulDateKey,
   formatIstanbulDateKey,
@@ -57,15 +58,11 @@ export async function GET(request: NextRequest) {
     // on 2026-08-02 while /dashboard/monthly reported $1.05 for the same day — the extra
     // $16.14 was an abandoned checkout that never reached Stripe. Both pages now recognise
     // revenue on settlement only, so their monthly series agree.
-    const dateWindowOr = [
-      { status: 'PAID', paidAt: { gte: startDate, lte: endDate } },
-      { status: 'FAILED', createdAt: { gte: startDate, lte: endDate } },
-    ];
-
+    const requestedStatus = searchParams.get('status');
+    const requestedType = searchParams.get('donationType');
     const innerWhere: Record<string, unknown> = {
-      OR: dateWindowOr,
+      ...donationChartStatusWhere(requestedStatus, startDate, endDate),
     };
-
     if (userId && userId !== 'all') {
       innerWhere.donorId = userId;
     }
@@ -83,7 +80,9 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const baseWhere = mergeCountryFilter(mergeLocaleFilter(innerWhere, locale), country);
+    const scopedWhere = mergeCountryFilter(mergeLocaleFilter(innerWhere, locale), country);
+    const typeWhere = donationChartTypeWhere(requestedType);
+    const baseWhere = typeWhere ? { AND: [scopedWhere, typeWhere] } : scopedWhere;
 
     // Always fetch both paid and failed donations
     const donations = await prisma.donation.findMany({
@@ -94,6 +93,7 @@ export async function GET(request: NextRequest) {
         teamSupport: true,
         fees: true,
         amountUSD: true,
+        refundedAmountUSD: true,
         totalAmount: true,
         amount: true,
         // Required by donationRowUsdApprox — without it a USD row with a null amountUSD
@@ -108,6 +108,8 @@ export async function GET(request: NextRequest) {
 
     type Bucket = {
       amountOneTime: number;
+      grossAmountUSD: number;
+      refundedAmountUSD: number;
       countOneTime: number;
       amountMonthly: number;
       countMonthly: number;
@@ -131,6 +133,8 @@ export async function GET(request: NextRequest) {
       const dateStr = formatIstanbulDateKey(bucketDate);
       const bucket = byDate.get(dateStr) ?? {
         amountOneTime: 0,
+        grossAmountUSD: 0,
+        refundedAmountUSD: 0,
         countOneTime: 0,
         amountMonthly: 0,
         countMonthly: 0,
@@ -144,9 +148,16 @@ export async function GET(request: NextRequest) {
       // The old expression fell back to `totalAmount`/`amount` in the row's LOCAL currency,
       // so a ₺1,000 donation with no `amountUSD` plotted as 1000 on a dollar axis.
       // `donationRowUsdApprox` is the same helper the KPI cards use, so chart and card agree.
-      const amount = donationRowUsdApprox(d);
+      const grossAmount = donationRowUsdApprox(d);
+      // Chart uses net cause income after refunds, matching the donor profile
+      // and report net-cause columns. The gross/refund series remain available
+      // for explicit reconciliation and retain the original paidAt cohort.
+      const returned = isPaid ? Math.max(0, Number(d.refundedAmountUSD) || 0) : 0;
+      const amount = isPaid ? Math.max(0, grossAmount - returned) : grossAmount;
 
       if (isPaid) {
+        bucket.grossAmountUSD += grossAmount;
+        bucket.refundedAmountUSD += returned;
         if (d.subscriptionId == null) {
           bucket.amountOneTime += amount;
           bucket.countOneTime += 1;
@@ -173,6 +184,9 @@ export async function GET(request: NextRequest) {
     const filledChartData: {
       date: string;
       amountUSD: number;
+      grossAmountUSD: number;
+      refundedAmountUSD: number;
+      netAmountUSD: number;
       count: number;
       amountOneTime: number;
       countOneTime: number;
@@ -198,6 +212,9 @@ export async function GET(request: NextRequest) {
       filledChartData.push({
         date: dateStr,
         amountUSD: Number((amountOneTime + amountMonthly).toFixed(2)),
+        grossAmountUSD: Number((b?.grossAmountUSD ?? 0).toFixed(2)),
+        refundedAmountUSD: Number((b?.refundedAmountUSD ?? 0).toFixed(2)),
+        netAmountUSD: Number((amountOneTime + amountMonthly).toFixed(2)),
         count: countOneTime + countMonthly,
         amountOneTime,
         countOneTime,
