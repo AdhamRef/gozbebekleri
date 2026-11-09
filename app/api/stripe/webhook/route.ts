@@ -1,3 +1,4 @@
+import { recordSignedStripeCardDecline } from "@/lib/site-security/stripe-verified-decline";
 import { after, NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import Stripe from "stripe";
@@ -592,7 +593,7 @@ export async function POST(req: NextRequest) {
 
         const donation = await prisma.donation.findUnique({
           where: { id: donationId },
-          select: { paidAt: true, status: true },
+          select: { paidAt: true, status: true, attribution: true },
         });
         if (!donation || donation.paidAt || donation.status === "FAILED") break;
 
@@ -611,6 +612,8 @@ export async function POST(req: NextRequest) {
             providerRaw: intent as never,
           },
         });
+        // Observe only verified signed card-decline evidence, after financial settlement logic.
+        after(() => recordSignedStripeCardDecline(intent, event.id, donation));
         after(() => dispatchEvent("DONATION_FAILED", { donationId }));
         // Browser may have closed before /api/donations/:id/fail PATCH fired —
         // seed DonateFailed from here so the lookalike audience never misses a
