@@ -14,7 +14,8 @@ import { checkoutPaymentCanSettle, stripeInvoiceSettlementDate, stripeSubscripti
 import { settleStripeInvoiceOnce } from "@/lib/donations/stripe-invoice-settlement";
 import { verifiedUsdCredit } from "@/lib/donations/verified-usd-credit";
 import { stripeBillingState } from "@/lib/donations/stripe-subscription-billing";
-import { reconcileChargeRefunds, reconcileStripeRefund } from "@/lib/donations/stripe-refund-settlement";
+import { reconcileChargeRefunds } from "@/lib/donations/stripe-refund-settlement";
+import { reconcileOrDeferStripeRefund } from "@/lib/donations/stripe-refund-deferred";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   // Preserve the provider API version already used by this handler. Stripe SDK
@@ -655,7 +656,8 @@ export async function POST(req: NextRequest) {
         // list is read back from Stripe, and each refund is re-retrieved and
         // recorded exactly once inside MongoDB.
         const charge = event.data.object as Stripe.Charge;
-        await reconcileChargeRefunds(prisma, stripe, charge.id);
+        await reconcileChargeRefunds(prisma, stripe, charge.id,
+          refundId => reconcileOrDeferStripeRefund(prisma, stripe, refundId));
         break;
       }
 
@@ -663,7 +665,7 @@ export async function POST(req: NextRequest) {
       case "refund.updated":
       case "refund.failed": {
         const refund = event.data.object as Stripe.Refund;
-        await reconcileStripeRefund(prisma, stripe, refund.id);
+        await reconcileOrDeferStripeRefund(prisma, stripe, refund.id);
         break;
       }
 
