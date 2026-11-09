@@ -1,3 +1,7 @@
+import { BLOCKED_EMAIL_ERROR, isBlockedEmail } from "@/lib/security/blocked-emails";
+import { securityClientIp } from "@/lib/site-security/policy";
+import { sanitizeDonationAttribution } from "@/lib/attribution/sanitize";
+import { enforceDonationIntakeBudget } from "@/lib/site-security/payment-initiation-budget";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isValidLocale } from "@/lib/locales";
@@ -22,6 +26,7 @@ import { BLOCKED_EMAIL_ERROR, isBlockedEmail } from "@/lib/security/blocked-emai
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
+    const trustedClientIp = securityClientIp(request.headers);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -100,6 +105,7 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     const body = await request.json();
+
     const {
       items,
       currency,
@@ -112,6 +118,10 @@ export async function POST(request: NextRequest) {
       locale: donationLocale,
       guest,
     } = body;
+    if (isBlockedEmail(session?.user?.email) || isBlockedEmail(guest?.email)) {
+      return NextResponse.json({ error: BLOCKED_EMAIL_ERROR }, { status: 403 });
+    }
+
 
     if (isBlockedEmail(session?.user?.email) || isBlockedEmail(guest?.email)) {
       return NextResponse.json({ error: BLOCKED_EMAIL_ERROR }, { status: 403 });
@@ -123,6 +133,11 @@ export async function POST(request: NextRequest) {
         { error: "Items, currency, and payment method are required" },
         { status: 400 }
       );
+    }
+
+    if (body.paymentMethod === "CARD") {
+      const intakeLimit = await enforceDonationIntakeBudget(request);
+      if (intakeLimit) return intakeLimit;
     }
 
     // Resolve donor
@@ -293,6 +308,7 @@ export async function POST(request: NextRequest) {
             referralId: referralId ?? undefined,
             subscriptionId: sub.id,
             paymentMethod,
+            attribution: trustedClientIp ? sanitizeDonationAttribution({ client_ip: trustedClientIp }) : undefined,
             cardDetails: null,
             items: {
               create: itemsResolved.map((item) => ({
@@ -364,6 +380,7 @@ export async function POST(request: NextRequest) {
           donorId: donorId,
           referralId: referralId ?? undefined,
           paymentMethod,
+          attribution: trustedClientIp ? sanitizeDonationAttribution({ client_ip: trustedClientIp }) : undefined,
           cardDetails: null,
           items: {
             create: itemsResolved.map((item) => ({
