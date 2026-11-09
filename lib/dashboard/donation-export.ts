@@ -265,6 +265,7 @@ interface Aggregates {
   totalTeamSupportUSD: number;  // team support (paid), in USD
   totalFeesUSD: number;
   totalChargedUSD: number;      // original gross field preserved for compatibility
+  grossChargedUSD: number;
   totalRefundedUSD: number;
   netChargedUSD: number;
   totalRefundedCauseUSD: number;
@@ -310,6 +311,7 @@ function aggregate(rows: DonationExportRow[]): Aggregates {
   let totalTeamSupportUSD = 0;
   let totalFeesUSD = 0;
   let totalChargedUSD = 0;
+  let grossChargedUSD = 0;
   let totalRefundedUSD = 0;
   let netChargedUSD = 0;
   let totalRefundedCauseUSD = 0;
@@ -351,6 +353,7 @@ function aggregate(rows: DonationExportRow[]): Aggregates {
     totalFeesUSD += feesUsdShare;
     totalChargedUSD += r.amountUSD ?? 0;
     const refund = donationGrossRefundNet(r);
+    grossChargedUSD += refund.grossChargedUSD;
     totalRefundedUSD += refund.refundedChargedUSD;
     netChargedUSD += refund.netChargedUSD;
     totalRefundedCauseUSD += refund.refundedCauseUSD;
@@ -501,6 +504,7 @@ function aggregate(rows: DonationExportRow[]): Aggregates {
     totalTeamSupportUSD,
     totalFeesUSD,
     totalChargedUSD,
+    grossChargedUSD,
     totalRefundedUSD,
     netChargedUSD,
     totalRefundedCauseUSD,
@@ -647,10 +651,6 @@ function addCoverSheet(wb: ExcelJS.Workbook, input: DonationExportInput, agg: Ag
   addReportHeader(sheet, input, 7);
   const moneyKpis = [
     [dt("إجمالي المبالغ المحصلة (USD)"), agg.totalChargedUSD],
-    ["إجمالي الاستردادات (USD)", agg.totalRefundedUSD],
-    ["صافي التحصيل بعد الاسترداد (USD)", agg.netChargedUSD],
-    ["مسترد أصل التبرعات (USD)", agg.totalRefundedCauseUSD],
-    ["صافي أصل التبرعات (USD)", agg.netCauseUSD],
     [dt("إجمالي التبرعات (USD)"), agg.totalAmountUSD],
     [dt("إجمالي دعم الفريق (USD)"), agg.totalTeamSupportUSD],
     [dt("إجمالي الرسوم (USD)"), agg.totalFeesUSD],
@@ -716,6 +716,15 @@ function addCoverSheet(wb: ExcelJS.Workbook, input: DonationExportInput, agg: Ag
     [dt("العملة"), dt("العدد"), dt("مبلغ التبرع (محلي)"), dt("دعم الفريق (محلي)"), dt("الرسوم (محلي)"), dt("إجمالي محصل (محلي)"), dt("بالدولار (USD)")],
     agg.perCurrency.map(c => [c.currency, c.count, fmtMoney(c.donationAmount), fmtMoney(c.teamSupport), fmtMoney(c.fees), fmtMoney(c.totalCharged), fmtMoney(c.amountUSD)]),
     { noTotal: true });
+  addBreakdownTable(sheet, sheet.rowCount + 3, "تسويات الاستردادات / Refund settlements",
+    ["المؤشر", "القيمة USD"],
+    [
+      ["التحصيل الإجمالي قبل الاسترداد", fmtMoney(agg.grossChargedUSD)],
+      ["إجمالي الاستردادات", fmtMoney(agg.totalRefundedUSD)],
+      ["صافي التحصيل", fmtMoney(agg.netChargedUSD)],
+      ["مسترد أصل التبرعات", fmtMoney(agg.totalRefundedCauseUSD)],
+      ["صافي أصل التبرعات", fmtMoney(agg.netCauseUSD)],
+    ], { noTotal: true });
   sheet.pageSetup.printArea = `A1:G${sheet.rowCount}`;
   sheet.pageSetup.fitToHeight = 1;
 }
@@ -1141,6 +1150,7 @@ function buildCsv(input: DonationExportInput): Buffer {
     [dt("إجمالي دعم الفريق (USD)"), fmtMoney(agg.totalTeamSupportUSD)],
     [dt("إجمالي الرسوم (USD)"), fmtMoney(agg.totalFeesUSD)],
     [dt("إجمالي المبالغ المحصلة (USD)"), fmtMoney(agg.totalChargedUSD)],
+    ["التحصيل الإجمالي قبل الاسترداد (USD)", fmtMoney(agg.grossChargedUSD)],
     ["إجمالي الاستردادات (USD)", fmtMoney(agg.totalRefundedUSD)],
     ["صافي التحصيل بعد الاسترداد (USD)", fmtMoney(agg.netChargedUSD)],
     ["مسترد أصل التبرعات (USD)", fmtMoney(agg.totalRefundedCauseUSD)],
