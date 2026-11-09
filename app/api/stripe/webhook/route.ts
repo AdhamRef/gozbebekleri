@@ -18,7 +18,9 @@ import { stripeBillingState } from "@/lib/donations/stripe-subscription-billing"
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   // Preserve the provider API version already used by this handler. Stripe SDK
   // only types its latest version; do not silently change runtime API semantics.
-  apiVersion: "2026-03-25.dahlia" as Stripe.LatestApiVersion,
+  // SDK v22's type only admits its latest version; preserve the existing
+  // explicit runtime version rather than silently changing Stripe behavior.
+  apiVersion: "2026-03-25.dahlia" as any,
 });
 
 // Stripe removed `invoice.subscription` in API 2024-09-30. The subscription ID
