@@ -45,9 +45,11 @@ export const REGISTERED_LOCALES = [
   "zh",
   "hi",
 ] as const;
-export const SUPPORTED_LOCALES = PUBLIC_LOCALES;
+export const SUPPORTED_LOCALES: readonly SupportedLocale[] = PUBLIC_LOCALES;
 
-export type SupportedLocale = (typeof PUBLIC_LOCALES)[number];
+// Legacy template payloads may contain known, disabled language codes, but
+// ONLY the runtime supported array controls what users can select.
+export type SupportedLocale = (typeof REGISTERED_LOCALES)[number];
 
 /**
  * Other historical/registered codes stay disabled. They are not routing,
