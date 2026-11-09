@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (checkoutPaymentCanSettle(session.mode, session.payment_status)) {
-          await prisma.$transaction(async (tx) => {
+          const settledNow = await prisma.$transaction(async (tx) => {
             const donation = await tx.donation.findUnique({
               where: { id: donationId },
               include: { items: true, categoryItems: true },
@@ -123,8 +123,9 @@ export async function POST(req: NextRequest) {
               });
             }
 
+            return true;
           });
-          after(() => dispatchDonationPaid(donationId));
+          if (settledNow) after(() => dispatchDonationPaid(donationId));
         }
         break;
       }
@@ -463,13 +464,13 @@ export async function POST(req: NextRequest) {
           });
           // Idempotency: the row is created with status=PAID by /api/stripe/intent
           // before Stripe confirms payment, so we key off paidAt (only set here).
-          if (!donation || donation.paidAt != null) return;
+          if (!donation || donation.paidAt != null) return false;
 
           await tx.donation.update({
             where: { id: donationId },
             data: {
               status: "PAID",
-              paidAt: new Date(),
+              paidAt: new Date(event.created * 1000),
               provider: "STRIPE",
               providerOrderId: intent.id,
               providerAuthCode: intent.id,
