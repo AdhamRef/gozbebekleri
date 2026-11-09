@@ -194,12 +194,12 @@ const DONATION_COLUMNS: ColSpec<DonationExportRow>[] = [
   { key: "subscriptionId", get header() { return dt("رقم الاشتراك"); }, width: 26, value: (r) => r.subscriptionId ?? "" },
   { key: "comment", get header() { return dt("ملاحظة"); }, width: 28, value: (r) => r.comment ?? "" },
   // Explicit refund columns retain the original gross values for finance audit.
-  { key: "refundedTotalAmount", header: refundReportLabel("المسترد (عملة العملية)", "Refunded (local currency)"), width: 20, numFmt: "#,##0.00", value: r => r.refundedTotalAmount ?? 0 },
-  { key: "netLocal", header: refundReportLabel("صافي المحصل (عملة العملية)", "Net collected (local currency)"), width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netLocal },
-  { key: "refundedAmountUSD", header: refundReportLabel("مسترد أصل التبرع (USD)", "Refunded donation (USD)"), width: 23, numFmt: "#,##0.00", value: r => r.refundedAmountUSD ?? 0 },
-  { key: "netCauseUSD", header: refundReportLabel("صافي أصل التبرع (USD)", "Net donation (USD)"), width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netCauseUSD },
-  { key: "refundedTotalUSD", header: refundReportLabel("إجمالي المسترد (USD)", "Refunded gross (USD)"), width: 23, numFmt: "#,##0.00", value: r => r.refundedTotalUSD ?? 0 },
-  { key: "netChargedUSD", header: refundReportLabel("صافي التحصيل (USD)", "Net collected (USD)"), width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netChargedUSD },
+  { key: "refundedTotalAmount", get header() { return refundReportLabel("المسترد (عملة العملية)", "Refunded (local currency)"); }, width: 20, numFmt: "#,##0.00", value: r => r.refundedTotalAmount ?? 0 },
+  { key: "netLocal", get header() { return refundReportLabel("صافي المحصل (عملة العملية)", "Net collected (local currency)"); }, width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netLocal },
+  { key: "refundedAmountUSD", get header() { return refundReportLabel("مسترد أصل التبرع (USD)", "Refunded donation (USD)"); }, width: 23, numFmt: "#,##0.00", value: r => r.refundedAmountUSD ?? 0 },
+  { key: "netCauseUSD", get header() { return refundReportLabel("صافي أصل التبرع (USD)", "Net donation (USD)"); }, width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netCauseUSD },
+  { key: "refundedTotalUSD", get header() { return refundReportLabel("إجمالي المسترد (USD)", "Refunded gross (USD)"); }, width: 23, numFmt: "#,##0.00", value: r => r.refundedTotalUSD ?? 0 },
+  { key: "netChargedUSD", get header() { return refundReportLabel("صافي التحصيل (USD)", "Net collected (USD)"); }, width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netChargedUSD },
 ];
 
 const SUBSCRIPTION_COLUMNS: ColSpec<SubscriptionExportRow>[] = [
