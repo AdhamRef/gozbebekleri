@@ -17,7 +17,7 @@ const stubs={
 "events.cjs":'exports.dispatchDonationPaid=async()=>{};exports.dispatchEvent=async()=>{};',
 "country.cjs":'exports.getDonorCountryCodeForSnapshot=async()=>"TR";',
 "conversion.cjs":'exports.sendDonationFailedConversions=async()=>{};',
-"stripe.cjs":'const Stripe=require('+JSON.stringify(stripePath)+');module.exports=class MockStripe{constructor(){const x=new Stripe("sk_test_fake_no_network");this.webhooks=x.webhooks;this.subscriptions={retrieve:async id=>({id,...globalThis.fixture.remote.get(id)})}}}'
+"stripe.cjs":'const Stripe=require('+JSON.stringify(stripePath)+');module.exports=class MockStripe{constructor(){const x=new Stripe("sk_test_fake_no_network");this.webhooks=x.webhooks;const f=globalThis.fixture;this.subscriptions={retrieve:async id=>({id,...f.remote.get(id)})};this.refunds={retrieve:async id=>{if(!f.refunds.has(id))throw Error("Unknown refund "+id);return f.refunds.get(id)},list:async q=>({data:[...f.refunds.values()].filter(x=>x.charge===q.charge),has_more:false})};this.charges={retrieve:async id=>{if(!f.charges.has(id))throw Error("Unknown charge "+id);return f.charges.get(id)}};this.paymentIntents={retrieve:async id=>{if(!f.intents.has(id))throw Error("Unknown intent "+id);return f.intents.get(id)}}}}'
 };
 for(const [k,v] of Object.entries(stubs))writeFileSync(resolve(dir,k),v);
 const aliases={"next/server":"next.cjs","@/lib/prisma":"db.cjs","@/lib/events/dispatch":"events.cjs","@/lib/donations/donor-country-code":"country.cjs","@/lib/tracking/donation-conversion-server":"conversion.cjs","stripe":"stripe.cjs"};
@@ -28,13 +28,13 @@ process.env.STRIPE_WEBHOOK_SECRET=secret;
 const repl=await MongoMemoryReplSet.create({binary:{version:"7.0.15"},replSet:{count:1}});
 process.env.DATABASE_URL=repl.getUri("goz_http_test");
 const mongo=new MongoClient(process.env.DATABASE_URL),prisma=new PrismaClient();
-globalThis.fixture={prisma,afters:[],remote:new Map()};
+globalThis.fixture={prisma,afters:[],remote:new Map(),refunds:new Map(),charges:new Map(),intents:new Map()};
 let server;
 let passed=0;
 const pass=(name,details={})=>{passed++;console.log(JSON.stringify({name,result:"PASS",...details}))};
 try{
 await mongo.connect();const db=mongo.db("goz_http_test");
-for(const name of ["StripeInvoiceSettlement","Campaign","Category","Subscription","SubscriptionItem","SubscriptionCategoryItem","Donation","DonationItem","DonationCategoryItem"])await db.createCollection(name);
+for(const name of ["StripeInvoiceSettlement","StripeRefundSettlement","Campaign","Category","Subscription","SubscriptionItem","SubscriptionCategoryItem","Donation","DonationItem","DonationCategoryItem"])await db.createCollection(name);
 const donor=new ObjectId(),campaign=new ObjectId(),category=new ObjectId(),sub=new ObjectId(),donation=new ObjectId();
 const created=new Date("2026-11-09T04:00:00Z"),sid="sub_synthetic";
 await db.collection("Campaign").insertOne({_id:campaign,title:"Synthetic",description:"Synthetic",targetAmount:1000,currentAmount:0,baselineAmount:0,images:[],categoryIds:[],createdAt:created,updatedAt:created});
@@ -105,8 +105,58 @@ const staleActive=await send(evt("customer.subscription.updated",{id:sid,object:
 assert.equal(staleActive.status,200);
 assert.equal((await db.collection("Subscription").findOne({_id:sub})).status,"CANCELLED");
 pass("out-of-order subscription.updated uses latest provider status, not stale payload");
-const refund=await send(evt("charge.refunded",{id:"ch_synthetic",object:"charge",payment_intent:"pi_synthetic",amount_refunded:100,refunded:true}));
-assert.equal(refund.status,200);
-console.log(JSON.stringify({name:"refund accounting",result:"BLOCKED",reason:"Webhook ignores charge.refunded; no financial reversal observed",campaignAmount:(await db.collection("Campaign").findOne({_id:campaign})).currentAmount}));
-console.log(JSON.stringify({summary:"SIGNED_HTTP_PASS",passed,refund:"BLOCKED",database:"isolated MongoDB",stripeCalls:0}));
+
+const firstCharge="ch_signup_synth", firstPi="pi_signup_synth";
+globalThis.fixture.charges.set(firstCharge,{id:firstCharge,amount:10000,currency:"usd",paid:true,captured:true,payment_intent:firstPi,invoice:"in_synthetic_signup",metadata:{}});
+globalThis.fixture.intents.set(firstPi,{id:firstPi,invoice:"in_synthetic_signup",metadata:{}});
+const addRefund=(id,amount,chargeId=firstCharge,status="succeeded",currency="usd")=>{
+ globalThis.fixture.refunds.set(id,{id,object:"refund",amount,charge:chargeId,payment_intent:chargeId===firstCharge?firstPi:"pi_renew_synth",currency,status});
+};
+const refunded=async()=>{const x=await prisma.donation.findUnique({where:{id:donation.toHexString()}});return x?.refundedTotalAmount??0};
+const balance=async()=>[(await db.collection("Campaign").findOne({_id:campaign})).currentAmount,(await db.collection("Category").findOne({_id:category})).currentAmount];
+addRefund("re_signup_partial40",4000);
+const partial=await send(evt("refund.updated",{id:"re_signup_partial40",object:"refund"}));
+assert.equal(partial.status,200,partial.body);
+assert.deepEqual(await balance(),[160,160]);assert.equal(await refunded(),40);
+pass("verified signed partial refund 40 yields gross 200 net 160 for two invoices");
+const repeat=await Promise.all([0,1,2,3].map(()=>send(evt("refund.updated",{id:"re_signup_partial40",object:"refund"}))));
+assert.ok(repeat.every(x=>x.status===200));assert.deepEqual(await balance(),[160,160]);
+assert.equal(await db.collection("StripeRefundSettlement").countDocuments({_id:"re_signup_partial40"}),1);
+pass("four concurrent replays of the same refund leave exactly one ledger record");
+addRefund("re_signup_remaining60",6000);
+const finalRefund=await send(evt("charge.refunded",{id:firstCharge,object:"charge"}));
+assert.equal(finalRefund.status,200,finalRefund.body);
+assert.equal(await refunded(),100);assert.deepEqual(await balance(),[100,100]);
+const settled=await prisma.donation.findUnique({where:{id:donation.toHexString()}});
+assert.equal(settled.status,"PAID");assert.ok(settled.paidAt);
+pass("remaining 60 refunded: original charge net zero, paidAt unchanged, another renewal intact");
+const renewalCharge="ch_renew_synth",renewPi="pi_renew_synth";
+globalThis.fixture.charges.set(renewalCharge,{id:renewalCharge,amount:10000,currency:"usd",paid:true,captured:true,payment_intent:renewPi,invoice:"in_synthetic_renewal",metadata:{}});
+globalThis.fixture.intents.set(renewPi,{id:renewPi,invoice:"in_synthetic_renewal",metadata:{}});
+addRefund("re_renew20",2000,renewalCharge);addRefund("re_renew30",3000,renewalCharge);
+const concurrent=await Promise.all([send(evt("refund.updated",{id:"re_renew20",object:"refund"})),send(evt("refund.updated",{id:"re_renew30",object:"refund"}))]);
+assert.ok(concurrent.every(x=>x.status===200),JSON.stringify(concurrent));
+assert.deepEqual(await balance(),[50,50]);
+pass("two different partial refunds on same charge in parallel reduce only that invoice");
+const beforePending=await balance();
+addRefund("re_renew_pending",2000,renewalCharge,"pending");
+assert.equal((await send(evt("refund.created",{id:"re_renew_pending",object:"refund"}))).status,200);
+assert.deepEqual(await balance(),beforePending);
+pass("pending refund does not reduce booked balances");
+globalThis.fixture.refunds.get("re_renew_pending").status="succeeded";
+assert.equal((await send(evt("refund.updated",{id:"re_renew_pending",object:"refund"}))).status,200);
+assert.deepEqual(await balance(),[30,30]);
+globalThis.fixture.refunds.get("re_renew_pending").status="failed";
+assert.equal((await send(evt("refund.failed",{id:"re_renew_pending",object:"refund"}))).status,200);
+assert.deepEqual(await balance(),[50,50]);
+pass("successful refund later failed restores its previous monetary effect");
+addRefund("re_unknown",2000,"ch_unknown");
+const unknown=await send(evt("refund.updated",{id:"re_unknown",object:"refund"}));
+assert.equal(unknown.status,500);assert.deepEqual(await balance(),[50,50]);
+pass("unknown charge fails closed and leaves financial balances unchanged");
+addRefund("re_wrong_currency",1000,renewalCharge,"succeeded","try");
+const mismatch=await send(evt("refund.updated",{id:"re_wrong_currency",object:"refund"}));
+assert.equal(mismatch.status,500);assert.deepEqual(await balance(),[50,50]);
+pass("provider currency mismatch rejected without ledger mutation");
+console.log(JSON.stringify({summary:"SIGNED_HTTP_REFUNDS_PASS",passed,refund:"PASS",database:"isolated MongoDB",stripeCalls:0}));
 }finally{if(server)await new Promise(ok=>server.close(ok));await prisma.$disconnect();await mongo.close();await repl.stop();rmSync(dir,{recursive:true,force:true})}
