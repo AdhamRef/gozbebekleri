@@ -25,6 +25,23 @@ model StripeInvoiceSettlement {
 // One immutable provider refund ID, reconciled by its current Stripe status.
 // Keep failed/reversed history; never delete successful payment or paidAt.
 // Pre-provision this collection before accepting refund webhooks.
+// Signed Stripe refund event received before its local payment was settled.
+// Keep the immutable refund ID until verified reconciliation succeeds.
+// No personal donor fields are stored here.
+model StripeDeferredRefund {
+  id               String   @id @map("_id")
+  chargeId         String?
+  status           String   @default("PENDING") // PENDING | RESOLVED | REVIEW_REQUIRED
+  reason           String
+  attempts         Int      @default(0)
+  firstSeenAt      DateTime @default(now())
+  lastSeenAt       DateTime @updatedAt
+  lastAttemptAt    DateTime?
+  nextAttemptAt    DateTime @default(now())
+  resolvedAt       DateTime?
+  @@index([status, nextAttemptAt])
+}
+
 model StripeRefundSettlement {
   id                String   @id @map("_id") // re_... (Stripe refund ID)
   donationId        String   @db.ObjectId
