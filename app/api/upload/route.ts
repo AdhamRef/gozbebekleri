@@ -6,6 +6,7 @@ import { authOptions } from '../auth/[...nextauth]/options';
 import { requireAdminSession } from '@/lib/dashboard/api-auth';
 import { sessionHasDashboardPermission } from '@/lib/dashboard/permissions';
 import { assertRasterImageUpload } from '@/lib/uploads/strict-image-content';
+import { isMediaUrlReferenced } from '@/lib/media/reference-check';
 import {
   queueAuditLog,
   auditActorFromSiteSession,
@@ -134,8 +135,18 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'معرّف الصورة غير صالح' }, { status: 400 });
     }
 
-    // Delete from Cloudinary
-    await cloudinary.uploader.destroy(`campaigns/${imageId}`);
+    // Only delete a known asset in the legacy campaigns namespace, and do not
+    // destroy images that are referenced by live or archived content. This is
+    // deliberately fail-closed if Cloudinary/Prisma cannot confirm ownership.
+    const assetId = `campaigns/${imageId}`;
+    const existing = await cloudinary.api.resource(assetId, { resource_type: 'image' });
+    if (!existing?.secure_url) {
+      return NextResponse.json({ error: 'لم يمكن تأكيد هوية الملف' }, { status: 409 });
+    }
+    if (await isMediaUrlReferenced(existing.secure_url)) {
+      return NextResponse.json({ error: 'الصورة مستخدمة بالفعل ولا يمكن حذفها' }, { status: 409 });
+    }
+    await cloudinary.uploader.destroy(assetId);
 
     const actor = auditActorFromSiteSession(session);
     queueAuditLog({
