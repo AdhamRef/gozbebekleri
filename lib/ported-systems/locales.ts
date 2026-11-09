@@ -107,12 +107,12 @@ export const LOCALES: Record<AnyLocale, LocaleMeta> = {
 /** Historical export  label map for the enabled locales. Unchanged values. */
 for (const code of REGISTERED_LOCALES) LOCALES[code].enabled = (PUBLIC_LOCALES as readonly string[]).includes(code);
 
-export const LOCALE_LABELS: Record<SupportedLocale, string> = SUPPORTED_LOCALES.reduce(
+export const LOCALE_LABELS: Record<AnyLocale, string> = SUPPORTED_LOCALES.reduce(
   (acc, code) => {
     acc[code] = LOCALES[code].label;
     return acc;
   },
-  {} as Record<SupportedLocale, string>
+  {} as Record<AnyLocale, string>
 );
 
 /** Enabled locales for dropdown/select (code + label). */
