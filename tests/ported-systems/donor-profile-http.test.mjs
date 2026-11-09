@@ -52,6 +52,7 @@ const paymentFields={
 const donation={
  id:'dddddddddddddddddddddddd',donorId:userId,status:'PAID',
  amount:12,totalAmount:15,amountUSD:15,currency:'USD',paidAt:now,createdAt:now,
+ refundedTotalAmount:6,refundedAmountUSD:6,refundedTotalUSD:6,refundedMinor:600,
  subscriptionId:null,items:[{campaignId:'cccccccccccccccccccccccc'}],
  subscription:null,...paymentFields
 };
@@ -72,7 +73,7 @@ const db={
    });
    return copy;
  }},
- donation:{groupBy:async()=>[{_sum:{totalAmount:15,amountUSD:15},_max:{paidAt:now},_count:{id:1}}]},
+ donation:{groupBy:async()=>[{_sum:{totalAmount:15,amountUSD:15,refundedTotalAmount:6,refundedAmountUSD:6,refundedTotalUSD:6},_max:{paidAt:now},_count:{id:1}}]},
  badge:{findMany:async()=>[]},
  subscription:{findMany:async()=>[]}
 };
@@ -110,6 +111,10 @@ try {
    assert.equal(r.status,200,JSON.stringify(r.body));
    assert.equal(r.body.user.totalDonationsCount,1);
    assert.equal(r.body.user.totalDonatedAmountUSD,15);
+   assert.equal(r.body.user.totalRefundedAmountUSD,6);
+   assert.equal(r.body.user.netDonatedAmountUSD,9);
+   assert.equal(r.body.user.netDonatedAmount,9);
+   assert.equal(r.body.user.donations[0].paidAt,now.toISOString());
    assert.equal(r.body.user.hasPassword,true);
    assert.ok(!('password' in r.body.user));
    assert.ok(!('clarityId' in r.body.user),'tracking ID leaked');
