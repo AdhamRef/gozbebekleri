@@ -1,3 +1,6 @@
+import { redactPayForResponse } from "@/lib/payfor";
+import { recordSignedPayForDecline } from "@/lib/site-security/payfor-verified-decline";
+import { verifyPayForResponseHash } from "@/lib/payfor";
 import { after, NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { dispatchEvent } from "@/lib/events/dispatch";
@@ -16,7 +19,7 @@ export async function POST(req: NextRequest) {
   const form = await req.formData();
   const raw = Object.fromEntries(form.entries());
 
-  console.error("[PayFor FAIL] Bank response:", JSON.stringify(raw, null, 2));
+  console.error("[PayFor FAIL] Bank response:", JSON.stringify(redactPayForResponse(raw), null, 2));
 
   const orderId = String(raw.OrderId || raw.orderId || "");
   const procReturnCode = String(raw.ProcReturnCode || raw.procReturnCode || "");
@@ -28,7 +31,16 @@ export async function POST(req: NextRequest) {
       where: { id: donationId },
     });
 
-    if (donation && donation.paidAt === null) {
+    const authenticated =
+      donation && donation.providerOrderId && orderId &&
+      donation.providerOrderId === orderId &&
+      verifyPayForResponseHash(raw, process.env.PAYFOR_MERCHANT_PASS);
+    // Unsigned failure/3DS return codes cannot mark a donation FAILED.
+    // A signed approval posted to the FAIL URL is still an approval, not a decline.
+    const bankConfirmedFailure =
+      procReturnCode !== "" && procReturnCode !== "00" &&
+      txnResult.toLowerCase() !== "success";
+    if (donation && donation.paidAt === null && authenticated && bankConfirmedFailure) {
       await prisma.donation.update({
         where: { id: donationId },
         data: {
@@ -41,6 +53,7 @@ export async function POST(req: NextRequest) {
           providerRaw: raw as Record<string, unknown>,
         },
       });
+      after(() => recordSignedPayForDecline(raw, donation));
       after(() => dispatchEvent("DONATION_FAILED", { donationId }));
       // Seed Meta with the failed attempt so lookalike audiences can include
       // donors-who-tried. Browser pixel fires the matching DonateFailed hit
