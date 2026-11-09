@@ -10,6 +10,7 @@ import { sendDonationFailedConversions } from "@/lib/tracking/donation-conversio
 import { dispatchDonationPaid, dispatchEvent } from "@/lib/events/dispatch";
 import { donationFieldEmpty } from "@/lib/donations/mongo-null";
 import { normalizeDonationCurrencyCode } from "@/lib/exchange/convert-amount-in-currency-to-usd";
+import { checkoutPaymentCanSettle } from "@/lib/donations/stripe-checkout-settlement";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
@@ -58,7 +59,20 @@ export async function POST(req: NextRequest) {
 
         const isMonthly = session.mode === "subscription";
 
-        if (session.payment_status === "paid" || isMonthly) {
+        // Subscriptions have a separate authoritative invoice.payment_succeeded
+        // event. Settling them here would count the signup invoice twice when
+        // the two webhook event types arrive in either order.
+        if (isMonthly) {
+          if (subscriptionDbId && session.subscription) {
+            await prisma.subscription.update({
+              where: { id: subscriptionDbId },
+              data: { payforToken: session.subscription as string },
+            });
+          }
+          break;
+        }
+
+        if (checkoutPaymentCanSettle(session.mode, session.payment_status)) {
           await prisma.$transaction(async (tx) => {
             const donation = await tx.donation.findUnique({
               where: { id: donationId },
@@ -96,21 +110,8 @@ export async function POST(req: NextRequest) {
               });
             }
 
-            // If monthly subscription, store Stripe subscription ID
-            if (isMonthly && subscriptionDbId && session.subscription) {
-              await tx.subscription.update({
-                where: { id: subscriptionDbId },
-                data: {
-                  // Reuse payforToken field to store Stripe subscription ID
-                  payforToken: session.subscription as string,
-                },
-              });
-            }
           });
           after(() => dispatchDonationPaid(donationId));
-          if (isMonthly && subscriptionDbId) {
-            after(() => dispatchEvent("SUBSCRIPTION_CREATED", { donationId }));
-          }
         }
         break;
       }
@@ -328,6 +329,9 @@ export async function POST(req: NextRequest) {
         });
         if (paidForInvoice) {
           after(() => dispatchEvent("SUBSCRIPTION_PAYMENT", { donationId: paidForInvoice.id }));
+          if (isSignupInvoice) {
+            after(() => dispatchEvent("SUBSCRIPTION_CREATED", { donationId: paidForInvoice.id }));
+          }
         }
         break;
       }
