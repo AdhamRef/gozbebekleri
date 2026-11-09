@@ -198,5 +198,28 @@ assert.equal(mismatchValue.status,500);
 assert.equal((await db.collection("Campaign").findOne({_id:projectA})).currentAmount,30);
 pass("changed Stripe original amount rejects refund replay without modifying applied ledger");
 wrongValue.amount=11000;
+
+const unallocated=new ObjectId(),unallocatedPi="pi_no_alloc_synth",unallocatedCharge="ch_no_alloc_synth";
+await db.collection("Donation").insertOne({_id:unallocated,donorId:donor,amount:100,amountUSD:100,teamSupport:0,fees:0,coverFees:false,totalAmount:100,currency:"USD",status:"PAID",paidAt:created,createdAt:created,provider:"STRIPE",providerOrderId:unallocatedPi,paymentMethod:"CARD"});
+globalThis.fixture.charges.set(unallocatedCharge,{id:unallocatedCharge,amount:10000,currency:"usd",paid:true,captured:true,payment_intent:unallocatedPi,metadata:{donationId:unallocated.toHexString()}});
+globalThis.fixture.intents.set(unallocatedPi,{id:unallocatedPi,metadata:{donationId:unallocated.toHexString()}});
+addRefund("re_no_allocation",2000,unallocatedCharge);
+const noAllocation=await send(evt("refund.updated",{id:"re_no_allocation",object:"refund"}));
+assert.equal(noAllocation.status,500);
+assert.equal(await db.collection("StripeRefundSettlement").countDocuments({_id:"re_no_allocation"}),0);
+pass("originally paid donation missing project allocation cannot silently settle a refund");
+
+const jpyDonation=new ObjectId(),jpyPi="pi_jpy_synth",jpyCharge="ch_jpy_synth",jpyProject=new ObjectId();
+await db.collection("Campaign").insertOne({_id:jpyProject,title:"JPY synthetic",description:"JPY",targetAmount:10,currentAmount:0.7,baselineAmount:0,images:[],categoryIds:[],createdAt:created,updatedAt:created});
+await db.collection("Donation").insertOne({_id:jpyDonation,donorId:donor,amount:100,amountUSD:0.7,teamSupport:0,fees:0,coverFees:false,totalAmount:100,currency:"JPY",status:"PAID",paidAt:created,createdAt:created,provider:"STRIPE",providerOrderId:jpyPi,paymentMethod:"CARD"});
+await db.collection("DonationItem").insertOne({_id:new ObjectId(),donationId:jpyDonation,campaignId:jpyProject,amount:100,amountUSD:0.7,createdAt:created,updatedAt:created});
+globalThis.fixture.charges.set(jpyCharge,{id:jpyCharge,amount:100,currency:"jpy",paid:true,captured:true,payment_intent:jpyPi,metadata:{donationId:jpyDonation.toHexString()}});
+globalThis.fixture.intents.set(jpyPi,{id:jpyPi,metadata:{donationId:jpyDonation.toHexString()}});
+globalThis.fixture.refunds.set("re_jpy_half",{id:"re_jpy_half",object:"refund",amount:50,charge:jpyCharge,payment_intent:jpyPi,currency:"jpy",status:"succeeded"});
+const jpyResult=await send(evt("refund.updated",{id:"re_jpy_half",object:"refund"}));
+assert.equal(jpyResult.status,200,jpyResult.body);
+assert.equal((await db.collection("Campaign").findOne({_id:jpyProject})).currentAmount,0.35);
+assert.equal((await prisma.donation.findUnique({where:{id:jpyDonation.toHexString()}})).refundedTotalAmount,50);
+pass("zero-decimal JPY correctly reconciles 100 yen captured and 50 yen refund using saved historical FX");
 console.log(JSON.stringify({summary:"SIGNED_HTTP_REFUNDS_PASS",passed,refund:"PASS",database:"isolated MongoDB",stripeCalls:0}));
 }finally{if(server)await new Promise(ok=>server.close(ok));await prisma.$disconnect();await mongo.close();await repl.stop();rmSync(dir,{recursive:true,force:true})}
