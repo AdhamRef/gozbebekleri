@@ -494,6 +494,8 @@ export default function DashboardPage() {
       if (selectedCampaign !== "all") params.append("campaignId", selectedCampaign);
       if (effectiveUserId !== "all") params.append("userId", effectiveUserId);
       if (showFailed) params.set("showFailed", "true");
+      params.set("status", donationsStatusFilter);
+      params.set("donationType", donationsTypeFilter);
       if (donationLocaleFilter !== "all") params.set("locale", donationLocaleFilter);
       if (donationCountryFilter !== "all") params.set("country", donationCountryFilter);
       const response = await axios.get(`/api/admin/donations/chart?${params}`);
@@ -505,7 +507,7 @@ export default function DashboardPage() {
     } finally {
       setChartLoading(false);
     }
-  }, [selectedCategory, selectedCampaign, selectedUserId, searchParams, chartPeriod, dateFrom, dateTo, showFailed, donationLocaleFilter, donationCountryFilter]);
+  }, [selectedCategory, selectedCampaign, selectedUserId, searchParams, chartPeriod, dateFrom, dateTo, showFailed, donationsStatusFilter, donationsTypeFilter, donationLocaleFilter, donationCountryFilter]);
 
   useEffect(() => {
     fetchChartData();
