@@ -9,6 +9,7 @@ import { cookies } from "next/headers";
 import { OAuth2Client, type TokenPayload } from "google-auth-library";
 import { verifyToken } from "@/lib/otp";
 import { isValidLocale, DEFAULT_LOCALE, type SupportedLocale } from "@/lib/locales";
+import { isBlockedEmail } from "@/lib/security/blocked-emails";
 
 const googleAuthClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -94,6 +95,7 @@ providers.push(
         return null;
       }
       if (!payload?.email || !payload.email_verified) return null;
+      if (isBlockedEmail(payload.email)) return null;
 
       const email = payload.email.toLowerCase();
       const name = payload.name ?? "Google User";
@@ -144,6 +146,7 @@ providers.push(
       if (!credentials?.email) return null;
 
       const email = credentials.email.toLowerCase().trim();
+      if (isBlockedEmail(email)) return null;
 
       // ── Auto-sign-in path (post email verification) ──────────────────────
       if (credentials.autoSignInToken) {
@@ -188,6 +191,9 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account, profile }) {
       try {
+        // Blocked domains can never sign in, whatever the provider.
+        if (isBlockedEmail(user?.email)) return false;
+
         // Credentials — authorize() already validated the user
         if (account?.type === "credentials") return true;
 
@@ -263,6 +269,12 @@ export const authOptions: NextAuthOptions = {
       }
       if (account) {
         token.accessToken = account.access_token;
+      }
+      // Kill any session that already exists for a blocked domain: throwing
+      // here makes NextAuth return no session and clear the session cookie,
+      // so getServerSession()/useSession() see the visitor as signed out.
+      if (isBlockedEmail(token.email)) {
+        throw new Error("EMAIL_NOT_ALLOWED");
       }
       return token;
     }
