@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false
+  },
+  "include": [
+    "lib/geo/ip-lookup.ts",
+    "lib/geo/country-from-request.ts",
+    "app/api/geo/client/route.ts"
+  ]
+}

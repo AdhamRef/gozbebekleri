@@ -20,6 +20,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useSession } from 'next-auth/react';
 import SignInDialog from '@/components/SignInDialog';
 import { useTracking } from '@/components/TrackingPixels';
+import { hasConfirmedDonationPayment } from '@/lib/donations/receipt-state';
 
 const dateLocales: Record<string, Locale> = { ar, en: enUS, fr, tr, id, pt, es };
 
@@ -55,6 +56,7 @@ const DonationSuccessPage = () => {
   const router = useRouter();
   const pathname = usePathname() ?? '/';
   const t = useTranslations('DonationSuccess');
+  const failedText = useTranslations('DonationFailed');
   const locale = useLocale();
   const confetti = useConfettiStore();
   const { data: session, status: sessionStatus } = useSession();
@@ -81,11 +83,14 @@ const DonationSuccessPage = () => {
   useEffect(() => {
     if (id) {
       fetchDonation();
-      confetti.onOpen();
     } else {
       setLoading(false);
     }
   }, [id]);
+
+  useEffect(() => {
+    if (hasConfirmedDonationPayment(donation)) confetti.onOpen();
+  }, [donation?.id, donation?.status]);
 
   const fetchDonation = async () => {
     if (!id) return;
@@ -317,9 +322,24 @@ const DonationSuccessPage = () => {
   if (!donation) {
     return (
       <main className="min-h-screen bg-slate-50 flex items-center justify-center" dir={isRtl ? 'rtl' : 'ltr'}>
-        <p className="text-slate-600">{t('donationReceivedMessage')}</p>
+        <section className="max-w-xl space-y-4 p-8 text-center">
+          <h1 className="text-2xl font-bold">{failedText('noDonation.title')}</h1>
+          <p className="text-slate-600">{failedText('noDonation.description')}</p>
+          <a className="inline-block rounded-lg bg-brand px-5 py-3 text-white" href={`/${locale}/campaigns`}>{failedText('noDonation.cta')}</a>
+        </section>
       </main>
     );
+  }
+
+  if (!hasConfirmedDonationPayment(donation)) {
+    return <main className="min-h-screen bg-slate-50 flex items-center justify-center" dir={isRtl ? 'rtl' : 'ltr'}>
+      <section className="max-w-xl space-y-4 p-8 text-center" role="status">
+        <h1 className="text-2xl font-bold">{t('unconfirmedTitle')}</h1>
+        <p className="text-slate-600">{t('unconfirmedDescription')}</p>
+        <Button onClick={() => { setLoading(true); void fetchDonation(); }}>{t('checkStatus')}</Button>
+        <a className="block text-brand underline" href={`/${locale}/campaigns`}>{failedText('noDonation.cta')}</a>
+      </section>
+    </main>;
   }
 
   const nextBillingFormatted = donation.nextBillingDate

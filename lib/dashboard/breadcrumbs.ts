@@ -124,7 +124,7 @@ export function buildBreadcrumbs(pathname: string, visibleHrefs?: readonly strin
     rest.forEach((segment, i) => {
       const href = `${match!.href}/${rest.slice(0, i + 1).join("/")}`;
       const last = i === rest.length - 1;
-      crumbs.push({ label: labelForSegment(segment), href: last ? undefined : href });
+      crumbs.push({ label: labelForSegment(segment), href: last || segment === "edit" ? undefined : href });
     });
     return crumbs;
   }
@@ -135,7 +135,7 @@ export function buildBreadcrumbs(pathname: string, visibleHrefs?: readonly strin
   segments.forEach((segment, i) => {
     const href = `/dashboard/${segments.slice(0, i + 1).join("/")}`;
     const last = i === segments.length - 1;
-    crumbs.push({ label: labelForSegment(segment), href: last ? undefined : href });
+    crumbs.push({ label: labelForSegment(segment), href: last || segment === "edit" ? undefined : href });
   });
   return crumbs;
 }

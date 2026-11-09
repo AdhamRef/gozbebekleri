@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { impactCampaignPath } from "@/lib/impact/routing";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -12,5 +13,5 @@ export default async function ImpactIndexPage({ params }: { params: Promise<{ lo
     select: { slug: true },
   });
   if (!latest) notFound();
-  redirect(`/${locale}/impact/${encodeURIComponent(latest.slug)}`);
+  redirect(impactCampaignPath(locale, latest.slug));
 }

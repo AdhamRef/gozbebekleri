@@ -9,7 +9,9 @@ import { CURRENCY_COOKIE_UPDATED_EVENT } from "@/components/CurrencyFromUrlSync"
  * links refresh as soon as `CurrencyFromUrlSync` (or middleware) settles the
  * real selection. */
 function useCurrencyCodeForLinks(): string {
-  const [code, setCode] = React.useState<string>(() => getCurrencyCodeForLinks());
+  // Match the server markup, then update from the real cookie after hydration.
+  // Reading the cookie in the initial render leaves stale USD href attributes.
+  const [code, setCode] = React.useState("USD");
   React.useEffect(() => {
     // Hydration: re-read the cookie in case middleware set it before paint.
     setCode(getCurrencyCodeForLinks());

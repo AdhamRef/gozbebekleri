@@ -11,6 +11,11 @@ export function metaDonationEventId(
     : `donate_${donationId}`;
 }
 
+/** Separate ledger identity; Pixel and CAPI must share this exact ID for Purchase. */
+export function metaPurchaseEventId(donationId: string): string {
+  return `purchase_${donationId}`;
+}
+
 export type CanonicalEventName =
   | "page_view"
   | "view_content"
@@ -130,7 +135,7 @@ export interface CanonicalDonation {
 
 export interface CanonicalPayment {
   method?: string;
-  gateway?: "stripe" | "payfor" | "paypal";
+  gateway?: "stripe" | "albaraka" | "payfor" | "paypal";
   is_3ds?: boolean;
   payment_status?: "pending" | "success" | "failed";
   transaction_id?: string;

@@ -1,4 +1,6 @@
 import "server-only";
+import { localizedCampaignTitle } from "@/lib/campaign/localized-title";
+import { translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 import { prisma } from "@/lib/prisma";
 import {
   computeCampaignProgressPercent,
@@ -32,7 +34,7 @@ export async function getInitialCampaignsForPage(locale: string) {
           translations: { where: { locale }, take: 1 },
         },
       },
-      translations: { where: { locale }, take: 1 },
+      translations: { where: translationLocaleWhere(locale), take: 2 },
       _count: { select: { donations: true } },
     } as const;
 
@@ -64,10 +66,11 @@ export async function getInitialCampaignsForPage(locale: string) {
       const goalType = normalizeGoalType(c.goalType);
       const fundraisingMode = normalizeFundraisingMode(c.fundraisingMode);
       const tC = (c.translations as Array<{
+        locale: string;
         title?: string;
         description?: string;
         slug?: string | null;
-      }>)[0];
+      }>).find(t => t.locale === locale);
       const cats = ((c as any).categories as
         | Array<{
             id: string;
@@ -91,7 +94,7 @@ export async function getInitialCampaignsForPage(locale: string) {
         // Locale-aware slug: per-locale translation slug → base slug → null.
         slug: tC?.slug || (c as { slug?: string | null }).slug || null,
         baseSlug: (c as { slug?: string | null }).slug ?? null,
-        title: tC?.title || c.title,
+        ...localizedCampaignTitle(c.title, c.translations, locale),
         description: tC?.description || c.description,
         images: c.images,
         videoUrl: c.videoUrl,

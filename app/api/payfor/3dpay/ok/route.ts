@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 // Donate (success) CAPI now fires server-side from `dispatchDonationPaid`
 // the moment the donation flips to PAID — that's the only path that
@@ -118,11 +118,11 @@ export async function POST(req: NextRequest) {
     });
 
     if (result.ok) {
-      void dispatchDonationPaid(donationId);
+      after(() => dispatchDonationPaid(donationId));
       return NextResponse.redirect(new URL(`/${locale}/success/${donationId}`, origin));
     }
     if (result.reason === "failed") {
-      void dispatchEvent("DONATION_FAILED", { donationId });
+      after(() => dispatchEvent("DONATION_FAILED", { donationId }));
       void sendDonationFailedConversions(donationId);
     }
     if (result.reason === "order_mismatch") {
@@ -139,4 +139,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

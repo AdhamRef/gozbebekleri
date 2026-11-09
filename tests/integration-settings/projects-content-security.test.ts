@@ -184,8 +184,11 @@ test("layouts remain defense in depth and pages use only editor data loaders", (
     "app/(dashboard)/dashboard/blog/create/page.tsx",
     "utf8",
   );
+  const entryPage = readFileSync("app/(dashboard)/dashboard/blog/create/[postId]/page.tsx", "utf8");
+  assert.match(entryPage, /await requireDashboardPagePermission\("blog"\)/);
+  assert.doesNotMatch(entryPage, /prisma\.|getPost/);
   const editPage = readFileSync(
-    "app/(dashboard)/dashboard/blog/create/[postId]/page.tsx",
+    "app/(dashboard)/dashboard/blog/settings/[postId]/page.tsx",
     "utf8",
   );
   assert.match(createPage, /loadBlogCreateEditorData\(\)/);
@@ -253,7 +256,7 @@ test("direct bulk Arabic mutation is disabled without OpenAI or database access"
   assert.doesNotMatch(source, /api\.openai\.com|OPENAI_API_KEY|prisma\.|saveArabicItem|proofreadArabic/);
 });
 
-test("localization preview cannot apply or save database changes", () => {
+test("preview generation remains read-only and reviewed saves use the guarded editor endpoint", () => {
   const api = readFileSync("app/api/admin/content-localization/preview/route.ts", "utf8");
   const dialog = readFileSync(
     "app/(dashboard)/dashboard/_components/ContentLocalizationPreviewDialog.tsx",
@@ -266,7 +269,12 @@ test("localization preview cannot apply or save database changes", () => {
   assert.match(api, /body\?\.action !== "generate"/);
   assert.match(api, /status: 409/);
   assert.doesNotMatch(api, /\.update\(|\.upsert\(|\.create\(|\.delete\(/);
-  assert.doesNotMatch(dialog, /saveRows|حفظ بعد التدقيق|rows:\s*changedRows/);
+  assert.doesNotMatch(dialog, /saveRows|rows:\s*changedRows/);
+  assert.match(dialog, /axios\.put\(endpoint/);
+  assert.match(dialog, /api\/admin\/content-editor/);
+  assert.match(dialog, /revision: row\.editorRevision/);
+  assert.match(dialog, /reviewed: true/);
+  assert.match(api, /withEditorRevisions/);
   assert.doesNotMatch(card, /arabic-bulk-proofread|تدقيق العربي بالكامل/);
 });
 
@@ -304,5 +312,5 @@ test("primary Prisma schema validates without modification", () => {
     "validate",
     "--schema",
     "prisma/schema.prisma",
-  ], { stdio: "pipe" });
+  ], { stdio: "pipe", env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL || "mongodb://127.0.0.1:27017/schema_validation_only" } });
 });

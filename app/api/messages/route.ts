@@ -2,18 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
+<<<<<<< HEAD
 import { isValidLocale } from "@/lib/locales";
 import { BLOCKED_EMAIL_ERROR, isBlockedEmail } from "@/lib/security/blocked-emails";
 import { writeAuditLog, auditActorFromSiteSession, auditStreamForRole } from "@/lib/audit-log";
+=======
+import { isValidLocale } from "@/lib/ported-systems/locales";
+import { writeAuditLog, auditActorFromSiteSession } from "@/lib/audit-log";
+>>>>>>> 0105005cbfa07b521cbc3975080ccdd7c68fc842
 import {
   isMessageSubject,
   type MessageSubject,
 } from "@/lib/messages/subjects";
 
-// POST /api/messages - Submit a message (public; optional session)
+// POST /api/messages — authenticated contact submission; identity comes from the session.
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
+    if (!session?.user?.id) return NextResponse.json({ error: "AUTH_REQUIRED" }, { status: 401 });
     const body = await request.json();
     if (isBlockedEmail(session?.user?.email) || isBlockedEmail(body?.guestEmail)) {
       return NextResponse.json({ error: BLOCKED_EMAIL_ERROR }, { status: 403 });
@@ -22,7 +28,7 @@ export async function POST(request: NextRequest) {
     const locale = isValidLocale(body?.locale) ? body.locale : "ar";
     const subject: MessageSubject = isMessageSubject(body?.subject) ? body.subject : "GENERAL";
 
-    if (!messageBody || messageBody.length < 3) {
+    if (!messageBody || messageBody.length < 3 || messageBody.length > 20000) {
       return NextResponse.json(
         { error: "Message body is required (min 3 characters)" },
         { status: 400 }
@@ -46,14 +52,7 @@ export async function POST(request: NextRequest) {
       locale,
     };
 
-    if (session?.user?.id) {
-      data.userId = session.user.id;
-    } else {
-      const guestName = typeof body.guestName === "string" ? body.guestName.trim() || null : null;
-      const guestEmail = typeof body.guestEmail === "string" ? body.guestEmail.trim() || null : null;
-      data.guestName = guestName;
-      data.guestEmail = guestEmail;
-    }
+    data.userId = session.user.id;
 
     const message = await prisma.message.create({
       data: {
@@ -75,18 +74,7 @@ export async function POST(request: NextRequest) {
         messageAr: `${actor.actorName ?? "مستخدم"} أرسل رسالة تواصل (${locale}) - ${subject}`,
         entityType: "Message",
         entityId: message.id,
-        stream: auditStreamForRole(actor.actorRole),
-      });
-    } else {
-      await writeAuditLog({
-        actorId: null,
-        actorName: data.guestName ?? "زائر",
-        actorRole: "GUEST",
-        action: "CONTACT_MESSAGE",
-        messageAr: `${data.guestName?.trim() || "زائر"} أرسل رسالة تواصل (${locale}) - ${subject}`,
-        entityType: "Message",
-        entityId: message.id,
-        stream: "DONOR",
+        stream: "SITE",
       });
     }
 

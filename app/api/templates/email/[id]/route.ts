@@ -1,3 +1,6 @@
+import { classifyEventTemplates } from "@/lib/communication/template-event-classification";
+import { templateInUse, templateKindChangeBlocked } from "@/lib/communication/template-usage";
+import { resolveTemplateKind } from "@/lib/communication/template-kind";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getServerSession } from "next-auth";
@@ -11,6 +14,9 @@ const updateSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   subject: z.string().min(1).max(200).optional(),
   document: z.record(z.unknown()).optional(),
+  kind: z.enum(["SYSTEM", "CAMPAIGN"]).optional(),
+  purpose: z.enum(["MARKETING", "UTILITY", "TRANSACTIONAL", "AUTHENTICATION"]).optional(),
+  status: z.enum(["DRAFT", "READY", "NEEDS_REVIEW", "ARCHIVED"]).optional(),
   translations: z
     .record(z.object({ subject: z.string().optional(), document: z.record(z.unknown()).optional() }))
     .nullable()
@@ -28,7 +34,7 @@ export async function GET(
 
   const template = await prisma.emailTemplate.findUnique({ where: { id } });
   if (!template) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json({ template });
+  return NextResponse.json({ template: (await classifyEventTemplates("EMAIL", [template]))[0] });
 }
 
 export async function PATCH(
@@ -54,16 +60,28 @@ export async function PATCH(
     );
   }
 
+  if (parsed.data.kind || parsed.data.purpose) {
+    const current = await prisma.emailTemplate.findUnique({ where: { id } });
+    if (!current) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const nextKind = resolveTemplateKind({ ...current, ...parsed.data });
+    if (await templateKindChangeBlocked("EMAIL", id, nextKind)) {
+      return NextResponse.json({ error: "TEMPLATE_IN_USE", message: "القالب مرتبط باستخدام آخر. أزل الارتباط قبل تغيير نوعه." }, { status: 409 });
+    }
+  }
+
   const data: Prisma.EmailTemplateUpdateInput = {};
   if (parsed.data.name != null) data.name = parsed.data.name;
   if (parsed.data.subject != null) data.subject = parsed.data.subject;
   if (parsed.data.document != null) {
     data.document = parsed.data.document as Prisma.InputJsonValue;
   }
+  if (parsed.data.kind != null) data.kind = parsed.data.kind;
+  if (parsed.data.purpose != null) data.purpose = parsed.data.purpose;
+  if (parsed.data.status != null) data.status = parsed.data.status;
   if (parsed.data.translations !== undefined) {
     data.translations =
       parsed.data.translations === null
-        ? (Prisma.DbNull as unknown as Prisma.InputJsonValue)
+        ? (null as unknown as Prisma.InputJsonValue)
         : (parsed.data.translations as Prisma.InputJsonValue);
   }
 
@@ -77,7 +95,7 @@ export async function PATCH(
     entityId: updated.id,
     stream: "TEAM",
   });
-  return NextResponse.json({ template: updated });
+  return NextResponse.json({ template: (await classifyEventTemplates("EMAIL", [updated]))[0] });
 }
 
 export async function DELETE(
@@ -89,6 +107,9 @@ export async function DELETE(
   if (denied) return denied;
   const { id } = await params;
 
+  if (await templateInUse("EMAIL", id)) {
+    return NextResponse.json({ error: "TEMPLATE_IN_USE", message: "القالب قيد الاستخدام ولا يمكن حذفه." }, { status: 409 });
+  }
   const deleted = await prisma.emailTemplate.delete({ where: { id } });
   const actor = auditActorFromDashboardSession(session!);
   await writeAuditLog({

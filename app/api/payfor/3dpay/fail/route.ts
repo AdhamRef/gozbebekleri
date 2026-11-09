@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { dispatchEvent } from "@/lib/events/dispatch";
 import { sendDonationFailedConversions } from "@/lib/tracking/donation-conversion-server";
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
           providerRaw: raw as Record<string, unknown>,
         },
       });
-      void dispatchEvent("DONATION_FAILED", { donationId });
+      after(() => dispatchEvent("DONATION_FAILED", { donationId }));
       // Seed Meta with the failed attempt so lookalike audiences can include
       // donors-who-tried. Browser pixel fires the matching DonateFailed hit
       // with event_id `${donationId}_failed` — same id here for dedup.

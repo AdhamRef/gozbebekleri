@@ -18,6 +18,8 @@ import type { SuggestedDonationsConfig } from "@/lib/campaign/suggested-donation
 import type { SuggestedTeamSupportConfig } from "@/lib/campaign/suggested-team-support";
 import { resolveSharePlural, type ShareLabelsConfig } from "@/lib/campaign/share-labels";
 import { useLocale } from "next-intl";
+import { TRANSLATION_UNAVAILABLE } from "@/lib/campaign/localized-title";
+import { isValidLocale } from "@/lib/locales";
 
 const RESUME_KEY = "campaignDonateResume";
 const FALLBACK_IMG = "https://i.ibb.co/N2zVsqfg/calisma-alanlarimiz-egitim-sektoru.jpg";
@@ -34,6 +36,8 @@ function buildImgSrc(src: string, width = 640, height = 480): string {
 }
 
 export interface CampaignCardData {
+  titleLocale?: string;
+  translationMissing?: boolean;
   id: string;
   slug?: string | null;
   images: string[];
@@ -181,7 +185,8 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
               <p className="text-[10px] text-gray-400 font-medium truncate mb-0.5">{campaign.category.name}</p>
             )}
             <Link href={`/campaign/${campaign.slug || campaign.id}`} onClick={onClick}>
-              <h3 className="text-[13px] font-bold text-gray-900 line-clamp-2 leading-snug">{campaign.title}</h3>
+              <h3 lang={campaign.titleLocale} dir={campaign.titleLocale === "ar" ? "rtl" : "ltr"} className="text-[13px] font-bold text-gray-900 line-clamp-2 leading-snug">{campaign.title}</h3>
+              {campaign.translationMissing && <p className="text-xs text-gray-600">{TRANSLATION_UNAVAILABLE[isValidLocale(locale) ? locale : "ar"]}</p>}
             </Link>
             <div className="mt-1.5">
               <div className="w-full bg-gray-100 rounded-full h-[3px] mb-1">
@@ -241,9 +246,10 @@ export function CampaignCard({ campaign, className, onClick, isFeatured = false,
 
             {/* Title + stats — overlaid at bottom */}
             <div className={`absolute bottom-0 inset-x-0 ${isFeatured ? "px-5 pb-5" : compact ? "px-2 pb-2" : "px-3 pb-2.5 sm:px-4 sm:pb-3.5"}`}>
-              <h3 className={`text-white font-bold leading-snug drop-shadow-sm mb-1.5 ${isFeatured ? "text-base lg:text-xl xl:text-2xl line-clamp-1 sm:line-clamp-2" : compact ? "text-[11px] sm:text-[13px] line-clamp-1 sm:line-clamp-2" : "text-[12px] sm:text-[14px] line-clamp-1 sm:line-clamp-2"}`}>
+              <h3 lang={campaign.titleLocale} dir={campaign.titleLocale === "ar" ? "rtl" : "ltr"} className={`text-white font-bold leading-snug drop-shadow-sm mb-1.5 ${isFeatured ? "text-base lg:text-xl xl:text-2xl line-clamp-1 sm:line-clamp-2" : compact ? "text-[11px] sm:text-[13px] line-clamp-1 sm:line-clamp-2" : "text-[12px] sm:text-[14px] line-clamp-1 sm:line-clamp-2"}`}>
                 {campaign.title}
               </h3>
+              {campaign.translationMissing && <p className="mb-1 text-xs text-white">{TRANSLATION_UNAVAILABLE[isValidLocale(locale) ? locale : "ar"]}</p>}
 
               {!hideBottomStats && (campaign.showProgress !== false ? (
                 <>

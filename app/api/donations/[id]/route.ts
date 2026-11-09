@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
@@ -77,7 +78,7 @@ async function reconcileStripeDonation(donationId: string) {
         });
       }
     });
-    void dispatchDonationPaid(donationId);
+    after(() => dispatchDonationPaid(donationId));
   } catch (err) {
     console.error('[donation reconcile] Finalize failed:', err);
   }
@@ -791,4 +792,4 @@ export async function PATCH(
       { status: 500 }
     );
   }
-} 
+}

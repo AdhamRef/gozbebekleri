@@ -236,7 +236,6 @@ export async function PUT(
       gender,
       image,
       emailNotifications,
-      smsNotifications,
       profileCompletionSeen,
       role,
       preferredLang,
@@ -403,9 +402,6 @@ export async function PUT(
         ...(image !== undefined && { image: image === "" ? null : image }),
         ...(emailNotifications !== undefined && {
           emailNotifications: Boolean(emailNotifications),
-        }),
-        ...(smsNotifications !== undefined && {
-          smsNotifications: Boolean(smsNotifications),
         }),
         ...(profileCompletionSeen !== undefined && { profileCompletionSeen }),
         ...(role !== undefined && { role }),

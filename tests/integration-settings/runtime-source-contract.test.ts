@@ -19,7 +19,6 @@ const operationalFiles = [
   "lib/communication/campaign-send-executor.ts",
   "lib/events/dispatch.ts",
   "app/api/webhooks/meta/whatsapp/route.ts",
-  "app/api/webhooks/brevo/transactional/route.ts",
   "app/api/webhooks/elastic-email/route.ts",
   // The three provider test routes that were here lived under app/api/dashboard/operations and
   // were removed with التشغيل. Their credential-handling contract went with them.
@@ -88,12 +87,10 @@ test("test-send tools use runtime configuration and create delivery records", ()
 
 test("provider webhooks use active runtime helpers and never candidate helpers", () => {
   const meta = source("app/api/webhooks/meta/whatsapp/route.ts") + source("lib/communication/providers/meta-whatsapp/webhooks.ts");
-  const brevo = source("app/api/webhooks/brevo/transactional/route.ts");
   const elastic = source("app/api/webhooks/elastic-email/route.ts");
   assert.match(meta, /getActiveMetaWebhookConfig/);
-  assert.match(brevo, /getActiveBrevoWebhookSecret/);
   assert.match(elastic, /getActiveElasticEmailWebhookSecret/);
-  assert.equal(/Candidate|pending/i.test(meta + brevo + elastic), false);
+  assert.equal(/Candidate|pending/i.test(meta + elastic), false);
 });
 
 test("email channel routes exclusively through Elastic Email", () => {

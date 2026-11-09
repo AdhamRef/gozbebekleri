@@ -1,5 +1,6 @@
 import {
-  Activity, Archive, Award, BarChart3, Briefcase, Calendar, Contact, FileClock,
+  Shield,
+  Layers, AlertTriangle, Activity, Archive, Award, BarChart3, Briefcase, Calendar, Contact, FileClock,
   FileStack, Globe, Heart, HeartHandshake, HeartPulse, History, Images, Inbox,
   Landmark, LayoutDashboard, LayoutTemplate, Lightbulb, Link2, ListChecks, Mail,
   Megaphone, MessageCircle, MessageSquare, PenLine, Plug, Radar, Repeat, ScrollText, Send,
@@ -11,6 +12,9 @@ import {
 // nav-config.ts, so nav-config stays a plain serialisable data module that server
 // components (the team permissions page) can import without dragging in icon components.
 export const NAV_ICONS = {
+  shield: Shield,
+  layers: Layers,
+  alertTriangle: AlertTriangle,
   activity: Activity,
   archive: Archive,
   award: Award,

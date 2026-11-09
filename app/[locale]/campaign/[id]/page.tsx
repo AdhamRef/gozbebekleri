@@ -1,8 +1,19 @@
+import {
+  applyEditorialSeo,
+  readPublicEditorialSeo,
+} from "@/lib/content-editor/public-seo";
+import { EditorialFaq } from "@/components/content/EditorialFaq";
+import { impactCampaignPath } from "@/lib/impact/routing";
 import { Metadata } from "next";
 import { redirect } from "next/navigation";
 import MainPageDummy from "../_components/MainPageDummy";
 import { prisma } from "@/lib/prisma";
-import { isObjectId, pickLocaleSlug, whereByIdOrAnyLocaleSlug } from "@/lib/slug";
+import {
+  isObjectId,
+  decodeRouteKey,
+  pickLocaleSlug,
+  whereByIdOrAnyLocaleSlug,
+} from "@/lib/slug";
 import { pickTranslation } from "@/lib/i18n/translation-fallback";
 import {
   LOCALE_SEO,
@@ -11,7 +22,12 @@ import {
   buildLocalizedAlternates,
 } from "@/lib/seo";
 import type { Locale } from "@/lib/seo";
-import { buildSeoFallback, compactSeoFields, type ProjectSeoFields } from "@/lib/campaign/project-seo";
+import { seoPlainText } from "@/lib/content-editor/seo-fill";
+import {
+  buildSeoFallback,
+  compactSeoFields,
+  type ProjectSeoFields,
+} from "@/lib/campaign/project-seo";
 
 interface Props {
   params: Promise<{ id: string; locale: string }>;
@@ -20,16 +36,21 @@ interface Props {
 type MongoDocument = Record<string, unknown>;
 
 function firstBatch(result: unknown): MongoDocument[] {
-  const cursor = (result as { cursor?: { firstBatch?: MongoDocument[] } })?.cursor;
+  const cursor = (result as { cursor?: { firstBatch?: MongoDocument[] } })
+    ?.cursor;
   return Array.isArray(cursor?.firstBatch) ? cursor.firstBatch : [];
 }
 
-function getSeoFieldsFromDocument(doc?: MongoDocument | null): ProjectSeoFields {
+function getSeoFieldsFromDocument(
+  doc?: MongoDocument | null,
+): ProjectSeoFields {
   return compactSeoFields({
     seoTitle: typeof doc?.seoTitle === "string" ? doc.seoTitle : null,
-    seoDescription: typeof doc?.seoDescription === "string" ? doc.seoDescription : null,
+    seoDescription:
+      typeof doc?.seoDescription === "string" ? doc.seoDescription : null,
     ogTitle: typeof doc?.ogTitle === "string" ? doc.ogTitle : null,
-    ogDescription: typeof doc?.ogDescription === "string" ? doc.ogDescription : null,
+    ogDescription:
+      typeof doc?.ogDescription === "string" ? doc.ogDescription : null,
     ogImage: typeof doc?.ogImage === "string" ? doc.ogImage : null,
   });
 }
@@ -52,7 +73,9 @@ async function fetchCampaignSeoDocuments(campaignId: string, locale: string) {
 
   return {
     campaignSeo: getSeoFieldsFromDocument(firstBatch(campaignResult)[0]),
-    translationSeo: translationResult ? getSeoFieldsFromDocument(firstBatch(translationResult)[0]) : null,
+    translationSeo: translationResult
+      ? getSeoFieldsFromDocument(firstBatch(translationResult)[0])
+      : null,
   };
 }
 
@@ -65,12 +88,14 @@ async function fetchCampaignForSeo(idOrSlug: string) {
       title: true,
       description: true,
       images: true,
+      imageAlt: true,
       translations: {
         select: {
           locale: true,
           title: true,
           description: true,
           image: true,
+          imageAlt: true,
           slug: true,
         },
       },
@@ -89,8 +114,9 @@ const URGENCY_PREFIX: Record<string, string> = {
   de: "Dringend: ",
 };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { id, locale } = await params;
+async function generateBaseMetadata({ params }: Props): Promise<Metadata> {
+  const { id: routeId, locale } = await params;
+  const id = decodeRouteKey(routeId);
   const seo = LOCALE_SEO[locale as Locale] ?? LOCALE_SEO.en;
   const requestedCanonical = `${SITE_URL}/${locale}/campaign/${encodeURIComponent(id)}`;
 
@@ -112,10 +138,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const t = pickTranslation(campaign.translations, locale);
   const localeTitle = t?.title || campaign.title || seo.campaigns.title;
-  const localeDescription = t?.description || campaign.description || seo.campaigns.description;
-  const localeImage = (t as { image?: string | null } | undefined)?.image || campaign.images?.[0] || `${SITE_URL}/og-image.jpg`;
+  const localeDescription = seoPlainText(
+    t?.description || campaign.description || seo.campaigns.description,
+  );
+  const localeImage =
+    (t as { image?: string | null } | undefined)?.image ||
+    campaign.images?.[0] ||
+    `${SITE_URL}/og-image.jpg`;
 
-  let storedSeo: { campaignSeo: ProjectSeoFields; translationSeo: ProjectSeoFields | null } = {
+  let storedSeo: {
+    campaignSeo: ProjectSeoFields;
+    translationSeo: ProjectSeoFields | null;
+  } = {
     campaignSeo: {},
     translationSeo: null,
   };
@@ -126,21 +160,31 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const resolvedSeo = buildSeoFallback({
-    localeFields: locale === "ar" ? storedSeo.campaignSeo : storedSeo.translationSeo,
+    localeFields:
+      locale === "ar" ? storedSeo.campaignSeo : storedSeo.translationSeo,
     localeTitle,
     localeDescription,
     localeImage,
     campaignFields: storedSeo.campaignSeo,
     campaignTitle: campaign.title,
-    campaignDescription: campaign.description,
+    campaignDescription: seoPlainText(campaign.description || ""),
     campaignImage: campaign.images?.[0] || `${SITE_URL}/og-image.jpg`,
   });
 
-  const description = String(resolvedSeo.seoDescription || seo.campaigns.description).slice(0, 160);
-  const longDescription = String(resolvedSeo.ogDescription || resolvedSeo.seoDescription || seo.campaigns.description).slice(0, 200);
-  const image = resolvedSeo.ogImage || localeImage || `${SITE_URL}/og-image.jpg`;
+  const description = String(
+    resolvedSeo.seoDescription || seo.campaigns.description,
+  ).slice(0, 160);
+  const longDescription = String(
+    resolvedSeo.ogDescription ||
+      resolvedSeo.seoDescription ||
+      seo.campaigns.description,
+  ).slice(0, 200);
+  const image =
+    resolvedSeo.ogImage || localeImage || `${SITE_URL}/og-image.jpg`;
 
-  let alternates: { canonical: string; languages: Record<string, string> } | { canonical: string };
+  let alternates:
+    | { canonical: string; languages: Record<string, string> }
+    | { canonical: string };
   try {
     alternates = buildLocalizedAlternates({
       basePath: "/campaign",
@@ -155,13 +199,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const prefix = URGENCY_PREFIX[locale] ?? "";
-  const title = String(resolvedSeo.seoTitle || localeTitle || seo.campaigns.title);
-  const ogTitle = String(resolvedSeo.ogTitle || resolvedSeo.seoTitle || localeTitle || seo.campaigns.title);
+  const title = String(
+    resolvedSeo.seoTitle || localeTitle || seo.campaigns.title,
+  );
+  const ogTitle = String(
+    resolvedSeo.ogTitle ||
+      resolvedSeo.seoTitle ||
+      localeTitle ||
+      seo.campaigns.title,
+  );
   const fullTitle = `${prefix}${title} | ${seo.siteName}`;
   const fullOgTitle = `${prefix}${ogTitle} | ${seo.siteName}`;
 
   return {
-    title: fullTitle,
+    title: { absolute: fullTitle },
     description,
     keywords: seo.keywords,
     alternates,
@@ -172,7 +223,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       siteName: seo.siteName,
       locale: OG_LOCALE_MAP[locale as Locale] ?? "en_US",
       type: "website",
-      images: [{ url: image, width: 1200, height: 630, alt: ogTitle }],
+      images: [
+        {
+          url: image,
+          width: 1200,
+          height: 630,
+          alt: t?.imageAlt || campaign.imageAlt || ogTitle,
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
@@ -185,7 +243,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function CampaignPage({ params }: Props) {
-  const { id, locale } = await params;
+  const { id: routeId, locale } = await params;
+  const id = decodeRouteKey(routeId);
 
   try {
     const campaign = await prisma.campaign.findFirst({
@@ -199,10 +258,12 @@ export default async function CampaignPage({ params }: Props) {
     });
     // An impact builder's hidden settlement campaign is donated to via its builder page.
     if (campaign?.impactCampaign) {
-      redirect(`/${locale}/impact/${encodeURIComponent(campaign.impactCampaign.slug)}`);
+      redirect(impactCampaignPath(locale, campaign.impactCampaign.slug));
     }
     if (campaign) {
-      const canonical = pickLocaleSlug(campaign.slug, campaign.translations, locale) ?? campaign.id;
+      const canonical =
+        pickLocaleSlug(campaign.slug, campaign.translations, locale) ??
+        campaign.id;
       if (id !== canonical && (isObjectId(id) || id !== campaign.id)) {
         redirect(`/${locale}/campaign/${encodeURIComponent(canonical)}`);
       }
@@ -212,5 +273,23 @@ export default async function CampaignPage({ params }: Props) {
     console.error("Failed to resolve canonical campaign slug", err);
   }
 
-  return <MainPageDummy id={id} locale={locale} />;
+  return (
+    <>
+      <MainPageDummy id={id} locale={locale} />
+      <EditorialFaq
+        kind="campaigns"
+        contentKey={id}
+        locale={locale}
+      />
+    </>
+  );
+}
+
+export async function generateMetadata(args: Props): Promise<Metadata> {
+  const { id, locale } = await args.params;
+  const [base, extra] = await Promise.all([
+    generateBaseMetadata(args),
+    readPublicEditorialSeo("campaigns", decodeRouteKey(id), locale),
+  ]);
+  return applyEditorialSeo(base, extra);
 }

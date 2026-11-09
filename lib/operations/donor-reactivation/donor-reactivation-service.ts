@@ -87,15 +87,15 @@ function donorLocale(donationLocale: string | null, preferredLang: string | null
   return preferredLang || donationLocale || "ar";
 }
 
-function donorChannel(donor: { phone: string | null; email: string | null; smsNotifications: boolean; emailNotifications: boolean }): DonorReactivationChannel {
-  if (donor.phone && donor.smsNotifications) return "WHATSAPP_OR_SMS";
+function donorChannel(donor: { phone: string | null; email: string | null; emailNotifications: boolean }): DonorReactivationChannel {
+  if (donor.phone) return "WHATSAPP";
   if (donor.email && donor.emailNotifications) return "EMAIL";
   return "NO_CHANNEL";
 }
 
 function suggestedMessage(channel: DonorReactivationChannel) {
   if (channel === "EMAIL") return "استخدم قالب Email donor reactivation، ثم راجع النص يدويًا قبل الإرسال.";
-  if (channel === "WHATSAPP_OR_SMS") return "استخدم WhatsApp/SMS حسب provider المتاح، ثم أكد الإرسال يدويًا فقط.";
+  if (channel === "WHATSAPP") return "استخدم قالب WhatsApp المناسب، ثم راجع الرسالة وسجّل الإرسال يدويًا.";
   return "لا يوجد channel مناسب؛ أنشئ مهمة متابعة داخل الفريق بدل الإرسال.";
 }
 
@@ -204,7 +204,7 @@ export async function getDonorReactivationOverview(): Promise<DonorReactivationO
       },
       summary: {
         candidates: candidates.length,
-        whatsappOrSms: candidates.filter((candidate) => candidate.channel === "WHATSAPP_OR_SMS").length,
+        whatsappOrSms: candidates.filter((candidate) => candidate.channel === "WHATSAPP").length,
         email: candidates.filter((candidate) => candidate.channel === "EMAIL").length,
         noChannel,
         recentlyHandled: handledIds.length,

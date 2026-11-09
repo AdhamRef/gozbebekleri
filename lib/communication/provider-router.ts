@@ -2,7 +2,6 @@ import type { CommunicationChannelId } from "./communication-runtime-types";
 import { getActiveCommunicationRuntimeBundle, type CommunicationRuntimeBundle } from "./runtime-config";
 import { META_REASONS } from "./providers/meta-whatsapp/errors";
 import { EMAIL_REASONS, EMAIL_PROVIDER_ID } from "./providers/email/client";
-import { resolveSmsProviderWithRuntime, sendSmsMessage } from "./providers/sms/client";
 
 export type ProviderSendDecision =
   | { canSend: false; reason: string }
@@ -11,10 +10,29 @@ export type ProviderSendDecision =
 export type RouterSender = { provider?: string | null; phoneNumberId?: string | null; senderEmail?: string | null; smsSender?: string | null };
 export type RouterContext = { country?: string | null; phone?: string | null };
 
+/**
+ * A supplied sender is a routing DECISION and is used as given.
+ *
+ * The environment default stands in only when no sender object was supplied at all  a one-off send
+ * that never routed, such as a connection test. When a caller did route and handed us a sender, a
+ * missing identity is a fault on that sender, and quietly sending from the default number instead
+ * would send exactly the message the routing was asked not to send. The full account of that
+ * failure mode is in `lib/communication/sender-resolution.ts`.
+ */
+function whatsappPhoneNumberId(sender: RouterSender | null | undefined, runtime: CommunicationRuntimeBundle): string | null {
+  if (sender) return sender.phoneNumberId?.trim() || null;
+  return (runtime.meta.configured ? runtime.meta.values.defaultPhoneNumberId : null) || null;
+}
+
+function emailIdentity(sender: RouterSender | null | undefined, runtime: CommunicationRuntimeBundle): string | null {
+  if (sender) return sender.senderEmail?.trim() || null;
+  return (runtime.elasticEmail.configured ? runtime.elasticEmail.values.senderEmail : null) || null;
+}
+
 export function providerNotConfiguredReason(channel: CommunicationChannelId): string {
   if (channel === "WHATSAPP") return META_REASONS.NOT_CONFIGURED;
   if (channel === "EMAIL") return EMAIL_REASONS.NOT_CONFIGURED;
-  return "SMS_PROVIDER_NOT_CONFIGURED";
+  return "CHANNEL_REMOVED";
 }
 
 export function resolveProviderForSendWithRuntime(
@@ -25,28 +43,28 @@ export function resolveProviderForSendWithRuntime(
 ): ProviderSendDecision {
   if (channel === "WHATSAPP") {
     if (!runtime.meta.configured) return { canSend: false, reason: runtime.meta.reason ?? META_REASONS.NOT_CONFIGURED };
-    if (!sender?.phoneNumberId && !runtime.meta.values.defaultPhoneNumberId) return { canSend: false, reason: META_REASONS.SENDER_MISSING_PHONE_NUMBER_ID };
+    if (!whatsappPhoneNumberId(sender, runtime)) return { canSend: false, reason: META_REASONS.SENDER_MISSING_PHONE_NUMBER_ID };
     return { canSend: true, providerId: "META_WHATSAPP" };
   }
   if (channel === "EMAIL") {
     if (!runtime.elasticEmail.configured) return { canSend: false, reason: runtime.elasticEmail.reason ?? EMAIL_REASONS.NOT_CONFIGURED };
-    if (!sender?.senderEmail && !runtime.elasticEmail.values.senderEmail) return { canSend: false, reason: EMAIL_REASONS.SENDER_MISSING_IDENTITY };
+    if (!emailIdentity(sender, runtime)) return { canSend: false, reason: EMAIL_REASONS.SENDER_MISSING_IDENTITY };
     return { canSend: true, providerId: EMAIL_PROVIDER_ID };
   }
-  const sms = resolveSmsProviderWithRuntime(runtime, ctx?.country, ctx?.phone);
-  if (!sms.configured) return { canSend: false, reason: sms.reason };
-  return { canSend: true, providerId: sms.provider };
+  return { canSend: false, reason: "CHANNEL_REMOVED" };
 }
 
 export async function resolveProviderForSend(channel: CommunicationChannelId, sender?: RouterSender | null, ctx?: RouterContext, runtime?: CommunicationRuntimeBundle): Promise<ProviderSendDecision> {
+  if (channel === "SMS") return { canSend: false, reason: "CHANNEL_REMOVED" };
   return resolveProviderForSendWithRuntime(runtime ?? await getActiveCommunicationRuntimeBundle(), channel, sender, ctx);
 }
 
 export async function isSendEnabled(channel: CommunicationChannelId, runtime?: CommunicationRuntimeBundle): Promise<boolean> {
+  if (channel === "SMS") return false;
   const bundle = runtime ?? await getActiveCommunicationRuntimeBundle();
   if (channel === "WHATSAPP") return bundle.meta.configured;
   if (channel === "EMAIL") return bundle.elasticEmail.configured;
-  return bundle.netgsm.configured || bundle.brevoSms.configured;
+  return false;
 }
 
 export type PreparedSendInput = {
@@ -60,6 +78,12 @@ export type PreparedSendInput = {
   subject?: string | null;
   html?: string | null;
   text?: string | null;
+  /** Email purpose controls suppression policy and marketing/bulk transport. */
+  purpose?: "MARKETING" | "TRANSACTIONAL" | "UTILITY" | "AUTHENTICATION" | null;
+  locale?: string | null;
+  channelName?: string | null;
+  /** Email only: files to attach (base64 content). */
+  attachments?: Array<{ filename: string; content: string; contentType: string }>;
 };
 
 export type PreparedSendResult =
@@ -67,6 +91,7 @@ export type PreparedSendResult =
   | { ok: false; provider?: string; reason: string; detail?: string };
 
 export async function sendPreparedDelivery(input: PreparedSendInput, runtime?: CommunicationRuntimeBundle): Promise<PreparedSendResult> {
+  if (input.channel === "SMS") return { ok: false, reason: "CHANNEL_REMOVED" };
   const bundle = runtime ?? await getActiveCommunicationRuntimeBundle();
   const decision = resolveProviderForSendWithRuntime(bundle, input.channel, input.sender, { country: input.country, phone: input.to });
   if (!decision.canSend) return { ok: false, reason: decision.reason };
@@ -75,7 +100,7 @@ export async function sendPreparedDelivery(input: PreparedSendInput, runtime?: C
     if (!input.templateName || !input.languageCode) return { ok: false, reason: "META_TEMPLATE_REQUIRED" };
     const { sendTemplateMessage } = await import("./providers/meta-whatsapp/messages");
     const res = await sendTemplateMessage({
-      phoneNumberId: input.sender?.phoneNumberId || (bundle.meta.configured ? bundle.meta.values.defaultPhoneNumberId : ""),
+      phoneNumberId: whatsappPhoneNumberId(input.sender, bundle) ?? "",
       to: input.to,
       templateName: input.templateName,
       languageCode: input.languageCode,
@@ -92,13 +117,15 @@ export async function sendPreparedDelivery(input: PreparedSendInput, runtime?: C
       subject: input.subject ?? "",
       html: input.html ?? "",
       text: input.text,
-      senderEmail: input.sender?.senderEmail,
+      senderEmail: emailIdentity(input.sender, bundle) ?? undefined,
+      purpose: input.purpose,
+      locale: input.locale,
+      channelName: input.channelName,
+      attachments: input.attachments,
     }, bundle.elasticEmail);
     if (!res.ok) return { ok: false, provider: EMAIL_PROVIDER_ID, reason: res.reason, detail: res.detail };
     return { ok: true, provider: res.providerId, providerMessageId: res.providerMessageId, internalAccepted: res.internalAccepted };
   }
 
-  const res = await sendSmsMessage({ to: input.to, content: input.html ?? input.subject ?? "", country: input.country, sender: input.sender?.smsSender, tag: "communication" }, bundle);
-  if (!res.ok) return { ok: false, provider: res.provider, reason: res.reason, detail: res.detail };
-  return { ok: true, provider: res.provider, providerMessageId: res.providerMessageId, internalAccepted: res.internalAccepted };
+  return { ok: false, reason: "CHANNEL_REMOVED" };
 }

@@ -1,8 +1,9 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { FEATURED_IMPACT_SLUG, resolveImpactCampaignSlug } from "./routing";
 
 /** Slug of the impact builder linked from the navbar and shown on the homepage. */
-export const FEATURED_IMPACT_SLUG = "make-an-impact";
+export { FEATURED_IMPACT_SLUG } from "./routing";
 
 const IMPACT_SELECT = {
   id: true,
@@ -19,7 +20,7 @@ const IMPACT_SELECT = {
 /** An active impact campaign by slug, or null. */
 export async function loadImpactCampaign(slug: string) {
   const row = await prisma.impactCampaign.findUnique({
-    where: { slug: decodeURIComponent(slug) },
+    where: { slug: resolveImpactCampaignSlug(slug) },
     select: IMPACT_SELECT,
   });
   return row?.isActive ? row : null;

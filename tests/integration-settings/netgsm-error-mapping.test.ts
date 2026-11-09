@@ -4,13 +4,13 @@ import { mapNetgsmCode, readNetgsmCode, scrubNetgsm, NETGSM_REASONS } from "../.
 
 /**
  * Netgsm answers a rejected send with a non-2xx status whose body still carries the numeric code.
- * The live account currently returns exactly this for every campaign send:
+ * Synthetic provider-shaped authentication-error fixture:
  *
  *   HTTP 406 {"code":"30","msgheaders":null,
  *             "description":"Check the usercode-password information and API access permission"}
  *
  * The adapter used to look only at `res.ok`, so that arrived on the delivery row as
- * NETGSM_REQUEST_FAILED — indistinguishable from a timeout, and pointing at the wrong cause.
+ * NETGSM_REQUEST_FAILED  indistinguishable from a timeout, and pointing at the wrong cause.
  */
 
 test("a rejected send is read from the body, not just the HTTP status", () => {

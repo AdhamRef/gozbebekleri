@@ -1,3 +1,4 @@
+import { statuses } from "@/lib/content-editor/contracts";
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
 import { SITE_URL, LOCALES } from "@/lib/seo";
@@ -154,5 +155,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   } catch {
   }
 
+  try {
+    const programs = await prisma.superCategory.findMany({ where: {isActive: true}, include: {translations: true, blocks: {include: {translations: true}}} });
+    for (const program of programs) {
+      const state = statuses("super-categories", program);
+      const languages = Object.fromEntries(LOCALES.filter(locale => state[locale]?.complete).map(locale => [locale, `${SITE_URL}/${locale}/programs/${encodeURIComponent(program.slug)}`]));
+      for (const locale of LOCALES) if (languages[locale]) entries.push({url: languages[locale], lastModified: program.updatedAt, changeFrequency: "weekly", priority: 0.75, alternates: {languages}});
+    }
+  } catch { /* New content units may be empty until the index setup runs. */ }
   return entries;
 }

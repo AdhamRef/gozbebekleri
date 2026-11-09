@@ -1,3 +1,4 @@
+import { hasConfirmedDonationPayment } from '@/lib/donations/receipt-state';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
@@ -258,6 +259,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
+    if (!hasConfirmedDonationPayment(donationRow)) {
+      return NextResponse.json({ error: 'لم يتأكد نجاح الدفع؛ لا يمكن إصدار إيصال استلام بعد' }, { status: 409 });
+    }
     const sub = donationRow.subscription;
     const donation = {
       ...donationRow,

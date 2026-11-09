@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loadImpactCampaign } from "@/lib/impact/load";
+import { readImpactConfig } from "@/lib/impact/config";
+import { FEATURED_IMPACT_SLUG, resolveImpactCampaignSlug, impactCampaignPath, impactRegionPath, resolveImpactRegion } from "@/lib/impact/routing";
 import { prisma } from "@/lib/prisma";
 import { LOCALES } from "@/lib/seo";
 import { pickLocaleSlug, whereByIdOrAnyLocaleSlug } from "@/lib/slug";
@@ -65,6 +68,28 @@ export async function GET(req: NextRequest) {
 
   const kind = bodySegments[0];
   const idOrSlug = bodySegments[1];
+
+  const cleanImpact = kind && resolveImpactCampaignSlug(kind) === FEATURED_IMPACT_SLUG
+    && (bodySegments.length === 1 || bodySegments.length === 2);
+  const legacyImpact = kind === "impact" && idOrSlug
+    && (bodySegments.length === 2 || bodySegments.length === 3);
+  if (cleanImpact || legacyImpact) {
+    const campaignSlug = cleanImpact ? kind : idOrSlug;
+    const regionSlug = bodySegments[cleanImpact ? 1 : 2];
+    try {
+      const row = await loadImpactCampaign(campaignSlug);
+      if (row && !regionSlug) {
+        return NextResponse.json({ ok: true, path: impactCampaignPath(targetLocale, row.slug), resolved: true, kind });
+      }
+      const region = row && resolveImpactRegion(readImpactConfig(row).regions, regionSlug);
+      if (row && region) {
+        return NextResponse.json({ ok: true, path: impactRegionPath(targetLocale, row.slug, region), resolved: true, kind });
+      }
+    } catch (error) {
+      console.error("[resolve-localized-path] impact failed", error);
+    }
+    return NextResponse.json({ ok: true, path: fallback, resolved: false });
+  }
 
   if (!kind || !idOrSlug || !DYNAMIC_ROUTE_KINDS.has(kind)) {
     return NextResponse.json({ ok: true, path: fallback, resolved: false });

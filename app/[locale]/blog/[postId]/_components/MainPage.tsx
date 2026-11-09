@@ -19,7 +19,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Share2, ChevronUp } from "lucide-react";
-import { ar } from "date-fns/locale";
+import { publicDateLocale } from "@/lib/public-date-locale";
 import { useLocale } from "next-intl";
 
 import { Post as PrismaPost, Category as PrismaCategory } from "@prisma/client";
@@ -39,7 +39,7 @@ interface BlogPostProps {
 }
 
 const MainPage: React.FC<BlogPostProps> = ({ id }: { id: string }) => {
-  const locale = useLocale(); // Get the current locale (ar or en)
+  const locale = useLocale();
   const [loading, setLoading] = useState<boolean>(true);
   const [post, setPost] = useState<ExtendedPost | null>(null);
   const [similarPosts, setSimilarPosts] = useState<ExtendedPost[]>([]);
@@ -150,7 +150,7 @@ const MainPage: React.FC<BlogPostProps> = ({ id }: { id: string }) => {
                     {post.createdAt
                       ? formatDistanceToNow(post.createdAt, {
                           addSuffix: true,
-                          locale: locale === "ar" ? ar : undefined, // Use Arabic locale if lang is ar
+                          locale: publicDateLocale(locale),
                         })
                       : ""}
                   </div>

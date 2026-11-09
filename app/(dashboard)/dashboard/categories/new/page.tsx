@@ -26,7 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CategoryIconPicker } from '@/components/dashboard/CategoryIconPicker';
 
 const formSchema = z.object({
-  name: z.string().min(1, 'اسم الحملة مطلوب').max(50, 'اسم الحملة طويل جداً'),
+  name: z.string().min(1, 'اسم التصنيف مطلوب').max(50, 'اسم التصنيف طويل جداً'),
   description: z.string().max(500, 'الوصف طويل جداً').optional(),
   image: z.string().optional(),
   icon: z.string().optional(),
@@ -95,11 +95,11 @@ export default function NewCategoryPage() {
           de: { name: values.name_de ?? '', description: values.description_de ?? '' },
         },
       });
-      toast.success('تم إنشاء الحملة بنجاح');
+      toast.success('تم إنشاء التصنيف بنجاح');
       router.push('/dashboard/categories');
     } catch (error) {
       console.error('Error creating category:', error);
-      toast.error('فشل في إنشاء الحملة');
+      toast.error('فشل في إنشاء التصنيف');
     } finally {
       setSaving(false);
     }
@@ -146,8 +146,8 @@ export default function NewCategoryPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">إنشاء حملة جديدة</h1>
-          <p className="text-gray-600">قم بإدخال معلومات الحملة</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">إنشاء تصنيف جديد</h1>
+          <p className="text-gray-600">قم بإدخال معلومات التصنيف</p>
         </div>
         <Button
           variant="outline"
@@ -193,10 +193,10 @@ export default function NewCategoryPage() {
               <Card className="p-6">
                 <div className="grid gap-6">
                   <FormField control={form.control} name="name" render={({ field }) => (
-                    <FormItem><FormLabel>اسم الحملة</FormLabel><FormControl><Input {...field} placeholder="أدخل اسم الحملة" /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>اسم التصنيف</FormLabel><FormControl><Input {...field} placeholder="أدخل اسم التصنيف" /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="description" render={({ field }) => (
-                    <FormItem><FormLabel>وصف الحملة</FormLabel><FormControl><Textarea placeholder="اكتب وصفاً للحملة..." className="resize-y" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>وصف التصنيف</FormLabel><FormControl><Textarea placeholder="اكتب وصفاً للتصنيف..." className="resize-y" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
               </Card>
@@ -295,7 +295,7 @@ export default function NewCategoryPage() {
                 name="image"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>صورة الحملة</FormLabel>
+                    <FormLabel>صورة التصنيف</FormLabel>
                     <FormControl>
                       <div className="space-y-4">
                         {field.value ? (
@@ -343,7 +343,7 @@ export default function NewCategoryPage() {
                       </div>
                     </FormControl>
                     <FormDescription>
-                      يمكنك رفع صورة واحدة للحملة.
+                      يمكنك رفع صورة واحدة للتصنيف.
                       <br />
                       <span className="text-amber-700">
                         الحجم المُوصى به: <strong>1200×800 px</strong> (نسبة 3:2)، صيغة JPG أو PNG، حجم الملف لا يزيد عن 2MB.
@@ -360,11 +360,11 @@ export default function NewCategoryPage() {
                 name="icon"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>أيقونة الحملة</FormLabel>
+                    <FormLabel>أيقونة التصنيف</FormLabel>
                     <FormControl>
                       <CategoryIconPicker value={field.value} onChange={field.onChange} />
                     </FormControl>
-                    <FormDescription>اختر أيقونة أو علم دولة للحملة</FormDescription>
+                    <FormDescription>اختر أيقونة أو علم دولة للتصنيف</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -387,11 +387,11 @@ export default function NewCategoryPage() {
               disabled={saving}
             >
               {saving && <Loader2 className="w-4 h-4 ml-2 animate-spin" />}
-              إنشاء الحملة
+              إنشاء التصنيف
             </Button>
           </div>
         </form>
       </Form>
     </div>
   );
-} 
+}

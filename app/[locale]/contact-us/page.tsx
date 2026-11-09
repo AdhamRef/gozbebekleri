@@ -34,7 +34,7 @@ const ADDRESS_LINES = [
 
 const ContactPage = () => {
   const t = useTranslations("ContactUs");
-  const locale = useLocale() as "ar" | "en" | "fr" | "tr";
+  const locale = useLocale();
 
   const messageTypes: MessageSubject[] = MESSAGE_SUBJECTS.filter(
     (s) => s !== "COMPLAINT",
@@ -204,10 +204,10 @@ const ContactPage = () => {
               <div className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-semibold text-gray-600 mb-1 block">
+                    <label htmlFor="contact-name" className="text-xs font-semibold text-gray-600 mb-1 block">
                       {t("name")} *
                     </label>
-                    <input
+                    <input id="contact-name" aria-required="true"
                       type="text"
                       value={formData.name}
                       onChange={(e) =>
@@ -218,10 +218,10 @@ const ContactPage = () => {
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-gray-600 mb-1 block">
+                    <label htmlFor="contact-phone" className="text-xs font-semibold text-gray-600 mb-1 block">
                       {t("phone")} *
                     </label>
-                    <input
+                    <input id="contact-phone" aria-required="true"
                       type="tel"
                       dir="ltr"
                       value={formData.phone}
@@ -234,10 +234,10 @@ const ContactPage = () => {
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-gray-600 mb-1 block">
+                  <label htmlFor="contact-email" className="text-xs font-semibold text-gray-600 mb-1 block">
                     {t("email")} *
                   </label>
-                  <input
+                  <input id="contact-email" aria-required="true"
                     type="email"
                     dir="ltr"
                     value={formData.email}
@@ -249,10 +249,10 @@ const ContactPage = () => {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-gray-600 mb-1 block">
+                  <label htmlFor="contact-messageType" className="text-xs font-semibold text-gray-600 mb-1 block">
                     {t("messageType")}
                   </label>
-                  <select
+                  <select id="contact-messageType"
                     value={formData.messageType}
                     onChange={(e) =>
                       setFormData({
@@ -270,10 +270,10 @@ const ContactPage = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-gray-600 mb-1 block">
+                  <label htmlFor="contact-message" className="text-xs font-semibold text-gray-600 mb-1 block">
                     {t("message")} *
                   </label>
-                  <textarea
+                  <textarea id="contact-message" aria-required="true"
                     value={formData.message}
                     onChange={(e) =>
                       setFormData({ ...formData, message: e.target.value })

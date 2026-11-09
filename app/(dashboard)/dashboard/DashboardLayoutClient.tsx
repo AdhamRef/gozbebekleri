@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react';
 
-import { localeDirection } from "@/lib/locales";
+import { localeDirection } from "@/lib/ported-systems/locales";
 import SessionProvider from '@/components/providers/SessionProvider';
 import { NextIntlClientProvider } from "next-intl";
 import { Toaster } from "react-hot-toast";
@@ -99,7 +99,7 @@ function DashboardContent({
     return DASHBOARD_NAV_GROUPS
       .map((section) => ({
         group: section.group,
-        items: section.items.filter((item) => userHasDashboardPermission(u, item.key)),
+        items: section.items.filter((item) => (!item.adminOnly || u.role === "ADMIN") && userHasDashboardPermission(u, item.key)),
       }))
       .filter((s) => s.items.length > 0);
   }, [session?.user]);
@@ -133,6 +133,8 @@ function DashboardContent({
     () => navigation.flatMap((s) => s.items.filter((i) => i.badge).map((i) => i.badge!)),
     [navigation],
   );
+  const canUseWhatsappInbox = Boolean(session?.user && userHasDashboardPermission(session.user, "messages"));
+  const [whatsappInboxCount, setWhatsappInboxCount] = useState(0);
   const wantsInboxBadge = badgeKeys.includes('inboxUnread');
   const [navCounts, setNavCounts] = useState<Record<string, number>>({});
 
@@ -171,6 +173,22 @@ function DashboardContent({
       window.removeEventListener(INBOX_UNREAD_EVENT, onLocalChange);
     };
   }, [wantsInboxBadge]);
+
+  useEffect(() => {
+    if (!canUseWhatsappInbox) { setWhatsappInboxCount(0); return; }
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const res = await fetch("/api/dashboard/communication/inbox/summary", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && data.ok !== false && Number.isFinite(data.unread)) setWhatsappInboxCount(Math.max(0, data.unread));
+      } catch { /* Retain the last successful count. */ }
+    };
+    void run();
+    const timer = setInterval(run, 30000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [canUseWhatsappInbox]);
 
   const closeSidebar = useCallback(() => setIsSidebarOpen(false), []);
   const openSearch = useCallback(() => { setIsSidebarOpen(false); setIsSearchOpen(true); }, []);
@@ -219,6 +237,8 @@ function DashboardContent({
           onOpenSidebar={() => setIsSidebarOpen(true)}
           onOpenSearch={openSearch}
           dir={dir}
+          showWhatsappInbox={canUseWhatsappInbox}
+          whatsappInboxCount={whatsappInboxCount}
         />
 
         {/* Content well. Pages own their own surfaces (Card, PageHeader, …) — the shell no

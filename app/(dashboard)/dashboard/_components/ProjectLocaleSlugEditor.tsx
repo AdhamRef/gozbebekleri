@@ -279,7 +279,7 @@ function setupApiFailureReporter() {
     xhr.open = function patchedOpen(this: XMLHttpRequest, m: string, u: string | URL, ...rest: any[]) {
       method = String(m || "").toUpperCase();
       url = String(u || "");
-      return originalOpen.call(this, m, u, ...rest as [boolean?, string?, string?]);
+      return originalOpen.call(this, m, u, rest[0] ?? true, rest[1], rest[2]);
     } as XMLHttpRequest["open"];
     xhr.addEventListener("loadend", () => {
       if (method === "POST" && url.includes("/api/campaigns") && xhr.status >= 400) {
@@ -288,7 +288,7 @@ function setupApiFailureReporter() {
       }
     });
     return xhr;
-  } as typeof XMLHttpRequest;
+  } as unknown as typeof XMLHttpRequest;
 }
 
 function setupArabicOnlyCreationFallback() {

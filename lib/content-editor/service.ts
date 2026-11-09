@@ -1,0 +1,556 @@
+import { createHash, randomUUID } from "node:crypto";
+import { validateWorkspaceSettings } from "./workspace-settings";
+import { saveWorkspaceRelations } from "./workspace-relations";
+import { SUPPORTED_LOCALES } from "../locales";
+import { pickLocaleSlug } from "../slug";
+import { HAS_IMPACT_BACKING_CAMPAIGNS } from "./site-capabilities";
+import { missingSeoChanges } from "./seo-fill";
+import { arabicSourceFingerprint, workflowFor } from "./workflow";
+import {
+  CONFIG,
+  fieldsFor,
+  hasText,
+  rows,
+  statuses,
+  text,
+  validateChanges,
+  valuesFor,
+  type ContentKind,
+  type ContentRecord,
+  type TextValues,
+} from "./contracts";
+
+export interface Delegate {
+  findUnique(args: object): Promise<ContentRecord | null>;
+  findFirst(args: object): Promise<ContentRecord | null>;
+  findMany(args: object): Promise<ContentRecord[]>;
+  update(args: object): Promise<ContentRecord>;
+  create(args: object): Promise<ContentRecord>;
+  upsert(args: object): Promise<ContentRecord>;
+  deleteMany?(args: object): Promise<unknown>;
+}
+export interface Store {
+  model(name: string): Delegate;
+  transaction<T>(fn: (tx: Store) => Promise<T>): Promise<T>;
+}
+export class ContentError extends Error {
+  constructor(
+    message: string,
+    public status = 400,
+  ) {
+    super(message);
+  }
+}
+export function fingerprint(value: unknown): string {
+  function stable(v: unknown): unknown {
+    if (v instanceof Date) return v.toISOString();
+    if (Array.isArray(v)) return v.map(stable);
+    if (v && typeof v === "object")
+      return Object.fromEntries(
+        Object.entries(v)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([k, val]) => [k, stable(val)]),
+      );
+    return v;
+  }
+  return createHash("sha256")
+    .update(JSON.stringify(stable(value)))
+    .digest("hex");
+}
+export function includeFor(kind: ContentKind) {
+  return {
+    translations: true,
+    ...(kind === "campaigns" && HAS_IMPACT_BACKING_CAMPAIGNS
+      ? { impactCampaign: { select: { id: true } } }
+      : {}),
+    ...(kind === "campaigns"
+      ? {
+        updates: {
+          include: { translations: true },
+          orderBy: { createdAt: "desc" },
+        },
+      }
+      : {}),
+    ...(kind === "categories"
+      ? {
+        values: { include: { translations: true } },
+        infoCards: { include: { translations: true } },
+      }
+      : {}),
+    ...(kind === "super-categories"
+      ? {
+        blocks: {
+          include: { translations: true },
+          orderBy: { order: "asc" },
+        },
+        items: { orderBy: { order: "asc" } },
+      }
+      : {}),
+  };
+}
+export async function readContent(db: Store, kind: ContentKind, id: string) {
+  const row = await db
+    .model(CONFIG[kind].model)
+    .findUnique({ where: { id }, include: includeFor(kind) });
+  if (!row) throw new ContentError("المحتوى غير موجود", 404);
+  if (kind === "campaigns" && row.impactCampaign)
+    throw new ContentError("مشاريع تسوية الأثر تُدار من محرر الأثر المتخصص");
+  return row;
+}
+export function documentFor(kind: ContentKind, row: ContentRecord) {
+  const base = valuesFor(kind, row, "ar");
+  const locales = statuses(kind, row);
+  const workflow = workflowFor(row), sourceRevision = arabicSourceFingerprint(kind, row);
+  const sourceFields = fieldsFor(kind, row).filter(f => f.group === "content" && !f.locked && !f.optional && (f.required || hasText(base[f.key]))).map(f => f.key);
+  const reviews =
+    row.editorReviews && typeof row.editorReviews === "object"
+      ? (row.editorReviews as Record<string, string>)
+      : {};
+  return {
+    id: text(row.id),
+    kind,
+    title: text(row.title || row.name),
+    slug: text(row.slug),
+    slugs: Object.fromEntries(
+      SUPPORTED_LOCALES.map((locale) => [
+        locale,
+        pickLocaleSlug(
+          text(row.slug),
+          rows(row.translations) as { locale: string; slug?: string | null }[],
+          locale,
+        ) || text(row.id),
+      ]),
+    ),
+    revision: fingerprint(row),
+    fields: fieldsFor(kind, row),
+    source: base,
+    workflow: { sourceRevision, arabicApproved: workflow.approvedArabic === sourceRevision && locales.ar.complete, lastActions: workflow.lastActions },
+    values: Object.fromEntries(
+      Object.keys(locales).map((locale) => [
+        locale,
+        valuesFor(kind, row, locale),
+      ]),
+    ),
+    statuses: Object.fromEntries(
+      Object.entries(locales).map(([locale, status]) => [
+        locale,
+        {
+          ...status,
+          sourceKnown: locale === "ar" || (sourceFields.length > 0 && sourceFields.every(key => workflow.sources[locale]?.[key] === sourceRevision)),
+          needsUpdate: locale !== "ar" && Object.values(workflow.sources[locale] || {}).some(revision => revision !== sourceRevision),
+          reviewed:
+            reviews[locale] ===
+            fingerprint([base, valuesFor(kind, row, locale)]),
+        },
+      ]),
+    ),
+    previousSlugs: rows(row.slugChanges),
+    settings: row,
+  };
+}
+export async function approveArabicSource(db: Store, input: { kind: ContentKind; id: string; revision: string }) {
+  return db.transaction(async tx => {
+const row = await readContent(tx, input.kind, input.id); if (fingerprint(row) !== input.revision) throw new ContentError("تغير المحتوى؛ أعد تحميله قبل اعتماد العربية", 409);
+    if (!statuses(input.kind, row).ar.complete) throw new ContentError("أكمل الحقول العربية المطلوبة قبل اعتماد المصدر");
+    const workflow = workflowFor(row); workflow.approvedArabic = arabicSourceFingerprint(input.kind, row);
+    await tx.model(CONFIG[input.kind].model).update({ where: { id: input.id }, data: { editorVersion: randomUUID(), editorWorkflow: JSON.parse(JSON.stringify(workflow)) } });
+    return documentFor(input.kind, await readContent(tx, input.kind, input.id));
+  });
+}
+async function captureContentRevision(tx: Store, kind: ContentKind, row: ContentRecord, deltas: Record<string, unknown>) {
+  const changed = Object.entries(deltas).some(([locale, value]) => value && typeof value === "object" && !Array.isArray(value) && Object.entries(value).some(([key, text]) => valuesFor(kind, row, locale)[key] !== text));
+  if (!changed) return;
+  await tx.model("contentEditorRevision").create({ data: { kind, entityId: row.id, revision: fingerprint(row), values: Object.fromEntries(SUPPORTED_LOCALES.map(locale => [locale, valuesFor(kind, row, locale)])) } });
+}
+function dataFor(changes: TextValues) {
+  return Object.fromEntries(
+    Object.entries(changes).map(([key, value]) => [
+      key,
+      key === "amountLabels"
+        ? value
+          .split("\n")
+          .map((v) => v.trim())
+          .filter(Boolean)
+        : value,
+    ]),
+  );
+}
+/** One atomic metadata-only save, with a single parent touch/readback for all locales. */
+export async function fillMissingSeo(db: Store, input: { kind: ContentKind; id: string; revision: string }) {
+  return db.transaction(async tx => {
+    const { kind, id } = input, cfg = CONFIG[kind], row = await readContent(tx, kind, id);
+    if (fingerprint(row) !== input.revision) throw new ContentError("تغير المحتوى. أعد تحميله قبل الاستكمال.", 409);
+    const changes = missingSeoChanges(kind, row);
+    const filledFields = Object.values(changes).reduce((sum, values) => sum + Object.keys(values).length, 0);
+    if (!filledFields) return { ...documentFor(kind, row), filledFields: 0 };
+    const fields = fieldsFor(kind, row).filter(f => f.group === "seo");
+    await captureContentRevision(tx, kind, row, changes);
+    const reviews = { ...(row.editorReviews && typeof row.editorReviews === "object" ? row.editorReviews as Record<string, string> : {}) };
+    for (const [locale, delta] of Object.entries(changes)) { validateChanges(fields, delta); delete reviews[locale]; }
+    await tx.model(cfg.model).update({ where: { id }, data: { editorVersion: randomUUID(), editorReviews: reviews, ...(changes.ar || {}) } });
+    for (const [locale, delta] of Object.entries(changes)) {
+      if (locale === "ar") continue;
+      const own = valuesFor(kind, row, locale), titleKey = kind === "categories" ? "name" : "title";
+      await tx.model(cfg.translationModel).upsert({ where: { [`${cfg.parentKey}_locale`]: { [cfg.parentKey]: id, locale } }, create: { [cfg.parentKey]: id, locale, [titleKey]: own[titleKey], ...(kind === "campaigns" ? { description: own.description || "" } : {}), ...delta }, update: delta });
+    }
+    const saved = await readContent(tx, kind, id);
+    for (const [locale, delta] of Object.entries(changes)) {
+      const values = valuesFor(kind, saved, locale);
+      if (Object.entries(delta).some(([key, value]) => values[key] !== value)) throw new ContentError("تعذر التحقق من حفظ SEO", 500);
+    }
+    return { ...documentFor(kind, saved), filledFields };
+  });
+}
+export async function saveContent(
+  db: Store,
+  input: {
+    kind: ContentKind;
+    id: string;
+    locale: string;
+    revision: string;
+    changes: unknown;
+    reviewed?: boolean;
+    settings?: unknown;
+    skipHistory?: boolean;
+    editorialAction?: string;
+  },
+) {
+  return db.transaction(async (tx) => {
+    const { kind, id, locale } = input,
+      cfg = CONFIG[kind];
+    const row = await readContent(tx, kind, id);
+    if (fingerprint(row) !== input.revision)
+      throw new ContentError(
+        "عدّل زميل هذا المحتوى. احتفظ بتعديلاتك ثم أعد تحميل النسخة الحالية.",
+        409,
+      );
+    let changes: TextValues, settings: ContentRecord;
+    try {
+      changes = validateChanges(fieldsFor(kind, row), input.changes);
+      if (kind === "campaigns" && locale === "ar" && "image" in changes) {
+        if (changes.image !== text(row.image)) throw new ContentError("الصورة العربية تُدار من معرض صور المشروع");
+        delete changes.image;
+      }
+      settings = validateWorkspaceSettings(kind, row, input.settings);
+    } catch (error) {
+      throw new ContentError(
+        error instanceof Error ? error.message : "حقول غير صالحة",
+      );
+    }
+    const categorySet = settings.categories as
+      | { set: { id: string }[] }
+      | undefined;
+    if (categorySet) {
+      const found = await tx
+        .model("category")
+        .findMany({ where: { id: { in: categorySet.set.map((x) => x.id) } } });
+      if (found.length !== categorySet.set.length)
+        throw new ContentError("أحد التصنيفات غير موجود");
+    }
+    const current = valuesFor(kind, row, locale),
+      next = { ...current, ...changes };
+    for (const [key, model] of [
+      ["categoryId", "postCategory"],
+      ["campaignId", "campaign"],
+      ["donateCampaignId", "campaign"],
+    ]) {
+      if (settings[key]) {
+        const linked = await tx
+          .model(model)
+          .findUnique({ where: { id: settings[key] } });
+        if (!linked || linked.isDeleted)
+          throw new ContentError("المحتوى المرتبط غير موجود");
+        if (
+          key === "donateCampaignId" &&
+          (!Array.isArray(linked.categoryIds) ||
+            !linked.categoryIds.includes(id))
+        )
+          throw new ContentError("مشروع التبرع يجب أن ينتمي لهذا التصنيف");
+      }
+    }
+    for (const [key, model] of [
+      ["campaignIds", "campaign"],
+      ["achievementVideoIds", "video"],
+    ]) {
+      if (Array.isArray(settings[key]) && (settings[key] as unknown[]).length) {
+        const found = await tx
+          .model(model)
+          .findMany({ where: { id: { in: settings[key] } } });
+        if (
+          found.length !== (settings[key] as unknown[]).length ||
+          found.some((r) => r.isDeleted)
+        )
+          throw new ContentError("أحد عناصر المحتوى المرتبط غير موجود");
+      }
+    }
+    const titleKey = kind === "categories" ? "name" : "title";
+    if (!hasText(next[titleKey]))
+      throw new ContentError("العنوان مطلوب قبل الحفظ");
+    if (!input.skipHistory) await captureContentRevision(tx, kind, row, { [locale]: changes });
+    // Touch the parent in the same transaction as every translation/child write.
+    // A concurrent legacy form therefore conflicts with this save too.
+    const reviews =
+      row.editorReviews && typeof row.editorReviews === "object"
+        ? { ...(row.editorReviews as Record<string, string>) }
+        : {};
+    if (input.reviewed)
+      reviews[locale] = fingerprint([
+        locale === "ar" ? next : valuesFor(kind, row, "ar"),
+        next,
+      ]);
+    else delete reviews[locale];
+    const parentChanges = Object.fromEntries(
+      Object.entries(changes).filter(([key]) => !key.includes(".")),
+    );
+    await tx.model(cfg.model).update({
+      where: { id },
+      data: {
+        editorVersion: randomUUID(),
+        editorReviews: reviews,
+        ...settings,
+        ...(locale === "ar" ? dataFor(parentChanges) : {}),
+      },
+    });
+    if (locale !== "ar" && Object.keys(parentChanges).length) {
+      const key = `${cfg.parentKey}_locale`,
+        where = { [key]: { [cfg.parentKey]: id, locale } };
+      const data = dataFor(parentChanges);
+      await tx.model(cfg.translationModel).upsert({
+        where,
+        create: {
+          [cfg.parentKey]: id,
+          locale,
+          [titleKey]: next[titleKey],
+          ...(kind === "campaigns"
+            ? { description: next.description || "" }
+            : {}),
+          ...data,
+        },
+        update: data,
+      });
+    }
+    const childModels: Record<string, [string, string, string]> = {
+      values: ["categoryValue", "categoryValueTranslation", "valueId"],
+      infoCards: ["categoryInfoCard", "categoryInfoCardTranslation", "cardId"],
+      blocks: [
+        "superCategoryBlock",
+        "superCategoryBlockTranslation",
+        "blockId",
+      ],
+    };
+    const grouped = new Map<string, TextValues>();
+    for (const [key, value] of Object.entries(changes))
+      if (key.includes(".")) {
+        const [group, childId, field] = key.split("."),
+          mapKey = `${group}.${childId}`;
+        grouped.set(mapKey, { ...grouped.get(mapKey), [field]: value });
+      }
+    for (const [key, data] of grouped) {
+      const [group, childId] = key.split("."),
+        [model, translationModel, foreignKey] = childModels[group];
+      if (locale === "ar")
+        await tx.model(model).update({ where: { id: childId }, data });
+      else {
+        const required =
+          group === "values" ? "label" : group === "infoCards" ? "title" : null;
+        const full = Object.fromEntries(
+          fieldsFor(kind, row)
+            .filter((f) => f.key.startsWith(key + "."))
+            .map((f) => [f.key.split(".")[2], next[f.key]]),
+        );
+        if (required && !hasText(full[required]))
+          throw new ContentError("أكمل عنوان البطاقة أو القيمة قبل الحفظ");
+        await tx.model(translationModel).upsert({
+          where: {
+            [`${foreignKey}_locale`]: { [foreignKey]: childId, locale },
+          },
+          create: { [foreignKey]: childId, locale, ...full },
+          update: data,
+        });
+      }
+    }
+    await saveWorkspaceRelations(tx, kind, id, row, input.settings);
+    let saved = await readContent(tx, kind, id);
+    const workflow = workflowFor(saved);
+    if (locale !== "ar" && (Object.keys(changes).length || input.reviewed) && workflow.approvedArabic === arabicSourceFingerprint(kind, saved)) {
+      const source = valuesFor(kind, saved, "ar"), ownValues = valuesFor(kind, saved, locale);
+      const linked = { ...workflow.sources[locale] };
+      for (const field of fieldsFor(kind, saved).filter(f => f.group === "content" && !f.locked)) if ((field.key in changes || input.reviewed) && hasText(ownValues[field.key]) && hasText(source[field.key])) linked[field.key] = workflow.approvedArabic;
+      workflow.sources[locale] = linked;
+    }
+    if (input.editorialAction && Object.keys(changes).length) workflow.lastActions[locale] = input.editorialAction;
+    if (JSON.stringify(workflow) !== JSON.stringify(workflowFor(saved))) { await tx.model(cfg.model).update({ where: { id }, data: { editorWorkflow: JSON.parse(JSON.stringify(workflow)) } }); saved = await readContent(tx, kind, id); }
+    const
+      actual = valuesFor(kind, saved, locale);
+    for (const [key, value] of Object.entries(settings)) {
+      if (key === "categories") continue;
+      if (fingerprint(saved[key] ?? null) !== fingerprint(value ?? null))
+        throw new ContentError(
+          "لم تُحفظ إعدادات العنصر كاملة. لم يُعتمد التعديل.",
+          500,
+        );
+    }
+    if (
+      Object.keys(changes).some((key) =>
+        key === "amountLabels"
+          ? text(actual[key]) !== text(dataFor(changes)[key])
+          : actual[key] !== changes[key],
+      )
+    )
+      throw new ContentError("لم تُحفظ كل الحقول. لم يُعتمد التعديل.", 500);
+    return documentFor(kind, saved);
+  });
+}
+export async function saveWorkspace(
+  db: Store,
+  input: {
+    kind: ContentKind;
+    id: string;
+    revision: string;
+    locale: string;
+    changes: unknown;
+    reviewed?: boolean;
+    settings?: unknown;
+    localeChanges?: Record<string, unknown>;
+    editorialAction?: string;
+  },
+) {
+  return db.transaction(async (tx) => {
+    const original = await readContent(tx, input.kind, input.id);
+    let revision = input.revision;
+    const locales = { ...input.localeChanges, [input.locale]: input.changes };
+    if (fingerprint(original) !== input.revision) throw new ContentError("تغير المحتوى؛ أعد تحميله قبل الحفظ", 409);
+    await captureContentRevision(tx, input.kind, original, locales);
+    const scalarSettings =
+      input.settings &&
+        typeof input.settings === "object" &&
+        !Array.isArray(input.settings)
+        ? Object.fromEntries(
+          Object.entries(input.settings).filter(
+            ([key]) => !(
+              (["super-categories", "urgent-banners"].includes(input.kind) && key === "slugAdjustment") ||
+              (input.kind === "super-categories" && ["blocks", "items", "religiousTextAdjustment"].includes(key)) ||
+              (input.kind === "campaigns" && ["campaignUpdates", "financialAdjustment"].includes(key))
+            ),
+          ),
+        )
+        : input.settings;
+    let saved: ReturnType<typeof documentFor> | undefined;
+    for (const [locale, changes] of Object.entries(locales).sort(([a], [b]) =>
+      a === "ar" ? -1 : b === "ar" ? 1 : 0,
+    )) {
+      saved = await saveContent(tx, {
+        ...input,
+        skipHistory: true,
+        locale,
+        changes,
+        revision,
+        reviewed: locale === input.locale && input.reviewed,
+        settings: saved ? undefined : scalarSettings,
+      });
+      revision = saved.revision;
+    }
+    try {
+      await saveWorkspaceRelations(
+        tx,
+        input.kind,
+        input.id,
+        original,
+        input.settings,
+      );
+    } catch (error) {
+      throw new ContentError(
+        error instanceof Error ? error.message : "علاقات محتوى غير صالحة",
+      );
+    }
+    return documentFor(input.kind, await readContent(tx, input.kind, input.id));
+  });
+}
+export async function changeCategorySlug(
+  db: Store,
+  input: {
+    id: string;
+    revision: string;
+    slug: string;
+    confirmation: string;
+    actor: string;
+    locale?: string;
+  },
+) {
+  const slug = input.slug.trim();
+  const locale = input.locale || "ar";
+  if (!(SUPPORTED_LOCALES as readonly string[]).includes(locale))
+    throw new ContentError("لغة غير صالحة");
+  if (
+    !/^[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*$/u.test(slug) ||
+    slug.length > 150 ||
+    /^[a-f0-9]{24}$/i.test(slug)
+  )
+    throw new ContentError("استخدم حروفًا وأرقامًا وشرطات للرابط");
+  if (input.confirmation !== slug)
+    throw new ContentError("اكتب الرابط الجديد لتأكيد التغيير");
+  return db.transaction(async (tx) => {
+    const row = await readContent(tx, "categories", input.id);
+    if (fingerprint(row) !== input.revision)
+      throw new ContentError("تغير التصنيف. أعد تحميله أولًا.", 409);
+    const current =
+      pickLocaleSlug(
+        text(row.slug),
+        rows(row.translations) as { locale: string; slug?: string | null }[],
+        locale,
+      ) || "";
+    if (current === slug) return documentFor("categories", row);
+    if (locale !== "ar" && !hasText(valuesFor("categories", row, locale).name))
+      throw new ContentError("احفظ عنوان هذه اللغة قبل تخصيص رابطها");
+    const collision = await tx.model("category").findFirst({
+      where: {
+        id: { not: input.id },
+        OR: [
+          { slug },
+          { previousSlugs: { has: slug } },
+          { translations: { some: { slug } } },
+        ],
+      },
+    });
+    if (collision)
+      throw new ContentError("هذا الرابط مستخدم أو محفوظ لتصنيف آخر", 409);
+    const previous = Array.isArray(row.previousSlugs)
+      ? row.previousSlugs.filter((v): v is string => typeof v === "string")
+      : [];
+    if (current) previous.push(current);
+    const history = [
+      ...rows(row.slugChanges),
+      {
+        from: current,
+        to: slug,
+        locale,
+        at: new Date().toISOString(),
+        actor: input.actor,
+      },
+    ];
+    await tx.model("category").update({
+      where: { id: input.id },
+      data: {
+        ...(locale === "ar" ? { slug } : {}),
+        previousSlugs: [...new Set(previous)].filter((v) => v !== slug),
+        slugChanges: history,
+        editorVersion: randomUUID(),
+      },
+    });
+    if (locale !== "ar")
+      await tx.model("categoryTranslation").upsert({
+        where: { categoryId_locale: { categoryId: input.id, locale } },
+        create: {
+          categoryId: input.id,
+          locale,
+          name: valuesFor("categories", row, locale).name,
+          slug,
+        },
+        update: { slug },
+      });
+    return documentFor(
+      "categories",
+      await readContent(tx, "categories", input.id),
+    );
+  });
+}

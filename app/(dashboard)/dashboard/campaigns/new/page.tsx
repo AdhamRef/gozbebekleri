@@ -632,7 +632,7 @@ const getTranslationStatus = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">إنشاء مشروع جديدة</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">إنشاء مشروع جديد</h1>
           <p className="text-gray-600">قم بإدخال معلومات المشروع</p>
           
           {/* ✅ Translation Status Badge */}

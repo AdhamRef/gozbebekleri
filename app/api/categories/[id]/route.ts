@@ -1,12 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { deleteContentSafely } from "@/lib/content-editor/deletion";
+import { contentStore } from "@/lib/content-editor/store";
+import { ContentError } from "@/lib/content-editor/service";
+import {
+  contentWriteWhere,
+  contentVersionPatch,
+  isContentWriteConflict,
+} from "@/lib/content-editor/legacy-write";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from 'next-auth';
+import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/options";
 import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { writeAuditLog, auditActorFromDashboardSession } from "@/lib/audit-log";
-import { pickTranslation, translationLocaleWhere } from "@/lib/i18n/translation-fallback";
 import {
-  generateUniqueSlug,
+  pickTranslation,
+  translationLocaleWhere,
+} from "@/lib/i18n/translation-fallback";
+import {
   generateUniqueLocaleSlug,
   normalizeUserSlug,
   whereByIdOrSlug,
@@ -17,14 +27,14 @@ import { NOT_SOFT_DELETED } from "@/lib/campaign/soft-delete-filter";
 // GET: return a single category (localized) with optional counts
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
     const paramsUrl = request.nextUrl.searchParams;
-    const locale = paramsUrl.get('locale') || 'ar';
-    const includeCounts = paramsUrl.get('counts') === 'true';
-    const allTranslations = paramsUrl.get('allTranslations') === 'true';
+    const locale = paramsUrl.get("locale") || "ar";
+    const includeCounts = paramsUrl.get("counts") === "true";
+    const allTranslations = paramsUrl.get("allTranslations") === "true";
 
     const category = await prisma.category.findFirst({
       where: whereByIdOrAnyLocaleSlug(id),
@@ -38,18 +48,33 @@ export async function GET(
         order: true,
         isActive: true,
         translations: allTranslations
-          ? { select: { locale: true, name: true, description: true, slug: true } }
+          ? {
+              select: {
+                locale: true,
+                name: true,
+                description: true,
+                slug: true,
+              },
+            }
           : {
               where: translationLocaleWhere(locale),
               take: 2,
-              select: { locale: true, name: true, description: true, slug: true },
+              select: {
+                locale: true,
+                name: true,
+                description: true,
+                slug: true,
+              },
             },
-        ...(includeCounts ? { _count: { select: { campaigns: true } } } : {})
-      }
+        ...(includeCounts ? { _count: { select: { campaigns: true } } } : {}),
+      },
     });
 
     if (!category) {
-      return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: "Category not found" },
+        { status: 404 },
+      );
     }
 
     const isActive = category.isActive ?? true;
@@ -58,14 +83,17 @@ export async function GET(
       return NextResponse.json({
         ...category,
         isActive,
-        campaignCount: (category as any)._count?.campaigns ?? undefined
+        campaignCount: (category as any)._count?.campaigns ?? undefined,
       });
     }
 
     const t = pickTranslation(category.translations, locale);
     return NextResponse.json({
       id: category.id,
-      slug: (t as { slug?: string | null } | undefined)?.slug || category.slug || null,
+      slug:
+        (t as { slug?: string | null } | undefined)?.slug ||
+        category.slug ||
+        null,
       baseSlug: category.slug ?? null,
       name: t?.name || category.name,
       description: t?.description || category.description,
@@ -73,181 +101,218 @@ export async function GET(
       icon: category.icon,
       order: category.order,
       isActive,
-      campaignCount: (category as any)._count?.campaigns ?? undefined
+      campaignCount: (category as any)._count?.campaigns ?? undefined,
     });
   } catch (error) {
-    console.error('Error fetching category:', error);
-    return NextResponse.json({ error: 'Failed to fetch category' }, { status: 500 });
+    console.error("Error fetching category:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch category" },
+      { status: 500 },
+    );
   }
 }
 
 // PUT: admin-only; supports updating base fields and upserting translations.
-// Important: this intentionally avoids prisma.$transaction because some MongoDB
-// deployments used by the app do not support replica-set transactions.
+// The settings form and its locale writes share an atomic version-checked transaction.
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: idOrSlug } = await params;
     const session = await getServerSession(authOptions);
-    const denied = requireAdminOrDashboardPermission(session, 'categories');
+    const denied = requireAdminOrDashboardPermission(session, "categories");
     if (denied) return denied;
 
-    const body = await request.json();
-    const { name, description, image, icon, order, translations } = body;
+    return await prisma.$transaction(
+      async (tx) => {
+        const body = await request.json();
+        const { name, description, image, icon, order, translations } = body;
 
-    if (!name || !String(name).trim()) {
-      return NextResponse.json({ error: 'Category name is required' }, { status: 400 });
-    }
-
-    const existing = await prisma.category.findFirst({
-      where: whereByIdOrSlug(idOrSlug),
-      select: { id: true, name: true },
-    });
-    if (!existing) {
-      return NextResponse.json({ error: 'Category not found' }, { status: 404 });
-    }
-    const id = existing.id;
-
-    let nextSlug: string | undefined;
-    if (body.slug !== undefined) {
-      const cleaned = normalizeUserSlug(body.slug);
-      let base = cleaned ?? '';
-      if (!base) {
-        const newEnName = typeof body?.translations?.en?.name === 'string' ? body.translations.en.name.trim() : '';
-        if (newEnName) {
-          base = newEnName;
-        } else {
-          const existingEn = await prisma.categoryTranslation.findFirst({
-            where: { categoryId: id, locale: 'en' },
-            select: { name: true },
-          });
-          base = existingEn?.name?.trim() || name || existing.name;
+        if (!name || !String(name).trim()) {
+          return NextResponse.json(
+            { error: "Category name is required" },
+            { status: 400 },
+          );
         }
-      }
-      nextSlug = await generateUniqueSlug(prisma.category as any, base, { fallbackPrefix: 'category', currentId: id });
-    }
 
-    const updatedCat = await prisma.category.update({
-      where: { id },
-      data: {
-        name: String(name).trim(),
-        description: description || '',
-        image: image || '',
-        icon: icon || '',
-        order: order ?? 0,
-        ...(nextSlug !== undefined ? { slug: nextSlug } : {}),
-      }
-    });
+        const existing = await tx.category.findFirst({
+          where: whereByIdOrSlug(idOrSlug),
+          select: { id: true, name: true, slug: true },
+        });
+        if (!existing) {
+          return NextResponse.json(
+            { error: "Category not found" },
+            { status: 404 },
+          );
+        }
+        const id = existing.id;
 
-    if (translations && typeof translations === 'object') {
-      for (const [locale, t] of Object.entries(translations)) {
-        if (locale === 'ar') continue;
-        if (!t || typeof t !== 'object') continue;
-        const tt: any = t;
-        const translatedName = typeof tt.name === 'string' ? tt.name.trim() : '';
-        const translatedDescription = typeof tt.description === 'string' ? tt.description : '';
+        const nextSlug: string | undefined = undefined;
+        if (
+          body.slug !== undefined &&
+          normalizeUserSlug(body.slug) !== (existing.slug || undefined)
+        ) {
+          return NextResponse.json(
+            { error: "غيّر الرابط من محرر المحتوى لتأكيده وحفظ سجله" },
+            { status: 409 },
+          );
+        }
 
-        // Empty locale tabs should not overwrite existing translations or break save.
-        if (!translatedName && !translatedDescription && !tt.slug) continue;
-        if (!translatedName) continue;
-
-        const existingTrans = await prisma.categoryTranslation.findUnique({
-          where: { categoryId_locale: { categoryId: id, locale } as any },
-          select: { id: true, slug: true },
+        const updatedCat = await tx.category.update({
+          where: contentWriteWhere({ id: id }, body),
+          data: {
+            ...contentVersionPatch(),
+            name: String(name).trim(),
+            description: description || "",
+            image: image || "",
+            icon: icon || "",
+            order: order ?? 0,
+            ...(nextSlug !== undefined ? { slug: nextSlug } : {}),
+          },
         });
 
-        const requestedSlug = normalizeUserSlug(tt.slug);
-        let localeSlug: string | null = existingTrans?.slug ?? null;
-        if (Object.prototype.hasOwnProperty.call(tt, 'slug')) {
-          localeSlug = requestedSlug
-            ? await generateUniqueLocaleSlug(prisma.categoryTranslation as any, requestedSlug, {
+        if (translations && typeof translations === "object") {
+          for (const [locale, t] of Object.entries(translations)) {
+            if (locale === "ar") continue;
+            if (!t || typeof t !== "object") continue;
+            const tt: any = t;
+            const translatedName =
+              typeof tt.name === "string" ? tt.name.trim() : "";
+            const translatedDescription =
+              typeof tt.description === "string" ? tt.description : "";
+
+            // Empty locale tabs should not overwrite existing translations or break save.
+            if (!translatedName && !translatedDescription && !tt.slug) continue;
+            if (!translatedName) continue;
+
+            const existingTrans = await tx.categoryTranslation.findUnique({
+              where: { categoryId_locale: { categoryId: id, locale } as any },
+              select: { id: true, slug: true },
+            });
+
+            const requestedSlug = normalizeUserSlug(tt.slug);
+            let localeSlug: string | null = existingTrans?.slug ?? null;
+            if (Object.prototype.hasOwnProperty.call(tt, "slug")) {
+              localeSlug = requestedSlug
+                ? await generateUniqueLocaleSlug(
+                    tx.categoryTranslation as any,
+                    requestedSlug,
+                    {
+                      locale,
+                      fallbackPrefix: "category",
+                      currentTranslationId: existingTrans?.id,
+                    },
+                  )
+                : null;
+            } else if (!existingTrans?.slug && translatedName) {
+              localeSlug = await generateUniqueLocaleSlug(
+                tx.categoryTranslation as any,
+                translatedName,
+                {
+                  locale,
+                  fallbackPrefix: "category",
+                  currentTranslationId: existingTrans?.id,
+                },
+              );
+            }
+
+            await tx.categoryTranslation.upsert({
+              where: { categoryId_locale: { categoryId: id, locale } as any },
+              update: {
+                name: translatedName,
+                description: translatedDescription,
+                slug: localeSlug,
+              },
+              create: {
+                categoryId: id,
                 locale,
-                fallbackPrefix: 'category',
-                currentTranslationId: existingTrans?.id,
-              })
-            : null;
-        } else if (!existingTrans?.slug && translatedName) {
-          localeSlug = await generateUniqueLocaleSlug(prisma.categoryTranslation as any, translatedName, {
-            locale,
-            fallbackPrefix: 'category',
-            currentTranslationId: existingTrans?.id,
-          });
+                name: translatedName,
+                description: translatedDescription,
+                slug: localeSlug,
+              },
+            });
+          }
         }
 
-        await prisma.categoryTranslation.upsert({
-          where: { categoryId_locale: { categoryId: id, locale } as any },
-          update: {
-            name: translatedName,
-            description: translatedDescription,
-            slug: localeSlug,
-          },
-          create: {
-            categoryId: id,
-            locale,
-            name: translatedName,
-            description: translatedDescription,
-            slug: localeSlug,
+        const full = await tx.category.findUnique({
+          where: { id: updatedCat.id },
+          select: {
+            id: true,
+            slug: true,
+            name: true,
+            description: true,
+            image: true,
+            icon: true,
+            order: true,
+            translations: {
+              select: {
+                locale: true,
+                name: true,
+                description: true,
+                slug: true,
+              },
+            },
           },
         });
-      }
-    }
 
-    const full = await prisma.category.findUnique({
-      where: { id: updatedCat.id },
-      select: {
-        id: true,
-        slug: true,
-        name: true,
-        description: true,
-        image: true,
-        icon: true,
-        order: true,
-        translations: { select: { locale: true, name: true, description: true, slug: true } }
-      }
-    });
+        const actor = auditActorFromDashboardSession(session!);
+        await writeAuditLog({
+          ...actor,
+          action: "CATEGORY_UPDATE",
+          messageAr: `${actor.actorName ?? "مسؤول"} عدّل الحملة: ${full?.name ?? name}`,
+          entityType: "Category",
+          entityId: id,
+        });
 
-    const actor = auditActorFromDashboardSession(session!);
-    await writeAuditLog({
-      ...actor,
-      action: 'CATEGORY_UPDATE',
-      messageAr: `${actor.actorName ?? 'مسؤول'} عدّل الحملة: ${full?.name ?? name}`,
-      entityType: 'Category',
-      entityId: id,
-    });
-
-    return NextResponse.json(full);
+        return NextResponse.json(full);
+      },
+      { maxWait: 10000, timeout: 30000 },
+    );
   } catch (error: any) {
-    console.error('Error updating category:', error);
-    const code = error?.code || '';
-    const message = String(error?.message || '');
-    if (code === 'P2002' || message.toLowerCase().includes('unique')) {
-      return NextResponse.json({ error: 'Category with this name already exists' }, { status: 400 });
+    if (isContentWriteConflict(error))
+      return NextResponse.json(
+        { error: "تغير المحتوى لدى زميل. أعد تحميل الصفحة قبل الحفظ." },
+        { status: 409 },
+      );
+    console.error("Error updating category:", error);
+    const code = error?.code || "";
+    const message = String(error?.message || "");
+    if (code === "P2002" || message.toLowerCase().includes("unique")) {
+      return NextResponse.json(
+        { error: "Category with this name already exists" },
+        { status: 400 },
+      );
     }
     return NextResponse.json(
-      { error: message ? `Failed to update category: ${message.slice(0, 180)}` : 'Failed to update category' },
-      { status: 500 }
+      {
+        error: message
+          ? `Failed to update category: ${message.slice(0, 180)}`
+          : "Failed to update category",
+      },
+      { status: 500 },
     );
   }
 }
 
 // PATCH: admin-only; toggle the category's archive state. When isActive flips,
-// cascade the same value to every campaign in the category — archiving the
-// category archives every campaign, re-activating brings them all back.
+// Category publication is independent of member campaign publication.
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: idOrSlug } = await params;
     const session = await getServerSession(authOptions);
-    const denied = requireAdminOrDashboardPermission(session, 'categories');
+    const denied = requireAdminOrDashboardPermission(session, "categories");
     if (denied) return denied;
 
     const body = await request.json();
-    if (typeof body?.isActive !== 'boolean') {
-      return NextResponse.json({ error: 'isActive (boolean) is required' }, { status: 400 });
+    if (typeof body?.isActive !== "boolean") {
+      return NextResponse.json(
+        { error: "isActive (boolean) is required" },
+        { status: 400 },
+      );
     }
     const nextActive: boolean = body.isActive;
 
@@ -256,7 +321,10 @@ export async function PATCH(
       select: { id: true, name: true, isActive: true },
     });
     if (!existing) {
-      return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: "Category not found" },
+        { status: 404 },
+      );
     }
     const id = existing.id;
 
@@ -265,79 +333,87 @@ export async function PATCH(
       data: { isActive: nextActive },
     });
 
-    // Cascade to every non-deleted member campaign. updateMany on the m2m
-    // mirror is safe — categoryIds is just an ObjectId[] on the Campaign side.
-    // Soft-deleted campaigns are skipped so re-activating a category doesn't
-    // resurrect them.
-    const cascade = await prisma.campaign.updateMany({
-      where: {
-        AND: [
-          { categoryIds: { has: id } },
-          NOT_SOFT_DELETED,
-        ],
-      },
-      data: { isActive: nextActive },
-    });
-
     const actor = auditActorFromDashboardSession(session!);
     await writeAuditLog({
       ...actor,
-      action: nextActive ? 'CATEGORY_ACTIVATE' : 'CATEGORY_ARCHIVE',
-      messageAr: `${actor.actorName ?? 'مسؤول'} ${nextActive ? 'فعّل' : 'أرشف'} الحملة "${existing.name}" (${cascade.count} مشروع تابع)`,
-      entityType: 'Category',
+      action: nextActive ? "CATEGORY_ACTIVATE" : "CATEGORY_ARCHIVE",
+      messageAr: `${actor.actorName ?? "مسؤول"} ${nextActive ? "فعّل" : "أرشف"} التصنيف "${existing.name}" دون تغيير حالة المشاريع التابعة`,
+      entityType: "Category",
       entityId: id,
     });
 
     return NextResponse.json({
       id,
       isActive: nextActive,
-      cascadedCampaigns: cascade.count,
+      affectedCampaigns: 0,
     });
   } catch (error) {
-    console.error('Error toggling category isActive:', error);
-    return NextResponse.json({ error: 'Failed to update category status' }, { status: 500 });
+    console.error("Error toggling category isActive:", error);
+    return NextResponse.json(
+      { error: "Failed to update category status" },
+      { status: 500 },
+    );
   }
 }
 
 // DELETE: admin-only; refuse to delete if campaigns exist
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id: idOrSlug } = await params;
     const session = await getServerSession(authOptions);
-    const denied = requireAdminOrDashboardPermission(session, 'categories');
+    const denied = requireAdminOrDashboardPermission(session, "categories");
     if (denied) return denied;
 
     const cat = await prisma.category.findFirst({
       where: whereByIdOrSlug(idOrSlug),
-      select: { id: true, name: true },
+      select: { id: true, name: true, slug: true },
     });
     if (!cat) {
-      return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: "Category not found" },
+        { status: 404 },
+      );
     }
     const id = cat.id;
 
-    const campaignCount = await prisma.campaign.count({ where: { categoryIds: { has: id } } });
+    const campaignCount = await prisma.campaign.count({
+      where: { categoryIds: { has: id } },
+    });
     if (campaignCount > 0) {
-      return NextResponse.json({ error: 'Category has campaigns. Delete or move campaigns before deleting the category.' }, { status: 400 });
+      return NextResponse.json(
+        {
+          error:
+            "Category has campaigns. Delete or move campaigns before deleting the category.",
+        },
+        { status: 400 },
+      );
     }
 
-    await prisma.category.delete({ where: { id } });
+    const deletionInput=await request.json().catch(()=>({}));
+    await deleteContentSafely(contentStore,{kind:"categories",id:id,confirmation:String(deletionInput.confirmation || ""),revision:typeof deletionInput.revision === "string" ? deletionInput.revision : undefined});
 
     const actor = auditActorFromDashboardSession(session!);
     await writeAuditLog({
       ...actor,
-      action: 'CATEGORY_DELETE',
-      messageAr: `${actor.actorName ?? 'مسؤول'} حذف الحملة: ${cat?.name ?? id}`,
-      entityType: 'Category',
+      action: "CATEGORY_DELETE",
+      messageAr: `${actor.actorName ?? "مسؤول"} حذف الحملة: ${cat?.name ?? id}`,
+      entityType: "Category",
       entityId: id,
     });
 
-    return NextResponse.json({ message: 'Category deleted successfully' }, { status: 200 });
+    return NextResponse.json(
+      { message: "Category deleted successfully" },
+      { status: 200 },
+    );
   } catch (error) {
-    console.error('Error deleting category:', error);
-    return NextResponse.json({ error: 'Failed to delete category' }, { status: 500 });
+    if(error instanceof ContentError)return NextResponse.json({error:error.message},{status:error.status});
+    console.error("Error deleting category:", error);
+    return NextResponse.json(
+      { error: "Failed to delete category" },
+      { status: 500 },
+    );
   }
 }

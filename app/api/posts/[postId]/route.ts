@@ -1,3 +1,7 @@
+import { deleteContentSafely } from "@/lib/content-editor/deletion";
+import { contentStore } from "@/lib/content-editor/store";
+import { ContentError } from "@/lib/content-editor/service";
+import { contentWriteWhere, contentVersionPatch, isContentWriteConflict } from "@/lib/content-editor/legacy-write";
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
@@ -293,7 +297,7 @@ export async function PATCH(
     }
 
     const updated = await prisma.$transaction(async (tx) => {
-      const post = await tx.post.update({ where: { id: postId }, data: updateData });
+      const post = await tx.post.update({ where: contentWriteWhere({ id: postId }, body), data: { ...updateData, ...contentVersionPatch() } });
 
       for (const { locale, data } of translationUpdates) {
         const td: any = {};
@@ -371,6 +375,7 @@ export async function PATCH(
 
     return NextResponse.json(full);
   } catch (error) {
+    if (isContentWriteConflict(error)) return NextResponse.json({ error: "تغير المحتوى لدى زميل. أعد تحميل الصفحة قبل الحفظ." }, { status: 409 });
     console.error('[POST_UPDATE]', error);
     return NextResponse.json({ error: 'Internal Error' }, { status: 500 });
   }
@@ -392,10 +397,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ p
     if (!exists) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
     const postId = exists.id;
 
-    await prisma.$transaction(async (tx) => {
-      await tx.postTranslation.deleteMany({ where: { postId } });
-      await tx.post.delete({ where: { id: postId } });
-    });
+    const deletionInput=await req.json().catch(()=>({}));
+    await deleteContentSafely(contentStore,{kind:"blog",id:postId,confirmation:String(deletionInput.confirmation || ""),revision:typeof deletionInput.revision === "string" ? deletionInput.revision : undefined});
 
     const actor = session!.user;
     await writeAuditLog({
@@ -410,6 +413,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ p
 
     return NextResponse.json({ message: 'Post deleted' });
   } catch (error) {
+    if(error instanceof ContentError)return NextResponse.json({error:error.message},{status:error.status});
     console.error('[POST_DELETE]', error);
     return NextResponse.json({ error: 'Error deleting post' }, { status: 500 });
   }

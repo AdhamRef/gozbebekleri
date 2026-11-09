@@ -1,3 +1,4 @@
+import translations from "@/lib/privacy-translations.json";
 import { Shield } from "lucide-react";
 
 type Copy = {
@@ -8,7 +9,8 @@ type Copy = {
   contact: { heading: string; body: string };
 };
 
-const CONTENT: Record<string, Copy> = {
+export const CONTENT: Record<string, Copy> = {
+  ...translations,
   ar: {
     title: "سياسة الخصوصية",
     subtitle: "كيف نجمع بياناتك ونستخدمها ونحميها.",
@@ -119,10 +121,9 @@ const CONTENT: Record<string, Copy> = {
   },
 };
 
-const ALIAS: Record<string, string> = { fr: "en", tr: "en", id: "en", pt: "en", es: "en" };
 
 export default function PolicyPage({ locale }: { locale: string }) {
-  const effective = CONTENT[locale] ? locale : ALIAS[locale] ?? "en";
+  const effective = CONTENT[locale] ? locale : "en";
   const copy = CONTENT[effective];
   const isRTL = locale === "ar";
 

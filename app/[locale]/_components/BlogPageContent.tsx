@@ -6,8 +6,8 @@ import { Link } from "@/i18n/routing";
 import { Search, BookOpen, Calendar, ArrowRight, Loader2 } from "lucide-react";
 import { useDebounce } from "use-debounce";
 import { useLocale, useTranslations } from "next-intl";
-import { formatDistanceToNow, type Locale } from "date-fns";
-import { ar, enUS, tr } from "date-fns/locale";
+import { formatDistanceToNow } from "date-fns";
+import { publicDateLocale } from "@/lib/public-date-locale";
 
 interface Post {
   id: string;
@@ -19,7 +19,6 @@ interface Post {
   category?: { id?: string; slug?: string | null; name?: string } | null;
 }
 
-const dateLocaleMap: Record<string, Locale> = { ar, en: enUS, tr };
 
 interface BlogPageContentProps {
   initialPosts?: Post[];
@@ -34,7 +33,7 @@ const BlogPage = ({
 }: BlogPageContentProps = {}) => {
   const t = useTranslations("Blog");
   const locale = useLocale();
-  const dateLocale = dateLocaleMap[locale] ?? enUS;
+  const dateLocale = publicDateLocale(locale);
 
   const [posts, setPosts] = useState<Post[]>(initialPosts);
   const [loading, setLoading] = useState(initialPosts.length === 0);

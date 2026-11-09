@@ -1,3 +1,4 @@
+// Offline regression fixtures for the transferred runtime.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -28,11 +29,10 @@ test("invalid encryption key, http production URL, and legacy flags block releas
   const checks = inspectEnvironment(safeEnv({
     INTEGRATION_SETTINGS_ENCRYPTION_KEY: "invalid",
     NEXTAUTH_URL: "http://example.org",
-    WHATSAPP_LEGACY_TWILIO_ENABLED: "true",
     SENDGRID_FALLBACK_ENABLED: "true",
   }));
   assert.equal(overallStatus(checks), "BLOCKED");
-  assert.equal(checks.filter((check) => check.status === "BLOCKED").length >= 4, true);
+  assert.equal(checks.filter((check) => check.status === "BLOCKED").length >= 3, true);
 });
 
 test("canonical URL conflicts are warnings without exposing URL values", () => {
@@ -67,7 +67,6 @@ test("preflight and migration verification are read-only and provider-free", () 
 test("crypto Prisma webhook integration and Cron routes explicitly use Node runtime", () => {
   const routes = [
     "app/api/webhooks/meta/whatsapp/route.ts",
-    "app/api/webhooks/brevo/transactional/route.ts",
     "app/api/cron/communication-run-due/route.ts",
     "app/api/admin/integration-settings/[provider]/route.ts",
     "app/api/admin/integration-settings/[provider]/test-active/route.ts",
@@ -85,3 +84,4 @@ test("migration fails on duplicates and never deletes data or indexes", () => {
   assert.match(migration, /createIndexes/);
   assert.doesNotMatch(migration, /dropIndexes|dropIndex|deleteMany|deleteOne|dropDatabase|drop:/);
 });
+

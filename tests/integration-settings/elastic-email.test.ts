@@ -51,7 +51,7 @@ test("Elastic Email field validation rejects bad values", () => {
 test("transactional payload matches the Elastic Email v4 contract", () => {
   const payload = buildElasticEmailPayload(
     { to: "donor@example.org", subject: "شكرًا لتبرعك", html: "<p>شكرًا</p>", text: "شكرًا" },
-    { email: "noreply@gozbebekleri.org.tr", name: "Gözbebekleri" }
+    { email: "fixture-recipient-9@example.test", name: "Gözbebekleri" }
   ) as {
     Recipients: { To: string[] };
     Content: { From: string; Subject: string; Body: { ContentType: string; Content: string; Charset: string }[] };
@@ -59,26 +59,46 @@ test("transactional payload matches the Elastic Email v4 contract", () => {
   };
 
   assert.deepEqual(payload.Recipients.To, ["donor@example.org"]);
-  assert.equal(payload.Content.From, "Gözbebekleri <noreply@gozbebekleri.org.tr>");
+  assert.equal(payload.Content.From, "Gözbebekleri <fixture-recipient-9@example.test>");
   assert.equal(payload.Content.Subject, "شكرًا لتبرعك");
   assert.deepEqual(payload.Content.Body.map((part) => part.ContentType), ["HTML", "PlainText"]);
   assert.equal(payload.Content.Body[0].Charset, "utf-8");
   assert.equal(payload.Options.TrackOpens, true);
 });
 
+test("payload carries PDF attachments inline as base64 (v4 `Attachments`)", () => {
+  const payload = buildElasticEmailPayload(
+    {
+      to: "donor@example.org",
+      subject: "s",
+      html: "<p>x</p>",
+      attachments: [{ filename: "شهادة الشكر.pdf", content: "JVBERi0=", contentType: "application/pdf" }],
+    },
+    { email: "fixture-recipient-5@example.test", name: "" }
+  ) as { Content: { Attachments?: Array<{ BinaryContent: string; Name: string; ContentType: string }> } };
+  assert.deepEqual(payload.Content.Attachments, [{ BinaryContent: "JVBERi0=", Name: "شهادة الشكر.pdf", ContentType: "application/pdf" }]);
+});
+
+test("payload has no Attachments key when nothing is attached", () => {
+  const payload = buildElasticEmailPayload({ to: "fixture-recipient-1@example.test", subject: "s", html: "<p>x</p>", attachments: [] }, { email: "fixture-recipient-5@example.test", name: "" }) as {
+    Content: Record<string, unknown>;
+  };
+  assert.equal("Attachments" in payload.Content, false);
+});
+
 test("payload omits the plain-text part when none is rendered", () => {
-  const payload = buildElasticEmailPayload({ to: "a@b.org", subject: "s", html: "<p>x</p>" }, { email: "from@b.org", name: "" }) as {
+  const payload = buildElasticEmailPayload({ to: "fixture-recipient-1@example.test", subject: "s", html: "<p>x</p>" }, { email: "fixture-recipient-5@example.test", name: "" }) as {
     Content: { From: string; Body: unknown[] };
   };
   assert.equal(payload.Content.Body.length, 1);
-  assert.equal(payload.Content.From, "from@b.org");
+  assert.equal(payload.Content.From, "fixture-recipient-5@example.test");
 });
 
 test("sender identity quotes display names that would break the From header", () => {
-  assert.equal(formatSenderIdentity("a@b.org", null), "a@b.org");
-  assert.equal(formatSenderIdentity("a@b.org", "Gözbebekleri"), "Gözbebekleri <a@b.org>");
-  assert.equal(formatSenderIdentity("a@b.org", "Charity, Inc <spoof@evil.org>"), '"Charity, Inc <spoof@evil.org>" <a@b.org>');
-  assert.equal(formatSenderIdentity("a@b.org", "Line\nBreak"), "Line Break <a@b.org>");
+  assert.equal(formatSenderIdentity("fixture-recipient-1@example.test", null), "fixture-recipient-1@example.test");
+  assert.equal(formatSenderIdentity("fixture-recipient-1@example.test", "Gözbebekleri"), "Gözbebekleri <fixture-recipient-1@example.test>");
+  assert.equal(formatSenderIdentity("fixture-recipient-1@example.test", "Charity, Inc <fixture-recipient-12@example.test>"), '"Charity, Inc <fixture-recipient-12@example.test>" <fixture-recipient-1@example.test>');
+  assert.equal(formatSenderIdentity("fixture-recipient-1@example.test", "Line\nBreak"), "Line Break <fixture-recipient-1@example.test>");
 });
 
 test("provider message id is read across response casings", () => {
@@ -134,8 +154,8 @@ test("event names map to delivery statuses regardless of casing or separators", 
 });
 
 test("a spam complaint is an opt-out, not a delivery failure", () => {
-  // It used to map to FAILED, which both inflated the failure count and — because
-  // nothing downstream reacts to FAILED — left the complainant in every future
+  // It used to map to FAILED, which both inflated the failure count and  because
+  // nothing downstream reacts to FAILED  left the complainant in every future
   // audience. The message reached them; they opted out in the harshest way.
   for (const name of ["AbuseReport", "abuse", "Spam", "SpamComplaint", "complaint"]) {
     assert.equal(mapElasticEmailEventStatus(name), "UNSUBSCRIBED", `failed for ${name}`);
@@ -163,19 +183,19 @@ test("only permanent failures suppress the address", () => {
 
 test("normalized events carry their suppression reason", () => {
   const events = normalizeElasticEmailEvents([
-    { messageid: "m1", eventtype: "Opened", to: "a@b.org" },
-    { messageid: "m2", eventtype: "Unsubscribed", to: "c@d.org" },
-    { messageid: "m3", eventtype: "AbuseReport", to: "e@f.org" },
-    { messageid: "m4", eventtype: "HardBounce", to: "g@h.org" },
-    { messageid: "m5", eventtype: "SoftBounce", to: "i@j.org" },
+    { messageid: "m1", eventtype: "Opened", to: "fixture-recipient-1@example.test" },
+    { messageid: "m2", eventtype: "Unsubscribed", to: "fixture-recipient-2@example.test" },
+    { messageid: "m3", eventtype: "AbuseReport", to: "fixture-recipient-4@example.test" },
+    { messageid: "m4", eventtype: "HardBounce", to: "fixture-recipient-6@example.test" },
+    { messageid: "m5", eventtype: "SoftBounce", to: "fixture-recipient-7@example.test" },
   ]);
   assert.deepEqual(
     events.map((e) => e.suppression),
     ["none", "unsubscribe", "complaint", "hard-bounce", "none"]
   );
-  // The recipient must survive normalization — it is the only handle the
+  // The recipient must survive normalization  it is the only handle the
   // suppression step has on the donor.
-  assert.deepEqual(events.map((e) => e.recipient), ["a@b.org", "c@d.org", "e@f.org", "g@h.org", "i@j.org"]);
+  assert.deepEqual(events.map((e) => e.recipient), ["fixture-recipient-1@example.test", "fixture-recipient-2@example.test", "fixture-recipient-4@example.test", "fixture-recipient-6@example.test", "fixture-recipient-7@example.test"]);
 });
 
 test("payload unwrapping handles single objects, arrays, and wrapped collections", () => {
@@ -188,15 +208,15 @@ test("payload unwrapping handles single objects, arrays, and wrapped collections
 
 test("events normalize across Elastic Email field-name generations", () => {
   const events = normalizeElasticEmailEvents([
-    { messageid: "m1", eventtype: "Delivered", to: "a@b.org", date: "2026-08-01T10:00:00Z" },
-    { MessageID: "m2", EventType: "Opened", email: "c@d.org" },
-    { msgid: "m3", status: "Error", to: "e@f.org", error: "mailbox full" },
+    { messageid: "m1", eventtype: "Delivered", to: "fixture-recipient-1@example.test", date: "2026-08-01T10:00:00Z" },
+    { MessageID: "m2", EventType: "Opened", email: "fixture-recipient-2@example.test" },
+    { msgid: "m3", status: "Error", to: "fixture-recipient-4@example.test", error: "mailbox full" },
   ]);
 
   assert.equal(events.length, 3);
   assert.deepEqual(events.map((event) => event.status), ["DELIVERED", "OPENED", "FAILED"]);
   assert.deepEqual(events.map((event) => event.providerMessageId), ["m1", "m2", "m3"]);
-  assert.deepEqual(events.map((event) => event.recipient), ["a@b.org", "c@d.org", "e@f.org"]);
+  assert.deepEqual(events.map((event) => event.recipient), ["fixture-recipient-1@example.test", "fixture-recipient-2@example.test", "fixture-recipient-4@example.test"]);
   assert.equal(events[2].errorMessage, "mailbox full");
   // Errors carry the reason; successes must not invent one.
   assert.equal(events[0].errorMessage, null);
@@ -237,70 +257,48 @@ test("engagement statuses only move forward but terminal outcomes always apply",
 
 /* ───────────────────────────── pull-based event feed ───────────────────────────── */
 
-/**
- * Verbatim rows from `GET /v4/events` on the live account. The send path can only ever record
- * "the provider returned 2xx"; these are the events that say what happened afterwards, and they
- * are the only thing that can turn an over-optimistic SENT row into the truth.
- */
-const LIVE_EVENT_FEED = [
-  {
-    TransactionID: "f01ce91d-22a4-823d-001d-aef4225c5024",
-    MsgID: "ho3apRyH2qK9s5TBPlMkew2",
-    FromEmail: "info@gozbebekleri.org",
-    To: "salahelnabtity@gamil.com",
-    EventType: "Suppress",
-    EventDate: "2026-08-06T12:47:46Z",
-    MessageCategory: "NotDelivered",
-    Message: "Delivery to this domain is not permitted on your account until the trust level of your mail increases.",
-  },
-  {
-    TransactionID: "f01ce904-1ea4-0149-c004-dced3b45495b",
-    MsgID: "oxqUU2gsBIPZ_UwdTz2w8g2",
-    FromEmail: "info@gozbebekleri.org",
-    To: "theaxhunter303@gmail.com",
-    EventType: "Error",
-    EventDate: "2026-08-06T12:47:41Z",
-    MessageCategory: "AccountProblem",
-    Message: "Delivery failed due to account problem or spam block. Will attempt again at a later date.",
-  },
-  { MsgID: "aaa", To: "x@y.com", EventType: "Sent", EventDate: "2026-08-06T05:59:46Z", MessageCategory: "Unknown", Message: "" },
-  { MsgID: "bbb", To: "x@y.com", EventType: "Open", EventDate: "2026-08-05T23:01:03Z", MessageCategory: "Unknown", Message: "" },
-  { MsgID: "ccc", To: "x@y.com", EventType: "Click", EventDate: "2026-08-05T22:37:16Z", MessageCategory: "Unknown", Message: "" },
-  { MsgID: "ddd", To: "x@y.com", EventType: "Submission", EventDate: "2026-08-06T12:47:41Z", MessageCategory: "Unknown", Message: "" },
+/** Synthetic provider-shaped events; no live-account exports or real recipient data. */
+const SYNTHETIC_EVENT_FEED = [
+  { TransactionID: "fixture-transaction-001", MsgID: "fixture-suppressed", FromEmail: "sender@example.test", To: "recipient@example.test", EventType: "Suppress", EventDate: "2030-01-02T10:00:00Z", MessageCategory: "NotDelivered", Message: "Synthetic fixture: trust level limit." },
+  { TransactionID: "fixture-transaction-002", MsgID: "fixture-errored", FromEmail: "sender@example.test", To: "recipient@example.test", EventType: "Error", EventDate: "2030-01-02T10:01:00Z", MessageCategory: "AccountProblem", Message: "Synthetic fixture: account problem or spam block." },
+  { MsgID: "aaa", To: "recipient@example.test", EventType: "Sent", EventDate: "2030-01-02T10:02:00Z", MessageCategory: "Unknown", Message: "" },
+  { MsgID: "bbb", To: "recipient@example.test", EventType: "Open", EventDate: "2030-01-02T10:03:00Z", MessageCategory: "Unknown", Message: "" },
+  { MsgID: "ccc", To: "recipient@example.test", EventType: "Click", EventDate: "2030-01-02T10:04:00Z", MessageCategory: "Unknown", Message: "" },
+  { MsgID: "ddd", To: "recipient@example.test", EventType: "Submission", EventDate: "2030-01-02T10:05:00Z", MessageCategory: "Unknown", Message: "" },
 ];
 
 test("an accepted-then-refused message normalizes to a failure, not a success", () => {
-  const events = normalizeElasticEmailEvents(LIVE_EVENT_FEED);
-  const suppressed = events.find((e) => e.providerMessageId === "ho3apRyH2qK9s5TBPlMkew2");
-  assert.ok(suppressed, "a Suppress event must not be dropped — it is the whole point of the sync");
+  const events = normalizeElasticEmailEvents(SYNTHETIC_EVENT_FEED);
+  const suppressed = events.find((e) => e.providerMessageId === "fixture-suppressed");
+  assert.ok(suppressed, "a Suppress event must not be dropped  it is the whole point of the sync");
   assert.equal(suppressed.status, "FAILED");
   // Without the reason the operator sees a bare FAILED and still cannot act on it.
   assert.match(suppressed.errorMessage ?? "", /trust level/);
 
-  const errored = events.find((e) => e.providerMessageId === "oxqUU2gsBIPZ_UwdTz2w8g2");
+  const errored = events.find((e) => e.providerMessageId === "fixture-errored");
   assert.equal(errored?.status, "FAILED");
   assert.match(errored?.errorMessage ?? "", /account problem or spam block/);
 });
 
 test("the pull feed keys on MsgID and maps the tracked lifecycle events", () => {
-  const byId = new Map(normalizeElasticEmailEvents(LIVE_EVENT_FEED).map((e) => [e.providerMessageId, e.status]));
+  const byId = new Map(normalizeElasticEmailEvents(SYNTHETIC_EVENT_FEED).map((e) => [e.providerMessageId, e.status]));
   assert.equal(byId.get("aaa"), "SENT");
   assert.equal(byId.get("bbb"), "OPENED");
   assert.equal(byId.get("ccc"), "CLICKED");
-  // "Submission" is Elastic Email accepting the payload — exactly the fact the send already
+  // "Submission" is Elastic Email accepting the payload  exactly the fact the send already
   // recorded. Treating it as a delivery state would re-assert the claim under investigation.
   assert.equal(byId.has("ddd"), false);
   assert.equal(byId.size, 5);
 });
 
 test("a success event carries no error text", () => {
-  const sent = normalizeElasticEmailEvents(LIVE_EVENT_FEED).find((e) => e.providerMessageId === "aaa");
+  const sent = normalizeElasticEmailEvents(SYNTHETIC_EVENT_FEED).find((e) => e.providerMessageId === "aaa");
   assert.equal(sent?.errorMessage, null);
 });
 
 test("repeated polls of the same feed produce identical idempotency keys", () => {
-  const first = normalizeElasticEmailEvents(LIVE_EVENT_FEED).map((e) => e.idempotencyKey);
-  const second = normalizeElasticEmailEvents(LIVE_EVENT_FEED).map((e) => e.idempotencyKey);
+  const first = normalizeElasticEmailEvents(SYNTHETIC_EVENT_FEED).map((e) => e.idempotencyKey);
+  const second = normalizeElasticEmailEvents(SYNTHETIC_EVENT_FEED).map((e) => e.idempotencyKey);
   assert.deepEqual(first, second);
   assert.equal(new Set(first).size, first.length);
 });

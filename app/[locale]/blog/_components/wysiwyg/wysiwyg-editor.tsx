@@ -42,14 +42,20 @@ export default function WysiwygEditor({
     onDebouncedUpdate(editor);
   }, debounceDuration);
 
+  const hydratedKeyRef = useRef<string | null>(null);
   const editor = useEditor({
     editable: isEditable,
+    content: defaultValue,
     extensions: [...defaultExtensions, ...extensions],
     editorProps: {
       ...defaultEditorProps,
       ...editorProps,
     },
     onUpdate: (e) => {
+      // Transaction subscribers can render before the parent's onUpdate state
+      // reaches us. Record this synchronously so undo/redo isn't overwritten by
+      // the previous controlled value during that intermediate render.
+      hydratedKeyRef.current = JSON.stringify(e.editor.getJSON());
       onUpdate(e.editor);
       debouncedUpdates(e);
     },
@@ -59,7 +65,9 @@ export default function WysiwygEditor({
   // cursor every render. The parent re-creates the `defaultValue` object on
   // every keystroke (parseEditorContent(state)), so a naïve `setContent` would
   // reset selection to the end after every edit.
-  const hydratedKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    editor?.setEditable(isEditable, false);
+  }, [editor, isEditable]);
 
   useEffect(() => {
     if (!editor) return;
@@ -96,9 +104,10 @@ export default function WysiwygEditor({
 
   return (
     <div className={isEditable ? className : ""}>
-      {isEditable && editor && <EditorToolbar editor={editor} />}
-      {editor && <EditorBubbleMenu editor={editor} />}
-      {editor?.isActive("image") && <ImageResizer editor={editor} />}
+      <div hidden={!isEditable}>{editor && <EditorToolbar editor={editor} />}</div>
+      {/* Tippy moves the menu node. Keep its React parent stable when saving. */}
+      <div>{editor && <EditorBubbleMenu editor={editor} />}</div>
+      <div>{editor?.isActive("image") && <ImageResizer editor={editor} />}</div>
       <EditorContent editor={editor} />
     </div>
   );

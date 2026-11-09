@@ -1,3 +1,4 @@
+import { findClassifiedTemplate, retainAutomaticTemplateKind } from "@/lib/communication/template-usage";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getServerSession } from "next-auth";
@@ -6,6 +7,7 @@ import { requireAdminOrDashboardPermission } from "@/lib/dashboard/api-auth";
 import { prisma } from "@/lib/prisma";
 import { auditActorFromDashboardSession, writeAuditLog } from "@/lib/audit-log";
 import { MAX_COOLDOWN_DAYS, MAX_LAPSE_DAYS, MIN_COOLDOWN_DAYS, MIN_LAPSE_DAYS } from "@/lib/events/catalog";
+import { preflightTrigger } from "@/lib/communication/trigger-preflight";
 
 const updateSchema = z.object({
   enabled: z.boolean().optional(),
@@ -37,19 +39,35 @@ export async function PATCH(
   const existing = await prisma.messageTrigger.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  if (existing.channel === "SMS") return NextResponse.json({ error: "CHANNEL_REMOVED" }, { status: 410 });
+
   if (parsed.data.templateId) {
-    const exists =
-      existing.channel === "EMAIL"
-        ? await prisma.emailTemplate.findUnique({ where: { id: parsed.data.templateId }, select: { id: true } })
-        : await prisma.whatsappTemplate.findUnique({ where: { id: parsed.data.templateId }, select: { id: true } });
-    if (!exists) {
-      return NextResponse.json({ error: "Template not found for channel" }, { status: 400 });
+    const template = await findClassifiedTemplate(existing.channel, parsed.data.templateId);
+    if (!template) return NextResponse.json({ error: "Template not found for channel" }, { status: 400 });
+    if (template.kind !== "SYSTEM" || template.status === "ARCHIVED") {
+      return NextResponse.json({ error: "SYSTEM_TEMPLATE_REQUIRED" }, { status: 409 });
+    }
+  }
+
+  /* Same gate as creation: switching a trigger on, or pointing an enabled one at a new template, is
+     the moment it starts costing donors their messages. Disabling is never gated. */
+  const willBeEnabled = parsed.data.enabled ?? existing.enabled;
+  const templateChanged = Boolean(parsed.data.templateId && parsed.data.templateId !== existing.templateId);
+  const turningOn = parsed.data.enabled === true && !existing.enabled;
+  if (willBeEnabled && (turningOn || templateChanged)) {
+    const preflight = await preflightTrigger({ channel: existing.channel, templateId: parsed.data.templateId ?? existing.templateId, event: existing.event });
+    if (!preflight.ok) {
+      return NextResponse.json({ error: "TRIGGER_NOT_READY", preflight }, { status: 409 });
     }
   }
 
   // Timing only applies to scheduled events; silently ignore it on event-driven triggers.
   const scheduled = existing.event === "DONATION_LAPSED";
 
+  if (templateChanged) {
+    await retainAutomaticTemplateKind(existing.channel, existing.templateId);
+    await retainAutomaticTemplateKind(existing.channel, parsed.data.templateId!);
+  }
   const updated = await prisma.messageTrigger.update({
     where: { id },
     data: {
@@ -64,7 +82,7 @@ export async function PATCH(
   await writeAuditLog({
     ...actor,
     action: "MESSAGE_TRIGGER_UPDATE",
-    messageAr: `حدّث حدث تلقائي ${updated.event} — مفعّل: ${updated.enabled ? "نعم" : "لا"}`,
+    messageAr: `حدّث حدث تلقائي ${updated.event}  مفعّل: ${updated.enabled ? "نعم" : "لا"}`,
     entityType: "MessageTrigger",
     entityId: updated.id,
     stream: "TEAM",
@@ -81,6 +99,9 @@ export async function DELETE(
   if (denied) return denied;
   const { id } = await params;
 
+  const existing = await prisma.messageTrigger.findUnique({ where: { id } });
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  await retainAutomaticTemplateKind(existing.channel, existing.templateId);
   const deleted = await prisma.messageTrigger.delete({ where: { id } });
   const actor = auditActorFromDashboardSession(session!);
   await writeAuditLog({

@@ -1,13 +1,14 @@
-import { SUPPORTED_CURRENCY_OPTIONS } from "@/lib/supported-currencies";
+import { PUBLIC_CURRENCY_OPTIONS, SUPPORTED_CURRENCY_OPTIONS } from "@/lib/supported-currencies";
 
 /** Stable list for dashboards / link builders (DEFAULT first, then same order as `CurrencySelector`). */
 export const URL_CURRENCY_CODES_ORDERED = [
   "DEFAULT",
-  ...SUPPORTED_CURRENCY_OPTIONS.map((o) => o.code),
+  ...PUBLIC_CURRENCY_OPTIONS.map((o) => o.code),
 ] as const;
 
 /** Matches `CurrencySelector` codes (uppercase in URLs). */
-export const ALLOWED_URL_CURRENCIES = new Set<string>(URL_CURRENCY_CODES_ORDERED);
+// Accept legacy links without relabelling an existing amount into another currency.
+export const ALLOWED_URL_CURRENCIES = new Set<string>(["DEFAULT", ...SUPPORTED_CURRENCY_OPTIONS.map((o) => o.code)]);
 
 const COOKIE_DEFAULT = "DEFAULT";
 

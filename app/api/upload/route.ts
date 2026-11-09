@@ -3,6 +3,7 @@ import type { UploadApiResponse } from 'cloudinary';
 import cloudinary from '@/lib/cloudinary';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/options';
+import { requireAdminSession } from '@/lib/dashboard/api-auth';
 import {
   queueAuditLog,
   auditActorFromSiteSession,
@@ -105,19 +106,19 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: 'يجب تسجيل الدخول' }, { status: 401 });
-    }
+    const denied = requireAdminSession(session);
+    if (denied) return denied;
 
     const { searchParams } = new URL(request.url);
     const publicId = searchParams.get('publicId');
 
-    if (!publicId) {
-      return NextResponse.json({ error: 'Public ID is required' }, { status: 400 });
+    const imageId = publicId?.replace(/^campaigns\//, '');
+    if (!imageId || !/^[a-zA-Z0-9_-]{1,256}$/.test(imageId)) {
+      return NextResponse.json({ error: 'معرّف الصورة غير صالح' }, { status: 400 });
     }
 
     // Delete from Cloudinary
-    await cloudinary.uploader.destroy(`campaigns/${publicId}`);
+    await cloudinary.uploader.destroy(`campaigns/${imageId}`);
 
     const actor = auditActorFromSiteSession(session);
     queueAuditLog({

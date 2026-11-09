@@ -112,7 +112,6 @@ interface UserProfile {
   birthdate?: string | null;
   gender?: string | null;
   emailNotifications?: boolean;
-  smsNotifications?: boolean;
   hasPassword?: boolean;
   /** Filled server-side: true if user.password is set */
   password?: string | null;
@@ -185,7 +184,7 @@ const ProfilePage = () => {
   const [subscriptionSettingsDonation, setSubscriptionSettingsDonation] =
     useState<DonationForProfile | null>(null);
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
-  const [savingNotifications, setSavingNotifications] = useState<"email" | "sms" | null>(null);
+  const [savingNotifications, setSavingNotifications] = useState<"email" | null>(null);
 
   const id = session?.user?.id;
 
@@ -251,11 +250,11 @@ const ProfilePage = () => {
     }
   };
 
-  const handleNotificationToggle = async (kind: "email" | "sms", value: boolean) => {
+  const handleNotificationToggle = async (kind: "email", value: boolean) => {
     if (!id) return;
     setSavingNotifications(kind);
     try {
-      const field = kind === "email" ? "emailNotifications" : "smsNotifications";
+      const field = "emailNotifications";
       await axios.put(`/api/users/${id}`, { [field]: value });
       setUser((prev) => (prev ? { ...prev, [field]: value } : prev));
       toast.success(t("toast.notificationsUpdated"));
@@ -558,25 +557,6 @@ const ProfilePage = () => {
                   checked={u.emailNotifications ?? true}
                   onCheckedChange={(value) => handleNotificationToggle("email", value)}
                   disabled={savingNotifications === "email"}
-                />
-              </div>
-            </div>
-            <div className="flex items-center justify-between gap-4 p-5">
-              <div className="flex-1">
-                <h4 className="font-medium text-gray-900 flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-gray-400" />
-                  {t("settings.smsNotifications")}
-                </h4>
-                <p className="text-sm text-gray-500 mt-1">{t("settings.smsNotificationsDesc")}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {savingNotifications === "sms" && (
-                  <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                )}
-                <Switch
-                  checked={u.smsNotifications ?? true}
-                  onCheckedChange={(value) => handleNotificationToggle("sms", value)}
-                  disabled={savingNotifications === "sms"}
                 />
               </div>
             </div>
