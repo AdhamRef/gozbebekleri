@@ -10,7 +10,7 @@ import { sendDonationFailedConversions } from "@/lib/tracking/donation-conversio
 import { dispatchDonationPaid, dispatchEvent } from "@/lib/events/dispatch";
 import { donationFieldEmpty } from "@/lib/donations/mongo-null";
 import { normalizeDonationCurrencyCode } from "@/lib/exchange/convert-amount-in-currency-to-usd";
-import { checkoutPaymentCanSettle } from "@/lib/donations/stripe-checkout-settlement";
+import { checkoutPaymentCanSettle, stripeSubscriptionOwnershipMatches } from "@/lib/donations/stripe-checkout-settlement";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
@@ -139,10 +139,12 @@ export async function POST(req: NextRequest) {
               where: { id: dbId },
               include: { items: true, categoryItems: true },
             });
-            if (
-              candidate?.donorId === ownerId &&
-              (!candidate.payforToken || candidate.payforToken === stripeSubscriptionId)
-            ) {
+            if (stripeSubscriptionOwnershipMatches(
+              candidate,
+              stripeSubscriptionId,
+              { subscriptionDbId: dbId, userId: ownerId },
+              dbId,
+            )) {
               if (!candidate.payforToken) {
                 await prisma.subscription.update({
                   where: { id: candidate.id },
