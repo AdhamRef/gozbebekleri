@@ -3,7 +3,7 @@ on:
   push:
     branches: [port/minber-systems-20261104, integration/unified-systems-20261107]
   pull_request:
-    branches: [main, integration/unified-systems-20261107, fix/goz-report-profile-settlement-20261108]
+    branches: [main, integration/unified-systems-20261107, fix/goz-report-profile-settlement-20261108, audit/goz-parity-finance-20261109]
   workflow_dispatch:
 permissions:
   contents: read
