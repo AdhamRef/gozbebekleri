@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { checkoutPaymentCanSettle, stripeSubscriptionOwnershipMatches } from "../../lib/donations/stripe-checkout-settlement";
+import { checkoutPaymentCanSettle, stripeInvoiceSettlementDate, stripeSubscriptionOwnershipMatches } from "../../lib/donations/stripe-checkout-settlement";
 
 test("only paid one-time Checkout settles via checkout.session.completed", () => {
   assert.equal(checkoutPaymentCanSettle("payment", "paid"), true);
@@ -44,4 +44,14 @@ test("invoice fallback is read-only at Stripe and never rebinds another Stripe s
   assert.match(invoice, /stripe\.subscriptions\.retrieve\(stripeSubscriptionId\)/);
   assert.match(invoice, /stripeSubscriptionOwnershipMatches\(/);
   assert.match(invoice, /candidate\.payforToken/);
+});
+
+test("Stripe paid_at, not invoice creation time, determines the revenue period", () => {
+  const invoiceCreated = Date.parse("2026-10-31T20:00:00Z") / 1000;
+  const paid = Date.parse("2026-11-01T05:10:00Z") / 1000;
+  const event = Date.parse("2026-11-01T05:10:01Z") / 1000;
+  assert.equal(stripeInvoiceSettlementDate(paid, event).toISOString(), "2026-11-01T05:10:00.000Z");
+  assert.equal(stripeInvoiceSettlementDate(null, event).toISOString(), "2026-11-01T05:10:01.000Z");
+  assert.notEqual(stripeInvoiceSettlementDate(paid, event).getTime(), invoiceCreated * 1000);
+  assert.throws(() => stripeInvoiceSettlementDate(null, Number.NaN), /valid settlement timestamp/);
 });
