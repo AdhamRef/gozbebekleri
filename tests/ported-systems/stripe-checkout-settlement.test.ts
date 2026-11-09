@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { checkoutPaymentCanSettle } from "../../lib/donations/stripe-checkout-settlement";
+import { checkoutPaymentCanSettle, stripeSubscriptionOwnershipMatches } from "../../lib/donations/stripe-checkout-settlement";
 
 test("only paid one-time Checkout settles via checkout.session.completed", () => {
   assert.equal(checkoutPaymentCanSettle("payment", "paid"), true);
@@ -25,4 +25,23 @@ test("subscription checkout only maps Stripe id; invoice owns settlement, campai
   assert.match(invoice, /if \(isSignupInvoice\) \{/);
   assert.match(invoice, /SUBSCRIPTION_CREATED/);
   assert.match(invoice, /SUBSCRIPTION_PAYMENT/);
+});
+
+test("out-of-order invoice can bind only a matching donor and unbound Stripe subscription", () => {
+  const candidate = { donorId: "donor-A", payforToken: null };
+  const metadata = { subscriptionDbId: "db-sub-A", userId: "donor-A" };
+  assert.equal(stripeSubscriptionOwnershipMatches(candidate, "sub_stripe_A", metadata, "db-sub-A"), true);
+  assert.equal(stripeSubscriptionOwnershipMatches({ ...candidate, payforToken: "sub_stripe_A" }, "sub_stripe_A", metadata, "db-sub-A"), true);
+  assert.equal(stripeSubscriptionOwnershipMatches({ ...candidate, payforToken: "sub_stripe_B" }, "sub_stripe_A", metadata, "db-sub-A"), false);
+  assert.equal(stripeSubscriptionOwnershipMatches({ ...candidate, donorId: "donor-B" }, "sub_stripe_A", metadata, "db-sub-A"), false);
+  assert.equal(stripeSubscriptionOwnershipMatches(candidate, "sub_stripe_A", { ...metadata, userId: "" }, "db-sub-A"), false);
+  assert.equal(stripeSubscriptionOwnershipMatches(candidate, "sub_stripe_A", metadata, "db-sub-X"), false);
+  assert.equal(stripeSubscriptionOwnershipMatches(null, "sub_stripe_A", metadata, "db-sub-A"), false);
+});
+test("invoice fallback is read-only at Stripe and never rebinds another Stripe subscription", () => {
+  const src = readFileSync("app/api/stripe/webhook/route.ts", "utf8");
+  const invoice = src.slice(src.indexOf('case "invoice.payment_succeeded":'), src.indexOf('case "invoice.payment_failed":'));
+  assert.match(invoice, /stripe\.subscriptions\.retrieve\(stripeSubscriptionId\)/);
+  assert.match(invoice, /stripeSubscriptionOwnershipMatches\(/);
+  assert.match(invoice, /candidate\.payforToken/);
 });
