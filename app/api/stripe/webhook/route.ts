@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
               where: { id: dbId },
               include: { items: true, categoryItems: true },
             });
-            if (stripeSubscriptionOwnershipMatches(
+            if (candidate && stripeSubscriptionOwnershipMatches(
               candidate,
               stripeSubscriptionId,
               { subscriptionDbId: dbId, userId: ownerId },
