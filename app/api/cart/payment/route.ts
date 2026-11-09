@@ -1,3 +1,4 @@
+import { enforceDonationIntakeBudget } from "@/lib/site-security/payment-initiation-budget";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isValidLocale } from "@/lib/locales";
@@ -99,6 +100,11 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     const body = await request.json();
+    if (body.paymentMethod === "CARD") {
+      const intakeLimit = await enforceDonationIntakeBudget(request);
+      if (intakeLimit) return intakeLimit;
+    }
+
     const {
       items,
       currency,
