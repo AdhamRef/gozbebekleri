@@ -37,7 +37,7 @@ await mongo.connect();const db=mongo.db("goz_http_test");
 for(const name of ["StripeInvoiceSettlement","Campaign","Category","Subscription","SubscriptionItem","SubscriptionCategoryItem","Donation","DonationItem","DonationCategoryItem"])await db.createCollection(name);
 const donor=new ObjectId(),campaign=new ObjectId(),category=new ObjectId(),sub=new ObjectId(),donation=new ObjectId();
 const created=new Date("2026-11-09T04:00:00Z"),sid="sub_synthetic";
-await db.collection("Campaign").insertOne({_id:campaign,title:"Synthetic",description:"Synthetic",targetAmount:1000,currentAmount:0,baselineAmount:0,images:[]});
+await db.collection("Campaign").insertOne({_id:campaign,title:"Synthetic",description:"Synthetic",targetAmount:1000,currentAmount:0,baselineAmount:0,images:[],categoryIds:[],createdAt:created,updatedAt:created});
 await db.collection("Category").insertOne({_id:category,name:"Synthetic",campaignIds:[],currentAmount:0,baselineAmount:0});
 await db.collection("Subscription").insertOne({_id:sub,status:"ACTIVE",amount:100,amountUSD:100,currency:"USD",teamSupport:0,coverFees:false,paymentMethod:"CARD",donorId:donor,createdAt:created,payforToken:null});
 await db.collection("SubscriptionItem").insertOne({_id:new ObjectId(),subscriptionId:sub,campaignId:campaign,amount:100,amountUSD:100,createdAt:created,updatedAt:created});
