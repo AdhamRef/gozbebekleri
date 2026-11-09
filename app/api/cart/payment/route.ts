@@ -304,6 +304,7 @@ export async function POST(request: NextRequest) {
             referralId: referralId ?? undefined,
             subscriptionId: sub.id,
             paymentMethod,
+            attribution: trustedClientIp ? sanitizeDonationAttribution({ client_ip: trustedClientIp }) : undefined,
             cardDetails: null,
             items: {
               create: itemsResolved.map((item) => ({
@@ -375,6 +376,7 @@ export async function POST(request: NextRequest) {
           donorId: donorId,
           referralId: referralId ?? undefined,
           paymentMethod,
+          attribution: trustedClientIp ? sanitizeDonationAttribution({ client_ip: trustedClientIp }) : undefined,
           cardDetails: null,
           items: {
             create: itemsResolved.map((item) => ({
