@@ -12,6 +12,7 @@ import { donationFieldEmpty } from "@/lib/donations/mongo-null";
 import { normalizeDonationCurrencyCode } from "@/lib/exchange/convert-amount-in-currency-to-usd";
 import { checkoutPaymentCanSettle, stripeInvoiceSettlementDate, stripeSubscriptionOwnershipMatches } from "@/lib/donations/stripe-checkout-settlement";
 import { settleStripeInvoiceOnce } from "@/lib/donations/stripe-invoice-settlement";
+import { stripeBillingState } from "@/lib/donations/stripe-subscription-billing";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
@@ -185,22 +186,11 @@ export async function POST(req: NextRequest) {
         const billingReason = ((invoice as any).billing_reason as string | null) ?? null;
         const isSignupInvoice = billingReason === "subscription_create";
 
-        // nextBillingDate = one month after this invoice was paid. Stripe owns the
-        // actual billing cadence (donors can't pick a day); we just mirror it so
-        // the admin UI and cron filters have a usable value. Clamp to the target
-        // month's last day to handle edge cases like the 31st.
-        const nextBillingDate = new Date(Date.UTC(
-          paidAt.getUTCFullYear(),
-          paidAt.getUTCMonth() + 1,
-          1,
-        ));
-        const lastDay = new Date(Date.UTC(
-          nextBillingDate.getUTCFullYear(),
-          nextBillingDate.getUTCMonth() + 1,
-          0,
-        )).getUTCDate();
-        nextBillingDate.setUTCDate(Math.min(paidAt.getUTCDate(), lastDay));
-        nextBillingDate.setUTCHours(0, 0, 0, 0);
+        // Stripe owns the period anchor. A late-paid invoice must not shift
+        // the next due date; a canceled or failed plan must not be revived.
+        const billingSnapshot = stripeBillingState(
+          await stripe.subscriptions.retrieve(stripeSubscriptionId),
+        );
 
         const fees = (dbSubscription.amount + dbSubscription.teamSupport) * 0.03;
         const finalTotal =
@@ -349,8 +339,8 @@ export async function POST(req: NextRequest) {
             where: { id: dbSubscription.id },
             data: {
               lastBillingDate: paidAt,
-              nextBillingDate: nextBillingDate,
-              status: "ACTIVE",
+              ...(billingSnapshot.nextBillingDate ? { nextBillingDate: billingSnapshot.nextBillingDate } : {}),
+              ...(billingSnapshot.status ? { status: billingSnapshot.status } : {}),
             },
           });
           },
