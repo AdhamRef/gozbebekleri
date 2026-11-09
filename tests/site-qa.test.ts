@@ -50,6 +50,7 @@ function uploadDeleteFixture(role:string|null){
   const dependencies:Record<string,unknown>={
     'next/server':{NextResponse:response},'next-auth':{getServerSession:async()=>session},'../auth/[...nextauth]/options':{authOptions:{}},
     '@/lib/dashboard/api-auth':{requireAdminSession:(s:typeof session)=>!s?response.json({error:'Unauthorized'},{status:401}):s.user.role!=='ADMIN'?response.json({error:'Forbidden'},{status:403}):null},
+    '@/lib/dashboard/permissions':{sessionHasDashboardPermission:(s:typeof session,key:string)=>Boolean(s?.user?.role==='ADMIN'||(s?.user?.role==='STAFF'&&['campaigns','categories','blog','slides','siteContent'].includes(key)))},
     '@/lib/cloudinary':{uploader:{destroy:async(id:string)=>destroyed.push(id)}},
     '@/lib/audit-log':{queueAuditLog:()=>{},auditActorFromSiteSession:()=>({}),auditStreamForRole:()=>''},
     '@/lib/uploads/image-file-rules':{MAX_IMAGE_BYTES,formatBytes:()=>'',validateImageFile},
