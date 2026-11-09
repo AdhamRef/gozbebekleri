@@ -83,14 +83,14 @@ export async function POST(req: NextRequest) {
             });
             // Idempotency: the row is created with status=PAID by /api/stripe/intent
             // before Stripe confirms payment, so we key off paidAt (only set here).
-            if (!donation || donation.paidAt != null) return;
+            if (!donation || donation.paidAt != null) return false;
 
             // Mark donation as paid
             await tx.donation.update({
               where: { id: donationId },
               data: {
                 status: "PAID",
-                paidAt: new Date(),
+                paidAt: new Date(event.created * 1000),
                 provider: "STRIPE",
                 providerOrderId: session.id,
                 providerAuthCode: session.payment_intent as string ?? null,
@@ -456,7 +456,7 @@ export async function POST(req: NextRequest) {
         const donationId = intent.metadata?.donationId;
         if (!donationId) break;
 
-        await prisma.$transaction(async (tx) => {
+        const settledNow = await prisma.$transaction(async (tx) => {
           const donation = await tx.donation.findUnique({
             where: { id: donationId },
             include: { items: true, categoryItems: true },
@@ -479,19 +479,30 @@ export async function POST(req: NextRequest) {
           });
 
           for (const item of donation.items) {
+            const credit = verifiedUsdCredit(item.amount, item.amountUSD, donation.currency);
+            if (credit === null) {
+              console.warn("[stripe] skipping non-USD campaign increment without recorded FX", { intentId: intent.id });
+              continue;
+            }
             await tx.campaign.update({
               where: { id: item.campaignId },
-              data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
+              data: { currentAmount: { increment: credit } },
             });
           }
           for (const item of donation.categoryItems) {
+            const credit = verifiedUsdCredit(item.amount, item.amountUSD, donation.currency);
+            if (credit === null) {
+              console.warn("[stripe] skipping non-USD category increment without recorded FX", { intentId: intent.id });
+              continue;
+            }
             await tx.category.update({
               where: { id: item.categoryId },
-              data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
+              data: { currentAmount: { increment: credit } },
             });
           }
+          return true;
         });
-        after(() => dispatchDonationPaid(donationId));
+        if (settledNow) after(() => dispatchDonationPaid(donationId));
         break;
       }
 
