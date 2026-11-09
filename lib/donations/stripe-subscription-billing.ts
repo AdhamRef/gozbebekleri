@@ -18,7 +18,7 @@ export function stripeBillingState(snapshot: StripeBillingSnapshot) {
   );
   const nextBillingDate =
     periods.length > 0 ? new Date(Math.min(...periods) * 1000) : null;
-  const status = snapshot.status === "canceled" ? "CANCELLED"
+  const status: "CANCELLED" | "PAUSED" | "PAYMENT_FAILED" | "ACTIVE" | null = snapshot.status === "canceled" ? "CANCELLED"
     : snapshot.status === "paused" ? "PAUSED"
     : ["past_due","unpaid","incomplete","incomplete_expired"].includes(snapshot.status) ? "PAYMENT_FAILED"
     : ["active","trialing"].includes(snapshot.status) ? "ACTIVE"
