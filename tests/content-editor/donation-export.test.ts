@@ -316,3 +316,32 @@ test("project identity, category lines and unallocated balances remain separate 
     assert.equal(amounts.reduce((a, b) => a + b, 0), 100);
   }
 });
+
+
+test("refunds appear consistently in English CSV and Excel without changing gross payment", async () => {
+  const row = gift({
+    id: "refund-synthetic", amount: 100, amountUSD: 100, totalAmount: 110,
+    teamSupport: 5, fees: 5, coverFees: true,
+    refundedTotalAmount: 55, refundedTotalUSD: 55,
+    refundedAmountUSD: 50, refundedTeamSupport: 2.5, refundedFees: 2.5,
+    campaigns: [], categories: [],
+  });
+  const input = { language: "en" as const, title: "تقرير التبرعات", filters: [], donations: [row] };
+  const csv = await buildDonationExport({ ...input, format: "csv" });
+  const text = csv.body.toString("utf8");
+  for (const heading of ["Refunded gross (USD)", "Net collected (USD)",
+    "Gross collected before refunds (USD)", "Net collected after refunds (USD)"])
+    assert.ok(text.includes(heading), heading);
+  const xlsx = await buildDonationExport({ ...input, format: "xlsx" });
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(xlsx.body as never);
+  const details = wb.worksheets.find(sheet => sheet.getCell("AB6").value === "Refunded (local currency)");
+  assert.ok(details, "detailed XLSX refund columns missing");
+  assert.equal(details.getCell("O7").value, 110); // original gross in local currency
+  assert.equal(details.getCell("AB7").value, 55); // refunded local
+  assert.equal(details.getCell("AC7").value, 55); // net local
+  assert.equal(details.getCell("AD7").value, 50); // refund cause USD
+  assert.equal(details.getCell("AE7").value, 50); // net cause USD
+  assert.equal(details.getCell("AF7").value, 55); // refund gross USD
+  assert.equal(details.getCell("AG7").value, 55); // net gross USD
+});
