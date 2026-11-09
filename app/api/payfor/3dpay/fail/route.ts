@@ -1,3 +1,4 @@
+import { recordSignedPayForDecline } from "@/lib/site-security/payfor-verified-decline";
 import { verifyPayForResponseHash } from "@/lib/payfor";
 import { after, NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
           providerRaw: raw as Record<string, unknown>,
         },
       });
+      after(() => recordSignedPayForDecline(raw, donation));
       after(() => dispatchEvent("DONATION_FAILED", { donationId }));
       // Seed Meta with the failed attempt so lookalike audiences can include
       // donors-who-tried. Browser pixel fires the matching DonateFailed hit
