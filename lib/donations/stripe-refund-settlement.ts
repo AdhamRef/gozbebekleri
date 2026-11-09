@@ -2,7 +2,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
 import { verifiedUsdCredit } from "@/lib/donations/verified-usd-credit";
 
-type RefundSource = Pick<Stripe, "refunds" | "charges" | "paymentIntents">;
+type RefundSource = Pick<Stripe, "refunds" | "charges" | "paymentIntents" | "invoicePayments">;
 type Db = PrismaClient;
 
 export class StripeRefundReconciliationError extends Error {
@@ -18,9 +18,14 @@ const idOf = (value: unknown): string | null =>
   typeof value === "string" ? value :
   value && typeof value === "object" && typeof (value as {id?: unknown}).id === "string"
     ? (value as {id: string}).id : null;
-const cents = (n: number) => Math.round(n * 100);
-const usdCents = (n: number) => Math.round(n * 100);
-const localCents = (n: number) => Math.round(n * 100);
+// Stripe uses zero-decimal minor units for these ISO currencies. Payments
+// in TWD/HUF still have two decimals (payout rules are different).
+const ZERO_DECIMAL = new Set([
+  "bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga", "pyg",
+  "rwf", "ugx", "vnd", "vuv", "xaf", "xof", "xpf",
+]);
+const minorFromMajor = (major: number, currency: string) =>
+  Math.round(major * (ZERO_DECIMAL.has(currency.toLowerCase()) ? 1 : 100));
 
 /**
  * Strict financial policy:
@@ -54,7 +59,7 @@ export async function reconcileStripeRefund(
   const intent = intentId ? await stripe.paymentIntents.retrieve(intentId) : null;
   if (intentId && (!intent || intent.id !== intentId)) return reject("PAYMENT_INTENT_MISMATCH");
   if (idOf(refund.payment_intent) && idOf(refund.payment_intent) !== intentId) return reject("REFUND_INTENT_MISMATCH");
-  const invoiceId = idOf((intent as any)?.invoice) ?? idOf((charge as any).invoice);
+  let invoiceId = idOf((intent as any)?.invoice) ?? idOf((charge as any).invoice);
   const originalDonationId = (intent?.metadata?.donationId ?? charge.metadata?.donationId) || null;
   const query = [
     ...(invoiceId ? [{ providerOrderId: invoiceId }] : []),
@@ -62,11 +67,29 @@ export async function reconcileStripeRefund(
     ...(originalDonationId && /^[0-9a-f]{24}$/.test(originalDonationId) ? [{ id: originalDonationId }] : []),
   ];
   if (!query.length) return reject("UNRESOLVED_PROVIDER_BINDING", true);
-  const matches = await db.donation.findMany({
+  let matches = await db.donation.findMany({
     where: { provider: "STRIPE", status: "PAID", paidAt: { not: null }, OR: query },
     include: { items: true, categoryItems: true },
     take: 3,
   });
+  if (matches.length === 0 && !invoiceId && intentId) {
+    // In modern Stripe Billing invoices the InvoicePayment record, not
+    // Charge/PaymentIntent.invoice, may hold the authoritative relationship.
+    // Never guess a billing period using a subscription-wide identifier.
+    const paid = await stripe.invoicePayments.list({
+      payment: { type: "payment_intent", payment_intent: intentId },
+      status: "paid", limit: 2,
+    });
+    if (paid.has_more || paid.data.length > 1) return reject("AMBIGUOUS_INVOICE_PAYMENTS");
+    const identified = paid.data[0];
+    invoiceId = identified ? idOf(identified.invoice) : null;
+    if (invoiceId) {
+      matches = await db.donation.findMany({
+        where: { provider: "STRIPE", status: "PAID", paidAt: { not: null }, providerOrderId: invoiceId },
+        include: { items: true, categoryItems: true }, take: 3,
+      });
+    }
+  }
   if (matches.length !== 1) return reject("DONATION_NOT_UNIQUELY_SETTLED", matches.length === 0);
   const donation = matches[0];
   // A provider invoice is authoritative for a recurring donation. Never
@@ -78,18 +101,29 @@ export async function reconcileStripeRefund(
     return reject("INTENT_DONATION_MISMATCH");
   if (refund.currency.toLowerCase() !== charge.currency.toLowerCase() ||
       donation.currency.toLowerCase() !== charge.currency.toLowerCase()) return reject("REFUND_CURRENCY_MISMATCH");
-  if (cents(donation.totalAmount) !== charge.amount) return reject("ORIGINAL_CAPTURE_AMOUNT_MISMATCH");
+  if (minorFromMajor(donation.totalAmount, charge.currency) !== charge.amount) return reject("ORIGINAL_CAPTURE_AMOUNT_MISMATCH");
   if (!Number.isSafeInteger(refund.amount) || refund.amount <= 0 || refund.amount > charge.amount)
     return reject("REFUND_AMOUNT_INVALID");
   // Historical conversion must be verified for ALL reported monetary components.
-  const historicalBaseUSD = verifiedUsdCredit(donation.amount, donation.amountUSD, donation.currency);
+  const historicalBaseUSD = donation.currency.toUpperCase() === "USD"
+    ? donation.amount
+    : verifiedUsdCredit(donation.amount, donation.amountUSD, donation.currency);
   if (historicalBaseUSD == null || donation.amount <= 0) return reject("HISTORICAL_FX_UNAVAILABLE");
   const historicalRate = historicalBaseUSD / donation.amount;
   const lines = [
-    ...donation.items.map(i => ({ kind: "campaign" as const, id: i.campaignId, amountUSD: verifiedUsdCredit(i.amount, i.amountUSD, donation.currency) })),
-    ...donation.categoryItems.map(i => ({ kind: "category" as const, id: i.categoryId, amountUSD: verifiedUsdCredit(i.amount, i.amountUSD, donation.currency) })),
+    ...donation.items.map(i => ({ kind: "campaign" as const, id: i.campaignId, amountUSD: donation.currency.toUpperCase() === "USD" ? i.amount : verifiedUsdCredit(i.amount, i.amountUSD, donation.currency) })),
+    ...donation.categoryItems.map(i => ({ kind: "category" as const, id: i.categoryId, amountUSD: donation.currency.toUpperCase() === "USD" ? i.amount : verifiedUsdCredit(i.amount, i.amountUSD, donation.currency) })),
   ];
   if (lines.some(i => i.amountUSD == null)) return reject("HISTORICAL_LINE_FX_UNAVAILABLE");
+  // Missing or incomplete original distribution must never silently refund the
+  // donor while leaving project/category counters over-reported. In the
+  // existing model campaign and category lines may each mirror the same cause
+  // amount, hence exactly one or two cause totals are valid.
+  const allocatedUSD = lines.reduce((sum, i) => sum + (i.amountUSD ?? 0), 0);
+  if (!lines.length ||
+      (Math.abs(allocatedUSD - historicalBaseUSD) > 0.025 &&
+       Math.abs(allocatedUSD - historicalBaseUSD * 2) > 0.025))
+    return reject("ORIGINAL_ALLOCATION_INCOMPLETE");
   const status = refund.status === "succeeded" ? "APPLIED" :
     refund.status === "failed" || refund.status === "canceled" ? "REVERSED" : "PENDING";
   const old = await db.stripeRefundSettlement.findUnique({ where: { id: refundId } });
