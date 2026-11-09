@@ -2,7 +2,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
 import { verifiedUsdCredit } from "@/lib/donations/verified-usd-credit";
 
-type RefundSource = Pick<Stripe, "refunds" | "charges" | "paymentIntents">;
+type RefundSource = Pick<Stripe, "refunds" | "charges" | "paymentIntents" | "invoicePayments">;
 type Db = PrismaClient;
 
 export class StripeRefundReconciliationError extends Error {
@@ -54,7 +54,7 @@ export async function reconcileStripeRefund(
   const intent = intentId ? await stripe.paymentIntents.retrieve(intentId) : null;
   if (intentId && (!intent || intent.id !== intentId)) return reject("PAYMENT_INTENT_MISMATCH");
   if (idOf(refund.payment_intent) && idOf(refund.payment_intent) !== intentId) return reject("REFUND_INTENT_MISMATCH");
-  const invoiceId = idOf((intent as any)?.invoice) ?? idOf((charge as any).invoice);
+  let invoiceId = idOf((intent as any)?.invoice) ?? idOf((charge as any).invoice);
   const originalDonationId = (intent?.metadata?.donationId ?? charge.metadata?.donationId) || null;
   const query = [
     ...(invoiceId ? [{ providerOrderId: invoiceId }] : []),
@@ -62,11 +62,29 @@ export async function reconcileStripeRefund(
     ...(originalDonationId && /^[0-9a-f]{24}$/.test(originalDonationId) ? [{ id: originalDonationId }] : []),
   ];
   if (!query.length) return reject("UNRESOLVED_PROVIDER_BINDING", true);
-  const matches = await db.donation.findMany({
+  let matches = await db.donation.findMany({
     where: { provider: "STRIPE", status: "PAID", paidAt: { not: null }, OR: query },
     include: { items: true, categoryItems: true },
     take: 3,
   });
+  if (matches.length === 0 && !invoiceId && intentId) {
+    // In modern Stripe Billing invoices the InvoicePayment record, not
+    // Charge/PaymentIntent.invoice, may hold the authoritative relationship.
+    // Never guess a billing period using a subscription-wide identifier.
+    const paid = await stripe.invoicePayments.list({
+      payment: { type: "payment_intent", payment_intent: intentId },
+      status: "paid", limit: 2,
+    });
+    if (paid.has_more || paid.data.length > 1) return reject("AMBIGUOUS_INVOICE_PAYMENTS");
+    const identified = paid.data[0];
+    invoiceId = identified ? idOf(identified.invoice) : null;
+    if (invoiceId) {
+      matches = await db.donation.findMany({
+        where: { provider: "STRIPE", status: "PAID", paidAt: { not: null }, providerOrderId: invoiceId },
+        include: { items: true, categoryItems: true }, take: 3,
+      });
+    }
+  }
   if (matches.length !== 1) return reject("DONATION_NOT_UNIQUELY_SETTLED", matches.length === 0);
   const donation = matches[0];
   // A provider invoice is authoritative for a recurring donation. Never
