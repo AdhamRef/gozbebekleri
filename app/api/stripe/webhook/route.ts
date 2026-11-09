@@ -400,7 +400,33 @@ export async function POST(req: NextRequest) {
         const existingFailed = await prisma.donation.findFirst({
           where: { subscriptionId: dbSubscription.id, providerOrderId: invoice.id },
         });
-        if (existingFailed) break;
+        // The signup creates an unsettled donation before Stripe attempts the
+        // first charge. Never create a second FAILED row for that invoice or
+        // leave an unpaid subscription labeled ACTIVE.
+        if (existingFailed) {
+          if (existingFailed.paidAt != null) break; // A successful charge always wins.
+          const changed = await prisma.donation.updateMany({
+            where: {
+              AND: [{ id: existingFailed.id }, donationFieldEmpty("paidAt")],
+            },
+            data: {
+              status: "FAILED",
+              providerTxnResult: "Failed",
+              providerErrorMessage: "Monthly billing failed via Stripe",
+            },
+          });
+          if (changed.count > 0) {
+            await prisma.subscription.update({
+              where: { id: dbSubscription.id },
+              data: { status: "PAYMENT_FAILED" },
+            });
+            if (existingFailed.status !== "FAILED") {
+              after(() => dispatchEvent("DONATION_FAILED", { donationId: existingFailed.id }));
+              void sendDonationFailedConversions(existingFailed.id);
+            }
+          }
+          break;
+        }
 
         const fees = (dbSubscription.amount + dbSubscription.teamSupport) * 0.03;
         const finalTotal =
@@ -444,6 +470,10 @@ export async function POST(req: NextRequest) {
         // Seed Meta DonateFailed for the failed recurring charge so lookalike
         // audiences still get the "donor who tried" signal on monthly drops.
         void sendDonationFailedConversions(failedRecurring.id);
+        await prisma.subscription.update({
+          where: { id: dbSubscription.id },
+          data: { status: "PAYMENT_FAILED" },
+        });
         break;
       }
 
