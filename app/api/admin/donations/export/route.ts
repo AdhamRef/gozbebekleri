@@ -164,6 +164,11 @@ async function localizedGET(request: NextRequest) {
         teamSupport,
         fees,
         totalAmount: total,
+        refundedTotalAmount: d.refundedTotalAmount ?? 0,
+        refundedTotalUSD: d.refundedTotalUSD ?? 0,
+        refundedAmountUSD: d.refundedAmountUSD ?? 0,
+        refundedTeamSupport: d.refundedTeamSupport ?? 0,
+        refundedFees: d.refundedFees ?? 0,
         coverFees: !!d.coverFees,
         projectAllocations: [
           ...d.items.map(i => ({ id: `campaign:${i.campaign.id}`, title: i.campaign.title, amount: Number(i.amount) })),
