@@ -249,6 +249,7 @@ export async function POST(req: NextRequest) {
                   donationFieldEmpty("paidAt"),
                 ],
               },
+              include: { items: true, categoryItems: true },
             })) ??
             (isSignupInvoice
               ? await tx.donation.findFirst({
@@ -259,6 +260,7 @@ export async function POST(req: NextRequest) {
                     ],
                   },
                   orderBy: { createdAt: "asc" },
+                  include: { items: true, categoryItems: true },
                 })
               : null);
 
@@ -274,6 +276,17 @@ export async function POST(req: NextRequest) {
                 providerAuthCode: stripeSubscriptionId,
                 providerTxnResult: "Success",
                 providerRaw: invoice as any,
+                // Signup checkout rows can be created without allocation
+                // snapshots. Persist the EXACT settlement allocation before
+                // refunds rely on it; never infer history from a later plan.
+                ...(existingPending.items.length === 0 && dbSubscription.items.length
+                  ? { items: { create: dbSubscription.items.map(i => ({
+                        campaignId: i.campaignId, amount: i.amount, amountUSD: i.amountUSD,
+                      })) } } : {}),
+                ...(existingPending.categoryItems.length === 0 && dbSubscription.categoryItems.length
+                  ? { categoryItems: { create: dbSubscription.categoryItems.map(i => ({
+                        categoryId: i.categoryId, amount: i.amount, amountUSD: i.amountUSD,
+                      })) } } : {}),
               },
             });
           } else {
