@@ -11,6 +11,7 @@ import { dispatchDonationPaid, dispatchEvent } from "@/lib/events/dispatch";
 import { donationFieldEmpty } from "@/lib/donations/mongo-null";
 import { normalizeDonationCurrencyCode } from "@/lib/exchange/convert-amount-in-currency-to-usd";
 import { checkoutPaymentCanSettle, stripeInvoiceSettlementDate, stripeSubscriptionOwnershipMatches } from "@/lib/donations/stripe-checkout-settlement";
+import { settleStripeInvoiceOnce } from "@/lib/donations/stripe-invoice-settlement";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
@@ -211,7 +212,10 @@ export async function POST(req: NextRequest) {
           (await getDonorCountryCodeForSnapshot(prisma, dbSubscription.donorId)) ??
           undefined;
 
-        await prisma.$transaction(async (tx) => {
+        const settlementOutcome = await settleStripeInvoiceOnce(
+          prisma,
+          { invoiceId: invoice.id, subscriptionId: dbSubscription.id, paidAt },
+          async (tx) => {
           // Find the original "checkout started" donation for this subscription
           // (status=PAID is the optimistic sentinel; paidAt=null means it never
           // settled). For the FIRST invoice we update that row instead of
@@ -349,7 +353,9 @@ export async function POST(req: NextRequest) {
               status: "ACTIVE",
             },
           });
-        });
+          },
+        );
+        if (settlementOutcome === "duplicate") break;
         const paidForInvoice = await prisma.donation.findFirst({
           where: {
             subscriptionId: dbSubscription.id,
