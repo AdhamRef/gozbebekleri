@@ -31,6 +31,10 @@
     {
       "path": "/api/cron/resume-dispatches",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/reconcile-stripe-refunds",
+      "schedule": "*/15 * * * *"
     }
   ],
   "installCommand": "npm ci --include=dev --legacy-peer-deps --no-audit --no-fund"
