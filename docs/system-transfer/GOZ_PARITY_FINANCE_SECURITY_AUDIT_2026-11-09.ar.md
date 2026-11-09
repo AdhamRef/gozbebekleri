@@ -110,3 +110,10 @@
 - فحص القاعدة: `DATABASE_URL=<isolated-mongo-url> npx prisma validate --schema prisma/schema.prisma`؛ لا تستخدم إنتاجًا للاختبار.
 - أداة بحث ازدواج السجلات **للقراءة فقط**: `node --import tsx scripts/audit-goz-subscription-duplicates-readonly.ts --subscription-id=<24-hex-id>` في بيئة ذات صلاحيات مناسبة. لا تحتوي على وضع Commit.
 - في حال تحديد سجل مكرر: قارن `invoice.id` مع `providerOrderId` و`paidAt`، و`subscriptionId` ومعرفات Stripe الموثقة، ثم اصدر خطة تسوية مستقلة للمراجعة قبل أي تعديل.
+
+## 9. إضافات تحقق موثقة بعد فتح PR #194
+
+- جرى تشغيل **Prisma Client 6.19.2 الحقيقي** على MongoDB Replica Set مؤقتة 7.0.15، دون أي قاعدة إنتاجية. أُدخلت 3 سجلات اصطناعية: مدفوع مثبت، checkout مع `paidAt` غير موجود، ومحاولة FAILED. النتيجة: `settled=1` و`unsettled=1` و`invoiceRows=1` — **PASS**.
+- لتكرار هذا الاختبار، أضيف `scripts/qa-prisma-mongo-settlement-isolated.mjs` (manual only)، والذي ينشئ قاعدة MongoDB منفصلة ويُجبِر `DATABASE_URL` على عنوانها المؤقت، ولا يحتوي وضعًا لقراءة الإنتاج.
+- هذه النتيجة تثبت مرشحات Prisma الأساسية مع MongoDB حقيقية في النطاق الاصطناعي، **ولا تثبت تنفيذ Webhooks ببيانات Stripe الحية أو سلامة إعادة المحاولات المتزامنة**.
+- وُسِّعت GitHub Actions للتشغيل أيضًا على Draft PR يستهدف فرع `fix/goz-report-profile-settlement-20261108`، دون تفعيل نشر إنتاجي.
