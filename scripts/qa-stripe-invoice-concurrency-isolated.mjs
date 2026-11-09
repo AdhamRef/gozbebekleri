@@ -11,7 +11,8 @@ import assert from "node:assert/strict";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 import { MongoClient, ObjectId } from "mongodb";
 import { PrismaClient } from "@prisma/client";
-import { settleStripeInvoiceOnce } from "../lib/donations/stripe-invoice-settlement.ts";
+import settlementModule from "../lib/donations/stripe-invoice-settlement.ts";
+const { settleStripeInvoiceOnce } = settlementModule;
 
 const server=await MongoMemoryReplSet.create({binary:{version:"7.0.15"},replSet:{count:1}});
 process.env.DATABASE_URL=server.getUri("goz_concurrency_fixture");
