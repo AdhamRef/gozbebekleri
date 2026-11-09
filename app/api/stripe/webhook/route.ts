@@ -636,6 +636,37 @@ export async function POST(req: NextRequest) {
         break;
       }
 
+      case "customer.subscription.updated": {
+        // An event may be delivered after a newer status update. Re-read the
+        // provider's current state rather than trusting an out-of-order payload.
+        const updated = event.data.object as Stripe.Subscription;
+        const local = await prisma.subscription.findFirst({
+          where: { payforToken: updated.id },
+          select: { id: true },
+        });
+        if (!local) break;
+        const provider = await stripe.subscriptions.retrieve(updated.id);
+        const state = stripeBillingState(provider);
+        if (!state.status) break;
+        // "ACTIVE" in Stripe does not prove that the first donation settled.
+        const confirmed = state.status === "ACTIVE"
+          ? await prisma.donation.findFirst({
+              where: { subscriptionId: local.id, paidAt: { not: null } },
+              select: { id: true },
+            })
+          : null;
+        await prisma.subscription.update({
+          where: { id: local.id },
+          data: {
+            status: state.status === "ACTIVE" && !confirmed
+              ? "PAYMENT_FAILED"
+              : state.status,
+            ...(state.nextBillingDate ? { nextBillingDate: state.nextBillingDate } : {}),
+          },
+        });
+        break;
+      }
+
       case "customer.subscription.deleted": {
         // Stripe subscription cancelled
         const stripeSub = event.data.object as Stripe.Subscription;
