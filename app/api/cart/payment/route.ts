@@ -100,10 +100,6 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     const body = await request.json();
-    if (body.paymentMethod === "CARD") {
-      const intakeLimit = await enforceDonationIntakeBudget(request);
-      if (intakeLimit) return intakeLimit;
-    }
 
     const {
       items,
@@ -124,6 +120,11 @@ export async function POST(request: NextRequest) {
         { error: "Items, currency, and payment method are required" },
         { status: 400 }
       );
+    }
+
+    if (body.paymentMethod === "CARD") {
+      const intakeLimit = await enforceDonationIntakeBudget(request);
+      if (intakeLimit) return intakeLimit;
     }
 
     // Resolve donor
