@@ -391,9 +391,33 @@ export async function POST(req: NextRequest) {
         const stripeSubscriptionId = getStripeSubscriptionIdFromInvoice(invoice);
         if (!stripeSubscriptionId) break;
 
-        const dbSubscription = await prisma.subscription.findFirst({
+        let dbSubscription = await prisma.subscription.findFirst({
           where: { payforToken: stripeSubscriptionId },
         });
+        // Stripe may send the FAILED first invoice before Checkout binds the
+        // provider subscription. Resolve only from trusted provider metadata.
+        if (!dbSubscription) {
+          const remoteSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+          const dbId = remoteSub.metadata?.subscriptionDbId;
+          const ownerId = remoteSub.metadata?.userId;
+          if (dbId && ownerId) {
+            const candidate = await prisma.subscription.findUnique({ where: { id: dbId } });
+            if (candidate && stripeSubscriptionOwnershipMatches(
+              candidate,
+              stripeSubscriptionId,
+              { subscriptionDbId: dbId, userId: ownerId },
+              dbId,
+            )) {
+              if (!candidate.payforToken) {
+                await prisma.subscription.update({
+                  where: { id: candidate.id },
+                  data: { payforToken: stripeSubscriptionId },
+                });
+              }
+              dbSubscription = candidate;
+            }
+          }
+        }
         if (!dbSubscription) break;
 
         // Idempotency: skip if already recorded
