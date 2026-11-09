@@ -14,7 +14,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 45
     env:
       NODE_OPTIONS: --max-old-space-size=6144
       DATABASE_URL: mongodb://127.0.0.1:27018/ported_systems_fixture?serverSelectionTimeoutMS=500&connectTimeoutMS=500
@@ -48,3 +48,8 @@ jobs:
         run: npm run test:ported-systems
       - name: Compile Next routes without production index writes
         run: npx --no-install next build
+      - name: Mandatory signed Stripe refund HTTP and MongoDB transaction regressions
+        run: |
+          npm install --no-save --package-lock=false --ignore-scripts --legacy-peer-deps --no-audit --no-fund mongodb-memory-server@10.1.4
+          DATABASE_URL=mongodb://127.0.0.1:27018/isolated_refunds npx --no-install prisma generate --schema prisma/schema.prisma
+          node --import tsx scripts/qa-stripe-signed-http-isolated.mjs
