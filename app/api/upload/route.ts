@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/options';
 import { requireAdminSession } from '@/lib/dashboard/api-auth';
 import { sessionHasDashboardPermission } from '@/lib/dashboard/permissions';
+import { assertRasterImageUpload } from '@/lib/uploads/strict-image-content';
 import {
   queueAuditLog,
   auditActorFromSiteSession,
@@ -59,6 +60,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const declaredLength = Number(request.headers.get('content-length') || 0);
+    if (declaredLength > MAX_IMAGE_BYTES + 1024 * 1024) {
+      return NextResponse.json({ error: 'حجم الطلب أكبر من الحد المسموح' }, { status: 413 });
+    }
     const formData = await request.formData();
     const file = formData.get('file');
 
@@ -80,6 +85,9 @@ export async function POST(request: Request) {
         { status: 413 }
       );
     }
+
+    const unsafe = assertRasterImageUpload(file, buffer);
+    if (unsafe) return NextResponse.json({ error: unsafe }, { status: 400 });
 
     const result = await uploadBuffer(buffer, 'campaigns');
 
