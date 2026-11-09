@@ -35,7 +35,7 @@ let passed=0;
 const pass=(name,details={})=>{passed++;console.log(JSON.stringify({name,result:"PASS",...details}))};
 try{
 await mongo.connect();const db=mongo.db("goz_http_test");
-for(const name of ["StripeInvoiceSettlement","StripeRefundSettlement","Campaign","Category","Subscription","SubscriptionItem","SubscriptionCategoryItem","Donation","DonationItem","DonationCategoryItem"])await db.createCollection(name);
+for(const name of ["StripeInvoiceSettlement","StripeRefundSettlement","StripeDeferredRefund","Campaign","Category","Subscription","SubscriptionItem","SubscriptionCategoryItem","Donation","DonationItem","DonationCategoryItem"])await db.createCollection(name);
 const preflight = execFileSync(process.execPath,["scripts/preflight-stripe-ledgers.mjs"],{
  env:{...process.env,GOZ_DB_IDENTITY_CONFIRMED:"yes",GOZ_DB_RESTORE_VERIFIED:"yes",GOZ_FINANCE_RELEASE_APPROVED:"yes"},
  encoding:"utf8",
@@ -185,12 +185,24 @@ globalThis.fixture.charges.set(chSplit,{id:chSplit,amount:11000,currency:"usd",p
 globalThis.fixture.intents.set(piSplit,{id:piSplit,metadata:{donationId:fixtureDonation.toHexString()}});
 globalThis.fixture.refunds.set("re_before_paid",{id:"re_before_paid",object:"refund",amount:5500,charge:chSplit,payment_intent:piSplit,currency:"usd",status:"succeeded"});
 const early=await send(evt("refund.updated",{id:"re_before_paid",object:"refund"}));
-assert.equal(early.status,500,"refund before known successful donation must retry");
+assert.equal(early.status,200,"early signed refund must be durably queued before acknowledgment");
 assert.equal(await db.collection("StripeRefundSettlement").countDocuments({_id:"re_before_paid"}),0);
-pass("refund before local settled donation fails closed, no premature ledger record");
+assert.equal(await db.collection("StripeDeferredRefund").countDocuments({_id:"re_before_paid",status:"PENDING"}),1);
+pass("early signed refund persisted to a durable, idempotent retry queue without premature accounting");
 await db.collection("Donation").insertOne({_id:fixtureDonation,donorId:donor,amount:100,amountUSD:100,teamSupport:5,fees:5,coverFees:true,totalAmount:110,currency:"USD",status:"PAID",paidAt:created,createdAt:created,provider:"STRIPE",providerOrderId:piSplit,providerAuthCode:piSplit,paymentMethod:"CARD"});
 for(const [id,amount] of [[projectA,60],[projectB,40]]) await db.collection("DonationItem").insertOne({_id:new ObjectId(),donationId:fixtureDonation,campaignId:id,amount,amountUSD:amount,createdAt:created,updatedAt:created});
 for(const [id,amount] of [[categoryA,70],[categoryB,30]]) await db.collection("DonationCategoryItem").insertOne({_id:new ObjectId(),donationId:fixtureDonation,categoryId:id,amount,amountUSD:amount,createdAt:created,updatedAt:created});
+await prisma.stripeDeferredRefund.update({where:{id:"re_before_paid"},data:{nextAttemptAt:new Date(0)}});
+const {reconcileDeferredStripeRefunds}=await import("../lib/donations/stripe-refund-deferred.ts");
+const recovery=await reconcileDeferredStripeRefunds(prisma,{
+  refunds:{retrieve:async id=>globalThis.fixture.refunds.get(id)},
+  charges:{retrieve:async id=>globalThis.fixture.charges.get(id)},
+  paymentIntents:{retrieve:async id=>globalThis.fixture.intents.get(id)},
+  invoicePayments:{list:async q=>({data:[],has_more:false})},
+});
+assert.equal(recovery.resolved,1,JSON.stringify(recovery));
+assert.equal(await db.collection("StripeDeferredRefund").countDocuments({_id:"re_before_paid",status:"RESOLVED"}),1);
+pass("scheduled refund reconciliation replays the early refund after local payment becomes PAID");
 const completed=await send(evt("refund.updated",{id:"re_before_paid",object:"refund"}));
 assert.equal(completed.status,200,completed.body);
 const da=await prisma.donation.findUnique({where:{id:fixtureDonation.toHexString()}});
