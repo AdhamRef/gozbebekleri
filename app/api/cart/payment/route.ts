@@ -1,3 +1,4 @@
+import { BLOCKED_EMAIL_ERROR, isBlockedEmail } from "@/lib/security/blocked-emails";
 import { securityClientIp } from "@/lib/site-security/policy";
 import { sanitizeDonationAttribution } from "@/lib/attribution/sanitize";
 import { enforceDonationIntakeBudget } from "@/lib/site-security/payment-initiation-budget";
@@ -116,6 +117,10 @@ export async function POST(request: NextRequest) {
       locale: donationLocale,
       guest,
     } = body;
+    if (isBlockedEmail(session?.user?.email) || isBlockedEmail(guest?.email)) {
+      return NextResponse.json({ error: BLOCKED_EMAIL_ERROR }, { status: 403 });
+    }
+
 
     // Validate required fields
     if (!items?.length || !currency || !paymentMethod) {
