@@ -1,3 +1,5 @@
+import { securityClientIp } from "@/lib/site-security/policy";
+import { enforceDonationIntakeBudget } from "@/lib/site-security/payment-initiation-budget";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isValidLocale } from "@/lib/locales";
@@ -221,11 +223,7 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     const body = await request.json();
-    const forwardedFor = request.headers.get("x-forwarded-for");
-    const clientIp =
-      forwardedFor?.split(",")[0]?.trim() ||
-      request.headers.get("x-real-ip") ||
-      undefined;
+    const clientIp = securityClientIp(request.headers) ?? undefined;
     const userAgent = request.headers.get("user-agent")?.slice(0, 500) || undefined;
     const attribution = sanitizeDonationAttribution({
       ...((body.attribution && typeof body.attribution === "object" && !Array.isArray(body.attribution)
@@ -260,6 +258,11 @@ export async function POST(request: NextRequest) {
         { error: "Items or categoryItems, currency, and payment method are required" },
         { status: 400 }
       );
+    }
+
+    if (body.paymentMethod === "CARD" || body.paymentMethod === "STRIPE") {
+      const intakeLimit = await enforceDonationIntakeBudget(request);
+      if (intakeLimit) return intakeLimit;
     }
 
     // Impact builder ("make an impact for a child"): the single campaign item
