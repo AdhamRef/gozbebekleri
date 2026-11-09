@@ -105,12 +105,14 @@ export async function reconcileStripeRefund(
   if (!Number.isSafeInteger(refund.amount) || refund.amount <= 0 || refund.amount > charge.amount)
     return reject("REFUND_AMOUNT_INVALID");
   // Historical conversion must be verified for ALL reported monetary components.
-  const historicalBaseUSD = verifiedUsdCredit(donation.amount, donation.amountUSD, donation.currency);
+  const historicalBaseUSD = donation.currency.toUpperCase() === "USD"
+    ? donation.amount
+    : verifiedUsdCredit(donation.amount, donation.amountUSD, donation.currency);
   if (historicalBaseUSD == null || donation.amount <= 0) return reject("HISTORICAL_FX_UNAVAILABLE");
   const historicalRate = historicalBaseUSD / donation.amount;
   const lines = [
-    ...donation.items.map(i => ({ kind: "campaign" as const, id: i.campaignId, amountUSD: verifiedUsdCredit(i.amount, i.amountUSD, donation.currency) })),
-    ...donation.categoryItems.map(i => ({ kind: "category" as const, id: i.categoryId, amountUSD: verifiedUsdCredit(i.amount, i.amountUSD, donation.currency) })),
+    ...donation.items.map(i => ({ kind: "campaign" as const, id: i.campaignId, amountUSD: donation.currency.toUpperCase() === "USD" ? i.amount : verifiedUsdCredit(i.amount, i.amountUSD, donation.currency) })),
+    ...donation.categoryItems.map(i => ({ kind: "category" as const, id: i.categoryId, amountUSD: donation.currency.toUpperCase() === "USD" ? i.amount : verifiedUsdCredit(i.amount, i.amountUSD, donation.currency) })),
   ];
   if (lines.some(i => i.amountUSD == null)) return reject("HISTORICAL_LINE_FX_UNAVAILABLE");
   // Missing or incomplete original distribution must never silently refund the
