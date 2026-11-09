@@ -4,6 +4,7 @@ import cloudinary from '@/lib/cloudinary';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/options';
 import { requireAdminSession } from '@/lib/dashboard/api-auth';
+import { sessionHasDashboardPermission } from '@/lib/dashboard/permissions';
 import {
   queueAuditLog,
   auditActorFromSiteSession,
@@ -48,6 +49,14 @@ export async function POST(request: Request) {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: 'يجب تسجيل الدخول' }, { status: 401 });
+    }
+    // This endpoint previously allowed any logged-in donor to upload directly
+    // into the shared campaigns Cloudinary namespace. Restrict write access
+    // to authorized content editors BEFORE reading request body bytes.
+    const contentAreas = ['campaigns', 'categories', 'blog', 'slides', 'siteContent'] as const;
+    const canUpload = contentAreas.some((key) => sessionHasDashboardPermission(session, key));
+    if (!canUpload) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const formData = await request.formData();
