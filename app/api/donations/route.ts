@@ -1,3 +1,4 @@
+import { enforceDonationIntakeBudget } from "@/lib/site-security/payment-initiation-budget";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isValidLocale } from "@/lib/locales";
@@ -220,6 +221,11 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     const body = await request.json();
+    if (body.paymentMethod === "CARD" || body.paymentMethod === "STRIPE") {
+      const intakeLimit = await enforceDonationIntakeBudget(request);
+      if (intakeLimit) return intakeLimit;
+    }
+
     const forwardedFor = request.headers.get("x-forwarded-for");
     const clientIp =
       forwardedFor?.split(",")[0]?.trim() ||
