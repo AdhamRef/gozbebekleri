@@ -21,7 +21,7 @@ test("upload permission checked before request body and storage writes",()=>{
  const source=readFileSync("app/api/upload/route.ts","utf8");
  const permission=source.indexOf("const canUpload =");
  const body=source.indexOf("request.formData()");
- const storage=source.indexOf("uploadBuffer(buffer");
+ const storage=source.indexOf("await uploadBuffer(buffer");
  assert.ok(permission>=0 && permission<body && body<storage);
  assert.match(source,/if \(!canUpload\)/);
 });
