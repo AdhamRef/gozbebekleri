@@ -31,3 +31,15 @@ export function stripeSubscriptionOwnershipMatches(
     (!candidate.payforToken || candidate.payforToken === stripeSubscriptionId),
   );
 }
+
+/** The invoice payment date, not the invoice creation date, owns revenue. */
+export function stripeInvoiceSettlementDate(
+  paidUnix: number | null | undefined,
+  eventUnix: number,
+): Date {
+  const value = typeof paidUnix === "number" && paidUnix > 0 ? paidUnix : eventUnix;
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error("Stripe invoice lacks a valid settlement timestamp");
+  }
+  return new Date(value * 1000);
+}
