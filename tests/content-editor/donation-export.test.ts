@@ -35,7 +35,7 @@ for (const [locale, name, rtl] of [["ar", "المملكة العربية الس�
     assert.equal(rows.getCell("I7").value, name);
     assert.equal(rows.views[0].rightToLeft, rtl);
     assert.equal("ySplit" in rows.views[0] ? rows.views[0].ySplit : 0, 6);
-    assert.deepEqual(rows.autoFilter, "A6:AA7");
+    assert.deepEqual(rows.autoFilter, "A6:AG7"); // six refund/gross/net columns appended
     assert.equal(rows.getCell("L7").value, 15.5);
     assert.equal(rows.getCell("L7").numFmt, "#,##0.00");
     for (const sheetName of [dt("ملخص التقرير"), dt("الدول")]) {
