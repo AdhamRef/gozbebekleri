@@ -1,18 +1,14 @@
-# Gözbebekleri — Snapshot of all remote branches (2026-11-09)
+# Gözbebekleri — Complete remote branch inventory (2026-11-09)
 
-**Repository:** `AdhamRef/gozbebekleri`  
-**Reference main:** `0105005cbfa07b521cbc3975080ccdd7c68fc842`  
-**Canonical release candidate:** `audit/goz-round2-idempotency-locale-20261109` at `289244f5f090d18ed90deeeff7112faaf165603c`
+Repository: `AdhamRef/gozbebekleri` — audited **223 remote branches** with Git ancestry.
+Main baseline: `0105005cbfa07b521cbc3975080ccdd7c68fc842`.
+Canonical release candidate (PR #195): `audit/goz-round2-idempotency-locale-20261109` initially at `289244f5f090d18ed90deeeff7112faaf165603c`.
 
-This is a **Git ancestry inventory**, not a blanket declaration that unrelated branches are absent from main. Squash merges, cherry-picks, refactors, and deliberately removed features can make a branch tip non-ancestral even when its feature is already in main. In particular, `INDEPENDENT_OR_STALE` is **NOT permission to merge**.
+**Interpretations:** `ALREADY_MAIN` is an ancestor of main; `STACKED_PR195` is ancestor of the canonical PR; `INDEPENDENT_OR_STALE` is neither. The last class is not automatically missing: squash/cherry-pick/refactor/deletion can preserve or supersede the same functionality. No automatic merge or branch deletion is justified without a feature-by-feature review.
 
-- `ALREADY_MAIN`: branch tip is ancestor of main. Safe to leave untouched; no merge required.
-- `STACKED_PR195`: branch tip is included in the canonical release PR. Do not merge it a second time.
-- `INDEPENDENT_OR_STALE`: not ancestral to either reference. Requires feature-level comparison against current code; many are obsolete/squashed already.
+**Audited totals:** ALREADY_MAIN: 32; STACKED_PR195: 9; INDEPENDENT_OR_STALE: 182.
 
-**Total verified remote branches:** 99. Classification counts: ALREADY_MAIN=16; STACKED_PR195=4; INDEPENDENT_OR_STALE=78.
-
-| Branch | Git ancestry classification |
+| Remote branch | Git ancestry classification |
 |---|---|
 | `add-archive-asset-review-actions-ui` | INDEPENDENT_OR_STALE |
 | `add-archive-asset-task-action-ui` | INDEPENDENT_OR_STALE |
@@ -46,7 +42,49 @@ This is a **Git ancestry inventory**, not a blanket declaration that unrelated b
 | `add-weekly-theme-task-action` | INDEPENDENT_OR_STALE |
 | `agent/campaign-create-correctness` | ALREADY_MAIN |
 | `agent/marketing-five-pages-refactor` | INDEPENDENT_OR_STALE |
-| `agent/operatio...[truncated]` | INDEPENDENT_OR_STALE |
+| `agent/operations-archive-consolidation` | INDEPENDENT_OR_STALE |
+| `agent/operations-archive-final-refactor` | ALREADY_MAIN |
+| `agent/projects-content-security-guards` | ALREADY_MAIN |
+| `agent/protect-integration-settings-page` | INDEPENDENT_OR_STALE |
+| `agent/remove-brand-dashboard` | ALREADY_MAIN |
+| `agent/secure-integration-settings-backend` | INDEPENDENT_OR_STALE |
+| `agent/secure-media-upload-delete` | INDEPENDENT_OR_STALE |
+| `ai-recommendations-foundation` | INDEPENDENT_OR_STALE |
+| `ai-recs-v1` | INDEPENDENT_OR_STALE |
+| `align-ai-core-entry-links` | INDEPENDENT_OR_STALE |
+| `align-provider-catalog-archive-ai` | INDEPENDENT_OR_STALE |
+| `append-brand-asset-runtime-model` | INDEPENDENT_OR_STALE |
+| `append-brand-asset-runtime-model-v2` | INDEPENDENT_OR_STALE |
+| `append-content-item-runtime-model` | INDEPENDENT_OR_STALE |
+| `append-first-dashboard-prisma-models` | INDEPENDENT_OR_STALE |
+| `append-operation-content-item-runtime-model` | INDEPENDENT_OR_STALE |
+| `audit/goz-parity-finance-20261109` | STACKED_PR195 |
+| `audit/goz-round2-idempotency-locale-20261109` | STACKED_PR195 |
+| `brand-center-shared-ai-polish-qa` | INDEPENDENT_OR_STALE |
+| `campaign-link-detail-intelligence` | INDEPENDENT_OR_STALE |
+| `campaign-links-api-v1` | INDEPENDENT_OR_STALE |
+| `campaign-registry-completion` | INDEPENDENT_OR_STALE |
+| `chatgpt-link-retest-20260622` | INDEPENDENT_OR_STALE |
+| `chatgpt-minber-preview-test-20260622` | INDEPENDENT_OR_STALE |
+| `cleanup-system-overview-page` | INDEPENDENT_OR_STALE |
+| `code-chatgpt-send-test` | INDEPENDENT_OR_STALE |
+| `code-minber-cleanup-direct` | INDEPENDENT_OR_STALE |
+| `codex/arabic-editorial-workflow` | ALREADY_MAIN |
+| `codex/campaign-link-operations-detail` | INDEPENDENT_OR_STALE |
+| `codex/goz-article-seo-title-20261021` | ALREADY_MAIN |
+| `codex/goz-currency-link-hydration-20261021` | ALREADY_MAIN |
+| `codex/goz-full-review-seo-morocco-20261021` | ALREADY_MAIN |
+| `codex/goz-localized-seo-routes-20261021` | ALREADY_MAIN |
+| `codex/goz-seo-locale-guard-20261021` | ALREADY_MAIN |
+| `codex/operations-persistence-completion` | INDEPENDENT_OR_STALE |
+| `codex/retry-all-meta-verify-20261022` | INDEPENDENT_OR_STALE |
+| `complete-campaign-registry-save-flow` | INDEPENDENT_OR_STALE |
+| `complete-operations-persistence-foundation` | INDEPENDENT_OR_STALE |
+| `connect-campaign-links-conversion-truth` | INDEPENDENT_OR_STALE |
+| `connection-health-v1` | INDEPENDENT_OR_STALE |
+| `connections-provider-readiness-adapter` | INDEPENDENT_OR_STALE |
+| `content-command-center-v1` | INDEPENDENT_OR_STALE |
+| `cut-over-archive-collections-repository-storage` | INDEPENDENT_OR_STALE |
 | `cut-over-brand-profiles-repository-storage` | INDEPENDENT_OR_STALE |
 | `cut-over-operation-tasks-repository-storage` | INDEPENDENT_OR_STALE |
 | `dashboard-db-contracts-foundation` | INDEPENDENT_OR_STALE |
@@ -80,7 +118,48 @@ This is a **Git ancestry inventory**, not a blanket declaration that unrelated b
 | `fix/footer-localization-audit` | ALREADY_MAIN |
 | `fix/goz-report-profile-settlement-20261108` | STACKED_PR195 |
 | `fix/goz-round2-atomic-stripe-20261109` | STACKED_PR195 |
-| `fix/localization-pre...[truncated]` | ALREADY_MAIN |
+| `fix/localization-preview-save` | ALREADY_MAIN |
+| `fix/marketing-system-simplification` | INDEPENDENT_OR_STALE |
+| `fix/qa-confirmed-qa-issues-20261023` | INDEPENDENT_OR_STALE |
+| `fix/restore-prisma-schema` | INDEPENDENT_OR_STALE |
+| `fix/save-reviewed-translations` | ALREADY_MAIN |
+| `fix/template-purpose-separation` | ALREADY_MAIN |
+| `fix/translation-review-evidence` | ALREADY_MAIN |
+| `fix/translation-value-validation-20261021` | ALREADY_MAIN |
+| `fix/whatsapp-language-media-and-delivery` | ALREADY_MAIN |
+| `harden-dashboard-system-document-status` | INDEPENDENT_OR_STALE |
+| `improve/content-editor-usability` | ALREADY_MAIN |
+| `integration-foundation` | INDEPENDENT_OR_STALE |
+| `integration-foundation-clean` | INDEPENDENT_OR_STALE |
+| `integration-foundation-v1` | INDEPENDENT_OR_STALE |
+| `integration/unified-systems-20261107` | STACKED_PR195 |
+| `m-results` | INDEPENDENT_OR_STALE |
+| `main` | ALREADY_MAIN |
+| `marketing-audit-map` | INDEPENDENT_OR_STALE |
+| `marketing-command-center-v1` | INDEPENDENT_OR_STALE |
+| `marketing-connections-catalog-v1` | INDEPENDENT_OR_STALE |
+| `marketing-results-loop-foundation` | INDEPENDENT_OR_STALE |
+| `minber-identity-cleanup-v1` | INDEPENDENT_OR_STALE |
+| `minber-identity-cleanup-v2` | INDEPENDENT_OR_STALE |
+| `navigation-architecture-plan` | INDEPENDENT_OR_STALE |
+| `operations-archive-center-foundation` | INDEPENDENT_OR_STALE |
+| `operations-audit-map` | INDEPENDENT_OR_STALE |
+| `operations-calendar-alerts-foundation` | INDEPENDENT_OR_STALE |
+| `operations-components-extraction` | INDEPENDENT_OR_STALE |
+| `operations-planning-engine-foundation` | INDEPENDENT_OR_STALE |
+| `operations-planning-engine-foundation-v2` | INDEPENDENT_OR_STALE |
+| `operations-production-board-foundation` | INDEPENDENT_OR_STALE |
+| `operations-season-engine-foundation` | INDEPENDENT_OR_STALE |
+| `operations-shared-layer` | INDEPENDENT_OR_STALE |
+| `operations-task-engine-foundation` | INDEPENDENT_OR_STALE |
+| `ops-4a-instructions-page` | INDEPENDENT_OR_STALE |
+| `ops-4a-safe-snippet` | INDEPENDENT_OR_STALE |
+| `ops-content-fetch-api` | INDEPENDENT_OR_STALE |
+| `ops-data-models` | INDEPENDENT_OR_STALE |
+| `ops-dedicated-apis` | INDEPENDENT_OR_STALE |
+| `ops-mock-api` | INDEPENDENT_OR_STALE |
+| `ops-shared-data-source` | INDEPENDENT_OR_STALE |
+| `ops-system-page` | INDEPENDENT_OR_STALE |
 | `ops-system-roadmap` | INDEPENDENT_OR_STALE |
 | `ops/add-guarded-comment-trigger-bootstrap-dispatcher` | INDEPENDENT_OR_STALE |
 | `ops/add-one-shot-bootstrap-dispatcher` | INDEPENDENT_OR_STALE |
@@ -112,6 +191,47 @@ This is a **Git ancestry inventory**, not a blanket declaration that unrelated b
 | `persist-archive-asset-review-actions` | INDEPENDENT_OR_STALE |
 | `persist-archive-asset-task-assignment` | INDEPENDENT_OR_STALE |
 | `persist-archive-collections-projects` | INDEPENDENT_OR_STALE |
-| `INDEPENDENT_OR_...[truncated]` | INDEPENDENT_OR_...[truncated |
+| `persist-archive-content-item-proposals` | INDEPENDENT_OR_STALE |
+| `persist-archive-drive-links` | INDEPENDENT_OR_STALE |
+| `phase-0-marketing-cleanup` | INDEPENDENT_OR_STALE |
+| `pkg-1-operations-foundation` | INDEPENDENT_OR_STALE |
+| `pkg-2-operations-data-model` | INDEPENDENT_OR_STALE |
+| `pkg-2b-add-content-plan-item` | INDEPENDENT_OR_STALE |
+| `pkg-2b-operations-official-models-plan` | INDEPENDENT_OR_STALE |
+| `pkg-2b-operations-plan-item-models` | INDEPENDENT_OR_STALE |
+| `pkg-2c-operations-prisma-models` | INDEPENDENT_OR_STALE |
+| `pkg-3a-operations-content-board-shell` | INDEPENDENT_OR_STALE |
+| `pkg-3a-operations-content-ui-shell` | INDEPENDENT_OR_STALE |
+| `pkg-3b-operations-content-board-ui` | INDEPENDENT_OR_STALE |
+| `pkg-3c-operations-content-tasks` | INDEPENDENT_OR_STALE |
+| `pkg-3d-operations-calendar-seasons` | INDEPENDENT_OR_STALE |
+| `port/minber-systems-20261104` | INDEPENDENT_OR_STALE |
+| `port/system-parity-20261106` | STACKED_PR195 |
+| `port/verify-system-parity-20261107` | STACKED_PR195 |
+| `prepare-ai-audit-run-repository-fallback` | INDEPENDENT_OR_STALE |
+| `prepare-archive-assets-repository-fallback` | INDEPENDENT_OR_STALE |
+| `prepare-brand-asset-repository-read-fallback` | INDEPENDENT_OR_STALE |
+| `prepare-shared-ai-core-real-assistants` | INDEPENDENT_OR_STALE |
+| `prisma-foundation-model-slice` | INDEPENDENT_OR_STALE |
+| `quick-add-link-generator-nav` | INDEPENDENT_OR_STALE |
+| `quick-link-operations-content` | INDEPENDENT_OR_STALE |
+| `record-manual-content-publications` | INDEPENDENT_OR_STALE |
+| `release/integration-settings-final` | INDEPENDENT_OR_STALE |
+| `remove/residual-sms-wording` | INDEPENDENT_OR_STALE |
+| `remove/sms-20261105` | INDEPENDENT_OR_STALE |
+| `scripts/bootstrap-integration-settings-vercel-ci.sh` | INDEPENDENT_OR_STALE |
+| `show-content-publication-markers` | INDEPENDENT_OR_STALE |
+| `show-scheduled-published-content-columns` | INDEPENDENT_OR_STALE |
+| `smart-archive-foundation-remote` | INDEPENDENT_OR_STALE |
+| `smart-archive-google-drive-ai-review` | INDEPENDENT_OR_STALE |
+| `stage-ai-operation-run-persistence-contract` | INDEPENDENT_OR_STALE |
+| `stage-archive-asset-drive-contracts` | INDEPENDENT_OR_STALE |
+| `stage-brand-asset-contract-foundation` | INDEPENDENT_OR_STALE |
+| `stage-brand-asset-persistence` | INDEPENDENT_OR_STALE |
+| `stage-brand-font-framework-contracts` | INDEPENDENT_OR_STALE |
+| `stage-dashboard-prisma-slice` | INDEPENDENT_OR_STALE |
+| `stage-operations-content-workflow-contracts` | INDEPENDENT_OR_STALE |
+| `vercel/react-server-components-cve-vu-1thynv` | INDEPENDENT_OR_STALE |
+| `wire-click-id-storage` | INDEPENDENT_OR_STALE |
 
-**No branch deletion, force-push, reset of repository history, or production merge is performed by this snapshot.** The main question for remaining independent branches is whether their *individual functions* already exist in the latest main or remain necessary.
+**Release policy:** Keep the unique canonical PR as the review target. Do not re-merge ancestral branches or bulk-merge unrelated legacy work. No source-institution financial/content records, secrets, default locales or gateway configuration may be imported. No production deployment without verified database restore, financial P0 closure and browser QA.
