@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { canResendToken, createVerificationToken } from "@/lib/otp";
 import { sendVerificationEmailViaRuntime } from "@/lib/communication/system-email";
+import { BLOCKED_EMAIL_ERROR, isBlockedEmail } from "@/lib/security/blocked-emails";
 
 export async function POST(req: NextRequest) {
   try {
     const { email, purpose = "VERIFY_EMAIL", locale = "en", callbackUrl } = await req.json();
     if (!email) return NextResponse.json({ error: "MISSING_FIELDS" }, { status: 400 });
+    if (isBlockedEmail(email)) return NextResponse.json({ error: BLOCKED_EMAIL_ERROR }, { status: 403 });
     const normalizedEmail = email.toLowerCase().trim();
     const { allowed, waitSeconds } = await canResendToken(normalizedEmail, purpose);
     if (!allowed) return NextResponse.json({ error: "RATE_LIMITED", waitSeconds }, { status: 429 });
