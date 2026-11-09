@@ -1,3 +1,5 @@
+import { redactPayForResponse } from "@/lib/payfor";
+import { verifyPayForResponseHash } from "@/lib/payfor";
 import { after, NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 // Donate (success) CAPI now fires server-side from `dispatchDonationPaid`
@@ -26,7 +28,7 @@ export async function POST(req: NextRequest) {
   const raw = Object.fromEntries(form.entries());
 
   // Log full bank response for debugging
-  console.log("[PayFor OK] Bank response:", JSON.stringify(raw, null, 2));
+  console.log("[PayFor OK] Bank response:", JSON.stringify(redactPayForResponse(raw), null, 2));
 
   const orderId = String(raw.OrderId || raw.orderId || "");
   const procReturnCode = String(raw.ProcReturnCode || raw.ProcReturnCode?.toString?.() || raw.procReturnCode || "");
@@ -48,6 +50,14 @@ export async function POST(req: NextRequest) {
 
       // Idempotency: if already confirmed by a prior callback, just redirect to success
       if (donation.paidAt !== null) return { ok: true as const };
+
+      // Bank-signed callback must match the server-generated order exactly.
+      // An unsigned or mismatched result is not proof of paid OR declined.
+      if (!donation.providerOrderId || !orderId ||
+          donation.providerOrderId !== orderId ||
+          !verifyPayForResponseHash(raw, process.env.PAYFOR_MERCHANT_PASS)) {
+        return { ok: false as const, reason: "unverified" as const };
+      }
 
       // Basic linkage check
       if (donation.providerOrderId && orderId && donation.providerOrderId !== orderId) {

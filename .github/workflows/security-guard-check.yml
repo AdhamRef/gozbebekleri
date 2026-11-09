@@ -2,7 +2,12 @@ name: Security guard verification
 on:
   push:
     branches:
-      - feature/donation-abuse-guard-20261109
+      - integration/security-on-canonical-20261109
+      - integration/goz-finance-security-rc-20261109
+  pull_request:
+    branches:
+      - audit/goz-round2-idempotency-locale-20261109
+      - main
   workflow_dispatch:
 jobs:
   guard-tests:

@@ -1,3 +1,4 @@
+import { enforcePaymentInitiationBudget } from "@/lib/site-security/payment-initiation-budget";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { isValidLocale } from "@/lib/locales";
@@ -31,6 +32,9 @@ export async function POST(req: NextRequest) {
     
 
     const body = await req.json();
+    const abuseLimit = await enforcePaymentInitiationBudget(req);
+    if (abuseLimit) return abuseLimit;
+
     const {
       items,
       categoryItems,
