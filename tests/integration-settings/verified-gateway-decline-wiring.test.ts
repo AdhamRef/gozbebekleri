@@ -19,3 +19,11 @@ test("bank-origin redirects without authenticated response must not increment fr
   const failCallback = src("app/api/payfor/3dpay/fail/route.ts");
   assert.doesNotMatch(failCallback, /recordVerifiedDonationFailure|recordConfirmedAlbarakaSaleDecline/);
 });
+
+test("deferred Stripe refund callback is accepted by charge settlement without breaking legacy callers", () => {
+  const webhook = src("app/api/stripe/webhook/route.ts");
+  const settlement = src("lib/donations/stripe-refund-settlement.ts");
+  assert.match(webhook, /refundId => reconcileOrDeferStripeRefund\(prisma, stripe, refundId\)/);
+  assert.match(settlement, /reconcileRefund: \(refundId: string\) => Promise<string>/);
+  assert.match(settlement, /results\.push\(await reconcileRefund\(item\.id\)\)/);
+});
