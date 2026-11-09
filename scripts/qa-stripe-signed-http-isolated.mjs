@@ -6,6 +6,7 @@ import {tmpdir} from "node:os";
 import {resolve} from "node:path";
 import {pathToFileURL} from "node:url";
 import {createRequire} from "node:module";
+import {execFileSync} from "node:child_process";
 import {MongoMemoryReplSet} from "mongodb-memory-server";
 import {MongoClient,ObjectId} from "mongodb";
 import {PrismaClient} from "@prisma/client";
@@ -35,6 +36,17 @@ const pass=(name,details={})=>{passed++;console.log(JSON.stringify({name,result:
 try{
 await mongo.connect();const db=mongo.db("goz_http_test");
 for(const name of ["StripeInvoiceSettlement","StripeRefundSettlement","Campaign","Category","Subscription","SubscriptionItem","SubscriptionCategoryItem","Donation","DonationItem","DonationCategoryItem"])await db.createCollection(name);
+const preflight = execFileSync(process.execPath,["scripts/preflight-stripe-ledgers.mjs"],{
+ env:{...process.env,GOZ_DB_IDENTITY_CONFIRMED:"yes",GOZ_DB_RESTORE_VERIFIED:"yes",GOZ_FINANCE_RELEASE_APPROVED:"yes"},
+ encoding:"utf8",
+});
+assert.ok(preflight.includes('"READ_ONLY_INSPECTION"'));
+const provision = execFileSync(process.execPath,["scripts/preflight-stripe-ledgers.mjs","--apply"],{
+ env:{...process.env,GOZ_DB_IDENTITY_CONFIRMED:"yes",GOZ_DB_RESTORE_VERIFIED:"yes",GOZ_FINANCE_RELEASE_APPROVED:"yes"},
+ encoding:"utf8",
+});
+assert.ok(provision.includes('"APPLIED_AND_VERIFIED"'));
+pass("isolated financial ledger preflight and idempotent index provisioning verified");
 const donor=new ObjectId(),campaign=new ObjectId(),category=new ObjectId(),sub=new ObjectId(),donation=new ObjectId();
 const created=new Date("2026-11-09T04:00:00Z"),sid="sub_synthetic";
 await db.collection("Campaign").insertOne({_id:campaign,title:"Synthetic",description:"Synthetic",targetAmount:1000,currentAmount:0,baselineAmount:0,images:[],categoryIds:[],createdAt:created,updatedAt:created});
