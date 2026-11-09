@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyToken, createAutoSignInToken } from "@/lib/otp";
 import { dispatchEvent } from "@/lib/events/dispatch";
 import { isValidLocale } from "@/lib/locales";
+import { isBlockedEmail } from "@/lib/security/blocked-emails";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -27,6 +28,7 @@ export async function GET(req: NextRequest) {
   if (!token || !email) return errorRedirect("invalid");
 
   const normalizedEmail = decodeURIComponent(email).toLowerCase().trim();
+  if (isBlockedEmail(normalizedEmail)) return errorRedirect("invalid");
   const result = await verifyToken(normalizedEmail, token, "VERIFY_EMAIL");
 
   if (!result.success) {
