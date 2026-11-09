@@ -63,6 +63,12 @@ const inv=(id,reason)=>({id,object:"invoice",billing_reason:reason,status:"paid"
 const event=evt("invoice.payment_succeeded",inv("in_synthetic_signup","subscription_create"));
 assert.equal((await send(event,true)).status,400);
 assert.equal(await db.collection("StripeInvoiceSettlement").countDocuments({}),0);pass("invalid signature rejected");
+const firstFailure=await send(evt("invoice.payment_failed",inv("in_synthetic_signup","subscription_create")));
+assert.equal(firstFailure.status,200,firstFailure.body);
+assert.equal(await db.collection("Donation").countDocuments({subscriptionId:sub}),1,"first failed invoice must not create second donation");
+assert.equal((await db.collection("Subscription").findOne({_id:sub})).status,"PAYMENT_FAILED","failed first invoice must disable ACTIVE");
+assert.equal((await db.collection("Donation").findOne({_id:donation})).status,"FAILED");
+pass("failed first installment marks existing row failed and subscription PAYMENT_FAILED");
 const responses=await Promise.all([send(event),send({...event,id:"evt_fake_concurrent"})]);
 assert.ok(responses.every(x=>x.status===200),JSON.stringify(responses));
 assert.equal(await db.collection("StripeInvoiceSettlement").countDocuments({_id:"in_synthetic_signup"}),1);
