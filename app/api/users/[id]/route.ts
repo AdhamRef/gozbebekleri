@@ -120,7 +120,7 @@ export async function GET(
           // Initial and recurring payments require the same settlement evidence.
           paidAt: { not: null },
         },
-        _sum: { totalAmount: true, amountUSD: true },
+        _sum: { totalAmount: true, amountUSD: true, refundedTotalAmount: true, refundedTotalUSD: true, refundedAmountUSD: true },
         _max: { paidAt: true },
         _count: { id: true },
       }),
@@ -185,6 +185,13 @@ export async function GET(
       totalDonationsCount: t?._count.id ?? 0,
       totalDonatedAmount: t?._sum.totalAmount ?? 0,
       totalDonatedAmountUSD: t?._sum.amountUSD ?? 0,
+      // Do not rewrite original gross values. Display explicit refunds and
+      // net (USD cause-only). Local sums are meaningful only for same-currency donors.
+      totalRefundedAmount: t?._sum.refundedTotalAmount ?? 0,
+      netDonatedAmount: Math.max(0, (t?._sum.totalAmount ?? 0) - (t?._sum.refundedTotalAmount ?? 0)),
+      totalRefundedAmountUSD: t?._sum.refundedAmountUSD ?? 0,
+      netDonatedAmountUSD: Math.max(0, (t?._sum.amountUSD ?? 0) - (t?._sum.refundedAmountUSD ?? 0)),
+      totalRefundedChargedUSD: t?._sum.refundedTotalUSD ?? 0,
       lastDonationAt: t?._max.paidAt ?? null,
       badgeIds: badgeIdsByUser.get(id) ?? [],
       currentMonthlyMrrUSD,
