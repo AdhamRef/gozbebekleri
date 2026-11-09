@@ -143,6 +143,11 @@ export interface ExportResult {
   filenameUtf8: string;
 }
 
+/** Refund export additions must honor the XLSX/CSV language independently of UI dictionary coverage. */
+function refundText(ar: string, en: string): string {
+  return dashDir() === "rtl" ? ar : en;
+}
+
 // ─── Donation column schema ───────────────────────────────────────────────────
 
 type Aligned = "left" | "right" | "center";
@@ -193,12 +198,12 @@ const DONATION_COLUMNS: ColSpec<DonationExportRow>[] = [
   { key: "subscriptionId", get header() { return dt("رقم الاشتراك"); }, width: 26, value: (r) => r.subscriptionId ?? "" },
   { key: "comment", get header() { return dt("ملاحظة"); }, width: 28, value: (r) => r.comment ?? "" },
   // Explicit refund columns retain the original gross values for finance audit.
-  { key: "refundedTotalAmount", header: "المسترد (عملة العملية)", width: 20, numFmt: "#,##0.00", value: r => r.refundedTotalAmount ?? 0 },
-  { key: "netLocal", header: "صافي المحصل (عملة العملية)", width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netLocal },
-  { key: "refundedAmountUSD", header: "مسترد أصل التبرع (USD)", width: 23, numFmt: "#,##0.00", value: r => r.refundedAmountUSD ?? 0 },
-  { key: "netCauseUSD", header: "صافي أصل التبرع (USD)", width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netCauseUSD },
-  { key: "refundedTotalUSD", header: "إجمالي المسترد (USD)", width: 23, numFmt: "#,##0.00", value: r => r.refundedTotalUSD ?? 0 },
-  { key: "netChargedUSD", header: "صافي التحصيل (USD)", width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netChargedUSD },
+  { key: "refundedTotalAmount", get header() { return refundText("المسترد (عملة العملية)", "Refunded (transaction currency)"); }, width: 20, numFmt: "#,##0.00", value: r => r.refundedTotalAmount ?? 0 },
+  { key: "netLocal", get header() { return refundText("صافي المحصل (عملة العملية)", "Net collected (transaction currency)"); }, width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netLocal },
+  { key: "refundedAmountUSD", get header() { return refundText("مسترد أصل التبرع (USD)", "Refunded donation principal (USD)"); }, width: 23, numFmt: "#,##0.00", value: r => r.refundedAmountUSD ?? 0 },
+  { key: "netCauseUSD", get header() { return refundText("صافي أصل التبرع (USD)", "Net donation principal (USD)"); }, width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netCauseUSD },
+  { key: "refundedTotalUSD", get header() { return refundText("إجمالي المسترد (USD)", "Total refunded (USD)"); }, width: 23, numFmt: "#,##0.00", value: r => r.refundedTotalUSD ?? 0 },
+  { key: "netChargedUSD", get header() { return refundText("صافي التحصيل (USD)", "Net collected (USD)"); }, width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netChargedUSD },
 ];
 
 const SUBSCRIPTION_COLUMNS: ColSpec<SubscriptionExportRow>[] = [
@@ -716,14 +721,14 @@ function addCoverSheet(wb: ExcelJS.Workbook, input: DonationExportInput, agg: Ag
     [dt("العملة"), dt("العدد"), dt("مبلغ التبرع (محلي)"), dt("دعم الفريق (محلي)"), dt("الرسوم (محلي)"), dt("إجمالي محصل (محلي)"), dt("بالدولار (USD)")],
     agg.perCurrency.map(c => [c.currency, c.count, fmtMoney(c.donationAmount), fmtMoney(c.teamSupport), fmtMoney(c.fees), fmtMoney(c.totalCharged), fmtMoney(c.amountUSD)]),
     { noTotal: true });
-  addBreakdownTable(sheet, sheet.rowCount + 3, "تسويات الاستردادات / Refund settlements",
-    ["المؤشر", "القيمة USD"],
+  addBreakdownTable(sheet, sheet.rowCount + 3, refundText("تسويات الاستردادات", "Refund settlements"),
+    [refundText("المؤشر", "Metric"), refundText("القيمة USD", "Value (USD)")],
     [
-      ["التحصيل الإجمالي قبل الاسترداد", fmtMoney(agg.grossChargedUSD)],
-      ["إجمالي الاستردادات", fmtMoney(agg.totalRefundedUSD)],
-      ["صافي التحصيل", fmtMoney(agg.netChargedUSD)],
-      ["مسترد أصل التبرعات", fmtMoney(agg.totalRefundedCauseUSD)],
-      ["صافي أصل التبرعات", fmtMoney(agg.netCauseUSD)],
+      [refundText("التحصيل الإجمالي قبل الاسترداد", "Gross collected before refunds"), fmtMoney(agg.grossChargedUSD)],
+      [refundText("إجمالي الاستردادات", "Total refunds"), fmtMoney(agg.totalRefundedUSD)],
+      [refundText("صافي التحصيل", "Net collected"), fmtMoney(agg.netChargedUSD)],
+      [refundText("مسترد أصل التبرعات", "Refunded donation principal"), fmtMoney(agg.totalRefundedCauseUSD)],
+      [refundText("صافي أصل التبرعات", "Net donation principal"), fmtMoney(agg.netCauseUSD)],
     ], { noTotal: true });
   sheet.pageSetup.printArea = `A1:G${sheet.rowCount}`;
   sheet.pageSetup.fitToHeight = 1;
@@ -1150,11 +1155,11 @@ function buildCsv(input: DonationExportInput): Buffer {
     [dt("إجمالي دعم الفريق (USD)"), fmtMoney(agg.totalTeamSupportUSD)],
     [dt("إجمالي الرسوم (USD)"), fmtMoney(agg.totalFeesUSD)],
     [dt("إجمالي المبالغ المحصلة (USD)"), fmtMoney(agg.totalChargedUSD)],
-    ["التحصيل الإجمالي قبل الاسترداد (USD)", fmtMoney(agg.grossChargedUSD)],
-    ["إجمالي الاستردادات (USD)", fmtMoney(agg.totalRefundedUSD)],
-    ["صافي التحصيل بعد الاسترداد (USD)", fmtMoney(agg.netChargedUSD)],
-    ["مسترد أصل التبرعات (USD)", fmtMoney(agg.totalRefundedCauseUSD)],
-    ["صافي أصل التبرعات (USD)", fmtMoney(agg.netCauseUSD)],
+    [refundText("التحصيل الإجمالي قبل الاسترداد (USD)", "Gross collected before refunds (USD)"), fmtMoney(agg.grossChargedUSD)],
+    [refundText("إجمالي الاستردادات (USD)", "Total refunded (USD)"), fmtMoney(agg.totalRefundedUSD)],
+    [refundText("صافي التحصيل بعد الاسترداد (USD)", "Net collected after refunds (USD)"), fmtMoney(agg.netChargedUSD)],
+    [refundText("مسترد أصل التبرعات (USD)", "Refunded donation principal (USD)"), fmtMoney(agg.totalRefundedCauseUSD)],
+    [refundText("صافي أصل التبرعات (USD)", "Net donation principal (USD)"), fmtMoney(agg.netCauseUSD)],
     [dt("قيمة العمليات الفاشلة (USD)"), fmtMoney(agg.failedAmountUSD)],
   ];
   for (const [k, v] of kpis) lines.push(`${csvEscape(k)},${csvEscape(v)}`);
