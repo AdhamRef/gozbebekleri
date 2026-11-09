@@ -16,9 +16,6 @@ export const ALLOWED_IMAGE_MIME = [
   "image/jpeg",
   "image/png",
   "image/webp",
-  "image/gif",
-  "image/avif",
-  "image/svg+xml",
 ] as const;
 
 export function formatBytes(bytes: number): string {
