@@ -24,16 +24,17 @@ export function canonicalNetwork(raw: string): string | null {
   return address + "/" + prefix;
 }
 export function securityClientIp(headers: Pick<Headers, "get">): string | null {
-  // The VPS nginx overwrites X-Real-IP. Never prioritize a caller-supplied CF header.
-  const real = canonicalNetwork(headers.get("x-real-ip") || "");
-  if (real && isIP(real)) return real;
+  // Vercel injects its own forwarding chain. Never prefer an arbitrary
+  // X-Real-IP supplied by a caller when deployed behind Vercel.
   if (process.env.VERCEL) {
     const forwarded = canonicalNetwork(
       headers.get("x-vercel-forwarded-for")?.split(",").at(-1)?.trim() || "",
     );
-    if (forwarded && isIP(forwarded)) return forwarded;
+    return forwarded && isIP(forwarded) ? forwarded : null;
   }
-  return null;
+  // On the VPS the trusted nginx ingress must overwrite X-Real-IP.
+  const real = canonicalNetwork(headers.get("x-real-ip") || "");
+  return real && isIP(real) ? real : null;
 }
 export function matchesNetwork(ip: string, network: string) {
   const canonical = canonicalNetwork(network),
