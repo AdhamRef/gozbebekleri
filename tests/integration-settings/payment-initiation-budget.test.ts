@@ -28,3 +28,15 @@ test("card donation creation is guarded at both public intake routes", () => {
     assert.ok(source.indexOf("enforceDonationIntakeBudget(request)") < source.indexOf("resolveGuestDonor("));
   }
 });
+
+test("PayFor initiation and anonymous donation retry cannot bypass payment budget", () => {
+  for (const path of ["app/api/payfor/3dpay/initiate/route.ts", "app/api/donations/[id]/retry/route.ts"]) {
+    const source = readFileSync(path, "utf8");
+    assert.match(source, /enforcePaymentInitiationBudget\(/);
+  }
+});
+test("payment budgets are disabled by default and use keyed actor identifiers", () => {
+  const source = readFileSync("lib/site-security/payment-initiation-budget.ts", "utf8");
+  assert.match(source, /DONATION_ABUSE_GUARD_ENABLED !== "true"/);
+  assert.match(source, /createHmac\("sha256"/);
+});
