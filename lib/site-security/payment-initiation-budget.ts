@@ -15,10 +15,10 @@ const WINDOW_MS = 5 * 60_000;
 const ipLimit = 8;
 const donationLimit = 3;
 type CheckResult = { accepted: boolean; retryAfterSeconds: number };
-function identity(scope: "ip" | "donation", value: string, bucket: number) {
+function identity(scope: "ip" | "donation" | "intake", value: string, bucket: number) {
   return createHash("sha256").update(scope + ":" + value + ":" + bucket).digest("hex");
 }
-async function count(scope: "ip" | "donation", value: string, limit: number, now: number): Promise<CheckResult> {
+async function count(scope: "ip" | "donation" | "intake", value: string, limit: number, now: number): Promise<CheckResult> {
   const bucket = Math.floor(now / WINDOW_MS);
   // Each bucket's immutable identity makes upserts concurrency-safe with a unique _id.
   const result = await prisma.$runCommandRaw({
@@ -78,4 +78,23 @@ function rateLimit(seconds: number) {
     { error: "PAYMENT_TOO_MANY_ATTEMPTS", retryAfterSeconds: seconds },
     { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(seconds) } },
   );
+}
+
+/**
+ * Reject high-volume creation of distinct guest/card donation records before
+ * donor resolution or any downstream payment request. This is an independent
+ * scope from provider initiation, so a normal checkout is not double-counted.
+ */
+export async function enforceDonationIntakeBudget(request: NextRequest): Promise<NextResponse | null> {
+  const ip = securityClientIp(request.headers);
+  if (!ip) return null; // Never infer identity from a spoofable request header.
+  try {
+    const decision = await count("intake", ip, 12, Date.now());
+    return decision.accepted ? null : rateLimit(decision.retryAfterSeconds);
+  } catch {
+    return NextResponse.json(
+      { error: "PAYMENT_SECURITY_TEMPORARILY_UNAVAILABLE" },
+      { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "30" } },
+    );
+  }
 }
