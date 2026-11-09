@@ -21,6 +21,7 @@ import { REPORT_ORGANIZATION } from "./report-identity";
 
 import ExcelJS from "exceljs";
 import { donationGrossRefundNet } from "@/lib/dashboard/donation-refund-finance";
+const refundReportLabel = (ar: string, en: string) => dashDir() === "rtl" ? ar : en;
 import { dashDir, dashIntl, dt, withReportLanguage } from "@/lib/dashboard/report-i18n";
 import { exportCountryName, exportLanguageName, exportPaymentMethod, exportPaymentStatus } from "@/lib/dashboard/export-labels";
 
@@ -193,12 +194,12 @@ const DONATION_COLUMNS: ColSpec<DonationExportRow>[] = [
   { key: "subscriptionId", get header() { return dt("رقم الاشتراك"); }, width: 26, value: (r) => r.subscriptionId ?? "" },
   { key: "comment", get header() { return dt("ملاحظة"); }, width: 28, value: (r) => r.comment ?? "" },
   // Explicit refund columns retain the original gross values for finance audit.
-  { key: "refundedTotalAmount", header: "المسترد (عملة العملية)", width: 20, numFmt: "#,##0.00", value: r => r.refundedTotalAmount ?? 0 },
-  { key: "netLocal", header: "صافي المحصل (عملة العملية)", width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netLocal },
-  { key: "refundedAmountUSD", header: "مسترد أصل التبرع (USD)", width: 23, numFmt: "#,##0.00", value: r => r.refundedAmountUSD ?? 0 },
-  { key: "netCauseUSD", header: "صافي أصل التبرع (USD)", width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netCauseUSD },
-  { key: "refundedTotalUSD", header: "إجمالي المسترد (USD)", width: 23, numFmt: "#,##0.00", value: r => r.refundedTotalUSD ?? 0 },
-  { key: "netChargedUSD", header: "صافي التحصيل (USD)", width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netChargedUSD },
+  { key: "refundedTotalAmount", header: refundReportLabel("المسترد (عملة العملية)", "Refunded (local currency)"), width: 20, numFmt: "#,##0.00", value: r => r.refundedTotalAmount ?? 0 },
+  { key: "netLocal", header: refundReportLabel("صافي المحصل (عملة العملية)", "Net collected (local currency)"), width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netLocal },
+  { key: "refundedAmountUSD", header: refundReportLabel("مسترد أصل التبرع (USD)", "Refunded donation (USD)"), width: 23, numFmt: "#,##0.00", value: r => r.refundedAmountUSD ?? 0 },
+  { key: "netCauseUSD", header: refundReportLabel("صافي أصل التبرع (USD)", "Net donation (USD)"), width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netCauseUSD },
+  { key: "refundedTotalUSD", header: refundReportLabel("إجمالي المسترد (USD)", "Refunded gross (USD)"), width: 23, numFmt: "#,##0.00", value: r => r.refundedTotalUSD ?? 0 },
+  { key: "netChargedUSD", header: refundReportLabel("صافي التحصيل (USD)", "Net collected (USD)"), width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netChargedUSD },
 ];
 
 const SUBSCRIPTION_COLUMNS: ColSpec<SubscriptionExportRow>[] = [
@@ -687,7 +688,7 @@ function addCoverSheet(wb: ExcelJS.Workbook, input: DonationExportInput, agg: Ag
   styleSectionBanner(sheet.getRow(15));
   sheet.mergeCells("A16:B16");
   sheet.mergeCells("F16:G16");
-  sheet.getCell("A16").value = dt("المؤشر");
+  sheet.getCell("A16").value = dt(refundReportLabel("المؤشر", "Metric"));
   sheet.getCell("C16").value = dt("القيمة");
   sheet.getCell("E16").value = dt("المعيار");
   sheet.getCell("F16").value = dt("القيمة");
@@ -716,14 +717,14 @@ function addCoverSheet(wb: ExcelJS.Workbook, input: DonationExportInput, agg: Ag
     [dt("العملة"), dt("العدد"), dt("مبلغ التبرع (محلي)"), dt("دعم الفريق (محلي)"), dt("الرسوم (محلي)"), dt("إجمالي محصل (محلي)"), dt("بالدولار (USD)")],
     agg.perCurrency.map(c => [c.currency, c.count, fmtMoney(c.donationAmount), fmtMoney(c.teamSupport), fmtMoney(c.fees), fmtMoney(c.totalCharged), fmtMoney(c.amountUSD)]),
     { noTotal: true });
-  addBreakdownTable(sheet, sheet.rowCount + 3, "تسويات الاستردادات / Refund settlements",
-    ["المؤشر", "القيمة USD"],
+  addBreakdownTable(sheet, sheet.rowCount + 3, refundReportLabel("تسويات الاستردادات / Refund settlements", "Refund settlements"),
+    [refundReportLabel("المؤشر", "Metric"), refundReportLabel("القيمة USD", "Value USD")],
     [
-      ["التحصيل الإجمالي قبل الاسترداد", fmtMoney(agg.grossChargedUSD)],
-      ["إجمالي الاستردادات", fmtMoney(agg.totalRefundedUSD)],
-      ["صافي التحصيل", fmtMoney(agg.netChargedUSD)],
-      ["مسترد أصل التبرعات", fmtMoney(agg.totalRefundedCauseUSD)],
-      ["صافي أصل التبرعات", fmtMoney(agg.netCauseUSD)],
+      [refundReportLabel("التحصيل الإجمالي قبل الاسترداد", "Gross collected before refunds"), fmtMoney(agg.grossChargedUSD)],
+      [refundReportLabel("إجمالي الاستردادات", "Total refunds"), fmtMoney(agg.totalRefundedUSD)],
+      [refundReportLabel("صافي التحصيل", "Net collected"), fmtMoney(agg.netChargedUSD)],
+      [refundReportLabel("مسترد أصل التبرعات", "Refunded donations"), fmtMoney(agg.totalRefundedCauseUSD)],
+      [refundReportLabel("صافي أصل التبرعات", "Net donations"), fmtMoney(agg.netCauseUSD)],
     ], { noTotal: true });
   sheet.pageSetup.printArea = `A1:G${sheet.rowCount}`;
   sheet.pageSetup.fitToHeight = 1;
@@ -1025,7 +1026,7 @@ function addManagementSheets(wb: ExcelJS.Workbook, input: DonationExportInput, a
       const first = rows[0];
       return [`${first.provider || dt("غير محدد")} — ${first.type === "MONTHLY" ? dt("متكرر") : dt("لمرة واحدة")}`, rows.length, fmtMoney(rows.reduce((sum, r) => sum + r.amount, 0)), first.currency, fmtMoney(rows.reduce((sum, r) => sum + baseUsd(r), 0))];
     }), { noTotal: true });
-  next = addBreakdownTable(cover, next, dt("متوسط التبرع"), [dt("المؤشر"), dt("القيمة")],
+  next = addBreakdownTable(cover, next, dt("متوسط التبرع"), [dt(refundReportLabel("المؤشر", "Metric")), dt("القيمة")],
     [[dt("متوسط التبرع (USD)"), agg.paidCount ? fmtMoney(agg.totalAmountUSD / agg.paidCount) : 0]], { noTotal: true });
   cover.getCell(next - 2, 2).numFmt = "#,##0.00";
   performance(cover, next, dt("الصرف الإعلاني الإجمالي"), dt("النطاق"), [{ label: dt("جميع التبرعات"), count: agg.paidCount, amount: agg.totalAmountUSD }]);
@@ -1150,11 +1151,11 @@ function buildCsv(input: DonationExportInput): Buffer {
     [dt("إجمالي دعم الفريق (USD)"), fmtMoney(agg.totalTeamSupportUSD)],
     [dt("إجمالي الرسوم (USD)"), fmtMoney(agg.totalFeesUSD)],
     [dt("إجمالي المبالغ المحصلة (USD)"), fmtMoney(agg.totalChargedUSD)],
-    ["التحصيل الإجمالي قبل الاسترداد (USD)", fmtMoney(agg.grossChargedUSD)],
-    ["إجمالي الاستردادات (USD)", fmtMoney(agg.totalRefundedUSD)],
-    ["صافي التحصيل بعد الاسترداد (USD)", fmtMoney(agg.netChargedUSD)],
-    ["مسترد أصل التبرعات (USD)", fmtMoney(agg.totalRefundedCauseUSD)],
-    ["صافي أصل التبرعات (USD)", fmtMoney(agg.netCauseUSD)],
+    [refundReportLabel("التحصيل الإجمالي قبل الاسترداد (USD)", "Gross collected before refunds (USD)"), fmtMoney(agg.grossChargedUSD)],
+    [refundReportLabel("إجمالي الاستردادات (USD)", "Total refunds (USD)"), fmtMoney(agg.totalRefundedUSD)],
+    [refundReportLabel("صافي التحصيل بعد الاسترداد (USD)", "Net collected after refunds (USD)"), fmtMoney(agg.netChargedUSD)],
+    [refundReportLabel("مسترد أصل التبرعات (USD)", "Refunded donations (USD)"), fmtMoney(agg.totalRefundedCauseUSD)],
+    [refundReportLabel("صافي أصل التبرعات (USD)", "Net donations (USD)"), fmtMoney(agg.netCauseUSD)],
     [dt("قيمة العمليات الفاشلة (USD)"), fmtMoney(agg.failedAmountUSD)],
   ];
   for (const [k, v] of kpis) lines.push(`${csvEscape(k)},${csvEscape(v)}`);
@@ -1330,7 +1331,7 @@ function addDetailedAnalysis(wb: ExcelJS.Workbook, input: DonationExportInput) {
   const plans = input.subscriptions;
   const verified = plans.filter(s => s.status === "ACTIVE" && s.totalChargesCount > 0);
   const selectedPaid = paid(input.donations);
-  make("ملخص الاشتراكات", ["المؤشر", "القيمة", "التوضيح"], [
+  make("ملخص الاشتراكات", [refundReportLabel("المؤشر", "Metric"), "القيمة", "التوضيح"], [
     [dt("عدد الاشتراكات"), plans.length, dt("الاشتراكات المشمولة فقط")],
     [dt("المتبرعون المعروفون"), new Set(plans.map(s => s.donor.id).filter(Boolean)).size, dt("كل متبرع مرة واحدة مهما تعددت اشتراكاته")],
     [dt("اشتراكات بلا هوية متبرع"), plans.filter(s => !s.donor.id).length, dt("لا تدخل في عدد المتبرعين المعروفين")],
