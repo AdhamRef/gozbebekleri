@@ -4,6 +4,7 @@ import type { PrismaClient } from "@prisma/client";
 import assert from "node:assert/strict";
 import ExcelJS from "exceljs";
 import { buildDonationExport, type DonationExportRow, type SubscriptionExportRow } from "../../lib/dashboard/donation-export";
+import { donationGrossRefundNet } from "../../lib/dashboard/donation-refund-finance";
 import { exportCountryName } from "../../lib/dashboard/export-labels";
 import { dt, setDashLocale } from "../../lib/dashboard/report-i18n";
 
@@ -344,4 +345,17 @@ test("refunds appear consistently in English CSV and Excel without changing gros
   assert.equal(details.getCell("AE7").value, 50); // net cause USD
   assert.equal(details.getCell("AF7").value, 55); // refund gross USD
   assert.equal(details.getCell("AG7").value, 55); // net gross USD
+});
+
+test("legacy USD amountUSD that includes support cannot inflate cause-only refund reconciliation",()=>{
+  const result=donationGrossRefundNet(gift({
+    currency:"USD", amount:100, totalAmount:110, amountUSD:110,
+    teamSupport:5, fees:5, refundedAmountUSD:50, refundedTotalUSD:55,
+    refundedTotalAmount:55,
+  }));
+  assert.equal(result.grossCauseUSD,100);
+  assert.equal(result.netCauseUSD,50);
+  assert.equal(result.grossChargedUSD,110);
+  assert.equal(result.refundedChargedUSD,55);
+  assert.equal(result.netChargedUSD,55);
 });
