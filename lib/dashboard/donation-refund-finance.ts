@@ -19,7 +19,11 @@ export type RefundedDonationView = {
 const money = (n: number) => Math.round(n * 100) / 100;
 const positive = (n: number | undefined | null) => typeof n === "number" && Number.isFinite(n) && n > 0 ? n : 0;
 export function donationGrossRefundNet(row: RefundedDonationView) {
-  const grossCauseUSD = positive(row.amountUSD) || (row.currency.toUpperCase() === "USD" ? positive(row.amount) : 0);
+  // USD-native donation.amount is the cause itself; older rows sometimes stored
+  // amountUSD as the total charged including team support, so never trust that
+  // field over the native USD amount. Non-USD requires recorded historical FX.
+  const grossCauseUSD = row.currency.toUpperCase() === "USD"
+    ? positive(row.amount) : positive(row.amountUSD);
   // Exact historical USD price of this charge; never fetch/guess new rates.
   const grossChargedUSD = row.amount > 0 && grossCauseUSD > 0
     ? money(row.totalAmount * grossCauseUSD / row.amount) : 0;
