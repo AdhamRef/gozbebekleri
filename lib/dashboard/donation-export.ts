@@ -20,6 +20,7 @@ import { REPORT_ORGANIZATION } from "./report-identity";
  */
 
 import ExcelJS from "exceljs";
+import { donationGrossRefundNet } from "@/lib/dashboard/donation-refund-finance";
 import { dashDir, dashIntl, dt, withReportLanguage } from "@/lib/dashboard/report-i18n";
 import { exportCountryName, exportLanguageName, exportPaymentMethod, exportPaymentStatus } from "@/lib/dashboard/export-labels";
 
@@ -60,6 +61,11 @@ export interface DonationExportRow {
   teamSupport: number;
   fees: number;
   totalAmount: number;     // amount + teamSupport + fees (if coverFees)
+  refundedTotalAmount?: number;
+  refundedTotalUSD?: number;
+  refundedAmountUSD?: number;
+  refundedTeamSupport?: number;
+  refundedFees?: number;
   coverFees: boolean;
   projectAllocations?: { id: string; title: string; amount: number }[];
   campaigns: { id: string; title: string }[];
@@ -186,6 +192,13 @@ const DONATION_COLUMNS: ColSpec<DonationExportRow>[] = [
   { key: "providerErrorMessage", get header() { return dt("سبب الفشل"); }, width: 30, value: (r) => r.providerErrorMessage ?? "" },
   { key: "subscriptionId", get header() { return dt("رقم الاشتراك"); }, width: 26, value: (r) => r.subscriptionId ?? "" },
   { key: "comment", get header() { return dt("ملاحظة"); }, width: 28, value: (r) => r.comment ?? "" },
+  // Explicit refund columns retain the original gross values for finance audit.
+  { key: "refundedTotalAmount", header: "المسترد (عملة العملية)", width: 20, numFmt: "#,##0.00", value: r => r.refundedTotalAmount ?? 0 },
+  { key: "netLocal", header: "صافي المحصل (عملة العملية)", width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netLocal },
+  { key: "refundedAmountUSD", header: "مسترد أصل التبرع (USD)", width: 23, numFmt: "#,##0.00", value: r => r.refundedAmountUSD ?? 0 },
+  { key: "netCauseUSD", header: "صافي أصل التبرع (USD)", width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netCauseUSD },
+  { key: "refundedTotalUSD", header: "إجمالي المسترد (USD)", width: 23, numFmt: "#,##0.00", value: r => r.refundedTotalUSD ?? 0 },
+  { key: "netChargedUSD", header: "صافي التحصيل (USD)", width: 23, numFmt: "#,##0.00", value: r => donationGrossRefundNet(r).netChargedUSD },
 ];
 
 const SUBSCRIPTION_COLUMNS: ColSpec<SubscriptionExportRow>[] = [
@@ -251,7 +264,11 @@ interface Aggregates {
   totalAmountUSD: number;       // base donations only (paid), in USD
   totalTeamSupportUSD: number;  // team support (paid), in USD
   totalFeesUSD: number;
-  totalChargedUSD: number;      // amount + teamSupport + fees, paid only
+  totalChargedUSD: number;      // original gross field preserved for compatibility
+  totalRefundedUSD: number;
+  netChargedUSD: number;
+  totalRefundedCauseUSD: number;
+  netCauseUSD: number;
   failedAmountUSD: number;
   uniqueDonors: number;
   perCurrency: PerCurrencyTotal[];
@@ -293,6 +310,10 @@ function aggregate(rows: DonationExportRow[]): Aggregates {
   let totalTeamSupportUSD = 0;
   let totalFeesUSD = 0;
   let totalChargedUSD = 0;
+  let totalRefundedUSD = 0;
+  let netChargedUSD = 0;
+  let totalRefundedCauseUSD = 0;
+  let netCauseUSD = 0;
   let failedAmountUSD = 0;
   let oneTimeCount = 0;
   let monthlyCount = 0;
@@ -329,6 +350,11 @@ function aggregate(rows: DonationExportRow[]): Aggregates {
     totalTeamSupportUSD += teamUsdShare;
     totalFeesUSD += feesUsdShare;
     totalChargedUSD += r.amountUSD ?? 0;
+    const refund = donationGrossRefundNet(r);
+    totalRefundedUSD += refund.refundedChargedUSD;
+    netChargedUSD += refund.netChargedUSD;
+    totalRefundedCauseUSD += refund.refundedCauseUSD;
+    netCauseUSD += refund.netCauseUSD;
 
     // Per-currency local accounting
     const cur = r.currency || "USD";
@@ -475,6 +501,10 @@ function aggregate(rows: DonationExportRow[]): Aggregates {
     totalTeamSupportUSD,
     totalFeesUSD,
     totalChargedUSD,
+    totalRefundedUSD,
+    netChargedUSD,
+    totalRefundedCauseUSD,
+    netCauseUSD,
     failedAmountUSD,
     uniqueDonors: donorSet.size,
     perCurrency: Array.from(perCurrencyMap.values()).sort((a, b) => b.amountUSD - a.amountUSD),
@@ -617,6 +647,10 @@ function addCoverSheet(wb: ExcelJS.Workbook, input: DonationExportInput, agg: Ag
   addReportHeader(sheet, input, 7);
   const moneyKpis = [
     [dt("إجمالي المبالغ المحصلة (USD)"), agg.totalChargedUSD],
+    ["إجمالي الاستردادات (USD)", agg.totalRefundedUSD],
+    ["صافي التحصيل بعد الاسترداد (USD)", agg.netChargedUSD],
+    ["مسترد أصل التبرعات (USD)", agg.totalRefundedCauseUSD],
+    ["صافي أصل التبرعات (USD)", agg.netCauseUSD],
     [dt("إجمالي التبرعات (USD)"), agg.totalAmountUSD],
     [dt("إجمالي دعم الفريق (USD)"), agg.totalTeamSupportUSD],
     [dt("إجمالي الرسوم (USD)"), agg.totalFeesUSD],
@@ -1107,6 +1141,10 @@ function buildCsv(input: DonationExportInput): Buffer {
     [dt("إجمالي دعم الفريق (USD)"), fmtMoney(agg.totalTeamSupportUSD)],
     [dt("إجمالي الرسوم (USD)"), fmtMoney(agg.totalFeesUSD)],
     [dt("إجمالي المبالغ المحصلة (USD)"), fmtMoney(agg.totalChargedUSD)],
+    ["إجمالي الاستردادات (USD)", fmtMoney(agg.totalRefundedUSD)],
+    ["صافي التحصيل بعد الاسترداد (USD)", fmtMoney(agg.netChargedUSD)],
+    ["مسترد أصل التبرعات (USD)", fmtMoney(agg.totalRefundedCauseUSD)],
+    ["صافي أصل التبرعات (USD)", fmtMoney(agg.netCauseUSD)],
     [dt("قيمة العمليات الفاشلة (USD)"), fmtMoney(agg.failedAmountUSD)],
   ];
   for (const [k, v] of kpis) lines.push(`${csvEscape(k)},${csvEscape(v)}`);
