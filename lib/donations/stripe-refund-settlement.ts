@@ -18,9 +18,14 @@ const idOf = (value: unknown): string | null =>
   typeof value === "string" ? value :
   value && typeof value === "object" && typeof (value as {id?: unknown}).id === "string"
     ? (value as {id: string}).id : null;
-const cents = (n: number) => Math.round(n * 100);
-const usdCents = (n: number) => Math.round(n * 100);
-const localCents = (n: number) => Math.round(n * 100);
+// Stripe uses zero-decimal minor units for these ISO currencies. Payments
+// in TWD/HUF still have two decimals (payout rules are different).
+const ZERO_DECIMAL = new Set([
+  "bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga", "pyg",
+  "rwf", "ugx", "vnd", "vuv", "xaf", "xof", "xpf",
+]);
+const minorFromMajor = (major: number, currency: string) =>
+  Math.round(major * (ZERO_DECIMAL.has(currency.toLowerCase()) ? 1 : 100));
 
 /**
  * Strict financial policy:
@@ -96,7 +101,7 @@ export async function reconcileStripeRefund(
     return reject("INTENT_DONATION_MISMATCH");
   if (refund.currency.toLowerCase() !== charge.currency.toLowerCase() ||
       donation.currency.toLowerCase() !== charge.currency.toLowerCase()) return reject("REFUND_CURRENCY_MISMATCH");
-  if (cents(donation.totalAmount) !== charge.amount) return reject("ORIGINAL_CAPTURE_AMOUNT_MISMATCH");
+  if (minorFromMajor(donation.totalAmount, charge.currency) !== charge.amount) return reject("ORIGINAL_CAPTURE_AMOUNT_MISMATCH");
   if (!Number.isSafeInteger(refund.amount) || refund.amount <= 0 || refund.amount > charge.amount)
     return reject("REFUND_AMOUNT_INVALID");
   // Historical conversion must be verified for ALL reported monetary components.
@@ -108,6 +113,15 @@ export async function reconcileStripeRefund(
     ...donation.categoryItems.map(i => ({ kind: "category" as const, id: i.categoryId, amountUSD: verifiedUsdCredit(i.amount, i.amountUSD, donation.currency) })),
   ];
   if (lines.some(i => i.amountUSD == null)) return reject("HISTORICAL_LINE_FX_UNAVAILABLE");
+  // Missing or incomplete original distribution must never silently refund the
+  // donor while leaving project/category counters over-reported. In the
+  // existing model campaign and category lines may each mirror the same cause
+  // amount, hence exactly one or two cause totals are valid.
+  const allocatedUSD = lines.reduce((sum, i) => sum + (i.amountUSD ?? 0), 0);
+  if (!lines.length ||
+      (Math.abs(allocatedUSD - historicalBaseUSD) > 0.025 &&
+       Math.abs(allocatedUSD - historicalBaseUSD * 2) > 0.025))
+    return reject("ORIGINAL_ALLOCATION_INCOMPLETE");
   const status = refund.status === "succeeded" ? "APPLIED" :
     refund.status === "failed" || refund.status === "canceled" ? "REVERSED" : "PENDING";
   const old = await db.stripeRefundSettlement.findUnique({ where: { id: refundId } });
