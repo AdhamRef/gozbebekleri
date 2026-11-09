@@ -22,6 +22,27 @@ model StripeInvoiceSettlement {
   @@index([subscriptionId, paidAt])
 }
 
+// One immutable provider refund ID, reconciled by its current Stripe status.
+// Keep failed/reversed history; never delete successful payment or paidAt.
+// Pre-provision this collection before accepting refund webhooks.
+model StripeRefundSettlement {
+  id                String   @id @map("_id") // re_... (Stripe refund ID)
+  donationId        String   @db.ObjectId
+  chargeId          String
+  paymentIntentId   String?
+  invoiceId         String?
+  amountMinor       Int
+  chargeAmountMinor Int
+  currency          String
+  status            String   // APPLIED | REVERSED
+  appliedAt         DateTime?
+  reversedAt        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  @@index([donationId, status])
+  @@index([chargeId])
+}
+
 model ContentEditorRevision {
   id String @id @default(auto()) @map("_id") @db.ObjectId
   kind String
@@ -694,6 +715,14 @@ model Donation {
 
   createdAt DateTime @default(now())
   paidAt    DateTime?
+  // Reconciled, provider-confirmed refunds. Optional for legacy Mongo documents:
+  // missing fields must not break existing Prisma reads.
+  refundedMinor        Int?   @default(0)
+  refundedTotalAmount  Float? @default(0) // local captured currency, including fees/support
+  refundedTotalUSD     Float? @default(0) // historical FX snapshot; gross
+  refundedAmountUSD    Float? @default(0) // cause donation only, excludes support/fees
+  refundedTeamSupport  Float? @default(0) // local currency
+  refundedFees         Float? @default(0) // local currency
 
   items         DonationItem[]
   categoryItems DonationCategoryItem[]
