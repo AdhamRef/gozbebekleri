@@ -17,6 +17,7 @@ import {
   normalizeDonorCountryCode,
 } from "@/lib/donations/donor-country-code";
 import { resolveGuestDonor } from "@/lib/users/resolve-guest-donor";
+import { BLOCKED_EMAIL_ERROR, isBlockedEmail } from "@/lib/security/blocked-emails";
 
 export async function GET(request: NextRequest) {
   try {
@@ -111,6 +112,10 @@ export async function POST(request: NextRequest) {
       locale: donationLocale,
       guest,
     } = body;
+
+    if (isBlockedEmail(session?.user?.email) || isBlockedEmail(guest?.email)) {
+      return NextResponse.json({ error: BLOCKED_EMAIL_ERROR }, { status: 403 });
+    }
 
     // Validate required fields
     if (!items?.length || !currency || !paymentMethod) {

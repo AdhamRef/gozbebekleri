@@ -5,12 +5,14 @@ import { prisma } from "@/lib/prisma";
 import { createVerificationToken } from "@/lib/otp";
 import { sendVerificationEmailViaRuntime } from "@/lib/communication/system-email";
 import { inferLocaleFromRequest } from "@/lib/preferred-lang";
+import { BLOCKED_EMAIL_ERROR, isBlockedEmail } from "@/lib/security/blocked-emails";
 
 export async function POST(req: NextRequest) {
   try {
     const { firstName, lastName, phone, dateOfBirth, gender, email, password, locale, callbackUrl } = await req.json();
     if (!firstName?.trim() || !lastName?.trim() || !email?.trim() || !password) return NextResponse.json({ error: "MISSING_FIELDS" }, { status: 400 });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "INVALID_EMAIL" }, { status: 400 });
+    if (isBlockedEmail(email)) return NextResponse.json({ error: BLOCKED_EMAIL_ERROR }, { status: 403 });
     if (password.length < 8) return NextResponse.json({ error: "PASSWORD_TOO_SHORT" }, { status: 400 });
     const normalizedEmail = email.toLowerCase().trim();
     const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });

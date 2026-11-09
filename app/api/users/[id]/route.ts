@@ -11,6 +11,7 @@ import { requireAdminSession } from '@/lib/dashboard/api-auth';
 import { writeAuditLog } from '@/lib/audit-log';
 import { getBadgeIdsByUser } from '@/lib/badge-criteria';
 import { chargesPerMonth } from '@/lib/donations/recurring-schedule';
+import { BLOCKED_EMAIL_ERROR, isBlockedEmail } from '@/lib/security/blocked-emails';
 
 function roleLabelAr(r: string) {
   if (r === 'ADMIN') return 'مدير';
@@ -325,6 +326,10 @@ export async function PUT(
           { status: 400 }
         );
       }
+    }
+
+    if (email && isBlockedEmail(email)) {
+      return NextResponse.json({ error: BLOCKED_EMAIL_ERROR }, { status: 403 });
     }
 
     if (email) {

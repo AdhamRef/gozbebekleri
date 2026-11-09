@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { countryCodeFromPhone } from "@/lib/donations/donor-country-code";
+import { BlockedEmailError, isBlockedEmail } from "@/lib/security/blocked-emails";
 
 export interface GuestPayload {
   firstName?: string | null;
@@ -48,6 +49,8 @@ export async function resolveGuestDonor(
   opts: ResolveOptions
 ): Promise<ResolvedDonor> {
   const email = guest.email?.trim().toLowerCase() || null;
+  // Backstop — callers should already have rejected this with a 403.
+  if (isBlockedEmail(email)) throw new BlockedEmailError();
   const phone = guest.phone?.trim() || null;
   const name = [guest.firstName, guest.lastName].filter(Boolean).join(" ").trim() || null;
   // Phone-derived country is a stronger signal than IP geo and lets us avoid
