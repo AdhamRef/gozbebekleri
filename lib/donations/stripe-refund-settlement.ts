@@ -211,7 +211,12 @@ export async function reconcileStripeRefund(
   return reject("REFUND_RETRY_EXHAUSTED", true);
 }
 
-export async function reconcileChargeRefunds(db: Db, stripe: RefundSource, chargeId: string) {
+export async function reconcileChargeRefunds(
+  db: Db,
+  stripe: RefundSource,
+  chargeId: string,
+  settle: (refundId: string) => Promise<string> = refundId => reconcileStripeRefund(db, stripe, refundId),
+) {
   if (!/^ch_[A-Za-z0-9_]+$/.test(chargeId)) return reject("INVALID_CHARGE_ID");
   const results: string[] = [];
   let startingAfter: string | undefined;
@@ -220,7 +225,7 @@ export async function reconcileChargeRefunds(db: Db, stripe: RefundSource, charg
     if (!list.data.length && list.has_more) return reject("REFUND_PAGE_INCOMPLETE", true);
     for (const item of list.data) {
       if (idOf(item.charge) !== chargeId) return reject("REFUND_LIST_CHARGE_MISMATCH");
-      results.push(await reconcileStripeRefund(db, stripe, item.id));
+      results.push(await settle(item.id));
     }
     if (!list.has_more) return results;
     startingAfter = list.data.at(-1)?.id;
