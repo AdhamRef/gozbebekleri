@@ -12,6 +12,7 @@ import { donationFieldEmpty } from "@/lib/donations/mongo-null";
 import { normalizeDonationCurrencyCode } from "@/lib/exchange/convert-amount-in-currency-to-usd";
 import { checkoutPaymentCanSettle, stripeInvoiceSettlementDate, stripeSubscriptionOwnershipMatches } from "@/lib/donations/stripe-checkout-settlement";
 import { settleStripeInvoiceOnce } from "@/lib/donations/stripe-invoice-settlement";
+import { verifiedUsdCredit } from "@/lib/donations/verified-usd-credit";
 import { stripeBillingState } from "@/lib/donations/stripe-subscription-billing";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -100,15 +101,25 @@ export async function POST(req: NextRequest) {
 
             // Apply campaign/category amount increments
             for (const item of donation.items) {
+              const credit = verifiedUsdCredit(item.amount, item.amountUSD, donation.currency);
+              if (credit === null) {
+                console.warn("[stripe] skipping non-USD project/category increment without recorded FX", { invoiceOrSession: session.id });
+                continue;
+              }
               await tx.campaign.update({
                 where: { id: item.campaignId },
-                data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
+                data: { currentAmount: { increment: credit } },
               });
             }
             for (const item of donation.categoryItems) {
+              const credit = verifiedUsdCredit(item.amount, item.amountUSD, donation.currency);
+              if (credit === null) {
+                console.warn("[stripe] skipping non-USD project/category increment without recorded FX", { invoiceOrSession: session.id });
+                continue;
+              }
               await tx.category.update({
                 where: { id: item.categoryId },
-                data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
+                data: { currentAmount: { increment: credit } },
               });
             }
 
@@ -322,15 +333,25 @@ export async function POST(req: NextRequest) {
 
           // Apply campaign/category amount increments for every paid invoice
           for (const item of dbSubscription.items) {
+            const credit = verifiedUsdCredit(item.amount, item.amountUSD, dbSubscription.currency);
+            if (credit === null) {
+              console.warn("[stripe] skipping non-USD project/category increment without recorded FX", { invoiceOrSession: invoice.id });
+              continue;
+            }
             await tx.campaign.update({
               where: { id: item.campaignId },
-              data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
+              data: { currentAmount: { increment: credit } },
             });
           }
           for (const item of dbSubscription.categoryItems) {
+            const credit = verifiedUsdCredit(item.amount, item.amountUSD, dbSubscription.currency);
+            if (credit === null) {
+              console.warn("[stripe] skipping non-USD project/category increment without recorded FX", { invoiceOrSession: invoice.id });
+              continue;
+            }
             await tx.category.update({
               where: { id: item.categoryId },
-              data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
+              data: { currentAmount: { increment: credit } },
             });
           }
 
