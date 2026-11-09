@@ -18,6 +18,7 @@ import {
 import { sanitizeDonationAttribution } from "@/lib/attribution/sanitize";
 import { inferLocaleFromRequest } from "@/lib/preferred-lang";
 import { resolveGuestDonor } from "@/lib/users/resolve-guest-donor";
+import { BLOCKED_EMAIL_ERROR, isBlockedEmail } from "@/lib/security/blocked-emails";
 import { istanbulDateKeysToUtcRange } from "@/lib/admin/istanbul-calendar";
 import {
   assertImpactAmountMatches,
@@ -249,6 +250,10 @@ export async function POST(request: NextRequest) {
       locale: donationLocale,
       guest,
     } = body;
+
+    if (isBlockedEmail(session?.user?.email) || isBlockedEmail(guest?.email)) {
+      return NextResponse.json({ error: BLOCKED_EMAIL_ERROR }, { status: 403 });
+    }
 
     const hasCampaignItems = items?.length > 0;
     const hasCategoryItems = categoryItems?.length > 0;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyOtpCode } from "@/lib/otp";
 import { dispatchEvent } from "@/lib/events/dispatch";
+import { BLOCKED_EMAIL_ERROR, isBlockedEmail } from "@/lib/security/blocked-emails";
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,6 +10,9 @@ export async function POST(req: NextRequest) {
 
     if (!email || !code) {
       return NextResponse.json({ error: "MISSING_FIELDS" }, { status: 400 });
+    }
+    if (isBlockedEmail(email)) {
+      return NextResponse.json({ error: BLOCKED_EMAIL_ERROR }, { status: 403 });
     }
 
     const result = await verifyOtpCode(email.toLowerCase().trim(), code.trim(), purpose);

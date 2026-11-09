@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/options";
 import { prisma } from "@/lib/prisma";
 import { isValidLocale } from "@/lib/locales";
+import { BLOCKED_EMAIL_ERROR, isBlockedEmail } from "@/lib/security/blocked-emails";
 import { writeAuditLog, auditActorFromSiteSession, auditStreamForRole } from "@/lib/audit-log";
 import {
   isMessageSubject,
@@ -14,6 +15,9 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     const body = await request.json();
+    if (isBlockedEmail(session?.user?.email) || isBlockedEmail(body?.guestEmail)) {
+      return NextResponse.json({ error: BLOCKED_EMAIL_ERROR }, { status: 403 });
+    }
     const messageBody = typeof body?.body === "string" ? body.body.trim() : "";
     const locale = isValidLocale(body?.locale) ? body.locale : "ar";
     const subject: MessageSubject = isMessageSubject(body?.subject) ? body.subject : "GENERAL";

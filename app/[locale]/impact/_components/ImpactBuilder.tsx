@@ -299,7 +299,7 @@ export default function ImpactBuilder({
               alt={img.key === shownStateKey ? pickText(region?.name, locale) : ""}
               fill
               priority={img.key === "base"}
-              sizes="(max-width: 1024px) 320px, 500px"
+              sizes="(max-width: 1024px) 360px, 540px"
               unoptimized={!optimizable(img.src)}
               className={`z-40 object-contain object-bottom transition-opacity duration-200 ${
                 img.key === shownStateKey ? "opacity-100" : "opacity-0"
@@ -461,12 +461,12 @@ export default function ImpactBuilder({
       </section>
 
       <section className={`mx-auto max-w-[1280px] ${compact ? "" : "px-4 sm:px-5"}`}>
-        <div className="flex flex-col lg:grid lg:grid-cols-[minmax(220px,1fr)_minmax(380px,500px)_minmax(220px,1fr)] lg:items-start lg:gap-[30px]">
+        <div className="flex flex-col lg:grid lg:grid-cols-[minmax(220px,1fr)_minmax(400px,540px)_minmax(220px,1fr)] lg:items-start lg:gap-[30px]">
           <div className="hidden content-start gap-[34px] lg:grid">{needs.slice(0, half).map((n) => renderCard(n, false))}</div>
 
           {/* Character stays in view while adding: under the navbar on phones, beside the lists on desktop. */}
           <div className="sticky top-16 z-30 -mx-4 bg-[#fbfcfe]/90 px-4 pb-2 pt-1 backdrop-blur-md sm:-mx-5 sm:px-5 lg:top-[120px] lg:mx-0 lg:flex lg:flex-col lg:items-center lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
-            <div className="mx-auto h-[clamp(220px,38svh,380px)] w-full max-w-[320px] lg:h-[clamp(320px,calc(100svh-440px),600px)] lg:max-w-[500px]">
+            <div className="mx-auto h-[clamp(250px,44svh,440px)] w-full max-w-[360px] lg:h-[clamp(380px,calc(100svh-390px),680px)] lg:max-w-[540px]">
               {stage}
             </div>
             <div className="mt-[18px] hidden w-full max-w-[460px] lg:block">{summary}</div>
