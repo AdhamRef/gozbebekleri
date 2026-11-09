@@ -1,3 +1,5 @@
+import { securityClientIp } from "@/lib/site-security/policy";
+import { sanitizeDonationAttribution } from "@/lib/attribution/sanitize";
 import { enforceDonationIntakeBudget } from "@/lib/site-security/payment-initiation-budget";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -22,6 +24,7 @@ import { resolveGuestDonor } from "@/lib/users/resolve-guest-donor";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
+    const trustedClientIp = securityClientIp(request.headers);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -295,6 +298,7 @@ export async function POST(request: NextRequest) {
             referralId: referralId ?? undefined,
             subscriptionId: sub.id,
             paymentMethod,
+            attribution: trustedClientIp ? sanitizeDonationAttribution({ client_ip: trustedClientIp }) : undefined,
             cardDetails: null,
             items: {
               create: itemsResolved.map((item) => ({
@@ -366,6 +370,7 @@ export async function POST(request: NextRequest) {
           donorId: donorId,
           referralId: referralId ?? undefined,
           paymentMethod,
+          attribution: trustedClientIp ? sanitizeDonationAttribution({ client_ip: trustedClientIp }) : undefined,
           cardDetails: null,
           items: {
             create: itemsResolved.map((item) => ({
