@@ -18,6 +18,9 @@ import {
 } from "@/lib/donations/donor-country-code";
 import { resolveGuestDonor } from "@/lib/users/resolve-guest-donor";
 import { BLOCKED_EMAIL_ERROR, isBlockedEmail } from "@/lib/security/blocked-emails";
+import { securityClientIp } from "@/lib/site-security/policy";
+import { sanitizeDonationAttribution } from "@/lib/attribution/sanitize";
+import { enforceDonationIntakeBudget } from "@/lib/site-security/payment-initiation-budget";
 
 export async function GET(request: NextRequest) {
   try {
@@ -98,6 +101,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
+    // Use only a trusted proxy identity; never trust user-supplied forwarding headers.
+    const trustedClientIp = securityClientIp(request.headers);
 
     const body = await request.json();
     const {
@@ -123,6 +128,12 @@ export async function POST(request: NextRequest) {
         { error: "Items, currency, and payment method are required" },
         { status: 400 }
       );
+    }
+
+    // Guard only new card-payment intake, not bank transfers or callbacks.
+    if (paymentMethod === "CARD") {
+      const intakeLimit = await enforceDonationIntakeBudget(request);
+      if (intakeLimit) return intakeLimit;
     }
 
     // Resolve donor
