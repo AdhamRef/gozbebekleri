@@ -40,3 +40,15 @@ test("payment budgets are disabled by default and use keyed actor identifiers", 
   assert.match(source, /DONATION_ABUSE_GUARD_ENABLED !== "true"/);
   assert.match(source, /createHmac\("sha256"/);
 });
+
+test("structurally invalid donation requests do not consume valid-donor intake budget", () => {
+  for (const path of ["app/api/cart/payment/route.ts", "app/api/donations/route.ts"]) {
+    const source = readFileSync(path, "utf8");
+    const guardAt = source.indexOf("enforceDonationIntakeBudget(request)");
+    const validationAt = source.indexOf("Items or categoryItems, currency, and payment method are required") >= 0
+      ? source.indexOf("Items or categoryItems, currency, and payment method are required")
+      : source.indexOf("Items, currency, and payment method are required");
+    assert.ok(guardAt > 0, path + " must guard intake");
+    assert.ok(validationAt > 0 && guardAt > validationAt, path + " must reject invalid intake first");
+  }
+});
