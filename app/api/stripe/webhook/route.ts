@@ -16,7 +16,9 @@ import { verifiedUsdCredit } from "@/lib/donations/verified-usd-credit";
 import { stripeBillingState } from "@/lib/donations/stripe-subscription-billing";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  // Preserve the provider API version already used by this handler. Stripe SDK\n  // only types its latest version; do not silently change runtime API semantics.\n  apiVersion: "2026-03-25.dahlia" as Stripe.LatestApiVersion,
+  // Preserve the provider API version already used by this handler. Stripe SDK
+  // only types its latest version; do not silently change runtime API semantics.
+  apiVersion: "2026-03-25.dahlia" as Stripe.LatestApiVersion,
 });
 
 // Stripe removed `invoice.subscription` in API 2024-09-30. The subscription ID
