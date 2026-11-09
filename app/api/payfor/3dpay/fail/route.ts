@@ -1,3 +1,4 @@
+import { verifyPayForResponseHash } from "@/lib/payfor";
 import { after, NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { dispatchEvent } from "@/lib/events/dispatch";
@@ -28,7 +29,12 @@ export async function POST(req: NextRequest) {
       where: { id: donationId },
     });
 
-    if (donation && donation.paidAt === null) {
+    const authenticated =
+      donation && donation.providerOrderId && orderId &&
+      donation.providerOrderId === orderId &&
+      verifyPayForResponseHash(raw, process.env.PAYFOR_MERCHANT_PASS);
+    // Unsigned failure/3DS return codes cannot mark a donation FAILED.
+    if (donation && donation.paidAt === null && authenticated) {
       await prisma.donation.update({
         where: { id: donationId },
         data: {
