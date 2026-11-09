@@ -10,7 +10,7 @@ import { sendDonationFailedConversions } from "@/lib/tracking/donation-conversio
 import { dispatchDonationPaid, dispatchEvent } from "@/lib/events/dispatch";
 import { donationFieldEmpty } from "@/lib/donations/mongo-null";
 import { normalizeDonationCurrencyCode } from "@/lib/exchange/convert-amount-in-currency-to-usd";
-import { checkoutPaymentCanSettle, stripeSubscriptionOwnershipMatches } from "@/lib/donations/stripe-checkout-settlement";
+import { checkoutPaymentCanSettle, stripeInvoiceSettlementDate, stripeSubscriptionOwnershipMatches } from "@/lib/donations/stripe-checkout-settlement";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
@@ -172,8 +172,10 @@ export async function POST(req: NextRequest) {
         });
         if (existingForInvoice) break;
 
-        // Compute paidAt from invoice timestamp
-        const paidAt = new Date((invoice as any).created * 1000);
+        // The invoice can be created days before it is actually paid.
+        // Stripe status_transitions.paid_at is the collected-money calendar.
+        // Fallback to the signed webhook event time, never invoice.created.
+        const paidAt = stripeInvoiceSettlementDate(invoice.status_transitions?.paid_at, event.created);
 
         // Stripe's own first-vs-renewal marker. "subscription_create" is the signup
         // charge; "subscription_cycle" is an automatic renewal. Anything else
