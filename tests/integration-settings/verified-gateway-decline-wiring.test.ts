@@ -24,6 +24,6 @@ test("deferred Stripe refund callback is accepted by charge settlement without b
   const webhook = src("app/api/stripe/webhook/route.ts");
   const settlement = src("lib/donations/stripe-refund-settlement.ts");
   assert.match(webhook, /refundId => reconcileOrDeferStripeRefund\(prisma, stripe, refundId\)/);
-  assert.match(settlement, /reconcileRefund: \(refundId: string\) => Promise<string>/);
-  assert.match(settlement, /results\.push\(await reconcileRefund\(item\.id\)\)/);
+  assert.match(settlement, /settle: \(refundId: string\) => Promise<string>/);
+  assert.match(settlement, /results\.push\(await settle\(item\.id\)\)/);
 });
