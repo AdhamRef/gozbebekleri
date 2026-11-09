@@ -28,6 +28,7 @@ try{
  const spec=[
   ["StripeInvoiceSettlement",[{key:{subscriptionId:1,paidAt:1},name:"subscriptionId_1_paidAt_1"}]],
   ["StripeRefundSettlement",[{key:{donationId:1,status:1},name:"donationId_1_status_1"},{key:{chargeId:1},name:"chargeId_1"}]],
+  ["StripeDeferredRefund",[{key:{status:1,nextAttemptAt:1},name:"status_1_nextAttemptAt_1"}]],
  ];
  const existing=new Set((await db.listCollections({}, {nameOnly:true}).toArray()).map(x=>x.name));
  for(const [name,indexes] of spec){
