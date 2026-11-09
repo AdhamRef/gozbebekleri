@@ -9,6 +9,19 @@ datasource db {
 
 /* ===================== AUTH ===================== */
 
+// Stripe invoice claim ledger. MongoDB _id uniqueness serializes concurrent webhook
+// handlers; the claim and all money-side effects MUST live in one transaction.
+// Provision this collection before accepting invoice webhooks (collection creation
+// inside transactions is not supported in all MongoDB topologies).
+model StripeInvoiceSettlement {
+  id             String   @id @map("_id") // Stripe invoice ID (in_...), not ObjectId
+  subscriptionId String   @db.ObjectId
+  paidAt         DateTime
+  createdAt      DateTime @default(now())
+
+  @@index([subscriptionId, paidAt])
+}
+
 model ContentEditorRevision {
   id String @id @default(auto()) @map("_id") @db.ObjectId
   kind String
