@@ -1,3 +1,4 @@
+import { BLOCKED_EMAIL_ERROR, isBlockedEmail } from "@/lib/security/blocked-emails";
 import { securityClientIp } from "@/lib/site-security/policy";
 import { enforceDonationIntakeBudget } from "@/lib/site-security/payment-initiation-budget";
 import { NextRequest, NextResponse } from "next/server";
@@ -248,6 +249,10 @@ export async function POST(request: NextRequest) {
       locale: donationLocale,
       guest,
     } = body;
+    if (isBlockedEmail(session?.user?.email) || isBlockedEmail(guest?.email)) {
+      return NextResponse.json({ error: BLOCKED_EMAIL_ERROR }, { status: 403 });
+    }
+
 
     const hasCampaignItems = items?.length > 0;
     const hasCategoryItems = categoryItems?.length > 0;
