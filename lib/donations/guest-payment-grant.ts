@@ -38,6 +38,49 @@ function signature(donationId: string, expiresAt: number, secret: Buffer): Buffe
 export function guestPaymentCookieName(donationId: string): string {
   return COOKIE_PREFIX + donationId;
 }
+/**
+ * Separately scoped receipt capability. An ObjectId is not a secret.
+ * Do not use the charge cookie as proof of receipt access: browsers must
+ * not send a payment-initiation credential to unrelated API routes.
+ */
+const RECEIPT_COOKIE_PREFIX = "goz_guest_receipt_";
+const RECEIPT_TTL_SECONDS = 24 * 60 * 60;
+export function guestReceiptCookieName(donationId: string): string {
+  return RECEIPT_COOKIE_PREFIX + donationId;
+}
+function receiptSignature(donationId: string, expiresAt: number, secret: Buffer): Buffer {
+  return createHmac("sha256", secret)
+    .update("gozbebekleri:receipt-access:v1:" + donationId + ":" + expiresAt)
+    .digest();
+}
+export function issueGuestReceiptGrant(response: NextResponse, donationId: string): void {
+  const key = paymentKeys()[0];
+  if (!key || !DONATION_ID.test(donationId)) throw new Error("Guest receipt signing key unavailable");
+  const expiresAt = Math.floor(Date.now() / 1000) + RECEIPT_TTL_SECONDS;
+  response.cookies.set({
+    name: guestReceiptCookieName(donationId),
+    value: key.id + "." + expiresAt + "." + receiptSignature(donationId, expiresAt, key.secret).toString("hex"),
+    maxAge: RECEIPT_TTL_SECONDS,
+    path: "/api/donations/" + donationId + "/receipt",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+}
+export function hasGuestReceiptGrant(request: NextRequest, donationId: string): boolean {
+  if (!DONATION_ID.test(donationId)) return false;
+  const token = request.cookies.get(guestReceiptCookieName(donationId))?.value;
+  const match = token && /^([a-zA-Z0-9_-]{1,24})\.(\d{10})\.([0-9a-f]{64})$/.exec(token);
+  if (!match) return false;
+  const expiresAt = Number(match[2]);
+  const now = Math.floor(Date.now() / 1000);
+  if (expiresAt <= now || expiresAt > now + RECEIPT_TTL_SECONDS) return false;
+  const key = paymentKeys().find(k => k.id === match[1]);
+  return Boolean(key && timingSafeEqual(
+    Buffer.from(match[3], "hex"), receiptSignature(donationId, expiresAt, key.secret),
+  ));
+}
+
 export function issueGuestPaymentGrant(response: NextResponse, donationId: string): void {
   const active = paymentKeys()[0];
   if (!active || !DONATION_ID.test(donationId)) {
