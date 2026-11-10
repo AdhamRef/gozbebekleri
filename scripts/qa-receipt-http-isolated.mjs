@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import pdfParse from "pdf-parse";
+import {execFileSync} from "node:child_process";
 import { createHmac } from "node:crypto";
 import { createServer } from "node:http";
 import { registerHooks } from "node:module";
@@ -113,13 +113,17 @@ try{
  const ownerReceipt=await call();
  pdf(ownerReceipt);
  // Extract visible PDF text, not just raw compressed PDF bytes.
- const ownerExtracted=(await pdfParse(ownerReceipt.bytes)).text;
+ const ownerPath=resolve(dir,"owner-receipt.pdf");
+ writeFileSync(ownerPath,ownerReceipt.bytes);
+ const ownerExtracted=execFileSync("pdftotext",["-layout",ownerPath,"-"],{encoding:"utf8"});
  assert.match(ownerExtracted,/Synthetic Private Donor/);
  assert.match(ownerExtracted,/private-fixture@example.invalid/);
  globalThis.receiptFixture.session=null;
  const privateGuestReceipt=await call({cookie:receiptCookie});
  pdf(privateGuestReceipt);
- const guestExtracted=(await pdfParse(privateGuestReceipt.bytes)).text;
+ const guestPath=resolve(dir,"guest-receipt.pdf");
+ writeFileSync(guestPath,privateGuestReceipt.bytes);
+ const guestExtracted=execFileSync("pdftotext",["-layout",guestPath,"-"],{encoding:"utf8"});
  assert.match(guestExtracted,/Donor/);
  assert.doesNotMatch(guestExtracted,/Synthetic Private Donor|private-fixture@example.invalid|999111222/);
  assert.doesNotMatch(privateGuestReceipt.body,/Synthetic Private Donor|private-fixture@example.invalid|999111222/);
