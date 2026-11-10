@@ -1,3 +1,4 @@
+import { stripeAmountInMinorUnits } from "./stripe-minor-units";
 import { randomUUID } from "node:crypto";
 import type Stripe from "stripe";
 import { stripeOneTimePaymentMatchesDonation } from "@/lib/donations/stripe-one-time-payment";
@@ -46,7 +47,7 @@ export function createStripeChargeAttempt(
   description: string,
   now: number = Date.now(),
 ): StripeChargeAttempt {
-  const amountMinor = Math.round(donation.totalAmount * 100);
+  const amountMinor = stripeAmountInMinorUnits(donation.totalAmount, donation.currency);
   const currency = donation.currency.trim().toLowerCase();
   if (!OBJECT_ID.test(donation.id) || !OBJECT_ID.test(donation.donorId) ||
       !Number.isSafeInteger(amountMinor) || amountMinor <= 0 ||
@@ -73,7 +74,8 @@ export function readStripeChargeAttempt(raw: unknown, donation: ChargeDonation):
       typeof a.currency !== "string" || !/^[a-z]{3}$/.test(a.currency) ||
       typeof a.description !== "string" || !a.description ||
       a.description.length > 490) return null;
-  const current = Math.round(donation.totalAmount * 100);
+  let current: number;
+  try { current = stripeAmountInMinorUnits(donation.totalAmount, donation.currency); } catch { return null; }
   if (!Number.isSafeInteger(current) || current !== a.amountMinor ||
       donation.currency.toLowerCase() !== a.currency) return null;
   return a as StripeChargeAttempt;
