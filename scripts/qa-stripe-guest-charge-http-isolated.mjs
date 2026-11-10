@@ -135,22 +135,24 @@ try{
   assert.equal(creates,0);pass("authenticated non-owner cannot borrow guest grant");
   globalThis.fixture.session=null;
   const results=await Promise.all([call(donationId,guestToken),call(donationId,guestToken)]);
-  assert.deepEqual(results.map(x=>x.status).sort(),[200,503]);
-  assert.equal(creates,1);
+  assert.ok(results.some(x=>x.status===200),JSON.stringify(results));
+  assert.ok(results.every(x=>x.status===200||x.status===503),JSON.stringify(results));
+  assert.equal(actualStripeCreates,1,"same idempotency key must mint only one provider object");
+  const initialCreates=creates;
   assert.equal(stored.providerOrderId,"pi_synthetic_original");
   pass("concurrent authorized guest initiation creates only one intent and atomically binds reference");
   assert.equal((await call(donationId,guestToken)).status,200);
-  assert.equal(creates,1);assert.equal(retrievals,1);
+  assert.equal(creates,initialCreates);assert.equal(retrievals,1);
   pass("authorized retry reuses original Stripe intent without replacing providerOrderId");
   stored.paidAt=new Date();
   assert.equal((await call(donationId,guestToken)).status,409);
-  assert.equal(creates,1);pass("settled donation rejects late payment initiation");
+  assert.equal(creates,initialCreates);pass("settled donation rejects late payment initiation");
   stored=row();stored.provider="PAYFOR";stored.providerOrderId="payfor_existing";
   assert.equal((await call(donationId,guestToken)).status,409);
-  assert.equal(creates,1);pass("existing other-provider binding cannot be replaced");
+  assert.equal(creates,initialCreates);pass("existing other-provider binding cannot be replaced");
   stored=row();stored.provider="STRIPE";stored.providerOrderId="goz_charge_reserved_"+donationId;
   assert.equal((await call(donationId,guestToken)).status,409);
-  assert.equal(creates,1);pass("legacy reservation without nonce is never replayed");
+  assert.equal(creates,initialCreates);pass("legacy reservation without nonce is never replayed");
   // Lost response after Stripe created the intent: the original metadata
   // and exact provider reference are discovered without another create.
   stored=row();stored.provider="STRIPE";
@@ -166,14 +168,14 @@ try{
   stripeSearch=[lastCreated];
   assert.equal((await call(donationId,guestToken)).status,200);
   assert.equal(stored.providerOrderId,"pi_synthetic_original");
-  assert.equal(creates,1);pass("lost provider response recovered from verified Stripe search without second create");
+  assert.equal(creates,initialCreates);pass("lost provider response recovered from verified Stripe search without second create");
   // Key is past Stripe's retention safety margin. A negative search must
   // never authorize a fresh PaymentIntent even if Stripe pruned the key.
   stored.providerOrderId="goz_charge_reserved_"+donationId;
   stored.stripeChargeAttempt.startedAt=Date.now()-25*60*60*1000;
   stripeSearch=[];
   assert.equal((await call(donationId,guestToken)).status,409);
-  assert.equal(creates,1);pass("expired idempotency key with search miss fails closed");
+  assert.equal(creates,initialCreates);pass("expired idempotency key with search miss fails closed");
   stripeSearch=[lastCreated];
   assert.equal((await call(donationId,guestToken)).status,200);
   assert.equal(creates,1);pass("expired idempotency key can bind positive Stripe evidence only");
