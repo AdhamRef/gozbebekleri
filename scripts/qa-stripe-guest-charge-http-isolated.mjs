@@ -43,11 +43,13 @@ const row = () => ({
   categoryItems:[]
 });
 let stored = row(), creates=0, retrievals=0, lastCreated=null, stripeSearch=[];
+let failBeforeStripe=false, failAfterStripe=false, failDbBinding=false, actualStripeCreates=0, lastKey=null;
 globalThis.fixture = {
   session:null,prisma:{
     donation:{
       findUnique:async({where})=>where.id===donationId?structuredClone(stored):null,
       updateMany:async({where,data})=>{
+        if (failDbBinding && data.providerOrderId?.startsWith("pi_")) { failDbBinding=false; throw new Error("synthetic Mongo network drop"); }
         // The isolated emulator checks the CAS identity and provider reference.
         // Real MongoDB atomicity is exercised in the separate signed HTTP suite.
         const fields=where.AND||[];
@@ -70,8 +72,13 @@ globalThis.fixture = {
     assert.equal(input.metadata.donationId,donationId);
     assert.ok(input.metadata.chargeAttemptId);
     await new Promise(ok=>setTimeout(ok,12));
-    lastCreated={id:"pi_synthetic_original",client_secret:"test_secret",metadata:input.metadata,
-      amount:input.amount,amount_received:0,currency:input.currency,status:"requires_payment_method"};
+    if (failBeforeStripe) { failBeforeStripe=false; throw new Error("synthetic transport timeout before Stripe"); }
+    if (lastKey !== opts.idempotencyKey) {
+      lastKey=opts.idempotencyKey;actualStripeCreates++;
+      lastCreated={id:"pi_synthetic_original",client_secret:"test_secret",metadata:input.metadata,
+        amount:input.amount,amount_received:0,currency:input.currency,status:"requires_payment_method"};
+    }
+    if (failAfterStripe) { failAfterStripe=false;stripeSearch=[lastCreated];throw new Error("synthetic lost Stripe response"); }
     return lastCreated;
   },
   retrieve:async(id)=>{
@@ -170,6 +177,60 @@ try{
   stripeSearch=[lastCreated];
   assert.equal((await call(donationId,guestToken)).status,200);
   assert.equal(creates,1);pass("expired idempotency key can bind positive Stripe evidence only");
+
+  // Retry after a timeout BEFORE the provider created an object.
+  stored=row();lastKey=null;lastCreated=null;stripeSearch=[];failBeforeStripe=true;
+  const countBeforeTimeout=actualStripeCreates;
+  assert.equal((await call(donationId,guestToken)).status,503);
+  const timeoutSnapshot=structuredClone(stored.stripeChargeAttempt);
+  assert.equal(stored.providerOrderId,"goz_charge_reserved_"+donationId);
+  assert.equal(actualStripeCreates,countBeforeTimeout);
+  assert.equal((await call(donationId,guestToken)).status,200);
+  assert.equal(stored.stripeChargeAttempt.attemptId,timeoutSnapshot.attemptId);
+  assert.equal(actualStripeCreates,countBeforeTimeout+1);
+  pass("pre-provider timeout replays identical durable snapshot and mints only one intent");
+
+  // Stripe created an intent, response was lost. Recover from a positive
+  // provider search; no second create can be issued.
+  stored=row();lastKey=null;lastCreated=null;stripeSearch=[];failAfterStripe=true;
+  const beforeLost=actualStripeCreates;
+  assert.equal((await call(donationId,guestToken)).status,503);
+  assert.equal(stored.providerOrderId,"goz_charge_reserved_"+donationId);
+  assert.equal(actualStripeCreates,beforeLost+1);
+  assert.equal((await call(donationId,guestToken)).status,200);
+  assert.equal(actualStripeCreates,beforeLost+1);
+  pass("provider-created but lost response is safely recovered without another PaymentIntent");
+
+  // Stripe responded, but the database connection failed before storing its
+  // identity. The persisted reservation is enough for positive reconciliation.
+  stored=row();lastKey=null;lastCreated=null;stripeSearch=[];failDbBinding=true;
+  const beforeDbFailure=actualStripeCreates;
+  assert.equal((await call(donationId,guestToken)).status,503);
+  assert.equal(stored.providerOrderId,"goz_charge_reserved_"+donationId);
+  assert.equal(actualStripeCreates,beforeDbFailure+1);
+  stripeSearch=[lastCreated];
+  assert.equal((await call(donationId,guestToken)).status,200);
+  assert.equal(actualStripeCreates,beforeDbFailure+1);
+  assert.equal(stored.providerOrderId,"pi_synthetic_original");
+  pass("database failure after Stripe success recovers existing intent, no additional provider object");
+
+  // Rotation is bounded: the old grant remains valid for <= TTL when the
+  // verifying key remains configured, while a newly active key signs new ones.
+  const oldKey=process.env.GOZ_GUEST_PAYMENT_KEYS;
+  process.env.GOZ_GUEST_PAYMENT_KEYS="k2:"+Buffer.alloc(32,12).toString("base64url")+","+oldKey;
+  const {hasGuestPaymentGrant}=await import("../lib/donations/guest-payment-grant.ts");
+  assert.equal(hasGuestPaymentGrant({cookies:{get:()=>({value:guestToken})}},donationId),true);
+  let rotated=null;
+  issueGuestPaymentGrant({cookies:{set:({value})=>rotated=value}},donationId);
+  assert.ok(rotated.startsWith("k2."));
+  process.env.GOZ_GUEST_PAYMENT_KEYS="k2:"+Buffer.alloc(32,12).toString("base64url");
+  assert.equal(hasGuestPaymentGrant({cookies:{get:()=>({value:guestToken})}},donationId),false);
+  assert.equal(hasGuestPaymentGrant({cookies:{get:()=>({value:rotated})}},donationId),true);
+  delete process.env.GOZ_GUEST_PAYMENT_KEYS;
+  assert.equal(hasGuestPaymentGrant({cookies:{get:()=>({value:rotated})}},donationId),false);
+  process.env.GOZ_GUEST_PAYMENT_KEYS=oldKey;
+  pass("guest signing key rotation and removal are independent of NextAuth secret");
+
   console.log(JSON.stringify({summary:"GUEST_CHARGE_HTTP_PASS",passed,stripeNetworkCalls:0}));
 }finally{
   await new Promise(ok=>server.close(ok));
