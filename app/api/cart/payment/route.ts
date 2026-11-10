@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { canIssueGuestPaymentGrant, issueGuestPaymentGrant, issueGuestReceiptGrant, issueGuestClaimGrant } from "@/lib/donations/guest-payment-grant";
 import { prisma } from "@/lib/prisma";
 import { isValidLocale } from "@/lib/locales";
 import { getServerSession } from "next-auth";
@@ -134,6 +135,11 @@ export async function POST(request: NextRequest) {
     if (paymentMethod === "CARD") {
       const intakeLimit = await enforceDonationIntakeBudget(request);
       if (intakeLimit) return intakeLimit;
+    }
+
+    // Guest checkout cannot be initiated if a scoped payment capability cannot be issued.
+    if (!session?.user?.id && !canIssueGuestPaymentGrant()) {
+      return NextResponse.json({ error: "Guest payment unavailable" }, { status: 503 });
     }
 
     // Resolve donor
@@ -424,10 +430,13 @@ export async function POST(request: NextRequest) {
       stream: auditStreamForRole(actorRole),
     });
 
-    return NextResponse.json({
-      success: true,
-      donation,
-    });
+    const response = NextResponse.json({ success: true, donation });
+    if (!session?.user?.id) {
+      issueGuestPaymentGrant(response, donation.id);
+      issueGuestReceiptGrant(response, donation.id);
+      issueGuestClaimGrant(response, donation.id);
+    }
+    return response;
   } catch (error) {
     console.error("Error creating donation:", error);
     return NextResponse.json(

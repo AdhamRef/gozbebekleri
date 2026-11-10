@@ -245,5 +245,194 @@ assert.equal(jpyResult.status,200,jpyResult.body);
 assert.equal((await db.collection("Campaign").findOne({_id:jpyProject})).currentAmount,0.35);
 assert.equal((await prisma.donation.findUnique({where:{id:jpyDonation.toHexString()}})).refundedTotalAmount,50);
 pass("zero-decimal JPY correctly reconciles 100 yen captured and 50 yen refund using saved historical FX");
+
+// Independent signed HTTP, real isolated MongoDB one-time settlement regression.
+// No provider requests or production fixtures; refund and recurring tests above
+// remain untouched.
+const oneCampaign=new ObjectId(),oneCategory=new ObjectId();
+await db.collection("Campaign").insertOne({_id:oneCampaign,title:"Signed one-time fixture",description:"Synthetic",targetAmount:3000,currentAmount:0,baselineAmount:0,images:[],categoryIds:[],createdAt:created,updatedAt:created});
+await db.collection("Category").insertOne({_id:oneCategory,name:"Signed one-time fixture",campaignIds:[],currentAmount:0,baselineAmount:0});
+async function oneTimeRow(reference,amount=25) {
+ const id=new ObjectId();
+ await db.collection("Donation").insertOne({
+   _id:id,donorId:donor,amount,amountUSD:amount,teamSupport:0,fees:0,coverFees:false,
+   totalAmount:amount,currency:"USD",status:"PAID",provider:"STRIPE",
+   providerOrderId:reference,paymentMethod:"CARD",createdAt:created
+ });
+ await db.collection("DonationItem").insertOne({_id:new ObjectId(),donationId:id,campaignId:oneCampaign,amount,amountUSD:amount,createdAt:created,updatedAt:created});
+ await db.collection("DonationCategoryItem").insertOne({_id:new ObjectId(),donationId:id,categoryId:oneCategory,amount,amountUSD:amount,createdAt:created,updatedAt:created});
+ return id;
+}
+async function oneBalance(){
+ return [(await db.collection("Campaign").findOne({_id:oneCampaign})).currentAmount,
+         (await db.collection("Category").findOne({_id:oneCategory})).currentAmount];
+}
+const onePi="pi_one_time_synthetic";
+const oneId=await oneTimeRow(onePi);
+const oneIntent=(id=onePi,amount=2500,currency="usd")=>({
+ id,object:"payment_intent",status:"succeeded",amount:2500,amount_received:amount,
+ currency,metadata:{donationId:oneId.toHexString()}
+});
+assert.equal((await send(evt("payment_intent.succeeded",oneIntent(onePi,2499)))).status,500);
+assert.equal((await send(evt("payment_intent.succeeded",oneIntent(onePi,2500,"eur")))).status,500);
+assert.equal((await send(evt("payment_intent.succeeded",oneIntent("pi_wrong_one_time")))).status,500);
+assert.deepEqual(await oneBalance(),[0,0]);
+assert.equal((await db.collection("Donation").findOne({_id:oneId})).paidAt,undefined);
+pass("signed direct PaymentIntent rejects amount, currency and wrong provider reference without booking");
+const onePaid=evt("payment_intent.succeeded",oneIntent());
+assert.equal((await send(onePaid)).status,200);
+assert.deepEqual(await oneBalance(),[25,25]);
+assert.ok((await db.collection("Donation").findOne({_id:oneId})).paidAt);
+pass("signed direct PaymentIntent settles exactly one donation and both allocations");
+const directReplay=await Promise.all([send(onePaid),send({...onePaid,id:"evt_direct_replay"})]);
+assert.ok(directReplay.every(x=>x.status===200));
+assert.deepEqual(await oneBalance(),[25,25]);
+assert.equal((await send(evt("payment_intent.succeeded",oneIntent("pi_late_wrong")))).status,200);
+assert.deepEqual(await oneBalance(),[25,25]);
+pass("signed direct duplicate and late wrong event cannot double-book confirmed donation");
+const cs="cs_one_time_synthetic",checkoutId=await oneTimeRow(cs);
+const checkoutPayload=(id=cs,amount=2500,currency="usd")=>({
+ id,object:"checkout.session",mode:"payment",payment_status:"paid",
+ amount_total:amount,currency,metadata:{donationId:checkoutId.toHexString()},
+ payment_intent:"pi_checkout_one_time"
+});
+assert.equal((await send(evt("checkout.session.completed",checkoutPayload(cs,2400)))).status,500);
+assert.equal((await send(evt("checkout.session.completed",checkoutPayload(cs,2500,"try")))).status,500);
+assert.equal((await send(evt("checkout.session.completed",checkoutPayload("cs_wrong_one_time")))).status,500);
+assert.deepEqual(await oneBalance(),[25,25]);
+pass("signed Checkout refuses amount, currency, and session reference mismatches");
+const checkoutPaid=evt("checkout.session.completed",checkoutPayload());
+assert.equal((await send(checkoutPaid)).status,200);
+assert.deepEqual(await oneBalance(),[50,50]);
+assert.equal((await send(checkoutPaid)).status,200);
+assert.deepEqual(await oneBalance(),[50,50]);
+pass("signed paid Checkout settles once; repeated delivery cannot increment allocations");
+const checkoutIntent=oneIntent("pi_checkout_one_time",2500,"usd");
+checkoutIntent.metadata.donationId=checkoutId.toHexString();
+assert.equal((await send(evt("payment_intent.succeeded",checkoutIntent))).status,200);
+assert.deepEqual(await oneBalance(),[50,50]);
+pass("late Checkout-owned PaymentIntent never settles the same donation twice");
+
+
+const {donationFieldEmpty}=await import("../lib/donations/mongo-null.ts");
+const casDonation=await oneTimeRow(null);
+const reserve="goz_charge_reserved_"+casDonation.toHexString();
+const claimWhere={AND:[
+  {id:casDonation.toHexString(),donorId:donor.toHexString(),status:"PAID"},
+  donationFieldEmpty("subscriptionId"),
+  donationFieldEmpty("paidAt"),
+  donationFieldEmpty("providerOrderId"),
+  {OR:[{provider:null},{provider:{isSet:false}},{provider:"STRIPE"}]},
+]};
+const claims=await Promise.all([prisma.donation.updateMany({where:claimWhere,data:{provider:"STRIPE",providerOrderId:reserve}}),
+  prisma.donation.updateMany({where:claimWhere,data:{provider:"STRIPE",providerOrderId:reserve}})]);
+assert.equal(claims.reduce((sum,x)=>sum+x.count,0),1);
+assert.equal((await db.collection("Donation").findOne({_id:casDonation})).providerOrderId,reserve);
+pass("isolated MongoDB CAS permits exactly one concurrent payment-reference reservation");
+
+
+const reservedOne=await oneTimeRow("goz_charge_reserved_"+new ObjectId().toHexString());
+// The reservation has to incorporate its own donated record ID.
+const reservedRef="goz_charge_reserved_"+reservedOne.toHexString();
+await db.collection("Donation").updateOne({_id:reservedOne},{$set:{providerOrderId:reservedRef}});
+const attemptNonce="22222222-2222-4222-8222-222222222222";
+await db.collection("Donation").updateOne({_id:reservedOne},{$set:{stripeChargeAttempt:{
+ version:1,attemptId:attemptNonce,donationId:reservedOne.toHexString(),
+ donorId:donor.toHexString(),startedAt:Date.now()-26*3600_000,
+ amountMinor:2500,currency:"usd",description:"Signed one-time fixture",
+}}});
+const reservedSuccess={
+ id:"pi_reserved_verified",object:"payment_intent",status:"succeeded",
+ amount:2500,amount_received:2500,currency:"usd",
+ metadata:{donationId:reservedOne.toHexString(),userId:donor.toHexString(),chargeAttemptId:attemptNonce},
+};
+const priorReserved=await oneBalance();
+const spoofed={...reservedSuccess,metadata:{...reservedSuccess.metadata,chargeAttemptId:"33333333-3333-4333-8333-333333333333"}};
+assert.equal((await send(evt("payment_intent.succeeded",spoofed))).status,500);
+assert.equal((await db.collection("Donation").findOne({_id:reservedOne})).providerOrderId,reservedRef);
+assert.deepEqual(await oneBalance(),priorReserved);
+pass("signed reserved attempt rejects incorrect provider nonce and credits nothing");
+const competingBind=prisma.donation.updateMany({where:{AND:[
+ {id:reservedOne.toHexString(),provider:"STRIPE",providerOrderId:reservedRef},
+ donationFieldEmpty("paidAt"),
+]},data:{providerOrderId:reservedSuccess.id}});
+const signedDuringRecovery=send(evt("payment_intent.succeeded",reservedSuccess));
+const simultaneous=await Promise.all([competingBind,signedDuringRecovery]);
+assert.equal(simultaneous[1].status,200,simultaneous[1].body);
+const verifiedPaid=await db.collection("Donation").findOne({_id:reservedOne});
+assert.equal(verifiedPaid.providerOrderId,reservedSuccess.id);
+assert.ok(verifiedPaid.paidAt);
+assert.deepEqual(await oneBalance(),[priorReserved[0]+25,priorReserved[1]+25]);
+pass("real MongoDB webhook/recovery race settles original reservation exactly once");
+const afterReserved=await oneBalance();
+const sameEvent=evt("payment_intent.succeeded",reservedSuccess);
+const redundant=await Promise.all([send(sameEvent),send({...sameEvent,id:"evt_reserved_replay"})]);
+assert.ok(redundant.every(x=>x.status===200),JSON.stringify(redundant));
+assert.deepEqual(await oneBalance(),afterReserved);
+pass("replayed signed success after recovery cannot double-count project or category");
+
+
+// Isolated logical backup -> fresh database restore drill. This is a synthetic
+// BSON snapshot, NOT a production mongodump/restore acceptance certificate.
+const { serialize, deserialize } = await import("bson");
+const originalIndexes=await db.collection("StripeRefundSettlement").listIndexes().toArray();
+assert.ok(originalIndexes.some(i=>i.name==="_id_"));
+const restoreDb=mongo.db("goz_http_restored_synthetic");
+const snapshots={};
+for (const name of ["StripeRefundSettlement","StripeInvoiceSettlement","Donation","DonationItem","DonationCategoryItem","Campaign","Category"]) {
+  const rows=await db.collection(name).find({}).toArray();
+  snapshots[name]=serialize({rows});
+  await restoreDb.createCollection(name);
+  const restored=deserialize(snapshots[name]).rows;
+  if (restored.length) await restoreDb.collection(name).insertMany(restored);
+  assert.equal(await restoreDb.collection(name).countDocuments({}),rows.length,"restored count "+name);
+}
+const restoredPaid=await restoreDb.collection("Donation").findOne({_id:reservedOne});
+assert.equal(restoredPaid?.providerOrderId,reservedSuccess.id);
+assert.ok(restoredPaid?.paidAt);
+const restoredBalances=[
+  (await restoreDb.collection("Campaign").findOne({_id:oneCampaign})).currentAmount,
+  (await restoreDb.collection("Category").findOne({_id:oneCategory})).currentAmount,
+];
+assert.deepEqual(restoredBalances,await oneBalance());
+for(const name of ["StripeRefundSettlement","StripeInvoiceSettlement"]){
+  const indexes=await restoreDb.collection(name).listIndexes().toArray();
+  assert.ok(indexes.some(x=>x.name==="_id_"));
+  const saved=await restoreDb.collection(name).findOne({});
+  if(saved)await assert.rejects(
+    restoreDb.collection(name).insertOne({...saved}),
+    e=>e?.code===11000,
+    name+" duplicate _id must be rejected after restore"
+  );
+}
+pass("synthetic BSON snapshot restored in a separate isolated database, totals and unique ledger keys verified");
+
+
+const {countDuplicateStripeReferences,matchingUniqueIndex}=await import("./qa/financial-index-audit-core.mjs");
+const duplicatesBefore=await countDuplicateStripeReferences(db.collection("Donation"));
+assert.equal(duplicatesBefore,0,"fixture starts without provider duplicates");
+const duplicateRef="pi_duplicate_reference_fixture";
+const insertDuplicate=async()=>db.collection("Donation").insertOne({
+ _id:new ObjectId(),provider:"STRIPE",providerOrderId:duplicateRef,donorId:donor,
+ amount:1,totalAmount:1,currency:"USD",status:"PAID",paidAt:null,
+ paymentMethod:"CARD",createdAt:created
+});
+await insertDuplicate();await insertDuplicate();
+assert.equal(await countDuplicateStripeReferences(db.collection("Donation")),1);
+await db.collection("Donation").deleteMany({providerOrderId:duplicateRef});
+assert.equal(await countDuplicateStripeReferences(db.collection("Donation")),0);
+pass("read-only duplicate reference scan detects collisions before any unique index change");
+const key={provider:1,providerOrderId:1};
+assert.equal(matchingUniqueIndex(await db.collection("Donation").listIndexes().toArray(),key,{partial:true}),false);
+await db.collection("Donation").createIndex(key,{
+ unique:true,name:"isolated_stripe_provider_reference_unique",
+ partialFilterExpression:{provider:"STRIPE",providerOrderId:{$type:"string"}}
+});
+assert.equal(matchingUniqueIndex(await db.collection("Donation").listIndexes().toArray(),key,{partial:true}),true);
+await insertDuplicate();
+await assert.rejects(insertDuplicate(),error=>error?.code===11000,"same provider reference rejected");
+await db.collection("Donation").deleteMany({providerOrderId:duplicateRef});
+pass("isolated Mongo partial unique index rejects second Stripe reference without touching hosted DB");
+
 console.log(JSON.stringify({summary:"SIGNED_HTTP_REFUNDS_PASS",passed,refund:"PASS",database:"isolated MongoDB",stripeCalls:0}));
 }finally{if(server)await new Promise(ok=>server.close(ok));await prisma.$disconnect();await mongo.close();await repl.stop();rmSync(dir,{recursive:true,force:true})}

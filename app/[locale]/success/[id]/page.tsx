@@ -86,7 +86,7 @@ const DonationSuccessPage = () => {
     } else {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, sessionStatus]);
 
   useEffect(() => {
     if (hasConfirmedDonationPayment(donation)) confetti.onOpen();
@@ -266,8 +266,14 @@ const DonationSuccessPage = () => {
     if (!id) return;
     if (linkAttemptedRef.current) return;
     if (sessionStatus !== 'authenticated') return;
-    if (!donation?.donor?.id) return;
-    if (session?.user?.id === donation.donor.id) return;
+    // Guest-safe donation summaries intentionally hide the linked user's ID.
+    // The separate signed original-browser claim cookie proves eligibility;
+    // never require a donor ID in browser-visible JSON to attempt linking.
+    // OAuth redirects can restore the page after the user has authenticated,
+    // before the donation summary is accessible to that new account.
+    // The original-browser signed claim cookie is verified on the server;
+    // do not depend on a donor ID or prior unauthenticated summary response.
+    if (donation?.donor?.id && session?.user?.id === donation.donor.id) return;
 
     linkAttemptedRef.current = true;
     setLinkState('linking');
@@ -281,7 +287,11 @@ const DonationSuccessPage = () => {
         const reason = err?.response?.data?.error;
         // Donor was already a real account (e.g. matched by email) — nothing
         // to merge, just hide the banner.
-        if (reason === 'GUEST_NOT_ELIGIBLE') {
+        if (reason === 'Claim authorization required') {
+          // A signed-in donor visiting a public URL without a valid original-
+          // browser claim proof must not take ownership or see donor details.
+          setLinkState('failed');
+        } else if (reason === 'GUEST_NOT_ELIGIBLE') {
           setLinkState('linked');
         } else {
           console.error('[link-guest]', err);
@@ -308,8 +318,13 @@ const DonationSuccessPage = () => {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error downloading receipt:', error);
-      // You might want to show a toast notification here
+      // Older guests whose scoped receipt cookie expired must verify their
+      // original account. Never fall back to donation-ID authorization.
+      if (axios.isAxiosError(error) && error.response?.status === 404 && !session?.user?.id) {
+        setSignInOpen(true);
+      } else {
+        console.error('Receipt download unavailable:', error);
+      }
     } finally {
       setIsDownloading(false);
     }
@@ -325,8 +340,16 @@ const DonationSuccessPage = () => {
         <section className="max-w-xl space-y-4 p-8 text-center">
           <h1 className="text-2xl font-bold">{failedText('noDonation.title')}</h1>
           <p className="text-slate-600">{failedText('noDonation.description')}</p>
+          {!session?.user?.id && (
+            <Button onClick={() => setSignInOpen(true)}>{t('signupCtaTitle')}</Button>
+          )}
           <a className="inline-block rounded-lg bg-brand px-5 py-3 text-white" href={`/${locale}/campaigns`}>{failedText('noDonation.cta')}</a>
         </section>
+        <SignInDialog
+          isOpen={signInOpen}
+          onClose={() => setSignInOpen(false)}
+          callbackUrl={pathname}
+        />
       </main>
     );
   }

@@ -1,10 +1,10 @@
-import { after } from "next/server";
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/options';
 import { Prisma, SubscriptionStatus } from '@prisma/client';
 import { userHasDashboardPermission } from '@/lib/dashboard/permissions';
+import { hasGuestReceiptGrant } from '@/lib/donations/guest-payment-grant';
 import { isRevenueDashboardUser } from '@/lib/dashboard/api-auth';
 import { convertAmountInCurrencyToUsd, normalizeDonationCurrencyCode } from '@/lib/exchange/convert-amount-in-currency-to-usd';
 import {
@@ -13,76 +13,10 @@ import {
   auditActorFromSiteSession,
   auditStreamForRole,
 } from '@/lib/audit-log';
-import Stripe from 'stripe';
-import { dispatchDonationPaid } from "@/lib/events/dispatch";
 import {
   recomputeCampaignCurrentAmount as sharedRecomputeCampaign,
   recomputeCategoryCurrentAmount as sharedRecomputeCategory,
 } from "@/lib/campaign/current-amount";
-
-const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-03-25.dahlia' })
-  : null;
-
-/**
- * Self-heal donations whose webhook never landed: if Stripe already has the
- * PaymentIntent marked succeeded, set paidAt and increment campaign/category
- * totals. Idempotent — a paidAt guard inside the transaction prevents double
- * increments if the webhook arrives between the Stripe lookup and the update.
- */
-async function reconcileStripeDonation(donationId: string) {
-  if (!stripe) return;
-  const row = await prisma.donation.findUnique({
-    where: { id: donationId },
-    select: { provider: true, providerOrderId: true, paidAt: true },
-  });
-  if (!row || row.paidAt || row.provider !== 'STRIPE' || !row.providerOrderId) return;
-  if (!row.providerOrderId.startsWith('pi_')) return;
-
-  let intent: Stripe.PaymentIntent;
-  try {
-    intent = await stripe.paymentIntents.retrieve(row.providerOrderId);
-  } catch (err) {
-    console.error('[donation reconcile] Stripe retrieve failed:', err);
-    return;
-  }
-  if (intent.status !== 'succeeded') return;
-
-  try {
-    await prisma.$transaction(async (tx) => {
-      const fresh = await tx.donation.findUnique({
-        where: { id: donationId },
-        include: { items: true, categoryItems: true },
-      });
-      if (!fresh || fresh.paidAt) return;
-
-      await tx.donation.update({
-        where: { id: donationId },
-        data: {
-          status: 'PAID',
-          paidAt: new Date(),
-          providerAuthCode: intent.id,
-          providerTxnResult: 'Success',
-        },
-      });
-      for (const item of fresh.items) {
-        await tx.campaign.update({
-          where: { id: item.campaignId },
-          data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
-        });
-      }
-      for (const item of fresh.categoryItems) {
-        await tx.category.update({
-          where: { id: item.categoryId },
-          data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
-        });
-      }
-    });
-    after(() => dispatchDonationPaid(donationId));
-  } catch (err) {
-    console.error('[donation reconcile] Finalize failed:', err);
-  }
-}
 
 // GET /api/donations/[id] - Get donation (transaction) by ID; include type/status from subscription when applicable
 export async function GET(
@@ -94,13 +28,26 @@ export async function GET(
     if (!id) {
       return NextResponse.json({ error: 'Donation ID required' }, { status: 400 });
     }
+    if (!/^[0-9a-f]{24}$/i.test(id)) {
+      return NextResponse.json({ error: 'Donation unavailable' }, { status: 404 });
+    }
     const session = await getServerSession(authOptions);
+    const authorizationRow = await prisma.donation.findUnique({
+      where: { id },
+      select: { donorId: true },
+    });
+    const authorized = authorizationRow && (session?.user?.id
+      ? (session.user.id === authorizationRow.donorId ||
+        userHasDashboardPermission(session.user, 'revenue') ||
+        userHasDashboardPermission(session.user, 'donationsEdit'))
+      : hasGuestReceiptGrant(request, id));
+    if (!authorized) {
+      return NextResponse.json({ error: 'Donation unavailable' }, {
+        status: 404, headers: { 'Cache-Control': 'no-store' },
+      });
+    }
 
-    // Self-heal: if Stripe already confirmed the payment but the webhook
-    // hasn't landed yet (common in dev / with slow webhook delivery), finalize
-    // the donation and increment campaign totals here so the success page
-    // reflects reality. Safe for guests and logged-in donors alike.
-    await reconcileStripeDonation(id);
+    // Read-only API: settlement and Stripe recovery belong to verified server paths.
 
     const donation = await prisma.donation.findUnique({
       where: { id },
@@ -165,33 +112,62 @@ export async function GET(
       );
     }
 
-    // Guest donations have no session — the unguessable donation id acts as
-    // the access token (same posture as Stripe checkout session IDs). For
-    // authenticated users, still require ownership or revenue-dashboard
-    // permission to prevent cross-account snooping.
-    if (session) {
-      const canViewAllDonations =
-        userHasDashboardPermission(session.user, 'revenue') ||
-        userHasDashboardPermission(session.user, 'donationsEdit');
-      if (!canViewAllDonations && session.user.id !== donation.donorId) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
-    }
-
     const sub = donation.subscription;
+    // Explicit public contract: never spread Prisma's Donation or User
+    // records. providerRaw, stripeChargeAttempt, gateway credentials, donor
+    // account metadata and future schema fields must remain server-only.
+    const authenticated = Boolean(session?.user?.id);
     const response = {
-      ...donation,
-      type: donation.subscriptionId ? ('MONTHLY' as const) : ('ONE_TIME' as const),
-      // Default to CARD on read for legacy rows where the field was never
-      // written. Every current create path sets CARD or PAYPAL explicitly,
-      // so this only kicks in for historical donations.
+      id: donation.id,
+      amount: donation.amount,
+      totalAmount: donation.totalAmount,
+      currency: donation.currency,
+      status: donation.status,
+      paidAt: donation.paidAt,
+      createdAt: donation.createdAt,
       paymentMethod: donation.paymentMethod ?? 'CARD',
+      provider: donation.provider,
+      subscriptionId: donation.subscriptionId,
+      donor: authenticated ? {
+        id: donation.donor?.id ?? null,
+        name: donation.donor?.name ?? null,
+        email: donation.donor?.email ?? null,
+      } : {
+        id: null,
+        name: 'Donor',
+        email: null,
+      },
+      items: donation.items.map(item => ({
+        id: item.id,
+        campaignId: item.campaignId,
+        amount: item.amount,
+        campaign: item.campaign ? {
+          title: item.campaign.title,
+          images: item.campaign.images,
+          translations: item.campaign.translations.map(t => ({
+            locale: t.locale, title: t.title,
+          })),
+        } : null,
+      })),
+      categoryItems: donation.categoryItems.map(item => ({
+        id: item.id,
+        categoryId: item.categoryId,
+        amount: item.amount,
+        category: item.category ? {
+          name: item.category.name,
+          image: item.category.image,
+          translations: item.category.translations.map(t => ({
+            locale: t.locale, name: t.name,
+          })),
+        } : null,
+      })),
+      type: donation.subscriptionId ? ('MONTHLY' as const) : ('ONE_TIME' as const),
       paymentStatus: donation.status,
       subscriptionStatus: sub?.status ?? null,
       nextBillingDate: sub?.nextBillingDate ?? null,
       lastBillingDate: sub?.lastBillingDate ?? null,
     };
-    return NextResponse.json(response);
+    return NextResponse.json(response, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     console.error('Error fetching donation:', error);
     return NextResponse.json(
@@ -241,6 +217,14 @@ export async function PUT(
     const isAdmin = isRevenueDashboardUser(session);
     const isOwner = session.user.id === currentDonation.donorId;
 
+    // Enforce ownership/finance authorization before either the read-only
+    // empty-update response or any subscription details can be returned.
+    if (!isAdmin && !isOwner) {
+      return NextResponse.json({ error: 'Forbidden' }, {
+        status: 403, headers: { 'Cache-Control': 'no-store' },
+      });
+    }
+
     if (!currentDonation.subscriptionId) {
       return NextResponse.json(
         { error: 'Only subscriptions can be updated; this donation is one-time' },
@@ -287,13 +271,6 @@ export async function PUT(
         nextBillingDate: s?.nextBillingDate ?? null,
         lastBillingDate: s?.lastBillingDate ?? null,
       });
-    }
-
-    if (!isAdmin && !isOwner) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      );
     }
 
     if (!isAdmin && isOwner && status === 'CANCELLED') {

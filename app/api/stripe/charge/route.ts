@@ -1,4 +1,13 @@
+import { stripeAmountInMinorUnits } from "@/lib/donations/stripe-minor-units";
 import { enforcePaymentInitiationBudget } from "@/lib/site-security/payment-initiation-budget";
+import { hasGuestPaymentGrant } from "@/lib/donations/guest-payment-grant";
+import { donationFieldEmpty } from "@/lib/donations/mongo-null";
+import {
+  createStripeChargeAttempt, readStripeChargeAttempt, mayReplayStripeChargeAttempt,
+  stripeChargeReservationId, stripeChargeIdempotencyKey,
+  stripeChargeCreateParams, stripeIntentMatchesAttempt,
+  type StripeChargeAttempt,
+} from "@/lib/donations/stripe-charge-attempt";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
@@ -9,24 +18,104 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-03-25.dahlia",
 });
 
-// POST /api/stripe/charge
-// Creates a PaymentIntent for the given donation and returns its clientSecret.
-// The client then calls stripe.confirmCardPayment(clientSecret, { payment_method: { card: rawData } })
-// so card data goes directly from browser to Stripe — never through this server.
+const noStore = { "Cache-Control": "no-store" };
+function errorResponse(error: string, status: number) {
+  return NextResponse.json({ error }, {
+    status, headers: { ...noStore, ...(status === 503 ? { "Retry-After": "5" } : {}) },
+  });
+}
+
+// A pending/reconciliation state is not a failed charge. Preserve all IDs and
+// give the client an unambiguous, safely retryable status without a new intent.
+function verificationPending(reason: string, status: 409 | 503 = 503) {
+  return NextResponse.json({
+    error: reason,
+    paymentStatus: "PENDING_VERIFICATION",
+    retrySafe: true,
+    createNewPayment: false,
+  }, { status, headers: { ...noStore, "Retry-After": status === 503 ? "5" : "60" } });
+}
+
+/** Search is positive evidence only; an empty Stripe search never proves absence. */
+async function findCreatedIntent(attempt: StripeChargeAttempt): Promise<Stripe.PaymentIntent | null> {
+  const results = await stripe.paymentIntents.search({
+    query: "metadata['chargeAttemptId']:'" + attempt.attemptId + "'",
+    limit: 10,
+  });
+  if (results.has_more || results.data.length > 1) {
+    throw new Error("STRIPE_CHARGE_ATTEMPT_AMBIGUOUS");
+  }
+  const found = results.data[0];
+  if (!found) return null;
+  // Stripe search may return delayed or stale data; re-read the specific intent.
+  const verified = await stripe.paymentIntents.retrieve(found.id);
+  if (!stripeIntentMatchesAttempt(verified, attempt)) {
+    throw new Error("STRIPE_CHARGE_ATTEMPT_MISMATCH");
+  }
+  return verified;
+}
+
+async function commitVerifiedIntent(
+  donationId: string,
+  attempt: StripeChargeAttempt,
+  intent: Stripe.PaymentIntent,
+): Promise<NextResponse> {
+  if (!stripeIntentMatchesAttempt(intent, attempt)) {
+    return errorResponse("Stripe intent does not match original attempt", 409);
+  }
+  // Never return a payment secret for a successful/canceled intent, even if
+  // its signed webhook is in flight. Stripe webhook owns booked revenue.
+  if (intent.status === "succeeded" || intent.status === "canceled") {
+    // Bind a valid successful intent so the already-in-flight webhook can
+    // finish. Never overwrite a confirmed payment or different intent.
+    await prisma.donation.updateMany({
+      where: {
+        AND: [
+          { id: donationId, provider: "STRIPE",
+            providerOrderId: stripeChargeReservationId(donationId) },
+          donationFieldEmpty("paidAt"),
+        ],
+      },
+      data: { providerOrderId: intent.id },
+    });
+    return verificationPending("Payment confirmation is being reconciled", 409);
+  }
+  if (!intent.client_secret) return errorResponse("Stripe intent has no client secret", 409);
+  const bound = await prisma.donation.updateMany({
+    where: {
+      AND: [
+        { id: donationId, provider: "STRIPE",
+          providerOrderId: stripeChargeReservationId(donationId) },
+        donationFieldEmpty("paidAt"),
+      ],
+    },
+    data: { providerOrderId: intent.id },
+  });
+  if (bound.count !== 1) {
+    // Another recovery or a successful webhook could have won the race.
+    // Query only; do not rebind or return an unauthorized client secret.
+    const latest = await prisma.donation.findUnique({
+      where: { id: donationId },
+      select: { providerOrderId: true, paidAt: true },
+    });
+    if (latest?.paidAt != null) return verificationPending("Payment confirmation already recorded", 409);
+    if (latest?.providerOrderId !== intent.id) {
+      return verificationPending("Payment binding is under review", 409);
+    }
+  }
+  return NextResponse.json({ clientSecret: intent.client_secret }, { headers: noStore });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
-
-    const body = await req.json() as { donationId?: string; locale?: string };
+    const body = (await req.json()) as { donationId?: string; locale?: string };
     const donationId = String(body.donationId || "").trim();
+    if (!/^[a-f0-9]{24}$/i.test(donationId)) {
+      return errorResponse("Invalid donationId", 400);
+    }
     const abuseLimit = await enforcePaymentInitiationBudget(req, donationId);
     if (abuseLimit) return abuseLimit;
-
-
-    if (!donationId) {
-      return NextResponse.json({ error: "donationId is required" }, { status: 400 });
-    }
 
     const donation = await prisma.donation.findUnique({
       where: { id: donationId },
@@ -35,46 +124,104 @@ export async function POST(req: NextRequest) {
         categoryItems: { include: { category: { select: { name: true } } } },
       },
     });
-
-    if (!donation) {
-      return NextResponse.json({ error: "Donation not found" }, { status: 404 });
-    }
-    // Authenticated users: verify ownership. Guests have no session — trust the donationId.
-    if (session?.user?.id && donation.donorId !== session.user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-    if (donation.status === "FAILED") {
-      return NextResponse.json(
-        { error: `Donation has already failed (status=${donation.status})` },
-        { status: 400 }
-      );
+    if (!donation) return errorResponse("Donation not found", 404);
+    const allowed = session?.user?.id
+      ? donation.donorId === session.user.id
+      : hasGuestPaymentGrant(req, donationId);
+    if (!allowed) return errorResponse("Forbidden", 403);
+    if (donation.paidAt || donation.status !== "PAID" ||
+        donation.subscriptionId || donation.paymentMethod !== "CARD") {
+      return errorResponse("Donation is not eligible for one-time card payment", 409);
     }
 
-    const locale = (body.locale ?? donation.locale ?? "en").toLowerCase();
-    const currency = (donation.currency || "USD").toLowerCase();
-    const amountInSmallestUnit = Math.round(donation.totalAmount * 100);
+    const ref = donation.providerOrderId;
+    const attempt = readStripeChargeAttempt(donation.stripeChargeAttempt, donation);
+    if (donation.stripeChargeAttempt && !attempt) {
+      return errorResponse("Corrupt Stripe payment attempt requires review", 409);
+    }
 
-    const campaignNames = donation.items.map((i) => i.campaign.title).join(", ");
-    const categoryNames = donation.categoryItems.map((i) => i.category.name).join(", ");
-    const description = campaignNames || categoryNames || "Donation";
+    if (ref && ref.startsWith("pi_") && donation.provider === "STRIPE") {
+      const existing = await stripe.paymentIntents.retrieve(ref);
+      if (attempt && !stripeIntentMatchesAttempt(existing, attempt)) {
+        return errorResponse("Stripe payment does not match recorded attempt", 409);
+      }
+      let amountMinor: number;
+      try { amountMinor = stripeAmountInMinorUnits(donation.totalAmount, donation.currency); }
+      catch { return errorResponse("Unsupported currency or amount precision", 422); }
+      if (existing.id !== ref || existing.metadata?.donationId !== donationId ||
+          existing.amount !== amountMinor ||
+          existing.currency?.toLowerCase() !== donation.currency.toLowerCase() ||
+          existing.status === "succeeded" || existing.status === "canceled" ||
+          !existing.client_secret) return errorResponse("Existing payment requires review", 409);
+      return NextResponse.json({ clientSecret: existing.client_secret }, { headers: noStore });
+    }
+    const reserved = stripeChargeReservationId(donationId);
+    if (ref && ref !== reserved) return errorResponse("Payment is already bound", 409);
+    if (donation.provider && donation.provider !== "STRIPE") {
+      return errorResponse("Donation bound to another payment provider", 409);
+    }
 
-    // Create PaymentIntent without confirming — client confirms with raw card data via stripe.js
-    const intent = await stripe.paymentIntents.create({
-      amount: amountInSmallestUnit,
-      currency,
-      description,
-      automatic_payment_methods: { enabled: true, allow_redirects: "never" },
-      metadata: { donationId, userId: session?.user?.id ?? donation.donorId },
-    });
+    let snapshot = attempt;
+    let newlyReserved = false;
+    if (!ref) {
+      if (attempt) return errorResponse("Conflicting existing payment attempt", 409);
+      const campaignNames = donation.items.map(i => i.campaign.title).join(", ");
+      const categoryNames = donation.categoryItems.map(i => i.category.name).join(", ");
+      try {
+        snapshot = createStripeChargeAttempt(
+          donation, campaignNames || categoryNames || "Donation",
+        );
+      } catch {
+        return errorResponse("Invalid donation amount or currency", 422);
+      }
+      const locale = (body.locale ?? donation.locale ?? "en").toLowerCase();
+      // Atomic claim stores all retry inputs BEFORE contacting Stripe.
+      const locked = await prisma.donation.updateMany({
+        where: {
+          AND: [
+            { id: donationId, donorId: donation.donorId, status: "PAID" },
+            donationFieldEmpty("subscriptionId"),
+            donationFieldEmpty("paidAt"),
+            donationFieldEmpty("providerOrderId"),
+            { OR: [{ provider: null }, { provider: { isSet: false } }, { provider: "STRIPE" }] },
+            { stripeChargeAttempt: { isSet: false } },
+          ],
+        },
+        data: { provider: "STRIPE", providerOrderId: reserved,
+                stripeChargeAttempt: snapshot as any, locale },
+      });
+      if (locked.count !== 1) {
+        // Another request won; subsequent retry reads its immutable snapshot.
+        return verificationPending("Payment creation is in progress");
+      }
+      newlyReserved = true;
+    }
+    if (!snapshot) {
+      // Legacy reservation from before recovery support: no trustworthy
+      // idempotency timestamp or nonce exists. Never create a new intent.
+      return verificationPending("Legacy payment reservation requires manual review", 409);
+    }
 
-    await prisma.donation.update({
-      where: { id: donationId },
-      data: { provider: "STRIPE", providerOrderId: intent.id, locale },
-    });
+    // An eventual-consistency search can recover an intent even after Stripe
+    // has pruned the idempotency key. A negative search is NEVER permission
+    // to issue a fresh create after that expiry.
+    const found = newlyReserved ? null : await findCreatedIntent(snapshot);
+    if (found) return await commitVerifiedIntent(donationId, snapshot, found);
+    if (!mayReplayStripeChargeAttempt(snapshot)) {
+      return verificationPending("Payment attempt expired; manual reconciliation required", 409);
+    }
 
-    return NextResponse.json({ clientSecret: intent.client_secret });
+    // Within the conservative retention window only, replay the IDENTICAL
+    // Stripe API request under the IDENTICAL key. A timeout leaves the
+    // reservation and snapshot durable; a retry cannot mint a second intent.
+    const intent = await stripe.paymentIntents.create(
+      stripeChargeCreateParams(snapshot),
+      { idempotencyKey: stripeChargeIdempotencyKey(snapshot) },
+    );
+    return await commitVerifiedIntent(donationId, snapshot, intent);
   } catch (error) {
-    console.error("[Stripe Charge] error:", error);
-    return NextResponse.json({ error: "Failed to create payment intent" }, { status: 500 });
+    console.error("[Stripe Charge] recovery temporarily unavailable", error);
+    // Do not delete, replace or expire the immutable reservation on failures.
+    return verificationPending("Payment recovery temporarily unavailable");
   }
 }

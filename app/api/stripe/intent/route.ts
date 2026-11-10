@@ -1,3 +1,4 @@
+import { stripeAmountInMinorUnits } from "@/lib/donations/stripe-minor-units";
 import { enforcePaymentInitiationBudget } from "@/lib/site-security/payment-initiation-budget";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -69,7 +70,9 @@ export async function POST(req: NextRequest) {
     const fees = (totalAmount + teamSupport) * 0.03;
     const finalTotal = totalAmount + teamSupport + (coverFees ? fees : 0);
     const stripeCurrency = String(currency).toLowerCase();
-    const stripeAmount = Math.round(finalTotal * 100);
+    let stripeAmount: number;
+    try { stripeAmount = stripeAmountInMinorUnits(finalTotal, currency); }
+    catch { return NextResponse.json({ error: "Unsupported Stripe currency or amount precision" }, { status: 422 }); }
 
     // Referral
     let referralId: string | null = null;

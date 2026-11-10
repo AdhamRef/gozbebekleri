@@ -1,7 +1,7 @@
 name: Transferred systems verification
 on:
   push:
-    branches: [port/minber-systems-20261104, integration/unified-systems-20261107, integration/goz-finance-security-rc-20261109, fix/goz-stripe-qa-react-server-20261109]
+    branches: [port/minber-systems-20261104, integration/unified-systems-20261107, integration/goz-finance-security-rc-20261109, fix/goz-stripe-qa-react-server-20261109, fix/goz-guest-charge-binding-signed-http-20261110, fix/goz-stripe-intent-recovery-20261110, review/goz-stripe-finance-qa-rc-20261110]
   pull_request:
     branches: [main, integration/unified-systems-20261107, fix/goz-report-profile-settlement-20261108, audit/goz-parity-finance-20261109, audit/goz-round2-idempotency-locale-20261109, integration/goz-finance-security-rc-20261109]
   workflow_dispatch:
@@ -46,12 +46,23 @@ jobs:
         run: npm run typecheck:ported-systems
       - name: Run offline, synthetic system regressions
         run: npm run test:ported-systems
-      - name: Compile Next routes without production index writes
-        run: npx --no-install next build
+      - name: Install isolated Mongo replica for DB-backed build and signed payment checks
+        run: npm install --no-save --package-lock=false --ignore-scripts --legacy-peer-deps --no-audit --no-fund mongodb-memory-server@10.1.4
+      - name: Compile Next routes with reachable isolated MongoDB, reject ignored DB errors
+        run: node scripts/qa-build-with-isolated-mongo.mjs
+      - name: Ensure independent PDF text extraction utility
+        run: |
+          if ! command -v pdftotext >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y poppler-utils
+          fi
       - name: Mandatory signed Stripe refund HTTP and MongoDB transaction regressions
         run: |
-          npm install --no-save --package-lock=false --ignore-scripts --legacy-peer-deps --no-audit --no-fund mongodb-memory-server@10.1.4
           DATABASE_URL=mongodb://127.0.0.1:27018/isolated_refunds npx --no-install prisma generate --schema prisma/schema.prisma
           # The Stripe HTTP fixture imports server-only modules under Node; select
           # React's server export condition without changing application security boundaries.
           node --conditions=react-server --import tsx scripts/qa-stripe-signed-http-isolated.mjs
+          node --conditions=react-server --import tsx scripts/qa-stripe-guest-charge-http-isolated.mjs
+          node --conditions=react-server --import tsx scripts/qa-receipt-http-isolated.mjs
+          node --conditions=react-server --import tsx scripts/qa-donation-access-http-isolated.mjs
+          node --conditions=react-server --import tsx scripts/qa-stripe-internal-reconcile-http-isolated.mjs

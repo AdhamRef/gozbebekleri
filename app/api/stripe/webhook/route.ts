@@ -12,6 +12,8 @@ import { dispatchDonationPaid, dispatchEvent } from "@/lib/events/dispatch";
 import { donationFieldEmpty } from "@/lib/donations/mongo-null";
 import { normalizeDonationCurrencyCode } from "@/lib/exchange/convert-amount-in-currency-to-usd";
 import { checkoutPaymentCanSettle, stripeInvoiceSettlementDate, stripeSubscriptionOwnershipMatches } from "@/lib/donations/stripe-checkout-settlement";
+import { stripeOneTimePaymentMatchesDonation } from "@/lib/donations/stripe-one-time-payment";
+import { stripeOneTimeIntentCanSettle } from "@/lib/donations/stripe-charge-attempt";
 import { settleStripeInvoiceOnce } from "@/lib/donations/stripe-invoice-settlement";
 import { verifiedUsdCredit } from "@/lib/donations/verified-usd-credit";
 import { stripeBillingState } from "@/lib/donations/stripe-subscription-billing";
@@ -91,6 +93,13 @@ export async function POST(req: NextRequest) {
             // Idempotency: the row is created with status=PAID by /api/stripe/intent
             // before Stripe confirms payment, so we key off paidAt (only set here).
             if (!donation || donation.paidAt != null) return false;
+            if (!stripeOneTimePaymentMatchesDonation(donation, {
+              id: session.id,
+              amountMinor: session.amount_total,
+              currency: session.currency,
+            })) {
+              throw new Error("Stripe Checkout settlement does not match original donation");
+            }
 
             // Mark donation as paid
             await tx.donation.update({
@@ -531,7 +540,14 @@ export async function POST(req: NextRequest) {
         const donationId = intent.metadata?.donationId;
         if (!donationId) break;
 
-        const settledNow = await prisma.$transaction(async (tx) => {
+        // MongoDB can abort an otherwise valid transaction when provider
+        // reconciliation races with a concurrent reservation CAS. Retry the
+        // ENTIRE transaction, never just its campaign increments, so paidAt
+        // remains the single atomic idempotency gate.
+        let settledNow = false;
+        for (let attempt = 0; attempt < 4; attempt++) {
+          try {
+            settledNow = await prisma.$transaction(async (tx) => {
           const donation = await tx.donation.findUnique({
             where: { id: donationId },
             include: { items: true, categoryItems: true },
@@ -539,6 +555,13 @@ export async function POST(req: NextRequest) {
           // Idempotency: the row is created with status=PAID by /api/stripe/intent
           // before Stripe confirms payment, so we key off paidAt (only set here).
           if (!donation || donation.paidAt != null) return false;
+          // Stripe Checkout also emits payment_intent.succeeded. That payment
+          // belongs to its Checkout Session (cs_), not this direct-Intent path.
+          // A signed unrelated payment must never settle another donation.
+          if (donation.subscriptionId || donation.providerOrderId?.startsWith("cs_")) return false;
+          if (!stripeOneTimeIntentCanSettle(donation, intent)) {
+            throw new Error("Stripe PaymentIntent settlement does not match original donation");
+          }
 
           await tx.donation.update({
             where: { id: donationId },
@@ -576,7 +599,13 @@ export async function POST(req: NextRequest) {
             });
           }
           return true;
-        });
+            });
+            break;
+          } catch (error) {
+            if ((error as { code?: string })?.code !== "P2034" || attempt === 3) throw error;
+            await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 25));
+          }
+        }
         if (settledNow) after(() => dispatchDonationPaid(donationId));
         break;
       }
