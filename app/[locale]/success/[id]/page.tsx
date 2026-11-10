@@ -86,7 +86,7 @@ const DonationSuccessPage = () => {
     } else {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, sessionStatus]);
 
   useEffect(() => {
     if (hasConfirmedDonationPayment(donation)) confetti.onOpen();
@@ -308,8 +308,13 @@ const DonationSuccessPage = () => {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error downloading receipt:', error);
-      // You might want to show a toast notification here
+      // Older guests whose scoped receipt cookie expired must verify their
+      // original account. Never fall back to donation-ID authorization.
+      if (axios.isAxiosError(error) && error.response?.status === 404 && !session?.user?.id) {
+        setSignInOpen(true);
+      } else {
+        console.error('Receipt download unavailable:', error);
+      }
     } finally {
       setIsDownloading(false);
     }
@@ -325,8 +330,16 @@ const DonationSuccessPage = () => {
         <section className="max-w-xl space-y-4 p-8 text-center">
           <h1 className="text-2xl font-bold">{failedText('noDonation.title')}</h1>
           <p className="text-slate-600">{failedText('noDonation.description')}</p>
+          {!session?.user?.id && (
+            <Button onClick={() => setSignInOpen(true)}>{t('signupCtaTitle')}</Button>
+          )}
           <a className="inline-block rounded-lg bg-brand px-5 py-3 text-white" href={`/${locale}/campaigns`}>{failedText('noDonation.cta')}</a>
         </section>
+        <SignInDialog
+          isOpen={signInOpen}
+          onClose={() => setSignInOpen(false)}
+          callbackUrl={pathname}
+        />
       </main>
     );
   }
