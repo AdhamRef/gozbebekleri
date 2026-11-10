@@ -187,8 +187,23 @@ export async function GET(
     }
 
     const sub = donation.subscription;
+    // Guest proof is scoped to the new donation, not to the entire linked
+    // account's contact details (a typed email may match an existing donor).
+    const safeDonor = session?.user?.id ? donation.donor : {
+      ...donation.donor,
+      name: 'Donor',
+      email: null,
+      phone: null,
+      image: null,
+      gender: null,
+      birthdate: null,
+      countryCode: null,
+      city: null,
+      region: null,
+    };
     const response = {
       ...donation,
+      donor: safeDonor,
       type: donation.subscriptionId ? ('MONTHLY' as const) : ('ONE_TIME' as const),
       // Default to CARD on read for legacy rows where the field was never
       // written. Every current create path sets CARD or PAYPAL explicitly,
