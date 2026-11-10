@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import pdfParse from "pdf-parse";
 import { createHmac } from "node:crypto";
 import { createServer } from "node:http";
 import { registerHooks } from "node:module";
@@ -109,10 +110,18 @@ try{
  globalThis.receiptFixture.session={user:{id:otherId,role:"ADMIN"}};
  pdf(await call());
  globalThis.receiptFixture.session={user:{id:donorId,role:"DONOR"}};
- pdf(await call());
+ const ownerReceipt=await call();
+ pdf(ownerReceipt);
+ // Extract visible PDF text, not just raw compressed PDF bytes.
+ const ownerExtracted=(await pdfParse(ownerReceipt.bytes)).text;
+ assert.match(ownerExtracted,/Synthetic Private Donor/);
+ assert.match(ownerExtracted,/private-fixture@example.invalid/);
  globalThis.receiptFixture.session=null;
  const privateGuestReceipt=await call({cookie:receiptCookie});
  pdf(privateGuestReceipt);
+ const guestExtracted=(await pdfParse(privateGuestReceipt.bytes)).text;
+ assert.match(guestExtracted,/Donor/);
+ assert.doesNotMatch(guestExtracted,/Synthetic Private Donor|private-fixture@example.invalid|999111222/);
  assert.doesNotMatch(privateGuestReceipt.body,/Synthetic Private Donor|private-fixture@example.invalid|999111222/);
  pass("ADMIN, authorized STAFF, owner and scoped guest download real PDF over HTTP");
  pass("guest PDF does not disclose contact fields of a pre-existing linked donor account");
