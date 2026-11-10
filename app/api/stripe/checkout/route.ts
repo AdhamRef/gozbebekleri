@@ -1,3 +1,4 @@
+import { stripeAmountInMinorUnits } from "@/lib/donations/stripe-minor-units";
 import { enforcePaymentInitiationBudget } from "@/lib/site-security/payment-initiation-budget";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -66,7 +67,9 @@ export async function POST(req: NextRequest) {
     // Stripe amount must be in smallest currency unit (cents/kuruş/etc.)
     // For currencies without decimals (e.g. some), multiply by 100 as well.
     const currency = (donation.currency || "USD").toLowerCase();
-    const amountInSmallestUnit = Math.round(donation.totalAmount * 100);
+    let amountInSmallestUnit: number;
+    try { amountInSmallestUnit = stripeAmountInMinorUnits(donation.totalAmount, donation.currency); }
+    catch { return NextResponse.json({ error: "Unsupported Stripe currency or amount precision" }, { status: 422 }); }
 
     const isMonthly = Boolean(donation.subscriptionId);
 
