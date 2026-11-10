@@ -1,3 +1,4 @@
+import { stripeAmountInMinorUnits } from "@/lib/donations/stripe-minor-units";
 import { enforcePaymentInitiationBudget } from "@/lib/site-security/payment-initiation-budget";
 import { hasGuestPaymentGrant } from "@/lib/donations/guest-payment-grant";
 import { donationFieldEmpty } from "@/lib/donations/mongo-null";
@@ -133,7 +134,9 @@ export async function POST(req: NextRequest) {
       if (attempt && !stripeIntentMatchesAttempt(existing, attempt)) {
         return errorResponse("Stripe payment does not match recorded attempt", 409);
       }
-      const amountMinor = Math.round(donation.totalAmount * 100);
+      let amountMinor: number;
+      try { amountMinor = stripeAmountInMinorUnits(donation.totalAmount, donation.currency); }
+      catch { return errorResponse("Unsupported currency or amount precision", 422); }
       if (existing.id !== ref || existing.metadata?.donationId !== donationId ||
           existing.amount !== amountMinor ||
           existing.currency?.toLowerCase() !== donation.currency.toLowerCase() ||
