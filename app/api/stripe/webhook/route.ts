@@ -13,6 +13,7 @@ import { donationFieldEmpty } from "@/lib/donations/mongo-null";
 import { normalizeDonationCurrencyCode } from "@/lib/exchange/convert-amount-in-currency-to-usd";
 import { checkoutPaymentCanSettle, stripeInvoiceSettlementDate, stripeSubscriptionOwnershipMatches } from "@/lib/donations/stripe-checkout-settlement";
 import { stripeOneTimePaymentMatchesDonation } from "@/lib/donations/stripe-one-time-payment";
+import { stripeOneTimeIntentCanSettle } from "@/lib/donations/stripe-charge-attempt";
 import { settleStripeInvoiceOnce } from "@/lib/donations/stripe-invoice-settlement";
 import { verifiedUsdCredit } from "@/lib/donations/verified-usd-credit";
 import { stripeBillingState } from "@/lib/donations/stripe-subscription-billing";
@@ -551,11 +552,7 @@ export async function POST(req: NextRequest) {
           // belongs to its Checkout Session (cs_), not this direct-Intent path.
           // A signed unrelated payment must never settle another donation.
           if (donation.subscriptionId || donation.providerOrderId?.startsWith("cs_")) return false;
-          if (intent.status !== "succeeded" || !stripeOneTimePaymentMatchesDonation(donation, {
-            id: intent.id,
-            amountMinor: intent.amount_received,
-            currency: intent.currency,
-          })) {
+          if (!stripeOneTimeIntentCanSettle(donation, intent)) {
             throw new Error("Stripe PaymentIntent settlement does not match original donation");
           }
 
