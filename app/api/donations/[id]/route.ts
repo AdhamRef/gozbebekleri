@@ -117,11 +117,7 @@ export async function GET(
       });
     }
 
-    // Self-heal: if Stripe already confirmed the payment but the webhook
-    // hasn't landed yet (common in dev / with slow webhook delivery), finalize
-    // the donation and increment campaign totals here so the success page
-    // reflects reality. Safe for guests and logged-in donors alike.
-    await reconcileStripeDonation(id);
+    // Read-only API: settlement and Stripe recovery belong to verified server paths.
 
     const donation = await prisma.donation.findUnique({
       where: { id },
@@ -187,28 +183,55 @@ export async function GET(
     }
 
     const sub = donation.subscription;
-    // Guest proof is scoped to the new donation, not to the entire linked
-    // account's contact details (a typed email may match an existing donor).
-    const safeDonor = session?.user?.id ? donation.donor : {
-      ...donation.donor,
-      name: 'Donor',
-      email: null,
-      phone: null,
-      image: null,
-      gender: null,
-      birthdate: null,
-      countryCode: null,
-      city: null,
-      region: null,
-    };
+    // Explicit public contract: never spread Prisma's Donation or User
+    // records. providerRaw, stripeChargeAttempt, gateway credentials, donor
+    // account metadata and future schema fields must remain server-only.
+    const authenticated = Boolean(session?.user?.id);
     const response = {
-      ...donation,
-      donor: safeDonor,
-      type: donation.subscriptionId ? ('MONTHLY' as const) : ('ONE_TIME' as const),
-      // Default to CARD on read for legacy rows where the field was never
-      // written. Every current create path sets CARD or PAYPAL explicitly,
-      // so this only kicks in for historical donations.
+      id: donation.id,
+      amount: donation.amount,
+      totalAmount: donation.totalAmount,
+      currency: donation.currency,
+      status: donation.status,
+      paidAt: donation.paidAt,
+      createdAt: donation.createdAt,
       paymentMethod: donation.paymentMethod ?? 'CARD',
+      provider: donation.provider,
+      subscriptionId: donation.subscriptionId,
+      donor: authenticated ? {
+        id: donation.donor?.id ?? null,
+        name: donation.donor?.name ?? null,
+        email: donation.donor?.email ?? null,
+      } : {
+        id: null,
+        name: 'Donor',
+        email: null,
+      },
+      items: donation.items.map(item => ({
+        id: item.id,
+        campaignId: item.campaignId,
+        amount: item.amount,
+        campaign: item.campaign ? {
+          title: item.campaign.title,
+          images: item.campaign.images,
+          translations: item.campaign.translations.map(t => ({
+            locale: t.locale, title: t.title,
+          })),
+        } : null,
+      })),
+      categoryItems: donation.categoryItems.map(item => ({
+        id: item.id,
+        categoryId: item.categoryId,
+        amount: item.amount,
+        category: item.category ? {
+          name: item.category.name,
+          image: item.category.image,
+          translations: item.category.translations.map(t => ({
+            locale: t.locale, name: t.name,
+          })),
+        } : null,
+      })),
+      type: donation.subscriptionId ? ('MONTHLY' as const) : ('ONE_TIME' as const),
       paymentStatus: donation.status,
       subscriptionStatus: sub?.status ?? null,
       nextBillingDate: sub?.nextBillingDate ?? null,
