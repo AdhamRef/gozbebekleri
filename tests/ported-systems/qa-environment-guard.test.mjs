@@ -26,7 +26,6 @@ test("QA boundary rejects live keys, production, mismatched DB hostname and inhe
   for (const [key,value,needle] of [
     ["STRIPE_SECRET_KEY","sk_live_not_allowed","STRIPE_LIVE_CREDENTIAL_FORBIDDEN"],
     ["VERCEL_ENV","production","PRODUCTION_RUNTIME_FORBIDDEN"],
-    ["NODE_ENV","production","PRODUCTION_RUNTIME_FORBIDDEN"],
     ["GOZ_QA_EXPECTED_MONGO_HOST","production-database.example","QA_DATABASE_HOST_MISMATCH"],
     ["GOZ_QA_ISOLATION_APPROVED","no","QA_APPROVAL_REQUIRED"],
     ["GOZ_QA_DB_IDENTITY_VERIFIED","no","DB_IDENTITY_APPROVAL_REQUIRED"],
@@ -47,4 +46,13 @@ test("QA boundary rejects missing test-mode and unique signing key requirements"
   assert.ok(errors.includes("MISSING_GOZ_GUEST_PAYMENT_KEYS"));
   assert.ok(errors.includes("INVALID_GUEST_PAYMENT_KEY_RING"));
   assert.ok(qaEnvironmentProblems({...isolated(),GOZ_GUEST_PAYMENT_KEYS:"old:"+testKey+",old:"+testKey}).includes("INVALID_GUEST_PAYMENT_KEY_RING"));
+});
+
+test("Next production build is valid in isolated QA; Vercel target and project identity determine production",()=>{
+ const qa={...isolated(),NODE_ENV:"production",VERCEL:"1",VERCEL_ENV:"preview",VERCEL_PROJECT_ID:"prj_qa_separately_owned_fixture"};
+ assert.deepEqual(qaEnvironmentProblems(qa),[]);
+ assert.equal(qaEnvironmentProblems({...qa,VERCEL_PROJECT_ID:"prj_hkMyu8iABc7AAqF7T1DvYRpKYRqV"}).includes("SHARED_PRODUCTION_VERCEL_PROJECT_FORBIDDEN"),true);
+ assert.equal(qaEnvironmentProblems({...qa,VERCEL_ENV:"production"}).includes("PRODUCTION_RUNTIME_FORBIDDEN"),true);
+ assert.equal(qaEnvironmentProblems({...qa,VERCEL_PROJECT_ID:""}).includes("VERCEL_PROJECT_ID_REQUIRED"),true);
+ assert.equal(qaEnvironmentProblems({...qa,VERCEL_ENV:"development",VERCEL_TARGET_ENV:""}).includes("QA_PREVIEW_OR_CUSTOM_ENV_REQUIRED"),true);
 });
