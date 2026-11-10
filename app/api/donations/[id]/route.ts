@@ -6,6 +6,7 @@ import { authOptions } from '../../auth/[...nextauth]/options';
 import { Prisma, SubscriptionStatus } from '@prisma/client';
 import { userHasDashboardPermission } from '@/lib/dashboard/permissions';
 import { hasGuestReceiptGrant } from '@/lib/donations/guest-payment-grant';
+import { stripeOneTimeIntentCanSettle } from "@/lib/donations/stripe-charge-attempt";
 import { isRevenueDashboardUser } from '@/lib/dashboard/api-auth';
 import { convertAmountInCurrencyToUsd, normalizeDonationCurrencyCode } from '@/lib/exchange/convert-amount-in-currency-to-usd';
 import {
@@ -35,7 +36,7 @@ async function reconcileStripeDonation(donationId: string) {
   if (!stripe) return;
   const row = await prisma.donation.findUnique({
     where: { id: donationId },
-    select: { provider: true, providerOrderId: true, paidAt: true },
+    select: { id: true, donorId: true, provider: true, providerOrderId: true, paidAt: true, totalAmount: true, currency: true, subscriptionId: true, stripeChargeAttempt: true },
   });
   if (!row || row.paidAt || row.provider !== 'STRIPE' || !row.providerOrderId) return;
   if (!row.providerOrderId.startsWith('pi_')) return;
@@ -47,7 +48,9 @@ async function reconcileStripeDonation(donationId: string) {
     console.error('[donation reconcile] Stripe retrieve failed:', err);
     return;
   }
-  if (intent.status !== 'succeeded') return;
+  // A browser GET must never bypass the signed Webhook's immutable
+  // amount/currency/nonce/reference settlement checks.
+  if (!stripeOneTimeIntentCanSettle(row, intent)) return;
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -55,7 +58,7 @@ async function reconcileStripeDonation(donationId: string) {
         where: { id: donationId },
         include: { items: true, categoryItems: true },
       });
-      if (!fresh || fresh.paidAt) return;
+      if (!fresh || fresh.paidAt || fresh.providerOrderId !== intent.id) return;
 
       await tx.donation.update({
         where: { id: donationId },
