@@ -28,6 +28,7 @@ export function qaEnvironmentProblems(env = process.env) {
   const productionProjectId = "prj_hkMyu8iABc7AAqF7T1DvYRpKYRqV";
   if (env.VERCEL_PROJECT_ID === productionProjectId) errors.push("SHARED_PRODUCTION_VERCEL_PROJECT_FORBIDDEN");
   if (env.VERCEL === "1" && !env.VERCEL_PROJECT_ID) errors.push("VERCEL_PROJECT_ID_REQUIRED");
+  if (env.VERCEL === "1" && env.GOZ_QA_LOCAL_ONLY === "yes") errors.push("LOCAL_QA_MODE_FORBIDDEN_ON_HOSTED_ENV");
   if (env.VERCEL === "1" && env.VERCEL_ENV !== "preview" && !env.VERCEL_TARGET_ENV) {
     errors.push("QA_PREVIEW_OR_CUSTOM_ENV_REQUIRED");
   }
