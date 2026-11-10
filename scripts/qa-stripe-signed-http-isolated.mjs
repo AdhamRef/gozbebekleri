@@ -407,5 +407,32 @@ for(const name of ["StripeRefundSettlement","StripeInvoiceSettlement"]){
 }
 pass("synthetic BSON snapshot restored in a separate isolated database, totals and unique ledger keys verified");
 
+
+const {countDuplicateStripeReferences,matchingUniqueIndex}=await import("./qa/financial-index-audit-core.mjs");
+const duplicatesBefore=await countDuplicateStripeReferences(db.collection("Donation"));
+assert.equal(duplicatesBefore,0,"fixture starts without provider duplicates");
+const duplicateRef="pi_duplicate_reference_fixture";
+const insertDuplicate=async()=>db.collection("Donation").insertOne({
+ _id:new ObjectId(),provider:"STRIPE",providerOrderId:duplicateRef,donorId:donor,
+ amount:1,totalAmount:1,currency:"USD",status:"PAID",paidAt:null,
+ paymentMethod:"CARD",createdAt:created
+});
+await insertDuplicate();await insertDuplicate();
+assert.equal(await countDuplicateStripeReferences(db.collection("Donation")),1);
+await db.collection("Donation").deleteMany({providerOrderId:duplicateRef});
+assert.equal(await countDuplicateStripeReferences(db.collection("Donation")),0);
+pass("read-only duplicate reference scan detects collisions before any unique index change");
+const key={provider:1,providerOrderId:1};
+assert.equal(matchingUniqueIndex(await db.collection("Donation").listIndexes().toArray(),key,{partial:true}),false);
+await db.collection("Donation").createIndex(key,{
+ unique:true,name:"isolated_stripe_provider_reference_unique",
+ partialFilterExpression:{provider:"STRIPE",providerOrderId:{$type:"string"}}
+});
+assert.equal(matchingUniqueIndex(await db.collection("Donation").listIndexes().toArray(),key,{partial:true}),true);
+await insertDuplicate();
+await assert.rejects(insertDuplicate(),error=>error?.code===11000,"same provider reference rejected");
+await db.collection("Donation").deleteMany({providerOrderId:duplicateRef});
+pass("isolated Mongo partial unique index rejects second Stripe reference without touching hosted DB");
+
 console.log(JSON.stringify({summary:"SIGNED_HTTP_REFUNDS_PASS",passed,refund:"PASS",database:"isolated MongoDB",stripeCalls:0}));
 }finally{if(server)await new Promise(ok=>server.close(ok));await prisma.$disconnect();await mongo.close();await repl.stop();rmSync(dir,{recursive:true,force:true})}
