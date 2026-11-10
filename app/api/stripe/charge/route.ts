@@ -90,7 +90,8 @@ export async function POST(req: NextRequest) {
     const locked = await prisma.donation.updateMany({
       where: {
         AND: [
-          { id: donationId, donorId: donation.donorId, paidAt: null },
+          { id: donationId, donorId: donation.donorId, status: "PAID", subscriptionId: null },
+          donationFieldEmpty("paidAt"),
           donationFieldEmpty("providerOrderId"),
           { OR: [{ provider: null }, { provider: "STRIPE" }] },
         ],
@@ -115,7 +116,10 @@ export async function POST(req: NextRequest) {
     }, { idempotencyKey: `goz-one-time-charge-${donationId}` });
 
     const committed = await prisma.donation.updateMany({
-      where: { id: donationId, provider: "STRIPE", providerOrderId: reservation, paidAt: null },
+      where: { AND: [
+        { id: donationId, provider: "STRIPE", providerOrderId: reservation },
+        donationFieldEmpty("paidAt"),
+      ] },
       data: { providerOrderId: intent.id },
     });
     if (committed.count !== 1) {
