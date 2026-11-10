@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
             donationFieldEmpty("paidAt"),
             donationFieldEmpty("providerOrderId"),
             { OR: [{ provider: null }, { provider: { isSet: false } }, { provider: "STRIPE" }] },
-            { OR: [{ stripeChargeAttempt: { isSet: false } }, { stripeChargeAttempt: { equals: null } }] },
+            { stripeChargeAttempt: { isSet: false } },
           ],
         },
         data: { provider: "STRIPE", providerOrderId: reserved,
