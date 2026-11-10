@@ -12,6 +12,7 @@ import { dispatchDonationPaid, dispatchEvent } from "@/lib/events/dispatch";
 import { donationFieldEmpty } from "@/lib/donations/mongo-null";
 import { normalizeDonationCurrencyCode } from "@/lib/exchange/convert-amount-in-currency-to-usd";
 import { checkoutPaymentCanSettle, stripeInvoiceSettlementDate, stripeSubscriptionOwnershipMatches } from "@/lib/donations/stripe-checkout-settlement";
+import { stripeOneTimePaymentMatchesDonation } from "@/lib/donations/stripe-one-time-payment";
 import { settleStripeInvoiceOnce } from "@/lib/donations/stripe-invoice-settlement";
 import { verifiedUsdCredit } from "@/lib/donations/verified-usd-credit";
 import { stripeBillingState } from "@/lib/donations/stripe-subscription-billing";
@@ -91,6 +92,13 @@ export async function POST(req: NextRequest) {
             // Idempotency: the row is created with status=PAID by /api/stripe/intent
             // before Stripe confirms payment, so we key off paidAt (only set here).
             if (!donation || donation.paidAt != null) return false;
+            if (!stripeOneTimePaymentMatchesDonation(donation, {
+              id: session.id,
+              amountMinor: session.amount_total,
+              currency: session.currency,
+            })) {
+              throw new Error("Stripe Checkout settlement does not match original donation");
+            }
 
             // Mark donation as paid
             await tx.donation.update({
@@ -539,6 +547,17 @@ export async function POST(req: NextRequest) {
           // Idempotency: the row is created with status=PAID by /api/stripe/intent
           // before Stripe confirms payment, so we key off paidAt (only set here).
           if (!donation || donation.paidAt != null) return false;
+          // Stripe Checkout also emits payment_intent.succeeded. That payment
+          // belongs to its Checkout Session (cs_), not this direct-Intent path.
+          // A signed unrelated payment must never settle another donation.
+          if (donation.subscriptionId || donation.providerOrderId?.startsWith("cs_")) return false;
+          if (intent.status !== "succeeded" || !stripeOneTimePaymentMatchesDonation(donation, {
+            id: intent.id,
+            amountMinor: intent.amount_received,
+            currency: intent.currency,
+          })) {
+            throw new Error("Stripe PaymentIntent settlement does not match original donation");
+          }
 
           await tx.donation.update({
             where: { id: donationId },
