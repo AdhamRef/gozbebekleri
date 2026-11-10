@@ -51,4 +51,5 @@ test("both signed one-time webhook paths use the financial settlement guard", ()
   assert.match(intent, /currency:\s*intent\.currency/);
   assert.match(intent, /intent\.status !== "succeeded"/);
   assert.match(intent, /providerOrderId\?\.startsWith\("cs_"\)/);
+  assert.match(intent, /donation\.subscriptionId \|\|/);
 });
