@@ -241,6 +241,14 @@ export async function PUT(
     const isAdmin = isRevenueDashboardUser(session);
     const isOwner = session.user.id === currentDonation.donorId;
 
+    // Check server-side authorization before empty-update read responses,
+    // subscription details, or any mutable operation.
+    if (!isAdmin && !isOwner) {
+      return NextResponse.json({ error: 'Forbidden' }, {
+        status: 403, headers: { 'Cache-Control': 'no-store' },
+      });
+    }
+
     if (!currentDonation.subscriptionId) {
       return NextResponse.json(
         { error: 'Only subscriptions can be updated; this donation is one-time' },
@@ -287,13 +295,6 @@ export async function PUT(
         nextBillingDate: s?.nextBillingDate ?? null,
         lastBillingDate: s?.lastBillingDate ?? null,
       });
-    }
-
-    if (!isAdmin && !isOwner) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      );
     }
 
     if (!isAdmin && isOwner && status === 'CANCELLED') {
