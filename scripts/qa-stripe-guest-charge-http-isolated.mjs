@@ -91,7 +91,7 @@ globalThis.fixture = {
     return {data:stripeSearch,has_more:false};
   }
 };
-const { issueGuestPaymentGrant, guestPaymentCookieName }=await import("../lib/donations/guest-payment-grant.ts");
+const { issueGuestPaymentGrant, guestPaymentCookieName, issueGuestReceiptGrant, hasGuestReceiptGrant, guestReceiptCookieName }=await import("../lib/donations/guest-payment-grant.ts");
 const {POST}=await import("../app/api/stripe/charge/route.ts");
 let guestToken=null;
 issueGuestPaymentGrant({cookies:{set:({name,value,htmlOnly,httpOnly,path})=>{
@@ -99,6 +99,24 @@ issueGuestPaymentGrant({cookies:{set:({name,value,htmlOnly,httpOnly,path})=>{
   assert.equal(httpOnly,true);assert.equal(path,"/api/stripe/charge");
   guestToken=value;
 }}}, donationId);
+let receiptToken=null;
+issueGuestReceiptGrant({cookies:{set:({name,value,httpOnly,path,maxAge})=>{
+  assert.equal(name,guestReceiptCookieName(donationId));
+  assert.equal(httpOnly,true);
+  assert.equal(path,"/api/donations/"+donationId+"/receipt");
+  assert.equal(maxAge,24*60*60);
+  receiptToken=value;
+}}},donationId);
+const fakeReceiptRequest=(value,id=donationId)=>({cookies:{get:name=>
+  name===guestReceiptCookieName(id) && value?{value}:undefined
+}});
+assert.equal(hasGuestReceiptGrant(fakeReceiptRequest(receiptToken),donationId),true);
+assert.equal(hasGuestReceiptGrant(fakeReceiptRequest(receiptToken),otherId),false);
+assert.equal(hasGuestReceiptGrant(fakeReceiptRequest(receiptToken+"x"),donationId),false);
+assert.equal(hasGuestReceiptGrant(fakeReceiptRequest(null),donationId),false);
+assert.equal(hasGuestReceiptGrant(fakeReceiptRequest(guestToken),donationId),false);
+console.log(JSON.stringify({name:"scoped guest receipt grant rejects guessed ID, no grant, tampering and charge-only grant",result:"PASS"}));
+
 const server = createServer(async(req,res)=>{
   const body=[];
   for await(const chunk of req)body.push(chunk);
@@ -254,6 +272,17 @@ try{
   assert.equal(hasGuestPaymentGrant({cookies:{get:()=>({value:rotated})}},donationId),false);
   process.env.GOZ_GUEST_PAYMENT_KEYS=oldKey;
   pass("guest signing key rotation and removal are independent of NextAuth secret");
+  // Old guest receipt grants are valid only while their matching signing key
+  // is retained; removing a key revokes both payment and receipt grants.
+  let rotatedReceipt=null;
+  issueGuestReceiptGrant({cookies:{set:({value})=>rotatedReceipt=value}},donationId);
+  assert.equal(hasGuestReceiptGrant(fakeReceiptRequest(rotatedReceipt),donationId),true);
+  process.env.GOZ_GUEST_PAYMENT_KEYS="k2:"+Buffer.alloc(32,12).toString("base64url");
+  assert.equal(hasGuestReceiptGrant(fakeReceiptRequest(receiptToken),donationId),false);
+  process.env.GOZ_GUEST_PAYMENT_KEYS=oldKey;
+  assert.equal(hasGuestReceiptGrant(fakeReceiptRequest(receiptToken),donationId),true);
+  pass("receipt grant verifies HMAC rotation independently and never accepts payment grant");
+
 
   console.log(JSON.stringify({summary:"GUEST_CHARGE_HTTP_PASS",passed,stripeNetworkCalls:0}));
 }finally{
