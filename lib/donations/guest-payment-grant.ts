@@ -61,7 +61,8 @@ export function issueGuestReceiptGrant(response: NextResponse, donationId: strin
     name: guestReceiptCookieName(donationId),
     value: key.id + "." + expiresAt + "." + receiptSignature(donationId, expiresAt, key.secret).toString("hex"),
     maxAge: RECEIPT_TTL_SECONDS,
-    path: "/api/donations/" + donationId + "/receipt",
+    // Covers owner-scoped donation summary and its receipt, never payment or guest claiming.
+    path: "/api/donations/" + donationId,
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
