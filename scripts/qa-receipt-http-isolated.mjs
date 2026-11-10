@@ -111,8 +111,11 @@ try{
  globalThis.receiptFixture.session={user:{id:donorId,role:"DONOR"}};
  pdf(await call());
  globalThis.receiptFixture.session=null;
- pdf(await call({cookie:receiptCookie}));
+ const privateGuestReceipt=await call({cookie:receiptCookie});
+ pdf(privateGuestReceipt);
+ assert.doesNotMatch(privateGuestReceipt.body,/Synthetic Private Donor|private-fixture@example.invalid|999111222/);
  pass("ADMIN, authorized STAFF, owner and scoped guest download real PDF over HTTP");
+ pass("guest PDF does not disclose contact fields of a pre-existing linked donor account");
  globalThis.receiptFixture.donation.paidAt=null;
  assert.equal((await call({cookie:receiptCookie})).status,409);
  globalThis.receiptFixture.donation.status="FAILED";
