@@ -148,6 +148,7 @@ export async function POST(req: NextRequest) {
     }
 
     let snapshot = attempt;
+    let newlyReserved = false;
     if (!ref) {
       if (attempt) return errorResponse("Conflicting existing payment attempt", 409);
       const campaignNames = donation.items.map(i => i.campaign.title).join(", ");
@@ -179,6 +180,7 @@ export async function POST(req: NextRequest) {
         // Another request won; subsequent retry reads its immutable snapshot.
         return errorResponse("Payment creation is in progress", 503);
       }
+      newlyReserved = true;
     }
     if (!snapshot) {
       // Legacy reservation from before recovery support: no trustworthy
@@ -189,7 +191,7 @@ export async function POST(req: NextRequest) {
     // An eventual-consistency search can recover an intent even after Stripe
     // has pruned the idempotency key. A negative search is NEVER permission
     // to issue a fresh create after that expiry.
-    const found = await findCreatedIntent(snapshot);
+    const found = newlyReserved ? null : await findCreatedIntent(snapshot);
     if (found) return commitVerifiedIntent(donationId, snapshot, found);
     if (!mayReplayStripeChargeAttempt(snapshot)) {
       return errorResponse("Payment attempt expired; manual reconciliation required", 409);
