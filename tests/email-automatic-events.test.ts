@@ -8,9 +8,9 @@ function authFixture(existing: boolean, providerFails = false) {
   const sent: unknown[] = [];
   let creates = 0;
   const prisma = { user: {
-    findUnique: async () => existing ? { id: 'existing-user', email: 'test@example.org', preferredLang: 'en' } : null,
+    findUnique: async () => existing ? { id: 'existing-user', email: 'test@fixture.invalid', preferredLang: 'en' } : null,
     update: async () => ({}),
-    create: async () => { creates++; return { id: 'new-user', email: 'test@example.org', name: 'Test', role: 'DONOR' }; },
+    create: async () => { creates++; return { id: 'new-user', email: 'test@fixture.invalid', name: 'Test', role: 'DONOR' }; },
   } };
   const mocks: Record<string, unknown> = {
     '@auth/prisma-adapter': { PrismaAdapter: () => ({}) }, '@/lib/prisma': { prisma },
@@ -19,9 +19,10 @@ function authFixture(existing: boolean, providerFails = false) {
     'next-auth/providers/credentials': (config: unknown) => config,
     'bcryptjs': {}, 'next/headers': { cookies: async () => ({ get: () => ({ value: 'en' }) }) },
     'google-auth-library': { OAuth2Client: class {
-      async verifyIdToken() { return { getPayload: () => ({ email: 'test@example.org', email_verified: true, name: 'Test' }) }; }
+      async verifyIdToken() { return { getPayload: () => ({ email: 'test@fixture.invalid', email_verified: true, name: 'Test' }) }; }
     } },
     '@/lib/otp': {}, '@/lib/locales': { isValidLocale: () => true, DEFAULT_LOCALE: 'ar' },
+    '@/lib/security/blocked-emails': { isBlockedEmail: (email: unknown) => typeof email === 'string' && /@example\.(org|com|net)$/i.test(email) },
     '@/lib/events/dispatch': { dispatchEvent: async (...args: unknown[]) => { sent.push(args); if (providerFails) throw new Error('provider unavailable'); } },
   };
   const fixture = { exports: {} as { authOptions: any } };
@@ -40,7 +41,7 @@ function authFixture(existing: boolean, providerFails = false) {
 test('new OAuth account dispatches welcome once after persistence; existing account does not', async () => {
   for (const existing of [false, true]) {
     const fixture = authFixture(existing);
-    const ok = await fixture.options.callbacks.signIn({ user: { email:'test@example.org', name:'Test' }, account:{type:'oauth'}, profile:{} });
+    const ok = await fixture.options.callbacks.signIn({ user: { email:'test@fixture.invalid', name:'Test' }, account:{type:'oauth'}, profile:{} });
     assert.equal(ok, true);
     assert.equal(fixture.getCreates(), existing ? 0 : 1);
     assert.equal(fixture.sent.length, existing ? 0 : 1);
@@ -60,5 +61,5 @@ test('Google One Tap dispatches welcome only for a newly created account', async
 
 test('notification provider failure never blocks successful account creation', async () => {
   const fixture = authFixture(false, true);
-  assert.equal(await fixture.options.callbacks.signIn({ user:{email:'test@example.org',name:'Test'}, account:{type:'oauth'}, profile:{} }), true);
+  assert.equal(await fixture.options.callbacks.signIn({ user:{email:'test@fixture.invalid',name:'Test'}, account:{type:'oauth'}, profile:{} }), true);
 });
