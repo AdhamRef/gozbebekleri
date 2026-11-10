@@ -266,8 +266,11 @@ const DonationSuccessPage = () => {
     if (!id) return;
     if (linkAttemptedRef.current) return;
     if (sessionStatus !== 'authenticated') return;
-    if (!donation?.donor?.id) return;
-    if (session?.user?.id === donation.donor.id) return;
+    // Guest-safe donation summaries intentionally hide the linked user's ID.
+    // The separate signed original-browser claim cookie proves eligibility;
+    // never require a donor ID in browser-visible JSON to attempt linking.
+    if (!donation?.id) return;
+    if (donation.donor?.id && session?.user?.id === donation.donor.id) return;
 
     linkAttemptedRef.current = true;
     setLinkState('linking');
