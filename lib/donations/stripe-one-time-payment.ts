@@ -1,3 +1,4 @@
+import { stripeAmountInMinorUnits } from "./stripe-minor-units";
 /**
  * Financial settlement guard for Stripe's one-time payment webhooks.
  * All existing one-time payment creators use Math.round(totalAmount * 100).
@@ -25,7 +26,8 @@ export function stripeOneTimePaymentMatchesDonation(
   const currency = donation.currency?.trim().toLowerCase();
   if (!currency || currency !== payment.currency?.trim().toLowerCase()) return false;
 
-  const expectedMinor = Math.round(donation.totalAmount * 100);
+  let expectedMinor: number;
+  try { expectedMinor = stripeAmountInMinorUnits(donation.totalAmount, donation.currency); } catch { return false; }
   return (
     Number.isSafeInteger(expectedMinor) && expectedMinor > 0 &&
     typeof payment.amountMinor === "number" &&
