@@ -178,7 +178,7 @@ try{
   assert.equal(creates,initialCreates);pass("expired idempotency key with search miss fails closed");
   stripeSearch=[lastCreated];
   assert.equal((await call(donationId,guestToken)).status,200);
-  assert.equal(creates,1);pass("expired idempotency key can bind positive Stripe evidence only");
+  assert.equal(creates,initialCreates);pass("expired idempotency key can bind positive Stripe evidence only");
 
   // Retry after a timeout BEFORE the provider created an object.
   stored=row();lastKey=null;lastCreated=null;stripeSearch=[];failBeforeStripe=true;
