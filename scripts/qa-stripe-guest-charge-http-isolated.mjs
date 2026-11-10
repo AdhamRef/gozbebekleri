@@ -133,7 +133,17 @@ try{
   globalThis.fixture.session={user:{id:otherId}};
   assert.equal((await call(donationId,guestToken)).status,403);
   assert.equal(creates,0);pass("authenticated non-owner cannot borrow guest grant");
+  // All four roles use the exact HTTP authorization boundary; staff/admin
+  // role alone is NOT a payment ownership override.
+  for(const role of ["ADMIN","STAFF","DONOR"]) {
+    globalThis.fixture.session={user:{id:otherId,role}};
+    assert.equal((await call(donationId,guestToken)).status,403,role);
+  }
   globalThis.fixture.session=null;
+  assert.equal((await call(donationId)).status,403);
+  assert.equal(creates,0);
+  pass("ADMIN, STAFF, DONOR and Guest direct charge API calls require donation ownership or scoped guest grant");
+
   const results=await Promise.all([call(donationId,guestToken),call(donationId,guestToken)]);
   assert.ok(results.some(x=>x.status===200),JSON.stringify(results));
   assert.ok(results.every(x=>x.status===200||x.status===503),JSON.stringify(results));
@@ -144,6 +154,12 @@ try{
   assert.equal((await call(donationId,guestToken)).status,200);
   assert.equal(creates,initialCreates);assert.ok(retrievals>=1);
   pass("authorized retry reuses original Stripe intent without replacing providerOrderId");
+  globalThis.fixture.session={user:{id:donorId,role:"DONOR"}};
+  assert.equal((await call(donationId)).status,200);
+  globalThis.fixture.session=null;
+  assert.equal(actualStripeCreates,1);
+  pass("authenticated owner can directly reuse original intent without guest cookie or new provider object");
+
   stored.paidAt=new Date();
   assert.equal((await call(donationId,guestToken)).status,409);
   assert.equal(creates,initialCreates);pass("settled donation rejects late payment initiation");
