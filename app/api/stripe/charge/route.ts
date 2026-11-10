@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
     // has pruned the idempotency key. A negative search is NEVER permission
     // to issue a fresh create after that expiry.
     const found = newlyReserved ? null : await findCreatedIntent(snapshot);
-    if (found) return commitVerifiedIntent(donationId, snapshot, found);
+    if (found) return await commitVerifiedIntent(donationId, snapshot, found);
     if (!mayReplayStripeChargeAttempt(snapshot)) {
       return errorResponse("Payment attempt expired; manual reconciliation required", 409);
     }
@@ -204,7 +204,7 @@ export async function POST(req: NextRequest) {
       stripeChargeCreateParams(snapshot),
       { idempotencyKey: stripeChargeIdempotencyKey(snapshot) },
     );
-    return commitVerifiedIntent(donationId, snapshot, intent);
+    return await commitVerifiedIntent(donationId, snapshot, intent);
   } catch (error) {
     console.error("[Stripe Charge] recovery temporarily unavailable", error);
     // Do not delete, replace or expire the immutable reservation on failures.
