@@ -262,8 +262,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Payment not confirmed' }, { status: 409, headers: { 'Cache-Control': 'no-store' } });
     }
     const sub = donationRow.subscription;
+    // A guest capability proves control of this checkout, not ownership of
+    // every personal field on a pre-existing user matched by email/phone.
+    // Never include the linked account's contact details in a guest PDF.
+    const safeDonor = session?.user?.id ? donationRow.donor : {
+      ...donationRow.donor,
+      name: 'Donor',
+      email: null,
+      phone: null,
+      country: null,
+      countryName: null,
+      countryCode: null,
+      city: null,
+      region: null,
+    };
     const donation = {
       ...donationRow,
+      donor: safeDonor,
       type: donationRow.subscriptionId ? ('MONTHLY' as const) : ('ONE_TIME' as const),
       status: sub?.status ?? null,
       nextBillingDate: sub?.nextBillingDate ?? null,
