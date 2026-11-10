@@ -18,15 +18,17 @@ jobs:
       GOOGLE_CLIENT_ID: fixture-client
       GOOGLE_CLIENT_SECRET: fixture-secret
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          persist-credentials: false
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            app/api/donations/[id]/route.ts
-            scripts/qa-donation-put-hotfix-http.mjs
-            package.json
-            package-lock.json
+      - name: Fetch exact GitHub event archive (legacy main contains invalid gitlink)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          printf 'header = "Authorization: Bearer %s"\n' "$GH_TOKEN" |
+            curl --fail --silent --show-error --location --config - \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" \
+              --output source.tgz
+          tar -xzf source.tgz --strip-components=1
+          rm source.tgz
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "24"
