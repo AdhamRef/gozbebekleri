@@ -57,7 +57,10 @@ function hasMacro(value: string): boolean {
 }
 
 function setIfClean(key: DonationAttributionKey, value: string | null | undefined, overwrite = true) {
-  const v = value?.trim();
+  const original = value?.trim();
+  const urlFields = new Set(["landing_page", "first_landing_page", "conversion_page", "referrer", "first_referrer"]);
+  const v = urlFields.has(key) ? safeAttributionUrl(original) : original;
+  if (urlFields.has(key) && isPaymentReturnPage(v) && key !== "conversion_page") return;
   if (!v) return;
   if (hasMacro(v)) {
     setCookie(PREFIX + `${key}_unresolved`, "true");
