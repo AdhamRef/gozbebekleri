@@ -55,3 +55,4 @@ jobs:
           # The Stripe HTTP fixture imports server-only modules under Node; select
           # React's server export condition without changing application security boundaries.
           node --conditions=react-server --import tsx scripts/qa-stripe-signed-http-isolated.mjs
+          node --conditions=react-server --import tsx scripts/qa-stripe-guest-charge-http-isolated.mjs
