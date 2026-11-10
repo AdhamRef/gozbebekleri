@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canIssueGuestPaymentGrant, issueGuestPaymentGrant } from "@/lib/donations/guest-payment-grant";
+import { canIssueGuestPaymentGrant, issueGuestPaymentGrant, issueGuestReceiptGrant } from "@/lib/donations/guest-payment-grant";
 import { prisma } from "@/lib/prisma";
 import { isValidLocale } from "@/lib/locales";
 import { getServerSession } from "next-auth";
@@ -684,7 +684,10 @@ export async function POST(request: NextRequest) {
     });
 
     const response = NextResponse.json({ success: true, donation });
-    if (!session?.user?.id) issueGuestPaymentGrant(response, donation.id);
+    if (!session?.user?.id) {
+      issueGuestPaymentGrant(response, donation.id);
+      issueGuestReceiptGrant(response, donation.id);
+    }
     return response;
   } catch (error) {
     console.error("Error creating donation:", error);
