@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { canIssueGuestPaymentGrant, issueGuestPaymentGrant } from "@/lib/donations/guest-payment-grant";
 import { prisma } from "@/lib/prisma";
 import { isValidLocale } from "@/lib/locales";
 import { getServerSession } from "next-auth";
@@ -297,6 +298,11 @@ export async function POST(request: NextRequest) {
         }
         throw e;
       }
+    }
+
+    // Guest checkout cannot be initiated if a scoped payment capability cannot be issued.
+    if (!session?.user?.id && !canIssueGuestPaymentGrant()) {
+      return NextResponse.json({ error: "Guest payment unavailable" }, { status: 503 });
     }
 
     // Resolve donorId — authenticated user or guest upsert
@@ -677,10 +683,9 @@ export async function POST(request: NextRequest) {
       stream: auditStreamForRole(actorRole),
     });
 
-    return NextResponse.json({
-      success: true,
-      donation,
-    });
+    const response = NextResponse.json({ success: true, donation });
+    if (!session?.user?.id) issueGuestPaymentGrant(response, donation.id);
+    return response;
   } catch (error) {
     console.error("Error creating donation:", error);
     return NextResponse.json(
