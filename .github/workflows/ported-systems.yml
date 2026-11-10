@@ -50,6 +50,12 @@ jobs:
         run: npm install --no-save --package-lock=false --ignore-scripts --legacy-peer-deps --no-audit --no-fund mongodb-memory-server@10.1.4
       - name: Compile Next routes with reachable isolated MongoDB, reject ignored DB errors
         run: node scripts/qa-build-with-isolated-mongo.mjs
+      - name: Ensure independent PDF text extraction utility
+        run: |
+          if ! command -v pdftotext >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y poppler-utils
+          fi
       - name: Mandatory signed Stripe refund HTTP and MongoDB transaction regressions
         run: |
           DATABASE_URL=mongodb://127.0.0.1:27018/isolated_refunds npx --no-install prisma generate --schema prisma/schema.prisma
