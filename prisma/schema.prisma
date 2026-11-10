@@ -698,6 +698,8 @@ model Donation {
   providerHostRefNum     String?
   providerErrorMessage   String?
   providerRaw            Json?
+  // Immutable one-time Stripe creation snapshot; never overwritten after reservation.
+  stripeChargeAttempt    Json?
 
   donorId        String    @db.ObjectId
   donor          User      @relation(fields: [donorId], references: [id])
