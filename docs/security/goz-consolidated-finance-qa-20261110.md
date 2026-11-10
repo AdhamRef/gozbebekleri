@@ -88,3 +88,85 @@ index inventory/provisioning and business review are still required.
    relevant unique indexes and audit signoff.
 5. Finance/security GO authorization. PR #197, #210, #211, #212 and this
    review branch must remain out of main until all gates pass.
+
+## Actual environment authority and findings (2026-11-10)
+Creating a dedicated Vercel project returned 403 Forbidden. Attempting a
+Git-linked QA project reused the existing production-linked project instead.
+No production/preview configuration was changed; no secrets were decrypted.
+There are zero Vercel custom QA environments. Metadata inspection confirms
+the following keys target BOTH production and preview: DATABASE_URL,
+DATABASE_URL_MAIN, NEXTAUTH_URL, NEXTAUTH_SECRET, STRIPE_SECRET_KEY,
+STRIPE_WEBHOOK_SECRET, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY. That is not
+proof of identical values, but IS proof that independence has not been
+established. Do not send test writes, logins or payment API calls to Preview.
+
+The connected Stripe account permits Live mode only. The Atlas orgs available
+to this connection belong to another institution; no database is authorized
+for Gozbebekleri QA.
+
+### Dedicated QA provisioning checklist
+1. Authorized operator creates a separate Gozbebekleri-owned MongoDB replica
+   set and a new Vercel QA project, both protected and isolated. No copying
+   production secret values or donor records.
+2. Set DATABASE_URL to an independently reviewed database named goz_qa_*.
+   Explicitly attest GOZ_QA_EXPECTED_MONGO_HOST,
+   GOZ_QA_DB_IDENTITY_VERIFIED=yes and GOZ_QA_ISOLATION_APPROVED=yes.
+   Do not set DATABASE_URL_MAIN or inherit any Production variable.
+3. Configure independent NEXTAUTH_SECRET, NEXTAUTH_URL, Stripe Test Mode
+   STRIPE_SECRET_KEY (sk_test_*), publishable key (pk_test_*),
+   Stripe webhook Test Mode secret and GOZ_GUEST_PAYMENT_KEYS as encrypted
+   QA-only secrets. No values or generated keys in GitHub/log output.
+4. Run node scripts/qa/qa-environment-guard.mjs before any live QA test.
+   This is a metadata and hostname guard, NOT proof that an operator's
+   declared DB hostname is truly independent. Confirm identity out-of-band.
+5. Guest charge cookies last 1 hour but receipt grants last **24 hours**.
+   Keep previous signing keys at least 24 hours plus deployment propagation
+   margin when rotating. An ID alone is no longer receipt authorization.
+   Expired receipt grants require signed-in identity or verified reissue.
+
+### Role-access test matrix
+
+| Surface | ADMIN | STAFF | DONOR | Guest | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| Direct Stripe charge | Own only | Own only | Own only | Signed scoped payment grant | Synthetic HTTP PASS |
+| Donation receipt | Revenue permission | Revenue grant | Owner only | Signed scoped receipt grant | Unit policy PASS; deployed HTTP untested |
+| Admin APIs | Authorized | Granular permission | Denied | Denied | QA NOT RUN |
+| Donor account and history | Authorized | Granular permission | Own only | No cross-account access | QA NOT RUN |
+| Donations, subscriptions, refunds | Authorized | Granular | Own limited actions | Restricted | QA NOT RUN |
+| Reports/export | Authorized | reportsExport permission | Denied | Denied | QA NOT RUN |
+| Certificates and additional receipts | Authorized | Granular | Own only | Scoped access | QA NOT RUN |
+| Upload and media | Authorized | Granular | Restricted | Restricted | QA NOT RUN |
+| Campaigns and communications | Authorized | Granular | Denied | Denied | QA NOT RUN |
+
+Do not count UI button visibility as server authorization. Execute two
+separate DONOR fixtures plus each role via direct HTTP, including negative
+mutations and persisted state assertions, only in approved QA.
+
+### Financial index and operational restore gates
+StripeInvoiceSettlement, StripeRefundSettlement and StripeDeferredRefund
+use their immutable provider IDs as Mongo _id. Existing secondary Prisma
+indexes are mostly non-unique performance indexes. A proposed partial
+unique MongoDB index on Donation(provider, providerOrderId) for Stripe with
+string references requires duplicate inventory and finance approval first.
+Never apply it directly to production or infer it already exists.
+
+node scripts/qa/audit-financial-indexes-readonly.mjs performs only QA
+metadata inspection and duplicate-reference counting after the QA guard.
+It cannot substitute for inspecting production indexes before release.
+
+Run mongodump/mongorestore against separately authorized QA source and
+restore-only destinations using protected database-tool configuration
+files rather than command-line URI credentials. Compare source/destination
+document counts, unique indexes, donation-project allocations, subscription
+relationships, Stripe invoice/refund references and financial totals.
+Then replay a signed provider event against the restored clone and verify
+no double credit; test transaction rollback under concurrent writes.
+The prior synthetic BSON round-trip is not this operational restore test.
+
+### Runtime and build distinction
+Earlier Next build had a localhost Mongo URL without a running server:
+connection refused errors were printed even when the build succeeded.
+This is NOT a runtime database PASS. New CI runs the build against a
+reachable isolated Mongo memory replica set, tests ping, and fails if
+Mongo connection errors appear. It remains a build/database-connectivity
+smoke test, not full deployed API runtime QA. Real QA remains blocked.
