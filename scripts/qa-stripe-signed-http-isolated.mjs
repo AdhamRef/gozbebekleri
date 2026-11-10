@@ -313,5 +313,22 @@ assert.equal((await send(evt("payment_intent.succeeded",checkoutIntent))).status
 assert.deepEqual(await oneBalance(),[50,50]);
 pass("late Checkout-owned PaymentIntent never settles the same donation twice");
 
+
+const {donationFieldEmpty}=await import("../lib/donations/mongo-null.ts");
+const casDonation=await oneTimeRow(null);
+const reserve="goz_charge_reserved_"+casDonation.toHexString();
+const claimWhere={AND:[
+  {id:casDonation.toHexString(),donorId:donor.toHexString(),status:"PAID"},
+  donationFieldEmpty("subscriptionId"),
+  donationFieldEmpty("paidAt"),
+  donationFieldEmpty("providerOrderId"),
+  {OR:[{provider:null},{provider:{isSet:false}},{provider:"STRIPE"}]},
+]};
+const claims=await Promise.all([prisma.donation.updateMany({where:claimWhere,data:{provider:"STRIPE",providerOrderId:reserve}}),
+  prisma.donation.updateMany({where:claimWhere,data:{provider:"STRIPE",providerOrderId:reserve}})]);
+assert.equal(claims.reduce((sum,x)=>sum+x.count,0),1);
+assert.equal((await db.collection("Donation").findOne({_id:casDonation})).providerOrderId,reserve);
+pass("isolated MongoDB CAS permits exactly one concurrent payment-reference reservation");
+
 console.log(JSON.stringify({summary:"SIGNED_HTTP_REFUNDS_PASS",passed,refund:"PASS",database:"isolated MongoDB",stripeCalls:0}));
 }finally{if(server)await new Promise(ok=>server.close(ok));await prisma.$disconnect();await mongo.close();await repl.stop();rmSync(dir,{recursive:true,force:true})}
