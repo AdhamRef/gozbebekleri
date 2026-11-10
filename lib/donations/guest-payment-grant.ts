@@ -6,7 +6,7 @@ import type { NextRequest, NextResponse } from "next/server";
 // GOZ_GUEST_PAYMENT_KEYS=kid:base64url(32+ bytes),previous:base64url(32+ bytes)
 export const GUEST_PAYMENT_TTL_SECONDS = 60 * 60;
 const COOKIE_PREFIX = "goz_guest_charge_";
-const DONATION_ID = /^[a-f\\d]{24}$/i;
+const DONATION_ID = /^[a-f\d]{24}$/i;
 const KEY_ID = /^[a-zA-Z0-9_-]{1,24}$/;
 
 type SigningKey = { id: string; secret: Buffer };
@@ -59,7 +59,7 @@ export function hasGuestPaymentGrant(request: NextRequest, donationId: string): 
   if (!DONATION_ID.test(donationId)) return false;
   const value = request.cookies.get(guestPaymentCookieName(donationId))?.value;
   if (!value) return false;
-  const match = /^([a-zA-Z0-9_-]{1,24})\\.(\\d{10})\\.([0-9a-f]{64})$/.exec(value);
+  const match = /^([a-zA-Z0-9_-]{1,24})\.(\d{10})\.([0-9a-f]{64})$/.exec(value);
   if (!match) return false;
   const expiresAt = Number(match[2]), now = Math.floor(Date.now() / 1000);
   if (expiresAt <= now || expiresAt > now + GUEST_PAYMENT_TTL_SECONDS) return false;
