@@ -113,3 +113,46 @@ export function hasGuestPaymentGrant(request: NextRequest, donationId: string): 
     signature(donationId, expiresAt, key.secret),
   );
 }
+
+
+/** Ownership handoff proof is separate from both charge and receipt grants.
+ * This HttpOnly token is issued only to the browser that created a guest
+ * donation and is sent exclusively to /api/users/link-guest. Sign-in alone
+ * plus a guessed donation ID is NEVER sufficient to claim a guest account.
+ */
+const CLAIM_COOKIE_PREFIX = "goz_guest_claim_";
+const CLAIM_TTL_SECONDS = 24 * 60 * 60;
+export function guestClaimCookieName(donationId: string): string {
+  return CLAIM_COOKIE_PREFIX + donationId;
+}
+function claimSignature(donationId: string, expiresAt: number, secret: Buffer) {
+  return createHmac("sha256", secret)
+    .update("gozbebekleri:guest-link:v1:" + donationId + ":" + expiresAt)
+    .digest();
+}
+export function issueGuestClaimGrant(response: NextResponse, donationId: string): void {
+  const key = paymentKeys()[0];
+  if (!key || !DONATION_ID.test(donationId)) throw new Error("Guest ownership signing key unavailable");
+  const expiresAt = Math.floor(Date.now() / 1000) + CLAIM_TTL_SECONDS;
+  response.cookies.set({
+    name: guestClaimCookieName(donationId),
+    value: key.id + "." + expiresAt + "." + claimSignature(donationId, expiresAt, key.secret).toString("hex"),
+    maxAge: CLAIM_TTL_SECONDS,
+    path: "/api/users/link-guest",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+}
+export function hasGuestClaimGrant(request: NextRequest, donationId: string): boolean {
+  if (!DONATION_ID.test(donationId)) return false;
+  const token = request.cookies.get(guestClaimCookieName(donationId))?.value;
+  const match = token && /^([a-zA-Z0-9_-]{1,24})\.(\d{10})\.([0-9a-f]{64})$/.exec(token);
+  if (!match) return false;
+  const expiresAt = Number(match[2]), now = Math.floor(Date.now() / 1000);
+  if (expiresAt <= now || expiresAt > now + CLAIM_TTL_SECONDS) return false;
+  const key = paymentKeys().find(k => k.id === match[1]);
+  return Boolean(key && timingSafeEqual(
+    Buffer.from(match[3], "hex"), claimSignature(donationId, expiresAt, key.secret),
+  ));
+}
