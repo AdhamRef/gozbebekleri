@@ -25,6 +25,17 @@ function errorResponse(error: string, status: number) {
   });
 }
 
+// A pending/reconciliation state is not a failed charge. Preserve all IDs and
+// give the client an unambiguous, safely retryable status without a new intent.
+function verificationPending(reason: string, status: 409 | 503 = 503) {
+  return NextResponse.json({
+    error: reason,
+    paymentStatus: "PENDING_VERIFICATION",
+    retrySafe: true,
+    createNewPayment: false,
+  }, { status, headers: { ...noStore, "Retry-After": status === 503 ? "5" : "60" } });
+}
+
 /** Search is positive evidence only; an empty Stripe search never proves absence. */
 async function findCreatedIntent(attempt: StripeChargeAttempt): Promise<Stripe.PaymentIntent | null> {
   const results = await stripe.paymentIntents.search({
@@ -67,7 +78,7 @@ async function commitVerifiedIntent(
       },
       data: { providerOrderId: intent.id },
     });
-    return errorResponse("Payment already completed or canceled; await confirmation", 409);
+    return verificationPending("Payment confirmation is being reconciled", 409);
   }
   if (!intent.client_secret) return errorResponse("Stripe intent has no client secret", 409);
   const bound = await prisma.donation.updateMany({
@@ -87,9 +98,9 @@ async function commitVerifiedIntent(
       where: { id: donationId },
       select: { providerOrderId: true, paidAt: true },
     });
-    if (latest?.paidAt != null) return errorResponse("Payment already confirmed", 409);
+    if (latest?.paidAt != null) return verificationPending("Payment confirmation already recorded", 409);
     if (latest?.providerOrderId !== intent.id) {
-      return errorResponse("Payment binding changed during recovery", 409);
+      return verificationPending("Payment binding is under review", 409);
     }
   }
   return NextResponse.json({ clientSecret: intent.client_secret }, { headers: noStore });
@@ -181,14 +192,14 @@ export async function POST(req: NextRequest) {
       });
       if (locked.count !== 1) {
         // Another request won; subsequent retry reads its immutable snapshot.
-        return errorResponse("Payment creation is in progress", 503);
+        return verificationPending("Payment creation is in progress");
       }
       newlyReserved = true;
     }
     if (!snapshot) {
       // Legacy reservation from before recovery support: no trustworthy
       // idempotency timestamp or nonce exists. Never create a new intent.
-      return errorResponse("Legacy payment reservation requires manual review", 409);
+      return verificationPending("Legacy payment reservation requires manual review", 409);
     }
 
     // An eventual-consistency search can recover an intent even after Stripe
@@ -197,7 +208,7 @@ export async function POST(req: NextRequest) {
     const found = newlyReserved ? null : await findCreatedIntent(snapshot);
     if (found) return await commitVerifiedIntent(donationId, snapshot, found);
     if (!mayReplayStripeChargeAttempt(snapshot)) {
-      return errorResponse("Payment attempt expired; manual reconciliation required", 409);
+      return verificationPending("Payment attempt expired; manual reconciliation required", 409);
     }
 
     // Within the conservative retention window only, replay the IDENTICAL
@@ -211,6 +222,6 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("[Stripe Charge] recovery temporarily unavailable", error);
     // Do not delete, replace or expire the immutable reservation on failures.
-    return errorResponse("Payment recovery temporarily unavailable", 503);
+    return verificationPending("Payment recovery temporarily unavailable");
   }
 }
