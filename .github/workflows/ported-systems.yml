@@ -58,3 +58,4 @@ jobs:
           node --conditions=react-server --import tsx scripts/qa-stripe-signed-http-isolated.mjs
           node --conditions=react-server --import tsx scripts/qa-stripe-guest-charge-http-isolated.mjs
           node --conditions=react-server --import tsx scripts/qa-receipt-http-isolated.mjs
+          node --conditions=react-server --import tsx scripts/qa-donation-access-http-isolated.mjs
