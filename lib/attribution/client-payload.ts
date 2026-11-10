@@ -1,6 +1,6 @@
 "use client";
 
-import { DONATION_ATTRIBUTION_KEYS, type DonationAttributionKey } from "./sanitize";
+import { DONATION_ATTRIBUTION_KEYS, safeAttributionUrl, isPaymentReturnPage, type DonationAttributionKey } from "./sanitize";
 import { captureStoredClickIds, clearStoredClickIds } from "@/lib/tracking/click-id-storage";
 
 const PREFIX = "ala_attr_";
@@ -57,7 +57,10 @@ function hasMacro(value: string): boolean {
 }
 
 function setIfClean(key: DonationAttributionKey, value: string | null | undefined, overwrite = true) {
-  const v = value?.trim();
+  const original = value?.trim();
+  const urlFields = new Set(["landing_page", "first_landing_page", "conversion_page", "referrer", "first_referrer"]);
+  const v = urlFields.has(key) ? safeAttributionUrl(original) : original;
+  if (urlFields.has(key) && isPaymentReturnPage(v) && key !== "conversion_page") return;
   if (!v) return;
   if (hasMacro(v)) {
     setCookie(PREFIX + `${key}_unresolved`, "true");
@@ -100,7 +103,9 @@ function persistMetaClickIds(params: URLSearchParams) {
 /** Capture URL params + click IDs into cookies (call once on app load / route change). */
 export function captureAttributionFromUrl(): void {
   if (typeof window === "undefined") return;
-  const params = new URLSearchParams(window.location.search);
+  const returnPage = isPaymentReturnPage(window.location.href);
+  // Ignore synthetic tracking parameters reintroduced by a bank return.
+  const params = new URLSearchParams(returnPage ? "" : window.location.search);
   for (const [key,value] of Array.from(params)) {
     const lower=key.toLowerCase(), canonical=["sccid","sc_click_id"].includes(lower)?"scclid":lower;
     if (!params.has(canonical)) params.set(canonical,value);
@@ -127,12 +132,15 @@ export function captureAttributionFromUrl(): void {
     if (fromUrl) setIfClean(key, fromUrl, true);
   }
 
-  const currentUrl = window.location.href.split("#")[0].slice(0, 2048);
-  setIfClean("first_landing_page", currentUrl, false);
-  setIfClean("landing_page", currentUrl, newTouch);
-  if (document.referrer) {
-    setIfClean("first_referrer", document.referrer.slice(0, 2048), false);
-    setIfClean("referrer", document.referrer.slice(0, 2048), newTouch);
+  const currentUrl = safeAttributionUrl(window.location.href);
+  if (currentUrl && !returnPage) {
+    setIfClean("first_landing_page", currentUrl, false);
+    setIfClean("landing_page", currentUrl, newTouch);
+  }
+  const safeReferrer = safeAttributionUrl(document.referrer);
+  if (safeReferrer && !isPaymentReturnPage(safeReferrer)) {
+    setIfClean("first_referrer", safeReferrer, false);
+    setIfClean("referrer", safeReferrer, newTouch);
   }
 
   const sessionId = getOrCreateSessionId();
@@ -163,11 +171,13 @@ export function getDonationAttributionPayload(): Record<string, string> {
     if (v) out[key] = v;
   }
 
-  const currentUrl = window.location.href.split("#")[0].slice(0, 2048);
-  out.conversion_page = currentUrl;
-  out.landing_page = out.landing_page || currentUrl;
+  const currentUrl = safeAttributionUrl(window.location.href);
+  if (currentUrl) out.conversion_page = currentUrl;
+  if (!out.landing_page && currentUrl && !isPaymentReturnPage(currentUrl)) out.landing_page = currentUrl;
+  if (out.landing_page && isPaymentReturnPage(out.landing_page)) delete out.landing_page;
   out.first_landing_page = out.first_landing_page || out.landing_page;
-  if (document.referrer) out.referrer = out.referrer || document.referrer.slice(0, 2048);
+  const safeReferrer = safeAttributionUrl(document.referrer);
+  if (safeReferrer && !isPaymentReturnPage(safeReferrer)) out.referrer = out.referrer || safeReferrer;
 
   const sessionId = getOrCreateSessionId();
   if (sessionId) out.session_id = out.session_id || sessionId;
