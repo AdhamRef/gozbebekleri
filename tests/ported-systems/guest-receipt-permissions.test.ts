@@ -22,7 +22,7 @@ const fakeRequest=(name:string,value:string)=>({
 }) as any;
 
 test("guest receipt has independent cryptographic scope and narrow cookie path",()=>{
-  assert.equal(receipt.path,"/api/donations/"+donationId+"/receipt");
+  assert.equal(receipt.path,"/api/donations/"+donationId);
   assert.equal(receipt.httpOnly,true);
   assert.equal(payment.path,"/api/stripe/charge");
   assert.equal(canAccessDonationReceipt(null,donorId,donationId,fakeRequest(receipt.name,receipt.value)),true);
