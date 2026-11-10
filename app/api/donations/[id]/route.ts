@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/options';
 import { Prisma, SubscriptionStatus } from '@prisma/client';
 import { userHasDashboardPermission } from '@/lib/dashboard/permissions';
+import { hasGuestReceiptGrant } from '@/lib/donations/guest-payment-grant';
 import { isRevenueDashboardUser } from '@/lib/dashboard/api-auth';
 import { convertAmountInCurrencyToUsd, normalizeDonationCurrencyCode } from '@/lib/exchange/convert-amount-in-currency-to-usd';
 import {
@@ -94,7 +95,24 @@ export async function GET(
     if (!id) {
       return NextResponse.json({ error: 'Donation ID required' }, { status: 400 });
     }
+    if (!/^[0-9a-f]{24}$/i.test(id)) {
+      return NextResponse.json({ error: 'Donation unavailable' }, { status: 404 });
+    }
     const session = await getServerSession(authOptions);
+    const authorizationRow = await prisma.donation.findUnique({
+      where: { id },
+      select: { donorId: true },
+    });
+    const authorized = authorizationRow && (session?.user?.id
+      ? (session.user.id === authorizationRow.donorId ||
+        userHasDashboardPermission(session.user, 'revenue') ||
+        userHasDashboardPermission(session.user, 'donationsEdit'))
+      : hasGuestReceiptGrant(request, id));
+    if (!authorized) {
+      return NextResponse.json({ error: 'Donation unavailable' }, {
+        status: 404, headers: { 'Cache-Control': 'no-store' },
+      });
+    }
 
     // Self-heal: if Stripe already confirmed the payment but the webhook
     // hasn't landed yet (common in dev / with slow webhook delivery), finalize
@@ -165,19 +183,6 @@ export async function GET(
       );
     }
 
-    // Guest donations have no session — the unguessable donation id acts as
-    // the access token (same posture as Stripe checkout session IDs). For
-    // authenticated users, still require ownership or revenue-dashboard
-    // permission to prevent cross-account snooping.
-    if (session) {
-      const canViewAllDonations =
-        userHasDashboardPermission(session.user, 'revenue') ||
-        userHasDashboardPermission(session.user, 'donationsEdit');
-      if (!canViewAllDonations && session.user.id !== donation.donorId) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
-    }
-
     const sub = donation.subscription;
     const response = {
       ...donation,
@@ -191,7 +196,7 @@ export async function GET(
       nextBillingDate: sub?.nextBillingDate ?? null,
       lastBillingDate: sub?.lastBillingDate ?? null,
     };
-    return NextResponse.json(response);
+    return NextResponse.json(response, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     console.error('Error fetching donation:', error);
     return NextResponse.json(
