@@ -1,4 +1,5 @@
 import { hasConfirmedDonationPayment } from '@/lib/donations/receipt-state';
+import { hasGuestReceiptGrant } from '@/lib/donations/guest-payment-grant';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
@@ -247,16 +248,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Donation not found' }, { status: 404 });
     }
 
-    // Guest donations have no session — the unguessable donation id acts as
-    // the access token. For authenticated users, keep ownership/revenue-admin
-    // enforcement to prevent cross-account receipt access.
-    if (session) {
-      const canViewReceipt =
-        userHasDashboardPermission(session.user, 'revenue') ||
-        session.user.id === donationRow.donorId;
-      if (!canViewReceipt) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
+    // Do not treat a public donation ObjectId as an authorization token.
+    // Guest receipt access requires the independently signed HttpOnly grant
+    // created with the donor's original checkout. Dashboard privileges or
+    // ownership authorize an authenticated caller.
+    const canViewReceipt = session?.user?.id
+      ? (userHasDashboardPermission(session.user, 'revenue') ||
+         session.user.id === donationRow.donorId)
+      : hasGuestReceiptGrant(request, id);
+    if (!canViewReceipt) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     if (!hasConfirmedDonationPayment(donationRow)) {
