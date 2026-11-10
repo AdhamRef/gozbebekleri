@@ -10,7 +10,14 @@ Vercel operator needs access to the correct Gözbebekleri team with
 **permission to create projects**, configure project Git integration,
 manage project environment variables/secrets, protect deployments,
 read build logs and trigger **Preview/custom QA** deployments.
-These are project/team admin or equivalent scoped management privileges.
+The minimum to provision a new project is the Vercel **Create Project**
+permission (included for Owner/Member, available as an extended permission
+for Developer/Contributor depending on team plan). Environment Variable
+Manager and Deployment Protection Manager are also required for the
+appropriate QA configuration; add Environment Manager for a custom QA
+environment. These permissions must be limited to QA duties where the
+Vercel plan supports the corresponding scopes. Never grant Production
+deployment/promotion/rollback simply to run tests.
 Grant *no* production deploy/promotion/rollback permission to the QA test
 operator. The existing tool credential received HTTP 403 for project
 creation; request a project-creation-capable team role from the account owner,
@@ -99,13 +106,18 @@ mongodump --config="${GOZ_QA_SOURCE_TOOLS_CONFIG}" \
 # --drop only affects the separately approved empty QA restore destination.
 mongorestore --config="${GOZ_QA_TARGET_TOOLS_CONFIG}" \
   --archive="${GOZ_QA_ARCHIVE}" --gzip \
-  --nsFrom="${GOZ_QA_SOURCE_DB}.*" --nsTo="${GOZ_QA_RESTORE_DB}.*" --drop
+  --nsFrom="${GOZ_QA_SOURCE_DB}.*" --nsTo="${GOZ_QA_RESTORE_DB}.*" --drop --stopOnError
 
 # This verifier is READ-ONLY. It compares source and restored QA:
 # counts, stable financial digests, donation allocations, subscription
 # references, duplicate Stripe references and unique ledger ID indexes.
 node scripts/qa/verify-operational-restore.mjs
 ```
+
+Quiesce all writes to the isolated QA source during the dump, or arrange a
+consistent provider-supported backup snapshot. `mongodump --db` alone
+must not be presented as a transactionally consistent snapshot of a
+database receiving concurrent writes.
 
 After restoring, independently replay signed TEST Webhooks on the **restore
 clone only**, assert idempotency and rollback on write conflicts, then
