@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canIssueGuestPaymentGrant, issueGuestPaymentGrant, issueGuestReceiptGrant } from "@/lib/donations/guest-payment-grant";
+import { canIssueGuestPaymentGrant, issueGuestPaymentGrant, issueGuestReceiptGrant, issueGuestClaimGrant } from "@/lib/donations/guest-payment-grant";
 import { prisma } from "@/lib/prisma";
 import { isValidLocale } from "@/lib/locales";
 import { getServerSession } from "next-auth";
@@ -434,6 +434,7 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) {
       issueGuestPaymentGrant(response, donation.id);
       issueGuestReceiptGrant(response, donation.id);
+      issueGuestClaimGrant(response, donation.id);
     }
     return response;
   } catch (error) {
