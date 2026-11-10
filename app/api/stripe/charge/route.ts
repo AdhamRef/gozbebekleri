@@ -90,10 +90,11 @@ export async function POST(req: NextRequest) {
     const locked = await prisma.donation.updateMany({
       where: {
         AND: [
-          { id: donationId, donorId: donation.donorId, status: "PAID", subscriptionId: null },
+          { id: donationId, donorId: donation.donorId, status: "PAID" },
+          donationFieldEmpty("subscriptionId"),
           donationFieldEmpty("paidAt"),
           donationFieldEmpty("providerOrderId"),
-          { OR: [{ provider: null }, { provider: "STRIPE" }] },
+          { OR: [{ provider: null }, { provider: { isSet: false } }, { provider: "STRIPE" }] },
         ],
       },
       data: { provider: "STRIPE", providerOrderId: reservation, locale },
