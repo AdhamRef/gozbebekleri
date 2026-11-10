@@ -1,7 +1,7 @@
 name: Transferred systems verification
 on:
   push:
-    branches: [port/minber-systems-20261104, integration/unified-systems-20261107, integration/goz-finance-security-rc-20261109, fix/goz-stripe-qa-react-server-20261109]
+    branches: [port/minber-systems-20261104, integration/unified-systems-20261107, integration/goz-finance-security-rc-20261109, fix/goz-stripe-qa-react-server-20261109, fix/goz-guest-charge-binding-signed-http-20261110]
   pull_request:
     branches: [main, integration/unified-systems-20261107, fix/goz-report-profile-settlement-20261108, audit/goz-parity-finance-20261109, audit/goz-round2-idempotency-locale-20261109, integration/goz-finance-security-rc-20261109]
   workflow_dispatch:
