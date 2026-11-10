@@ -46,10 +46,10 @@ test("both signed one-time webhook paths use the financial settlement guard", ()
   assert.match(checkout, /stripeOneTimePaymentMatchesDonation\(donation,\s*\{/);
   assert.match(checkout, /amountMinor:\s*session\.amount_total/);
   assert.match(checkout, /currency:\s*session\.currency/);
-  assert.match(intent, /stripeOneTimePaymentMatchesDonation\(donation,\s*\{/);
-  assert.match(intent, /amountMinor:\s*intent\.amount_received/);
-  assert.match(intent, /currency:\s*intent\.currency/);
-  assert.match(intent, /intent\.status !== "succeeded"/);
+  assert.match(intent, /stripeOneTimeIntentCanSettle\(donation, intent\)/);
+  assert.match(intent, /stripeOneTimeIntentCanSettle/);
+  assert.match(intent, /providerOrderId: intent\.id/);
+  assert.match(intent, /stripeOneTimeIntentCanSettle/);
   assert.match(intent, /providerOrderId\?\.startsWith\("cs_"\)/);
   assert.match(intent, /donation\.subscriptionId \|\|/);
 });
