@@ -14,6 +14,7 @@ const aliases=new Map([
  ["@/lib/exchange/convert-amount-in-currency-to-usd","exchange.cjs"],
  ["@/lib/audit-log","audit.cjs"],["@/lib/campaign/current-amount","amount.cjs"],
  ["stripe","stripe.cjs"],["next/server","next.cjs"],
+ ["@/lib/events/dispatch","events.cjs"],
 ]);
 const modules={
  "auth.cjs":'exports.getServerSession=async()=>globalThis.fixture.session;',
@@ -25,6 +26,7 @@ const modules={
  "audit.cjs":'exports.writeAuditLog=async()=>{};exports.auditActorFromDashboardSession=()=>({actorRole:"ADMIN"});exports.auditActorFromSiteSession=()=>({actorRole:"DONOR"});exports.auditStreamForRole=()=>("TEAM");',
  "amount.cjs":'exports.recomputeCampaignCurrentAmount=async()=>{};exports.recomputeCategoryCurrentAmount=async()=>{};',
  "stripe.cjs":'module.exports=class Stripe{constructor(){this.paymentIntents={retrieve:async()=>{throw Error("Unexpected Stripe call")}}}};',
+ "events.cjs":'exports.dispatchDonationPaid=async()=>{};',
  "next.cjs":'exports.NextResponse={json:(data,options={})=>Response.json(data,options)};exports.after=()=>{};',
 };
 for(const [file,source] of Object.entries(modules))writeFileSync(resolve(dir,file),source);
