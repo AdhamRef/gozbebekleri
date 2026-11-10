@@ -21,7 +21,21 @@ export function qaEnvironmentProblems(env = process.env) {
 
   if (env.GOZ_QA_ISOLATION_APPROVED !== "yes") errors.push("QA_APPROVAL_REQUIRED");
   if (env.GOZ_QA_DB_IDENTITY_VERIFIED !== "yes") errors.push("DB_IDENTITY_APPROVAL_REQUIRED");
-  if (env.NODE_ENV === "production" || env.VERCEL_ENV === "production") errors.push("PRODUCTION_RUNTIME_FORBIDDEN");
+  // Next.js intentionally sets NODE_ENV=production for *both* QA and
+  // production optimized builds. VERCEL_ENV / immutable deployment project
+  // identity must determine the hosted environment boundary instead.
+  if (env.VERCEL_ENV === "production") errors.push("PRODUCTION_RUNTIME_FORBIDDEN");
+  const productionProjectId = "prj_hkMyu8iABc7AAqF7T1DvYRpKYRqV";
+  if (env.VERCEL_PROJECT_ID === productionProjectId) errors.push("SHARED_PRODUCTION_VERCEL_PROJECT_FORBIDDEN");
+  if (env.VERCEL === "1" && !env.VERCEL_PROJECT_ID) errors.push("VERCEL_PROJECT_ID_REQUIRED");
+  if (env.VERCEL === "1" && env.VERCEL_ENV !== "preview" && !env.VERCEL_TARGET_ENV) {
+    errors.push("QA_PREVIEW_OR_CUSTOM_ENV_REQUIRED");
+  }
+  // Environment-variable approvals and database names are self-declarations,
+  // NOT evidence that database identity/network policy is independent.
+  // Operators must validate the actual provider project, cluster identity,
+  // DNS and non-production Stripe account outside this preflight.
+
   if (env.DATABASE_URL_MAIN) errors.push("DATABASE_URL_MAIN_INHERITED");
   if (env.STRIPE_SECRET_KEY && !env.STRIPE_SECRET_KEY.startsWith("sk_test_")) errors.push("STRIPE_LIVE_CREDENTIAL_FORBIDDEN");
   if (env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY && !env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.startsWith("pk_test_")) errors.push("STRIPE_TEST_PUBLISHABLE_KEY_REQUIRED");
