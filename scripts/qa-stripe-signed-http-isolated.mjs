@@ -330,5 +330,46 @@ assert.equal(claims.reduce((sum,x)=>sum+x.count,0),1);
 assert.equal((await db.collection("Donation").findOne({_id:casDonation})).providerOrderId,reserve);
 pass("isolated MongoDB CAS permits exactly one concurrent payment-reference reservation");
 
+
+const reservedOne=await oneTimeRow("goz_charge_reserved_"+new ObjectId().toHexString());
+// The reservation has to incorporate its own donated record ID.
+const reservedRef="goz_charge_reserved_"+reservedOne.toHexString();
+await db.collection("Donation").updateOne({_id:reservedOne},{$set:{providerOrderId:reservedRef}});
+const attemptNonce="22222222-2222-4222-8222-222222222222";
+await db.collection("Donation").updateOne({_id:reservedOne},{$set:{stripeChargeAttempt:{
+ version:1,attemptId:attemptNonce,donationId:reservedOne.toHexString(),
+ donorId:donor.toHexString(),startedAt:Date.now()-26*3600_000,
+ amountMinor:2500,currency:"usd",description:"Signed one-time fixture",
+}}});
+const reservedSuccess={
+ id:"pi_reserved_verified",object:"payment_intent",status:"succeeded",
+ amount:2500,amount_received:2500,currency:"usd",
+ metadata:{donationId:reservedOne.toHexString(),userId:donor.toHexString(),chargeAttemptId:attemptNonce},
+};
+const priorReserved=await oneBalance();
+const spoofed={...reservedSuccess,metadata:{...reservedSuccess.metadata,chargeAttemptId:"33333333-3333-4333-8333-333333333333"}};
+assert.equal((await send(evt("payment_intent.succeeded",spoofed))).status,500);
+assert.equal((await db.collection("Donation").findOne({_id:reservedOne})).providerOrderId,reservedRef);
+assert.deepEqual(await oneBalance(),priorReserved);
+pass("signed reserved attempt rejects incorrect provider nonce and credits nothing");
+const competingBind=prisma.donation.updateMany({where:{AND:[
+ {id:reservedOne.toHexString(),provider:"STRIPE",providerOrderId:reservedRef},
+ donationFieldEmpty("paidAt"),
+]},data:{providerOrderId:reservedSuccess.id}});
+const signedDuringRecovery=send(evt("payment_intent.succeeded",reservedSuccess));
+const simultaneous=await Promise.all([competingBind,signedDuringRecovery]);
+assert.equal(simultaneous[1].status,200,simultaneous[1].body);
+const verifiedPaid=await db.collection("Donation").findOne({_id:reservedOne});
+assert.equal(verifiedPaid.providerOrderId,reservedSuccess.id);
+assert.ok(verifiedPaid.paidAt);
+assert.deepEqual(await oneBalance(),[priorReserved[0]+25,priorReserved[1]+25]);
+pass("real MongoDB webhook/recovery race settles original reservation exactly once");
+const afterReserved=await oneBalance();
+const sameEvent=evt("payment_intent.succeeded",reservedSuccess);
+const redundant=await Promise.all([send(sameEvent),send({...sameEvent,id:"evt_reserved_replay"})]);
+assert.ok(redundant.every(x=>x.status===200),JSON.stringify(redundant));
+assert.deepEqual(await oneBalance(),afterReserved);
+pass("replayed signed success after recovery cannot double-count project or category");
+
 console.log(JSON.stringify({summary:"SIGNED_HTTP_REFUNDS_PASS",passed,refund:"PASS",database:"isolated MongoDB",stripeCalls:0}));
 }finally{if(server)await new Promise(ok=>server.close(ok));await prisma.$disconnect();await mongo.close();await repl.stop();rmSync(dir,{recursive:true,force:true})}
