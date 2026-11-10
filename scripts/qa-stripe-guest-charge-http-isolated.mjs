@@ -190,7 +190,10 @@ try{
   stored.providerOrderId="goz_charge_reserved_"+donationId;
   stored.stripeChargeAttempt.startedAt=Date.now()-25*60*60*1000;
   stripeSearch=[];
-  assert.equal((await call(donationId,guestToken)).status,409);
+  const expired=await call(donationId,guestToken);
+  assert.equal(expired.status,409);
+  assert.equal(expired.body.paymentStatus,"PENDING_VERIFICATION");
+  assert.equal(expired.body.createNewPayment,false);
   assert.equal(creates,initialCreates);pass("expired idempotency key with search miss fails closed");
   stripeSearch=[lastCreated];
   assert.equal((await call(donationId,guestToken)).status,200);
@@ -199,7 +202,10 @@ try{
   // Retry after a timeout BEFORE the provider created an object.
   stored=row();lastKey=null;lastCreated=null;stripeSearch=[];failBeforeStripe=true;
   const countBeforeTimeout=actualStripeCreates;
-  assert.equal((await call(donationId,guestToken)).status,503);
+  const timedOut=await call(donationId,guestToken);
+  assert.equal(timedOut.status,503);
+  assert.equal(timedOut.body.paymentStatus,"PENDING_VERIFICATION");
+  assert.equal(timedOut.body.createNewPayment,false);
   const timeoutSnapshot=structuredClone(stored.stripeChargeAttempt);
   assert.equal(stored.providerOrderId,"goz_charge_reserved_"+donationId);
   assert.equal(actualStripeCreates,countBeforeTimeout);
