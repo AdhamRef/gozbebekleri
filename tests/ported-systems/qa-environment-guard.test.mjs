@@ -49,8 +49,9 @@ test("QA boundary rejects missing test-mode and unique signing key requirements"
 });
 
 test("Next production build is valid in isolated QA; Vercel target and project identity determine production",()=>{
- const qa={...isolated(),NODE_ENV:"production",VERCEL:"1",VERCEL_ENV:"preview",VERCEL_PROJECT_ID:"prj_qa_separately_owned_fixture"};
+ const qa={...isolated(),NODE_ENV:"production",VERCEL:"1",VERCEL_ENV:"preview",VERCEL_PROJECT_ID:"prj_qa_separately_owned_fixture",GOZ_QA_LOCAL_ONLY:"no",GOZ_QA_EXPECTED_MONGO_HOST:"mongo-qa.example.invalid",DATABASE_URL:"mongodb+srv://mongo-qa.example.invalid/goz_qa_fixture",NEXTAUTH_URL:"https://qa.example.invalid"};
  assert.deepEqual(qaEnvironmentProblems(qa),[]);
+ assert.equal(qaEnvironmentProblems({...qa,GOZ_QA_LOCAL_ONLY:"yes"}).includes("LOCAL_QA_MODE_FORBIDDEN_ON_HOSTED_ENV"),true);
  assert.equal(qaEnvironmentProblems({...qa,VERCEL_PROJECT_ID:"prj_hkMyu8iABc7AAqF7T1DvYRpKYRqV"}).includes("SHARED_PRODUCTION_VERCEL_PROJECT_FORBIDDEN"),true);
  assert.equal(qaEnvironmentProblems({...qa,VERCEL_ENV:"production"}).includes("PRODUCTION_RUNTIME_FORBIDDEN"),true);
  assert.equal(qaEnvironmentProblems({...qa,VERCEL_PROJECT_ID:""}).includes("VERCEL_PROJECT_ID_REQUIRED"),true);
