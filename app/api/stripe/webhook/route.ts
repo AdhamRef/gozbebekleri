@@ -550,7 +550,7 @@ export async function POST(req: NextRequest) {
           // Stripe Checkout also emits payment_intent.succeeded. That payment
           // belongs to its Checkout Session (cs_), not this direct-Intent path.
           // A signed unrelated payment must never settle another donation.
-          if (donation.providerOrderId?.startsWith("cs_")) return false;
+          if (donation.subscriptionId || donation.providerOrderId?.startsWith("cs_")) return false;
           if (intent.status !== "succeeded" || !stripeOneTimePaymentMatchesDonation(donation, {
             id: intent.id,
             amountMinor: intent.amount_received,
