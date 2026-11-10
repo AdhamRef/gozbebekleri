@@ -13,7 +13,11 @@ test('a missing or failed donation never becomes a paid receipt because its subs
   assert.equal(hasConfirmedDonationPayment(null),false);
   assert.equal(hasConfirmedDonationPayment({status:'FAILED'}),false);
   assert.equal(hasConfirmedDonationPayment({status:'ACTIVE'}),false);
-  assert.equal(hasConfirmedDonationPayment({status:'PAID'}),true);
+  assert.equal(hasConfirmedDonationPayment({status:'PAID'}),false);
+  assert.equal(hasConfirmedDonationPayment({status:'PAID',paidAt:null}),false);
+  assert.equal(hasConfirmedDonationPayment({status:'PAID',paidAt:new Date('2026-11-10T08:00:00Z')}),true);
+  assert.equal(hasConfirmedDonationPayment({status:'PAID',paidAt:'2026-11-10T08:00:00.000Z'}),true);
+  assert.equal(hasConfirmedDonationPayment({status:'FAILED',paidAt:new Date()}),false);
 });
 
 test('all literal UI translation references exist and preserve Arabic ICU arguments', () => {
