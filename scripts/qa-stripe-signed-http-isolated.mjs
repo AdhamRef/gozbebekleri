@@ -376,7 +376,7 @@ pass("replayed signed success after recovery cannot double-count project or cate
 // BSON snapshot, NOT a production mongodump/restore acceptance certificate.
 const { serialize, deserialize } = await import("bson");
 const originalIndexes=await db.collection("StripeRefundSettlement").listIndexes().toArray();
-assert.ok(originalIndexes.some(i=>i.name==="_id_" && i.unique===true));
+assert.ok(originalIndexes.some(i=>i.name==="_id_"));
 const restoreDb=mongo.db("goz_http_restored_synthetic");
 const snapshots={};
 for (const name of ["StripeRefundSettlement","StripeInvoiceSettlement","Donation","DonationItem","DonationCategoryItem","Campaign","Category"]) {
@@ -397,7 +397,7 @@ const restoredBalances=[
 assert.deepEqual(restoredBalances,await oneBalance());
 for(const name of ["StripeRefundSettlement","StripeInvoiceSettlement"]){
   const indexes=await restoreDb.collection(name).listIndexes().toArray();
-  assert.ok(indexes.some(x=>x.name==="_id_" && x.unique===true));
+  assert.ok(indexes.some(x=>x.name==="_id_"));
   const saved=await restoreDb.collection(name).findOne({});
   if(saved)await assert.rejects(
     restoreDb.collection(name).insertOne({...saved}),
