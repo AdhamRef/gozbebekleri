@@ -269,8 +269,11 @@ const DonationSuccessPage = () => {
     // Guest-safe donation summaries intentionally hide the linked user's ID.
     // The separate signed original-browser claim cookie proves eligibility;
     // never require a donor ID in browser-visible JSON to attempt linking.
-    if (!donation?.id) return;
-    if (donation.donor?.id && session?.user?.id === donation.donor.id) return;
+    // OAuth redirects can restore the page after the user has authenticated,
+    // before the donation summary is accessible to that new account.
+    // The original-browser signed claim cookie is verified on the server;
+    // do not depend on a donor ID or prior unauthenticated summary response.
+    if (donation?.donor?.id && session?.user?.id === donation.donor.id) return;
 
     linkAttemptedRef.current = true;
     setLinkState('linking');
@@ -284,7 +287,11 @@ const DonationSuccessPage = () => {
         const reason = err?.response?.data?.error;
         // Donor was already a real account (e.g. matched by email) — nothing
         // to merge, just hide the banner.
-        if (reason === 'GUEST_NOT_ELIGIBLE') {
+        if (reason === 'Claim authorization required') {
+          // A signed-in donor visiting a public URL without a valid original-
+          // browser claim proof must not take ownership or see donor details.
+          setLinkState('failed');
+        } else if (reason === 'GUEST_NOT_ELIGIBLE') {
           setLinkState('linked');
         } else {
           console.error('[link-guest]', err);
