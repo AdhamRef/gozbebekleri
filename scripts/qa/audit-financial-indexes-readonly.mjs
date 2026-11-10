@@ -1,5 +1,6 @@
 import { MongoClient } from "mongodb";
 import { assertQaEnvironment } from "./qa-environment-guard.mjs";
+import { countDuplicateStripeReferences, matchingUniqueIndex } from "./financial-index-audit-core.mjs";
 
 /**
  * Read-only QA index and duplicate-ref audit. NO createIndex, migration, repair
@@ -31,22 +32,12 @@ try {
       result.push({collection:spec.collection,index:"missing collection",status:"BLOCKED"});blockers++;continue;
     }
     const indexes=await db.collection(spec.collection).listIndexes().toArray();
-    const found=indexes.find(i=>JSON.stringify(i.key)===JSON.stringify(spec.key));
-    const valid=Boolean(found &&
-      (found.unique===true || spec.key._id===1) &&
-      (!spec.partial || (found.partialFilterExpression?.provider==="STRIPE" &&
-         found.partialFilterExpression?.providerOrderId?.$type==="string")));
+    const valid=matchingUniqueIndex(indexes,spec.key,{partial:Boolean(spec.partial)});
     result.push({collection:spec.collection,index:Object.keys(spec.key).join("+"),status:valid?"PASS":"BLOCKED"});
     if(!valid)blockers++;
   }
   if(actualNames.has("Donation")){
-    const duplicates=await db.collection("Donation").aggregate([
-      {$match:{provider:"STRIPE",providerOrderId:{$type:"string"}}},
-      {$group:{_id:{provider:"$provider",reference:"$providerOrderId"},n:{$sum:1}}},
-      {$match:{n:{$gt:1}}},
-      {$count:"duplicateReferences"},
-    ]).toArray();
-    const duplicateCount=duplicates[0]?.duplicateReferences||0;
+    const duplicateCount=await countDuplicateStripeReferences(db.collection("Donation"));
     result.push({collection:"Donation",check:"duplicate Stripe refs",status:duplicateCount===0?"PASS":"BLOCKED",duplicateGroups:duplicateCount});
     if(duplicateCount)blockers++;
   }
