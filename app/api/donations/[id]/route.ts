@@ -1,4 +1,3 @@
-import { after } from "next/server";
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from 'next-auth';
@@ -6,7 +5,6 @@ import { authOptions } from '../../auth/[...nextauth]/options';
 import { Prisma, SubscriptionStatus } from '@prisma/client';
 import { userHasDashboardPermission } from '@/lib/dashboard/permissions';
 import { hasGuestReceiptGrant } from '@/lib/donations/guest-payment-grant';
-import { stripeOneTimeIntentCanSettle } from "@/lib/donations/stripe-charge-attempt";
 import { isRevenueDashboardUser } from '@/lib/dashboard/api-auth';
 import { convertAmountInCurrencyToUsd, normalizeDonationCurrencyCode } from '@/lib/exchange/convert-amount-in-currency-to-usd';
 import {
@@ -15,78 +13,10 @@ import {
   auditActorFromSiteSession,
   auditStreamForRole,
 } from '@/lib/audit-log';
-import Stripe from 'stripe';
-import { dispatchDonationPaid } from "@/lib/events/dispatch";
 import {
   recomputeCampaignCurrentAmount as sharedRecomputeCampaign,
   recomputeCategoryCurrentAmount as sharedRecomputeCategory,
 } from "@/lib/campaign/current-amount";
-
-const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-03-25.dahlia' })
-  : null;
-
-/**
- * Self-heal donations whose webhook never landed: if Stripe already has the
- * PaymentIntent marked succeeded, set paidAt and increment campaign/category
- * totals. Idempotent — a paidAt guard inside the transaction prevents double
- * increments if the webhook arrives between the Stripe lookup and the update.
- */
-async function reconcileStripeDonation(donationId: string) {
-  if (!stripe) return;
-  const row = await prisma.donation.findUnique({
-    where: { id: donationId },
-    select: { id: true, donorId: true, provider: true, providerOrderId: true, paidAt: true, totalAmount: true, currency: true, subscriptionId: true, stripeChargeAttempt: true },
-  });
-  if (!row || row.paidAt || row.provider !== 'STRIPE' || !row.providerOrderId) return;
-  if (!row.providerOrderId.startsWith('pi_')) return;
-
-  let intent: Stripe.PaymentIntent;
-  try {
-    intent = await stripe.paymentIntents.retrieve(row.providerOrderId);
-  } catch (err) {
-    console.error('[donation reconcile] Stripe retrieve failed:', err);
-    return;
-  }
-  // A browser GET must never bypass the signed Webhook's immutable
-  // amount/currency/nonce/reference settlement checks.
-  if (!stripeOneTimeIntentCanSettle(row, intent)) return;
-
-  try {
-    await prisma.$transaction(async (tx) => {
-      const fresh = await tx.donation.findUnique({
-        where: { id: donationId },
-        include: { items: true, categoryItems: true },
-      });
-      if (!fresh || fresh.paidAt || fresh.providerOrderId !== intent.id) return;
-
-      await tx.donation.update({
-        where: { id: donationId },
-        data: {
-          status: 'PAID',
-          paidAt: new Date(),
-          providerAuthCode: intent.id,
-          providerTxnResult: 'Success',
-        },
-      });
-      for (const item of fresh.items) {
-        await tx.campaign.update({
-          where: { id: item.campaignId },
-          data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
-        });
-      }
-      for (const item of fresh.categoryItems) {
-        await tx.category.update({
-          where: { id: item.categoryId },
-          data: { currentAmount: { increment: item.amountUSD ?? item.amount } },
-        });
-      }
-    });
-    after(() => dispatchDonationPaid(donationId));
-  } catch (err) {
-    console.error('[donation reconcile] Finalize failed:', err);
-  }
-}
 
 // GET /api/donations/[id] - Get donation (transaction) by ID; include type/status from subscription when applicable
 export async function GET(
