@@ -371,5 +371,41 @@ assert.ok(redundant.every(x=>x.status===200),JSON.stringify(redundant));
 assert.deepEqual(await oneBalance(),afterReserved);
 pass("replayed signed success after recovery cannot double-count project or category");
 
+
+// Isolated logical backup -> fresh database restore drill. This is a synthetic
+// BSON snapshot, NOT a production mongodump/restore acceptance certificate.
+const { serialize, deserialize } = await import("bson");
+const originalIndexes=await db.collection("StripeRefundSettlement").listIndexes().toArray();
+assert.ok(originalIndexes.some(i=>i.name==="_id_" && i.unique===true));
+const restoreDb=mongo.db("goz_http_restored_synthetic");
+const snapshots={};
+for (const name of ["StripeRefundSettlement","StripeInvoiceSettlement","Donation","DonationItem","DonationCategoryItem","Campaign","Category"]) {
+  const rows=await db.collection(name).find({}).toArray();
+  snapshots[name]=serialize({rows});
+  await restoreDb.createCollection(name);
+  const restored=deserialize(snapshots[name]).rows;
+  if (restored.length) await restoreDb.collection(name).insertMany(restored);
+  assert.equal(await restoreDb.collection(name).countDocuments({}),rows.length,"restored count "+name);
+}
+const restoredPaid=await restoreDb.collection("Donation").findOne({_id:reservedOne});
+assert.equal(restoredPaid?.providerOrderId,reservedSuccess.id);
+assert.ok(restoredPaid?.paidAt);
+const restoredBalances=[
+  (await restoreDb.collection("Campaign").findOne({_id:oneCampaign})).currentAmount,
+  (await restoreDb.collection("Category").findOne({_id:oneCategory})).currentAmount,
+];
+assert.deepEqual(restoredBalances,await oneBalance());
+for(const name of ["StripeRefundSettlement","StripeInvoiceSettlement"]){
+  const indexes=await restoreDb.collection(name).listIndexes().toArray();
+  assert.ok(indexes.some(x=>x.name==="_id_" && x.unique===true));
+  const saved=await restoreDb.collection(name).findOne({});
+  if(saved)await assert.rejects(
+    restoreDb.collection(name).insertOne({...saved}),
+    e=>e?.code===11000,
+    name+" duplicate _id must be rejected after restore"
+  );
+}
+pass("synthetic BSON snapshot restored in a separate isolated database, totals and unique ledger keys verified");
+
 console.log(JSON.stringify({summary:"SIGNED_HTTP_REFUNDS_PASS",passed,refund:"PASS",database:"isolated MongoDB",stripeCalls:0}));
 }finally{if(server)await new Promise(ok=>server.close(ok));await prisma.$disconnect();await mongo.close();await repl.stop();rmSync(dir,{recursive:true,force:true})}
