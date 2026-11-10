@@ -103,7 +103,7 @@ let receiptToken=null;
 issueGuestReceiptGrant({cookies:{set:({name,value,httpOnly,path,maxAge})=>{
   assert.equal(name,guestReceiptCookieName(donationId));
   assert.equal(httpOnly,true);
-  assert.equal(path,"/api/donations/"+donationId+"/receipt");
+  assert.equal(path,"/api/donations/"+donationId);
   assert.equal(maxAge,24*60*60);
   receiptToken=value;
 }}},donationId);
