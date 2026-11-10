@@ -92,13 +92,6 @@ export async function POST(req: NextRequest) {
             // Idempotency: the row is created with status=PAID by /api/stripe/intent
             // before Stripe confirms payment, so we key off paidAt (only set here).
             if (!donation || donation.paidAt != null) return false;
-          if (intent.status !== "succeeded" || !stripeOneTimePaymentMatchesDonation(donation, {
-            id: intent.id,
-            amountMinor: intent.amount_received,
-            currency: intent.currency,
-          })) {
-            throw new Error("Stripe PaymentIntent settlement does not match original donation");
-          }
             if (!stripeOneTimePaymentMatchesDonation(donation, {
               id: session.id,
               amountMinor: session.amount_total,
@@ -554,6 +547,13 @@ export async function POST(req: NextRequest) {
           // Idempotency: the row is created with status=PAID by /api/stripe/intent
           // before Stripe confirms payment, so we key off paidAt (only set here).
           if (!donation || donation.paidAt != null) return false;
+          if (intent.status !== "succeeded" || !stripeOneTimePaymentMatchesDonation(donation, {
+            id: intent.id,
+            amountMinor: intent.amount_received,
+            currency: intent.currency,
+          })) {
+            throw new Error("Stripe PaymentIntent settlement does not match original donation");
+          }
 
           await tx.donation.update({
             where: { id: donationId },
