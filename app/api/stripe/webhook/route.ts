@@ -547,6 +547,10 @@ export async function POST(req: NextRequest) {
           // Idempotency: the row is created with status=PAID by /api/stripe/intent
           // before Stripe confirms payment, so we key off paidAt (only set here).
           if (!donation || donation.paidAt != null) return false;
+          // Stripe Checkout also emits payment_intent.succeeded. That payment
+          // belongs to its Checkout Session (cs_), not this direct-Intent path.
+          // A signed unrelated payment must never settle another donation.
+          if (donation.providerOrderId?.startsWith("cs_")) return false;
           if (intent.status !== "succeeded" || !stripeOneTimePaymentMatchesDonation(donation, {
             id: intent.id,
             amountMinor: intent.amount_received,
