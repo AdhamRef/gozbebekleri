@@ -1,10 +1,10 @@
 import { hasConfirmedDonationPayment } from '@/lib/donations/receipt-state';
-import { hasGuestReceiptGrant } from '@/lib/donations/guest-payment-grant';
+import { canAccessDonationReceipt } from '@/lib/donations/receipt-access';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
-import { userHasDashboardPermission } from '@/lib/dashboard/permissions';
+
 import jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import type { Locale } from 'date-fns';
@@ -252,10 +252,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // Guest receipt access requires the independently signed HttpOnly grant
     // created with the donor's original checkout. Dashboard privileges or
     // ownership authorize an authenticated caller.
-    const canViewReceipt = session?.user?.id
-      ? (userHasDashboardPermission(session.user, 'revenue') ||
-         session.user.id === donationRow.donorId)
-      : hasGuestReceiptGrant(request, id);
+    const canViewReceipt = canAccessDonationReceipt(
+      session?.user, donationRow.donorId, id, request
+    );
     if (!canViewReceipt) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
