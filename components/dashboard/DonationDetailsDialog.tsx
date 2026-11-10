@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import { safeAttributionUrl, safeAcquisitionLandingPage, isPaymentReturnPage } from "@/lib/attribution/sanitize";
 import {
   detectDonationSource,
   PLATFORM_LABEL_AR,
@@ -100,7 +101,10 @@ const ATTRIBUTION_FIELDS: FieldDef[] = [
   { key: "language", label: "اللغة", Icon: Languages },
   { key: "device", label: "الجهاز", Icon: Laptop },
   { key: "platform", label: "المنصة", Icon: MonitorSmartphone },
-  { key: "landing_page", label: "صفحة الهبوط", Icon: Link2, span: 2, ltr: true },
+  { key: "landing_page", label: "صفحة الهبوط الإعلانية", Icon: Link2, span: 2, ltr: true },
+  { key: "first_landing_page", label: "صفحة الدخول الأولى", Icon: Link2, span: 2, ltr: true },
+  { key: "conversion_page", label: "صفحة إتمام التبرع", Icon: Link2, span: 2, ltr: true },
+  { key: "first_referrer", label: "المُحيل الأول", Icon: CornerDownLeft, span: 2, ltr: true },
   { key: "referrer", label: "المُحيل", Icon: CornerDownLeft, span: 2, ltr: true },
   { key: "user_agent", label: "متصفح الزائر", Icon: Laptop, span: 2, ltr: true },
   { key: "client_ip", label: "عنوان IP", Icon: Network, ltr: true },
@@ -209,7 +213,7 @@ function SourceSummary({ donation }: { donation: DonationDetailsTarget }) {
           <span className="text-sm font-semibold">{PLATFORM_LABEL_AR[result.platform]}</span>
           <span className="text-[11px] opacity-70">— {STATUS_LABEL_AR[result.status]}</span>
         </div>
-        <div className="text-[11px] font-medium opacity-80">الثقة {result.confidence}%</div>
+        <div className="text-[11px] font-medium opacity-80">اكتمال بيانات التتبع {result.confidence}% (ليس احتمال إعلان مدفوع)</div>
       </div>
       {result.reasons.length > 0 && (
         <ul className="text-[11px] leading-relaxed space-y-0.5 opacity-90">
@@ -229,23 +233,34 @@ function AttributionView({ donation }: { donation: DonationDetailsTarget }) {
     const entries: Array<{ def: FieldDef; value: string }> = [];
     const seen = new Set<string>();
 
-    // Known fields first, in defined order
+    const urlKeys = new Set(["landing_page", "first_landing_page", "conversion_page", "referrer", "first_referrer", "ga_landing_page", "ga_referrer"]);
+    const acquisition = safeAcquisitionLandingPage(attr);
+    // Never display or copy the private receipt token in a historical URL.
     for (const def of ATTRIBUTION_FIELDS) {
       const raw = attr[def.key];
       if (raw == null || raw === "") continue;
-      const value = String(raw);
+      const value = def.key === "landing_page" ? acquisition
+        : urlKeys.has(def.key) ? safeAttributionUrl(String(raw)) : String(raw);
+      if (!value) continue;
       entries.push({ def, value });
       seen.add(def.key);
+    }
+    if (!seen.has("conversion_page") && isPaymentReturnPage(attr.landing_page)) {
+      const safe = safeAttributionUrl(attr.landing_page);
+      const def = ATTRIBUTION_FIELDS.find(field => field.key === "conversion_page");
+      if (safe && def) { entries.push({ def, value: safe }); seen.add(def.key); }
     }
 
     // Anything unknown (and not an ID) — surface with a generic icon so admins
     // can still see new attribution fields without redeploying this dialog.
     for (const [k, v] of Object.entries(attr)) {
-      if (seen.has(k) || HIDDEN_ATTRIBUTION_KEYS.has(k)) continue;
+      if (seen.has(k) || HIDDEN_ATTRIBUTION_KEYS.has(k) || (k === "landing_page" && !acquisition)) continue;
       if (v == null || v === "") continue;
+      const value = urlKeys.has(k) ? safeAttributionUrl(String(v)) : String(v);
+      if (!value) continue;
       entries.push({
-        def: { key: k, label: prettifyKey(k), Icon: Filter, span: String(v).length > 60 ? 2 : 1, ltr: /[A-Za-z0-9_/.:?=&-]/.test(String(v)) && !/[؀-ۿ]/.test(String(v)) },
-        value: String(v),
+        def: { key: k, label: prettifyKey(k), Icon: Filter, span: value.length > 60 ? 2 : 1, ltr: /[A-Za-z0-9_/.:?=&-]/.test(value) && !/[؀-ۿ]/.test(value) },
+        value,
       });
     }
 
