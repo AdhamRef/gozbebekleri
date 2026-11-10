@@ -46,11 +46,12 @@ jobs:
         run: npm run typecheck:ported-systems
       - name: Run offline, synthetic system regressions
         run: npm run test:ported-systems
-      - name: Compile Next routes without production index writes
-        run: npx --no-install next build
+      - name: Install isolated Mongo replica for DB-backed build and signed payment checks
+        run: npm install --no-save --package-lock=false --ignore-scripts --legacy-peer-deps --no-audit --no-fund mongodb-memory-server@10.1.4
+      - name: Compile Next routes with reachable isolated MongoDB, reject ignored DB errors
+        run: node scripts/qa-build-with-isolated-mongo.mjs
       - name: Mandatory signed Stripe refund HTTP and MongoDB transaction regressions
         run: |
-          npm install --no-save --package-lock=false --ignore-scripts --legacy-peer-deps --no-audit --no-fund mongodb-memory-server@10.1.4
           DATABASE_URL=mongodb://127.0.0.1:27018/isolated_refunds npx --no-install prisma generate --schema prisma/schema.prisma
           # The Stripe HTTP fixture imports server-only modules under Node; select
           # React's server export condition without changing application security boundaries.
