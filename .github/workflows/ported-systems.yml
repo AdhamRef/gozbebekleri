@@ -1,9 +1,9 @@
 name: Transferred systems verification
 on:
   push:
-    branches: [port/minber-systems-20261104, integration/unified-systems-20261107]
+    branches: [port/minber-systems-20261104, integration/unified-systems-20261107, integration/goz-finance-security-rc-20261109, fix/goz-stripe-qa-react-server-20261109]
   pull_request:
-    branches: [main, integration/unified-systems-20261107, fix/goz-report-profile-settlement-20261108, audit/goz-parity-finance-20261109]
+    branches: [main, integration/unified-systems-20261107, fix/goz-report-profile-settlement-20261108, audit/goz-parity-finance-20261109, audit/goz-round2-idempotency-locale-20261109, integration/goz-finance-security-rc-20261109]
   workflow_dispatch:
 permissions:
   contents: read
@@ -52,4 +52,6 @@ jobs:
         run: |
           npm install --no-save --package-lock=false --ignore-scripts --legacy-peer-deps --no-audit --no-fund mongodb-memory-server@10.1.4
           DATABASE_URL=mongodb://127.0.0.1:27018/isolated_refunds npx --no-install prisma generate --schema prisma/schema.prisma
-          node --import tsx scripts/qa-stripe-signed-http-isolated.mjs
+          # The Stripe HTTP fixture imports server-only modules under Node; select
+          # React's server export condition without changing application security boundaries.
+          node --conditions=react-server --import tsx scripts/qa-stripe-signed-http-isolated.mjs

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { safeAcquisitionLandingPage } from "@/lib/attribution/sanitize";
 import {
   getMetaCapiCredentials,
   sendMetaCapiEvent,
@@ -117,7 +118,7 @@ export async function sendDonationServerConversions(donationId: string, options:
 
     const creds = await getMetaCapiCredentials();
     const attribution = (row.attribution ?? undefined) as Attribution | undefined;
-    const eventSourceUrl = getStr(attribution, "landing_page");
+    const eventSourceUrl = safeAcquisitionLandingPage(attribution ?? null) ?? "https://www.gozbebekleri.org/";
     const eventTime = Math.floor((row.paidAt ?? new Date()).getTime() / 1000);
     const currency = (row.currency || "USD").toUpperCase();
     const contentName = primaryContentName(row);
@@ -193,7 +194,7 @@ export async function sendDonationFailedConversions(donationId: string, options:
     }
 
     const attribution = (row.attribution ?? undefined) as Attribution | undefined;
-    const eventSourceUrl = getStr(attribution, "landing_page");
+    const eventSourceUrl = safeAcquisitionLandingPage(attribution ?? null) ?? "https://www.gozbebekleri.org/";
     const eventTime = Math.floor(((row as { updatedAt?: Date }).updatedAt ?? row.createdAt ?? new Date()).getTime() / 1000);
     const contentName = primaryContentName(row);
     const { ids, contents } = buildContents(row);
