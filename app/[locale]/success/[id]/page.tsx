@@ -266,7 +266,9 @@ const DonationSuccessPage = () => {
     if (!id) return;
     if (linkAttemptedRef.current) return;
     if (sessionStatus !== 'authenticated') return;
-    if (!donation?.donor?.id) return;
+    // Guest GET deliberately masks donor.id. The signed claim cookie,
+    // not that field or the donation ID, authorizes the linking endpoint.
+    if (!donation?.id) return;
     if (session?.user?.id === donation.donor.id) return;
 
     linkAttemptedRef.current = true;
