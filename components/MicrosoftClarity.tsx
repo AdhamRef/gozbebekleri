@@ -25,10 +25,14 @@ export default function MicrosoftClarity() {
     const refresh = () => setConsentRevision(value => value + 1);
     window.addEventListener("storage", refresh);
     window.addEventListener("focus", refresh);
+    window.addEventListener("popstate", refresh);
+    window.addEventListener("hashchange", refresh);
     window.addEventListener("goz:analytics-consent-change", refresh);
     return () => {
       window.removeEventListener("storage", refresh);
       window.removeEventListener("focus", refresh);
+      window.removeEventListener("popstate", refresh);
+      window.removeEventListener("hashchange", refresh);
       window.removeEventListener("goz:analytics-consent-change", refresh);
     };
   }, []);
@@ -37,7 +41,7 @@ export default function MicrosoftClarity() {
     // or without an explicit consent signal from the approved CMP.
     let consent: string | null = null;
     try { consent = window.localStorage.getItem("goz_analytics_consent"); } catch {}
-    if (!mayInitializeClarity(pathname, consent)) {
+    if (!mayInitializeClarity(pathname, consent, window.location.search)) {
       if (window.__clarityInitialized && !window.__clarityStopped) {
         try {
           (window as Window & { clarity?: (...args: unknown[]) => void }).clarity?.("stop");
