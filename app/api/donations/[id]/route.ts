@@ -197,7 +197,10 @@ export async function PUT(
       );
     }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
     const { status } = body;
 
     const currentDonation = await prisma.donation.findUnique({
@@ -217,8 +220,20 @@ export async function PUT(
       );
     }
 
-    const isAdmin = isRevenueDashboardUser(session);
+    // Revenue-only access is READ access. Subscription mutation needs the
+    // explicit donationsEdit permission, or ownership with limited actions.
+    const isAdmin = session.user.role === 'ADMIN';
+    const canReadFinancial = isRevenueDashboardUser(session);
+    const canEditFinancial = userHasDashboardPermission(session.user, 'donationsEdit');
     const isOwner = session.user.id === currentDonation.donorId;
+
+    // Check server-side authorization before empty-update read responses,
+    // subscription details, or any mutable operation.
+    if (!canReadFinancial && !canEditFinancial && !isOwner) {
+      return NextResponse.json({ error: 'Forbidden' }, {
+        status: 403, headers: { 'Cache-Control': 'no-store' },
+      });
+    }
 
     if (!currentDonation.subscriptionId) {
       return NextResponse.json(
@@ -246,10 +261,73 @@ export async function PUT(
       updates.status = status as SubscriptionStatus;
     }
 
-    if (Object.keys(updates).length === 0) {
+    if (Object.keys(updates).length > 0) {
+      // A STAFF member granted 'revenue' can read the monthly record but
+      // must not change it unless separately granted 'donationsEdit'.
+      if (!isOwner && !canEditFinancial) {
+        return NextResponse.json({ error: 'Forbidden' }, {
+          status: 403, headers: { 'Cache-Control': 'no-store' },
+        });
+      }
+      // Cancellation always requires ADMIN; donor and STAFF edit permission
+      // alone must not upgrade to the destructive cancellation privilege.
+      if (status === 'CANCELLED' && !isAdmin) {
+        return NextResponse.json({ error: 'Forbidden' }, {
+          status: 403, headers: { 'Cache-Control': 'no-store' },
+        });
+      }
+    }
+
+    // Public subscription contract: explicit fields only, including nested records.
+    // Never spread a Prisma Donation row: new internal fields must stay private.
+    const safeSubscriptionResponse = (row: {
+      id: string; amount?: unknown; totalAmount?: unknown; currency?: unknown;
+      paidAt?: unknown; createdAt?: unknown; paymentMethod?: unknown;
+      subscriptionId?: string | null; donor?: { name?: string | null; email?: string | null; image?: string | null } | null;
+      items?: Array<{ id?: unknown; campaignId?: unknown; amount?: unknown; campaign?: unknown }>; categoryItems?: Array<{ id?: unknown; categoryId?: unknown; amount?: unknown; category?: unknown }>;
+      subscription?: { status?: string | null; nextBillingDate?: Date | null; lastBillingDate?: Date | null } | null;
+    }) => ({
+      id: row.id,
+      amount: row.amount,
+      totalAmount: row.totalAmount,
+      currency: row.currency,
+      paidAt: row.paidAt,
+      createdAt: row.createdAt,
+      paymentMethod: row.paymentMethod ?? 'CARD',
+      subscriptionId: row.subscriptionId ?? null,
+      donor: row.donor ? { name: row.donor.name ?? null, email: row.donor.email ?? null, image: row.donor.image ?? null } : null,
+      items: (row.items ?? []).map((item) => ({
+        id: item.id, campaignId: item.campaignId, amount: item.amount,
+        campaign: item.campaign && typeof item.campaign === 'object' ? (() => {
+          const campaign = item.campaign as Record<string, unknown>;
+          return { title: campaign.title, images: campaign.images,
+            translations: Array.isArray(campaign.translations) ? campaign.translations.map((entry: Record<string, unknown>) => ({
+              locale: entry.locale, title: entry.title,
+            })) : [] };
+        })() : null,
+      })),
+      categoryItems: (row.categoryItems ?? []).map((item) => ({
+        id: item.id, categoryId: item.categoryId, amount: item.amount,
+        category: item.category && typeof item.category === 'object' ? (() => {
+          const category = item.category as Record<string, unknown>;
+          return { name: category.name, image: category.image,
+            translations: Array.isArray(category.translations) ? category.translations.map((entry: Record<string, unknown>) => ({
+              locale: entry.locale, name: entry.name,
+            })) : [] };
+        })() : null,
+      })),
+      type: 'MONTHLY' as const,
+      // Legacy API contract: top-level status is the subscription state.
+      status: row.subscription?.status ?? null,
+      nextBillingDate: row.subscription?.nextBillingDate ?? null,
+      lastBillingDate: row.subscription?.lastBillingDate ?? null,
+    });
+    const responseHeaders = { 'Cache-Control': 'private, no-store' };
+
+    if (Object.keys(updates).length === 0 || sub.status === status) {
+      // An identical update is a safe replay; return the state without a write.
       const out = await prisma.donation.findUnique({
-        where: { id },
-        omit: { cardDetails: true },
+        where: { id }, omit: { cardDetails: true },
         include: {
           donor: { select: { name: true, email: true, image: true } },
           subscription: { select: { status: true, nextBillingDate: true, lastBillingDate: true } },
@@ -257,82 +335,69 @@ export async function PUT(
           categoryItems: { include: { category: { select: { name: true, image: true, translations: { select: { locale: true, name: true } } } } } },
         },
       });
-      if (!out) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-      const s = out.subscription;
-      return NextResponse.json({
-        ...out,
-        type: 'MONTHLY' as const,
-        status: s?.status ?? null,
-        nextBillingDate: s?.nextBillingDate ?? null,
-        lastBillingDate: s?.lastBillingDate ?? null,
-      });
+      if (!out) return NextResponse.json({ error: 'Donation unavailable' }, { status: 404 });
+      return NextResponse.json(safeSubscriptionResponse(out), { headers: responseHeaders });
     }
 
-    if (!isAdmin && !isOwner) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      );
-    }
-
-    if (!isAdmin && isOwner && status === 'CANCELLED') {
-      return NextResponse.json(
-        { error: 'Only admin can cancel a subscription' },
-        { status: 403 }
-      );
-    }
-
-    await prisma.subscription.update({
-      where: { id: currentDonation.subscriptionId },
+    // Compare-and-set prevents concurrent requests from overwriting one
+    // another after both read the same subscription state. The caller must
+    // refresh GET when another operation wins the race.
+    const writeResult = await prisma.subscription.updateMany({
+      where: { id: currentDonation.subscriptionId!, status: sub.status },
       data: updates,
     });
-
-    const subActor = isAdmin
-      ? auditActorFromDashboardSession(session!)
-      : auditActorFromSiteSession(session!);
-    const subStream = isAdmin
-      ? ("TEAM" as const)
-      : auditStreamForRole(subActor.actorRole);
-    await writeAuditLog({
-      ...subActor,
-      action: "SUBSCRIPTION_UPDATE",
-      messageAr: `${subActor.actorName ?? "مستخدم"} عدّل الاشتراك الشهري المرتبط بالتبرع (${Object.keys(updates).join("، ")})`,
-      entityType: "Subscription",
-      entityId: currentDonation.subscriptionId!,
-      metadata: {
-        donationId: id,
-        ...(updates.status !== undefined && { status: updates.status }),
-      },
-      stream: subStream,
-    });
-
-    const updatedDonation = await prisma.donation.findUnique({
-      where: { id },
-      omit: { cardDetails: true },
-      include: {
-        donor: { select: { name: true, email: true, image: true } },
-        subscription: { select: { status: true, nextBillingDate: true, lastBillingDate: true } },
-        items: { include: { campaign: { select: { title: true, images: true, translations: { select: { locale: true, title: true } } } } } },
-        categoryItems: { include: { category: { select: { name: true, image: true, translations: { select: { locale: true, name: true } } } } } },
-      },
-    });
-
-    if (!updatedDonation) {
-      return NextResponse.json({ error: 'Donation not found' }, { status: 404 });
+    if (writeResult.count !== 1) {
+      return NextResponse.json({ error: 'SUBSCRIPTION_STATE_CONFLICT' }, {
+        status: 409, headers: { 'Cache-Control': 'no-store' },
+      });
+    }
+    const updatedSubscription = { ...sub, status: updates.status ?? sub.status };
+    try {
+      const subActor = isAdmin
+        ? auditActorFromDashboardSession(session!)
+        : auditActorFromSiteSession(session!);
+      await writeAuditLog({
+        ...subActor,
+        action: "SUBSCRIPTION_UPDATE",
+        messageAr: `${subActor.actorName ?? "مستخدم"} عدّل الاشتراك الشهري المرتبط بالتبرع (status)`,
+        entityType: "Subscription", entityId: currentDonation.subscriptionId!,
+        metadata: { donationId: id, status: updates.status },
+        stream: isAdmin ? ("TEAM" as const) : auditStreamForRole(subActor.actorRole),
+      });
+    } catch (auditError) {
+      // Record the operational failure, but do not misreport the committed write.
+      console.error('Subscription updated; audit log failed:', auditError);
     }
 
-    const s = updatedDonation.subscription;
-    return NextResponse.json({
-      ...updatedDonation,
-      type: 'MONTHLY' as const,
-      status: s?.status ?? null,
-      nextBillingDate: s?.nextBillingDate ?? null,
-      lastBillingDate: s?.lastBillingDate ?? null,
-    });
+    try {
+      const updatedDonation = await prisma.donation.findUnique({
+        where: { id }, omit: { cardDetails: true },
+        include: {
+          donor: { select: { name: true, email: true, image: true } },
+          subscription: { select: { status: true, nextBillingDate: true, lastBillingDate: true } },
+          items: { include: { campaign: { select: { title: true, images: true, translations: { select: { locale: true, title: true } } } } } },
+          categoryItems: { include: { category: { select: { name: true, image: true, translations: { select: { locale: true, name: true } } } } } },
+        },
+      });
+      if (updatedDonation) return NextResponse.json(safeSubscriptionResponse(updatedDonation), { headers: responseHeaders });
+    } catch (readError) {
+      console.error('Subscription updated; response reload failed:', readError);
+    }
+    // The update was committed. Respond with the confirmed subscription result,
+    // never an unverified 500 or an unfiltered donation object.
+    return NextResponse.json(safeSubscriptionResponse({
+      id: currentDonation.id,
+      subscriptionId: currentDonation.subscriptionId,
+      subscription: {
+        status: updatedSubscription.status,
+        nextBillingDate: updatedSubscription.nextBillingDate,
+        lastBillingDate: updatedSubscription.lastBillingDate,
+      },
+    }), { headers: responseHeaders });
   } catch (error) {
     console.error('Error updating donation:', error);
     return NextResponse.json(
-      { error: 'Failed to update donation', details: (error as Error).message },
+      { error: 'Failed to update donation' },
       { status: 500 }
     );
   }
