@@ -65,14 +65,14 @@ state.prisma={
  update:async()=>{state.writes++;throw Error("GET MUST NOT WRITE")},
  updateMany:async()=>{state.writes++;throw Error("GET MUST NOT WRITE")},
  },
- subscription:{update:async()=>{state.writes++;return{}}},
+ subscription:{updateMany:async({where,data})=>{if(original.subscription.status!==where.status)return{count:0};state.writes++;original.subscription.status=data.status;return{count:1}}},
  $transaction:async()=>{state.writes++;throw Error("PUBLIC ROUTE MUST NOT SETTLE")},
  campaign:{update:async()=>{state.writes++;throw Error("NO CAMPAIGN WRITES")}},
  category:{update:async()=>{state.writes++;throw Error("NO CATEGORY WRITES")}},
 };
 globalThis.donationFixture=state;
 const {issueGuestReceiptGrant}=await import("../lib/donations/guest-payment-grant.ts");
-const {GET}=await import("../app/api/donations/[id]/route.ts");
+const {GET,PUT}=await import("../app/api/donations/[id]/route.ts");
 let cookie="";
 issueGuestReceiptGrant({cookies:{set:({name,value})=>cookie=name+"="+value}},donationId);
 const server=createServer(async(req,res)=>{
@@ -86,7 +86,7 @@ const server=createServer(async(req,res)=>{
   return found?{value:found.slice(name.length+1)}:undefined;
  }};
  try{
- const out=await GET(request,{params:Promise.resolve({id:donationId})});
+ const out=await(req.method==="PUT"?PUT(request,{params:Promise.resolve({id:donationId})}):GET(request,{params:Promise.resolve({id:donationId})}));
  res.writeHead(out.status,Object.fromEntries(out.headers));
  res.end(Buffer.from(await out.arrayBuffer()));
  }catch(error){res.writeHead(500);res.end(String(error))}
@@ -162,6 +162,18 @@ try{
  assert.equal(state.writes,0,"No financial or subscription writes across 20 concurrent public reads");
  assert.equal(state.stripeCalls,0);
  pass("20 concurrent authorized GET requests cause zero database mutations and zero Stripe calls");
+ state.session={user:{id:owner,role:"DONOR"}};
+ const mixed=await Promise.all([
+   call("PUT",{status:"PAUSED"}),
+   ...Array.from({length:20},()=>call("GET"))
+ ]);
+ assert.ok(mixed.every(x=>x.status===200),JSON.stringify(mixed.map(x=>x.status)));
+ assert.equal(state.writes,1,"Only the authorized PUT may write");
+ assert.equal(state.stripeCalls,0);
+ const afterWrite=await call("GET");
+ assert.equal(afterWrite.payload.subscriptionStatus,"PAUSED");
+ pass("20 concurrent GET with authorized PUT performs exactly one write and zero Stripe calls");
+
  console.log(JSON.stringify({summary:"DONATION_ACCESS_HTTP_PASS",passed,readCalls:state.reads,writes:state.writes,stripeCalls:state.stripeCalls}));
 } finally {
  await new Promise(ok=>server.close(ok));
