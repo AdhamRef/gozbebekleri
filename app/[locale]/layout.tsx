@@ -25,8 +25,6 @@ import PreferredLangSync from "@/components/PreferredLangSync";
 import SyncHtmlDir from "@/components/SyncHtmlDir";
 import { MarketingRuntime } from "@/components/MarketingRuntime";
 import { CurrencyProvider } from "@/context/CurrencyContext";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 
 // NOTE: this map must stay static (bundled JSON imports). When promoting a future
 // locale from `lib/locales.ts` to public, add its `import` above + an entry here.
@@ -107,8 +105,6 @@ export default async function Rootlayout({
               <Toaster position="top-center" />
             </SessionProvider>
           </CurrencyProvider>
-          <Analytics />
-          <SpeedInsights />
         </div>
       </MarketingRuntime>
     </IntlProviderClient>
