@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { isSensitiveClarityPath, mayInitializeClarity } from "@/lib/tracking/clarity-privacy-policy";
 import Clarity from "@microsoft/clarity";
@@ -10,6 +10,7 @@ declare global {
   interface Window {
     __clarityInitialized?: boolean;
     __clarityProjectId?: string;
+    __clarityStopped?: boolean;
   }
 }
 
@@ -19,22 +20,43 @@ declare global {
  */
 export default function MicrosoftClarity() {
   const pathname = usePathname();
+  const [consentRevision, setConsentRevision] = useState(0);
   useEffect(() => {
-    // If the page becomes sensitive after an SPA navigation, ask the hosted
-    // provider to stop. Until its network behavior is verified on staging,
-    // recording is NOT certified as safe on navigation.
-    if (isSensitiveClarityPath(pathname)) {
-      if (window.__clarityInitialized) {
+    const refresh = () => setConsentRevision(value => value + 1);
+    window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("goz:analytics-consent-change", refresh);
+    return () => {
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("goz:analytics-consent-change", refresh);
+    };
+  }, []);
+  useEffect(() => {
+    // Conservative privacy gate: no Clarity init/start on sensitive pages
+    // or without an explicit consent signal from the approved CMP.
+    let consent: string | null = null;
+    try { consent = window.localStorage.getItem("goz_analytics_consent"); } catch {}
+    if (!mayInitializeClarity(pathname, consent)) {
+      if (window.__clarityInitialized && !window.__clarityStopped) {
         try {
           (window as Window & { clarity?: (...args: unknown[]) => void }).clarity?.("stop");
+        } catch {}
+        window.__clarityStopped = true;
+      }
+      return;
+    }
+    if (window.__clarityInitialized) {
+      if (window.__clarityStopped) {
+        // Restart ONLY on a consented public page. Provider network validation
+        // is still required to prove stopping actually ceased uploads.
+        try {
+          (window as Window & { clarity?: (...args: unknown[]) => void }).clarity?.("start");
+          window.__clarityStopped = false;
         } catch {}
       }
       return;
     }
-    if (window.__clarityInitialized) return;
-    let consent: string | null = null;
-    try { consent = window.localStorage.getItem("goz_analytics_consent"); } catch {}
-    if (!mayInitializeClarity(pathname, consent)) return;
     const controller = new AbortController();
     void fetch("/api/tracking/config", {
       cache: "no-store", credentials: "same-origin", signal: controller.signal,
@@ -51,11 +73,12 @@ export default function MicrosoftClarity() {
       }
       Clarity.init(id);
       window.__clarityInitialized = true;
+      window.__clarityStopped = false;
       window.__clarityProjectId = id;
     }).catch(() => {
       // Tracking must not break navigation or expose provider details.
     });
     return () => controller.abort();
-  }, [pathname]);
+  }, [pathname, consentRevision]);
   return null;
 }
