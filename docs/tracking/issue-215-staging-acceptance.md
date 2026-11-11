@@ -24,3 +24,10 @@
 - This tracking PR does not authorize live or shared-Preview writes.
 - The `main` tree contains an unrelated unresolved merge marker in `app/api/messages/route.ts`; full staging build on this branch requires the upstream build fix to be approved separately.
 - Finance/security reviewers must approve deduplication evidence and privacy/consent configuration before enabling recorders on Production.
+
+## Consent and SPA privacy gate (new acceptance condition)
+- Session recording is **fail-closed** unless a site-approved CMP writes the exact localStorage value `goz_analytics_consent=granted` after explicit visitor consent. Missing/denied values skip SDK initialization.
+- A recorded consent granted at rest is not itself proof of legal/technical consent collection: approve CMP integration and consent withdrawal UX before any Production enabling.
+- Account, admin, auth, donation checkout, payment, success, receipt and subscription paths are excluded from Clarity initial recording. SPA entry after an existing public recording issues a best-effort `clarity('stop')`, but **requires network validation** that this genuinely halts capture. Without that validation, fail the release gate rather than assuming masking is enough.
+- The original Clarity project and GTM IDs remain configured during migration; withholding session replay until consent is explicit intentionally changes recording behavior for privacy protection.
+- Test both entry directly on sensitive pages and navigation from a consenting marketing page into a sensitive page; ensure no Clarity payloads containing user names, email addresses, donation amounts or tokenized URLs.
