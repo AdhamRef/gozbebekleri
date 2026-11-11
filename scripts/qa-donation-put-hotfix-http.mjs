@@ -31,14 +31,14 @@ const modules={
 };
 for(const [file,source] of Object.entries(modules))writeFileSync(resolve(dir,file),source);
 registerHooks({resolve(spec,ctx,next){const file=aliases.get(spec);return file?{url:pathToFileURL(resolve(dir,file)).href,shortCircuit:true}:next(spec,ctx)}});
-let writes=0;
+let writes=0, reads=0, failRead=false;
 const donation={
  id,donorId:owner,subscriptionId:"dddddddddddddddddddddddd",status:"PAID",
  subscription:{id:"dddddddddddddddddddddddd",status:"ACTIVE",nextBillingDate:null,lastBillingDate:null},
  amount:20,totalAmount:20,currency:"USD",items:[],categoryItems:[],paidAt:new Date(),
 };
 globalThis.fixture={session:null,prisma:{
- donation:{findUnique:async({where})=>where.id===id?structuredClone(donation):null,
+ donation:{findUnique:async({where})=>{reads++;if(failRead)throw Error("MONGO_SECRET_INTERNAL_FINANCIAL_MARKER");return where.id===id?structuredClone(donation):null;},
  update:async()=>{writes++;throw Error("Unexpected mutation")}},
  subscription:{update:async()=>{writes++;return{}}},
  $transaction:async()=>{writes++;throw Error("Unexpected transaction")},
@@ -91,6 +91,44 @@ try{
  assert.equal((await put({})).status,200);passed++;
  globalThis.fixture.session={user:{id:stranger,role:"ADMIN"}};
  assert.equal((await put({})).status,200);passed++;
+ // Reject unauthenticated requests before any database read or write.
+ globalThis.fixture.session=null;
+ const beforeGuestReads=reads;
+ for(const body of [{},{status:"ACTIVE"},{status:"CANCELLED"}]){
+  const r=await put(body);
+  assert.equal(r.status,401,r.text);assert.equal(reads,beforeGuestReads);assert.equal(writes,0);passed++;
+ }
+ // All status variants are denied before revealing subscription metadata.
+ globalThis.fixture.session={user:{id:stranger,role:"DONOR"}};
+ for(const body of [{status:"CANCELLED"},{status:"INVALID"},{status:"ACTIVE"},{status:"PAUSED"},{notAStatus:"oops"}]){
+  const r=await put(body);assert.equal(r.status,403,r.text);
+  assert.equal(r.text.includes("MONGO_SECRET_INTERNAL_FINANCIAL_MARKER"),false);
+  assert.equal(writes,0);passed++;
+ }
+ // Authorized owners see a safe validation response; no writes for malformed data.
+ globalThis.fixture.session={user:{id:owner,role:"DONOR"}};
+ for(const body of [{status:"INVALID"},{status:null},{status:123}]){
+  const r=await put(body);assert.equal(r.status,400,r.text);assert.equal(writes,0);passed++;
+ }
+ // Unrelated, one-time donations must not disclose details before authorization.
+ donation.subscriptionId=null; donation.subscription=null;
+ globalThis.fixture.session={user:{id:stranger,role:"DONOR"}};
+ for(const body of [{},{status:"ACTIVE"}]){
+  const r=await put(body);assert.equal(r.status,403,r.text);
+  assert.doesNotMatch(r.text,/one-time|subscription|totalAmount|dddddddddddd|donor/);
+  assert.equal(writes,0);passed++;
+ }
+ globalThis.fixture.session={user:{id:owner,role:"DONOR"}};
+ assert.equal((await put({})).status,400);assert.equal(writes,0);passed++;
+ donation.subscriptionId="dddddddddddddddddddddddd";
+ donation.subscription={id:"dddddddddddddddddddddddd",status:"ACTIVE",nextBillingDate:null,lastBillingDate:null};
+ // Database exception is not reflected back in HTTP JSON.
+ failRead=true;
+ const failed=await put({});
+ assert.equal(failed.status,500,failed.text);
+ assert.doesNotMatch(failed.text,/MONGO_SECRET_INTERNAL_FINANCIAL_MARKER|stack|details|dddddddddddd/);
+ assert.equal(writes,0);passed++;
+ failRead=false;
  console.log(JSON.stringify({summary:"DONATION_PUT_HOTFIX_HTTP_PASS",passed,writes}));
 }finally{
  await new Promise(ok=>server.close(ok));
