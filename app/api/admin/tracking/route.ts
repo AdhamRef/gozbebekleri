@@ -290,16 +290,16 @@ export async function PUT(request: NextRequest) {
     // first edited field is unrelated, unless the operator explicitly
     // supplies new IDs/enabled states.
     if (!existing || !Object.hasOwn(existing, "clarityProjectId")) {
-      bodyRaw.clarityProjectId ??= effectiveClarity.clarityProjectId;
+      if (!Object.hasOwn(bodyRaw, "clarityProjectId")) bodyRaw.clarityProjectId = effectiveClarity.clarityProjectId;
     }
     if (!existing || !Object.hasOwn(existing, "clarityEnabled")) {
-      bodyRaw.clarityEnabled ??= effectiveClarity.clarityEnabled;
+      if (!Object.hasOwn(bodyRaw, "clarityEnabled")) bodyRaw.clarityEnabled = effectiveClarity.clarityEnabled;
     }
     if (!existing || !Object.hasOwn(existing, "googleTagManagerId")) {
-      bodyRaw.googleTagManagerId ??= effectiveGtm.googleTagManagerId;
+      if (!Object.hasOwn(bodyRaw, "googleTagManagerId")) bodyRaw.googleTagManagerId = effectiveGtm.googleTagManagerId;
     }
     if (!existing || !Object.hasOwn(existing, "googleTagManagerEnabled")) {
-      bodyRaw.googleTagManagerEnabled ??= effectiveGtm.googleTagManagerEnabled;
+      if (!Object.hasOwn(bodyRaw, "googleTagManagerEnabled")) bodyRaw.googleTagManagerEnabled = effectiveGtm.googleTagManagerEnabled;
     }
     const update = buildUpdateFromBody(
       {
