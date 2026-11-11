@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {
-  canIssueGuestPaymentGrant, issueGuestReceiptGrant, hasGuestReceiptGrant,
-  issueGuestClaimGrant, hasGuestClaimGrant, guestReceiptCookieName,
-} from "../lib/donations/guest-payment-grant.ts";
+const grantModule=await import("../lib/donations/guest-payment-grant.ts");
+const {canIssueGuestPaymentGrant,issueGuestReceiptGrant,hasGuestReceiptGrant,
+ issueGuestClaimGrant,hasGuestClaimGrant,guestReceiptCookieName}=grantModule.default??grantModule;
 
 const id="aaaaaaaaaaaaaaaaaaaaaaaa", other="bbbbbbbbbbbbbbbbbbbbbbbb";
 const prior=process.env.GOZ_GUEST_PAYMENT_KEYS, originalDateNow=Date.now;
