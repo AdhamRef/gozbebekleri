@@ -129,7 +129,28 @@ try{
  assert.doesNotMatch(failed.text,/MONGO_SECRET_INTERNAL_FINANCIAL_MARKER|stack|details|dddddddddddd/);
  assert.equal(writes,0);passed++;
  failRead=false;
- console.log(JSON.stringify({summary:"DONATION_PUT_HOTFIX_HTTP_PASS",passed,writes}));
+ // "revenue" permits reading but must never implicitly grant mutation.
+ globalThis.fixture.session={user:{id:stranger,role:"STAFF",dashboardPermissions:["revenue"]}};
+ for(const status of ["ACTIVE","PAUSED","CANCELLED"]){
+  const r=await put({status});assert.equal(r.status,403,r.text);
+  assert.equal(writes,0);passed++;
+ }
+ // Explicit edit privilege can pause but cannot cancel a subscription.
+ globalThis.fixture.session={user:{id:stranger,role:"STAFF",dashboardPermissions:["donationsEdit"]}};
+ const staffRead=await put({});assert.equal(staffRead.status,200,staffRead.text);passed++;
+ assert.equal((await put({status:"CANCELLED"})).status,403);
+ assert.equal(writes,0);passed++;
+ assert.equal((await put({status:"PAUSED"})).status,200);
+ assert.equal(writes,1);passed++;
+ // Owner can resume a subscription but never cancel it.
+ globalThis.fixture.session={user:{id:owner,role:"DONOR"}};
+ assert.equal((await put({status:"ACTIVE"})).status,200);
+ assert.equal(writes,2);passed++;
+ // ADMIN remains the only role able to cancel.
+ globalThis.fixture.session={user:{id:stranger,role:"ADMIN"}};
+ assert.equal((await put({status:"CANCELLED"})).status,200);
+ assert.equal(writes,3);passed++;
+ console.log(JSON.stringify({summary:"DONATION_PUT_HOTFIX_HTTP_PASS",passed,authorizedWrites:writes,unauthorizedWrites:0}));
 }finally{
  await new Promise(ok=>server.close(ok));
  rmSync(dir,{recursive:true,force:true});
