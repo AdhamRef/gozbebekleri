@@ -6,7 +6,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
-import { userHasDashboardPermission } from '@/lib/dashboard/permissions';
 import jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import type { Locale } from 'date-fns';
